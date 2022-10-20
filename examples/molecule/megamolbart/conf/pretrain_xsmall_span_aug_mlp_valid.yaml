@@ -1,0 +1,46 @@
+defaults:
+  - pretrain_xsmall_span_aug
+
+model:
+  validation:
+    validation_enabled: True
+    datasets:
+      - name: ESOL
+        class: MLPValidationCallback
+        enabled: True
+        csv_path: '/data/cheminformatics/benchmark/csv_data/benchmark_MoleculeNet_ESOL.csv'
+        smis_column: 'SMILES'
+        target_column: 'measured log solubility in mols per litre'
+        num_epochs: 50
+        test_fraction: 0.25
+        batch_size: 32
+        learning_rate: 0.001
+        loss_func: MSELoss
+        optimizer: Adam
+        check_val_every_n_epoch: 10
+      - name: FreeSolv
+        class: MLPValidationCallback
+        enabled: True
+        csv_path: '/data/cheminformatics/benchmark/csv_data/benchmark_MoleculeNet_FreeSolv.csv'
+        smis_column: 'SMILES'
+        target_column: 'y'
+        num_epochs: 50
+        test_fraction: 0.25
+        batch_size: 32
+        learning_rate: 0.001
+        loss_func: MSELoss
+        optimizer: Adam
+        check_val_every_n_epoch: 10
+      - name: Lipophilicity
+        class: MLPValidationCallback
+        enabled: True
+        csv_path: '/data/cheminformatics/benchmark/csv_data/benchmark_MoleculeNet_Lipophilicity.csv'
+        smis_column: 'SMILES'
+        target_column: 'exp'
+        num_epochs: 10
+        test_fraction: 0.25
+        batch_size: 32
+        learning_rate: 0.001
+        loss_func: MSELoss
+        optimizer: Adam
+        check_val_every_n_epoch: 10

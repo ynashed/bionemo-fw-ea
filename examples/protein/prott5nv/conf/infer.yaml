@@ -1,0 +1,18 @@
+name: ProtT5_Inference
+desc: Minimum configuration for initializing a ProtT5 model for inference.
+
+trainer:
+  precision: 16
+  devices: 1 # must be set to accommodate the total model parallel size
+  num_nodes: 1 # must be set to accommodate the total model parallel size
+
+model:
+  tensor_model_parallel_size: 1
+  pipeline_model_parallel_size: 1
+  tokenizer:
+    vocab_path: /model/protein/prott5nv/vocab/protein_sequence.vocab
+    model_path: /model/protein/prott5nv/vocab/protein_sequence_sentencepiece.model
+  micro_batch_size: null
+  global_batch_size: null
+  downstream_task:
+    input_base_model: "/model/protein/prott5nv/prott5nv.nemo"

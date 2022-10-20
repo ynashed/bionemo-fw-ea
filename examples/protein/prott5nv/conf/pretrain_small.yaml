@@ -1,0 +1,26 @@
+defaults:
+  - base_config
+restore_from_path: null # used when starting from a .nemo file
+
+model:
+  tokenizer:
+    library: 'sentencepiece'
+    type: null
+    model: /model/protein/prott5nv/vocab/protein_sequence_sentencepiece.model
+    vocab_file: /model/vocab/protein_sequence.vocab
+  data:
+    # Path to data must be specified by the user.
+    data_url: 'https://ftp.uniprot.org/pub/databases/uniprot/uniref/uniref50/uniref50.fasta.gz'
+    dataset_path: /data/uniref2022_05 # parent directory for data, contains train / val / test folders. Needs to be writeable for index creation.
+    dataset: # inclusive range of data files to load or can load a single file, e.g. x000.csv
+      train: x[000..049]
+      test: x[000..049]
+      val: x[000..049]
+    data_impl_kwargs: # currently used only for text_mmap, csv_mmap (should be data_impl dependant)
+        newline_int: 10 # byte-value of newline
+        header_lines: 1 # skip first N header lines
+        workers: null # number of workers when creating missing index files (null defaults to cpu_num // 2)
+        sort_dataset_paths: False # if True datasets will be sorted by name
+        data_col: 3 # specifies which column in the csv file contains training data, 0-based
+        data_sep: ',' # string to split text into columns
+    num_workers: 0 # number of workers to be used for dataset preprocessing. 0 -- all available workers

@@ -19,7 +19,7 @@ import re
 from setuptools import setup, find_packages
 import importlib.util
 
-package_dir = 'nemo_chem'
+package_dir = 'bionemo'
 
 spec = importlib.util.spec_from_file_location('package_info', os.path.join(package_dir, 'package_info.py'))
 package_info = importlib.util.module_from_spec(spec)

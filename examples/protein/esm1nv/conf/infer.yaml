@@ -1,0 +1,12 @@
+name: ESM1nv_Inference
+desc: Minimum configuration for initializing a ESM1nv model for inference.
+
+trainer:
+  precision: 16
+  devices: 1 # must be set to accommodate the total model parallel size
+  num_nodes: 1 # must be set to accommodate the total model parallel size
+
+model:
+  post_process: False
+  downstream_task:
+    input_base_model: "/model/protein/esm1nv/esm1nv.nemo"
