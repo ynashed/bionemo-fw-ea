@@ -16,10 +16,8 @@
 import gzip
 import pytest
 import tempfile
-import numpy as np
-import numpy.testing as npt
 from bionemo.data.fasta_dataset import (
-    FastaDataset, ConcatFastaDataset,
+    FastaDataset, ConcatFastaDataset, Discretize,
     BACKENDS,
 )
 import pyfastx
@@ -62,6 +60,25 @@ def test_fasta_dataset(idx, sequence, backend):
     dataset = FastaDataset(fa, 4, backend=backend)
     assert dataset[idx]['seq'] == sequence
 
+test_discrete_examples = [
+    (0, 'ACAG'),
+    (1, 'ATTC'),
+    (2, 'GAC'),
+    (3, 'TAT'),
+    (4, 'TACC'),
+    (5, 'AT'),
+]
+@pytest.mark.parametrize('backend', BACKENDS.keys())
+@pytest.mark.parametrize('idx,sequence', test_discrete_examples)
+def test_discrete_fasta_dataset(idx, sequence, backend):
+    fasta_file = tempfile.NamedTemporaryFile()
+    with open(fasta_file.name, 'w') as fh:
+        fh.write('>seq1\nACAGAT\nTCGAC\n>seq2\nTAT\n>seq3\nTACCAT\n')
+
+    fa = pyfastx.Fasta(fasta_file.name)
+    dataset = Discretize(FastaDataset(fa, 4, backend=backend))
+    assert dataset[idx]['seq'] == sequence
+
 test_examples_multiple_files = [
     (0, 'ACAG', 'seq1', 0),
     (3, 'GATT', 'seq1', 3),
@@ -70,6 +87,8 @@ test_examples_multiple_files = [
     (18, 'CCCA', 'seq1:2', 0),
     (30, 'ACAT', 'seq2:2', 1),
 ]
+
+
 @pytest.mark.parametrize('backend', BACKENDS.keys())
 @pytest.mark.parametrize(
         'idx,sequence,contig,start',
@@ -97,3 +116,43 @@ def test_fasta_memmap_dataset_multiple_files(
     assert dataset[idx]['seq'] == sequence
     assert dataset[idx]['contig'] == contig
     assert dataset[idx]['start'] == start
+
+test_examples_multiple_files_discrete = [
+    (0, 'ACAG'),
+    (1, 'ATTC'),
+    (2, 'GACC'),
+    (3, 'C'),
+    (4, 'TACA'),
+    (5, 'T'),
+    (6, 'CCCA'),
+    (7, 'TTNA'),
+    (8, 'NAT'),
+    (9, 'TACA'),
+    (10, 'TACA'),
+    (11, 'TATT'),
+    (12, 'C'),
+]
+@pytest.mark.parametrize('backend', BACKENDS.keys())
+@pytest.mark.parametrize(
+        'idx,sequence',
+        test_examples_multiple_files_discrete
+    )
+def test_fasta_dataset_multiple_files_discrete(
+        idx,
+        sequence,
+        backend):
+    fasta_file_1 = tempfile.NamedTemporaryFile()
+    with open(fasta_file_1.name, 'w') as fh:
+        fh.write('>seq1\nACAGAT\nTCGACCC\n>seq2\nTACAT\n')
+
+    fasta_file_2 = tempfile.NamedTemporaryFile()
+    with gzip.open(fasta_file_2.name, 'wb') as fh:
+        fh.write(b'>seq1:2\nCCCATTNA\nNAT\n>seq2:2\nTACATAC\nATATTC\n')
+
+    dataset = ConcatFastaDataset(
+        [fasta_file_1.name, fasta_file_2.name],
+        max_length=4,
+        backend=backend,
+        transforms=[Discretize,]
+        )
+    assert dataset[idx]['seq'] == sequence

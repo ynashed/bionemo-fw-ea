@@ -1,10 +1,11 @@
 defaults:
   - dnabert_base_config
 trainer:
+  devices: 1
   val_check_interval: 100
 model:
   num_layers: 6
-  micro_batch_size: 128
+  micro_batch_size: 4
   pre_process: True # add embedding
   post_process: True # add pooler
   bert_binary_head: False # BERT binary head
