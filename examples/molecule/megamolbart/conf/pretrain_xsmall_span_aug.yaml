@@ -1,0 +1,14 @@
+defaults:
+  - pretrain_base
+
+# Extra small model with augmentation of the encoder SMILES and masking of decoder tokens
+trainer:
+  devices: 1
+  num_nodes: 1
+
+model:
+  name: xsmall_span_aug
+  # model architecture
+  num_layers: 2
+  hidden_size: 256
+  num_attention_heads: 4

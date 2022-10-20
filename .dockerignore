@@ -15,5 +15,5 @@ coverage.xml
 *,cover
 *.log
 .git
-**/*.nemo
-**/*.ckpt
+./.vscode-server
+./outputs

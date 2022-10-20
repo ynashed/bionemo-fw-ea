@@ -1,0 +1,11 @@
+# Model Upload to NGC
+
+# TODO Update model path and check container path
+MODEL_PATH=/data/bionemo/models/esm1nv.nemo && \
+ngc registry model upload-version \
+    --gpu-model A100 \
+    --org nvstaging \
+    --source $MODEL_PATH \
+    nvcr.io/t6a4nuz8vrsr/esm1nv:0.1.0
+
+# Commands for uploading containers are in launch.sh script

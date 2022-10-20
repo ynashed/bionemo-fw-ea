@@ -1,0 +1,40 @@
+defaults:
+  - base_config
+
+hydra:
+  searchpath:
+    - file://${oc.env:BIONEMO_PATH}/examples/protein/esm1nv/conf/ # BIONEMO_PATH is env variable with root location of code e.g. /opt/nividia/bionemo or /workspace/bionemo
+
+trainer:
+  max_epochs: 1 # PTL default. In practice we don't usually train for more than 1 epoch.
+  max_steps: 500 # consumed_samples = global_step * micro_batch_size * data_parallel_size * accumulate_grad_batches
+  val_check_interval: 500
+  limit_val_batches: 1
+    
+model:
+  micro_batch_size: 4
+  pre_process: True # add embedding
+  post_process: True # add pooler
+  bert_binary_head: False # BERT binary head
+  tokenizer:
+    library: 'sentencepiece'
+    type: null
+    model: /model/protein/esm1nv/vocab/protein_sequence_sentencepiece.model
+    vocab_file: /model/protein/esm1nv/vocab/protein_sequence.vocab
+  data:
+    dataset_path: ${oc.env:BIONEMO_PATH}/examples/tests/test_data # parent directory for data, contains train / val / test folders
+    dataset: # inclusive range of data files to load or can load a single file, e.g. x000.csv
+      train: x[000..001]
+      test: x[000..001]
+      val: x[000..001]
+    micro_batch_size: 4
+    num_workers: 10
+    dataloader_type: single
+    data_col: 3 # 0-based
+    data_sep: ','
+    header_lines: 1
+    modify_percent: 0.1
+    perturb_percent: 0.5
+    seed: ${model.seed}
+    max_seq_length: ${model.seq_length}
+    data_prefix: null

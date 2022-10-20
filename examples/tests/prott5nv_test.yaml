@@ -1,0 +1,34 @@
+defaults:
+  - base_config
+
+hydra:
+  searchpath:
+    - file://${oc.env:BIONEMO_PATH}/examples/protein/prott5nv/conf/ # BIONEMO_PATH is env variable with root location of code e.g. /opt/nividia/bionemo or /workspace/bionemo
+
+name: prott5nv_model
+do_training: True # set to false if data preprocessing steps must be completed
+do_testing: False # set to true to run evaluation on test data after training, requires test_dataset section
+restore_from_path: null # used when starting from a .nemo file
+
+trainer:
+  devices: 2
+  num_nodes: 1
+  accelerator: gpu
+  precision: 16
+  max_steps: 200 # consumed_samples = global_step * micro_batch_size * data_parallel_size * accumulate_grad_batches
+  val_check_interval: 200
+  limit_val_batches: 1
+  accumulate_grad_batches: 1
+
+model:
+  global_batch_size: 8
+  micro_batch_size: 4
+  data:
+    data_url: 'https://ftp.uniprot.org/pub/databases/uniprot/uniref/uniref50/uniref50.fasta.gz' 
+    dataset_path: /data/uniref2022_05 # parent directory for data, contains train / val / test folders
+    dataset: # inclusive range of data files to load or can load a single file, e.g. x000.csv
+      train: x000
+      test: x000
+      val: x000
+    data_prefix: null
+  

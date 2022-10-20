@@ -1,77 +1,67 @@
-# MegaMolBART
+# README
 
-MegaMolBART is a NeMo collection for large scale deep learning in cheminformatics with Megatron. [NeMo](https://github.com/NVIDIA/NeMo) is NVIDIA's toolkit for deep learning experimentation. 
+## Introduction
 
-## Quick Start
+NVIDIA BioNeMo is a framework for training and deploying large biomolecular language models at supercomputing scale for the discovery and development of theraputics. The large language model (LLM) framework currently has models for small molecules (SMILES) and protein sequences. More information about the models and their training is available in the [model guides](./docs/ngc/models).
 
-The [Quickstart Guide](QUICKSTART.md) contains
+BioNeMo relies on [NeMo](https://github.com/NVIDIA/NeMo). NeMo provides a robust environment for developing, training, and deploying deep learning models, including Megatron models. NeMo provides enhancements to PyTorch Lighting such as hyperparameter configuarbility with YAML files and checkpoint management. It also enables the development and training of large transformer models using NVIDIA's [Megatron](https://github.com/NVIDIA/Megatron-LM) framework, which makes multi-GPU, multi-node training with data parallelism, model parallelism, and mixed precision easily configurable. The [NeMo User Guide](https://docs.nvidia.com/deeplearning/nemo/user-guide/docs/en/main/) contains more information about all of these features. It is highly suggested to review at least the [NeMo Fundamentals](https://docs.nvidia.com/deeplearning/nemo/user-guide/docs/en/stable/starthere/tutorials.html) tutorial to understand how to configure jobs.
 
-### Configure `launch.sh` script
+## Repo Organization
 
-The `launch.sh` script can be used to build the NeMo MegaMolBART training container, push it to a registry, and to automate the mounting of paths inside the container. Here is an example of the file. It should be named `.env` and placed inside the repo. All of the variables are described in the Usage section of `launch.sh` in this directory. Missing variables will be substituted for the defaults in the script.
+The BioNeMo repo is organized by biological entity (molecule, protein) and by deep learning model, e.g. `molecule/megamolbart` or `protein/esm1nv`. Shared code can be found within `utils` files or directories. These are the most important directories and their purpose:
 
-```
-MEGAMOLBART_CONT=nvcr.io/nvidian/clara-lifesciences/megamolbart_training_nemo:latest
-PROJECT_PATH=$(pwd)
-DATA_PATH=${HOME}/data
-RESULT_PATH=${HOME}/results/nemo_experiments
-GITHUB_ACCESS_TOKEN=INSERT_GITHUB_ACCESS_TOKEN_HERE
-WANDB_API_KEY=$(grep password $HOME/.netrc | cut -d' ' -f4)
-REGISTRY_ACCESS_TOKEN=$(grep apikey ~/.ngc/config | cut -d' ' -f3)
-REGISTRY_USER=$oauthtoken
-REGISTRY=NotSpecified
-```
+- `bionemo`: The library location, including functionality for data processing, data loading, models, and associated functions.
+- `examples`: The files required to run a training or inferences: Python training scripts, YAML configuration files, shell scripts, and Jupyter notebooks.
+- `models`: The location for tokenizers and trained models that are downloaded.
+- `setup`: Dockerfile and associated setup scripts.
 
-### Build container
+## Quickstart
 
-The `launch.sh` script can be used to build and push containers to a registry. It can also be used to run interactive development jobs on a local system. See the instructions inside the script for more information. Once the `.env` script is created, a container can be built by running `bash launch.sh build`. If pushing to a registry is desired, `bash launch.sh dev` will complete this task.
+The [Quickstart Guide](./QUICKSTART.md) contains configuration information and examples of how to run data processing and training of a small model on a workstation. The tutorial contained in the Quickstart is a good way to gain familiarity with how trainings are run and configured. The remainder of this README contains information that will be of use for more advanced tasks, such as code development or model configuration changes. Familiarity with the material in the [Quickstart Guide](./QUICKSTART.md) is assumed for the remainder of this guide.
 
-### Run training job
+## Code Development
 
-#### Local machine (non-SLURM)
+`BIONEMO_PATH` is an environment variable used to select the path to the BioNeMo library in use. By default, this is the library installation path (`/opt/nvidia/bionemo`). For development, code should be mounted inside the container at `/workspace/bionemo`.
 
-A desktop machine (or similar, that doesn't use SLURM) can be used for development and training. First, after building and pulling a copy of the Docker container to the computer, run `bash launch.sh dev` which will drop the user into a shell inside the container. After configuring the configuration files below (see also the presentation above), a job can be run using one of the scripts from inside the `examples/chem/nosched` directory. The `megamolbart_pretrain_quick.sh` script is a good way to quickly test a training run. This script should be executed INSIDE the docker container.
+The easiest way to develop or test the training of in-development code is to mount a local copy of the code inside the docker container. The `launch.sh` script mounts the current working directory inside the container by default. This behavior can be customized by editing `PROJECT_PATH`, which is the local copy of the code, and `BIONEMO_PATH` in the `.env` file.
 
-###  Edit or create model configuration file
+It may also be necessary to recompile the Megatron helpers, which can be done by running the script `setup/recompile_megatron_helper.sh`. This recompilation should also be done immediately before training starts on clusters as a best practice.
 
-MegaMolBART using Hydra/OmegaConf for configuration, so the parameters are yaml file. The existing model configuration files can be found in `examples/chem` and are based on the configurations for [Chemformer](https://chemrxiv.org/engage/chemrxiv/article-details/60ee8a3eb95bdd06d062074b):
-* `megamolbart_pretrain_small_aug.yaml`: Small model with augmentation of the encoder SMILES
-* `megamolbart_pretrain_small_span_aug.yaml`: Small model with augmentation of the encoder SMILES and masking of decoder tokens
-* `megamolbart_pretrain_small_span.yaml`: Small model with masking of decoder tokens
-* `megamolbart_pretrain_large_span_aug.yaml`: Extra large model with augmentation of the encoder SMILES and masking of decoder tokens
-* `megamolbart_pretrain_xsmall_span_aug.yaml`: Extra small model with augmentation of the encoder SMILES and masking of decoder tokens, mainly for testing
+### Build and Start Container
 
-Each of these master parameter files depends on a heirarchy of dependent yaml files found in the `examples/chem/conf` directory.Additional files can be created to suit other configurations. The master parameter files are read by the script `megamolbart_pretrain.py` which runs the training loop.
+The `launch.sh` script (see the [Quickstart Guide](./QUICKSTART.md#configure-launchsh-script) for configuration of the required `.env` file) can be used to build and push containers to a registry and start a container for interactive work. See the instructions inside the script for more information. 
 
-## Edit SLURM / computer execution script
+Once the `.env` script is created, a container can be pulled by running `bash launch.sh pull`. The setup for BioNeMo training and inference is quite involved and requires the use of a Docker container. Due to this complexity, it is highly suggested to pull a prebuilt container. However, if a container must be built, it can be done by running `bash launch.sh build -p`. Executing this command will require an [NGC API key](https://docs.nvidia.com/ngc/ngc-overview/index.html#generating-api-key) to be configured. If pushing to a registry is desired, `bash launch.sh push` will complete this task.
 
-The bash scripts found in `examples/chem/slurm` are configurable for the location of system directories for data, results, and (optionally) development code. These files are also used to configure the size of the training run (number of nodes and gpus). Note that MegaMolBART currently supports on data parallel training. 
+Once a container has been built, it can be started in interactive mode with `bash launch.sh dev`.
 
-For SLURM, once a working bash script has been created, consecutive training runs can be queued with the `auto_launcher.sh` script: `./auto_launcher.sh -n 5 megamolbart_pretrain_slurm.sh`.
+### Setup Data Processing and Training Files
 
-## Conversion from CSV to NeMo format Binary Data
-### In Beta phase! Use at your own risk
+See the [Data Processing and Training](./QUICKSTART.md#data-processing-and-training) section in the [Quickstart Guide](./QUICKSTART.md) for information on the files required for processing data and running a training. These files can be customized as required for different model sizes, data selection, and training configuration.
+
 ### Data Preprocessing
-We support conversion of csv data to NeMo format binary data. The megamolbart_pretrain.py script can be used to preprocess the data into binary. 
-Copy paste below fields into the *data* field of your config.
+
+Data processing parameters can be customized in the YAML model configuration file or specified from the command line. The main change that is required to run data processing instead of training is to set `do_training` to `False`. This can be done from the command line by adding `++do_training=False` or by settting the following in the model's YAML config file:
+
+```yaml
+do_training: False # set to false if data preprocessing steps must be completed
 ```
+
+Data processing only needs to be performed once for a given model. Additional configuration parameters are specific to each dataset / model and select changes are highlighted below for clarity. 
+
+### Pre-Training
+
+Once data processing is complete, training is performed by inverting the value of `do_training` to `True`. One additional feature of note is that ranges of data files can be selected. For example, to select a contiguous range of 100 data files, from x000.csv to x099.csv,, use the range indicator `x[000..099]`. For only ten files, use `x[000..009]`. Ensure these are set as appropriate for the train, validation, and test splits as below in the YAML config file:
+
+```yaml
 model:
   data:
-    dataset_format: bin 
-    num_enumerations: 5 #You can change this number of how many every enumerations you want on every SMILE string.
+    dataset:
+      train: x[000..099]
+      test: x[000..099]
+      val: x[000..099]
 ```
-### Training
-For training, make the following changes in the *data* field of your config
-```
-model:
-  data:
-    dataset_format: bin
-    dataset_files: x[000..146]  
-```
-All files from 000 to 146 will be read for training. Do NOT add any extension to the data files here. The code looks for x[000...146].bin and x[000...146].idx on it's own. Giving an extension would mean that the code looks for x000.bin.bin and x000.bin.idx files, it will lead to File Not Found Errors. 
 
-## Process and train with FULL default ZINC15 tranches dataset
-Currently, the pretrain script uses a "test" default ZINC15 tranches data downloader text file to process and train. This is to prevent about 100GB of data being downloaded accidentally. If you wish to run with ALL of default ZINC15 tranches data, make the following changes.
-Change the [line 113](https://github.com/clara-parabricks/NeMo_MegaMolBART/blob/dev/examples/chem/megamolbart_pretrain.py#L113) links_file path to this: 'conf/dataset/ZINC-downloader.txt. TODO: change the link when publishing.
+**NOTE**: Do NOT add an extension to the data files. The appropriate extension is added automatically.
 
-Follow steps in Data Preprocessing and Training above if you want to preprocess the csv to binary and train with the binary files.
+To change the datafiles selection from the command line, it's often easier to use a varation that does not involve brackets (`[`, and `]`) to avoid having to add multiple escape characters. For the range listed above, this would be `x_OP_000..099_CL_`.
