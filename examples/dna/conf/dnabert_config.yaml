@@ -12,8 +12,8 @@ model:
   tokenizer:
     type: 'kmer'
     k: 6
-    model: /workspace/bionemo/models/vocab/dnabert/dnabert6-chr1.model
-    vocab_file: /workspace/bionemo/models/vocab/dnabert/dnabert6-chr1.vocab
+    model: /model/dna/dnabert/vocab/dnabert6-chr1.model
+    vocab_file: /model/dna/dnabert/vocab/dnabert6-chr1.vocab
   data:
     dataset_path: /workspace/bionemo/examples/dna/data/small-example # contains train / val / test folders
     dataset: # inclusive range of data files to load or can load a single file, e.g. x000.csv
