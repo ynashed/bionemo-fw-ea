@@ -1,0 +1,299 @@
+import os
+import torch
+import torch.nn as nn
+import typing
+import pandas as pd
+import numpy as np
+from nemo.core.config import hydra_runner
+from nemo.utils import logging
+from torch.utils.data import DataLoader, Dataset
+import pytorch_lightning as ptl
+from pytorch_lightning.trainer.trainer import Trainer
+from nemo_chem.models.megamolbart import MegaMolBARTModel
+from nemo.utils import logging
+from nemo.core.classes import ModelPT
+from nemo.core.classes.exportable import Exportable
+from omegaconf.omegaconf import OmegaConf, open_dict, DictConfig
+from pathlib import Path
+from typing import Union
+from nemo.utils.app_state import AppState
+from nemo.utils.exp_manager import exp_manager
+from torch.nn.utils.rnn import pad_sequence
+from nemo.collections.nlp.parts.nlp_overrides import NLPDDPPlugin, NLPSaveRestoreConnector
+from nemo_chem.models.core import MLPModel
+from nemo_chem.core import BioNeMoDataModule
+
+class FineTuneDataset(Dataset):
+    def __init__(self, data_file: Union[str, bytes, os.PathLike], transform_fn, input_column: str = 'SMILES', target_column: str = 'y'):
+        self.data_file = data_file
+        self.df = pd.read_csv(data_file)
+        self.input_column = input_column
+        self.target_column = target_column
+
+        self.transform_fn = transform_fn
+
+        self.token_ids = [self.transform_fn.text_to_ids(t) for t in self.df[self.input_column]]
+
+    def __len__(self):
+        return self.df.shape[0]
+
+    def __getitem__(self, idx):
+    
+        target = self.df[self.target_column].iloc[idx]
+
+        #idea: return dictionary which tells the name of target
+        #token_ids = self.transform_fn.text_to_ids(smile)
+
+        return {"token_ids": self.token_ids[idx], "target": target}
+
+    #collate function to handle padding of each batch
+    def custom_collate(self, data):
+        inputs = [torch.tensor(d['token_ids']) for d in data]
+        labels = [d['target'] for d in data]
+        inputs = pad_sequence(inputs, batch_first=True, padding_value=self.transform_fn.pad_id)
+        labels = torch.tensor(labels)
+        return {
+            'token_ids': inputs, 
+            'target': labels
+        } 
+
+class FineTuneDataModule(BioNeMoDataModule):
+    def __init__(self, cfg, transform_fn):
+
+        self.data_path = Path(cfg.downstream_task.dataset)
+        self.data = FineTuneDataset(self.data_path, transform_fn)
+
+        train_size = int(0.75*len(self.data))
+        val_size = len(self.data) - train_size
+
+        self.train_ds, self.val_ds = torch.utils.data.random_split(self.data, [train_size, val_size])
+
+    def train_dataset(self):
+        """Creates a training dataset
+        Returns:
+            Dataset: dataset to use for training
+        """
+        return self.train_ds
+
+    def val_dataset(self):
+        """Creates a validation dataset
+        Returns:
+            Dataset: dataset to use for validation
+        """
+        return self.val_ds
+
+    def test_dataset(self):
+        """Creates a testing dataset
+        Returns:
+            Dataset: dataset to use for testing
+        """
+        raise NotImplementedError()
+
+    def adjust_train_dataloader(self,model,dataloader):
+        """Allows adjustments to the training dataloader
+        This is a good place to adjust the collate function of the dataloader.
+        """
+
+        dataloader.collate_fn = self.data.custom_collate
+
+    def adjust_val_dataloader(self, model, dataloader):
+        """Allows adjustments to the validation dataloader
+        This is a good place to adjust the collate function of the dataloader.
+        """
+
+        dataloader.collate_fn = self.data.custom_collate
+
+
+class FineTuneMegaMolBART(ModelPT, Exportable):
+
+    def __init__(self, cfg: "DictConfig", trainer: Trainer):
+        #self._check_scheduler(cfg)
+        super().__init__(cfg, trainer=trainer)
+        self.cfg = cfg
+
+        self.pretrained_model = self.load_model(cfg)
+
+        self.regressor = MLPModel(layer_sizes=[512, 128, 1], dropout=0.1)
+        self.loss_fn = nn.MSELoss() #define a loss function
+
+        #check that decoder exists in megamolbart model and following modules
+        self.pretrained_model.decoder = torch.nn.Identity()
+
+        self.data_module = FineTuneDataModule(self.cfg, self.pretrained_model.tokenizer)
+
+        self._build_train_valid_datasets()
+        self.setup_training_data(self.cfg)
+        self.setup_validation_data(self.cfg)
+
+        #megatronbart.token_fc = torch.nn.Identity()
+        #megatronbart.loss_fn = torch.nn.Identity()
+        #megatronbart.log_softmax = torch.nn.Identity()
+
+    def forward(self, token_ids, mask):
+        """ Apply SMILES strings to model
+        The dictionary returned will be passed to other functions, so its contents are fairly flexible,
+        except that it must contain the key "token_output" which is the output of the model 
+        (possibly after any fully connected layers) for each token.
+        Arg:
+            token_ids: tensor of token_ids of shape (seq_len, batch_size),
+            mask: bool tensor of padded elems of shape (seq_len, batch_size)
+        Returns:
+            Output from model (dict containing key "token_output")
+        """
+
+        enc_output = self.pretrained_model.encode(tokens_enc=token_ids, enc_mask=mask) #return hiddens
+        
+        embeddings = self.hidden_to_embedding(enc_output, mask) 
+
+        token_output = self.regressor(embeddings.float())
+  
+        output = {'token_output': torch.squeeze(token_output)}
+
+        return output
+
+    def load_model(self, model_cfg):
+        """Load saved model checkpoint
+        Params:
+            checkpoint_path: path to nemo checkpoint
+        Returns:
+            MegaMolBART trained model
+        # """
+
+        # trainer required for restoring model parallel models
+        trainer = Trainer(
+            plugins=NLPDDPPlugin(),
+            devices=1,
+            accelerator='gpu',
+            precision=32, #TODO: Run benchmark to verify this value has no or
+            #                     minimum impact on KPIs.
+        )
+
+        app_state = AppState()
+        if model_cfg.downstream_task.megamolbart_model_path is not None:
+            model = MegaMolBARTModel.restore_from(
+                restore_path=model_cfg.downstream_task.megamolbart_model_path,
+                trainer=trainer,
+                save_restore_connector=NLPSaveRestoreConnector(),
+            )
+
+        return model
+    
+    def validation_epoch_end(self, outputs):
+        pass
+
+    def hidden_to_embedding(self, enc_output, enc_mask):
+        """Computes embedding and padding mask for smiles.
+        Params
+            enc_output: hidden-state array
+            enc_mask:   boolean mask
+        Returns
+            embeddings
+        """
+
+        lengths = enc_mask.sum(dim=1, keepdim=True)
+        embeddings = torch.sum(enc_output*enc_mask.unsqueeze(-1), dim=1) / lengths
+
+        return embeddings
+
+    def _calc_step(self, batch, batch_idx):
+
+        tokens, enc_mask = self.process_batch(batch)
+        output_tensor = self.forward(tokens, enc_mask)
+
+        target_tokens = batch['target']
+        loss = self.loss_fn(target_tokens.float(), output_tensor['token_output'])
+
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+
+        loss = self._calc_step(batch, batch_idx)
+
+        return loss
+
+    def training_step(self, batch, batch_idx):
+
+        loss = self._calc_step(batch, batch_idx)
+        self.log('train_loss', loss, prog_bar=True)
+
+        return loss    
+    
+    def process_batch(self, batch):
+        """Build the batch."""
+
+        token_ids = batch['token_ids']
+        mask = (token_ids != self.pretrained_model.tokenizer.pad_id)
+
+        tk = torch.tensor(token_ids, dtype=torch.int64).cuda()
+        mask = torch.tensor(mask, dtype=torch.int64,
+                                    device=token_ids.device)
+        return tk, mask
+
+    def _build_train_valid_datasets(self):
+
+        #data_path = Path(self.cfg.downstream_task.dataset)
+        #full_data = FineTuneDataset(data_path, self.pretrained_model.tokenizer)
+
+        #self.collate_fn = full_data.custom_collate #store custom collate in class
+
+        #train_size = int(0.75*len(full_data))
+        #val_size = len(full_data) - train_size
+
+        #self._train_ds, self._validation_ds = torch.utils.data.random_split(full_data, [train_size, val_size])
+        self._train_ds = self.data_module.get_sampled_train_dataset()
+        self._validation_ds = self.data_module.get_sampled_val_dataset()
+
+    def setup_training_data(self, cfg):
+        """
+        Setups data loader to be used in training
+
+        Args:
+            cfg: data layer parameters.
+        Returns:
+
+        """
+
+        #self._train_dl = DataLoader(self._train_ds, batch_size=cfg.downstream_task.batch_size, drop_last=True, collate_fn=self.collate_fn)
+        self._train_dl = DataLoader(self._train_ds, batch_size=cfg.downstream_task.batch_size, drop_last=True)
+        self.data_module.adjust_train_dataloader(self, self._train_dl)
+
+
+
+    def setup_validation_data(self, cfg):
+        """
+        Setups data loader to be used in validation
+        Args:
+
+            cfg: data layer parameters.
+        Returns:
+
+        """
+
+        #self._validation_dl = DataLoader(self._validation_ds, batch_size=cfg.downstream_task.batch_size, drop_last=True, collate_fn=self.collate_fn)
+        self._validation_dl = DataLoader(self._validation_ds, batch_size=cfg.downstream_task.batch_size, drop_last=True)
+        self.data_module.adjust_val_dataloader(self, self._validation_dl)
+
+    def list_available_models(self):
+        return []
+
+@hydra_runner(config_path="conf", config_name="finetune_config") 
+def main(cfg) -> None:
+
+    logging.info("\n\n************* Fintune config ****************")
+    logging.info(f'\n{OmegaConf.to_yaml(cfg)}')
+
+    np.random.seed(cfg.model.downstream_task.seed)
+    ptl.seed_everything(cfg.model.downstream_task.seed)
+
+    trainer = Trainer(accelerator='gpu', devices=1, max_epochs=cfg.model.downstream_task.epochs, logger=False)
+    exp_manager(trainer, cfg.get("exp_manager", None)) 
+    
+    #NOTE use setup_trainer from util.py from dev branch (configure_plugins/configure_callbacks/resume_checkpoint may cause error)
+    #trainer = setup_trainer(cfg, builder=FintuneTrainerBuilder())
+    #NOTE instantiate encoder outside of finetuning class to allow for flexibility
+
+    model = FineTuneMegaMolBART(cfg.model, trainer)
+    trainer.fit(model)
+
+if __name__ == '__main__':
+    main()
