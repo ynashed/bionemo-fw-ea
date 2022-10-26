@@ -119,6 +119,9 @@ class KmerTokenizerAdapter(TokenizerAdapterSpec):
         """
         return self.mask_token
 
+    def get_mask_id(self):
+        return self.vocab[self.mask_token]
+
     def is_special_token(self, token):
         """Determines if a token is a special token
 
