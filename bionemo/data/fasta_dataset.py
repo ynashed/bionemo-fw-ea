@@ -159,7 +159,7 @@ class DiscretizeFastaDataset(MappedDataset):
         """
         Produces a discretized version of a `FastaDataset`.
 
-        `Discretize` wraps a `FastaDatset` to produce non-overlapping
+        `DiscretizeFastaDataset` wraps a `FastaDatset` to produce non-overlapping
         subsections, e.g.: a dataset built on `ACGT` with sequence length of 2
         will only yield `AC` and `GT`. This is in contrast to the
         `FastaDataset`, which provides overlapping sections of the sequence,
