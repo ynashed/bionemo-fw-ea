@@ -22,7 +22,7 @@ trainer:
 exp_manager:
   explicit_log_dir: null
   exp_dir: null
-  name: megatron_bert
+  name: dnabert
   create_wandb_logger: False
   wandb_logger_kwargs:
     project: null
@@ -98,8 +98,9 @@ model:
     skip_warmup: True
     num_workers: 10
     dataloader_type: single # cyclic
-    seq_length: ${model.seq_length} # model seq size - 1 + k
+    seq_length: ${model.seq_length}
     k: ${model.tokenizer.k}
+    seed: ${model.seed}
 
   optim:
     name: fused_adam
