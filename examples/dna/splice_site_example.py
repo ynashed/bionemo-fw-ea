@@ -255,31 +255,88 @@ from nemo.core.classes.exportable import Exportable
 from bionemo.model.core import MLPModel
 from torch import nn
 
-class SpliceSitePredictionModel(ModelPT, Exportable):
-    pass
+class SpliceSiteBERTPredictionModel(ModelPT, Exportable):
+
+    def list_available_models(self):
+        return []
 
     def __init__(self, cfg, trainer):
         #self._check_scheduler(cfg)
         super().__init__(cfg, trainer=trainer)
         self.cfg = cfg
 
+        # TODO maybe warn that we are turning of the post_processing
+        # Also...this could be a little hacky
+        model.model.post_process = False
         # TODO make this load intead
-        self.pretrained_model = model
+        self.bert_model: DNABERTModel = model
 
         # TODO make 3 configurable for classificaiton
         # TODO make MLPModel configurable
-        self.downstream_model = MLPModel(layer_sizes=[512, 3], dropout=0.1)
+        self.task_head = MLPModel(layer_sizes=[cfg.hidden_size, 3], dropout=0.1)
+        # TODO double check that this index is the correct one (according to get mid point funciton)
+        # TODO and make it based off of the sequence length
+        def get_hiddens_for_idx(input_tensor, idx):
+            return input_tensor[:, idx, :]
+
+        self.extract_for_task_head = partial(get_hiddens_for_idx, idx=200)
         # TODO make (get_embedding_from_model_for_mlp) configurable
         self.loss_fn = nn.CrossEntropyLoss() #define a loss function
 
         # TODO initialize inside this model
         self.data_module = splice_site_dm
 
+        # TODO P0 is this how I want to do this?
         self._build_train_valid_datasets()
         self.setup_training_data(self.cfg)
         self.setup_validation_data(self.cfg)
 
+    def forward(self, batch: dict):
+        # TODO START: encapsualte this method
+        tokens, types, sentence_order, loss_mask, lm_labels, padding_mask = \
+            self.bert_model.process_batch(batch)
+        if not self.cfg.bert_binary_head:
+            types = None
+        output_tensor = self.bert_model(tokens, padding_mask, token_type_ids=types, lm_labels=lm_labels)
+        # TODO END: encapsulate this method
+        task_input_tensor = self.extract_for_task_head(output_tensor)
+        output = self.task_head(task_input_tensor)
+        # token_output = self.regressor(embeddings.float())
+        # output = {'token_output': torch.squeeze(token_output)}
+        return output
 
+    def _calc_step(self, batch, batch_idx):
+
+        output_tensor = self.forward(batch)
+
+        # TODO make target name configurable?
+        loss = self.loss_fn(output_tensor, batch['target'])
+        return loss
+
+    def training_step(self, batch, batch_idx):
+
+        loss = self._calc_step(batch, batch_idx)
+        self.log('train_loss', loss, prog_bar=True)
+
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        loss = self._calc_step(batch, batch_idx)
+        self.log('val_loss', loss)
+
+        return loss
+
+    def _build_train_valid_datasets(self):
+        self._train_ds = self.data_module.get_sampled_train_dataset()
+        self._validation_ds = self.data_module.get_sampled_val_dataset()
+
+    def setup_training_data(self, cfg):
+        self._train_dl = DataLoader(self._train_ds, batch_size=cfg.micro_batch_size, drop_last=True)
+        self.data_module.adjust_train_dataloader(self, self._train_dl)
+
+    def setup_validation_data(self, cfg):
+        self._train_dl = DataLoader(self._train_ds, batch_size=cfg.micro_batch_size, drop_last=True)
+        self.data_module.adjust_val_dataloader(self, self._validation_dl)
 
 
 # from bionemo.data.dataloader.kmer_collate import KmerBertCollate
@@ -296,6 +353,8 @@ class SpliceSitePredictionModel(ModelPT, Exportable):
 
 #     print(masked_k_correct_total(x, y, outputs.cpu(), model.tokenizer.get_mask_id(), k=3))
 #     print(masked_k_correct_total(x, y, outputs.cpu(), k=128))
+
+model = SpliceSiteBERTPredictionModel(cfg.model, trainer)
 
 trainer.fit(model)
 
