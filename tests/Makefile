@@ -17,8 +17,7 @@ PTL_TESTS=\
 	test_megamolbart_inference.py \
 	test_prott5nv_inference.py \
 	test_esm1nv_inference.py \
-	test_dnabert_training.py \
-	test_inference.py
+	test_dnabert_training.py
 
 PYTEST_FLAGS=
 
