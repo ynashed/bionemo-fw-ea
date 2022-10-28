@@ -135,12 +135,15 @@ class RemoteResource(object):
         return False
 
 
+@dataclass
 class ResourcePreparer(ABC):
     """ Interface defining a ResourcePreparer. Implementors promise to provide both a complete RemoteResource and a freeform
     preprocess method. This interface can be used to generically define a workflow from a config file.
 
         remote -> prepare -> prepared data.
     """
+
+    root_directory: Optional[str] = RemoteResource.get_env_tmpdir()
 
     @abstractmethod
     def get_remote_resources(self) -> List[RemoteResource]:
@@ -198,7 +201,7 @@ class GRCh38p13_ResourcePreparer(ResourcePreparer):
             resource = RemoteResource(
                 dest_directory=dest_dir,
                 dest_filename=filename,
-                root_directory=RemoteResource.get_env_tmpdir(),
+                root_directory=self.root_directory,
                 checksum=checksums.get(filename),
                 url=url,
             )
@@ -224,11 +227,6 @@ class Hg38chromResourcePreparer(ResourcePreparer):
 
     def get_remote_resources(self) -> List[RemoteResource]:
         dest_dir = "hg38"
-        tmpdir = None
-        if tmpdir is None and (tmpdir := os.environ.get("TMPDIR")) is None:
-            raise EnvironmentError(
-                "Expected the environment variable TMPDIR to be set."
-            )
 
         url = "https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/hg38.chromFa.tar.gz"
         checksum = "a5aa5da14ccf3d259c4308f7b2c18cb0"
@@ -236,7 +234,7 @@ class Hg38chromResourcePreparer(ResourcePreparer):
         obj = RemoteResource(
             dest_directory=dest_dir,
             dest_filename="hg38.chromFa.tar.gz",
-            root_directory=RemoteResource.get_env_tmpdir(),
+            root_directory=self.root_directory,
             checksum=checksum,
             url=url,
         )
@@ -337,7 +335,7 @@ class GRCh38Ensembl99ResourcePreparer(ResourcePreparer):
             fasta_resource = RemoteResource(
                 dest_directory=dest_dir,
                 dest_filename=fasta_filename,
-                root_directory=RemoteResource.get_env_tmpdir(),
+                root_directory=self.root_directory,
                 checksum=fasta_checksums.get(fasta_filename),
                 url=fasta_url,
             )
@@ -345,7 +343,7 @@ class GRCh38Ensembl99ResourcePreparer(ResourcePreparer):
             gff_resource = RemoteResource(
                 dest_directory=dest_dir,
                 dest_filename=gff_filename,
-                root_directory=RemoteResource.get_env_tmpdir(),
+                root_directory=self.root_directory,
                 checksum=gff_checksums.get(gff_filename),
                 url=gff_url,
             )
