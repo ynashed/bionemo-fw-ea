@@ -107,10 +107,10 @@ cfg.exp_manager.wandb_logger_kwargs.notes = ''
 cfg.exp_manager.wandb_logger_kwargs.offline = True
 cfg.model.tokenizer.k = 3
 # nemo_file = 'example-checkpoints/overfit-converted.nemo'
-nemo_file = 'example-checkpoints/new-overfit-model.nemo'
+# nemo_file = 'example-checkpoints/new-overfit-model.nemo'
 ckpt = '/workspace/bionemo/examples/dna/nemo_experiments/dnabert/2022-10-25_00-04-34/checkpoints/dnabert--val_loss=8.57-step=760400-consumed_samples=3041600.0-last.ckpt'
 # cfg.model.resume_from_checkpoint = ckpt
-cfg.trainer.max_steps = 5000000 # consumed_samples = global_step * micro_batch_size * data_parallel_size * accumulate_grad_batches
+cfg.trainer.max_steps = 5000 # consumed_samples = global_step * micro_batch_size * data_parallel_size * accumulate_grad_batches
 
 gff_csv = '/workspace/bionemo/examples/dna/data/splice-site-prediction/sampled-data-10k/sampled-data.csv'
 cfg.model.data['train_file'] = gff_csv
@@ -122,22 +122,14 @@ cfg.model.num_workers = 1
 trainer = setup_trainer(cfg)
 app_state = AppState()
 
-model = DNABERTModel.load_from_checkpoint(
-    ckpt,
-    cfg=cfg.model,
-    trainer=trainer,
-)
-
 from torch.utils.data import DataLoader
-opt = model.optimizers()
 
 from bionemo.data.utils import MappedDataset
 
 from splice_site_data_module import SpliceSiteDataModule
 
-splice_site_dm = SpliceSiteDataModule(cfg.model, trainer, model)
 # model.data_module = splice_site_dm
-initialize_distributed_alt(trainer)
+# initialize_distributed_alt(trainer)
 # model.setup()
 
 from nemo.core.classes import ModelPT
@@ -155,39 +147,62 @@ class SpliceSiteBERTPredictionModel(ModelPT, Exportable):
         # TODO maybe warn that we are turning of the post_processing
         # Also...this could be a little hacky
         encoder_model.model.post_process = False
-        encoder_model.freeze()
+        # TODO: make freeze encoder configurable?
+        # encoder_model.freeze()
         # TODO, do we want to have ctx manager or something so we can reverse
         # the changes we make here?
+
+    def load_model(self, ckpt, cfg, trainer):
+
+        model = DNABERTModel.load_from_checkpoint(
+            ckpt,
+            cfg=cfg,
+            trainer=trainer,
+        )
+
+        return model
 
     def __init__(self, cfg, trainer):
         #self._check_scheduler(cfg)
         super().__init__(cfg, trainer=trainer)
         self.cfg = cfg
 
-        # TODO make this load intead
+        # TODO this could be refactored to instantiate a new model if no
+        # checkpoint is specified
+        model = self.load_model(ckpt, cfg, trainer)
         self.modify_encoder_model(model)
         self.encoder_model: DNABERTModel = model
 
         # TODO make number_of_classes (3) configurable for classificaiton
+        # TODO make other NN MLP parameters configurable
         # TODO make MLPModel configurable
-        self.task_head = MLPModel(layer_sizes=[cfg.hidden_size, 256, 3], dropout=0.1)
-        def get_hiddens_for_idx(input_tensor, idx):
-            return input_tensor[:, idx, :]
+        self.task_head = MLPModel(layer_sizes=[cfg.hidden_size, 3], dropout=0.1)
 
         # TODO double check that this index is the correct one (according to get mid point function)
         # TODO and make it based off of the sequence length
-        self.extract_for_task_head = partial(get_hiddens_for_idx, idx=200)
-        # TODO make (get_embedding_from_model_for_mlp) configurable
+        self.extract_for_task_head = partial(self.get_hiddens_for_idx, idx=200)
+        # TODO make the loss configurable
         self.loss_fn = nn.CrossEntropyLoss() #define a loss function
+
+    # doing dataset (custom) setup in the normal set up method ensures that
+    # distributed is initialized appropriately by the time the data is loaded,
+    # since distributed is needed for NeMo upsampling
+    def setup(self, *args, **kwargs):
+        super().setup(*args, **kwargs)
         self.custom_setup()
 
     def custom_setup(self):
-        # TODO initialize inside this model
-        self.data_module = splice_site_dm
+        self.data_module = SpliceSiteDataModule(
+            self.cfg, self.trainer, self.encoder_model
+        )
         self._build_train_valid_datasets()
         self.setup_training_data(self.cfg)
         self.setup_validation_data(self.cfg)
         # TODO should we include test data?
+
+    @staticmethod
+    def get_hiddens_for_idx(input_tensor, idx):
+        return input_tensor[:, idx, :]
 
     def encoder_forward(self, bert_model, batch: dict):
         tokens, types, _, _, lm_labels, padding_mask = \
@@ -199,33 +214,26 @@ class SpliceSiteBERTPredictionModel(ModelPT, Exportable):
 
     def forward(self, batch: dict):
         output_tensor = self.encoder_forward(self.encoder_model, batch)
-        # TODO START: encapsulate this method
-        # TODO END: encapsulate this method
         task_input_tensor = self.extract_for_task_head(output_tensor)
         output = self.task_head(task_input_tensor)
-        # token_output = self.regressor(embeddings.float())
-        # output = {'token_output': torch.squeeze(token_output)}
         return output
 
     def _calc_step(self, batch, batch_idx):
-
         output_tensor = self.forward(batch)
-
         # TODO make target name configurable?
         loss = self.loss_fn(output_tensor, batch['target'])
         return loss
 
     def training_step(self, batch, batch_idx):
-
+        # TODO: I think we need a more sophisticated solution for DDP loss
+        # TODO: ^ reference NeMo
         loss = self._calc_step(batch, batch_idx)
         self.log('train_loss', loss, prog_bar=True)
-
         return loss
 
     def validation_step(self, batch, batch_idx):
         loss = self._calc_step(batch, batch_idx)
         self.log('val_loss', loss)
-
         return loss
 
     def _build_train_valid_datasets(self):
@@ -233,10 +241,12 @@ class SpliceSiteBERTPredictionModel(ModelPT, Exportable):
         self._validation_ds = self.data_module.get_sampled_val_dataset()
 
     def setup_training_data(self, cfg):
+        # TODO look at NeMo DataLoader instantiation and make sure arguments are correct
         self._train_dl = DataLoader(self._train_ds, batch_size=cfg.micro_batch_size, drop_last=True)
         self.data_module.adjust_train_dataloader(self, self._train_dl)
 
     def setup_validation_data(self, cfg):
+        # TODO look at NeMo DataLoader instantiation and make sure arguments are correct
         self._train_dl = DataLoader(self._train_ds, batch_size=cfg.micro_batch_size, drop_last=True)
         self.data_module.adjust_val_dataloader(self, self._validation_dl)
 
