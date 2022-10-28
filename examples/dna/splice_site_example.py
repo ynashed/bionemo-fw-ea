@@ -1,69 +1,27 @@
-from curses.ascii import SP
-from bionemo.data.validation_dataset import DataFrameTransformDataset
-from bionemo.data.fasta_dataset import ConcatFastaDataset
-from bionemo.data import KmerBertCollate
-from bionemo.tokenizer import KmerTokenizer
-from functools import partial
-import pandas as pd
-import math
-
-from pathlib import Path
-import os
-
-dir_ = Path('/workspace/bionemo/examples/dna/')
-sampled_data_file = str(dir_ / 'data/splice-site-prediction/sampled-data-10k/sampled-data.csv')
-df = pd.read_csv(sampled_data_file)
-fa_template = os.path.join(str(dir_),'data/splice-site-prediction/GRCh38.ensembl.99/Homo_sapiens.GRCh38.dna.chromosome.{}.fa.gz')
-chrs = list(str(i) for i in range(1, 23))
-
-fasta_dataset = ConcatFastaDataset([fa_template.format(chr) for chr in chrs], 400, backend='file')
-
-def get_start_end(coord, length):
-    start = int(coord - math.ceil(length / 2))
-    end = int(coord + math.floor(length / 2))
-    return start, end
-
-
-fa_tokenizer = fa_template.format(22)
-tokenizer_path = '/workspace/bionemo/models/dna/dnabert/vocab/dnabert3-chr22.model'
-
-tokenizer = KmerTokenizer.from_vocab_file(tokenizer_path)
-
-bert_prep = KmerBertCollate(
-    tokenizer,
-    modify_percent=0,
-    seq_length=512,
-    pad_size_divisible_by_8=True,
-).collate_fn
-
-
-def fetch_bert_dna(row: pd.Series, length):
-    mid = row.coord
-    start, end = get_start_end(mid, length)
-    text = fasta_dataset.fetch(row.id, start, end)
-    return {key: value[0] for key, value in bert_prep([text]).items()}
-
-def get_target(row: pd.Series):
-    return {'target': row.kind}
-
-gff_dataset = DataFrameTransformDataset(
-    sampled_data_file,
-    functions = [
-        partial(fetch_bert_dna, length=400),
-        get_target,
-    ],
-    read_csv_args={'dtype': {'id': str}}
-    )
-
-
 from bionemo.model.utils import setup_trainer
 from bionemo.model.dnabert import DNABERTModel
 from omegaconf import OmegaConf
 from nemo.utils.app_state import AppState
 
 import torch
-import os
 from nemo.utils import logging
+from functools import partial
+from splice_site_data_module import SpliceSiteDataModule
+
+from nemo.core.classes import ModelPT
+from nemo.core.classes.exportable import Exportable
+
+from bionemo.model.core import MLPModel
+from torch import nn
+from nemo.collections.nlp.modules.common.megatron.utils import (
+    average_losses_across_data_parallel_group,
+    get_params_for_weight_decay_optimization,
+)
+from nemo.collections.nlp.data.language_modeling.megatron.data_samplers import (
+    MegatronPretrainingRandomSampler,
+    MegatronPretrainingSampler,
+)
+from apex.transformer import parallel_state
 
 base_cfg_file = '/workspace/bionemo/examples/dna/conf/dnabert_base_config.yaml'
 cfg_file = '/workspace/bionemo/examples/dna/conf/dnabert_config_splice_site.yaml'
@@ -88,22 +46,6 @@ cfg.model.num_workers = 1
 
 trainer = setup_trainer(cfg)
 
-from splice_site_data_module import SpliceSiteDataModule
-
-from nemo.core.classes import ModelPT
-from nemo.core.classes.exportable import Exportable
-
-from bionemo.model.core import MLPModel
-from torch import nn
-from nemo.collections.nlp.modules.common.megatron.utils import (
-    average_losses_across_data_parallel_group,
-    get_params_for_weight_decay_optimization,
-)
-from nemo.collections.nlp.data.language_modeling.megatron.data_samplers import (
-    MegatronPretrainingRandomSampler,
-    MegatronPretrainingSampler,
-)
-from apex.transformer import parallel_state
 
 class EncoderFineTuning(ModelPT, Exportable):
     pass
@@ -125,6 +67,7 @@ class SpliceSiteBERTPredictionModel(ModelPT, Exportable):
 
     def setup_optimizer_param_groups(self):
         """ModelPT override. Optimizer will get self._optimizer_param_groups"""
+        # TODO check how this is used in ModelPT
         self._optimizer_param_groups = get_params_for_weight_decay_optimization(
             [self.encoder_model, self.task_head])
 
