@@ -56,43 +56,14 @@ gff_dataset = DataFrameTransformDataset(
     )
 
 
-from nemo.collections.nlp.parts.nlp_overrides import (
-    NLPSaveRestoreConnector,
-)
-from bionemo.model.utils import setup_trainer, TrainerBuilder
+from bionemo.model.utils import setup_trainer
 from bionemo.model.dnabert import DNABERTModel
 from omegaconf import OmegaConf
-from nemo.core.config import hydra_runner
 from nemo.utils.app_state import AppState
-from nemo.collections.nlp.modules.common.megatron.megatron_init import fake_initialize_model_parallel
 
 import torch
 import os
 from nemo.utils import logging
-
-def initialize_distributed_alt(trainer, reconfigure_microbatch=True):
-    from apex.transformer.pipeline_parallel.utils import (
-        _reconfigure_microbatch_calculator,
-    )
-    from apex.transformer import parallel_state
-    if parallel_state.is_unitialized():
-
-        def dummy():
-            return
-
-        if trainer.strategy.launcher is not None:
-            trainer.strategy.launcher.launch(dummy, trainer=trainer)
-        trainer.strategy.setup_environment()
-
-        # Reconfigure microbatch sizes here because on model restore, this will contain the micro/global batch configuration used while training.
-        if reconfigure_microbatch:
-            _reconfigure_microbatch_calculator(
-                rank=0,  # This doesn't matter since it is only used for logging
-                rampup_batch_size=None,
-                global_batch_size=1,
-                micro_batch_size=1,  # Make sure that there is no "grad acc" while decoding.
-                data_parallel_size=1,  # We check above to make sure that dataparallel size is always 1 at inference.
-            )
 
 base_cfg_file = '/workspace/bionemo/examples/dna/conf/dnabert_base_config.yaml'
 cfg_file = '/workspace/bionemo/examples/dna/conf/dnabert_config_splice_site.yaml'
@@ -102,14 +73,10 @@ cfg = OmegaConf.load(cfg_file)
 cfg = OmegaConf.merge(base_cfg, cfg)
 
 cfg.trainer['strategy'] = None
-# cfg.trainer.precision = 32
 cfg.exp_manager.wandb_logger_kwargs.notes = ''
 cfg.exp_manager.wandb_logger_kwargs.offline = True
 cfg.model.tokenizer.k = 3
-# nemo_file = 'example-checkpoints/overfit-converted.nemo'
-# nemo_file = 'example-checkpoints/new-overfit-model.nemo'
 ckpt = '/workspace/bionemo/examples/dna/nemo_experiments/dnabert/2022-10-25_00-04-34/checkpoints/dnabert--val_loss=8.57-step=760400-consumed_samples=3041600.0-last.ckpt'
-# cfg.model.resume_from_checkpoint = ckpt
 cfg.trainer.max_steps = 5000 # consumed_samples = global_step * micro_batch_size * data_parallel_size * accumulate_grad_batches
 
 gff_csv = '/workspace/bionemo/examples/dna/data/splice-site-prediction/sampled-data-10k/sampled-data.csv'
@@ -120,28 +87,50 @@ cfg.model.data['fasta_pattern'] = 'Homo_sapiens.GRCh38.dna.chromosome.{}.fa.gz'
 cfg.model.num_workers = 1
 
 trainer = setup_trainer(cfg)
-app_state = AppState()
-
-from torch.utils.data import DataLoader
-
-from bionemo.data.utils import MappedDataset
 
 from splice_site_data_module import SpliceSiteDataModule
-
-# model.data_module = splice_site_dm
-# initialize_distributed_alt(trainer)
-# model.setup()
 
 from nemo.core.classes import ModelPT
 from nemo.core.classes.exportable import Exportable
 
 from bionemo.model.core import MLPModel
 from torch import nn
+from nemo.collections.nlp.modules.common.megatron.utils import (
+    average_losses_across_data_parallel_group,
+    get_params_for_weight_decay_optimization,
+)
+from nemo.collections.nlp.data.language_modeling.megatron.data_samplers import (
+    MegatronPretrainingRandomSampler,
+    MegatronPretrainingSampler,
+)
+from apex.transformer import parallel_state
+
+class EncoderFineTuning(ModelPT, Exportable):
+    pass
 
 class SpliceSiteBERTPredictionModel(ModelPT, Exportable):
+    def compute_consumed_samples(self, steps_since_resume=0):
+        app_state = AppState()
+        consumed_samples = (
+            self.init_consumed_samples
+            + steps_since_resume
+            * app_state.data_parallel_size
+            * self.cfg.micro_batch_size
+            * self.trainer.accumulate_grad_batches
+        )
+        return int(consumed_samples)
 
     def list_available_models(self):
         return []
+
+    def setup_optimizer_param_groups(self):
+        """ModelPT override. Optimizer will get self._optimizer_param_groups"""
+        self._optimizer_param_groups = get_params_for_weight_decay_optimization(
+            [self.encoder_model, self.task_head])
+
+    def on_train_start(self) -> None:
+        super().on_train_start()
+        self.init_global_step = self.trainer.global_step
 
     def modify_encoder_model(self, encoder_model):
         # TODO maybe warn that we are turning of the post_processing
@@ -152,26 +141,29 @@ class SpliceSiteBERTPredictionModel(ModelPT, Exportable):
         # TODO, do we want to have ctx manager or something so we can reverse
         # the changes we make here?
 
-    def load_model(self, ckpt, cfg, trainer):
+    def setup_encoder_model(self, cfg, trainer):
+        # TODO this could be refactored to instantiate a new model if no
+        # checkpoint is specified
 
         model = DNABERTModel.load_from_checkpoint(
+            # TODO grab ckpt from config
             ckpt,
             cfg=cfg,
             trainer=trainer,
         )
+        self.modify_encoder_model(model)
 
         return model
 
     def __init__(self, cfg, trainer):
-        #self._check_scheduler(cfg)
         super().__init__(cfg, trainer=trainer)
+        if trainer.accumulate_grad_batches != 1:
+            raise ValueError(
+                "Trainer.accumulate_grad_batches currently only supported"
+                " for Trainer.accumulate_grad_batches = 1")
         self.cfg = cfg
 
-        # TODO this could be refactored to instantiate a new model if no
-        # checkpoint is specified
-        model = self.load_model(ckpt, cfg, trainer)
-        self.modify_encoder_model(model)
-        self.encoder_model: DNABERTModel = model
+        self.encoder_model = self.setup_encoder_model(cfg, trainer)
 
         # TODO make number_of_classes (3) configurable for classificaiton
         # TODO make other NN MLP parameters configurable
@@ -183,11 +175,26 @@ class SpliceSiteBERTPredictionModel(ModelPT, Exportable):
         self.extract_for_task_head = partial(self.get_hiddens_for_idx, idx=200)
         # TODO make the loss configurable
         self.loss_fn = nn.CrossEntropyLoss() #define a loss function
+        # TODO make target name configurable from cfg?
+        self.batch_target_name = 'target'
+        # TODO this must change to resume training
+        self.init_consumed_samples = 0
 
     # doing dataset (custom) setup in the normal set up method ensures that
     # distributed is initialized appropriately by the time the data is loaded,
     # since distributed is needed for NeMo upsampling
+    # It is also nice to do the data setup here because the data are not
+    # initialized unless this module specifically is trained
     def setup(self, *args, **kwargs):
+        resume_checkpoint_path = self.trainer._checkpoint_connector.resume_from_checkpoint_fit_path
+
+        if resume_checkpoint_path:
+            init_consumed_samples = self._extract_consumed_samples_from_ckpt(resume_checkpoint_path)
+        else:
+            init_consumed_samples = 0
+
+        self.init_consumed_samples = init_consumed_samples
+
         super().setup(*args, **kwargs)
         self.custom_setup()
 
@@ -220,34 +227,95 @@ class SpliceSiteBERTPredictionModel(ModelPT, Exportable):
 
     def _calc_step(self, batch, batch_idx):
         output_tensor = self.forward(batch)
-        # TODO make target name configurable?
-        loss = self.loss_fn(output_tensor, batch['target'])
+        loss = self.loss_fn(output_tensor, batch[self.batch_target_name])
         return loss
 
     def training_step(self, batch, batch_idx):
         # TODO: I think we need a more sophisticated solution for DDP loss
         # TODO: ^ reference NeMo
         loss = self._calc_step(batch, batch_idx)
-        self.log('train_loss', loss, prog_bar=True)
+        reduced_loss = average_losses_across_data_parallel_group([loss])
+        self.log('reduced_train_loss', reduced_loss, prog_bar=True)
+        # if we wanted to enable gradient accumulation across batches we could
+        # do something more sophisticated like megatron BERT:
+        # https://github.com/NVIDIA/NeMo/blob/c9811f14fa1e1f990fd29f1aed1ae08e2ff6b014/nemo/collections/nlp/models/language_modeling/megatron_bert_model.py#L132-L154
+        # self.log('train_loss', loss, prog_bar=True)
+        self.log_stats()
         return loss
+
+    def log_stats(self):
+        lr = self._optimizer.param_groups[0]['lr']
+        self.log('lr', lr)
+        self.log('global_step', self.trainer.global_step, prog_bar=True)
+        # self.log(
+        #     'consumed_samples',
+        #     self.compute_consumed_samples(self.trainer.global_step - self.init_global_step),
+        #     prog_bar=True,
+        # )
+
+    # # TODO incorporate this
+    def build_pretraining_data_loader(self, dataset, consumed_samples):
+        """Buld dataloader given an input dataset."""
+
+        if dataset is None:
+            return None
+
+        # Megatron sampler
+        if hasattr(self.cfg.data, 'dataloader_type') and self.cfg.data.dataloader_type is not None:
+            if self.cfg.data.dataloader_type == 'single':
+                batch_sampler = MegatronPretrainingSampler(
+                    total_samples=len(dataset),
+                    consumed_samples=consumed_samples,
+                    micro_batch_size=self.cfg.micro_batch_size,
+                    data_parallel_rank=parallel_state.get_data_parallel_rank(),
+                    data_parallel_size=parallel_state.get_data_parallel_world_size(),
+                )
+            elif self.cfg.data.dataloader_type == 'cyclic':
+                batch_sampler = MegatronPretrainingRandomSampler(
+                    total_samples=len(dataset),
+                    consumed_samples=consumed_samples,
+                    micro_batch_size=self.cfg.micro_batch_size,
+                    data_parallel_rank=parallel_state.get_data_parallel_rank(),
+                    data_parallel_size=parallel_state.get_data_parallel_world_size(),
+                )
+            else:
+                raise ValueError('cfg.data.dataloader_type must be "single" or "cyclic"')
+        else:
+            raise ValueError('cfg.data.dataloader_type not found. Must be "single" or "cyclic"')
+
+        # Torch dataloader.
+        return torch.utils.data.DataLoader(
+            dataset, batch_sampler=batch_sampler, num_workers=self.cfg.data.num_workers, pin_memory=True,
+        )
 
     def validation_step(self, batch, batch_idx):
         loss = self._calc_step(batch, batch_idx)
-        self.log('val_loss', loss)
-        return loss
+        reduced_loss = average_losses_across_data_parallel_group([loss])
+        return reduced_loss
+
+    def validation_epoch_end(self, outputs):
+        averaged_loss = torch.stack(outputs).mean()
+        self.log('val_loss', averaged_loss, prog_bar=True)
 
     def _build_train_valid_datasets(self):
         self._train_ds = self.data_module.get_sampled_train_dataset()
         self._validation_ds = self.data_module.get_sampled_val_dataset()
 
     def setup_training_data(self, cfg):
-        # TODO look at NeMo DataLoader instantiation and make sure arguments are correct
-        self._train_dl = DataLoader(self._train_ds, batch_size=cfg.micro_batch_size, drop_last=True)
+        consumed_samples = self.compute_consumed_samples(0)
+        logging.info(
+            f'Setting up train dataloader with len(len(self._train_ds)): {len(self._train_ds)} and consumed samples: {consumed_samples}'
+        )
+        self._train_dl = self.build_pretraining_data_loader(self._train_ds, consumed_samples)
         self.data_module.adjust_train_dataloader(self, self._train_dl)
+        print(len(self._train_dl))
 
     def setup_validation_data(self, cfg):
-        # TODO look at NeMo DataLoader instantiation and make sure arguments are correct
-        self._train_dl = DataLoader(self._train_ds, batch_size=cfg.micro_batch_size, drop_last=True)
+        consumed_samples = 0
+        logging.info(
+            f'Setting up validation dataloader with len(len(self._validation_ds)): {len(self._validation_ds)} and consumed samples: {consumed_samples}'
+        )
+        self._validation_dl = self.build_pretraining_data_loader(self._validation_ds, consumed_samples)
         self.data_module.adjust_val_dataloader(self, self._validation_dl)
 
 model = SpliceSiteBERTPredictionModel(cfg.model, trainer)
