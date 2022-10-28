@@ -74,7 +74,7 @@ class SpliceSiteEntry(GFFEntry):
             Optional[str]: The value of the Parent field in the attribute column, None if no such field exists.
         """
         # We might want to propagate the KeyError on failure.
-        return self.attributes_as_dict().get("Parent")
+        return self.attributes_as_dict()["Parent"]
 
 
 T = TypeVar('T', bound=GFFEntry)
@@ -204,7 +204,7 @@ def _get_donors_acceptors(exons: List[SpliceSiteEntry]) -> Tuple[List[int], List
             elif exon.strand == "-":
                 donors.append(exon.start)
             else:
-                '?'
+                raise ValueError(f"Unexpected strand detected: {exon.strand}")
 
         # Ignore the last exon for donors on the forward strand, and for acceptors on the reverse strand
         if i < len(exons) - 1:
@@ -213,6 +213,6 @@ def _get_donors_acceptors(exons: List[SpliceSiteEntry]) -> Tuple[List[int], List
             elif exon.strand == "-":
                 acceptors.append(exon.end)
             else:
-                '?'
+                raise ValueError(f"Unexpected strand detected: {exon.strand}")                
 
     return donors, acceptors
