@@ -39,9 +39,12 @@ class SpliceSiteDataModule(BioNeMoDataModule):
         fasta_directory = cfg.data.fasta_directory
         pattern = cfg.data.fasta_pattern
         chroms = get_chroms_1_22(fasta_directory, pattern)
+        # TODO set length from config
         self.length = 400
-        # TODO load from config
-        self.fasta_dataset = ConcatFastaDataset(chroms, self.length, backend='memory')
+        # TODO set chroms from config
+        self.fasta_dataset = ConcatFastaDataset(
+            chroms, self.length, backend='memory',
+        )
         super().__init__(cfg, trainer)
         self.init_num_samples()
 
@@ -57,21 +60,12 @@ class SpliceSiteDataModule(BioNeMoDataModule):
         gff_dataset = self._create_dataset(self.val_file)
         return gff_dataset
 
-    # def fake_data(self, row):
-    #     mid = row.coord
-    #     start, end = get_start_end(mid, self.length)
-    #     text = self.fasta_dataset.fetch(row.id, start, end)
-    #     return {
-    #         'tokens': np.zeros(512, dtype=np.int64),
-    #         'labels': np.zeros(512, dtype=np.int64),
-    #         'loss_mask': np.zeros(512, dtype=np.int64),
-    #         'padding_mask': np.zeros(512, dtype=np.int64),
-    #     }
-
     def _create_dataset(self, filename):
         bert_prep = KmerBertCollate(
             self.model.tokenizer,
+            # TODO can make modify_percent configurable
             modify_percent=0,
+            # TODO make 512 configurable
             seq_length=512,
             pad_size_divisible_by_8=True,
         ).collate_fn
@@ -83,9 +77,9 @@ class SpliceSiteDataModule(BioNeMoDataModule):
                     fetch_bert_dna,
                     dataset=self.fasta_dataset,
                     bert_prep=bert_prep,
+                    # TODO make length configurable
                     length=400
                 ),
-                # self.fake_data,
                 get_target,
             ],
             read_csv_args={'dtype': {'id': str}}
@@ -99,6 +93,7 @@ class SpliceSiteDataModule(BioNeMoDataModule):
 
         """
         num_samples = self.train_num_samples
+        # TODO make this configurable from config
         dataset_dir = '/tmp' #os.path.join(self.cfg.dataset_path, 'train',)
         dataset = NeMoUpsampling(
             dataset, num_samples=num_samples,
@@ -112,6 +107,7 @@ class SpliceSiteDataModule(BioNeMoDataModule):
 
     def sample_val_dataset(self, dataset):
         num_samples = self.val_num_samples
+        # TODO make this configurable from config
         dataset_dir = '/tmp' #os.path.join(self.cfg.dataset_path, 'val',)
         dataset = NeMoUpsampling(
             dataset, num_samples=num_samples,
