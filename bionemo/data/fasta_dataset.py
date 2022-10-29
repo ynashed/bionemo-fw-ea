@@ -159,18 +159,18 @@ class FastaDataset(Dataset):
         }
 
 
-class Discretize(MappedDataset):
+class DiscretizeFastaDataset(MappedDataset):
 
     def __init__(self, dataset: FastaDataset):
         """
         Produces a discretized version of a `FastaDataset`.
 
-        The `__getitem__` call of `FastaDataset` can provide overlapping
-        sections of the sequence, e.g., `ACGT` with a sequence length of 2
-        can return `AC`, `CG`, `GT`, and `T`. `Discretize` wraps the
-        `FastaDatset` to produce non-overlapping subsections, e.g.: a dataset
-        built on `ACGT` with sequence length of 2 will only yield `AC` and
-        `GT`.
+        `DiscretizeFastaDataset` wraps a `FastaDatset` to produce non-overlapping
+        subsections, e.g.: a dataset built on `ACGT` with sequence length of 2
+        will only yield `AC` and `GT`. This is in contrast to the
+        `FastaDataset`, which provides overlapping sections of the sequence,
+        e.g., `ACGT` with a sequence length of 2 will return `AC`, `CG`, `GT`,
+        and `T`.
 
         Arguments:
             dataset (FastaDataset): a dataset to discretize. The chunk size
@@ -345,7 +345,7 @@ class FastaDatasetBuilder(DatasetBuilderSpec):
             List[Callable[[Dataset], Dataset]]: Dataset transformations
 
         """
-        transforms = [Discretize,] if discretize else []
+        transforms = [DiscretizeFastaDataset,] if discretize else []
         return transforms
 
 
@@ -431,7 +431,7 @@ class FastaDatasetBuilder(DatasetBuilderSpec):
             List[Callable[[Dataset], Dataset]]: Dataset transformations
 
         """
-        transforms = [Discretize,] if discretize else []
+        transforms = [DiscretizeFastaDataset,] if discretize else []
         return transforms
 
 

@@ -17,7 +17,7 @@ import gzip
 import pytest
 import tempfile
 from bionemo.data.fasta_dataset import (
-    FastaDataset, ConcatFastaDataset, Discretize,
+    FastaDataset, ConcatFastaDataset, DiscretizeFastaDataset,
     BACKENDS,
 )
 import pyfastx
@@ -76,7 +76,7 @@ def test_discrete_fasta_dataset(idx, sequence, backend):
         fh.write('>seq1\nACAGAT\nTCGAC\n>seq2\nTAT\n>seq3\nTACCAT\n')
 
     fa = pyfastx.Fasta(fasta_file.name)
-    dataset = Discretize(FastaDataset(fa, 4, backend=backend))
+    dataset = DiscretizeFastaDataset(FastaDataset(fa, 4, backend=backend))
     assert dataset[idx]['seq'] == sequence
 
 test_examples_multiple_files = [
@@ -153,6 +153,6 @@ def test_fasta_dataset_multiple_files_discrete(
         [fasta_file_1.name, fasta_file_2.name],
         max_length=4,
         backend=backend,
-        transforms=[Discretize,]
+        transforms=[DiscretizeFastaDataset,]
         )
     assert dataset[idx]['seq'] == sequence

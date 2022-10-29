@@ -104,7 +104,6 @@ class BioNeMoDataModule(object):
         """
         pass
 
-    @abstractmethod
     def adjust_val_dataloader(self, model, dataloader):
         """Allows adjustments to the validation dataloader
 
@@ -113,7 +112,6 @@ class BioNeMoDataModule(object):
         """
         pass
 
-    @abstractmethod
     def adjust_test_dataloader(self, model, dataloader):
         """Allows adjustments to the testing dataloader
 
