@@ -31,31 +31,8 @@ spec:
     timeout(time: 120, unit: 'MINUTES') {
         node(POD_LABEL) {
             gitlabCommitStatus {
-                try {                
-                    stage('Build NeMo Image') {
-                        container('docker-dind') {
-                            sh "docker --version"      
-                            checkout([
-                                $class: 'GitSCM',
-                                branches: [[name: "*/${params.NEMO_BRANCH}"]], 
-                                doGenerateSubmoduleConfigurations: false, 
-                                extensions: [
-                                    [$class: 'CleanCheckout'], [$class: 'CheckoutOption', timeout: 120], [$class: 'GitLFSPull']
-                                ], 
-                                submoduleCfg: [], 
-                                userRemoteConfigs: [[url: "https://github.com/NVIDIA/NeMo.git"]]
-                            ])
-                            
-                            withCredentials([string(credentialsId: 'NGC_TOKEN', variable: 'NGC_TOKEN')]) {
-                                sh "docker login nvcr.io -u '\$oauthtoken' -p ${NGC_TOKEN}"
-                            }
-                            
-                            sh "DOCKER_BUILDKIT=1 docker build -f Dockerfile -t nvcr.io/nvidian/clara-lifesciences/bionemo_training:latest ."
-                            sh "docker push nvcr.io/nvidian/clara-lifesciences/bionemo_training:latest"
-                        }
-                    }
-                    
-                    stage('Build MegaMolBART image') {
+                try {                                    
+                    stage('Build BioNeMo') {
                         container('docker-dind') {
                             withCredentials([string(credentialsId: 'GITLAB_TOKEN_GKAUSHIK_STR', variable: 'GITLAB_TOKEN')]) {
                                 checkout([
@@ -78,7 +55,6 @@ spec:
                                 -t nvcr.io/nvidian/clara-lifesciences/bionemo_ci:latest \
                                 --build-arg GITHUB_ACCESS_TOKEN=${GITLAB_TOKEN} \
                                 --build-arg GITHUB_BRANCH=${params.BRANCH_NAME} \
-                                --build-arg BASE_IMAGE=nvcr.io/nvidian/clara-lifesciences/bionemo_training:latest \
                                 --no-cache \
                                 -f setup/Dockerfile .
                                 """
@@ -89,7 +65,7 @@ spec:
                         }
                     }
 
-                    stage('Call run_megamolbart_tests script') {
+                    stage('Run tests') {
                         build job: 'nemo-bionemo-run-gpu-tests', parameters: [
                             string(name: 'BRANCH_NAME', value: params.BRANCH_NAME)
                         ]
