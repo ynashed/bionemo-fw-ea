@@ -81,7 +81,7 @@ case $ARGS in
         ;;
 esac
 
-RES=$(cat ${RESULTS_MOUNT}/cmdline_prints | grep "Epoch 0:  99%" | sed 's/^.*\ loss/loss/' | sed 's/.$//')
+RES=$(cat ${RESULTS_MOUNT}/cmdline_prints | grep "Epoch 0:  99%" | sed 's/^.*\ loss/loss/' | sed 's/.$//') 
 arrRes=(${RES//,/ })
 echo ${arrRes[0]}" "${arrRes[2]}" "${arrRes[3]}" "${arrRes[4]} >& ${RESULTS_MOUNT}/result_log
 
