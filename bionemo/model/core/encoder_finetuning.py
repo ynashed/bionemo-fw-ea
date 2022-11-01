@@ -36,6 +36,7 @@ class EncoderFineTuning(ModelPT, Exportable):
             * self.cfg.micro_batch_size
             * self.trainer.accumulate_grad_batches
         )
+        # TODO it seems like this is off by batch_size...
         return int(consumed_samples)
 
     def list_available_models(self):
