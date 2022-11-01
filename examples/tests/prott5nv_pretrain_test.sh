@@ -94,6 +94,7 @@ if [ $DIFF_PASSED -ne 0 ]
 then
     echo -e "${RED}FAIL${NC}"
     echo "$DIFF"
+    cat "${RESULTS_MOUNT}/cmdline_prints"
     exit 1
 else
     echo -e "${GREEN}PASS${NC}"
