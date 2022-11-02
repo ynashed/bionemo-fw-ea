@@ -88,16 +88,18 @@ class SpliceSiteDataModule(BioNeMoDataModule):
         self.model = model
         self.train_file = cfg.data.train_file
         self.val_file = cfg.data.val_file
-        fasta_directory = cfg.data.fasta_directory
-        pattern = cfg.data.fasta_pattern
-        chroms = get_chroms_1_22(fasta_directory, pattern)
+        fasta_files = self.get_fasta_files()
         self.length = cfg.seq_length
-        # TODO set chroms from config
         self.fasta_dataset = ConcatFastaDataset(
-            chroms, self.length, backend='memory',
+            fasta_files, self.length, backend='memory',
         )
         super().__init__(cfg, trainer)
         self.init_num_samples()
+
+    def get_fasta_files(self):
+        fasta_directory = self.cfg.data.fasta_directory
+        pattern = self.cfg.data.fasta_pattern
+        return get_chroms_1_22(fasta_directory, pattern)
 
     def train_dataset(self):
         gff_dataset = self._create_dataset(self.train_file)
