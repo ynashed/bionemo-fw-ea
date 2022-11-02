@@ -112,7 +112,6 @@ def test_end_to_end():
     print(list(parent_lookup.keys())[0])
     print(list(donor_acceptors_midpoints.keys())[0])
 
-    return
 
     fasta = pyfastx.Fasta("/workspace/nemo_chem/Homo_sapiens.GRCh38.dna.chromosome.16.fa")
     d_counter = Counter()
