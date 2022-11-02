@@ -10,10 +10,10 @@ base_cfg = OmegaConf.load(base_cfg_file)
 cfg = OmegaConf.load(cfg_file)
 cfg = OmegaConf.merge(base_cfg, cfg)
 
-cfg.trainer['strategy'] = None
-cfg.exp_manager.wandb_logger_kwargs.notes = ''
-cfg.exp_manager.wandb_logger_kwargs.offline = True
-cfg.model.tokenizer.k = 3
+# cfg.trainer['strategy'] = None
+# cfg.exp_manager.wandb_logger_kwargs.notes = ''
+# cfg.exp_manager.wandb_logger_kwargs.offline = True
+# cfg.model.tokenizer.k = 3
 ckpt = '/workspace/bionemo/examples/dna/nemo_experiments/dnabert/2022-10-25_00-04-34/checkpoints/dnabert--val_loss=8.57-step=760400-consumed_samples=3041600.0-last.ckpt'
 cfg.trainer.max_steps = 5000 # consumed_samples = global_step * micro_batch_size * data_parallel_size * accumulate_grad_batches
 

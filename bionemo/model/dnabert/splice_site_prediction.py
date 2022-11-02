@@ -1,3 +1,4 @@
+from omegaconf import OmegaConf
 from torch import nn
 from bionemo.model.dnabert import DNABERTModel
 from bionemo.data.dna.splice_site_dataset import SpliceSiteDataModule
@@ -9,34 +10,35 @@ class SpliceSiteBERTPredictionModel(EncoderFineTuning):
     def __init__(self, cfg, trainer):
         super().__init__(cfg, trainer=trainer)
 
-        # START: Unique Setup
-        # TODO make number_of_classes (3) configurable for classificaiton
-        # TODO make other NN MLP parameters configurable
-        # TODO make MLPModel configurable
-        self.task_head = MLPModel(layer_sizes=[cfg.hidden_size, 3], dropout=0.1)
+        self.task_head = MLPModel(layer_sizes=[cfg.hidden_size, cfg.n_outputs],
+            dropout=0.1,
+        )
 
-        # TODO make the loss configurable
         self.loss_fn = nn.CrossEntropyLoss() #define a loss function
-        # TODO make target name configurable from cfg?
-        self.batch_target_name = 'target'
-        # TODO double check that this index is the correct one (according to get mid point function)
-        # TODO and make it based off of the sequence length
-        self.extract_idx = 200
-
-    def modify_encoder_model(self, encoder_model):
-        encoder_model.model.post_process = False
+        self.batch_target_name = cfg.target_name
+        # use this to get the embedding of the midpoint of the sequence
+        self.extract_idx = (cfg.seq_length - 1) // 2
 
     def setup_encoder_model(self, cfg, trainer):
         # TODO this could be refactored to instantiate a new model if no
         # checkpoint is specified
 
+        # TODO P0: check checkpoint behavior. does it load
+        # the encoder from the original specified file?
+        # OR does the encoder end up with the trained parameters
+        # from training this model
+
+        encoder_cfg = OmegaConf.load(cfg.encoder.hparams).cfg
+        # TODO do we need to override any keys in the encoder_cfg?
+        # e.g., tensor_model_parallel_size and pipeline_model_parallel_size
         model = DNABERTModel.load_from_checkpoint(
-            # TODO grab ckpt from config
-            cfg.encoder_checkpoint,
-            cfg=cfg,
+            cfg.encoder.checkpoint,
+            cfg=encoder_cfg,
             trainer=trainer,
         )
-        self.modify_encoder_model(model)
+        # TODO should we be doing this with some sort of
+        # context management so it can be reversed?
+        model.model.post_process = False
 
         return model
 
@@ -50,7 +52,7 @@ class SpliceSiteBERTPredictionModel(EncoderFineTuning):
     def encoder_forward(self, bert_model, batch: dict):
         tokens, types, _, _, lm_labels, padding_mask = \
             bert_model.process_batch(batch)
-        if not self.cfg.bert_binary_head:
+        if not bert_model.cfg.bert_binary_head:
             types = None
         output_tensor = bert_model(tokens, padding_mask, token_type_ids=types, lm_labels=lm_labels)
         return output_tensor

@@ -63,8 +63,8 @@ class ChrSpliceSitesDataset(Dataset):
         return len(self._dataset)
 
 def get_start_end(coord, length):
-    start = int(coord - math.ceil(length / 2))
-    end = int(coord + math.floor(length / 2))
+    start = int(coord - math.ceil(length / 2)) + 1
+    end = int(coord + math.floor(length / 2)) + 1
     return start, end
 
 def fetch_bert_dna(row: pd.Series, dataset: FastaDataset, bert_prep, length):
@@ -115,10 +115,8 @@ class SpliceSiteDataModule(BioNeMoDataModule):
     def _create_dataset(self, filename):
         bert_prep = KmerBertCollate(
             self.model.tokenizer,
-            # TODO can make modify_percent configurable
             modify_percent=0,
-            # TODO make 512 configurable
-            seq_length=512,
+            seq_length=self.length,
             pad_size_divisible_by_8=True,
         ).collate_fn
 
@@ -129,8 +127,7 @@ class SpliceSiteDataModule(BioNeMoDataModule):
                     fetch_bert_dna,
                     dataset=self.fasta_dataset,
                     bert_prep=bert_prep,
-                    # TODO make length configurable
-                    length=400
+                    length=self.length,
                 ),
                 get_target,
             ],
@@ -149,7 +146,7 @@ class SpliceSiteDataModule(BioNeMoDataModule):
         dataset = NeMoUpsampling(
             dataset, num_samples=num_samples,
             cfg=self.cfg,
-            data_prefix=self.cfg.dataset.train,
+            data_prefix=self.cfg.train_file,
             index_mapping_dir=dataset_dir,
             name='train',
             )
@@ -163,7 +160,7 @@ class SpliceSiteDataModule(BioNeMoDataModule):
         dataset = NeMoUpsampling(
             dataset, num_samples=num_samples,
             cfg=self.cfg,
-            data_prefix=self.cfg.dataset.val,
+            data_prefix=self.cfg.val_file,
             index_mapping_dir=dataset_dir,
             name='val',
             )
