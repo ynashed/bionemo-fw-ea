@@ -91,8 +91,7 @@ class SpliceSiteDataModule(BioNeMoDataModule):
         fasta_directory = cfg.data.fasta_directory
         pattern = cfg.data.fasta_pattern
         chroms = get_chroms_1_22(fasta_directory, pattern)
-        # TODO set length from config
-        self.length = 400
+        self.length = cfg.seq_length
         # TODO set chroms from config
         self.fasta_dataset = ConcatFastaDataset(
             chroms, self.length, backend='memory',
