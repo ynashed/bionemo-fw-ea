@@ -13,25 +13,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-PTL_TESTS=\
-	test_megamolbart_inference.py \
-	test_prott5nv_inference.py \
-	test_esm1nv_inference.py \
-	test_dnabert_training.py
+import pytest
+from bionemo.data.utils import (
+    SliceDataset,
+)
+import torch
+from torch.utils.data import TensorDataset
 
-PYTEST_FLAGS=
 
-space=$(noop) $(noop)
+test_dataset = TensorDataset(
+    torch.tensor(torch.arange(24 * 3).reshape(24, 3))
+)
 
-test: pytest test-examples
 
-pytest: pytest-no-lightning pytest-lightning
+start_end_length = [
+    (0, 9, 9),
+    (1, 7, 6),
+    (3, 3, 0),
+    (9, 24, 15),
+    (3, -1, 20),
+    (-5, -2, 3),
+]
 
-pytest-no-lightning:
-	py.test $(PYTEST_FLAGS)$(subst $(space), --ignore , $(PTL_TESTS))
-
-pytest-lightning:
-	$(foreach test,$(PTL_TESTS),py.test $(PYTEST_FLAGS) $(test);)
-
-test-examples:
-	make -C ../examples/tests test
+@pytest.mark.parametrize('start,end,length', start_end_length)
+def test_slice_dataset(start, end, length):
+    dataset = SliceDataset(test_dataset, start, end)
+    assert len(dataset) == length
