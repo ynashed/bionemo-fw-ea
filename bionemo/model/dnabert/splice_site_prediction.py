@@ -14,10 +14,15 @@ class SpliceSiteBERTPredictionModel(EncoderFineTuning):
             dropout=0.1,
         )
 
-        self.loss_fn = nn.CrossEntropyLoss() #define a loss function
         self.batch_target_name = cfg.target_name
         # use this to get the embedding of the midpoint of the sequence
         self.extract_idx = (cfg.seq_length - 1) // 2
+
+    def build_loss_fn(self):
+        return nn.CrossEntropyLoss()
+
+    def get_target_from_batch(self, batch):
+        return batch[self.batch_target_name]
 
     def setup_encoder_model(self, cfg, trainer):
         # TODO this could be refactored to instantiate a new model if no

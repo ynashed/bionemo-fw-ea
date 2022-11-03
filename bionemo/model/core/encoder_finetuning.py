@@ -26,6 +26,7 @@ class EncoderFineTuning(ModelPT, Exportable):
         self.cfg = cfg
         self.encoder_model = self.setup_encoder_model(cfg, trainer)
         self.init_consumed_samples = 0
+        self.loss_fn = self.build_loss_fn()
 
     def compute_consumed_samples(self, steps_since_resume=0):
         app_state = AppState()
@@ -70,6 +71,14 @@ class EncoderFineTuning(ModelPT, Exportable):
     def encoder_forward(self, bert_model, batch: dict):
         pass
 
+    @abstractmethod
+    def build_loss_fn(self):
+        pass
+
+    @abstractmethod
+    def get_target_from_batch(self, batch):
+        pass
+
     # doing dataset (custom) setup in the normal set up method ensures that
     # distributed is initialized appropriately by the time the data is loaded,
     # since distributed is needed for NeMo upsampling
@@ -103,7 +112,7 @@ class EncoderFineTuning(ModelPT, Exportable):
 
     def _calc_step(self, batch, batch_idx):
         output_tensor = self.forward(batch)
-        loss = self.loss_fn(output_tensor, batch[self.batch_target_name])
+        loss = self.loss_fn(output_tensor, self.get_target_from_batch(batch))
         return loss
 
     def training_step(self, batch, batch_idx):
