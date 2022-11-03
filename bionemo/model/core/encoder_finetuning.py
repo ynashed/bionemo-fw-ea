@@ -1,7 +1,5 @@
 from abc import abstractmethod
-import re
 import torch
-from nemo.utils.app_state import AppState
 from nemo.utils import logging
 from nemo.core.classes import ModelPT
 from nemo.core.classes.exportable import Exportable
@@ -13,6 +11,10 @@ from nemo.collections.nlp.data.language_modeling.megatron.data_samplers import (
     MegatronPretrainingSampler,
 )
 from apex.transformer import parallel_state
+from bionemo.model.utils import (
+    extract_consumed_samples_from_ckpt,
+    compute_consumed_samples,
+)
 
 
 class EncoderFineTuning(ModelPT, Exportable):
@@ -27,26 +29,6 @@ class EncoderFineTuning(ModelPT, Exportable):
         self.encoder_model = self.setup_encoder_model(cfg, trainer)
         self.init_consumed_samples = 0
         self.loss_fn = self.build_loss_fn()
-
-    def compute_consumed_samples(self, steps_since_resume=0):
-        app_state = AppState()
-        consumed_samples = (
-            self.init_consumed_samples
-            + steps_since_resume
-            * app_state.data_parallel_size
-            * self.cfg.micro_batch_size
-            * self.trainer.accumulate_grad_batches
-        )
-        return int(consumed_samples)
-
-    def _extract_consumed_samples_from_ckpt(self, ckpt_path):
-        try:
-            init_consumed_samples = int(float(re.findall(r"consumed_samples\=([0-9]+.[0-9]+)", ckpt_path)[0]))
-        except (ValueError, TypeError, IndexError):
-            logging.warning("Cannot parse the checkpoint file to get the consumed samples. assume it is zero.")
-            init_consumed_samples = 0
-
-        return init_consumed_samples
 
     def list_available_models(self):
         return []
@@ -88,7 +70,7 @@ class EncoderFineTuning(ModelPT, Exportable):
         resume_checkpoint_path = self.trainer._checkpoint_connector.resume_from_checkpoint_fit_path
 
         if resume_checkpoint_path:
-            init_consumed_samples = self._extract_consumed_samples_from_ckpt(resume_checkpoint_path)
+            init_consumed_samples = extract_consumed_samples_from_ckpt(resume_checkpoint_path)
         else:
             init_consumed_samples = 0
 
@@ -131,7 +113,7 @@ class EncoderFineTuning(ModelPT, Exportable):
         self.log('global_step', self.trainer.global_step, prog_bar=True)
         self.log(
             'consumed_samples',
-            self.compute_consumed_samples(self.trainer.global_step - self.init_global_step + 1),
+            compute_consumed_samples(self, self.trainer.global_step - self.init_global_step + 1),
             prog_bar=True,
         )
 
@@ -182,7 +164,7 @@ class EncoderFineTuning(ModelPT, Exportable):
 
     def setup_training_data(self, cfg):
         if hasattr(self, '_train_ds'):
-            consumed_samples = self.compute_consumed_samples(0)
+            consumed_samples = compute_consumed_samples(self, 0)
             logging.info(
                 f'Setting up train dataloader with len(len(self._train_ds)): {len(self._train_ds)} and consumed samples: {consumed_samples}'
             )
