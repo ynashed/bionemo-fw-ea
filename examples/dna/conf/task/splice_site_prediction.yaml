@@ -52,8 +52,8 @@ model:
     train_file: ???
     val_file: null
     test_file: null
-    fasta_directory: ???
-    fasta_pattern: ???
+    fasta_directory: ??? # Directory where reference chromosomes are stored
+    fasta_pattern: ??? # Template for reference chromosome filenames: e.g., chr{}.fa will correspond to files: chr1.fa, chr2.fa, ...
     seq_length: ${..seq_length}
     seed: ${..seed}
     dataloader_type: 'single'
