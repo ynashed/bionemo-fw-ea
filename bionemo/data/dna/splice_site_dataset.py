@@ -85,9 +85,11 @@ def get_chroms_1_22(root_directory, pattern):
 class SpliceSiteDataModule(BioNeMoDataModule):
 
     def __init__(self, cfg, trainer, model):
+        self.cfg = cfg
         self.model = model
         self.train_file = cfg.data.train_file
-        self.val_file = cfg.data.val_file
+        self.val_file = cfg.data.get('val_file')
+        self.test_file = cfg.data.get('test_file')
         fasta_files = self.get_fasta_files()
         self.length = cfg.seq_length
         self.fasta_dataset = ConcatFastaDataset(
@@ -106,11 +108,15 @@ class SpliceSiteDataModule(BioNeMoDataModule):
         return gff_dataset
 
     def val_dataset(self):
+        if self.val_file is None:
+            return []
         gff_dataset = self._create_dataset(self.val_file)
         return gff_dataset
 
     def test_dataset(self):
-        gff_dataset = self._create_dataset(self.val_file)
+        if self.test_file is None:
+            return []
+        gff_dataset = self._create_dataset(self.test_file)
         return gff_dataset
 
     def _create_dataset(self, filename):
@@ -142,8 +148,7 @@ class SpliceSiteDataModule(BioNeMoDataModule):
 
         """
         num_samples = self.train_num_samples
-        # TODO make this configurable from config
-        dataset_dir = os.path.join(self.cfg.dataset_path, 'train',)
+        dataset_dir = self.cfg.dataset_path
         dataset = NeMoUpsampling(
             dataset, num_samples=num_samples,
             cfg=self.cfg,
@@ -155,9 +160,10 @@ class SpliceSiteDataModule(BioNeMoDataModule):
         return dataset
 
     def sample_val_dataset(self, dataset):
+        if len(dataset) == 0:
+            return dataset
         num_samples = self.val_num_samples
-        # TODO make this configurable from config
-        dataset_dir = os.path.join(self.cfg.dataset_path, 'val',)
+        dataset_dir = self.cfg.dataset_path
         dataset = NeMoUpsampling(
             dataset, num_samples=num_samples,
             cfg=self.cfg,

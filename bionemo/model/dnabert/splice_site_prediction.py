@@ -23,11 +23,6 @@ class SpliceSiteBERTPredictionModel(EncoderFineTuning):
         # TODO this could be refactored to instantiate a new model if no
         # checkpoint is specified
 
-        # TODO P0: check checkpoint behavior. does it load
-        # the encoder from the original specified file?
-        # OR does the encoder end up with the trained parameters
-        # from training this model
-
         encoder_cfg = OmegaConf.load(cfg.encoder.hparams).cfg
         # TODO do we need to override any keys in the encoder_cfg?
         # e.g., tensor_model_parallel_size and pipeline_model_parallel_size
@@ -64,5 +59,12 @@ class SpliceSiteBERTPredictionModel(EncoderFineTuning):
         self.build_train_valid_test_datasets()
 
     def build_train_valid_test_datasets(self):
+        # if we want to make _train_ds optional for testing, we should be able
+        # to enforce it with something like an `on_fit_start` method
         self._train_ds = self.data_module.get_sampled_train_dataset()
-        self._validation_ds = self.data_module.get_sampled_val_dataset()
+        val_dataset = self.data_module.get_sampled_val_dataset()
+        if len(val_dataset) > 0:
+            self._validation_ds = val_dataset
+        test_dataset = self.data_module.get_sampled_test_dataset()
+        if len(test_dataset) > 0:
+            self._test_ds = test_dataset

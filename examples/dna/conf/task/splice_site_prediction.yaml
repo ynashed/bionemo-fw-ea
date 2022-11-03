@@ -50,7 +50,8 @@ model:
   data:
     dataset_path: ??? # root directory for saving memory maps
     train_file: ???
-    val_file: ???
+    val_file: null
+    test_file: null
     fasta_directory: ???
     fasta_pattern: ???
     seq_length: ${..seq_length}
@@ -62,7 +63,7 @@ model:
     hparams: ???
   n_outputs: 3
   hidden_size: 768
-  target_name: 'target'
+  target_name: ???
   seq_length: 400
 
   optim:

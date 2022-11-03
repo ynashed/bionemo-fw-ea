@@ -1,4 +1,5 @@
 from abc import abstractmethod
+import re
 import torch
 from nemo.utils.app_state import AppState
 from nemo.utils import logging
@@ -24,7 +25,6 @@ class EncoderFineTuning(ModelPT, Exportable):
                 " for Trainer.accumulate_grad_batches = 1")
         self.cfg = cfg
         self.encoder_model = self.setup_encoder_model(cfg, trainer)
-        # TODO this must change to resume training from a checkpoint
         self.init_consumed_samples = 0
 
     def compute_consumed_samples(self, steps_since_resume=0):
@@ -36,8 +36,16 @@ class EncoderFineTuning(ModelPT, Exportable):
             * self.cfg.micro_batch_size
             * self.trainer.accumulate_grad_batches
         )
-        # TODO it seems like this is off by batch_size...
         return int(consumed_samples)
+
+    def _extract_consumed_samples_from_ckpt(self, ckpt_path):
+        try:
+            init_consumed_samples = int(float(re.findall(r"consumed_samples\=([0-9]+.[0-9]+)", ckpt_path)[0]))
+        except (ValueError, TypeError, IndexError):
+            logging.warning("Cannot parse the checkpoint file to get the consumed samples. assume it is zero.")
+            init_consumed_samples = 0
+
+        return init_consumed_samples
 
     def list_available_models(self):
         return []
@@ -45,9 +53,6 @@ class EncoderFineTuning(ModelPT, Exportable):
     def on_train_start(self) -> None:
         super().on_train_start()
         self.init_global_step = self.trainer.global_step
-
-    def modify_encoder_model(self, encoder_model):
-        pass
 
     def configure_optimizers(self):
         # TODO do we need to configure a distributed optimizer?, similar to here:
@@ -117,7 +122,7 @@ class EncoderFineTuning(ModelPT, Exportable):
         self.log('global_step', self.trainer.global_step, prog_bar=True)
         self.log(
             'consumed_samples',
-            self.compute_consumed_samples(self.trainer.global_step - self.init_global_step),
+            self.compute_consumed_samples(self.trainer.global_step - self.init_global_step + 1),
             prog_bar=True,
         )
 
@@ -160,7 +165,10 @@ class EncoderFineTuning(ModelPT, Exportable):
         return reduced_loss
 
     def validation_epoch_end(self, outputs):
-        averaged_loss = torch.stack(outputs).mean()
+        if len(outputs) > 0:
+            averaged_loss = torch.stack(outputs).mean()
+        else:
+            averaged_loss = torch.nan
         self.log('val_loss', averaged_loss, prog_bar=True)
 
     def setup_training_data(self, cfg):

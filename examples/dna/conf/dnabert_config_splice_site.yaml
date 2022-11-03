@@ -5,11 +5,12 @@ task:
   trainer:
     devices: 1
     val_check_interval: 100
-    max_steps: 5000
+    max_steps: 6000
 
   model:
+    target_name: 'target'
     data:
-      dataset_path: /workspace/bionemo/examples/dna/data/small-example
+      dataset_path: /workspace/bionemo/examples/dna/data/splice-site-prediction/sampled-data-10k/
       gff_csv: /workspace/bionemo/examples/dna/data/splice-site-prediction/sampled-data-10k/sampled-data.csv
       train_file: ${.gff_csv} # TODO train-val-test split
       val_file: ${.gff_csv} # TODO train-val-test split
