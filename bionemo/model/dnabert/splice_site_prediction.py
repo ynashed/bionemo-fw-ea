@@ -10,16 +10,17 @@ class SpliceSiteBERTPredictionModel(EncoderFineTuning):
     def __init__(self, cfg, trainer):
         super().__init__(cfg, trainer=trainer)
 
-        self.task_head = MLPModel(layer_sizes=[cfg.hidden_size, cfg.n_outputs],
-            dropout=0.1,
-        )
-
         self.batch_target_name = cfg.target_name
         # use this to get the embedding of the midpoint of the sequence
         self.extract_idx = (cfg.seq_length - 1) // 2
 
     def build_loss_fn(self):
         return nn.CrossEntropyLoss()
+
+    def build_task_head(self):
+        return MLPModel(layer_sizes=[self.cfg.hidden_size, self.cfg.n_outputs],
+            dropout=0.1,
+        )
 
     def get_target_from_batch(self, batch):
         return batch[self.batch_target_name]

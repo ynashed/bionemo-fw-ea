@@ -29,6 +29,7 @@ class EncoderFineTuning(ModelPT, Exportable):
         self.encoder_model = self.setup_encoder_model(cfg, trainer)
         self.init_consumed_samples = 0
         self.loss_fn = self.build_loss_fn()
+        self.task_head = self.build_task_head()
 
     def list_available_models(self):
         return []
@@ -55,6 +56,10 @@ class EncoderFineTuning(ModelPT, Exportable):
 
     @abstractmethod
     def build_loss_fn(self):
+        pass
+
+    @abstractmethod
+    def build_task_head(self):
         pass
 
     @abstractmethod
