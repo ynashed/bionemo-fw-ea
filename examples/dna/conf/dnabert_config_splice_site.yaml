@@ -11,9 +11,7 @@ task:
     target_name: 'target'
     data:
       dataset_path: /workspace/bionemo/examples/dna/data/splice-site-prediction/sampled-data-10k/
-      gff_csv: /workspace/bionemo/examples/dna/data/splice-site-prediction/sampled-data-10k/sampled-data.csv
-      train_file: ${.gff_csv} # TODO train-val-test split
-      val_file: ${.gff_csv} # TODO train-val-test split
+      train_file: /workspace/bionemo/examples/dna/data/splice-site-prediction/sampled-data-10k/sampled-data.csv
       fasta_directory: /workspace/bionemo/examples/dna/data/splice-site-prediction/GRCh38.ensembl.99
       fasta_pattern: Homo_sapiens.GRCh38.dna.chromosome.{}.fa.gz
     encoder:
