@@ -6,7 +6,6 @@ trainer:
 model:
   num_layers: 12
   micro_batch_size: 4
-  hidden_dropout: 0.01 # Dropout probability for hidden state transformer.
   pre_process: True # add embedding
   post_process: True # add pooler
   bert_binary_head: False # BERT binary head
