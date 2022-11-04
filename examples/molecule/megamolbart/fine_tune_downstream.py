@@ -1,7 +1,6 @@
 import os
 import torch
 import torch.nn as nn
-import typing
 import pandas as pd
 import numpy as np
 from nemo.core.config import hydra_runner
@@ -9,8 +8,7 @@ from nemo.utils import logging
 from torch.utils.data import DataLoader, Dataset
 import pytorch_lightning as ptl
 from pytorch_lightning.trainer.trainer import Trainer
-from nemo_chem.models.megamolbart import MegaMolBARTModel
-from nemo.utils import logging
+from bionemo.model.molecule.megamolbart import MegaMolBARTModel
 from nemo.core.classes import ModelPT
 from nemo.core.classes.exportable import Exportable
 from omegaconf.omegaconf import OmegaConf, open_dict, DictConfig
@@ -20,88 +18,90 @@ from nemo.utils.app_state import AppState
 from nemo.utils.exp_manager import exp_manager
 from torch.nn.utils.rnn import pad_sequence
 from nemo.collections.nlp.parts.nlp_overrides import NLPDDPPlugin, NLPSaveRestoreConnector
-from nemo_chem.models.core import MLPModel
-from nemo_chem.core import BioNeMoDataModule
+from bionemo.model.core import MLPModel
+from bionemo.core import BioNeMoDataModule
+from bionemo.data.finetune_dataset import FineTuneDataset
+from bionemo.data.finetune_dataset import FineTuneDataModule
 
-class FineTuneDataset(Dataset):
-    def __init__(self, data_file: Union[str, bytes, os.PathLike], transform_fn, input_column: str = 'SMILES', target_column: str = 'y'):
-        self.data_file = data_file
-        self.df = pd.read_csv(data_file)
-        self.input_column = input_column
-        self.target_column = target_column
+# class FineTuneDataset(Dataset):
+#     def __init__(self, data_file: Union[str, bytes, os.PathLike], transform_fn, input_column: str = 'SMILES', target_column: str = 'y'):
+#         self.data_file = data_file
+#         self.df = pd.read_csv(data_file)
+#         self.input_column = input_column
+#         self.target_column = target_column
 
-        self.transform_fn = transform_fn
+#         self.transform_fn = transform_fn
 
-        self.token_ids = [self.transform_fn.text_to_ids(t) for t in self.df[self.input_column]]
+#         self.token_ids = [self.transform_fn.text_to_ids(t) for t in self.df[self.input_column]]
 
-    def __len__(self):
-        return self.df.shape[0]
+#     def __len__(self):
+#         return self.df.shape[0]
 
-    def __getitem__(self, idx):
+#     def __getitem__(self, idx):
     
-        target = self.df[self.target_column].iloc[idx]
+#         target = self.df[self.target_column].iloc[idx]
 
-        #idea: return dictionary which tells the name of target
-        #token_ids = self.transform_fn.text_to_ids(smile)
+#         #idea: return dictionary which tells the name of target
+#         #token_ids = self.transform_fn.text_to_ids(smile)
 
-        return {"token_ids": self.token_ids[idx], "target": target}
+#         return {"token_ids": self.token_ids[idx], "target": target}
 
-    #collate function to handle padding of each batch
-    def custom_collate(self, data):
-        inputs = [torch.tensor(d['token_ids']) for d in data]
-        labels = [d['target'] for d in data]
-        inputs = pad_sequence(inputs, batch_first=True, padding_value=self.transform_fn.pad_id)
-        labels = torch.tensor(labels)
-        return {
-            'token_ids': inputs, 
-            'target': labels
-        } 
+#     #collate function to handle padding of each batch
+#     def custom_collate(self, data):
+#         inputs = [torch.tensor(d['token_ids']) for d in data]
+#         labels = [d['target'] for d in data]
+#         inputs = pad_sequence(inputs, batch_first=True, padding_value=self.transform_fn.pad_id)
+#         labels = torch.tensor(labels)
+#         return {
+#             'token_ids': inputs, 
+#             'target': labels
+#         } 
 
-class FineTuneDataModule(BioNeMoDataModule):
-    def __init__(self, cfg, transform_fn):
+# class FineTuneDataModule(BioNeMoDataModule):
+#     def __init__(self, cfg, transform_fn):
 
-        self.data_path = Path(cfg.downstream_task.dataset)
-        self.data = FineTuneDataset(self.data_path, transform_fn)
+#         self.data_path = Path(cfg.downstream_task.dataset)
+#         self.data = FineTuneDataset(self.data_path, transform_fn)
 
-        train_size = int(0.75*len(self.data))
-        val_size = len(self.data) - train_size
+#         train_size = int(0.75*len(self.data))
+#         val_size = len(self.data) - train_size
 
-        self.train_ds, self.val_ds = torch.utils.data.random_split(self.data, [train_size, val_size])
+#         self.train_ds, self.val_ds = torch.utils.data.random_split(self.data, [train_size, val_size])
 
-    def train_dataset(self):
-        """Creates a training dataset
-        Returns:
-            Dataset: dataset to use for training
-        """
-        return self.train_ds
+#     def train_dataset(self):
+#         """Creates a training dataset
+#         Returns:
+#             Dataset: dataset to use for training
+#         """
+#         return self.train_ds
 
-    def val_dataset(self):
-        """Creates a validation dataset
-        Returns:
-            Dataset: dataset to use for validation
-        """
-        return self.val_ds
+#     def val_dataset(self):
+#         """Creates a validation dataset
+#         Returns:
+#             Dataset: dataset to use for validation
+#         """
+#         return self.val_ds
 
-    def test_dataset(self):
-        """Creates a testing dataset
-        Returns:
-            Dataset: dataset to use for testing
-        """
-        raise NotImplementedError()
+#     def test_dataset(self):
+#         """Creates a testing dataset
+#         Returns:
+#             Dataset: dataset to use for testing
+#         """
+#         raise NotImplementedError()
 
-    def adjust_train_dataloader(self,model,dataloader):
-        """Allows adjustments to the training dataloader
-        This is a good place to adjust the collate function of the dataloader.
-        """
+#     def adjust_train_dataloader(self,model,dataloader):
+#         """Allows adjustments to the training dataloader
+#         This is a good place to adjust the collate function of the dataloader.
+#         """
 
-        dataloader.collate_fn = self.data.custom_collate
+#         dataloader.collate_fn = self.data.custom_collate
 
-    def adjust_val_dataloader(self, model, dataloader):
-        """Allows adjustments to the validation dataloader
-        This is a good place to adjust the collate function of the dataloader.
-        """
+#     def adjust_val_dataloader(self, model, dataloader):
+#         """Allows adjustments to the validation dataloader
+#         This is a good place to adjust the collate function of the dataloader.
+#         """
 
-        dataloader.collate_fn = self.data.custom_collate
+#         dataloader.collate_fn = self.data.custom_collate
 
 
 class FineTuneMegaMolBART(ModelPT, Exportable):

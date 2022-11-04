@@ -130,15 +130,12 @@ model:
     epochs: 25
     seed: 42
     batch_size: 32
-    dataset: "/workspace/nemo_chem/benchmark_MoleculeNet_FreeSolv.csv"
+    dataset: "/workspace/bionemo/benchmark_MoleculeNet_FreeSolv.csv"
     # dataset:
     #   train: "/data/105217/train/x000.csv"
     #   val: "/data/105217/val/x000.csv"
     #   test: "/data/105217/test/new_pisces.csv"
-    megamolbart_model_path: "/workspace/nemo_chem/models/MegaMolBART_0_2_0.nemo" # used to load pretrained megamolbart .nemo file
-    input_base_model: "/workspace/bionemo/megatron_bert_esm_august9_draco_from_micha.nemo" #ESM/ProtT5 model to extract embeddings from
-    pretrained_model: "/workspace/bionemo/esm_downstream/new_pisces/secondary_structure_prediction_9.pth" # pretrained downstream model to do testing on.
-    result_dir: "/workspace/bionemo/esm_downstream/random"
+    megamolbart_model_path: "/workspace/bionemo/MegaMolBART_0_2_0.nemo" # used to load pretrained megamolbart .nemo file
 
 exp_manager:
   name: ${name}
