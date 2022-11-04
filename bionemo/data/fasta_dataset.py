@@ -119,6 +119,12 @@ class FastaDataset(Dataset):
         self.name_bins = [bin[0] for bin in bins]
         self.length_bins = np.cumsum([bin[1] for bin in bins])
 
+    def fetch(self, id_, start, end):
+        return self.backend.fetch(id_, start, end)
+
+    def ids(self):
+        return list(self.fastx.keys())
+
     def __len__(self):
         """Return the length of the dataset."""
         return self.length_bins[-1]
@@ -172,6 +178,12 @@ class DiscretizeFastaDataset(MappedDataset):
 
         """
         super().__init__(dataset, None)
+
+    def fetch(self, id_, start, end):
+        return self._dataset.fetch(id_, start, end)
+
+    def ids(self):
+        return self._dataset.ids()
 
     @staticmethod
     def create_sample_mapping(dataset, num_samples):
@@ -239,6 +251,19 @@ class ConcatFastaDataset(Dataset):
             )
             self.datasets.append(self._apply_transforms(new_dataset))
         self._dataset = ConcatDataset(self.datasets)
+        self.ids = {}
+        self.build_id_index()
+
+    def build_id_index(self):
+        for ds in self.datasets:
+            if hasattr(ds, 'ids'):
+                for key in ds.ids():
+                    # TODO warn for overriding key?
+                    self.ids[key] = ds
+
+    def fetch(self, id_, start, end):
+        ds = self.ids[id_]
+        return ds.fetch(id_, start, end)
 
     def _apply_transforms(self, dataset):
         for transform in self.transforms:
