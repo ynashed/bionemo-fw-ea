@@ -1,6 +1,6 @@
 from enum import IntEnum
 from torch.utils.data import Dataset, ConcatDataset
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Any, Callable
 from bionemo.data.dataloader.kmer_collate import KmerBertCollate
 from bionemo.data.fasta_dataset import ConcatFastaDataset, FastaDataset
 from bionemo.data.validation_dataset import DataFrameTransformDataset
@@ -21,6 +21,12 @@ class SpliceSite(IntEnum):
 
 class InstanceDataset(Dataset):
     def __init__(self, list_: List, kind: SpliceSite):
+        """Represents a single splice site
+
+        Args:
+            list_ (List): Contains a List of a single kind of splice site
+            kind (SpliceSite): The kind of splice site the dataset represents
+        """
         self.list_ = list_
         self.kind = kind
 
@@ -31,9 +37,18 @@ class InstanceDataset(Dataset):
         return len(self.list_)
 
 
-class SiteDataset(Dataset):
-    def __init__(self, site_tuple: Tuple[List[int], List[int], List[int]], site: str):
-        self.site = site
+class TranscriptDataset(Dataset):
+    def __init__(self, site_tuple: Tuple[List[int], List[int], List[int]],
+                 transcript: str):
+        """Dataset that represents a single transcript's donor and acceptors,
+        and negative examples.
+
+        Args:
+            site_tuple (Tuple[List[int], List[int], List[int]]): Contains a
+                list of Donors, Acceptors, and Negative sites, respectively.
+            site (str): Name of the splice site
+        """
+        self.transcript = transcript
         ds_0 = InstanceDataset(site_tuple[0], SpliceSite.DONOR)
         ds_1 = InstanceDataset(site_tuple[1], SpliceSite.ACCEPTOR)
         ds_2 = InstanceDataset(site_tuple[2], SpliceSite.NEGATIVE)
@@ -41,7 +56,7 @@ class SiteDataset(Dataset):
 
     def __getitem__(self, idx):
         item = self._dataset[idx]
-        item.update({'site': self.site})
+        item.update({'transcript': self.transcript})
         return item
 
     def __len__(self):
@@ -50,8 +65,18 @@ class SiteDataset(Dataset):
 
 class ChrSpliceSitesDataset(Dataset):
     def __init__(self, chr_sites: Dict[str, Tuple[List[int], List[int], List[int]]], id_: str):
+        """Represents all of the splice sites present in a chromosome
+
+        Args:
+            chr_sites (Dict[str, Tuple[List[int], List[int], List[int]]]):
+                Keys are transcript names and the entries are tuples of splice
+                    sites of Donor, Acceptor, and Negative, respectively
+            id_ (str): Chromosome id/name
+        """
         self.chr_sites = chr_sites
-        self._dataset = ConcatDataset(SiteDataset(sites, name) for name, sites in chr_sites.items())
+        self._dataset = ConcatDataset(
+            TranscriptDataset(sites, name) for name, sites in chr_sites.items()
+        )
         self.id_ = id_
 
     def __getitem__(self, idx):
@@ -63,20 +88,74 @@ class ChrSpliceSitesDataset(Dataset):
         return len(self._dataset)
 
 def get_start_end(coord, length):
+    """Gets start and end coordinates of a subsequence of `length` centered around `coord`
+
+    Args:
+        coord (int): Center of window
+        length (int): Width of window
+
+    Returns:
+        Tuple[int, int]: Start and end coordinates of window, respectively
+    """
     start = int(coord - math.ceil(length / 2)) + 1
     end = int(coord + math.floor(length / 2)) + 1
     return start, end
 
-def fetch_bert_dna(row: pd.Series, dataset: FastaDataset, bert_prep, length):
+def delistify_single_arg(fn: Callable[[List[Any]], Any]) -> Callable[[Any], Any]:
+    """Makes a function that runs on a list able to be run on a single entry
+    without being called as a list
+
+    Args:
+        fn (Callable[[List[Any]], Any]): Function that maps a list
+
+    Returns:
+        Callable[[Any], Any]: Function that operates on an entry of that list
+    """
+    def wrapper_fn(arg):
+        arg = [arg]
+        ret_val = fn(arg)
+        return ret_val[0]
+    return wrapper_fn
+
+def fetch_bert_dna(row: pd.Series, dataset: FastaDataset, bert_prep, length: int):
+    """Fetches and preprocesses data based
+
+    Args:
+        row (pd.Series): Row with `coord` and `id` attributes
+        dataset (FastaDataset): Fasta to get DNA text from
+        bert_prep (Callable[[str], Any]): Preprocesses the DNA from the FASTA
+        length (int): Length of DNA to fetch from `dataset`
+
+    Returns:
+        Dict[str, Any]: Preprocessed representation of the fetched DNA
+    """
     mid = row.coord
     start, end = get_start_end(mid, length)
     text = dataset.fetch(row.id, start, end)
-    return {key: value[0] for key, value in bert_prep([text]).items()}
+    return {key: value for key, value in bert_prep(text).items()}
 
 def get_target(row: pd.Series):
+    """sets the target from a dataframe row using the .kind attribute
+
+    Args:
+        row (pd.Series): row to set target from
+
+    Returns:
+        Dict: Dict containing 'target' as the key and the value gotten as the value
+    """
     return {'target': row.kind}
 
-def get_chroms_1_22(root_directory, pattern):
+def get_autosomes(root_directory, pattern):
+    """Generates filenames for autosomes based on a pattern using {}
+
+    Args:
+        root_directory (str): Filepath for root directory
+        pattern (str): str containing '{}' where '{}' will be replaced with the
+            autosome id
+
+    Returns:
+        List[str]: List of filepaths to autosomes
+    """
     paths = expand_dataset_paths(
         '(' + pattern.format('[1..9]') + ',' + pattern.format('[10..22]') + ')', None)
     return [os.path.join(root_directory, path) for path in paths]
@@ -101,7 +180,7 @@ class SpliceSiteDataModule(BioNeMoDataModule):
     def get_fasta_files(self):
         fasta_directory = self.cfg.data.fasta_directory
         pattern = self.cfg.data.fasta_pattern
-        return get_chroms_1_22(fasta_directory, pattern)
+        return get_autosomes(fasta_directory, pattern)
 
     def train_dataset(self):
         gff_dataset = self._create_dataset(self.train_file)
@@ -120,12 +199,12 @@ class SpliceSiteDataModule(BioNeMoDataModule):
         return gff_dataset
 
     def _create_dataset(self, filename):
-        bert_prep = KmerBertCollate(
+        bert_prep = delistify_single_arg(KmerBertCollate(
             self.model.tokenizer,
             modify_percent=0,
             seq_length=self.length,
             pad_size_divisible_by_8=True,
-        ).collate_fn
+        ).collate_fn)
 
         gff_dataset = DataFrameTransformDataset(
             filename,
