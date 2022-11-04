@@ -101,20 +101,20 @@ def get_start_end(coord, length):
     end = int(coord + math.floor(length / 2)) + 1
     return start, end
 
-def delistify_single_arg(fn: Callable[[List[Any]], Any]) -> Callable[[Any], Any]:
+def delistify_single_arg(fn: Callable[[List[Any]], Dict]) -> Callable[[Any], Dict]:
     """Makes a function that runs on a list able to be run on a single entry
-    without being called as a list
+    per dict key without being called as a list
 
     Args:
-        fn (Callable[[List[Any]], Any]): Function that maps a list
+        fn (Callable[[List[Any]], Dict]): Function that maps a list
 
     Returns:
-        Callable[[Any], Any]: Function that operates on an entry of that list
+        Callable[[Any], Dict]: Function that operates on an entry of that list
     """
     def wrapper_fn(arg):
         arg = [arg]
         ret_val = fn(arg)
-        return ret_val[0]
+        return {key: value[0] for key, value in ret_val.items()}
     return wrapper_fn
 
 def fetch_bert_dna(row: pd.Series, dataset: FastaDataset, bert_prep, length: int):
@@ -132,7 +132,7 @@ def fetch_bert_dna(row: pd.Series, dataset: FastaDataset, bert_prep, length: int
     mid = row.coord
     start, end = get_start_end(mid, length)
     text = dataset.fetch(row.id, start, end)
-    return {key: value for key, value in bert_prep(text).items()}
+    return bert_prep(text)
 
 def get_target(row: pd.Series):
     """sets the target from a dataframe row using the .kind attribute
