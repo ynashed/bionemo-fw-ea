@@ -35,7 +35,7 @@ from bionemo.model.molecule.megamolbart import MegaMolBARTModel
 from bionemo.data import MoleculeCsvDatasetConfig
 from bionemo.utils import update_dataclass_config
 from bionemo.utils.callbacks import setup_callbacks
-from bionemo.data import SmilesPreprocess
+from bionemo.data import SmilesPreprocess, PhysChemPreprocess
 import os
 
 def setup_trainer(cfg):
@@ -119,6 +119,9 @@ def main(cfg) -> None:
         SmilesPreprocess().prepare_dataset(links_file=cfg.model.data.links_file,
                                            output_dir=cfg.model.data.dataset_path,
                                            max_smiles_length=cfg.model.seq_length)
+        if 'validation' in cfg.model:
+            PhysChemPreprocess().prepare_dataset(links_file=cfg.model.validation.data.links_file,
+                                                 output_dir=cfg.model.validation.data.dataset_path)
         logging.info("************** Finished Data PreProcessing ***********")
 
     if cfg.do_testing:
