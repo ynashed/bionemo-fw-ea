@@ -11,15 +11,15 @@ from torch.nn.utils.rnn import pad_sequence
 from bionemo.core import BioNeMoDataModule
 
 class FineTuneDataset(Dataset):
-    def __init__(self, data_file: Union[str, bytes, os.PathLike], transform_fn, input_column: str = 'SMILES', target_column: str = 'y'):
+    def __init__(self, data_file: Union[str, bytes, os.PathLike], tokenizer_fn, input_column: str = 'SMILES', target_column: str = 'y'):
         self.data_file = data_file
         self.df = pd.read_csv(data_file)
         self.input_column = input_column
         self.target_column = target_column
 
-        self.transform_fn = transform_fn
+        self.tokenizer = tokenizer_fn
 
-        self.token_ids = [self.transform_fn.text_to_ids(t) for t in self.df[self.input_column]]
+        self.token_ids = [self.tokenizer.text_to_ids(t) for t in self.df[self.input_column]]
 
     def __len__(self):
         return self.df.shape[0]
@@ -37,7 +37,7 @@ class FineTuneDataset(Dataset):
     def custom_collate(self, data):
         inputs = [torch.tensor(d['token_ids']) for d in data]
         labels = [d['target'] for d in data]
-        inputs = pad_sequence(inputs, batch_first=True, padding_value=self.transform_fn.pad_id)
+        inputs = pad_sequence(inputs, batch_first=True, padding_value=self.tokenizer.pad_id)
         labels = torch.tensor(labels)
         return {
             'token_ids': inputs, 
@@ -45,10 +45,10 @@ class FineTuneDataset(Dataset):
         }
 
 class FineTuneDataModule(BioNeMoDataModule):
-    def __init__(self, cfg, transform_fn):
+    def __init__(self, cfg, tokenizer_fn):
 
         self.data_path = Path(cfg.downstream_task.dataset)
-        self.data = FineTuneDataset(self.data_path, transform_fn)
+        self.data = FineTuneDataset(self.data_path, tokenizer_fn)
 
         train_size = int(0.75*len(self.data))
         val_size = len(self.data) - train_size
