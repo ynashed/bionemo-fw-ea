@@ -48,7 +48,7 @@ class FineTuneDataModule(BioNeMoDataModule):
     def __init__(self, cfg, tokenizer_fn):
 
         self.data_path = Path(cfg.downstream_task.dataset)
-        self.data = FineTuneDataset(self.data_path, tokenizer_fn)
+        self.data = FineTuneDataset(self.data_path, tokenizer_fn, input_column = cfg.downstream_task.smis_column, target_column = cfg.downstream_task.target_column)
 
         train_size = int(0.75*len(self.data))
         val_size = len(self.data) - train_size

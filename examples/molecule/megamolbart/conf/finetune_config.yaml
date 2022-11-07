@@ -93,6 +93,8 @@ model:
     batch_size: 32
     loss_func: MSELoss
     dataset: "/workspace/bionemo/benchmark_MoleculeNet_FreeSolv.csv"
+    smis_column: 'SMILES'
+    target_column: 'y'
     megamolbart_model_path: "/workspace/bionemo/MegaMolBART_0_2_0.nemo" # used to load pretrained megamolbart .nemo file
 
     optim:

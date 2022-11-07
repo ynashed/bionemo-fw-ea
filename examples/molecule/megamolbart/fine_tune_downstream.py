@@ -34,7 +34,8 @@ class FineTuneMegaMolBART(ModelPT, Exportable):
 
         self.pretrained_model = self.load_model(cfg)
 
-        self.regressor = MLPModel(layer_sizes=[512, 128, 1], dropout=0.1)
+        #set input layer dims of MLP based on hidden_size from pretrained model
+        self.regressor = MLPModel(layer_sizes=[self.pretrained_model._cfg.hidden_size, 128, 1], dropout=0.1)
 
         self.loss_fn = bionemo.utils.lookup_or_use(torch.nn, cfg.downstream_task.loss_func)
 
@@ -64,7 +65,6 @@ class FineTuneMegaMolBART(ModelPT, Exportable):
         """
 
         enc_output = self.pretrained_model.encode(tokens_enc=token_ids, enc_mask=mask) #return hiddens
-        
         embeddings = self.hidden_to_embedding(enc_output, mask) 
 
         token_output = self.regressor(embeddings.float())
@@ -123,7 +123,7 @@ class FineTuneMegaMolBART(ModelPT, Exportable):
         output_tensor = self.forward(tokens, enc_mask)
 
         target_tokens = batch['target']
-        loss = self.loss_fn(target_tokens.float(), output_tensor['token_output'])
+        loss = self.loss_fn(output_tensor['token_output'], target_tokens.float())
 
         return loss
 
@@ -147,6 +147,7 @@ class FineTuneMegaMolBART(ModelPT, Exportable):
         mask = (token_ids != self.pretrained_model.tokenizer.pad_id)
 
         tk = torch.tensor(token_ids, dtype=torch.int64).cuda()
+
         mask = torch.tensor(mask, dtype=torch.int64,
                                     device=token_ids.device)
         return tk, mask
