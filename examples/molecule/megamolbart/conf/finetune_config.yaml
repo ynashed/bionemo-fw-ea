@@ -1,7 +1,6 @@
 name: finetune_config
 do_training: True # set to false if data preprocessing steps must be completed
 do_testing: False # set to true to run evaluation on test data after training, requires test_dataset section
-seed: 42
 
 trainer:
   devices: 1 # number of GPUs or CPUs
@@ -71,27 +70,6 @@ model:
     vocab_file: /workspace/nemo_chem/models/vocab/megamolbart.vocab
     merge_file: null
 
-  data:
-    links_file: /workspace/nemo_chem/examples/chem/conf/dataset/ZINC-downloader-test.txt
-    dataset_path: /data/zinc_csv_split # parent directory for data, contains train / val / test folders
-    dataset: # inclusive range of data files to load or can load a single file, e.g. x000
-      train: x[000..146]
-      test: x[000..146]
-      val: x000
-    encoder_augment: True # always True
-    encoder_mask: True # task = mask(span)_aug
-    decoder_augment: True # task = mask(span)_aug
-    decoder_mask: False # always False
-    mask_scheme: span
-    mask_prob: 0.1
-    span_lambda: 3.0
-    micro_batch_size: ${model.micro_batch_size}
-    num_workers: 10
-    num_enumerations: 5
-    dataloader_type: single
-    dataset_format: csv
-    canonicalize_input: true
-
   optim:
     name: fused_adam # fused optimizers used by Megatron models
     lr: 1.0 # max is scaled by Noam scheduler to d_model**(-0.5) * warmup**(-0.5)
@@ -109,6 +87,14 @@ model:
       min_lr: 1e-5
 
   downstream_task:
+    name: finetune_prediction
+    epochs: 25
+    seed: 42
+    batch_size: 32
+    loss_func: MSELoss
+    dataset: "/workspace/bionemo/benchmark_MoleculeNet_FreeSolv.csv"
+    megamolbart_model_path: "/workspace/bionemo/MegaMolBART_0_2_0.nemo" # used to load pretrained megamolbart .nemo file
+
     optim:
       name: adam
       lr: 0.0001
@@ -123,13 +109,6 @@ model:
         last_epoch: -1
         warmup_ratio: 0.01
         max_steps: 100000
-    name: finetune_prediction
-    epochs: 25
-    seed: 42
-    batch_size: 32
-    loss_func: MSELoss
-    dataset: "/workspace/bionemo/benchmark_MoleculeNet_FreeSolv.csv"
-    megamolbart_model_path: "/workspace/bionemo/MegaMolBART_0_2_0.nemo" # used to load pretrained megamolbart .nemo file
 
 exp_manager:
   name: ${name}
