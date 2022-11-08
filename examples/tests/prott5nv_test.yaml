@@ -11,7 +11,7 @@ do_testing: False # set to true to run evaluation on test data after training, r
 restore_from_path: null # used when starting from a .nemo file
 
 trainer:
-  devices: 2
+  devices: 1
   num_nodes: 1
   accelerator: gpu
   precision: 16

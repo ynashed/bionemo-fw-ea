@@ -53,6 +53,7 @@ download_model \
     "${PROTT5NV_MODEL}" \
     "${PROJECT_PATH}/models/protein/prott5nv/prott5nv.nemo"
 
-rm -rf /model/*
-cp -a ${PROJECT_PATH}/models/* /model
+cp ${PROJECT_PATH}/models/molecule/megamolbart/megamolbart.nemo /model/molecule/megamolbart/
+cp ${PROJECT_PATH}/models/protein/esm1nv/esm1nv.nemo /model/protein/esm1nv/
+cp ${PROJECT_PATH}/models/protein/prott5nv/prott5nv.nemo /model/protein/prott5nv/
 ls -l /model
