@@ -28,7 +28,6 @@ from bionemo.data.finetune_dataset import FineTuneDataModule
 class FineTuneMegaMolBART(ModelPT, Exportable):
 
     def __init__(self, cfg: "DictConfig", trainer: Trainer):
-        #self._check_scheduler(cfg)
         super().__init__(cfg, trainer=trainer)
         self.cfg = cfg
 
@@ -154,15 +153,6 @@ class FineTuneMegaMolBART(ModelPT, Exportable):
 
     def _build_train_valid_datasets(self):
 
-        #data_path = Path(self.cfg.downstream_task.dataset)
-        #full_data = FineTuneDataset(data_path, self.pretrained_model.tokenizer)
-
-        #self.collate_fn = full_data.custom_collate #store custom collate in class
-
-        #train_size = int(0.75*len(full_data))
-        #val_size = len(full_data) - train_size
-
-        #self._train_ds, self._validation_ds = torch.utils.data.random_split(full_data, [train_size, val_size])
         self._train_ds = self.data_module.get_sampled_train_dataset()
         self._validation_ds = self.data_module.get_sampled_val_dataset()
 
@@ -176,11 +166,8 @@ class FineTuneMegaMolBART(ModelPT, Exportable):
 
         """
 
-        #self._train_dl = DataLoader(self._train_ds, batch_size=cfg.downstream_task.batch_size, drop_last=True, collate_fn=self.collate_fn)
         self._train_dl = DataLoader(self._train_ds, batch_size=cfg.downstream_task.batch_size, drop_last=True)
         self.data_module.adjust_train_dataloader(self, self._train_dl)
-
-
 
     def setup_validation_data(self, cfg):
         """
@@ -192,7 +179,6 @@ class FineTuneMegaMolBART(ModelPT, Exportable):
 
         """
 
-        #self._validation_dl = DataLoader(self._validation_ds, batch_size=cfg.downstream_task.batch_size, drop_last=True, collate_fn=self.collate_fn)
         self._validation_dl = DataLoader(self._validation_ds, batch_size=cfg.downstream_task.batch_size, drop_last=True)
         self.data_module.adjust_val_dataloader(self, self._validation_dl)
 
@@ -211,7 +197,7 @@ def main(cfg) -> None:
     trainer = Trainer(accelerator='gpu', devices=1, max_epochs=cfg.model.downstream_task.epochs, logger=False)
     exp_manager(trainer, cfg.get("exp_manager", None)) 
     
-    #NOTE use setup_trainer from util.py from dev branch (configure_plugins/configure_callbacks/resume_checkpoint may cause error)
+    #NOTE try use setup_trainer from util.py from dev branch (configure_plugins/configure_callbacks/resume_checkpoint may cause error)
     #trainer = setup_trainer(cfg, builder=FintuneTrainerBuilder())
     #NOTE instantiate encoder outside of finetuning class to allow for flexibility
 
