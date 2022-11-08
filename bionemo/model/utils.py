@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import re
 from omegaconf.omegaconf import open_dict
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks.timer import Timer
@@ -24,6 +25,7 @@ from nemo.collections.nlp.parts.nlp_overrides import GradScaler, NLPDDPPlugin
 from nemo.core.config import hydra_runner
 from nemo.utils import logging
 from nemo.utils.exp_manager import StatelessTimer, exp_manager
+from nemo.utils.app_state import AppState
 
 
 class TrainerBuilder(object):
@@ -85,3 +87,27 @@ def setup_trainer(cfg, builder=None):
     exp_manager(trainer, cfg.get("exp_manager", None))
     builder.resume_checkpoint(cfg, trainer)
     return trainer
+
+# TODO this is taken and from NeMo and we should try to make sure we get this
+# back upstream into NeMo
+def extract_consumed_samples_from_ckpt(ckpt_path):
+    try:
+        init_consumed_samples = int(float(re.findall(r"consumed_samples\=([0-9]+.[0-9]+)", ckpt_path)[0]))
+    except (ValueError, TypeError, IndexError):
+        logging.warning("Cannot parse the checkpoint file to get the consumed samples. assume it is zero.")
+        init_consumed_samples = 0
+
+    return init_consumed_samples
+
+# TODO this is taken and from NeMo and we should try to make sure we get this
+# back upstream into NeMo
+def compute_consumed_samples(model, steps_since_resume=0):
+    app_state = AppState()
+    consumed_samples = (
+        model.init_consumed_samples
+        + steps_since_resume
+        * app_state.data_parallel_size
+        * model.cfg.micro_batch_size
+        * model.trainer.accumulate_grad_batches
+    )
+    return int(consumed_samples)

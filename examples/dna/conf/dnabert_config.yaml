@@ -4,16 +4,16 @@ trainer:
   devices: 1
   val_check_interval: 100
 model:
-  num_layers: 6
+  num_layers: 12
   micro_batch_size: 4
   pre_process: True # add embedding
   post_process: True # add pooler
   bert_binary_head: False # BERT binary head
   tokenizer:
     type: 'kmer'
-    k: 6
-    model: /model/dna/dnabert/vocab/dnabert6-chr1.model
-    vocab_file: /model/dna/dnabert/vocab/dnabert6-chr1.vocab
+    k: 3
+    model: /model/dna/dnabert/vocab/dnabert3-chr22.model
+    vocab_file: /model/dna/dnabert/vocab/dnabert3-chr22.vocab
   data:
     dataset_path: /workspace/bionemo/examples/dna/data/small-example # contains train / val / test folders
     dataset: # inclusive range of data files to load or can load a single file, e.g. x000.csv
