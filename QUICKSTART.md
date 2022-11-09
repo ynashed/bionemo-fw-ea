@@ -15,7 +15,7 @@ The [`launch.sh` script](./launch.sh) can be used for a number of tasks, includi
 ```bash
 BIONEMO_IMAGE=nvcr.io/t6a4nuz8vrsr/bionemo:latest                   # Container with tag
 GITHUB_BRANCH=v0.3.0_ea1                                            # GitLab branch
-BIONEMO_PATH=/workspace/bionemo                                     # Location of library in container /workspace/bionemo for dev work or /opt/nvidia/bionemo for non-dev use                                      
+PROJECT_MOUNT=/workspace/bionemo                                     # Location of library in container /workspace/bionemo for dev work or /opt/nvidia/bionemo for non-dev use                                      
 PROJECT_PATH=$(pwd)                                                 # Path of env config and optional development code
 DATA_PATH=${HOME}/data                                              # Path for data download and processing
 RESULT_PATH=${HOME}/result/bionemo_experiments                      # Path for training results
@@ -71,7 +71,7 @@ These scripts first require some variables to be set in their `CONFIG` section. 
 - `-c`, `--config`: Path to a YAML config file. The default is specified in each of the respective scripts.
 - `-f`, `--data-files`: The set or subset of processed data files (in CSV format) to use for training. Consecutive ranges of files can be supplied -- for three files (x000.csv, x001.csv, and x002.csv), the range can be supplied as "x[000..002]". However, the addition of the required shell escapes to this can become complicated, so it's adviseable to use `_OP_` instead of `[` and `_CL_` instead of `]`, making the range `x_OP_000..002_CL_`
 - `-o`, `--result_dir`: Set the path for the results.
-- `-a`, `--args`: Additional arguments passed to the training. Use one `--args` flag for each additional argument, e.g. to use tensor model parallelism of 2 with 4 GPUs: `--args "++trainer.devices=4" --args "++model.tensor_model_parallel_size=2"`
+- `-a`, `--args`: Additional arguments passed to the training. Use `--args` flag followed by a string of additional arguments, e.g. to use tensor model parallelism of 2 with 4 GPUs: `--args "++trainer.devices=4 ++model.tensor_model_parallel_size=2"`
 
 The two command options are `preprocess`, which will download and process the data, and `train` which performs pre-training using the data. An example is provided for executing one of the scripts once the `CONFIG` section has been edited:
 
@@ -86,7 +86,7 @@ train
 For preprocessing MegaMolBART data, a large amount (~100GB) of data in the form of multiple files must be downloaded for the selected ZINC15 tranches. To test the preprocessing and training on a subset of the files, change the filename in the `links_file` setting in the [config file](./examples/molecule/megamolbart/conf/pretrain_base.yaml) from `ZINC-downloader.txt` to `ZINC-downloader-test.txt`, e.g.:
 
 ```yaml
-links_file: '${oc.env:BIONEMO_PATH}/examples/molecule/megamolbart/dataset/ZINC-downloader-test.txt' # to process a subset of the ZINC15 data
+links_file: '${oc.env:PROJECT_MOUNT}/examples/molecule/megamolbart/dataset/ZINC-downloader-test.txt' # to process a subset of the ZINC15 data
 ```
 
 For more advanced customization, additional training arguments can be added to the shell script. Alternatively, the Python training commands executed by the script can be run directly.

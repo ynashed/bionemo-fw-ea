@@ -33,35 +33,7 @@ try:
 except (ImportError, ModuleNotFoundError):
     HAVE_APEX = False
 
-__all__ = ['MoleculeCsvDatasetConfig', 'MoleculeCsvDataset', 'DatasetFileConfig']
-
-@dataclass
-class DatasetFileConfig():
-    train: str = None
-    test: str = None
-    val: str = None
-
-@dataclass
-class MoleculeCsvDatasetConfig():
-    dataset_path: str = ''
-    dataset: DatasetFileConfig = None
-    newline_int: int = 10
-    header_lines: int = 1
-    data_col: int = 1
-    data_sep: str = ','
-    sort_dataset_paths: bool = True
-    # FIXME: remove unneeded config variables
-    skip_lines: int = 0
-    micro_batch_size: int = 1
-    encoder_augment: bool = False
-    encoder_mask: bool = False
-    decoder_augment: bool = False
-    decoder_mask: bool = False
-    canonicalize_input: bool = True
-    dataloader_type: str = 'single'
-    drop_last: bool = False
-    pin_memory: bool = False # must be False with CSV dataset
-    num_workers: Optional[int] = None
+__all__ = ['MoleculeCsvDataset']
 
 
 class MoleculeCsvDataset(Dataset):

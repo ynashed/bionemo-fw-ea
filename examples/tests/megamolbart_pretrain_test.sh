@@ -16,20 +16,20 @@
 # limitations under the License.
 
 ####
-# Test for ESM1nv training.
+# Test for MegaMolBART training.
 ####
 
 ### CONFIG ###
 PROJECT_MOUNT=${PROJECT_MOUNT:=/workspace/bionemo} # can also be explicity set, e.g. /opt/nvidia/bionemo or /workspace/bionemo
 ### END CONFIG ###
 
-CONFIG_FILE=esm1nv_test
-DATA_MOUNT=${PROJECT_MOUNT}/examples/tests/test_data
+CONFIG_FILE=megamolbart_test
+DATA_MOUNT=${PROJECT_MOUNT}/examples/tests/test_data/molecule
 RESULTS_MOUNT=/tmp/results
 
 execute() {
     set -x
-    python ${PROJECT_MOUNT}/examples/protein/esm1nv/pretrain.py \
+    python ${PROJECT_MOUNT}/examples/molecule/megamolbart/pretrain.py \
         --config-path=${PROJECT_MOUNT}/examples/tests \
         --config-name=${CONFIG_FILE} \
         exp_manager.exp_dir=${RESULTS_MOUNT} \
@@ -78,11 +78,12 @@ case $ARGS in
         ;;
 esac
 
-RES=$(cat ${RESULTS_MOUNT}/cmdline_prints | grep "Epoch 0:  99%" | sed 's/^.*\ loss/loss/' | sed 's/.$//')
+RES=$(cat ${RESULTS_MOUNT}/cmdline_prints | grep "Epoch 0: 100%" | sed 's/^.*\ loss/loss/' | sed 's/.$//')
+echo "RESULT: $RES"
 arrRes=(${RES//,/ })
-echo ${arrRes[0]}" "${arrRes[2]}" "${arrRes[3]}" "${arrRes[4]} >& ${RESULTS_MOUNT}/result_log
+echo ${arrRes[0]}" "${arrRes[2]}" "${arrRes[3]}" "${arrRes[4]}" "${arrRes[5]}" "${arrRes[6]}" "${arrRes[7]}" "${arrRes[8]}" "${arrRes[9]} >& ${RESULTS_MOUNT}/result_log
 
-DIFF=$(diff ${RESULTS_MOUNT}/result_log ${PROJECT_MOUNT}/examples/tests/expected_results/esm1nv_log)
+DIFF=$(diff ${RESULTS_MOUNT}/result_log ${PROJECT_MOUNT}/examples/tests/expected_results/megamolbart_log)
 DIFF_PASSED=$?
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -91,7 +92,6 @@ if [ $DIFF_PASSED -ne 0 ]
 then
     echo -e "${RED}FAIL${NC}"
     echo "$DIFF"
-    cat "${RESULTS_MOUNT}/cmdline_prints"
     exit 1
 else
     echo -e "${GREEN}PASS${NC}"

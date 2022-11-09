@@ -3,7 +3,7 @@ defaults:
 
 hydra:
   searchpath:
-    - file://${oc.env:BIONEMO_PATH}/examples/protein/prott5nv/conf/ # BIONEMO_PATH is env variable with root location of code e.g. /opt/nividia/bionemo or /workspace/bionemo
+    - file://${oc.env:PROJECT_MOUNT}/examples/protein/prott5nv/conf/ # PROJECT_MOUNT is env variable with root location of code e.g. /opt/nividia/bionemo or /workspace/bionemo
 
 name: prott5nv_model
 do_training: True # set to false if data preprocessing steps must be completed
@@ -31,4 +31,7 @@ model:
       test: x000
       val: x000
     data_prefix: null
+    data_col: 3 # 0-based
+    data_sep: ','
+    header_lines: 1
   

@@ -29,12 +29,7 @@ def _build_train_valid_test_datasets(
     trainer: Trainer,
     num_samples: int,
     filepath: str,
-    metadata_path: str,
 ):
-    cfg = deepcopy(cfg)
-    with open_dict(cfg):
-        cfg['metadata_path'] = metadata_path
-
     # Get datasets and load data
     logging.info(f'Loading data from {filepath}')
     dataset_paths = expand_dataset_paths(filepath, ".csv")
@@ -50,41 +45,33 @@ def megamolbart_build_train_valid_test_datasets(
     trainer: Trainer,
     train_valid_test_num_samples: List[int]
 ):
-     # TODO metadata_file is currently not used
     cfg = deepcopy(cfg)
     with open_dict(cfg):
         dataset_path = cfg.pop('dataset_path', '')
-        # dataset = cfg.pop('dataset')
-        metadata_file = cfg.pop('metadata_file', None)
-
         ds_train = cfg.dataset.train
         ds_val = cfg.dataset.val
         ds_test = cfg.dataset.test
-
         cfg.pop('dataset')
 
     # Build individual datasets.
     if train_valid_test_num_samples[0] > 0:
         filepath = os.path.join(dataset_path, 'train', ds_train)
-        metadata_path = os.path.join(dataset_path, 'train', metadata_file) if metadata_file else None
         train_dataset = _build_train_valid_test_datasets(cfg, trainer, train_valid_test_num_samples[0],
-                                                        filepath, metadata_path)
+                                                        filepath)
     else:
         train_dataset = None
 
     if train_valid_test_num_samples[1] > 0:
         filepath = os.path.join(dataset_path, 'val', ds_val)
-        metadata_path = os.path.join(dataset_path, 'val', metadata_file) if metadata_file else None
         validation_dataset = _build_train_valid_test_datasets(cfg, trainer, train_valid_test_num_samples[1],
-                                                            filepath, metadata_path)
+                                                            filepath)
     else:
         validation_dataset = None
 
     if train_valid_test_num_samples[2] > 0:
         filepath = os.path.join(dataset_path, 'test', ds_test)
-        metadata_path = os.path.join(dataset_path, 'test', metadata_file) if metadata_file else None
         test_dataset = _build_train_valid_test_datasets(cfg, trainer, train_valid_test_num_samples[2],
-                                                        filepath, metadata_path)
+                                                        filepath)
     else:
         test_dataset = None
 
