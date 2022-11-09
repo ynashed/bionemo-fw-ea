@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO make RESULTS_MOUNT and BIONEMO_PATH configurable here
+# TODO make RESULTS_MOUNT and PROJECT_MOUNT configurable here
 
 SRCS := $(wildcard *_test.sh)
 TESTS := $(SRCS:%.sh=%)

@@ -456,21 +456,14 @@ class DNABERTDataModule(BioNeMoDataModule):
         cfg = deepcopy(self.cfg)
         with open_dict(cfg):
             dataset_path = cfg.get('dataset_path', '')
-            metadata_file = cfg.get('metadata_file', None)
             dataset_format = cfg.get('dataset_format')
 
         # Build individual datasets.
         filepath = os.path.join(dataset_path, name, ds)
-        metadata_path = os.path.join(dataset_path, name, metadata_file) if metadata_file else None
-
-        cfg = deepcopy(cfg)
-        with open_dict(cfg):
-            cfg['metadata_path'] = metadata_path
 
         options = {
             'cfg': cfg,
             'filepath': filepath,
-            'metadata_path': metadata_path,
             'dataset_format': dataset_format,
             'batch_size': self.get_global_batch_size(),
         }

@@ -160,14 +160,6 @@ class SmilesPreprocess(object):
         test_df.to_csv(f'{output_dir}/test/{datafile}.csv', index=False)
         val_df.to_csv(f'{output_dir}/val/{datafile}.csv', index=False)
 
-        # TODO deprecate this
-        with open(f'{output_dir}/val/metadata.csv', 'a') as f:
-            f.write(f"{datafile},{val_df.shape[0]}\n")
-        with open(f'{output_dir}/test/metadata.csv', 'a') as f:
-            f.write(f"{datafile},{test_df.shape[0]}\n")
-        with open(f'{output_dir}/train/metadata.csv', 'a') as f:
-            f.write(f"{datafile},{df.shape[0]}\n")
-
         del df
         del test_df
         del val_df
@@ -197,13 +189,6 @@ class SmilesPreprocess(object):
 
         split_files = os.listdir(split_data)
         logging.info(f'The data has been be split into {len(split_files)} files.')
-
-        with open(f'{output_dir}/val/metadata.csv', 'w') as f:
-            f.write(f"file,size\n")
-        with open(f'{output_dir}/test/metadata.csv', 'w') as f:
-            f.write(f"file,size\n")
-        with open(f'{output_dir}/train/metadata.csv', 'w') as f:
-            f.write(f"file,size\n")
 
         val_frac = val_samples_per_file / total_samples_per_file
         test_frac = test_samples_per_file / total_samples_per_file

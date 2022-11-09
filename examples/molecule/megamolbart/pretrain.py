@@ -32,7 +32,6 @@ from nemo.utils import logging
 from nemo.utils.exp_manager import StatelessTimer, exp_manager
 
 from bionemo.model.molecule.megamolbart import MegaMolBARTModel
-from bionemo.data import MoleculeCsvDatasetConfig
 from bionemo.utils import update_dataclass_config
 from bionemo.data import SmilesPreprocess
 import os
@@ -90,9 +89,6 @@ def setup_trainer(cfg):
 
 @hydra_runner(config_path="conf", config_name="pretrain_xsmall_span_aug")
 def main(cfg) -> None:
-    with open_dict(cfg):
-        cfg.model.data = update_dataclass_config(cfg.model.data, MoleculeCsvDatasetConfig)
-
     logging.info("\n\n************** Experiment configuration ***********")
     logging.info(f'\n{OmegaConf.to_yaml(cfg)}')
 

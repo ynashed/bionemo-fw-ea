@@ -38,8 +38,9 @@ launch.sh [command]
     pull      - pull an existing container
     download  - download pre-trained models
     build     - build a container, only recommended if customization is needed
+    run       - launch the docker container in non-dev mode. Code is cloned from git and installed.
     push      - push a container to a registry
-    dev       - launch a new container in interactive mode
+    dev       - launch a new container in development mode. Local copy of the code is mounted and installed.
     attach    - attach to a running container
 
 
@@ -60,12 +61,11 @@ variables:
     BIONEMO_IMAGE
         Container image for BioNeMo training, prepended with registry. e.g.,
         Note that this is a separate (precursor) container from any service associated containers
-    BIONEMO_PATH
+    PROJECT_MOUNT
         Set this to change the location of the library in the container, e.g. for development work.
-        By default this is set to the BioNeMo installation path (/opt/nvidia/bionemo).
-        If the location is changed from /opt/nvidia/bionemo, then the code located at PROJECT_PATH (see below)
-        will be mounted in the container at the location set by BIONEMO_PATH.
+        It is set to /workspace/bionemo by default and a lot of the examples expect this path to be valid.
         Use of /workspace/bionemo is strongly recommended as the alternative for development work.
+        Only change this if you know what you're doing.
     PROJECT_PATH
         Path on workstation or cluster to code, e.g., /home/user/code/bionemo
     DATA_PATH
@@ -100,7 +100,7 @@ BIONEMO_WORKSPACE=/workspace/bionemo # Location of examples / config files and w
 
 # Defaults for `.env` file
 BIONEMO_IMAGE=${BIONEMO_IMAGE:=nvcr.io/t6a4nuz8vrsr/bionemo:latest}
-BIONEMO_PATH=${BIONEMO_PATH:=$BIONEMO_HOME}
+PROJECT_MOUNT=${PROJECT_MOUNT:=/workspace/bionemo}
 PROJECT_PATH=${PROJECT_PATH:=$(pwd)}
 DATA_PATH=${DATA_PATH:=/tmp}
 RESULT_PATH=${RESULT_PATH:=${HOME}/results/nemo_experiments}
@@ -131,7 +131,7 @@ fi
 # If $LOCAL_ENV was not found, write out a template for user to edit
 if [ $write_env -eq 1 ]; then
     echo BIONEMO_IMAGE=${BIONEMO_IMAGE} >> $LOCAL_ENV
-    echo BIONEMO_PATH=${BIONEMO_PATH} >> $LOCAL_ENV
+    echo PROJECT_MOUNT=${PROJECT_MOUNT} >> $LOCAL_ENV
     echo PROJECT_PATH=${PROJECT_PATH} >> $LOCAL_ENV
     echo DATA_PATH=${DATA_PATH} >> $LOCAL_ENV
     echo RESULT_PATH=${RESULT_PATH} >> $LOCAL_ENV
@@ -174,7 +174,6 @@ DOCKER_CMD="docker run \
     -p ${JUPYTER_PORT}:8888 \
     -v ${DATA_PATH}:${DATA_MOUNT_PATH} \
     -v ${RESULT_PATH}:${RESULT_MOUNT_PATH} \
-    -e BIONEMO_PATH=${BIONEMO_PATH} \
     --shm-size=1g \
     --ulimit memlock=-1 \
     --ulimit stack=67108864 \
@@ -182,17 +181,6 @@ DOCKER_CMD="docker run \
     -e NUMBA_CACHE_DIR=/tmp/ "
 
 
-if [[ ${BIONEMO_PATH} != ${BIONEMO_HOME} ]]; then
-    # For development work # TODO this could be moved to setup
-    echo "Mounting ${PROJECT_PATH} at ${BIONEMO_PATH} for development"
-    DOCKER_CMD="${DOCKER_CMD} -v ${PROJECT_PATH}:${BIONEMO_PATH} -e HOME=${BIONEMO_PATH} -w ${BIONEMO_PATH} "
-    DOCKER_CMD="${DOCKER_CMD} -v /etc/passwd:/etc/passwd:ro "
-    DOCKER_CMD="${DOCKER_CMD} -v /etc/group:/etc/group:ro "
-    DOCKER_CMD="${DOCKER_CMD} -v /etc/shadow:/etc/shadow:ro "
-    DOCKER_CMD="${DOCKER_CMD} -u $(id -u):$(id -g) "
-else
-    DOCKER_CMD=${DOCKER_CMD}" -e HOME=${BIONEMO_WORKSPACE} -w ${BIONEMO_WORKSPACE} "
-fi
 
 
 DOCKER_BUILD_CMD="docker build --network host \
@@ -355,10 +343,10 @@ setup() {
     mkdir -p ${DATA_PATH}
     mkdir -p ${RESULT_PATH}
 
-    # For code mounted for development purpose
-    if [[ ${BIONEMO_PATH} != ${BIONEMO_HOME} ]]; then
-        echo "Prepending ${BIONEMO_PATH} to PYTHONPATH for development"
-        DEV_PYTHONPATH="${BIONEMO_PATH}:${BIONEMO_PATH}/generated"  
+    # For dev mode, mount the local code for development purpose
+    if [[ $1 == "dev" ]]; then
+        echo "Prepending ${PROJECT_MOUNT} to PYTHONPATH for development"
+        DEV_PYTHONPATH="${PROJECT_MOUNT}:${PROJECT_MOUNT}/generated"  
         DOCKER_CMD="${DOCKER_CMD} --env PYTHONPATH=${DEV_PYTHONPATH}"
     else
         DEV_PYTHONPATH=""
@@ -377,6 +365,16 @@ setup() {
     fi
 
     DOCKER_CMD="${DOCKER_CMD} --env WANDB_API_KEY=$WANDB_API_KEY"
+    
+    # For development work
+    echo "Mounting ${PROJECT_PATH} at ${PROJECT_MOUNT} for development"
+    DOCKER_CMD="${DOCKER_CMD} -v ${PROJECT_PATH}:${PROJECT_MOUNT} -e HOME=${PROJECT_MOUNT} -w ${PROJECT_MOUNT} "
+    DOCKER_CMD="${DOCKER_CMD} -v /etc/passwd:/etc/passwd:ro "
+    DOCKER_CMD="${DOCKER_CMD} -v /etc/group:/etc/group:ro "
+    DOCKER_CMD="${DOCKER_CMD} -v /etc/shadow:/etc/shadow:ro "
+    DOCKER_CMD="${DOCKER_CMD} -u $(id -u):$(id -g) "
+    # For dev use the models in ./models dir
+    DOCKER_CMD="${DOCKER_CMD} -v ${PROJECT_PATH}/models:/model"
 }
 
 
@@ -411,16 +409,35 @@ Available options are -a(--additional-args), -i(--image), -d(--demon) and -c(--c
         esac
     done
 
-    # For dev use the models in ./models dir
-    DOCKER_CMD="${DOCKER_CMD} -v ${PROJECT_PATH}/models:/model"
 
-    setup
+    setup "dev"
     set -x
     ${DOCKER_CMD} --rm -it --name ${DEV_CONT_NAME} ${BIONEMO_IMAGE} ${CMD}
     set +x
     exit
 }
 
+run() {
+    CMD='bash'
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+	    -c|--cmd)
+	        shift
+		CMD="$@"
+		break
+		;;
+	    *)
+	        echo "Unknown option '$1'. Only available option is -c(--cmd)"
+		exit 1
+		;;
+	esac
+    done
+
+    set -x
+    ${DOCKER_CMD} --rm -it --gpus all -e HOME=${BIONEMO_WORKSPACE} -w ${BIONEMO_WORKSPACE} --name ${DEV_CONT_NAME} ${BIONEMO_IMAGE} ${CMD}
+    set +x
+    exit
+}
 
 attach() {
     set -x
@@ -452,6 +469,9 @@ case $1 in
         $@
         ;;
     build)
+        $@
+        ;;
+    run)
         $@
         ;;
     push)

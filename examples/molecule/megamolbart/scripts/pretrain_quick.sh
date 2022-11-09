@@ -23,7 +23,7 @@
 CONFIG_FILE=pretrain_xsmall_span_aug
 PROJECT=MegaMolBART
 DATA_MOUNT=/data/zinc_csv
-BIONEMO_PATH=/workspace/bionemo # /workspace/bionemo if library mounted or /opt/nvidia/bionemo
+PROJECT_MOUNT=/workspace/bionemo # /workspace/bionemo if library mounted or /opt/nvidia/bionemo
 OUTPUT_MOUNT=/result
 WANDB_OFFLINE=True # set to False to upload to WandB while training, otherwise True
 RESULTS_MOUNT=${OUTPUT_MOUNT}/nemo_experiments/${PROJECT}/${CONFIG_FILE}
@@ -34,7 +34,7 @@ DATA_FILES_SELECTED=x_OP_000..186_CL_ # x000 for a single file for x_OP_000..186
 BIONEMO_HOME=/opt/nvidia/bionemo # Where BioNeMo is installed in container, set the same as Docker container
 BIONEMO_WORKSPACE=/workspace/bionemo # Location of examples / config files and where BioNeMo code can be mounted for development
 RUN_SCRIPT="pretrain.py"
-RUN_SCRIPT_DIRECTORY="${BIONEMO_PATH}/examples/molecule/megamolbart"
+RUN_SCRIPT_DIRECTORY="${PROJECT_MOUNT}/examples/molecule/megamolbart"
 
 usage() {
 cat <<EOF
@@ -82,14 +82,12 @@ execute() {
 
 preprocess() {
     DO_TRAINING="False"
-    parse_args $@
     execute
 }
 
 
 train() {
     DO_TRAINING="True"
-    parse_args $@
     execute
 }
 
@@ -120,13 +118,12 @@ parse_args() {
     done
 }
 
-
 mkdir -p ${RESULTS_MOUNT}
-export BIONEMO_PATH=${BIONEMO_PATH}
+export PROJECT_MOUNT=${PROJECT_MOUNT}
 
-if [[ ${BIONEMO_PATH} != ${BIONEMO_HOME} ]]; then
-    echo "Prepending ${BIONEMO_PATH} to PYTHONPATH for development"
-    DEV_PYTHONPATH=${BIONEMO_PATH}
+if [[ ${PROJECT_MOUNT} != ${BIONEMO_HOME} ]]; then
+    echo "Prepending ${PROJECT_MOUNT} to PYTHONPATH for development"
+    DEV_PYTHONPATH=${PROJECT_MOUNT}
 else
     DEV_PYTHONPATH=""
 fi
@@ -136,19 +133,20 @@ export HYDRA_FULL_ERROR=1
 cd ${RUN_SCRIPT_DIRECTORY}
 
 if [ $# -eq 0 ]; then
-    ARGS=train
-    CMD='train'
+    ARGS="train"
+    parse_args "$@"
 else
     ARGS=$1
-    CMD=$@
+    shift
+    parse_args "$@"
 fi
 
 case $ARGS in
     preprocess)
-        $CMD
+	preprocess
         ;;
     train)
-        $CMD
+	train
         ;;
     *)
         usage

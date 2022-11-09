@@ -108,6 +108,14 @@ model:
     eod_mask_loss: False # Mask loss for the end of document tokens
     masked_lm_prob: 0.15 # Probability of replacing a token with mask.
     short_seq_prob: 0.1 # Probability of producing a short sequence.
+    header_lines: 1
+    data_col: 1
+    data_sep: ','
+    sort_dataset_paths: True
+    skip_lines: 0
+    drop_last: False
+    pin_memory: False
+    newline_int: 10
   
   optim:
     name: fused_adam # fused optimizers used by Megatron model

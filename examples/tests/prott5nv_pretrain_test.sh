@@ -20,19 +20,19 @@
 ####
 
 ### CONFIG ###
-BIONEMO_PATH=${BIONEMO_PATH:=$BIONEMO_HOME} # can also be explicity set, e.g. /opt/nvidia/bionemo or /workspace/bionemo
+PROJECT_MOUNT=${PROJECT_MOUNT:=/workspace/bionemo} # can also be explicity set, e.g. /opt/nvidia/bionemo or /workspace/bionemo
 ### END CONFIG ###
 
 CONFIG_FILE=prott5nv_test
-DATA_MOUNT=${BIONEMO_PATH}/examples/tests/test_data
+DATA_MOUNT=${PROJECT_MOUNT}/examples/tests/test_data/protein
 RESULTS_MOUNT=/tmp/results
 
 TRAINING_ARGS="model.data.dataset_path=${DATA_MOUNT}"
 
 execute() {
     set -x
-    python ${BIONEMO_PATH}/examples/protein/prott5nv/pretrain.py \
-        --config-path=${BIONEMO_PATH}/examples/tests \
+    python ${PROJECT_MOUNT}/examples/protein/prott5nv/pretrain.py \
+        --config-path=${PROJECT_MOUNT}/examples/tests \
         --config-name=${CONFIG_FILE} \
         exp_manager.exp_dir=${RESULTS_MOUNT} \
         ${TRAINING_ARGS} \
@@ -49,19 +49,19 @@ train() {
 
 rm -rf ${RESULTS_MOUNT}
 mkdir -p ${RESULTS_MOUNT}
-echo "Setting BIONEMO_PATH to ${BIONEMO_PATH}"
-export BIONEMO_PATH=${BIONEMO_PATH}
+echo "Setting PROJECT_MOUNT to ${PROJECT_MOUNT}"
+export PROJECT_MOUNT=${PROJECT_MOUNT}
 
-if [[ ${BIONEMO_PATH} != ${BIONEMO_HOME} ]]; then
-    echo "Prepending ${BIONEMO_PATH} to PYTHONPATH for development"
-    DEV_PYTHONPATH=${BIONEMO_PATH}
+if [[ ${PROJECT_MOUNT} != ${BIONEMO_HOME} ]]; then
+    echo "Prepending ${PROJECT_MOUNT} to PYTHONPATH for development"
+    DEV_PYTHONPATH=${PROJECT_MOUNT}
 else
     DEV_PYTHONPATH=""
 fi
 export PYTHONPATH="${DEV_PYTHONPATH}:${BIONEMO_WORKSPACE}:${BIONEMO_WORKSPACE}/generated:$PYTHONPATH"
 
 export HYDRA_FULL_ERROR=1
-cd ${BIONEMO_PATH}/examples
+cd ${PROJECT_MOUNT}/examples
 
 if [ $# -eq 0 ]; then
     ARGS=train
@@ -85,7 +85,7 @@ RES=$(cat ${RESULTS_MOUNT}/cmdline_prints | grep "Epoch 0:  99%" | sed 's/^.*\ l
 arrRes=(${RES//,/ })
 echo ${arrRes[0]}" "${arrRes[2]}" "${arrRes[3]}" "${arrRes[4]} >& ${RESULTS_MOUNT}/result_log
 
-DIFF=$(diff ${RESULTS_MOUNT}/result_log ${BIONEMO_PATH}/examples/tests/expected_results/prott5nv_log)
+DIFF=$(diff ${RESULTS_MOUNT}/result_log ${PROJECT_MOUNT}/examples/tests/expected_results/prott5nv_log)
 DIFF_PASSED=$?
 RED='\033[0;31m'
 GREEN='\033[0;32m'
