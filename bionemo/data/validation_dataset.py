@@ -28,15 +28,19 @@ class DataFrameTransformDataset(Dataset):
         self.df = pd.read_csv(data_file, **read_csv_args)
         self.length = self.df.shape[0]
         self.functions = functions
+        self.do_transforms = True
 
     def __len__(self):
         return self.length
 
     def __getitem__(self, idx):
         df_entry = self.df.iloc[idx]
-        result = {}
-        for fn in self.functions:
-            result.update(fn(df_entry))
+        if self.do_transforms:
+            result = {}
+            for fn in self.functions:
+                result.update(fn(df_entry))
+        else:
+            result = df_entry.to_dict()
         return result
 
 

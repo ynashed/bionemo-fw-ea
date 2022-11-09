@@ -10,11 +10,12 @@ task:
   model:
     target_name: 'target'
     data:
-      dataset_path: /workspace/bionemo/examples/dna/data/splice-site-prediction/sampled-data-10k/
-      train_file: /workspace/bionemo/examples/dna/data/splice-site-prediction/sampled-data-10k/sampled-data.csv
+      dataset_path: /workspace/bionemo/examples/dna/data/splice-site-prediction/sampled-data-30k/
+      train_file: /workspace/bionemo/examples/dna/data/splice-site-prediction/sampled-data-30k/train.csv
+      val_file: /workspace/bionemo/examples/dna/data/splice-site-prediction/sampled-data-30k/val.csv
+      predict_file: /workspace/bionemo/examples/dna/data/splice-site-prediction/sampled-data-30k/test.csv
       fasta_directory: /workspace/bionemo/examples/dna/data/splice-site-prediction/GRCh38.ensembl.99
       fasta_pattern: Homo_sapiens.GRCh38.dna.chromosome.{}.fa.gz
     encoder:
       checkpoint: /workspace/bionemo/examples/dna/nemo_experiments/dnabert/2022-10-25_00-04-34/checkpoints/dnabert--val_loss=8.57-step=760400-consumed_samples=3041600.0-last.ckpt
       hparams: /workspace/bionemo/examples/dna/nemo_experiments/dnabert/2022-10-25_00-04-34/hparams.yaml
-

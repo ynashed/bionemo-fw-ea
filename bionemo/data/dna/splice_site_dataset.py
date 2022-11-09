@@ -163,42 +163,70 @@ def get_autosomes(root_directory, pattern):
 
 class SpliceSiteDataModule(BioNeMoDataModule):
 
-    def __init__(self, cfg, trainer, model):
+    def __init__(self, cfg, trainer, model, fasta_backend='memory'):
+        """Data Module for Splice Site prediction
+
+        Args:
+            cfg (OmegaConf): Model configuration object
+            trainer (Trainer): PTL trainer
+            model (DNABERTModel): Model that will be used for splice site prediction
+            fasta_backend (str, optional): Backend for loading FASTA files.
+                Defaults to 'memory'. Options: ['memory', 'file']
+        """
         self.cfg = cfg
         self.model = model
         self.train_file = cfg.data.train_file
         self.val_file = cfg.data.get('val_file')
         self.test_file = cfg.data.get('test_file')
+        for f in [self.train_file, self.val_file, self.test_file]:
+            if f is not None and not os.path.exists(f):
+                raise ValueError(f'File: {f} does not exist.')
         fasta_files = self.get_fasta_files()
         self.length = cfg.seq_length
         self.fasta_dataset = ConcatFastaDataset(
-            fasta_files, self.length, backend='memory',
+            fasta_files, self.length, backend=fasta_backend,
         )
         super().__init__(cfg, trainer)
         self.init_num_samples()
 
     def get_fasta_files(self):
+        """Gets files to use to look up splice sites
+
+        Returns:
+            List[str]: Contains filepaths to reference FASTA files
+        """
         fasta_directory = self.cfg.data.fasta_directory
         pattern = self.cfg.data.fasta_pattern
         return get_autosomes(fasta_directory, pattern)
 
     def train_dataset(self):
-        gff_dataset = self._create_dataset(self.train_file)
+        gff_dataset = self.create_dataset(self.train_file)
         return gff_dataset
 
     def val_dataset(self):
         if self.val_file is None:
             return []
-        gff_dataset = self._create_dataset(self.val_file)
+        gff_dataset = self.create_dataset(self.val_file)
         return gff_dataset
 
     def test_dataset(self):
         if self.test_file is None:
             return []
-        gff_dataset = self._create_dataset(self.test_file)
+        gff_dataset = self.create_dataset(self.test_file)
         return gff_dataset
 
-    def _create_dataset(self, filename):
+    def create_dataset(self, filename):
+        """Creates a pytorch dataset from a CSV containing splice sites.
+
+        Args:
+            filename (str): splice site CSV. Requires `id` and `coord` columns.
+                Correspond to Chromosome/Contig ID and position, respectively.
+
+
+        Returns:
+            Dataset: PyTorch Dataset that retrieves reference strings from
+                genome coordinates.
+        """
         bert_prep = delistify_single_arg(KmerBertCollate(
             self.model.tokenizer,
             modify_percent=0,

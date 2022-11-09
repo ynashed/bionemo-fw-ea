@@ -75,6 +75,15 @@ class TrainerBuilder(object):
             cfg.model.precision = cfg.trainer.precision
 
 
+class PredictTrainerBuilder(TrainerBuilder):
+    @staticmethod
+    def configure_callbacks(cfg):
+        return []
+
+    @staticmethod
+    def resume_checkpoint(cfg, trainer):
+        pass
+
 def setup_trainer(cfg, builder=None):
     """NeMo Trainer setup functions"""
     if builder is None:
