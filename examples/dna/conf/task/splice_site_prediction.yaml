@@ -47,11 +47,15 @@ model:
 
   resume_from_checkpoint: null
   seed: 724
+
+  predict: False
+  predictions_output_file: null # File where predictions are saved if `predict` is True
   data:
     dataset_path: ??? # root directory for saving memory maps
-    train_file: ???
-    val_file: null
-    test_file: null
+    train_file: ??? # CSV containing splice sites to use for training
+    val_file: null # CSV containing splice sites to use for validation
+    test_file: null # CSV containing splice sites to use for testing
+    predict_file: null # CSV containing splice sites to use for inference
     fasta_directory: ??? # Directory where reference chromosomes are stored
     fasta_pattern: ??? # Template for reference chromosome filenames: e.g., chr{}.fa will correspond to files: chr1.fa, chr2.fa, ...
     seq_length: ${..seq_length}

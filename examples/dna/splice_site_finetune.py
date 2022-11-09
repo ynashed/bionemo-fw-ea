@@ -15,15 +15,20 @@
 # limitations under the License.
 
 from omegaconf.omegaconf import OmegaConf
+import torch
 from nemo.core.config import hydra_runner
 from nemo.utils import logging
 from bionemo.model.dnabert.splice_site_prediction import (
     SpliceSiteBERTPredictionModel
 )
-from bionemo.model.utils import setup_trainer
+from bionemo.model.utils import (
+    setup_trainer,
+    PredictTrainerBuilder,
+)
 
 import numpy as np
 import pytorch_lightning as pl
+import pandas as pd
 
 
 
@@ -33,14 +38,54 @@ def main(cfg) -> None:
     logging.info("\n\n************** Experiment configuration ***********")
     logging.info(f'\n{OmegaConf.to_yaml(cfg)}')
 
+    do_training = cfg.task.get('do_training')
+    do_prediction = cfg.task.get('do_prediction')
+
+    if do_prediction:
+        predictions_file = cfg.task.get('predictions_output_file')
+
+    if do_prediction and predictions_file is None:
+        raise ValueError(
+            'predictions_output_file must be specified if do_prediction=True')
+
     seed = cfg.task.model.seed
     np.random.seed(seed)
     pl.seed_everything(seed)
 
-    trainer = setup_trainer(cfg.task)
+    trainer = setup_trainer(
+        cfg.task, builder=PredictTrainerBuilder() if not do_training else None)
     model = SpliceSiteBERTPredictionModel(cfg.task.model, trainer)
 
-    trainer.fit(model)
+    if do_training:
+        trainer.fit(model)
+    if do_prediction:
+        if not do_training:
+            ckpt_path = cfg.task.model.get('resume_from_checkpoint')
+            # NOTE when predicting in distributed, instead use a custom writer, like
+            # seen here: https://pytorch-lightning.readthedocs.io/en/latest/deploy/production_basic.html
+            model.data_setup()
+        else:
+            ckpt_path = None
+
+        dataloader = model.predict_dataloader()
+        predictions = trainer.predict(
+            model, dataloaders=dataloader, ckpt_path=ckpt_path)
+        dataset = model.predict_dataset
+        predictions = reformat_predictions(predictions, dataset)
+        pd.DataFrame(predictions).to_csv(predictions_file)
+
+def reformat_predictions(predictions, dataset):
+    predictions = torch.cat(predictions)
+    pred_labels = torch.argmax(predictions, 1)
+
+    # WARNING: this changes the behavior or `dataset` and is intended for use
+    # only after the inference step has been completed. Set `do_transforms`
+    # back to True if normal behavior is needed again.
+    dataset.do_transforms = False
+    predictions = [dict(**dataset[i], pred_label=pred_labels[i].item())
+                       for i in range(len(dataset))]
+
+    return predictions
 
 if __name__ == '__main__':
     main()

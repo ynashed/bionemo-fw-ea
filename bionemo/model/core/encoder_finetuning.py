@@ -30,6 +30,7 @@ class EncoderFineTuning(ModelPT, Exportable):
         self.init_consumed_samples = 0
         self.loss_fn = self.build_loss_fn()
         self.task_head = self.build_task_head()
+        self.predict_dataset = None
 
     def list_available_models(self):
         return []
@@ -80,9 +81,10 @@ class EncoderFineTuning(ModelPT, Exportable):
             init_consumed_samples = 0
 
         self.init_consumed_samples = init_consumed_samples
-
-        super().setup(*args, **kwargs)
         self.data_setup()
+        super().setup(*args, **kwargs)
+
+    def on_fit_start(self):
         self.setup_training_data(self.cfg)
         self.setup_validation_data(self.cfg)
         self.setup_test_data(self.cfg)
@@ -90,6 +92,16 @@ class EncoderFineTuning(ModelPT, Exportable):
     @abstractmethod
     def data_setup(self):
         pass
+
+    def predict_dataloader(self):
+        self.predict_dataset = self.data_module.create_dataset(
+            self.cfg.data.predict_file
+        )
+        return torch.utils.data.DataLoader(
+            self.predict_dataset, num_workers=self.cfg.data.num_workers,
+            pin_memory=True, shuffle=False,
+            batch_size=self.cfg.micro_batch_size,
+        )
 
     def forward(self, batch: dict):
         output_tensor = self.encoder_forward(self.encoder_model, batch)

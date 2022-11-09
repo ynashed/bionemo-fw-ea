@@ -1,3 +1,4 @@
+from functools import lru_cache
 from omegaconf import OmegaConf
 from torch import nn
 from bionemo.model.dnabert import DNABERTModel
@@ -58,11 +59,17 @@ class SpliceSiteBERTPredictionModel(EncoderFineTuning):
         output_tensor = bert_model(tokens, padding_mask, token_type_ids=types, lm_labels=lm_labels)
         return output_tensor
 
+    # the lru cache is kind of a hacky way to make sure this isn't set up if
+    # it is already initialized, since this function doesn't return anything
+    @lru_cache
     def data_setup(self):
         self.data_module = SpliceSiteDataModule(
-            self.cfg, self.trainer, self.encoder_model
+            self.cfg, self.trainer, self.encoder_model,
         )
+
+    def on_fit_start(self):
         self.build_train_valid_test_datasets()
+        return super().on_fit_start()
 
     def build_train_valid_test_datasets(self):
         # if we want to make _train_ds optional for testing, we should be able
