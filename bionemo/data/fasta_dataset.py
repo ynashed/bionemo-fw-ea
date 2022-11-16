@@ -20,6 +20,9 @@ from nemo.core import Dataset
 from torch.utils.data import ConcatDataset
 import numpy as np
 from omegaconf import open_dict
+from nemo.collections.nlp.data.language_modeling.text_memmap_dataset import (
+    TextMemMapDataset
+)
 from bionemo.data.utils import (
     MappedDataset,
     handle_index,
@@ -157,6 +160,269 @@ class FastaDataset(Dataset):
             'contig': contig_name,
             'start': position_start,
         }
+
+
+class FastaMemMapDataset(TextMemMapDataset):
+    """
+    See FASTA format definition here:
+    http://www.ncbi.nlm.nih.gov/blast/fasta.shtml
+    E.g., the following is a valid FASTA
+    >seq1
+    ACGTAC
+    GAGATA
+    >seq2
+    TACATA
+    A useful access would be, e.g.,
+    >>> dataset = FastaMemMapDataset(files, seq_length=4)
+    >>> dataset[0]
+    'ACGT'
+    >>> dataset[4]
+    'ACGA'
+    >>> dataset[9]
+    'TACA'
+    >>> dataset[11]
+    'CATA'
+    The general pattern for getting substrings from the FASTA is:
+    On initialization:
+    1. Infer the lines to ignore (i.e., description lines)
+    2. Build an index of new line characters (this is saved, use the stored
+        index if it exists)
+    3. Build an index of the DNA sequences specifically based
+        on the buffer size of this reader (i.e., `seq_length`).
+    On get:
+    4. Use indexes to figure out the portion of string to pull into memory
+    5. Post-process to strip new lines
+    This could also be applicable to sequences from FASTQ, but is complicated
+        by files including a couple extra lines for quality scores.
+    This parser will need a little bit of additional sophistication to return
+        the description and relative position of a sequence.
+    """
+    def __init__(
+        self,
+        dataset_paths, seq_length, newline_int=10, header_lines=0,
+        workers=None, tokenizer=None, sort_dataset_paths=True,
+        escape_char=62,
+    ):
+        """
+        Args:
+            dataset_paths (List[str]): FASTA files to be included
+            seq_length (int): Length of sequences to load. The sequences
+                starting at the last `seq_length` - 1 characters of a FASTA
+                entry will not be directly indexable
+            newline_int (Optional[int]): The integer to parse as newline
+                characters in the memory map.
+            header_lines (Optional[int]): Number of lines to skip at beginning
+                of file
+            workers (Optional[int]): Number of works used to build the file
+                indexes.
+            tokenizer (Optional[TokenizerSpec]): If supplied, the string will
+                be tokenized by `tokenizer` before being returned.
+            sort_dataset_paths (Optional[bool]): If True, the files are sorted
+                in lexicographic order for accession.
+            escape_char (Optional[int]): ignore lines that start with
+                `escape_char`. Note: 62 is the result of
+                int.from_bytes('>'.encode('utf-8'), "big")
+        """
+        super().__init__(
+            dataset_paths=dataset_paths,
+            newline_int=newline_int,
+            header_lines=header_lines,
+            workers=workers,
+            tokenizer=tokenizer,
+            sort_dataset_paths=sort_dataset_paths,
+        )
+        self.seq_length = seq_length
+        self.escape_char = escape_char
+
+        startline_index_list = []
+        for _, midx in self.mdata_midx_list:
+            startlines = np.array([0, *midx[:-1]])
+            startline_index_list.append(startlines)
+
+        self.sequence_index_bins = []
+        self.sequence_indexes = []
+
+        self._build_sequence_indices()
+
+    def _build_sequence_indices(self):
+        """
+        Builds additional indices for sequence specific indexing.
+        There is one index to keep track of the number of indexable positions
+        in each file.
+        Then there is an index of cumulative number of indexable sequence bases
+        ending on each line of the file.
+        """
+        for mdata, midx in self.mdata_midx_list:
+            sequence_index = self._build_sequence_index(
+                    mdata, midx, self.escape_char,
+                )
+            self.sequence_indexes.append(sequence_index)
+            if len(self.sequence_index_bins) > 0:
+                new_bin = sequence_index[-1] + self.sequence_index_bins[-1]
+            else:
+                new_bin = sequence_index[-1]
+
+            self.sequence_index_bins.append(new_bin)
+
+    @staticmethod
+    def _build_sequence_index(mdata, midx, escape_char):
+        """
+        Create an index of the amount of sequence bases that have ocurred by
+        the end of each line. Sequence descriptions are ignored.
+        E.g., for the following FASTA:
+        ```
+        >seq1
+        ACAGAT
+        TCGACCC
+        >seq2
+        TACAT
+        ```
+        The result would be: [0, 6, 13, 13, 18]
+        """
+        # Note: We are creating a lot of arrays here, these have the potential
+        #  to be pretty huge on really large files. See if there is a way to
+        #  reduce memory usage. We can also store extra indices in an npy file.
+        start_positions = np.concatenate(([0], midx[:-1] + 1))
+        line_lengths = midx - start_positions
+        start_chars = mdata[start_positions]
+        is_kept_mask = start_chars != escape_char
+        masked_line_lengths = line_lengths * is_kept_mask
+
+        return np.cumsum(masked_line_lengths)
+
+    def __len__(self):
+        """The number of positions that can be sampled from the dataset"""
+        return self.sequence_index_bins[-1]
+
+    def __getitem__(self, idx):
+        """
+        Return a string from binary memmap
+        """
+
+        idx = handle_index(self, idx)
+
+        record, start, end = self._get_record_start_end(idx)
+
+        text = record[start:end].tobytes().decode("utf-8")
+
+        # parse raw text (e.g., tokenize)
+        data = self._build_data_from_text(text)
+
+        return data
+
+    def _build_data_from_text(self, text: str):
+        text = text.replace('\n', '').split('>')[0]
+        text = super()._build_data_from_text(text)
+        data = dict(seq=text)
+        return data
+
+    def _get_record_start_end(self, idx):
+        """
+        Retrieve the start and end of the index requested.
+        Since sequences in FASTA can have arbitrary new lines in the middle
+        of them, this function does additional work to ensure that the correct
+        number of non-newline characters are returned.
+        The extra work is linear with the number of newline characters, so
+        files can be pre-processed to remove the newlines to speed up access,
+        but this indexing will work in either case.
+        """
+        # Identify the file containing the record
+        file_id = np.digitize(idx, self.sequence_index_bins, right=False)
+        base_idx = self.sequence_index_bins[file_id - 1] if file_id > 0 else 0
+        within_file_idx = idx - base_idx + self._header_lines
+        mdata, midx = self.mdata_midx_list[file_id]
+        seq_index = self.sequence_indexes[file_id]
+
+        start_line = np.digitize(within_file_idx, seq_index)
+        # the condition where start_line == 0 should not be invoked for real
+        #  FASTA files, but this function will work regardless
+        position_at_start_of_line = \
+            (midx[start_line - 1] + 1) if start_line else 0
+
+        start_position_within_line = (within_file_idx - \
+            seq_index[start_line - 1]) if start_line else within_file_idx
+
+        start_index = position_at_start_of_line + start_position_within_line
+
+        # calculate number of new lines
+        current_pos = start_index
+        current_line = start_line
+        accumualted_chars = 0
+        number_of_new_line_chars = 0
+
+        # The length of the string here can vary because a desired string from
+        # a fasta may be split over an arbitrary number of lines.
+        while accumualted_chars < self.seq_length and current_line < len(midx):
+            # accumulate the end of this line, or as much as possible
+            chars_remaining = self.seq_length - accumualted_chars
+            chars_on_line = midx[current_line] - current_pos
+            accumualted_chars += min(
+                chars_remaining, chars_on_line
+            )
+            if chars_remaining > chars_on_line:
+                number_of_new_line_chars += 1
+            current_pos += chars_remaining + 1
+            current_line += 1
+
+        end_index = start_index + self.seq_length + \
+            number_of_new_line_chars
+        return mdata, start_index, end_index
+
+# class FastaMemmapDataset(TextMemMapDataset):
+#     def __init__(self, path, max_length, workers=None, tokenizer=None, sort_dataset_paths=True):
+
+#         self.max_length = max_length
+#         super().__init__(
+#             dataset_paths=[path],
+#             newline_int=ord(">"),
+#             header_lines=1, # skip first N lines
+#             workers=workers,
+#             tokenizer=tokenizer,
+#             sort_dataset_paths=sort_dataset_paths,
+#         )
+#         self._size = self._infer_size()
+
+#     def _infer_size(self):
+#         size = 0
+#         for file_id in range(len(self.midx_bins)):
+#             mdata, midx = self.mdata_midx_list[file_id]
+#             size += len(mdata)
+#             for idx in midx:
+#                 start = idx
+#                 while start < len(mdata) and mdata[start] != ord('\n') :
+#                     start += 1
+#                     size -= 1
+#             # TODO this is probably slow so we don't want to run it every single time
+#             # See if we can add it to the index file/npy thing
+#             for char in mdata:
+#                 if char == ord('\n'):
+#                     size -= 1
+#         return size
+
+#     def _fetch_sample_from_memmap(self, mdata, i, j):
+#         """Fetchs the text sample. Can be overriden by child-classes to support loading of partial samples and alternative decode methods"""
+#         # load text sample by slicing memmap data[i:j]
+#         # first: slide right until ord('\n')
+#         # then: index into the string and end at max_length
+#         # TODO this is not right yet
+#         seq_lbound = i
+#         while mdata[seq_lbound] != ord('\n'):
+#             seq_lbound += 1
+#         j = min(j, seq_lbound + self.max_length + 1)
+#         text = mdata[i:j].tobytes().decode("utf-8")
+
+#         return text
+
+#     def _build_data_from_text(self, text):
+#         """Allows child-classes to modify the parsing of raw text, prior to tokenization"""
+#         # convert text into data
+#         _build_data_from_text = super()._build_data_from_text
+#         # extract id and sequence and tokenize (if needed)
+#         id_, sequence = text.strip().split("\n", 1)
+#         sequence = _build_data_from_text(sequence)
+#         data = dict(contig=id_, seq=sequence)
+
+#         return data
 
 
 class DiscretizeFastaDataset(MappedDataset):

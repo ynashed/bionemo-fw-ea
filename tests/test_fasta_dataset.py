@@ -18,6 +18,7 @@ import pytest
 import tempfile
 from bionemo.data.fasta_dataset import (
     FastaDataset, ConcatFastaDataset, DiscretizeFastaDataset,
+    FastaMemMapDataset,
     BACKENDS,
 )
 import pyfastx
@@ -59,6 +60,25 @@ def test_fasta_dataset(idx, sequence, backend):
     fa = pyfastx.Fasta(fasta_file.name)
     dataset = FastaDataset(fa, 4, backend=backend)
     assert dataset[idx]['seq'] == sequence
+
+@pytest.fixture(scope="module")
+def memmap_fasta():
+    fasta_file = tempfile.NamedTemporaryFile()
+    with open(fasta_file.name, 'w') as fh:
+        fh.write('>seq1\nACAGAT\nTCGACCC\n>seq2\nTACAT\n')
+    dataset = FastaMemMapDataset(fasta_file.name, 4)
+    return dataset
+
+@pytest.mark.parametrize('idx,sequence', test_examples)
+def test_fasta_memmap_dataset(idx, sequence, memmap_fasta):
+    dataset = memmap_fasta
+
+    assert dataset[idx]['seq'] == sequence
+
+
+def test_fasta_memmap_dataset_len(memmap_fasta):
+    dataset = memmap_fasta
+    assert len(dataset) == 18
 
 test_discrete_examples = [
     (0, 'ACAG'),
