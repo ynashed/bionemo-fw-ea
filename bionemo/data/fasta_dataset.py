@@ -222,6 +222,12 @@ class FastaMemMapDataset(TextMemMapDataset):
             escape_char (Optional[int]): ignore lines that start with
                 `escape_char`. Note: 62 is the result of
                 int.from_bytes('>'.encode('utf-8'), "big")
+            # TODO needs:
+            #   * fetch() method
+            #   * ids() method
+            #   * return id/description from dataset call
+            #   * undo the files logic and wrap it into concat
+            #   * integrate with DNABERT
         """
         super().__init__(
             dataset_paths=dataset_paths,
@@ -367,62 +373,6 @@ class FastaMemMapDataset(TextMemMapDataset):
         end_index = start_index + self.seq_length + \
             number_of_new_line_chars
         return mdata, start_index, end_index
-
-# class FastaMemmapDataset(TextMemMapDataset):
-#     def __init__(self, path, max_length, workers=None, tokenizer=None, sort_dataset_paths=True):
-
-#         self.max_length = max_length
-#         super().__init__(
-#             dataset_paths=[path],
-#             newline_int=ord(">"),
-#             header_lines=1, # skip first N lines
-#             workers=workers,
-#             tokenizer=tokenizer,
-#             sort_dataset_paths=sort_dataset_paths,
-#         )
-#         self._size = self._infer_size()
-
-#     def _infer_size(self):
-#         size = 0
-#         for file_id in range(len(self.midx_bins)):
-#             mdata, midx = self.mdata_midx_list[file_id]
-#             size += len(mdata)
-#             for idx in midx:
-#                 start = idx
-#                 while start < len(mdata) and mdata[start] != ord('\n') :
-#                     start += 1
-#                     size -= 1
-#             # TODO this is probably slow so we don't want to run it every single time
-#             # See if we can add it to the index file/npy thing
-#             for char in mdata:
-#                 if char == ord('\n'):
-#                     size -= 1
-#         return size
-
-#     def _fetch_sample_from_memmap(self, mdata, i, j):
-#         """Fetchs the text sample. Can be overriden by child-classes to support loading of partial samples and alternative decode methods"""
-#         # load text sample by slicing memmap data[i:j]
-#         # first: slide right until ord('\n')
-#         # then: index into the string and end at max_length
-#         # TODO this is not right yet
-#         seq_lbound = i
-#         while mdata[seq_lbound] != ord('\n'):
-#             seq_lbound += 1
-#         j = min(j, seq_lbound + self.max_length + 1)
-#         text = mdata[i:j].tobytes().decode("utf-8")
-
-#         return text
-
-#     def _build_data_from_text(self, text):
-#         """Allows child-classes to modify the parsing of raw text, prior to tokenization"""
-#         # convert text into data
-#         _build_data_from_text = super()._build_data_from_text
-#         # extract id and sequence and tokenize (if needed)
-#         id_, sequence = text.strip().split("\n", 1)
-#         sequence = _build_data_from_text(sequence)
-#         data = dict(contig=id_, seq=sequence)
-
-#         return data
 
 
 class DiscretizeFastaDataset(MappedDataset):
