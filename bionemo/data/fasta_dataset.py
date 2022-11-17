@@ -43,6 +43,58 @@ from bionemo.data.utils import (
 )
 from bionemo.data.utils import NeMoUpsampling
 from bionemo.core import BioNeMoDataModule
+from bionemo.utils.fasta import FastaUtil
+from dataclasses import dataclass
+
+
+# FASTA I/O needs:
+# * iterator:
+#   yields: object
+#       * .name
+#       * .seq
+#   .keys()
+@dataclass
+class FastaEntry:
+    name: str
+    seq: str
+
+    def __len__(self):
+        return len(self.seq)
+
+
+# TODO refactor this into the FastaUtil
+class FastaIO:
+
+    def __init__(self, filename):
+        # TODO document
+        self.filename = filename
+        self.fasta_util = FastaUtil.from_filename(self.filename)
+        seq_lookup = self.fasta_util.seq_lookup
+        self.seq_lookup = {key: ''.join(value) for key, value in seq_lookup.items()}
+        self._index = self.fasta_util.order
+        self._pos = 0
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self._pos < len(self):
+            name = self._index[self._pos]
+            entry = self.seq_lookup[name]
+            self._pos += 1
+            # right now the leading '>' in the name is stripped here: but this
+            # should ultimately be put farther upstream in the I/O step
+            return FastaEntry(name=name[1:], seq=entry)
+        self._pos = 0
+        raise StopIteration
+
+    def __len__(self):
+        return len(self.seq_lookup)
+
+    def keys(self):
+        return self.seq_lookup.keys()
+
+    # TODO add FETCH method to support splice site prediciton
 
 
 class _InMemoryFastxBackend:
@@ -457,6 +509,7 @@ class DiscretizeFastaDataset(MappedDataset):
 class ConcatFastaDataset(Dataset):
     def __init__(self, files, max_length, backend='file', uppercase=False,
                  transforms=None,
+                 io='pyfastx', # TODO document
                  ):
         """
         Constructs a dataset consisting of multiple FASTA files.
@@ -484,8 +537,12 @@ class ConcatFastaDataset(Dataset):
         self.transforms = transforms
         self.datasets = []
         for f in files:
+            if io == 'pyfastx':
+                fh = pyfastx.Fasta(f, uppercase=uppercase)
+            elif io == 'bionemo':
+                fh = FastaIO(f) # TODO enable uppercase
             new_dataset = FastaDataset(
-                pyfastx.Fasta(f, uppercase=uppercase),
+                fh,
                 max_length, backend=backend,
             )
             self.datasets.append(self._apply_transforms(new_dataset))
@@ -569,14 +626,15 @@ class FastaDatasetBuilder(DatasetBuilderSpec):
         max_length = cfg.seq_length - 1 + cfg.k
         transforms = self.make_transforms(discretize)
         # TODO make a switch for concat dataset?
-        # self.dataset = ConcatFastaDataset(
-        self.dataset = FastaMemMapDataset(
+        self.dataset = ConcatFastaDataset(
+        # self.dataset = FastaMemMapDataset(
             self.dataset_paths, max_length,
-            # backend='memory',
-            # transforms=transforms,
+            backend='memory',
+            io='bionemo',
+            transforms=transforms,
         )
-        if discretize:
-            self.dataset = DiscretizeFastaDataset(self.dataset)
+        # if discretize: # turn on for FastaMemMapDataset
+        #     self.dataset = DiscretizeFastaDataset(self.dataset)
         return self.dataset
 
     def make_transforms(self, discretize):
