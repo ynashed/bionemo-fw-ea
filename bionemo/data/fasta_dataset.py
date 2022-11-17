@@ -225,9 +225,13 @@ class FastaMemMapDataset(TextMemMapDataset):
             # TODO needs:
             #   * fetch() method
             #   * ids() method
+            #   [x] set length_bins attribute for compatibility with Discretize
             #   * return id/description from dataset call
-            #   * undo the files logic and wrap it into concat
+            #   * undo the files logic and wrap it into concat?
             #   * integrate with DNABERT
+
+        Attr:
+
         """
         super().__init__(
             dataset_paths=dataset_paths,
@@ -238,6 +242,9 @@ class FastaMemMapDataset(TextMemMapDataset):
             sort_dataset_paths=sort_dataset_paths,
         )
         self.seq_length = seq_length
+        # added for compatibility with Discretize, see if Discretize should be
+        # converted or if we should change seq_length here
+        self.max_length = self.seq_length
         self.escape_char = escape_char
 
         startline_index_list = []
@@ -250,6 +257,7 @@ class FastaMemMapDataset(TextMemMapDataset):
 
         self._build_sequence_indices()
 
+
     def _build_sequence_indices(self):
         """
         Builds additional indices for sequence specific indexing.
@@ -258,9 +266,13 @@ class FastaMemMapDataset(TextMemMapDataset):
         Then there is an index of cumulative number of indexable sequence bases
         ending on each line of the file.
         """
+        self.length_bins = [0]
         for mdata, midx in self.mdata_midx_list:
             sequence_index = self._build_sequence_index(
                     mdata, midx, self.escape_char,
+                )
+            self.length_bins.extend(
+                    self._extract_sequence_lengths(sequence_index)
                 )
             self.sequence_indexes.append(sequence_index)
             if len(self.sequence_index_bins) > 0:
@@ -269,6 +281,17 @@ class FastaMemMapDataset(TextMemMapDataset):
                 new_bin = sequence_index[-1]
 
             self.sequence_index_bins.append(new_bin)
+            self.length_bins = np.array(self.length_bins)
+
+    def _extract_sequence_lengths(self, sequence_index):
+        length_bins = []
+        last_seq_len = 0
+        for i in range(len(sequence_index) - 1):
+            if sequence_index[i] == sequence_index[i + 1]:
+                self.length_bins.append(sequence_index[i])
+                last_seq_len = sequence_index[i] - last_seq_len
+        length_bins.append(sequence_index[-1])
+        return length_bins
 
     @staticmethod
     def _build_sequence_index(mdata, midx, escape_char):
@@ -307,7 +330,7 @@ class FastaMemMapDataset(TextMemMapDataset):
 
         idx = handle_index(self, idx)
 
-        record, start, end = self._get_record_start_end(idx)
+        record, start, end = self._get_record_start_end(idx, self.seq_length)
 
         text = record[start:end].tobytes().decode("utf-8")
 
@@ -322,7 +345,7 @@ class FastaMemMapDataset(TextMemMapDataset):
         data = dict(seq=text)
         return data
 
-    def _get_record_start_end(self, idx):
+    def _get_record_start_end(self, idx, length):
         """
         Retrieve the start and end of the index requested.
         Since sequences in FASTA can have arbitrary new lines in the middle
@@ -358,9 +381,9 @@ class FastaMemMapDataset(TextMemMapDataset):
 
         # The length of the string here can vary because a desired string from
         # a fasta may be split over an arbitrary number of lines.
-        while accumualted_chars < self.seq_length and current_line < len(midx):
+        while accumualted_chars < length and current_line < len(midx):
             # accumulate the end of this line, or as much as possible
-            chars_remaining = self.seq_length - accumualted_chars
+            chars_remaining = length - accumualted_chars
             chars_on_line = midx[current_line] - current_pos
             accumualted_chars += min(
                 chars_remaining, chars_on_line
@@ -370,7 +393,7 @@ class FastaMemMapDataset(TextMemMapDataset):
             current_pos += chars_remaining + 1
             current_line += 1
 
-        end_index = start_index + self.seq_length + \
+        end_index = start_index + length + \
             number_of_new_line_chars
         return mdata, start_index, end_index
 
@@ -545,10 +568,15 @@ class FastaDatasetBuilder(DatasetBuilderSpec):
         discretize = self.options['discretize']
         max_length = cfg.seq_length - 1 + cfg.k
         transforms = self.make_transforms(discretize)
-        self.dataset = ConcatFastaDataset(
-            self.dataset_paths, max_length, backend='memory',
-            transforms=transforms,
+        # TODO make a switch for concat dataset?
+        # self.dataset = ConcatFastaDataset(
+        self.dataset = FastaMemMapDataset(
+            self.dataset_paths, max_length,
+            # backend='memory',
+            # transforms=transforms,
         )
+        if discretize:
+            self.dataset = DiscretizeFastaDataset(self.dataset)
         return self.dataset
 
     def make_transforms(self, discretize):
@@ -593,62 +621,6 @@ tokenizers = {
 adapters = {
     'kmer': KmerTokenizerAdapter,
 }
-
-
-class FastaDatasetBuilder(DatasetBuilderSpec):
-
-    def format_dataset_paths(self):
-        """
-        Parses FASTA paths.
-
-        """
-        self.dataset_paths = expand_dataset_paths(
-            self.options['filepath'], None)
-
-    def check_path(self, filepath):
-        """
-        Checks whether a FASTA exists.
-
-        Arguments:
-            filepath (str): a string that can be used to identify the filepath
-
-        Returns:
-            Optional[str]: If the file exists, this returns None, otherwise
-                it returns the on the filepath.
-
-        """
-        if not os.path.exists(filepath):
-            return filepath
-
-    def create_dataset(self):
-        """
-        Instantiates a FastaDataset.
-
-        Returns:
-            Dataset: Dataset instantiated from paths.
-        """
-        cfg = self.options['cfg']
-        discretize = self.options['discretize']
-        max_length = cfg.seq_length - 1 + cfg.k
-        transforms = self.make_transforms(discretize)
-        self.dataset = ConcatFastaDataset(
-            self.dataset_paths, max_length, backend='memory',
-            transforms=transforms,
-        )
-        return self.dataset
-
-    def make_transforms(self, discretize):
-        """
-        Makes transformations to use for the a Dataset.
-
-        Arguments:
-            discretize (bool): whether the Discretize argument should be added
-        Returns:
-            List[Callable[[Dataset], Dataset]]: Dataset transformations
-
-        """
-        transforms = [DiscretizeFastaDataset,] if discretize else []
-        return transforms
 
 
 class DNABERTDataModule(BioNeMoDataModule):

@@ -99,6 +99,19 @@ def test_discrete_fasta_dataset(idx, sequence, backend):
     dataset = DiscretizeFastaDataset(FastaDataset(fa, 4, backend=backend))
     assert dataset[idx]['seq'] == sequence
 
+@pytest.fixture(scope='module')
+def discretized_fasta_memmap():
+    fasta_file = tempfile.NamedTemporaryFile()
+    with open(fasta_file.name, 'w') as fh:
+        fh.write('>seq1\nACAGAT\nTCGAC\n>seq2\nTAT\n>seq3\nTACCAT\n')
+
+    dataset = DiscretizeFastaDataset(FastaMemMapDataset([fasta_file.name], 4))
+    return dataset
+
+@pytest.mark.parametrize('idx,sequence', test_discrete_examples)
+def test_discrete_fasta_memmap_dataset(idx, sequence, discretized_fasta_memmap):
+    assert discretized_fasta_memmap[idx]['seq'] == sequence
+
 test_examples_multiple_files = [
     (0, 'ACAG', 'seq1', 0),
     (3, 'GATT', 'seq1', 3),
