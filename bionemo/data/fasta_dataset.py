@@ -61,7 +61,12 @@ class FastaEntry:
 class FastaIO:
 
     def __init__(self, filename):
-        # TODO document
+        """An iterator for reading FASTA files
+
+        Args:
+            filename (str): Filepath to fasta file
+
+        """
         self.filename = filename
         logging.info(f'Loading FASTA: {self.filename}')
         self.fasta_util = FastaUtil.from_filename(self.filename)
@@ -526,7 +531,9 @@ class ConcatFastaDataset(Dataset):
             if io == 'pyfastx':
                 fh = pyfastx.Fasta(f, uppercase=uppercase)
             elif io == 'bionemo':
-                fh = FastaIO(f) # TODO enable uppercase
+                if uppercase:
+                    logging.warning("bionemo FastaIO ignoring 'uppercase'")
+                fh = FastaIO(f)
             else:
                 raise ValueError(f'io={io} is not a valid option')
             new_dataset = FastaDataset(
