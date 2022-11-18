@@ -89,6 +89,9 @@ model:
 
   data:
     dataset_path: ???
+    dataset_class: memmap # Options: 'memmap', 'fastaio'
+    dataset_io: null # Optional. Required if dataset_class='fastaio'. Options: 'pyfastx', 'bionemo'
+    dataset_backend: null # Optional. Required if dataset_class='fastaio'. Options: 'memory', 'file'. 'file' is only compatible with 'pyfastx'.
     data_prefix: ''
     dataset:
       train: ???
