@@ -91,7 +91,7 @@ class FastaDataset(Dataset):
 
     A useful access would be, e.g.,
     >>> fasta = pyfasx.Fasta('example.fa')
-    >>> dataset = FastaDataset(fasta, seq_length=4)
+    >>> dataset = FastaDataset(fasta, max_length=4)
     >>> dataset[0]
     'ACGT'
     >>> dataset[4]
@@ -174,7 +174,7 @@ class FastaMemMapDataset(TextMemMapDataset):
     >seq2
     TACATA
     A useful access would be, e.g.,
-    >>> dataset = FastaMemMapDataset(files, seq_length=4)
+    >>> dataset = FastaMemMapDataset(files, max_length=4)
     >>> dataset[0]
     'ACGT'
     >>> dataset[4]
@@ -189,7 +189,7 @@ class FastaMemMapDataset(TextMemMapDataset):
     2. Build an index of new line characters (this is saved, use the stored
         index if it exists)
     3. Build an index of the DNA sequences specifically based
-        on the buffer size of this reader (i.e., `seq_length`).
+        on the buffer size of this reader (i.e., `max_length`).
     On get:
     4. Use indexes to figure out the portion of string to pull into memory
     5. Post-process to strip new lines
@@ -200,16 +200,16 @@ class FastaMemMapDataset(TextMemMapDataset):
     """
     def __init__(
         self,
-        dataset_paths, seq_length, newline_int=10, header_lines=0,
+        dataset_paths, max_length, newline_int=10, header_lines=0,
         workers=None, tokenizer=None, sort_dataset_paths=True,
         escape_char=62,
     ):
         """
         Args:
             dataset_paths (List[str]): FASTA files to be included
-            seq_length (int): Length of sequences to load. The sequences
-                starting at the last `seq_length` - 1 characters of a FASTA
-                entry will not be directly indexable
+            max_length (int): Length of sequences to load. Sequences will be
+                less than `max_length` if they are in the last `max_length` - 1
+                bases in the entry.
             newline_int (Optional[int]): The integer to parse as newline
                 characters in the memory map.
             header_lines (Optional[int]): Number of lines to skip at beginning
@@ -233,10 +233,7 @@ class FastaMemMapDataset(TextMemMapDataset):
             tokenizer=tokenizer,
             sort_dataset_paths=sort_dataset_paths,
         )
-        self.seq_length = seq_length
-        # added for compatibility with Discretize, see if Discretize should be
-        # converted or if we should change seq_length here
-        self.max_length = self.seq_length
+        self.max_length = max_length
         self.escape_char = escape_char
 
         startline_index_list = []
@@ -322,7 +319,7 @@ class FastaMemMapDataset(TextMemMapDataset):
 
         idx = handle_index(self, idx)
 
-        record, start, end = self._get_record_start_end(idx, self.seq_length)
+        record, start, end = self._get_record_start_end(idx, self.max_length)
 
         text = record[start:end].tobytes().decode("utf-8")
 
