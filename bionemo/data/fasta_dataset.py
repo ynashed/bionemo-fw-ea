@@ -500,7 +500,7 @@ class DiscretizeFastaDataset(MappedDataset):
 class ConcatFastaDataset(Dataset):
     def __init__(self, files, max_length, backend='file', uppercase=False,
                  transforms=None,
-                 io='pyfastx', # TODO document
+                 io='pyfastx',
                  ):
         """
         Constructs a dataset consisting of multiple FASTA files.
@@ -521,6 +521,8 @@ class ConcatFastaDataset(Dataset):
                 specified, each entry of `transforms` returns a dataset. The
                 entries will be applied sequentially to the components of this
                 dataset.
+            io (Optional[str], default='pyfastx'): Backend for Fasta IO. Options:
+                ['pyfastx', 'bionemo'].
 
         """
         if transforms is None:
