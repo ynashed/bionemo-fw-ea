@@ -28,66 +28,51 @@ class FastaUtil(object):
     Thus, we are controlling how this structure is created (from a filename), and methods that work
         on the constructed object.
 
-    Alternatively this could be handled with types, but because we are not really using mypy,
+    Alternatively this could be handled with types, but because we are not really using mypy, 
         it would be best to capture all this behavior in a class.
     """
 
     def __init__(self, seq_lookup):
         self.seq_lookup = seq_lookup
-        self.order = []
 
     @classmethod
     def from_filename(cls, filename):
         """
         Parse a FASTA file as a FastaUtil object.
-
+        
         Arguments:
             filename (str): Path to a FASTA-formatted file
-
+            
         Returns:
             FastaUtil: a `FastaUtil` object.
         """
-        seq_lookup, order = cls.read_fasta(filename, return_order=True)
-        obj = cls(seq_lookup)
-        obj.order = order
-        return obj
+        seq_lookup = cls.read_fasta(filename)
+        return cls(seq_lookup)
 
     @staticmethod
-    def read_fasta(filename, return_order=False):
+    def read_fasta(filename):
         """
         Parse a FASTA file as a `Dict` object.
-
+        
         Arguments:
             filename (str): Path to a FASTA-formatted file
-            return_order (Optional[bool], defaul=False): Indicates whether
-                an additional return should be made for the order of IDs in the
-                fasta file
-
+            
         Returns:
             Dict[str, List[str]] : A map of sequence ID's to a list of sequences.
-            Optional[List[str]] : if return_order=True, a sequence of ID's
-                corresponding to the order of IDs in filename
         """
         seq_lookup = defaultdict(list)
-        if return_order:
-            order = []
         # Read a FQ, hack for supporting gzipped FQs
         open_fn = gzip.open if filename.endswith(".gz") else open
         for line in open_fn(filename, "rb"):
             line = line.decode("utf-8")
             if line[0] == ">":
                 seq_id = line.strip()
-                if return_order:
-                    order.append(seq_id)
             else:
                 seq = line.strip()
                 seq_lookup[seq_id].append(seq)
 
         seq_lookup = seq_lookup
-        if return_order:
-            return seq_lookup, order
-        else:
-            return seq_lookup
+        return seq_lookup
 
     def split_on_ns(self) -> "FastaUtil":
         """ Splits a fasta file into new contigs wherever a 'N' is observed.
@@ -120,7 +105,7 @@ class FastaUtil(object):
     @staticmethod
     def _split_ns(sequences):
         """Splits sequences on N's
-
+        
         Arguments:
             sequences (List[str]): Sequences to split
         Returns:
