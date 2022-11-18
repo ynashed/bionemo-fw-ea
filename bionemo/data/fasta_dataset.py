@@ -44,57 +44,6 @@ from bionemo.data.utils import (
 )
 from bionemo.data.utils import NeMoUpsampling
 from bionemo.core import BioNeMoDataModule
-from bionemo.utils.fasta import FastaUtil
-from dataclasses import dataclass
-import copy
-
-
-@dataclass
-class FastaEntry:
-    name: str
-    seq: str
-
-    def __len__(self):
-        return len(self.seq)
-
-
-class FastaIO:
-
-    def __init__(self, filename):
-        """An iterator for reading FASTA files
-
-        Args:
-            filename (str): Filepath to fasta file
-
-        """
-        self.filename = filename
-        logging.info(f'Loading FASTA: {self.filename}')
-        self.fasta_util = FastaUtil.from_filename(self.filename)
-        seq_lookup = self.fasta_util.seq_lookup
-        self.seq_lookup = {key: ''.join(value) for key, value in seq_lookup.items()}
-        self._index = copy.deepcopy(self.fasta_util.order)
-        del self.fasta_util
-        self._pos = 0
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        if self._pos < len(self):
-            name = self._index[self._pos]
-            entry = self.seq_lookup[name]
-            self._pos += 1
-            # right now the leading '>' in the name is stripped here: but this
-            # should ultimately be put farther upstream in the I/O step
-            return FastaEntry(name=name[1:], seq=entry)
-        self._pos = 0
-        raise StopIteration
-
-    def __len__(self):
-        return len(self.seq_lookup)
-
-    def keys(self):
-        return self.seq_lookup.keys()
 
 
 class _InMemoryFastxBackend:
@@ -500,7 +449,6 @@ class DiscretizeFastaDataset(MappedDataset):
 class ConcatFastaDataset(Dataset):
     def __init__(self, files, max_length, backend='file', uppercase=False,
                  transforms=None,
-                 io='pyfastx',
                  ):
         """
         Constructs a dataset consisting of multiple FASTA files.
@@ -521,8 +469,6 @@ class ConcatFastaDataset(Dataset):
                 specified, each entry of `transforms` returns a dataset. The
                 entries will be applied sequentially to the components of this
                 dataset.
-            io (Optional[str], default='pyfastx'): Backend for Fasta IO. Options:
-                ['pyfastx', 'bionemo'].
 
         """
         if transforms is None:
@@ -530,16 +476,8 @@ class ConcatFastaDataset(Dataset):
         self.transforms = transforms
         self.datasets = []
         for f in files:
-            if io == 'pyfastx':
-                fh = pyfastx.Fasta(f, uppercase=uppercase)
-            elif io == 'bionemo':
-                if uppercase:
-                    logging.warning("bionemo FastaIO ignoring 'uppercase'")
-                fh = FastaIO(f)
-            else:
-                raise ValueError(f'io={io} is not a valid option')
             new_dataset = FastaDataset(
-                fh,
+                pyfastx.Fasta(f, uppercase=uppercase),
                 max_length, backend=backend,
             )
             self.datasets.append(self._apply_transforms(new_dataset))
@@ -576,12 +514,11 @@ class ConcatFastaDataset(Dataset):
         """
         return self._dataset[idx]
 
-def fastaio_constructor(builder, discretize, max_length):
+def pyfastx_constructor(builder, discretize, max_length):
     transforms = builder.make_transforms(discretize)
     return ConcatFastaDataset(
             builder.dataset_paths, max_length,
             backend=builder.options['dataset_backend'],
-            io=builder.options['dataset_io'],
             transforms=transforms,
         )
 
@@ -602,7 +539,7 @@ adapters = {
 }
 
 dataset_constructors = {
-    'fastaio': fastaio_constructor,
+    'pyfastx': pyfastx_constructor,
     'memmap': fasta_memmap_constructor
 }
 
@@ -716,23 +653,12 @@ class DNABERTDataModule(BioNeMoDataModule):
             dataset_format = cfg.get('dataset_format')
             dataset_class = cfg.get('dataset_class', 'memmap')
             dataset_backend = cfg.get('dataset_backend')
-            dataset_io = cfg.get('dataset_io')
-            if dataset_class == 'fastaio':
-                if dataset_io is None:
+            if dataset_class == 'pyfastx':
+                if dataset_backend not in BACKENDS.keys():
                     raise ValueError(
-                        f"dataset_io={dataset_io} must be configured to one "
-                        f"of: {['pyfastx', 'bionemo']}"
-                    )
-                io_supported_backends = {
-                    'bionemo': ['memory'],
-                    'pyfastx': ['memory', 'file'],
-                }
-                if dataset_backend not in io_supported_backends[dataset_io]:
-                    raise ValueError(
-                        f'dataset_backend={dataset_backend} for dataset_io='
-                        f'{dataset_io} must be configured to one of: '
-                        f'{io_supported_backends[dataset_io]}')
-
+                        f'dataset_backend={dataset_backend} for dataset_class='
+                        f'{dataset_class} must be configured to one of: '
+                        f'{BACKENDS.keys()}')
 
         # Build individual datasets.
         filepath = os.path.join(dataset_path, name, ds)
@@ -744,7 +670,6 @@ class DNABERTDataModule(BioNeMoDataModule):
             'batch_size': self.get_global_batch_size(),
             'dataset_class': dataset_class,
             'dataset_backend': dataset_backend,
-            'dataset_io': dataset_io,
         }
         return options
 

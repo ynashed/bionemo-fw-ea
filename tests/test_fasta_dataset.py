@@ -61,18 +61,6 @@ def test_fasta_dataset(idx, sequence, backend):
     dataset = FastaDataset(fa, 4, backend=backend)
     assert dataset[idx]['seq'] == sequence
 
-@pytest.mark.parametrize('idx,sequence', test_examples)
-def test_bionemo_fasta_util_dataset(idx, sequence):
-    fasta_file = tempfile.NamedTemporaryFile()
-    with open(fasta_file.name, 'w') as fh:
-        fh.write('>seq1\nACAGAT\nTCGACCC\n>seq2\nTACAT\n')
-
-    # TODO move import to top
-    from bionemo.data.fasta_dataset import FastaIO
-    fa = FastaIO(fasta_file.name)
-    dataset = FastaDataset(fa, 4, backend='memory')
-    assert dataset[idx]['seq'] == sequence
-
 @pytest.fixture(scope="module")
 def memmap_fasta():
     fasta_file = tempfile.NamedTemporaryFile()
@@ -134,7 +122,6 @@ test_examples_multiple_files = [
 ]
 
 
-@pytest.mark.parametrize('io', ['pyfastx', 'bionemo'])
 @pytest.mark.parametrize('backend', BACKENDS.keys())
 @pytest.mark.parametrize(
         'idx,sequence,contig,start',
@@ -146,11 +133,9 @@ def test_fasta_memmap_dataset_multiple_files(
         contig,
         start,
         backend,
-        io
         ):
-    if io == 'bionemo' and backend == 'file':
-        pytest.skip("invalid parameter combination")
     fasta_file_1 = tempfile.NamedTemporaryFile()
+
     with open(fasta_file_1.name, 'w') as fh:
         fh.write('>seq1\nACAGAT\nTCGACCC\n>seq2\nTACAT\n')
 
@@ -162,7 +147,6 @@ def test_fasta_memmap_dataset_multiple_files(
         [fasta_file_1.name, fasta_file_2.name],
         max_length=4,
         backend=backend,
-        io=io,
         )
     assert dataset[idx]['seq'] == sequence
     assert dataset[idx]['contig'] == contig
