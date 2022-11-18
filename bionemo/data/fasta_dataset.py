@@ -20,6 +20,7 @@ from nemo.core import Dataset
 from torch.utils.data import ConcatDataset
 import numpy as np
 from omegaconf import open_dict
+from nemo.utils import logging
 from nemo.collections.nlp.data.language_modeling.text_memmap_dataset import (
     TextMemMapDataset
 )
@@ -68,10 +69,13 @@ class FastaIO:
     def __init__(self, filename):
         # TODO document
         self.filename = filename
+        logging.info(f'Loading FASTA: {self.filename}')
         self.fasta_util = FastaUtil.from_filename(self.filename)
         seq_lookup = self.fasta_util.seq_lookup
         self.seq_lookup = {key: ''.join(value) for key, value in seq_lookup.items()}
-        self._index = self.fasta_util.order
+        import copy
+        self._index = copy.deepcopy(self.fasta_util.order)
+        del self.fasta_util
         self._pos = 0
 
     def __iter__(self):
@@ -333,7 +337,7 @@ class FastaMemMapDataset(TextMemMapDataset):
                 new_bin = sequence_index[-1]
 
             self.sequence_index_bins.append(new_bin)
-            self.length_bins = np.array(self.length_bins)
+        self.length_bins = np.array(self.length_bins)
 
     def _extract_sequence_lengths(self, sequence_index):
         length_bins = []
@@ -626,15 +630,15 @@ class FastaDatasetBuilder(DatasetBuilderSpec):
         max_length = cfg.seq_length - 1 + cfg.k
         transforms = self.make_transforms(discretize)
         # TODO make a switch for concat dataset?
-        self.dataset = ConcatFastaDataset(
-        # self.dataset = FastaMemMapDataset(
+        # self.dataset = ConcatFastaDataset(
+        self.dataset = FastaMemMapDataset(
             self.dataset_paths, max_length,
-            backend='memory',
-            io='bionemo',
-            transforms=transforms,
+            #backend='memory',
+            #io='bionemo',
+            #transforms=transforms,
         )
-        # if discretize: # turn on for FastaMemMapDataset
-        #     self.dataset = DiscretizeFastaDataset(self.dataset)
+        if discretize: # turn on for FastaMemMapDataset
+            self.dataset = DiscretizeFastaDataset(self.dataset)
         return self.dataset
 
     def make_transforms(self, discretize):
