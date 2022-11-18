@@ -47,37 +47,47 @@ class FastaUtil(object):
         Returns:
             FastaUtil: a `FastaUtil` object.
         """
-        seq_lookup, order = cls.read_fasta(filename)
+        seq_lookup, order = cls.read_fasta(filename, return_order=True)
         obj = cls(seq_lookup)
         obj.order = order
         return obj
 
     @staticmethod
-    def read_fasta(filename):
+    def read_fasta(filename, return_order=False):
         """
         Parse a FASTA file as a `Dict` object.
 
         Arguments:
             filename (str): Path to a FASTA-formatted file
+            return_order (Optional[bool], defaul=False): Indicates whether
+                an additional return should be made for the order of IDs in the
+                fasta file
 
         Returns:
             Dict[str, List[str]] : A map of sequence ID's to a list of sequences.
+            Optional[List[str]] : if return_order=True, a sequence of ID's
+                corresponding to the order of IDs in filename
         """
         seq_lookup = defaultdict(list)
-        order = []
+        if return_order:
+            order = []
         # Read a FQ, hack for supporting gzipped FQs
         open_fn = gzip.open if filename.endswith(".gz") else open
         for line in open_fn(filename, "rb"):
             line = line.decode("utf-8")
             if line[0] == ">":
                 seq_id = line.strip()
-                order.append(seq_id)
+                if return_order:
+                    order.append(seq_id)
             else:
                 seq = line.strip()
                 seq_lookup[seq_id].append(seq)
 
         seq_lookup = seq_lookup
-        return seq_lookup, order
+        if return_order:
+            return seq_lookup, order
+        else:
+            return seq_lookup
 
     def split_on_ns(self) -> "FastaUtil":
         """ Splits a fasta file into new contigs wherever a 'N' is observed.
