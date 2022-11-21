@@ -280,7 +280,7 @@ class FastaMemMapDataset(TextMemMapDataset):
                 self.length_bins.append(sequence_index[i])
                 last_seq_len = sequence_index[i] - last_seq_len
         length_bins.append(sequence_index[-1])
-        return np.array(length_bins)
+        return length_bins
 
     @staticmethod
     def _build_sequence_index(mdata, midx, escape_char):
