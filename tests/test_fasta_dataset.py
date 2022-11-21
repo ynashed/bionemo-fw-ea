@@ -16,6 +16,7 @@
 import gzip
 import pytest
 import tempfile
+from torch.utils.data import ConcatDataset
 from bionemo.data.fasta_dataset import (
     FastaDataset, ConcatFastaDataset, DiscretizeFastaDataset,
     FastaMemMapDataset,
@@ -105,7 +106,11 @@ def discretized_fasta_memmap():
     with open(fasta_file.name, 'w') as fh:
         fh.write('>seq1\nACAGAT\nTCGAC\n>seq2\nTAT\n>seq3\nTACCAT\n')
 
-    dataset = DiscretizeFastaDataset(FastaMemMapDataset([fasta_file.name], 4))
+    dataset = ConcatDataset([
+            DiscretizeFastaDataset(FastaMemMapDataset(fasta_file.name, 4)),
+            DiscretizeFastaDataset(FastaMemMapDataset(fasta_file.name, 4)),
+        ])
+
     return dataset
 
 @pytest.mark.parametrize('idx,sequence', test_discrete_examples)

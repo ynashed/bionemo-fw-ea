@@ -280,7 +280,7 @@ class FastaMemMapDataset(TextMemMapDataset):
                 self.length_bins.append(sequence_index[i])
                 last_seq_len = sequence_index[i] - last_seq_len
         length_bins.append(sequence_index[-1])
-        return length_bins
+        return np.array(length_bins)
 
     @staticmethod
     def _build_sequence_index(mdata, midx, escape_char):
@@ -520,11 +520,14 @@ def pyfastx_constructor(builder, discretize, max_length):
         )
 
 def fasta_memmap_constructor(builder, discretize, max_length):
-    dataset = FastaMemMapDataset(
-            builder.dataset_paths, max_length,
-        )
     if discretize:
-        dataset = DiscretizeFastaDataset(dataset)
+        datasets = [DiscretizeFastaDataset(FastaMemMapDataset(ds, max_length))
+            for ds in builder.dataset_paths]
+        dataset = ConcatDataset(datasets)
+    else:
+        dataset = FastaMemMapDataset(
+                builder.dataset_paths, max_length,
+            )
     return dataset
 
 tokenizers = {
