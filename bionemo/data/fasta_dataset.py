@@ -709,7 +709,7 @@ class DNABERTDataModule(BioNeMoDataModule):
         ds = self.cfg.dataset.train
         name = 'train'
         options = self._configure_options(name, ds)
-        options['discretize'] = False
+        options['discretize'] = self.cfg.discretize_train
 
         dataset = DNABERTDatasetFactory().create_dataset(options)
 
