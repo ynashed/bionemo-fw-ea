@@ -15,6 +15,7 @@
 
 import os
 from typing import Optional, Union, Iterable, Dict, List
+from itertools import product
 
 from nemo.collections.common.tokenizers import TokenizerSpec
 
@@ -249,3 +250,22 @@ class KmerTokenizer(TokenizerSpec):
                     self.decode_vocab[self.vocab[token]] = token
 
         return self
+
+    def build_vocab_from_k(self, alphabet: List[str]=None):
+        """Builds the complete k-mer vocabulary on an alphabet
+
+        E.g.,
+
+        the 3-mer vocabulary on alphabet=['A', 'C'] is ['AAA', 'AAC', 'ACA',
+        'ACC', 'CAA', 'CAC', 'CCA', 'CCC']
+
+
+        Args:
+            alphabet (List[str], optional): Alphabet to use to generate k-mers.
+            Defaults to ['A', 'C', 'G', 'T'].
+        """
+
+        if alphabet is None:
+            alphabet = ['A', 'C', 'G', 'T']
+        for kmer in product(alphabet, repeat=self.k):
+            self.build_vocab(''.join(kmer))

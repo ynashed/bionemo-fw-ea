@@ -20,8 +20,8 @@ from bionemo.model.dnabert import DNABERTModel
 from bionemo.model.utils import setup_trainer
 
 import numpy as np
-import pytorch_lightning as ptl
-
+import pytorch_lightning as pl
+from bionemo.data.preprocess.dna.preprocess import DNABERTPreprocess
 
 
 @hydra_runner(config_path="conf", config_name="dnabert_config")
@@ -30,13 +30,29 @@ def main(cfg) -> None:
     logging.info("\n\n************** Experiment configuration ***********")
     logging.info(f'\n{OmegaConf.to_yaml(cfg)}')
 
+    if cfg.do_preprocess:
+        logging.info("************** Starting Preprocessing ***********")
+
+        preprocessor = DNABERTPreprocess(
+            cfg.model.data.dataset_path, cfg.model.tokenizer.model,
+            cfg.model.tokenizer.vocab_file, cfg.model.tokenizer.k,
+            cfg.model.data.dataset,
+        )
+        preprocessor.preprocess()
+
+        logging.info("*************** Finish Preprocessing ************")
+
     np.random.seed(cfg.model.seed)
-    ptl.seed_everything(cfg.model.seed)
+    pl.seed_everything(cfg.model.seed)
 
     trainer = setup_trainer(cfg)
     model = DNABERTModel(cfg.model, trainer)
 
-    trainer.fit(model)
+    if cfg.do_training:
+        logging.info("************** Starting Training ***********")
+        trainer.fit(model)
+        logging.info("*************** Finish Training ************")
+
 
 if __name__ == '__main__':
     main()
