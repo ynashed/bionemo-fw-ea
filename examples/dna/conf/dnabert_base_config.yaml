@@ -1,6 +1,6 @@
 name: dnabert_base_config
 restore_from_path: null # used when starting from a .nemo file
-do_preprocessing: False # set to true if data preprocessing steps must be completed. Preprocessing will be skipped if it is already completed.
+do_preprocess: False # set to true if data preprocessing steps must be completed. Preprocessing will be skipped if it is already completed.
 do_training: True # set to true to train a model
 
 trainer:
