@@ -155,6 +155,16 @@ class DNABERTPreprocessorDataClass(object):
 class DNABERTPreprocess(DNABERTPreprocessorDataClass):
 
     def __init__(self, *args, **kwargs):
+        """Downloads and preprocesses GRCh38p13 reference genome and constructs
+        the tokenizer for DNABERT
+
+        genome_dir (str): Directory to store the reference genome in
+        tokenizer_model_path (str): Filepath to store the tokenzier parameters
+        tokenizer_vocab_path (str): Filepath to store the tokenizer vocab
+        tokenizer_k (int): k-mer size for the tokenizer
+        dataset_conf (OmegaConf): has 'train', 'val', 'test' keys containing
+            the names of preprocessed train/val/test files to use for training.
+        """
         super().__init__(*args, **kwargs)
         self._validate_tokenizer_args(
             self.tokenizer_model_path,
@@ -162,12 +172,20 @@ class DNABERTPreprocess(DNABERTPreprocessorDataClass):
         )
 
     def build_tokenizer(self, model_output_name, vocab_output_name, k):
+        """Builds a tokenizer for a given k
+
+        Args:
+            model_output_name (str): Filepath to store the tokenizer parameters
+            vocab_output_name (str): Filepath to store the tokenizer vocab
+            k (int): k-mer size for the tokenizer
+        """
         tokenizer = KmerTokenizer(k=k)
         tokenizer.build_vocab_from_k()
         tokenizer.save_vocab(
             model_file=model_output_name,
             vocab_file=vocab_output_name,
         )
+        return tokenizer
 
     def _validate_tokenizer_args(self, model_output_name, vocab_output_name):
         model_exists = os.path.exists(model_output_name)
@@ -191,6 +209,15 @@ class DNABERTPreprocess(DNABERTPreprocessorDataClass):
                 )
 
     def split_train_val_test_chrs(self, preprocessed_files):
+        """Splits the preprocessed files into train/val/test dirs
+
+        Args:
+            preprocessed_files (List[str]): List of preprocessed files
+
+        Raises:
+            ValueError: If the a requested train/val/test file does not exist
+                in the preprocessed files
+        """
         splits = ['train', 'val', 'test']
         preprocessed_filenames = [
                 os.path.basename(f) for f in preprocessed_files
@@ -231,6 +258,8 @@ class DNABERTPreprocess(DNABERTPreprocessorDataClass):
                     )
 
     def preprocess(self):
+        """Preprocesses for the DNABERT model
+        """
         filenames = GRCh38p13_ResourcePreparer(
             dest_dir=self.genome_dir, root_directory='/').prepare()
 
@@ -245,6 +274,14 @@ class DNABERTPreprocess(DNABERTPreprocessorDataClass):
         )
 
     def preprocess_fastas(self, filenames):
+        """Splits fasta files into contigs on N's, which is need for training
+
+        Args:
+            filenames (List[str]): List of files to preprocess
+
+        Returns:
+            List[str]: List of preprocessed files
+        """
         logging.info('Splitting fasta files...')
         fasta_preprocessor = FastaSplitNsPreprocessor(filenames)
         preprocessed_files = []
