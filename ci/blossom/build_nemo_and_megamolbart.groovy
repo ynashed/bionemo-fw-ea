@@ -66,7 +66,7 @@ spec:
                     }
 
                     stage('Run tests') {
-                        build job: 'nemo-bionemo-run-gpu-tests', parameters: [
+                        build job: 'bionemo-test', parameters: [
                             string(name: 'BRANCH_NAME', value: params.BRANCH_NAME)
                         ]
                     }
