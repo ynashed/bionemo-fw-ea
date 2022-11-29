@@ -17,9 +17,9 @@ model:
   data:
     dataset_path: /workspace/bionemo/examples/dna/data/small-example # contains train / val / test folders
     dataset: # inclusive range of data files to load or can load a single file, e.g. x000.csv
-      train: chr1-trim-train.fna
-      test: chr1-trim-test.fna
-      val: chr1-trim-val.fna
+      train: chr22.fna.gz.chunked.fa
+      test: chr21.fna.gz.chunked.fa
+      val: chr20.fna.gz.chunked.fa
     micro_batch_size: ${model.micro_batch_size}
     num_workers: 24
     dataloader_type: single
