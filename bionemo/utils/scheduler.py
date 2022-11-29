@@ -20,8 +20,25 @@ from nemo.core.config.schedulers import (
 )
 
 class LinearWarmupHoldDecayPolicy(_LRScheduler):
-    """Adds warmup kwargs and warmup logic to lr policy.
-    All arguments should be passed as kwargs for clarity,
+    """
+    Has a linear warmup phase from 0 to the optimizer's learning rate, then a
+    constant phase, followed by a linear decay to the `min_lr`, after which
+    the learning rate is held constant.
+
+    E.g.,
+    lr
+    |        _____________  <- optimizer.lr
+    |       /             \
+    |      /               \
+    |     /                 \
+    |    /                   \
+    |   /                     \
+    |  /                       \_______________ <- min_lr
+    | /
+    |/                          |<- max_steps
+    |------------------------------------------- steps
+         |<- warmup_steps |<- constant_steps
+
     Args:
         optimizer: Optimizer for the scheduler. In the warmup stage, the
             scheduler linearly increases the learning rate from 0 to the rate
