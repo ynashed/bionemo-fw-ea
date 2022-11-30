@@ -14,7 +14,6 @@
 # limitations under the License.
 
 import os
-import gzip
 import shutil
 import numpy as np
 import pandas as pd
@@ -28,6 +27,7 @@ from bionemo.data.dna.splice_site_dataset import (
     ChrSpliceSitesDataset,
     get_autosomes,
 )
+from bionemo.data.utils import gunzip
 from bionemo.utils.remote import (
     GRCh38Ensembl99ResourcePreparer,
     GRCh38p13_ResourcePreparer
@@ -37,12 +37,6 @@ from bionemo.utils.gff import parse_gff3, build_donor_acceptors_midpoints
 from bionemo.tokenizer.dna_tokenizer import KmerTokenizer
 from bionemo.utils.preprocessors import FastaSplitNsPreprocessor
 from bionemo.data.utils import expand_dataset_paths
-
-def _gunzip(i, o):
-    if os.path.exists(i):
-        with gzip.open(i, 'rb') as f_in:
-            with open(o, 'wb') as f_out:
-                shutil.copyfileobj(f_in, f_out)
 
 
 class SpliceSitePreprocess(object):
@@ -86,7 +80,7 @@ class SpliceSitePreprocess(object):
         gff_gzs = get_autosomes(self.ensembl_directory, self.gff_gz_template)
         gffs = get_autosomes(self.ensembl_directory, self.gff_template)
         for gff_gz, gff in zip(gff_gzs, gffs):
-            _gunzip(gff_gz, gff)
+            gunzip(gff_gz, gff, exist_ok=True)
 
     def make_sites_df(self):
         """Converts the GFF files to a dataframe of donor/acceptor/TN sites

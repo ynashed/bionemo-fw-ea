@@ -19,6 +19,8 @@ from enum import Enum
 import re
 import braceexpand
 import os
+import gzip
+import shutil
 from omegaconf import DictConfig, open_dict
 from pytorch_lightning.trainer.trainer import Trainer
 
@@ -63,6 +65,30 @@ def check_paths_exist(dataset_paths):
         if not os.path.exists(filepath):
             errors.append(filepath)
     return errors
+
+def gunzip(i: str, o: str, exist_ok: bool = False):
+    """Unzips a gzipped file
+
+    Args:
+        i (str): Filepath of file to unzip
+        o (str): Filepath to save unzipped file to
+        exist_ok (bool, optional): If True, `i` will be unzipped to `o` even if
+            `o` already exists. If False, and error is raised. Defaults to
+            False.
+
+    Raises:
+        FileExistsError: If `o` already exists and `exist_ok` is False.
+        FileNotFoundError: If `i` does not exist.
+    """
+    if not exist_ok and os.path.exists(o):
+        raise FileExistsError(f"Unzipping {i} to already existing path: {o}")
+    if os.path.exists(i):
+        with gzip.open(i, 'rb') as f_in:
+            with open(o, 'wb') as f_out:
+                shutil.copyfileobj(f_in, f_out)
+    else:
+        raise FileNotFoundError(i)
+
 
 class DatasetBuilderSpec(object):
     """
