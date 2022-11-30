@@ -1,8 +1,14 @@
 defaults:
   - dnabert_base_config
+
+hydra:
+  searchpath:
+    - file://${oc.env:PROJECT_MOUNT}/examples/dna/conf/
+
 trainer:
   devices: 1
   val_check_interval: 100
+  fast_dev_run: 2
 model:
   num_layers: 12
   micro_batch_size: 4
@@ -15,11 +21,11 @@ model:
     model: /model/dna/dnabert/vocab/dnabert${.k}.model
     vocab_file: /model/dna/dnabert/vocab/dnabert${.k}.vocab
   data:
-    dataset_path: /data/GRCh38.p13 # contains train / val / test folders
+    dataset_path: /workspace/bionemo/examples/dna/data/small-example # contains train / val / test folders
     dataset: # inclusive range of data files to load or can load a single file, e.g. x000.csv
-      train: chr22.fna.gz.chunked.fa
-      test: chr21.fna.gz.chunked.fa
-      val: chr20.fna.gz.chunked.fa
+      train: chr1-trim-train.fna
+      test: chr1-trim-test.fna
+      val: chr1-trim-val.fna
     micro_batch_size: ${model.micro_batch_size}
     num_workers: 24
     dataloader_type: single

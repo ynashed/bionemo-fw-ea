@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import pytest
+import os
 from hydra import initialize, compose
 from omegaconf.omegaconf import open_dict
 from bionemo.model.dnabert import DNABERTModel
@@ -22,11 +23,13 @@ from bionemo.model.utils import setup_trainer
 @pytest.mark.slow
 @pytest.mark.needs_gpu
 def test_dnabert_fast_dev_run():
-    with initialize(config_path="../examples/dna/conf"):
-        cfg = compose(config_name="dnabert_config")
 
-    with open_dict(cfg):
-        cfg.trainer.fast_dev_run = 2
+    os.environ["PROJECT_MOUNT"] = os.environ.get(
+        "PROJECT_MOUNT", '/workspace/bionemo')
+
+    with initialize(config_path="./conf"):
+        cfg = compose(config_name="dnabert_test")
+
     trainer = setup_trainer(cfg)
     model = DNABERTModel(cfg.model, trainer)
     # TODO not committing to any specific values right now, but there

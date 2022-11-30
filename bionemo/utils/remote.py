@@ -156,15 +156,16 @@ class ResourcePreparer(ABC):
         raise NotImplementedError
 
 
+@dataclass
 class GRCh38p13_ResourcePreparer(ResourcePreparer):
     """ ResourcePreparer for the human genome assembly produced by encode.
     GRCh38.p13, all primary chromosomes are downloaded. Since this resource does not create an archive for contigs,
     we must create a remote resource for each file. Preprocessing therefore requires working on sets of files.
     """
+    dest_dir: Optional[str] = "GRCh38.p13"
 
     def get_remote_resources(self) -> List[RemoteResource]:
         basename = "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.39_GRCh38.p13/GCF_000001405.39_GRCh38.p13_assembly_structure/Primary_Assembly/assembled_chromosomes/FASTA/"
-        dest_dir = "GRCh38.p13"
         resources = list()
 
         checksums = {
@@ -199,7 +200,7 @@ class GRCh38p13_ResourcePreparer(ResourcePreparer):
             filename = f"chr{contig}.fna.gz"
             url = basename + filename
             resource = RemoteResource(
-                dest_directory=dest_dir,
+                dest_directory=self.dest_dir,
                 dest_filename=filename,
                 root_directory=self.root_directory,
                 checksum=checksums.get(filename),
