@@ -18,7 +18,7 @@ import pytest
 import tempfile
 from torch.utils.data import ConcatDataset
 from bionemo.data.fasta_dataset import (
-    FastaDataset, ConcatFastaDataset, DiscretizeFastaDataset,
+    PyfastxFastaDataset, ConcatFastaDataset, DiscretizeFastaDataset,
     InternallyIndexedFastaMemMapDataset,
     BACKENDS,
 )
@@ -31,7 +31,7 @@ def test_fastx_dataset_check_len():
         fh.write('>seq1\nACAGAT\nTCGACCC\n>seq2\nTACAT\n')
 
     fa = pyfastx.Fasta(fasta_file.name)
-    dataset = FastaDataset(fa, 4)
+    dataset = PyfastxFastaDataset(fa, 4)
 
     assert len(dataset) == 18
 
@@ -60,7 +60,7 @@ def test_fasta_dataset(idx, sequence, backend):
         fh.write('>seq1\nACAGAT\nTCGACCC\n>seq2\nTACAT\n')
 
     fa = pyfastx.Fasta(fasta_file.name)
-    dataset = FastaDataset(fa, 4, backend=backend)
+    dataset = PyfastxFastaDataset(fa, 4, backend=backend)
     assert dataset[idx]['seq'] == sequence
 
 @pytest.fixture(scope="module")
@@ -98,7 +98,7 @@ def test_discrete_fasta_dataset(idx, sequence, backend):
         fh.write('>seq1\nACAGAT\nTCGAC\n>seq2\nTAT\n>seq3\nTACCAT\n')
 
     fa = pyfastx.Fasta(fasta_file.name)
-    dataset = DiscretizeFastaDataset(FastaDataset(fa, 4, backend=backend))
+    dataset = DiscretizeFastaDataset(PyfastxFastaDataset(fa, 4, backend=backend))
     assert dataset[idx]['seq'] == sequence
 
 @pytest.fixture(scope='module')

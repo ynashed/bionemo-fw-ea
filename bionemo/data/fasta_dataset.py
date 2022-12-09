@@ -75,7 +75,7 @@ BACKENDS = {
 }
 
 
-class FastaDataset(Dataset):
+class PyfastxFastaDataset(Dataset):
     """
     Constructs a dataset for a pyfastx.Fasta
 
@@ -91,7 +91,7 @@ class FastaDataset(Dataset):
 
     A useful access would be, e.g.,
     >>> fasta = pyfasx.Fasta('example.fa')
-    >>> dataset = FastaDataset(fasta, max_length=4)
+    >>> dataset = PyfastxFastaDataset(fasta, max_length=4)
     >>> dataset[0]
     'ACGT'
     >>> dataset[4]
@@ -303,7 +303,7 @@ class InternallyIndexedFastaMemMapDataset(Dataset):
 
 class DiscretizeFastaDataset(MappedDataset):
 
-    def __init__(self, dataset: FastaDataset):
+    def __init__(self, dataset: PyfastxFastaDataset):
         """
         Produces a discretized version of a `FastaDataset`.
 
@@ -387,7 +387,7 @@ class ConcatFastaDataset(Dataset):
         self.transforms = transforms
         self.datasets = []
         for f in files:
-            new_dataset = FastaDataset(
+            new_dataset = PyfastxFastaDataset(
                 pyfastx.Fasta(f, uppercase=uppercase),
                 max_length, backend=backend,
             )
