@@ -163,7 +163,7 @@ class FastaDataset(Dataset):
         }
 
 
-class FastaMemMapDataset(Dataset):
+class InternallyIndexedFastaMemMapDataset(Dataset):
     """
     See FASTA format definition here:
     http://www.ncbi.nlm.nih.gov/blast/fasta.shtml
@@ -174,7 +174,7 @@ class FastaMemMapDataset(Dataset):
     >seq2
     TACATA
     A useful access would be, e.g.,
-    >>> dataset = FastaMemMapDataset(files, max_length=4)
+    >>> dataset = InternallyIndexedFastaMemMapDataset(files, max_length=4)
     >>> dataset[0]
     'ACGT'
     >>> dataset[4]
@@ -435,11 +435,11 @@ def pyfastx_constructor(builder, discretize, max_length):
 
 def fasta_memmap_constructor(builder, discretize, max_length):
     if discretize:
-        datasets = [DiscretizeFastaDataset(FastaMemMapDataset(ds, max_length))
+        datasets = [DiscretizeFastaDataset(InternallyIndexedFastaMemMapDataset(ds, max_length))
             for ds in builder.dataset_paths]
         dataset = ConcatDataset(datasets)
     else:
-        dataset = FastaMemMapDataset(
+        dataset = InternallyIndexedFastaMemMapDataset(
                 builder.dataset_paths, max_length,
             )
     return dataset

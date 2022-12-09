@@ -19,7 +19,7 @@ import tempfile
 from torch.utils.data import ConcatDataset
 from bionemo.data.fasta_dataset import (
     FastaDataset, ConcatFastaDataset, DiscretizeFastaDataset,
-    FastaMemMapDataset,
+    InternallyIndexedFastaMemMapDataset,
     BACKENDS,
 )
 # TODO change all references to new fasta memmap dataset instead of janky import
@@ -68,7 +68,7 @@ def memmap_fasta():
     fasta_file = tempfile.NamedTemporaryFile()
     with open(fasta_file.name, 'w') as fh:
         fh.write('>seq1\nACAGAT\nTCGACCC\n>seq2\nTACAT\n')
-    dataset = FastaMemMapDataset(fasta_file.name, 4)
+    dataset = InternallyIndexedFastaMemMapDataset(fasta_file.name, 4)
     return dataset
 
 @pytest.mark.parametrize('idx,sequence', test_examples)
@@ -108,8 +108,8 @@ def discretized_fasta_memmap():
         fh.write('>seq1\nACAGAT\nTCGAC\n>seq2\nTAT\n>seq3\nTACCAT\n')
 
     dataset = ConcatDataset([
-            DiscretizeFastaDataset(FastaMemMapDataset(fasta_file.name, 4)),
-            DiscretizeFastaDataset(FastaMemMapDataset(fasta_file.name, 4)),
+            DiscretizeFastaDataset(InternallyIndexedFastaMemMapDataset(fasta_file.name, 4)),
+            DiscretizeFastaDataset(InternallyIndexedFastaMemMapDataset(fasta_file.name, 4)),
         ])
 
     return dataset
@@ -149,7 +149,7 @@ def test_fasta_memmap_dataset_multiple_files(
     with open(fasta_file_2.name, 'w') as fh:
         fh.write('>seq1:2\nCCCATTNA\nNAT\n>seq2:2\nTACATAC\nATATTC\n')
 
-    dataset = FastaMemMapDataset(
+    dataset = InternallyIndexedFastaMemMapDataset(
         [fasta_file_1.name, fasta_file_2.name],
         max_length=4,
         sort_dataset_paths=False,
@@ -165,7 +165,7 @@ def test_file_nointernal_newline():
     with open(fasta_file_1.name, 'w') as fh:
         fh.write('>seq1\nACAGAT')
 
-    dataset = FastaMemMapDataset(
+    dataset = InternallyIndexedFastaMemMapDataset(
         [fasta_file_1.name],
         max_length=4,
         sort_dataset_paths=False,
@@ -183,7 +183,7 @@ def test_file_nointernal_newline_multiple_lines():
     with open(fasta_file_1.name, 'w') as fh:
         fh.write('>seq1\nACAGAT\n>seq2\nACA')
 
-    dataset = FastaMemMapDataset(
+    dataset = InternallyIndexedFastaMemMapDataset(
         [fasta_file_1.name],
         max_length=4,
         sort_dataset_paths=False,
@@ -201,7 +201,7 @@ def test_file_nointernal_newline_multiple_lines_multiple_files():
     with open(fasta_file_1.name, 'w') as fh:
         fh.write('>seq1\nACAGAT\n>seq2\nACA')
 
-    dataset = FastaMemMapDataset(
+    dataset = InternallyIndexedFastaMemMapDataset(
         [fasta_file_1.name, fasta_file_1.name],
         max_length=4,
         sort_dataset_paths=False,
