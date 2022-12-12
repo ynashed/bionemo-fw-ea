@@ -435,8 +435,10 @@ def pyfastx_constructor(builder, discretize, max_length):
 
 def fasta_memmap_constructor(builder, discretize, max_length):
     if discretize:
-        datasets = [DiscretizeFastaDataset(InternallyIndexedFastaMemMapDataset(ds, max_length))
-            for ds in builder.dataset_paths]
+        datasets = DiscretizeFastaDataset(
+            InternallyIndexedFastaMemMapDataset(
+                [ds for ds in builder.dataset_paths], max_length
+            ))
         dataset = ConcatDataset(datasets)
     else:
         dataset = InternallyIndexedFastaMemMapDataset(

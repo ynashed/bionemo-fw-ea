@@ -107,14 +107,28 @@ def discretized_fasta_memmap():
     with open(fasta_file.name, 'w') as fh:
         fh.write('>seq1\nACAGAT\nTCGAC\n>seq2\nTAT\n>seq3\nTACCAT\n')
 
-    dataset = ConcatDataset([
-            DiscretizeFastaDataset(InternallyIndexedFastaMemMapDataset(fasta_file.name, 4)),
-            DiscretizeFastaDataset(InternallyIndexedFastaMemMapDataset(fasta_file.name, 4)),
-        ])
+    dataset = DiscretizeFastaDataset(
+        InternallyIndexedFastaMemMapDataset(
+            [fasta_file.name, fasta_file.name], 4)
+        )
 
     return dataset
 
-@pytest.mark.parametrize('idx,sequence', test_discrete_examples)
+test_multiple_discrete_examples = [
+    (0, 'ACAG'),
+    (1, 'ATTC'),
+    (2, 'GAC'),
+    (3, 'TAT'),
+    (4, 'TACC'),
+    (5, 'AT'),
+    (6, 'ACAG'),
+    (7, 'ATTC'),
+    (8, 'GAC'),
+    (9, 'TAT'),
+    (10, 'TACC'),
+    (11, 'AT'),
+]
+@pytest.mark.parametrize('idx,sequence', test_multiple_discrete_examples)
 def test_discrete_fasta_memmap_dataset(idx, sequence, discretized_fasta_memmap):
     assert discretized_fasta_memmap[idx]['seq'] == sequence
 
