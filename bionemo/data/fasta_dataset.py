@@ -212,28 +212,37 @@ class InternallyIndexedFastaMemMapDataset(Dataset):
         self.characters_and_entry_idx_by_file = self._dataset.mdata_midx_list
         self.n_fasta_entries = self._dataset.midx_bins[-1]
 
-        # splitting by file is nice because it makes the datasets composable
-        # TODO but in practice when we load we can just concatenate all of the indices
-        # or split them when we go to save, as long as they are relative, not cumulative
+        # TODO: saving indices.
+        # splitting by file is nice because it makes the datasets composable,
+        # but the current indices make use of global positions. In order to
+        # properly store indices, we would need to ensure proper globalization/
+        # relativization of the indices on load/save respectively.
+
         self.n_seq_bases_per_entry = np.zeros(len(self._dataset), dtype=int)
-        # TODO flatten this (all_newlines)
         self.all_newlines = []
         for idx in range(len(self._dataset)):
             _, mdata, start, end = self.get_fileid_mdata_start_end(self._dataset, idx)
             segment = mdata[start:end]
+            # newlines tracks the locations of newline characters
             newlines = np.where(segment == ord('\n'))[0]
             # make correction to the index if there are no newlines at end of file
             if newlines[-1] != len(segment) - 1:
                 newlines = np.concatenate([newlines, [len(segment)]])
 
+            # n_seq_chars is the index for the number of bases that have been
+            # observed in a sample at the end of each line
+            # the calculation is the number of cumulative characters in the sample
+            # at the end of the line, minus the initial line length
+            # (newlines[0], because this contains the description of the
+            # sequence but no bases) and minus the cumulative
+            # number of newline characters (np.arange(...)) so these are not
+            # counted toward the number of sequenced bases.
             n_seq_chars = newlines - (newlines[0] + np.arange(len(newlines)))
             self.n_seq_bases_per_entry[idx] =  n_seq_chars[-1] + (
                 self.n_seq_bases_per_entry[idx - 1] if idx > 0 else 0
             )
             self.all_newlines.append(newlines)
 
-        # TODO: figure out how to make the newlines_starts structure:
-        # self.all_newlines = np.concatenate(self.all_newlines)
         self.non_newline_chars = self.n_seq_bases_per_entry[-1]
         # length_bins for compatibility with discretize
         self.length_bins = self.n_seq_bases_per_entry
