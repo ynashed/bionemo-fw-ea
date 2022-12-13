@@ -91,6 +91,9 @@ model:
 
   data:
     dataset_path: ???
+    dataset_class: memmap # Options: 'memmap', 'pyfastx'
+    dataset_backend: null # Optional. Required if dataset_class='pyfastx'. Options: 'memory', 'file'.
+    discretize_train: False # If True, the reference data for training is chunked.
     data_prefix: ''
     dataset:
       train: ???

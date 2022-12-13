@@ -20,6 +20,10 @@ from nemo.core import Dataset
 from torch.utils.data import ConcatDataset
 import numpy as np
 from omegaconf import open_dict
+from nemo.utils import logging
+from nemo.collections.nlp.data.language_modeling.text_memmap_dataset import (
+    TextMemMapDataset
+)
 from bionemo.data.utils import (
     MappedDataset,
     handle_index,
@@ -71,7 +75,7 @@ BACKENDS = {
 }
 
 
-class FastaDataset(Dataset):
+class PyfastxFastaDataset(Dataset):
     """
     Constructs a dataset for a pyfastx.Fasta
 
@@ -87,7 +91,7 @@ class FastaDataset(Dataset):
 
     A useful access would be, e.g.,
     >>> fasta = pyfasx.Fasta('example.fa')
-    >>> dataset = FastaDataset(fasta, seq_length=4)
+    >>> dataset = PyfastxFastaDataset(fasta, max_length=4)
     >>> dataset[0]
     'ACGT'
     >>> dataset[4]
@@ -159,9 +163,156 @@ class FastaDataset(Dataset):
         }
 
 
+class InternallyIndexedFastaMemMapDataset(Dataset):
+    """
+    See FASTA format definition here:
+    http://www.ncbi.nlm.nih.gov/blast/fasta.shtml
+    E.g., the following is a valid FASTA
+    >seq1
+    ACGTAC
+    GAGATA
+    >seq2
+    TACATA
+    A useful access would be, e.g.,
+    >>> dataset = InternallyIndexedFastaMemMapDataset(files, max_length=4)
+    >>> dataset[0]
+    'ACGT'
+    >>> dataset[4]
+    'ACGA'
+    >>> dataset[9]
+    'TACA'
+    >>> dataset[11]
+    'CATA'
+    """
+    def __init__(self, dataset_paths, max_length, workers=None,
+            sort_dataset_paths=True,
+    ):
+        """
+        Args:
+            dataset_paths (List[str]): FASTA files to be included.
+                Must be unzipped.
+            max_length (int): Length of sequences to load. Sequences will be
+                less than `max_length` if they are in the last `max_length` - 1
+                bases in the entry.
+            workers (Optional[int]): Number of works used to build the file
+                indexes.
+            sort_dataset_paths (Optional[bool]): If True, the files are sorted
+                in lexicographic order for accession.
+        """
+        self.max_length = max_length
+        self.dataset_paths = dataset_paths
+        self._dataset = TextMemMapDataset(
+            dataset_paths, newline_int=ord('>'),
+            header_lines=1,
+            workers=workers,
+            sort_dataset_paths=sort_dataset_paths,
+        )
+
+        self.n_cumulative_entries = self._dataset.midx_bins
+        self.characters_and_entry_idx_by_file = self._dataset.mdata_midx_list
+        self.n_fasta_entries = self._dataset.midx_bins[-1]
+
+        # TODO: saving indices.
+        # splitting by file is nice because it makes the datasets composable,
+        # but the current indices make use of global positions. In order to
+        # properly store indices, we would need to ensure proper globalization/
+        # relativization of the indices on load/save respectively.
+
+        self.n_seq_bases_per_entry = np.zeros(len(self._dataset), dtype=int)
+        self.all_newlines = []
+        for idx in range(len(self._dataset)):
+            _, mdata, start, end = self.get_fileid_mdata_start_end(self._dataset, idx)
+            segment = mdata[start:end]
+            # newlines tracks the locations of newline characters
+            newlines = np.where(segment == ord('\n'))[0]
+            # make correction to the index if there are no newlines at end of file
+            if newlines[-1] != len(segment) - 1:
+                newlines = np.concatenate([newlines, [len(segment)]])
+
+            # n_seq_chars is the index for the number of bases that have been
+            # observed in a sample at the end of each line
+            # the calculation is the number of cumulative characters in the sample
+            # at the end of the line, minus the initial line length
+            # (newlines[0], because this contains the description of the
+            # sequence but no bases) and minus the cumulative
+            # number of newline characters (np.arange(...)) so these are not
+            # counted toward the number of sequenced bases.
+            n_seq_chars = newlines - (newlines[0] + np.arange(len(newlines)))
+            self.n_seq_bases_per_entry[idx] =  n_seq_chars[-1] + (
+                self.n_seq_bases_per_entry[idx - 1] if idx > 0 else 0
+            )
+            self.all_newlines.append(newlines)
+
+        self.non_newline_chars = self.n_seq_bases_per_entry[-1]
+        # length_bins for compatibility with discretize
+        self.length_bins = self.n_seq_bases_per_entry
+
+    def __getitem__(self, index):
+        index = handle_index(self, index)
+        # TODO: this lookup is currently a litle roundabout: it tells you which entry
+        # we want to go to, then uses that to lookup the file and get the entry position
+        # within the file. We can probably restructure the indices to go directly
+        # to the entry without needing to know its global position
+        entry = np.digitize(index, self.n_seq_bases_per_entry, right=False)
+        position_within_entry = index - (self.n_seq_bases_per_entry[entry - 1] if entry > 0 else 0)
+        end_position_within_entry = position_within_entry + \
+            min(self.n_seq_bases_per_entry[entry] - index, self.max_length)
+
+        _, mdata, start, _ = self.get_fileid_mdata_start_end(self._dataset, entry)
+        # there should be an index to find the start and end of a given section within
+        #  the flattened all_newlines index
+        # currently this looks like: [array([ 4, 11, 19]), array([ 4, 10]),
+        #   array([ 6, 15, 19]), array([ 6, 14, 21])]
+        # we want it too look like: [4, 11, 19, 4, 10, 6, 15, 19, 6, 14, 21]
+        # with a structure like:
+        # starts: [0, 3, 5, 8, -1]
+        newlines = self.all_newlines[entry]
+        n_seq_chars = newlines - (newlines[0] + np.arange(len(newlines)))
+        start_line = np.digitize(position_within_entry, n_seq_chars, right=False) - 1
+        end_line = np.digitize(end_position_within_entry, n_seq_chars, right=False) - 1
+
+        consume_leading_chars = position_within_entry - n_seq_chars[start_line]
+        consume_trailing_chars = end_position_within_entry - n_seq_chars[end_line]
+        seq_start = start + newlines[start_line] + consume_leading_chars + 1
+        seq_end = start + newlines[end_line] + consume_trailing_chars + 1
+
+        return {
+            'seq': mdata[seq_start:seq_end].tobytes().decode().replace('\n', ''),
+            'contig': mdata[start:start + newlines[0]].tobytes().decode(),
+            'start': position_within_entry,
+        }
+
+    @staticmethod
+    def get_entries_per_file(dataset: TextMemMapDataset):
+        entries_per_file = np.concatenate(
+            [dataset.midx_bins[0:1],
+            dataset.midx_bins[1:] - dataset.midx_bins[:-1]]
+        )
+        return entries_per_file
+
+    def __len__(self):
+        return self.non_newline_chars
+
+    @staticmethod
+    def get_fileid_mdata_start_end(dataset: TextMemMapDataset, idx):
+        # Identify the file containing the record
+        file_id = np.digitize(idx, dataset.midx_bins, right=False)
+        base_idx = dataset.midx_bins[file_id - 1] if file_id > 0 else 0
+        file_idx = idx - base_idx + dataset._header_lines
+        mdata, midx = dataset.mdata_midx_list[file_id]
+        # load sample
+        if file_idx == 0:
+            i = 0
+            j = midx[0]
+        else:
+            i = midx[file_idx - 1] + 1  # ignore newline
+            j = midx[file_idx]
+        return file_id, mdata, i, j
+
+
 class DiscretizeFastaDataset(MappedDataset):
 
-    def __init__(self, dataset: FastaDataset):
+    def __init__(self, dataset: PyfastxFastaDataset):
         """
         Produces a discretized version of a `FastaDataset`.
 
@@ -245,7 +396,7 @@ class ConcatFastaDataset(Dataset):
         self.transforms = transforms
         self.datasets = []
         for f in files:
-            new_dataset = FastaDataset(
+            new_dataset = PyfastxFastaDataset(
                 pyfastx.Fasta(f, uppercase=uppercase),
                 max_length, backend=backend,
             )
@@ -283,6 +434,26 @@ class ConcatFastaDataset(Dataset):
         """
         return self._dataset[idx]
 
+def pyfastx_constructor(builder, discretize, max_length):
+    transforms = builder.make_transforms(discretize)
+    return ConcatFastaDataset(
+            builder.dataset_paths, max_length,
+            backend=builder.options['dataset_backend'],
+            transforms=transforms,
+        )
+
+def fasta_memmap_constructor(builder, discretize, max_length):
+    if discretize:
+        datasets = DiscretizeFastaDataset(
+            InternallyIndexedFastaMemMapDataset(
+                [ds for ds in builder.dataset_paths], max_length
+            ))
+        dataset = ConcatDataset(datasets)
+    else:
+        dataset = InternallyIndexedFastaMemMapDataset(
+                builder.dataset_paths, max_length,
+            )
+    return dataset
 
 tokenizers = {
     'kmer': KmerTokenizer,
@@ -290,6 +461,11 @@ tokenizers = {
 
 adapters = {
     'kmer': KmerTokenizerAdapter,
+}
+
+dataset_constructors = {
+    'pyfastx': pyfastx_constructor,
+    'memmap': fasta_memmap_constructor
 }
 
 
@@ -327,13 +503,12 @@ class FastaDatasetBuilder(DatasetBuilderSpec):
         """
         cfg = self.options['cfg']
         discretize = self.options['discretize']
+        dataset_class = self.options['dataset_class']
         max_length = cfg.seq_length - 1 + cfg.k
-        transforms = self.make_transforms(discretize)
-        self.dataset = ConcatFastaDataset(
-            self.dataset_paths, max_length, backend='memory',
-            transforms=transforms,
-        )
+        constructor = dataset_constructors[dataset_class]
+        self.dataset = constructor(self, discretize=discretize, max_length=max_length)
         return self.dataset
+
 
     def make_transforms(self, discretize):
         """
@@ -377,62 +552,6 @@ tokenizers = {
 adapters = {
     'kmer': KmerTokenizerAdapter,
 }
-
-
-class FastaDatasetBuilder(DatasetBuilderSpec):
-
-    def format_dataset_paths(self):
-        """
-        Parses FASTA paths.
-
-        """
-        self.dataset_paths = expand_dataset_paths(
-            self.options['filepath'], None)
-
-    def check_path(self, filepath):
-        """
-        Checks whether a FASTA exists.
-
-        Arguments:
-            filepath (str): a string that can be used to identify the filepath
-
-        Returns:
-            Optional[str]: If the file exists, this returns None, otherwise
-                it returns the on the filepath.
-
-        """
-        if not os.path.exists(filepath):
-            return filepath
-
-    def create_dataset(self):
-        """
-        Instantiates a FastaDataset.
-
-        Returns:
-            Dataset: Dataset instantiated from paths.
-        """
-        cfg = self.options['cfg']
-        discretize = self.options['discretize']
-        max_length = cfg.seq_length - 1 + cfg.k
-        transforms = self.make_transforms(discretize)
-        self.dataset = ConcatFastaDataset(
-            self.dataset_paths, max_length, backend='memory',
-            transforms=transforms,
-        )
-        return self.dataset
-
-    def make_transforms(self, discretize):
-        """
-        Makes transformations to use for the a Dataset.
-
-        Arguments:
-            discretize (bool): whether the Discretize argument should be added
-        Returns:
-            List[Callable[[Dataset], Dataset]]: Dataset transformations
-
-        """
-        transforms = [DiscretizeFastaDataset,] if discretize else []
-        return transforms
 
 
 class DNABERTDataModule(BioNeMoDataModule):
@@ -457,6 +576,14 @@ class DNABERTDataModule(BioNeMoDataModule):
         with open_dict(cfg):
             dataset_path = cfg.get('dataset_path', '')
             dataset_format = cfg.get('dataset_format')
+            dataset_class = cfg.get('dataset_class', 'memmap')
+            dataset_backend = cfg.get('dataset_backend')
+            if dataset_class == 'pyfastx':
+                if dataset_backend not in BACKENDS.keys():
+                    raise ValueError(
+                        f'dataset_backend={dataset_backend} for dataset_class='
+                        f'{dataset_class} must be configured to one of: '
+                        f'{BACKENDS.keys()}')
 
         # Build individual datasets.
         filepath = os.path.join(dataset_path, name, ds)
@@ -466,6 +593,8 @@ class DNABERTDataModule(BioNeMoDataModule):
             'filepath': filepath,
             'dataset_format': dataset_format,
             'batch_size': self.get_global_batch_size(),
+            'dataset_class': dataset_class,
+            'dataset_backend': dataset_backend,
         }
         return options
 
@@ -508,7 +637,7 @@ class DNABERTDataModule(BioNeMoDataModule):
         ds = self.cfg.dataset.train
         name = 'train'
         options = self._configure_options(name, ds)
-        options['discretize'] = False
+        options['discretize'] = self.cfg.discretize_train
 
         dataset = DNABERTDatasetFactory().create_dataset(options)
 
