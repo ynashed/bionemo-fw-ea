@@ -55,8 +55,9 @@ model:
   pipeline_model_parallel_size: 1
 
   # model architecture
-  seq_length: 512
+  seq_length: 512 # FIXME: remove me (replaced by encoder_seq_length)
   max_position_embeddings: ${.seq_length}
+  encoder_seq_length: ${.seq_length}
   num_layers: 6
   hidden_size: 768
   ffn_hidden_size: 3072 # Transformer FFN hidden size. Usually 4 * hidden_size.

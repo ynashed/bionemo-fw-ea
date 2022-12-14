@@ -1,3 +1,5 @@
+#!/bin/bash
+#
 # Copyright (c) 2022, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -13,28 +15,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import pytest
-from bionemo.data.mapped_dataset import SliceDataset
+# This script is used to run inference on a single GPU using the ESM-1b model.
 
-import torch
-from torch.utils.data import TensorDataset
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
-
-test_dataset = TensorDataset(
-    torch.tensor(torch.arange(24 * 3).reshape(24, 3))
-)
-
-
-start_end_length = [
-    (0, 9, 9),
-    (1, 7, 6),
-    (3, 3, 0),
-    (9, 24, 15),
-    (3, -1, 20),
-    (-5, -2, 3),
-]
-
-@pytest.mark.parametrize('start,end,length', start_end_length)
-def test_slice_dataset(start, end, length):
-    dataset = SliceDataset(test_dataset, start, end)
-    assert len(dataset) == length
+python3 -- ${SCRIPT_DIR}/../../infer.py  --config-dir ${SCRIPT_DIR}/conf $*

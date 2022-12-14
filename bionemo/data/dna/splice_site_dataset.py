@@ -8,7 +8,7 @@ from bionemo.core import BioNeMoDataModule
 import pandas as pd
 from functools import partial
 from bionemo.data.utils import expand_dataset_paths
-from bionemo.data.utils import NeMoUpsampling
+from bionemo.data.mapped_dataset import NeMoUpsampling
 import os
 import math
 

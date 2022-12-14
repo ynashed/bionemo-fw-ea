@@ -1,12 +1,21 @@
+defaults:
+  - base_infer_config
+  # allow this config to override defaults
+  - _self_
+
 name: ESM1nv_Inference
 desc: Minimum configuration for initializing a ESM1nv model for inference.
 
-trainer:
-  precision: 16
-  devices: 1 # must be set to accommodate the total model parallel size
-  num_nodes: 1 # must be set to accommodate the total model parallel size
-
 model:
   post_process: False
+  tokenizer:
+    vocab_path: /model/protein/esm1nv/vocab/protein_sequence.vocab
+    model_path: /model/protein/esm1nv/vocab/protein_sequence_sentencepiece.model
   downstream_task:
-    input_base_model: "/model/protein/esm1nv/esm1nv.nemo"
+    restore_from_path: "/model/protein/esm1nv/esm1nv.nemo"
+    outputs: [embeddings, hiddens] # Which outputs to extract per sample (a value or list). Possible values: hiddens, embeddings.
+  data:
+    dataset_path: /data/netsurfp_2.0/val/x000 # full path to dataset (can include range or a list)
+
+target: bionemo.model.protein.esm1nv.esm1nv_model.ESM1nvModel  # path to model class to load
+infer_target: bionemo.model.protein.esm1nv.infer.ESM1nvInference # path to inferende class to load

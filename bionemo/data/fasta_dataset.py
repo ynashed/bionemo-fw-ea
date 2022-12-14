@@ -20,14 +20,10 @@ from nemo.core import Dataset
 from torch.utils.data import ConcatDataset
 import numpy as np
 from omegaconf import open_dict
+from bionemo.data.mapped_dataset import MappedDataset, NeMoUpsampling
 from nemo.utils import logging
-from nemo.collections.nlp.data.language_modeling.text_memmap_dataset import (
-    TextMemMapDataset
-)
-from bionemo.data.utils import (
-    MappedDataset,
-    handle_index,
-)
+from nemo.collections.nlp.data.language_modeling.text_memmap_dataset import TextMemMapDataset
+from bionemo.data.utils import handle_index
 from bionemo.data.dataloader.kmer_collate import DeterministicLengthTruncator
 from bionemo.tokenizer import KmerTokenizer
 from bionemo.data.dataloader import (
@@ -42,7 +38,6 @@ from bionemo.data.utils import (
     DatasetBuilderSpec,
     expand_dataset_paths,
 )
-from bionemo.data.utils import NeMoUpsampling
 from bionemo.core import BioNeMoDataModule
 
 

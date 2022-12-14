@@ -17,15 +17,15 @@ import logging
 import torch
 from torch.nn.functional import pad
 from pandas import Series
-
 from typing import List, Union
-
 from omegaconf import OmegaConf
 
 from pytorch_lightning.trainer.trainer import Trainer
-from nemo.collections.nlp.parts.nlp_overrides import (NLPDDPPlugin,
+from nemo.collections.nlp.parts.nlp_overrides import (NLPDDPStrategy,
                                                       NLPSaveRestoreConnector)
 from nemo.utils.app_state import AppState
+
+from bionemo.data.utils import pad_token_ids
 from bionemo.data import MoleculeEnumeration
 from bionemo.model.molecule.megamolbart import MegaMolBARTModel
 
@@ -33,6 +33,8 @@ from bionemo.model.molecule.megamolbart import MegaMolBARTModel
 log = logging.getLogger(__name__)
 __all__ = ["NeMoMegaMolBARTWrapper", "MegaMolBARTValidationInferenceWrapper"]
 
+
+# FIXME: switch to be based on BaseEncoderDecoderInference
 
 class NeMoMegaMolBARTWrapper():
     '''
@@ -72,21 +74,25 @@ class NeMoMegaMolBARTWrapper():
         self.mol_enum.mask_prob = 0
 
     def _tokenize(self, smis: List[str]):
+        """
+        MegaMolBART expects input/output format:
+        
+        encoder input ids - [tokens] (without <BOS> and <EOS>)
+        decoder input ids - <BOS> + [tokens]
+        decoder output ids - [tokens] + <EOS>
+        """
         tokens = [self.tokenizer.text_to_tokens(s) for s in smis]
         token_ids = [self.tokenizer.token_to_ids(t) for t in tokens]
 
-        pad_length = max([len(seq) for seq in token_ids])
-        # if self.pad_size_divisible_by_8:
-        #     pad_length = int(math.ceil(pad_length/8) * 8)
-
-        # 1/True = Active, 0/False = Inactive
-        encoder_mask = [([1] * len(seq)) + ([0] * (pad_length - len(seq))) for seq in token_ids]
-        token_ids = [seq + ([self.tokenizer.pad_id] * (pad_length - len(seq))) for seq in token_ids]
-
-        token_ids = torch.tensor(token_ids, dtype=torch.int64).cuda()
-        encoder_mask = torch.tensor(encoder_mask,
-                                    dtype=torch.int64,
-                                    device=token_ids.device)
+        # Pad token ids (1/True = Active, 0/False = Inactive)
+        token_ids, encoder_mask = pad_token_ids(
+            token_ids, 
+            padding_value=self.tokenizer.pad_id, 
+            pad_size_divisible_by=8 if self.pad_size_divisible_by_8 else 1,  
+            dtype=torch.int64,
+            # FIXME: use model.device
+            device="cuda",
+            )
 
         return token_ids, encoder_mask
 
@@ -121,10 +127,11 @@ class NeMoMegaMolBARTWrapper():
 
         # trainer required for restoring model parallel model
         trainer = Trainer(
-            plugins=NLPDDPPlugin(),
+            plugins=[],
             devices=1,
             accelerator='gpu',
             precision=32, #TODO: Run benchmark to verify this value has no or
+            strategy=NLPDDPStrategy(),
             #                     minimum impact on KPIs.
         )
 
