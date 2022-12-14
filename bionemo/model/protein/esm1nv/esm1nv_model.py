@@ -123,8 +123,9 @@ class ESM1nvModel(MegatronBertModel):
         loss_mask = data_b['loss_mask'].float()
         lm_labels = data_b['labels'].long()
         padding_mask = data_b['padding_mask'].long()
-        types = None #expected by training & validation methods
-        sentence_order = None #expected by training & validation methods
+        # faking values here for apex parallelism
+        types = torch.zeros(tokens.size(0)).to(loss_mask) #expected by training & validation methods
+        sentence_order = types #expected by training & validation methods
         return tokens, types, sentence_order, loss_mask, lm_labels, padding_mask
 
     def validation_epoch_end(self, outputs):
@@ -165,8 +166,8 @@ class ESM1nvModel(MegatronBertModel):
     def output_types(self) -> Optional[Dict[str, NeuralType]]:
         return {
             'output': {
-                0: 'time',
-                1: 'batch',
+                0: 'batch',
+                1: 'time',
                 2: 'size'
             }
         }

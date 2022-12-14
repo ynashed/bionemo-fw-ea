@@ -13,7 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ARG BASE_IMAGE=nvcr.io/nvidia/nemo:22.07
+# TODO: check if the following missing dependencies are needed
+#   - lcms2=2.12=hddcbb42_0
+#   - libgcc-ng=11.1.0=hc902ee8_8
+#   - libstdcxx-ng=11.1.0=h56837e0_8
+#   - pycairo=1.20.1=py38hf61ee4a_0
+
+
+# TODO: update to nemo's official release when 1.14 is ready
+# ARG BASE_IMAGE=nvcr.io/nvidia/nemo:22.07
+ARG BASE_IMAGE=gitlab-master.nvidia.com/mlivne/nemo_containers:nemo-r1.14.0
 FROM ${BASE_IMAGE}
 
 ARG GITHUB_ACCESS_TOKEN
@@ -23,24 +32,21 @@ ARG GITHUB_REPO=gitlab-master.nvidia.com/clara-discovery/bionemo.git
 ARG BIONEMO_HOME=/opt/nvidia/bionemo 
 ARG NEMO_HOME=/opt/nvidia/nemo
 ARG NEMO_BRANCH
-ARG CONDA_ENV=base
 ARG PACKAGE=0
 
 # Activating base environment
-RUN echo "source activate ${CONDA_ENV}" > /etc/bash.bashrc
 ENV TERM=xterm
 
 ## Installing dependencies and tools
 RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y \
-        python-setuptools python-dev swig \
+        python3-setuptools python3-dev swig \
         wget git unzip tmux vim tree && \
     rm -rf /var/lib/apt/lists/*
 
-RUN pip install pyfastx==0.8.4
-COPY setup/conda/env.yml /tmp/env.yml
-RUN conda env update --name base -f /tmp/env.yml && conda clean -afy
+COPY setup/requirements.txt /tmp/requirements.txt
+RUN pip3 install -r /tmp/requirements.txt
 
 ## PySMILES
 RUN git clone https://github.com/MolecularAI/pysmilesutils.git --branch master /opt/pysmilesutils \
@@ -48,8 +54,6 @@ RUN git clone https://github.com/MolecularAI/pysmilesutils.git --branch master /
 
 RUN git clone --branch ${GITHUB_BRANCH} \
     https://oauth2:${GITHUB_ACCESS_TOKEN}@${GITHUB_REPO} ${BIONEMO_HOME}
-
-RUN cd ${BIONEMO_HOME} && conda run -n ${CONDA_ENV} pip install -e .
 
 # Recompile Megatron helpers -- NOTE this will need to be done if PYTHONPATH changes later
 ENV PYTHONPATH=${BIONEMO_HOME}:${BIONEMO_HOME}/generated:${NEMO_HOME}:$PYTHONPATH

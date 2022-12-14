@@ -24,7 +24,6 @@ from nemo.core import Dataset
 from nemo.collections.nlp.data.language_modeling.text_memmap_dataset import CSVMemMapDataset
 from nemo.collections.nlp.data.language_modeling.megatron.dataset_utils import (
     get_samples_mapping,
-    make_text_memmap_bin_compatibility,
 )
 
 try:
@@ -35,7 +34,7 @@ except (ImportError, ModuleNotFoundError):
 
 __all__ = ['MoleculeCsvDataset']
 
-
+# TODO: use NeMoUpsampling instead of directly calling get_samples_mapping
 class MoleculeCsvDataset(Dataset):
     """
     Allow per-line lazy access to multiple text files using numpy memmap.
@@ -74,8 +73,6 @@ class MoleculeCsvDataset(Dataset):
         if self.num_samples is None:
             self.num_samples = len(self.ds)
 
-        # make dataset compatible with Megatron sample mapping
-        make_text_memmap_bin_compatibility(self.ds)
         # map dataset samples to the desired num_samples
         self.samples_mapping = get_samples_mapping(
             indexed_dataset=self.ds,
