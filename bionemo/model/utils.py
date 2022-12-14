@@ -49,23 +49,75 @@ try:
 except (ImportError, ModuleNotFoundError):
     HAVE_APEX = False
 
+def set_cfg_key(key, value, cfg_section):
+    """Adds a value to a config if it is missing
+
+    Args:
+        key (str): Key in `cfg_section` to be set
+        value (Any): value to set in config
+        cfg_section (OmegaConf): Config object to set the key/value for
+
+    Raises:
+        ValueError: If `key` already exists in `cfg_section` and is different
+            than `value`.
+    """
+    if key not in cfg_section or \
+            cfg_section.get(key) is None:
+        with open_dict(cfg_section):
+            cfg_section[key] = value
+    elif cfg_section[key] != value:
+        raise ValueError(
+            f"{key} set to: {cfg_section[key]}, which conflicts with inferred"
+            f"value: {value}."
+        )
+
+def infer_global_batch_size(
+            micro_batch_size,
+            n_devices=1,
+            n_nodes=1,
+            accumulate_grad_batches=1,
+            tensor_model_parallel_size=1,
+            pipeline_model_parallel_size=1,
+        ):
+    world_size = n_devices * n_nodes
+    model_parallel_size = tensor_model_parallel_size * pipeline_model_parallel_size
+
+    if (model_parallel_size > world_size) or world_size % model_parallel_size != 0:
+        raise ValueError(
+            f'Model parallel size: {model_parallel_size} '
+            f'(tensor_model_paralle_size={tensor_model_parallel_size} x '
+            f'pipeline_model_parallel_size={pipeline_model_parallel_size}) '
+            f'must be <= and a divisor of world size: {world_size} ('
+            f'n_devices={n_devices} x n_nodes={n_nodes}).'
+        )
+
+    data_parallel_size = world_size // model_parallel_size
+
+    global_batch_size = micro_batch_size * data_parallel_size * accumulate_grad_batches
+
+    return global_batch_size
+
 
 class TrainerBuilder(object):
     @staticmethod
     def adjust_config(cfg):
-        if 'global_batch_size' not in cfg.model or \
-                cfg.model.get('global_batch_size') is None:
-            micro_batch_size = cfg.model.micro_batch_size
-            tensor_model_parallel_size = cfg.model.tensor_model_parallel_size
-            pipeline_model_parallel_size = cfg.model.pipeline_model_parallel_size
-            accumulate_grad_batches = cfg.trainer.get('accumulate_grad_batches', 1)
-            n_devices = cfg.trainer.devices * cfg.trainer.num_nodes
-            global_batch_size = int(micro_batch_size * n_devices * accumulate_grad_batches / \
-                (tensor_model_parallel_size * pipeline_model_parallel_size))
+        micro_batch_size = cfg.model.micro_batch_size
+        tensor_model_parallel_size = cfg.model.tensor_model_parallel_size
+        pipeline_model_parallel_size = cfg.model.pipeline_model_parallel_size
+        n_devices = cfg.trainer.devices
+        n_nodes = cfg.trainer.num_nodes
+        acc_grad_batches = cfg.trainer.accumulate_grad_batches
+        global_batch_size = infer_global_batch_size(
+                micro_batch_size=micro_batch_size,
+                n_devices=n_devices,
+                n_nodes=n_nodes,
+                accumulate_grad_batches=acc_grad_batches,
+                tensor_model_parallel_size=tensor_model_parallel_size,
+                pipeline_model_parallel_size=pipeline_model_parallel_size,
+            )
 
-            with open_dict(cfg):
-                cfg.model.global_batch_size = global_batch_size
-    
+        set_cfg_key('global_batch_size', global_batch_size, cfg.model)
+
     @staticmethod
     def configure_plugins(cfg):
         plugins = []
@@ -254,7 +306,7 @@ def gather_objects(partial_results_list, main_rank=None):
     """
     Collect results from all GPUs.
     Useful for inference over multiple GPUs with DDP.
-    
+
     Args:
         partial_results_list: list of partial results from each GPU
         main_rank: rank of the main process to collect results from all GPUs (useful for collecting results in a target rank)
@@ -262,7 +314,7 @@ def gather_objects(partial_results_list, main_rank=None):
     # do not fail when DDP is not initialized
     if parallel_state.is_unitialized():
         return partial_results_list
-    
+
     rank = parallel_state.get_data_parallel_rank()
     world_size = parallel_state.get_data_parallel_world_size()
     # return input when no DDP is used
