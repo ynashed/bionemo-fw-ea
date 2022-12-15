@@ -49,6 +49,7 @@ model:
 
   # model architecture
   seq_length: 512
+  encoder_seq_length: ${.seq_length}
   max_position_embeddings: ${.seq_length}
   num_layers: 12
   hidden_size: 768
