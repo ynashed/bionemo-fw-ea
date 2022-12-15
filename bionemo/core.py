@@ -275,6 +275,6 @@ class BioNeMoBertModel(MegatronBertModel):
         loss_mask = data_b['loss_mask'].float()
         lm_labels = data_b['labels'].long()
         padding_mask = data_b['padding_mask'].long()
-        types = None #expected by training & validation methods
-        sentence_order = None #expected by training & validation methods
+        types = torch.ones_like(tokens).long() #expected by training & validation methods
+        sentence_order = torch.arange(len(tokens)).long() #expected by training & validation methods
         return tokens, types, sentence_order, loss_mask, lm_labels, padding_mask

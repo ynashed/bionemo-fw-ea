@@ -2,7 +2,7 @@ from enum import IntEnum
 from torch.utils.data import Dataset, ConcatDataset
 from typing import List, Dict, Tuple, Any, Callable
 from bionemo.data.dataloader.kmer_collate import KmerBertCollate
-from bionemo.data.fasta_dataset import ConcatFastaDataset, FastaDataset
+from bionemo.data.fasta_dataset import ConcatFastaDataset
 from bionemo.data.validation_dataset import DataFrameTransformDataset
 from bionemo.core import BioNeMoDataModule
 import pandas as pd
@@ -117,7 +117,7 @@ def delistify_single_arg(fn: Callable[[List[Any]], Dict]) -> Callable[[Any], Dic
         return {key: value[0] for key, value in ret_val.items()}
     return wrapper_fn
 
-def fetch_bert_dna(row: pd.Series, dataset: FastaDataset, bert_prep, length: int):
+def fetch_bert_dna(row: pd.Series, dataset, bert_prep, length: int):
     """Fetches and preprocesses data based
 
     Args:
