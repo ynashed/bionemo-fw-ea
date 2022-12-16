@@ -99,13 +99,12 @@ function download_model() {
                 model.data.dataset_path=${DATA_FILE} \
                 model.data.output_fname=${DATA_FILE}.${MODEL_NAME}.pkl
         done
+    done
 }
 
-for MODEL_NAME in ${MODEL_NAMES}; do
-    # extract embeddings
-    download_model '[embeddings]' ${DATA_FNAMES_EMBEDDINS_ONLY}
-    # extract hiddens
-    download_model '[hiddens]' ${DATA_FNAMES_HIDDENS_ONLY}
-    # extract embeddings and hiddens
-    download_model '[embeddings, hiddens]' ${DATA_FNAMEDATA_FNAMES_EMBEDDINS_HIDDENSS_HIDDENS_ONLY}
-done
+# extract embeddings
+download_model '[embeddings]' ${DATA_FNAMES_EMBEDDINS_ONLY}
+# extract hiddens
+download_model '[hiddens]' ${DATA_FNAMES_HIDDENS_ONLY}
+# extract embeddings and hiddens
+download_model '[embeddings, hiddens]' ${DATA_FNAMEDATA_FNAMES_EMBEDDINS_HIDDENSS_HIDDENS_ONLY}
