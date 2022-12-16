@@ -30,7 +30,7 @@ MODEL_NAMES=("esm1nv" "prott5nv")
 # embeddings only
 DATA_FNAMES_EMBEDDINS_ONLY=(
 # aav
-    aav/low_vs_high.fasta
+    # aav/low_vs_high.fasta
     aav/des_mut_nucleotide.fasta
     aav/one_vs_many_nucleotide.fasta
     aav/mut_des_nucleotide.fasta
@@ -87,17 +87,27 @@ function download_model() {
     for MODEL_NAME in ${MODEL_NAMES}; do
         for DATA_FNAME in ${DATA_FNAMES}; do
             DATA_FILE=${FLIP_DATA_PATH}/${DATA_FNAME}
-            echo ""
-            echo "**********************************************************"
-            echo "Extracting ${OUTPUTS} for ${DATA_FNAME} with ${MODEL_NAME}"
-            echo "**********************************************************"
-            echo ""
+            OUTPUT_FILE=${DATA_FILE}.${MODEL_NAME}.pkl
+            if test -f "${OUTPUT_FILE}"; then
+                echo ""
+                echo "**********************************************************"
+                echo "===> Skipping ${DATA_FNAME} with ${MODEL_NAME} (${OUTPUT_FILE} exists)" 
+                echo "**********************************************************"
+                echo ""
+                continue
+            else
+                echo ""
+                echo "**********************************************************"
+                echo "Extracting ${OUTPUTS} for ${DATA_FNAME} with ${MODEL_NAME}"
+                echo "**********************************************************"
+                echo ""
 
-            time ${SCRIPT_DIR}/../../${MODEL_NAME}/infer.sh \
-                trainer.devices=${DEVICES} \
-                model.downstream_task.outputs=${OUTPUTS} \
-                model.data.dataset_path=${DATA_FILE} \
-                model.data.output_fname=${DATA_FILE}.${MODEL_NAME}.pkl
+                time ${SCRIPT_DIR}/../../${MODEL_NAME}/infer.sh \
+                    trainer.devices=${DEVICES} \
+                    model.downstream_task.outputs=${OUTPUTS} \
+                    model.data.dataset_path=${DATA_FILE} \
+                    model.data.output_fname=${OUTPUT_FILE}
+            fi
         done
     done
 }
