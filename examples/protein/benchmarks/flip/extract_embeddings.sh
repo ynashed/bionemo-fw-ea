@@ -49,10 +49,10 @@ DATA_FNAMES_EMBEDDINS_ONLY=(
     gb1/three_vs_rest.fasta
     gb1/two_vs_rest.fasta
     gb1/one_vs_rest.fasta
-    gb1/two_vs_rest_nucleotide.fasta
-    gb1/three_vs_rest_nucleotide.fasta
-    gb1/low_vs_high_nucleotide.fasta
-    gb1/one_vs_rest_nucleotide.fasta
+    # gb1/two_vs_rest_nucleotide.fasta
+    # gb1/three_vs_rest_nucleotide.fasta
+    # gb1/low_vs_high_nucleotide.fasta
+    # gb1/one_vs_rest_nucleotide.fasta
 # meltome
     meltome/mixed_split.fasta
     meltome/human_cell.fasta
