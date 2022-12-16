@@ -30,7 +30,7 @@ MODEL_NAMES=("esm1nv" "prott5nv")
 # embeddings only
 DATA_FNAMES_EMBEDDINS_ONLY=(
 # aav
-    # aav/low_vs_high.fasta
+    # aav/low_vs_high.fasta <== all sequences are longer than 512!
     aav/des_mut_nucleotide.fasta
     aav/one_vs_many_nucleotide.fasta
     aav/mut_des_nucleotide.fasta
