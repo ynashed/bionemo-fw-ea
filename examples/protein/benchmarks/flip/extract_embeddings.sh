@@ -38,7 +38,7 @@ DATA_FNAMES_EMBEDDINS_ONLY=(
     aav/mut_des_nucleotide.fasta
     # aav/seven_vs_many.fasta
     aav/low_vs_high_nucleotide.fasta
-    aav/des_mut.fasta
+    # aav/des_mut.fasta
     aav/seven_vs_many_nucleotide.fasta
     aav/two_vs_many_nucleotide.fasta
     aav/mut_des.fasta
@@ -107,6 +107,8 @@ function extract_embeddings() {
 
                 time ${SCRIPT_DIR}/../../${MODEL_NAME}/infer.sh \
                     trainer.devices=${DEVICES} \
+                    model.data.num_workers=10 \
+                    model.data.batch_size=1024 \
                     model.downstream_task.outputs=${OUTPUTS} \
                     model.data.dataset_path=${DATA_FILE} \
                     model.data.output_fname=${OUTPUT_FILE}
