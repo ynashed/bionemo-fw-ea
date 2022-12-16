@@ -74,13 +74,13 @@ DATA_FNAMES_HIDDENS_ONLY=(
 )
 
 # embeddings and hiddens
-DATA_FNAMES_EMBEDDINS_HIDDENS=(
+DATA_FNAMEDATA_FNAMES_EMBEDDINS_HIDDENSS_HIDDENS_ONLY=(
 # scl
     scl/mixed_soft.fasta
     scl/mixed_hard.fasta
 )
 
-function download_model() {
+function extract_embeddings() {
     local OUTPUTS=$1
     local DATA_FNAMES=$2
     set -e
@@ -110,11 +110,12 @@ function download_model() {
             fi
         done
     done
+    set +e
 }
 
 # extract embeddings
-download_model '[embeddings]' ${DATA_FNAMES_EMBEDDINS_ONLY}
+extract_embeddings '[embeddings]' "${DATA_FNAMES_EMBEDDINS_ONLY}"
 # extract hiddens
-download_model '[hiddens]' ${DATA_FNAMES_HIDDENS_ONLY}
+extract_embeddings '[hiddens]' "${DATA_FNAMES_HIDDENS_ONLY}"
 # extract embeddings and hiddens
-download_model '[embeddings, hiddens]' ${DATA_FNAMEDATA_FNAMES_EMBEDDINS_HIDDENSS_HIDDENS_ONLY}
+extract_embeddings '[embeddings,hiddens]' "${DATA_FNAMEDATA_FNAMES_EMBEDDINS_HIDDENSS_HIDDENS_ONLY}"
