@@ -17,7 +17,7 @@ import pytest
 import os
 from hydra import initialize, compose
 from omegaconf.omegaconf import open_dict
-from bionemo.model.dnabert import DNABERTModel
+from bionemo.model.dna.dnabert import DNABERTModel
 from bionemo.model.utils import setup_trainer
 
 @pytest.mark.slow

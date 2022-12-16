@@ -16,7 +16,7 @@
 from omegaconf.omegaconf import OmegaConf
 from nemo.core.config import hydra_runner
 from nemo.utils import logging
-from bionemo.model.dnabert import DNABERTModel
+from bionemo.model.dna.dnabert import DNABERTModel
 from bionemo.model.utils import setup_trainer
 
 import numpy as np

@@ -18,7 +18,7 @@ from omegaconf.omegaconf import OmegaConf
 import torch
 from nemo.core.config import hydra_runner
 from nemo.utils import logging
-from bionemo.model.dnabert.splice_site_prediction import (
+from bionemo.model.dna.dnabert.splice_site_prediction import (
     SpliceSiteBERTPredictionModel
 )
 from bionemo.model.utils import (

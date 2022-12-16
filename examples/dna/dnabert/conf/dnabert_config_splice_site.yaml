@@ -3,7 +3,7 @@ defaults:
 
 task:
   trainer:
-    devices: 1
+    devices: 2
     val_check_interval: 100
     max_steps: 6000
 
@@ -17,5 +17,6 @@ task:
       fasta_directory: /workspace/bionemo/examples/dna/data/splice-site-prediction/GRCh38.ensembl.99
       fasta_pattern: Homo_sapiens.GRCh38.dna.chromosome.{}.fa.gz
     encoder:
-      checkpoint: /workspace/bionemo/examples/dna/nemo_experiments/dnabert/2022-10-25_00-04-34/checkpoints/dnabert--val_loss=8.57-step=760400-consumed_samples=3041600.0-last.ckpt
-      hparams: /workspace/bionemo/examples/dna/nemo_experiments/dnabert/2022-10-25_00-04-34/hparams.yaml
+      # checkpoint: /workspace/bionemo/examples/dna/nemo_experiments/dnabert/2022-10-25_00-04-34/checkpoints/dnabert--val_loss=8.57-step=760400-consumed_samples=3041600.0-last.ckpt
+      # checkpoint: /workspace/bionemo/models/dna/dnabert/checkpoints/dnabert_k_5_n_12_batchsize_32_minlr_0.0001/dnabert--val_loss=2.53-step=966900-consumed_samples=247526400.0.ckpt
+      checkpoint: /workspace/bionemo/models/dna/dnabert/checkpoints/dnabert_k_5_n_12_batchsize_32_minlr_0.0001/dnabert_k_5_n_12_batchsize_32_minlr_0.0001.nemo
