@@ -48,4 +48,6 @@ python splice_site_finetune.py ++task.do_preprocess=True \
     ++task.trainer.val_check_interval=2 \
     ++task.model.data.dataset_path=$FINETUNE_DIR \
     ++task.model.data.train_file=$FINETUNE_DIR/splits/train.csv \
+    ++task.model.data.fasta_directory=$FINETUNE_DIR \
+    ++task.model.data.val_file=NULL \
     ++task.model.encoder.checkpoint=$NEMO_FILE

@@ -2,7 +2,7 @@ from functools import lru_cache
 from omegaconf import OmegaConf
 from torch import nn
 from nemo.collections.nlp.parts.nlp_overrides import NLPSaveRestoreConnector
-from bionemo.model.dnabert import DNABERTModel
+from bionemo.model.dna.dnabert import DNABERTModel
 from bionemo.data.dna.splice_site_dataset import SpliceSiteDataModule
 from bionemo.model.core.encoder_finetuning import EncoderFineTuning
 from bionemo.model.core import MLPModel

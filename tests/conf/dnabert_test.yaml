@@ -3,7 +3,7 @@ defaults:
 
 hydra:
   searchpath:
-    - file://${oc.env:PROJECT_MOUNT}/examples/dna/conf/
+    - file://${oc.env:PROJECT_MOUNT}/examples/dna/dnabert/conf/
 
 trainer:
   devices: 1
@@ -21,7 +21,7 @@ model:
     model: /model/dna/dnabert/vocab/dnabert${.k}.model
     vocab_file: /model/dna/dnabert/vocab/dnabert${.k}.vocab
   data:
-    dataset_path: /workspace/bionemo/examples/dna/data/small-example # contains train / val / test folders
+    dataset_path: /workspace/bionemo/examples/dna/dnabert/data/small-example # contains train / val / test folders
     dataset: # inclusive range of data files to load or can load a single file, e.g. x000.csv
       train: chr1-trim-train.fna
       test: chr1-trim-test.fna
