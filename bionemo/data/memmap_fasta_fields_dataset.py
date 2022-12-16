@@ -55,7 +55,9 @@ class FASTAFieldsMemmapDataset(TextMemMapDataset):
         # extract id and sequence and tokenize (if needed)
         data = {}
         text_fields = text.split(self._data_sep)
+        # FIXME: should support multiple fields in a single line
         for field_name, field_idx in self._data_fields.items():
-            data[field_name] = _build_data_from_text(text_fields[field_idx])
+            data[field_name] = _build_data_from_text(text_fields[field_idx].split(" ")[0])
+            # data[field_name] = _build_data_from_text(text_fields[field_idx])
 
         return data
