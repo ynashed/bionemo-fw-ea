@@ -36,6 +36,7 @@ class FASTAFieldsMemmapDataset(TextMemMapDataset):
                  data_sep='\n',
                  data_fields={"data": 0},
                  strip_first_element=True,
+                 collpase_sequence_elements=True,
                  ):
         """
         Args:
@@ -46,6 +47,7 @@ class FASTAFieldsMemmapDataset(TextMemMapDataset):
             data_sep: separator between data fields (within a sample)
             data_fields: dictionary of field names and their indices
             strip_first_element: whether to strip the first element of the sequence from all text past first space
+            collpase_sequence_elements: whether to collapse all sequence elements into a single string (all but first)
         """
         super().__init__(
             dataset_paths=dataset_paths,
@@ -59,6 +61,7 @@ class FASTAFieldsMemmapDataset(TextMemMapDataset):
         self._data_fields = data_fields
         self._data_sep = data_sep
         self._strip_first_element = strip_first_element
+        self._collpase_sequence_elements = collpase_sequence_elements
 
     def _build_data_from_text(self, text):
         """Allows child-classes to modify the parsing of raw text, prior to tokenization"""
@@ -70,15 +73,20 @@ class FASTAFieldsMemmapDataset(TextMemMapDataset):
         
         # remove trailing words in first element
         if self._strip_first_element:
-            if len(text_fields):
-                elements = text_fields[0].split(" ")
-                text_fields[0] = elements[0].strip()
-                # add new fields for all elements with "=" past first element
-                for e in elements[1:]:
-                    if "=" in e:
-                        key, val = e.split("=")
-                        data[key] = val
-                
+            elements = text_fields[0].split(" ")
+            text_fields[0] = elements[0].strip()
+            # add new fields for all elements with "=" past first element
+            for e in elements[1:]:
+                if "=" in e:
+                    key, val = e.split("=")
+                    data[key] = val
+        
+        if self._collpase_sequence_elements:
+            # collapse all sequence elements into a single string (all but first)
+            seq_element = text_fields[1:].join("")
+            text_fields = [text_fields[0], seq_element]
+        
+        # map text fields to data fields by index
         for field_name, field_idx in self._data_fields.items():
             data[field_name] = _build_data_from_text(text_fields[field_idx])
 
