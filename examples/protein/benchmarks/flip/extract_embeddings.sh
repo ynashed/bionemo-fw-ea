@@ -108,7 +108,7 @@ function extract_embeddings() {
                 time ${SCRIPT_DIR}/../../${MODEL_NAME}/infer.sh \
                     trainer.devices=${DEVICES} \
                     model.data.num_workers=10 \
-                    model.data.batch_size=512 \
+                    model.data.batch_size=256 \
                     model.downstream_task.outputs=${OUTPUTS} \
                     model.data.dataset_path=${DATA_FILE} \
                     model.data.output_fname=${OUTPUT_FILE}

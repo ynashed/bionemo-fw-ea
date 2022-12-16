@@ -35,8 +35,19 @@ class FASTAFieldsMemmapDataset(TextMemMapDataset):
                  sort_dataset_paths=True,
                  data_sep='\n',
                  data_fields={"data": 0},
+                 strip_first_element=True,
                  ):
         super().__init__(
+            """
+            Args:
+                dataset_paths: list of paths to text files
+                workers: number of workers to use for parallel data indexing (on first run)
+                tokenizer: tokenizer to use for tokenization
+                sort_dataset_paths: whether to sort dataset paths by name
+                data_sep: separator between data fields (within a sample)
+                data_fields: dictionary of field names and their indices
+                strip_first_element: whether to strip the first element of the sequence from all text past first space
+            """
             dataset_paths=dataset_paths,
             newline_int=ord(">"),
             header_lines=1, # skip first line since it is not an empty sequence
@@ -47,6 +58,7 @@ class FASTAFieldsMemmapDataset(TextMemMapDataset):
         
         self._data_fields = data_fields
         self._data_sep = data_sep
+        self._strip_first_element = strip_first_element
 
     def _build_data_from_text(self, text):
         """Allows child-classes to modify the parsing of raw text, prior to tokenization"""
@@ -55,9 +67,19 @@ class FASTAFieldsMemmapDataset(TextMemMapDataset):
         # extract id and sequence and tokenize (if needed)
         data = {}
         text_fields = text.split(self._data_sep)
-        # FIXME: should support multiple fields in a single line
+        
+        # remove trailing words in first element
+        if self._strip_first_element:
+            if len(text_fields):
+                elements = text_fields[0].split(" ")
+                text_fields[0] = elements[0].strip()
+                # add new fields for all elements with "=" past first element
+                for e in elements[1:]:
+                    if "=" in e:
+                        key, val = e.split("=")
+                        data[key] = val
+                
         for field_name, field_idx in self._data_fields.items():
-            data[field_name] = _build_data_from_text(text_fields[field_idx].split(" ")[0])
-            # data[field_name] = _build_data_from_text(text_fields[field_idx])
+            data[field_name] = _build_data_from_text(text_fields[field_idx])
 
         return data
