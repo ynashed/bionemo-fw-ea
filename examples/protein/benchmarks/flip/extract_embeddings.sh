@@ -33,7 +33,7 @@ MODEL_NAMES=("esm1nv" "prott5nv")
 DATA_FNAMES_EMBEDDINS_ONLY=(
 # aav
     # aav/low_vs_high.fasta 
-    aav/des_mut_nucleotide.fasta
+    # aav/des_mut_nucleotide.fasta
     aav/one_vs_many_nucleotide.fasta
     aav/mut_des_nucleotide.fasta
     # aav/seven_vs_many.fasta
