@@ -82,8 +82,8 @@ DATA_FNAMEDATA_FNAMES_EMBEDDINS_HIDDENSS_HIDDENS_ONLY=(
 
 function extract_embeddings() {
     # extract outputs for all models and all datasets where output files do not exist
-    local OUTPUTS=$1
-    local DATA_FNAMES=$2
+    local OUTPUTS="$1"
+    local DATA_FNAMES=("${@:2}")
     set -e
     for MODEL_NAME in "${MODEL_NAMES[@]}"; do
         for DATA_FNAME in "${DATA_FNAMES[@]}"; do
@@ -115,8 +115,8 @@ function extract_embeddings() {
 }
 
 # extract embeddings
-extract_embeddings '[embeddings]' "${DATA_FNAMES_EMBEDDINS_ONLY}"
+extract_embeddings '[embeddings]' "${DATA_FNAMES_EMBEDDINS_ONLY[@]}"
 # extract hiddens
-extract_embeddings '[hiddens]' "${DATA_FNAMES_HIDDENS_ONLY}"
+extract_embeddings '[hiddens]' "${DATA_FNAMES_HIDDENS_ONLY[@]}"
 # extract embeddings and hiddens
-extract_embeddings '[embeddings,hiddens]' "${DATA_FNAMEDATA_FNAMES_EMBEDDINS_HIDDENSS_HIDDENS_ONLY}"
+extract_embeddings '[embeddings,hiddens]' "${DATA_FNAMEDATA_FNAMES_EMBEDDINS_HIDDENSS_HIDDENS_ONLY[@]}"
