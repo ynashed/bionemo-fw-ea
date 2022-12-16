@@ -83,7 +83,7 @@ class FASTAFieldsMemmapDataset(TextMemMapDataset):
         
         if self._collpase_sequence_elements:
             # collapse all sequence elements into a single string (all but first)
-            seq_element = text_fields[1:].join("")
+            seq_element = "".join(text_fields[1:])
             text_fields = [text_fields[0], seq_element]
         
         # map text fields to data fields by index
