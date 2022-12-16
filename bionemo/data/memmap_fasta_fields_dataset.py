@@ -37,17 +37,17 @@ class FASTAFieldsMemmapDataset(TextMemMapDataset):
                  data_fields={"data": 0},
                  strip_first_element=True,
                  ):
+        """
+        Args:
+            dataset_paths: list of paths to text files
+            workers: number of workers to use for parallel data indexing (on first run)
+            tokenizer: tokenizer to use for tokenization
+            sort_dataset_paths: whether to sort dataset paths by name
+            data_sep: separator between data fields (within a sample)
+            data_fields: dictionary of field names and their indices
+            strip_first_element: whether to strip the first element of the sequence from all text past first space
+        """
         super().__init__(
-            """
-            Args:
-                dataset_paths: list of paths to text files
-                workers: number of workers to use for parallel data indexing (on first run)
-                tokenizer: tokenizer to use for tokenization
-                sort_dataset_paths: whether to sort dataset paths by name
-                data_sep: separator between data fields (within a sample)
-                data_fields: dictionary of field names and their indices
-                strip_first_element: whether to strip the first element of the sequence from all text past first space
-            """
             dataset_paths=dataset_paths,
             newline_int=ord(">"),
             header_lines=1, # skip first line since it is not an empty sequence
