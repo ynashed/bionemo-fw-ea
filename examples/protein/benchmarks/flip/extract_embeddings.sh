@@ -84,8 +84,8 @@ function extract_embeddings() {
     local OUTPUTS=$1
     local DATA_FNAMES=$2
     set -e
-    for MODEL_NAME in "${MODEL_NAMES}"; do
-        for DATA_FNAME in "${DATA_FNAMES}"; do
+    for MODEL_NAME in "${MODEL_NAMES[@]}"; do
+        for DATA_FNAME in "${DATA_FNAMES[@]}"; do
             DATA_FILE=${FLIP_DATA_PATH}/${DATA_FNAME}
             OUTPUT_FILE=${DATA_FILE}.${MODEL_NAME}.pkl
             if test -f "${OUTPUT_FILE}"; then
