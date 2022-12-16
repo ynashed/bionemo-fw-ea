@@ -27,14 +27,16 @@ FLIP_DATA_PATH=${DATA_PATH}/flip
 
 MODEL_NAMES=("esm1nv" "prott5nv")
 
+# NOTE: commented out .fasta files are with all sequences longer than 512!
+
 # embeddings only
 DATA_FNAMES_EMBEDDINS_ONLY=(
 # aav
-    # aav/low_vs_high.fasta <== all sequences are longer than 512!
+    # aav/low_vs_high.fasta 
     aav/des_mut_nucleotide.fasta
     aav/one_vs_many_nucleotide.fasta
     aav/mut_des_nucleotide.fasta
-    aav/seven_vs_many.fasta
+    # aav/seven_vs_many.fasta
     aav/low_vs_high_nucleotide.fasta
     aav/des_mut.fasta
     aav/seven_vs_many_nucleotide.fasta
