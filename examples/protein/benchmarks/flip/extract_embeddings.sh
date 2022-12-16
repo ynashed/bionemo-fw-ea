@@ -65,7 +65,7 @@ DATA_FNAMES_EMBEDDINS_ONLY=(
 
 
 # hiddens only
-DATA_FNAMES_EMBEDDINS_ONLY=(
+DATA_FNAMES_HIDDENS_ONLY=(
 # secondary_structure
     secondary_structure/sequences.fasta
 # bind
@@ -81,17 +81,31 @@ DATA_FNAMES_EMBEDDINS_HIDDENS=(
     scl/mixed_hard.fasta
 )
 
-# extract embeddings
-for DATA_FNAME in ${DATA_FNAMES_EMBEDDINS_ONLY}; do
-    DATA_FILE=${FLIP_DATA_PATH}/${DATA_FNAME}
+function download_model() {
+    local OUTPUTS=$1
+    local DATA_FNAMES=$2
+    set -e
     for MODEL_NAME in ${MODEL_NAMES}; do
-        echo "\n**********************************************************"
-        echo "Extracting embeddings for ${DATA_FNAME} with ${MODEL_NAME}"
-        echo "**********************************************************\n"
+        for DATA_FNAME in ${DATA_FNAMES}; do
+            DATA_FILE=${FLIP_DATA_PATH}/${DATA_FNAME}
 
-        ${SCRIPT_DIR}/../../${MODEL_NAME}/infer.sh \
-            trainer.devices=${DEVICES} \
-            model.data.dataset_path=${DATA_FILE} \
-            model.data.output_fname=${DATA_FILE}.${MODEL_NAME}.pkl
-    done
+            echo "\n**********************************************************"
+            echo "Extracting ${OUTPUTS} for ${DATA_FNAME} with ${MODEL_NAME}"
+            echo "**********************************************************\n"
+
+            time ${SCRIPT_DIR}/../../${MODEL_NAME}/infer.sh \
+                trainer.devices=${DEVICES} \
+                model.downstream_task.outputs=${OUTPUTS} \
+                model.data.dataset_path=${DATA_FILE} \
+                model.data.output_fname=${DATA_FILE}.${MODEL_NAME}.pkl
+        done
+}
+
+for MODEL_NAME in ${MODEL_NAMES}; do
+    # extract embeddings
+    download_model '[embeddings]' ${DATA_FNAMES_EMBEDDINS_ONLY}
+    # extract hiddens
+    download_model '[hiddens]' ${DATA_FNAMES_HIDDENS_ONLY}
+    # extract embeddings and hiddens
+    download_model '[embeddings, hiddens]' ${DATA_FNAMEDATA_FNAMES_EMBEDDINS_HIDDENSS_HIDDENS_ONLY}
 done
