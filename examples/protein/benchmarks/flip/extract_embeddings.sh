@@ -24,7 +24,6 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 DEVICES=4
 DATA_PATH=/data
 FLIP_DATA_PATH=${DATA_PATH}/flip
-RESULTS_PATH=/result/nemo_experiments/flip
 
 MODEL_NAMES=("esm1nv" "prott5nv")
 
