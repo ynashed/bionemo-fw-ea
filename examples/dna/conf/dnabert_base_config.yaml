@@ -1,6 +1,6 @@
 name: dnabert_base_config
 restore_from_path: null # used when starting from a .nemo file
-do_preprocess: False # set to true if data preprocessing steps must be completed. Preprocessing will be skipped if it is already completed.
+do_preprocess: True # set to true if data preprocessing steps must be completed. Preprocessing will be skipped if it is already completed.
 do_training: True # set to true to train a model
 
 trainer:
@@ -29,6 +29,7 @@ exp_manager:
   wandb_logger_kwargs:
     project: null
     name: null
+    offline: True
   resume_if_exists: False
   resume_ignore_no_checkpoint: True
   create_checkpoint_callback: True
@@ -36,7 +37,7 @@ exp_manager:
     monitor: val_loss
     save_top_k: 10
     mode: min
-    always_save_nemo: False # saves nemo file during validation, not implemented for model parallel
+    always_save_nemo: True # saves nemo file during validation, not implemented for model parallel
     filename: 'dnabert--{val_loss:.2f}-{step}-{consumed_samples}'
     model_parallel_size: ${multiply:${model.tensor_model_parallel_size}, ${model.pipeline_model_parallel_size}}
 

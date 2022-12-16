@@ -1,6 +1,7 @@
 from functools import lru_cache
 from omegaconf import OmegaConf
 from torch import nn
+from nemo.collections.nlp.parts.nlp_overrides import NLPSaveRestoreConnector
 from bionemo.model.dnabert import DNABERTModel
 from bionemo.data.dna.splice_site_dataset import SpliceSiteDataModule
 from bionemo.model.core.encoder_finetuning import EncoderFineTuning
@@ -30,14 +31,15 @@ class SpliceSiteBERTPredictionModel(EncoderFineTuning):
         # TODO this could be refactored to instantiate a new model if no
         # checkpoint is specified
 
-        encoder_cfg = OmegaConf.load(cfg.encoder.hparams).cfg
         # TODO do we need to override any keys in the encoder_cfg?
         # e.g., tensor_model_parallel_size and pipeline_model_parallel_size
-        model = DNABERTModel.load_from_checkpoint(
-            cfg.encoder.checkpoint,
-            cfg=encoder_cfg,
+
+        model = DNABERTModel.restore_from(
+            restore_path=cfg.encoder.checkpoint,
             trainer=trainer,
+            save_restore_connector=NLPSaveRestoreConnector(),
         )
+
         # TODO should we be doing this with some sort of
         # context management so it can be reversed?
         model.model.post_process = False
