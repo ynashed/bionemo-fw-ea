@@ -34,13 +34,13 @@ DATA_FNAMES_EMBEDDINS_ONLY=(
 # aav
     # aav/low_vs_high.fasta 
     # aav/des_mut_nucleotide.fasta
-    aav/one_vs_many_nucleotide.fasta
-    aav/mut_des_nucleotide.fasta
+    # aav/one_vs_many_nucleotide.fasta
+    # aav/mut_des_nucleotide.fasta
     # aav/seven_vs_many.fasta
-    aav/low_vs_high_nucleotide.fasta
+    # aav/low_vs_high_nucleotide.fasta
     # aav/des_mut.fasta
-    aav/seven_vs_many_nucleotide.fasta
-    aav/two_vs_many_nucleotide.fasta
+    # aav/seven_vs_many_nucleotide.fasta
+    # aav/two_vs_many_nucleotide.fasta
     # aav/mut_des.fasta
     # aav/one_vs_many.fasta
     # aav/two_vs_many.fasta
