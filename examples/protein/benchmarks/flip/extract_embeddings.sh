@@ -26,7 +26,7 @@ DATA_PATH=/data
 FLIP_DATA_PATH=${DATA_PATH}/flip
 RESULTS_PATH=/result/nemo_experiments/flip
 
-MODEL_NAMES=("esm1nv", "prott5nv")
+MODEL_NAMES=("esm1nv" "prott5nv")
 
 # embeddings only
 DATA_FNAMES_EMBEDDINS_ONLY=(
@@ -88,10 +88,11 @@ function download_model() {
     for MODEL_NAME in ${MODEL_NAMES}; do
         for DATA_FNAME in ${DATA_FNAMES}; do
             DATA_FILE=${FLIP_DATA_PATH}/${DATA_FNAME}
-
-            echo "\n**********************************************************"
+            echo ""
+            echo "**********************************************************"
             echo "Extracting ${OUTPUTS} for ${DATA_FNAME} with ${MODEL_NAME}"
-            echo "**********************************************************\n"
+            echo "**********************************************************"
+            echo ""
 
             time ${SCRIPT_DIR}/../../${MODEL_NAME}/infer.sh \
                 trainer.devices=${DEVICES} \
