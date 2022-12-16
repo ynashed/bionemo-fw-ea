@@ -40,8 +40,14 @@ def dna_build_tokenizer(model):
     if tokenizer_type in tokenizers:
         tokenizer = KmerTokenizerAdapter(
             tokenizers[tokenizer_type].from_vocab_file(
-                model._cfg.tokenizer.model,
-                model._cfg.tokenizer.vocab_file,
+                model.register_artifact(
+                    "tokenizer.model",
+                    model._cfg.tokenizer.model,
+                ),
+                model.register_artifact(
+                    "tokenizer.vocab_file",
+                    model._cfg.tokenizer.vocab_file,
+                ),
             ))
     else:
         tokenizer = get_nmt_tokenizer(

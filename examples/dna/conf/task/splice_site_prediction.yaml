@@ -63,8 +63,7 @@ model:
     dataloader_type: 'single'
     num_workers: 24
   encoder:
-    checkpoint: ???
-    hparams: ???
+    checkpoint: ??? # .nemo file containing the model to start finetuning from
   n_outputs: 3
   hidden_size: 768
   target_name: ???

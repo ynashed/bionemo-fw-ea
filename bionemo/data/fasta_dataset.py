@@ -17,6 +17,7 @@ import os
 from copy import deepcopy
 import pyfastx
 from nemo.core import Dataset
+from functools import lru_cache
 from torch.utils.data import ConcatDataset
 import numpy as np
 from omegaconf import open_dict
@@ -560,8 +561,13 @@ class DNABERTDataModule(BioNeMoDataModule):
 
         """
         super().__init__(cfg, trainer)
-        self.init_num_samples()
         self.pad_size_divisible_by_8 = True if self.model_cfg.masked_softmax_fusion else False
+
+    # this only needs to be run once, but it shouldn't be called on initialization,
+    #  and we are not entirely sure where it will be called first
+    @lru_cache
+    def onetime_init_num_samples(self):
+        self.init_num_samples()
 
     # this can probably be shared by some BioNeMo models that already use the
     # dataset factory or should be refactored from `build_train_valid_test_datasets`
@@ -641,6 +647,7 @@ class DNABERTDataModule(BioNeMoDataModule):
         """Creates an upsampled version of the DNABERT training dataset
 
         """
+        self.onetime_init_num_samples()
         num_samples = self.train_num_samples
         dataset_dir = os.path.join(self.cfg.dataset_path, 'train',)
         dataset = NeMoUpsampling(
@@ -665,6 +672,7 @@ class DNABERTDataModule(BioNeMoDataModule):
         return dataset
 
     def sample_val_dataset(self, dataset):
+        self.onetime_init_num_samples()
         num_samples = self.val_num_samples
         dataset_dir = os.path.join(self.cfg.dataset_path, 'val',)
         dataset = NeMoUpsampling(

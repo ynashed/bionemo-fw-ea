@@ -163,9 +163,7 @@ class BioNeMoDataModule(object):
         return dataset
 
     def get_global_batch_size(self):
-        cfg = self.model_cfg
-        global_batch_size = self.trainer.world_size * cfg.micro_batch_size / cfg.tensor_model_parallel_size
-        return global_batch_size
+        return self.model_cfg.global_batch_size
 
     def get_max_train_steps(self):
         return self.trainer.max_steps * self.trainer.accumulate_grad_batches

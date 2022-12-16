@@ -25,6 +25,9 @@ from bionemo.model.utils import (
     setup_trainer,
     PredictTrainerBuilder,
 )
+from bionemo.data.preprocess.dna.preprocess import (
+    SpliceSitePreprocess,
+)
 
 import numpy as np
 import pytorch_lightning as pl
@@ -38,6 +41,7 @@ def main(cfg) -> None:
     logging.info("\n\n************** Experiment configuration ***********")
     logging.info(f'\n{OmegaConf.to_yaml(cfg)}')
 
+    do_preprocess = cfg.task.get('do_preprocess')
     do_training = cfg.task.get('do_training')
     do_prediction = cfg.task.get('do_prediction')
 
@@ -56,6 +60,8 @@ def main(cfg) -> None:
         cfg.task, builder=PredictTrainerBuilder() if not do_training else None)
     model = SpliceSiteBERTPredictionModel(cfg.task.model, trainer)
 
+    if do_preprocess:
+        SpliceSitePreprocess(cfg.task.model.data.dataset_path, 'splits').prepare_dataset()
     if do_training:
         trainer.fit(model)
     if do_prediction:
