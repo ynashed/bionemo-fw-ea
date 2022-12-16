@@ -81,6 +81,7 @@ DATA_FNAMEDATA_FNAMES_EMBEDDINS_HIDDENSS_HIDDENS_ONLY=(
 )
 
 function extract_embeddings() {
+    # extract outputs for all models and all datasets where output files do not exist
     local OUTPUTS=$1
     local DATA_FNAMES=$2
     set -e
