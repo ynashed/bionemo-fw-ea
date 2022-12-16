@@ -17,6 +17,8 @@
 
 # This script is used to run inference on a single GPU using the ESM-1b model.
 
+# TODO: use .env variables
+
 FLIP_REMOTE_DATA=http://data.bioembeddings.com/public/FLIP/fasta/all_fasta.zip
 DATA_PATH=/data
 FLIP_DATA_PATH=${DATA_PATH}/flip
