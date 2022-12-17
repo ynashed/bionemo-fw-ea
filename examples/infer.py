@@ -50,12 +50,11 @@ def main(cfg) -> None:
     # TODO: move this code into a dataset builder in data utils
     if not cfg.model.data.data_impl:
         # try to infer data_impl from the dataset_path file extension
-        if cfg.model.data.dataset_path.endswith('.csv'):
-            cfg.model.data.data_impl = 'csv_fields_mmap'
-        elif cfg.model.data.dataset_path.endswith('.fasta'):
+        if cfg.model.data.dataset_path.endswith('.fasta'):
             cfg.model.data.data_impl = 'fasta_fields_mmap'
         else:
-            raise ValueError(f'Could not infer data_impl from dataset_path: {cfg.model.data.dataset_path}')
+            # Data are assumed to be CSV format if no extension provided
+            cfg.model.data.data_impl = 'csv_fields_mmap'
 
         logging.info(f'Inferred data_impl: {cfg.model.data.data_impl}')
         
