@@ -54,6 +54,7 @@ def main(cfg) -> None:
             cfg.model.data.data_impl = 'fasta_fields_mmap'
         else:
             # Data are assumed to be CSV format if no extension provided
+            logging.info('File extension not supplied for data, inferring csv.')
             cfg.model.data.data_impl = 'csv_fields_mmap'
 
         logging.info(f'Inferred data_impl: {cfg.model.data.data_impl}')
