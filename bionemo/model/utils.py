@@ -106,7 +106,7 @@ class TrainerBuilder(object):
         pipeline_model_parallel_size = cfg.model.pipeline_model_parallel_size
         n_devices = cfg.trainer.devices
         n_nodes = cfg.trainer.num_nodes
-        acc_grad_batches = cfg.trainer.accumulate_grad_batches
+        acc_grad_batches = cfg.trainer.get("accumulate_grad_batches", 1)
         global_batch_size = infer_global_batch_size(
                 micro_batch_size=micro_batch_size,
                 n_devices=n_devices,
@@ -116,7 +116,9 @@ class TrainerBuilder(object):
                 pipeline_model_parallel_size=pipeline_model_parallel_size,
             )
 
-        set_cfg_key('global_batch_size', global_batch_size, cfg.model)
+        # we always inferr global batch size based on micro batch size
+        with open_dict(cfg.model):
+            cfg.model['global_batch_size'] = global_batch_size
 
     @staticmethod
     def configure_plugins(cfg):
