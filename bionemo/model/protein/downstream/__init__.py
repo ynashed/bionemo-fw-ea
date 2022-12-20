@@ -13,5 +13,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .callbacks import *
-from .callback_utils import *
+from .secondary_structure_pred import *
+from .get_protein_emb import *
