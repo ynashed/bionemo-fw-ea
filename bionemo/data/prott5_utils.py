@@ -50,6 +50,9 @@ def _build_dataset(
     # Indexed dataset.
     indexed_dataset = get_indexed_dataset_(data_prefix, data_impl, skip_warmup, data_impl_kwargs=data_impl_kwargs)
     total_num_of_documents = indexed_dataset.doc_idx.shape[0] - 1
+    # Checks.
+    assert indexed_dataset.doc_idx[0] == 0
+    assert indexed_dataset.doc_idx.shape[0] == (total_num_of_documents + 1)
 
     def build_t5_dataset(name):
         from nemo.collections.nlp.data.language_modeling.megatron.t5_dataset import T5Dataset
@@ -85,9 +88,6 @@ def _build_dataset(
         else:
             raise NotImplementedError("Dataset type must be t5.")
 
-        # Checks.
-        assert indexed_dataset.doc_idx[0] == 0
-        assert indexed_dataset.doc_idx.shape[0] == (total_num_of_documents + 1)
         return dataset
 
     dataset = build_t5_dataset(name)

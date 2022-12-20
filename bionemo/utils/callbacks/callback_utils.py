@@ -1,9 +1,23 @@
+# Copyright (c) 2022, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from pytorch_lightning import Callback
 
-from typing import List, Optional
+from typing import List, Optional, Union
 
 import bionemo.utils.callbacks
-from bionemo.utils import lookup_or_use
 
 __all__ = ["setup_callbacks"]
 
@@ -52,6 +66,10 @@ def setup_callbacks(cfg, plugins: Optional[List] = None) -> List:
     """
     callbacks = []
     callbacks.extend(_select_validation_callbacks(cfg))
-    
+
     callbacks = [_instantiate_callback(cb, cfg, plugins) for cb in callbacks]
     return callbacks
+
+def lookup_or_use(obj: object, attr: Union[str, object], *args, **kwargs):
+    """Looks up an object from a module or returns the attribute if it is not a string"""
+    return getattr(obj, attr)(*args, **kwargs) if type(attr) is str else attr

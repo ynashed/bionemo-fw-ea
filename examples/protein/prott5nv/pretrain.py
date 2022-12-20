@@ -17,35 +17,36 @@ from omegaconf.omegaconf import OmegaConf, open_dict
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelSummary
 from pytorch_lightning.callbacks.timer import Timer
-from pytorch_lightning.plugins.environments.torchelastic_environment import TorchElasticEnvironment
+from lightning_lite.plugins.environments import TorchElasticEnvironment
 from pytorch_lightning.trainer.connectors.checkpoint_connector import CheckpointConnector
 
 from bionemo.model.protein.prott5nv import ProtT5nvModel, T5SaveRestoreConnector
 from nemo.collections.nlp.parts.nlp_overrides import (
     GradScaler,
     MegatronHalfPrecisionPlugin,
-    NLPDDPPlugin,
+    NLPDDPStrategy,
     PipelineMixedPrecisionPlugin,
 )
 from nemo.core.config import hydra_runner
 from nemo.utils import logging
 from nemo.utils.exp_manager import StatelessTimer, exp_manager
 from bionemo.data import UniRef50Preprocess
+from bionemo.utils.callbacks.callback_utils import setup_callbacks
 
 
-@hydra_runner(config_path="../../../conf", config_name="prott5_small_config")
+@hydra_runner(config_path="../../../examples/protein/prott5nv/conf", config_name="pretrain_small")
 def main(cfg) -> None:
     logging.info("\n\n************** Experiment configuration ***********")
     logging.info(f'\n{OmegaConf.to_yaml(cfg)}')
 
     megatron_amp_o2 = cfg.model.get('megatron_amp_O2', False)
-    plugins = [
-        NLPDDPPlugin(
-            no_ddp_communication_hook=True,  # we don't use DDP for async grad allreduce
-            gradient_as_bucket_view=cfg.model.gradient_as_bucket_view,
-            find_unused_parameters=False,
-        )
-    ]
+    plugins = []
+    strategy = NLPDDPStrategy(
+        no_ddp_communication_hook=True,  # we don't use DDP for async grad allreduce
+        gradient_as_bucket_view=cfg.model.gradient_as_bucket_view,
+        find_unused_parameters=False,
+    )
+    
     if cfg.trainer.precision in [16, 'bf16']:
         scaler = None
         if cfg.trainer.precision == 16:
@@ -62,7 +63,13 @@ def main(cfg) -> None:
     if cfg.get('cluster_type', None) == 'BCP':
         plugins.append(TorchElasticEnvironment())
 
-    trainer = Trainer(plugins=plugins, **cfg.trainer, callbacks=[ModelSummary(max_depth=3)])
+    # TODO: move this to model utils
+    callbacks = [ModelSummary(max_depth=3)]
+    callbacks.extend(setup_callbacks(cfg))
+    logging.info(f'Selected Callbacks: {[type(c) for c in callbacks]}')
+
+    # TODO: Should use setup_inference from model uitls
+    trainer = Trainer(plugins=plugins, strategy=strategy, **cfg.trainer, callbacks=callbacks)
     exp_manager(trainer, cfg.exp_manager)
 
     # update resume from checkpoint found by exp_manager

@@ -24,3 +24,37 @@ model:
         data_col: 3 # specifies which column in the csv file contains training data, 0-based
         data_sep: ',' # string to split text into columns
     num_workers: 0 # number of workers to be used for dataset preprocessing. 0 -- all available workers
+  validation:
+      validation_enabled: True
+      datasets:
+        - name: SSPred
+          class: SSPredictionCallback
+          enabled: True
+          emb_type: "T5"
+          emb_batch_size: 128
+          batch_size: 128
+          num_epochs: 10
+          check_val_every_n_epoch: 1
+          shuffle: True
+          num_workers: 20
+          train_ds: 
+            data_file: /data/netsurfp_2.0/train/x000.csv 
+          validation_ds: 
+            data_file: /data/netsurfp_2.0/test/new_pisces.csv 
+          test_ds: 
+            data_file: /data/netsurfp_2.0/test/new_pisces.csv #"/data/netsurfp_2.0/test/casp12.csv"
+          random_seed: 1234
+          optim:
+              name: adam
+              lr: 0.0001
+              betas:
+                - 0.9
+                - 0.999
+              eps: 1e-8
+              weight_decay: 0.01
+              sched:
+                name: WarmupAnnealing
+                min_lr: 0.00001
+                last_epoch: -1
+                warmup_ratio: 0.01
+                max_steps: 1000
