@@ -16,14 +16,10 @@ import torch
 import numpy as np
 from tqdm import tqdm
 
-from nemo.utils import AppState, logging
 from tqdm import tqdm, trange
 
-from apex.transformer import parallel_state
+from bionemo.model.utils import _reconfigure_inference_batch
 
-from apex.transformer.pipeline_parallel.utils import (
-    _reconfigure_microbatch_calculator,
-)
 
 three_state_label2num = {"C": 0, "H": 1, "E": 2}
 eight_state_label2num = {"_": 0, "E": 1, "G": 2, "T": 3, "H": 4, "S": 5, "B": 6, "I": 7}
@@ -31,42 +27,24 @@ eight_state_label2num = {"_": 0, "E": 1, "G": 2, "T": 3, "H": 4, "S": 5, "B": 6,
 three_state_num2label = {0: "C", 1: "H", 2: "E"}
 eight_state_num2label = {0: "_", 1: "E", 2: "G", 3: "T", 4: "H", 5: "S", 6: "B", 7: "I"}
 
-# TODO: replace for similar function from model.utils
-def reconfigure_microbatch(new_batch_size_per_gpu):
-    app_state = AppState()
-    from apex.transformer.pipeline_parallel.utils import _GLOBAL_NUM_MICROBATCHES_CALCULATOR
-
-    _reconfigure_microbatch_calculator(
-        rank=app_state.global_rank,
-        rampup_batch_size=None,
-        global_batch_size=new_batch_size_per_gpu * parallel_state.get_data_parallel_world_size(),
-        micro_batch_size=new_batch_size_per_gpu,  # Make sure that there is no "grad acc" while decoding.
-        data_parallel_size=parallel_state.get_data_parallel_world_size(),
-    )
 
 
 class getData(object):
-    def __init__(self, datafile, model_arch, model, emb_batch_size, prot_model_batch_size):
+    def __init__(self, datafile, model, emb_batch_size):
         self.datafile = datafile
         self.model = model
-        self.model_arch = model_arch
         self.tokenizer = self.model.tokenizer
-        self.embeddings = []
+        self.hiddens = []
+        self.masks = []
         self.labels = []
-        self.input_seq = []
         self.labels_str = []
         self.max_length = self.model.cfg.model.seq_length
         self.emb_batch_size = emb_batch_size
-        self.prot_model_batch_size = prot_model_batch_size
+        self.prot_model_batch_size = model.cfg.model.micro_batch_size
         self._get_data()
 
-    # TODO: switch to a new inference interface
-    def compute_embeddings(self, seqs):
-        embeddings, _ = self.model._transform(seqs)
-        return embeddings 
-
     def _get_data(self):
-        
+        input_seq = []
         with torch.no_grad():
             with open(self.datafile, "r") as f:
                 next(f) # skip  the header
@@ -75,7 +53,7 @@ class getData(object):
                     sequence = line[1].strip()
                     if len(sequence) > self.model.cfg.model.seq_length - 2:
                         continue
-                    self.input_seq.append(sequence)
+                    input_seq.append(sequence)
                     numpy_threestate_labels=np.zeros((len(sequence), 3))
                     numpy_eightstate_labels=np.zeros((len(sequence), 8))
                     numpy_diso_labels=np.zeros((len(sequence), 2))
@@ -97,23 +75,27 @@ class getData(object):
                     self.labels_str.append(label_str)
         
         with torch.no_grad():
-            reconfigure_microbatch(self.emb_batch_size) 
+            _reconfigure_inference_batch(self.emb_batch_size) 
 
             batches = list(range(0, len(self.labels), self.emb_batch_size))
             if batches[-1] < len(self.labels):
                 batches.append(len(self.labels))
             for i in trange(len(batches) - 1):
-                embeddings = self.compute_embeddings(self.input_seq[batches[i]:batches[i+1]])
-                self.embeddings += list(embeddings.cpu()[:, 1:-1, :].float())
+                hiddens, masks = self.compute_hiddens(input_seq[batches[i]:batches[i+1]])
+                self.hiddens += list(hiddens.cpu().float())
+                self.masks += list(masks.cpu().float())
             
-            reconfigure_microbatch(self.prot_model_batch_size)
+            _reconfigure_inference_batch(self.prot_model_batch_size)
+
+    def compute_hiddens(self, seqs):
+        hiddens, masks = self.model.seq_to_hiddens(seqs)
+        return hiddens, masks 
 
     def get_hidden_size(self):
         return self.model.cfg.model.hidden_size
 
-
     def get_embeddings(self, idx):
-        return torch.squeeze(self.embeddings[idx])
+        return torch.squeeze(self.hiddens[idx][self.masks[idx].bool()])
 
     def get_labels(self, idx):
         return self.labels[idx]
@@ -123,9 +105,6 @@ class getData(object):
 
     def length(self):
         return len(self.labels)
-
-    def get_input_seq(self, idx):
-        return self.input_seq[idx]
 
     def tensor2list(self, tensor):
         """Convert multi-dimension tensor back to a single dimension list for labels"""
@@ -149,4 +128,3 @@ class getData(object):
         for num in seq_list:
             num2label.append(converter[num])
         return num2label
-

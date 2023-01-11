@@ -31,10 +31,10 @@ model:
           class: SSPredictionCallback
           enabled: True
           emb_type: "T5"
+          infer_target: bionemo.model.protein.prott5nv.infer.ProtT5nvInference
           emb_batch_size: 128
           batch_size: 128
           num_epochs: 10
-          check_val_every_n_epoch: 1
           shuffle: True
           num_workers: 20
           train_ds: 

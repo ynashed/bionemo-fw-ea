@@ -22,3 +22,37 @@ model:
     perturb_percent: 0.5 # Of the modify_percent, what percentage of characters are to be replaced with another amino acid.
     seed: ${model.seed} # Random seed
     max_seq_length: ${model.seq_length} # Maximum input sequence length. Longer sequences are truncated
+  validation:
+      validation_enabled: True
+      datasets:
+        - name: SSPred
+          class: SSPredictionCallback
+          enabled: True
+          emb_type: "ESM"
+          infer_target: bionemo.model.protein.esm1nv.infer.ESM1nvInference
+          emb_batch_size: 256
+          batch_size: 64
+          num_epochs: 10
+          shuffle: True
+          num_workers: 20
+          train_ds: 
+            data_file: /data/netsurfp_2.0/train/x000.csv 
+          validation_ds: 
+            data_file: /data/netsurfp_2.0/test/new_pisces.csv 
+          test_ds: 
+            data_file: /data/netsurfp_2.0/test/new_pisces.csv #"/data/netsurfp_2.0/test/casp12.csv"
+          random_seed: 1234
+          optim:
+              name: adam
+              lr: 0.0001
+              betas:
+                - 0.9
+                - 0.999
+              eps: 1e-8
+              weight_decay: 0.01
+              sched:
+                name: WarmupAnnealing
+                min_lr: 0.00001
+                last_epoch: -1
+                warmup_ratio: 0.01
+                max_steps: 1000

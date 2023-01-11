@@ -22,20 +22,17 @@ from nemo.utils import logging
 from torch.utils.data import DataLoader
 from bionemo.model.protein.downstream.get_protein_emb import *
 from bionemo.model.protein.downstream.secondary_structure_pred import SSDataset
-from bionemo.model.protein.prott5nv import ProtT5nvValidationInference
+from nemo.utils.model_utils import import_class_by_path
 
 from bionemo.model.protein.downstream import secondary_structure_pred as sspred
 
-from omegaconf.omegaconf import open_dict
 from pytorch_lightning.callbacks import Callback
-from bionemo.model.protein.prott5nv import ProtT5nvValidationInference
 
 from bionemo.model.core import MLPLightningModule, MLPModel
 from bionemo.model.molecule.megamolbart import MegaMolBARTValidationInferenceWrapper
 from bionemo.data import SingleValuePredictionDataModule
 
-
-        
+  
 class SSPredictionCallback(Callback):
     def __init__(self, dset_dict, parent_cfg, plugins: Optional[List] = None):
         super().__init__()
@@ -47,17 +44,20 @@ class SSPredictionCallback(Callback):
         self.valid_cfg = valid_cfg[0]
     
     def on_validation_epoch_end(self, trainer, main_model):
-        main_model.freeze()
+        # TODO: replace with prepare and release from inference
+        #main_model.freeze()
+        # FIXME: find out how to get rid of model.half() here
         torch.manual_seed(self.valid_cfg.random_seed)
-        inference_wrapper = ProtT5nvValidationInference(main_model, self.cfg)
-        prot_model_batch_size = self.cfg.model.micro_batch_size #* self.cfg.model.tensor_model_parallel_size
-        logging.info("Protein model micro batch size: " + str(prot_model_batch_size))
+        if self.valid_cfg.emb_type == "ESM":
+            main_model.half()
+            post_process = main_model.model.post_process
+            main_model.model.post_process = False
+        infer_class = import_class_by_path(self.valid_cfg.infer_target)
+        inference_wrapper = infer_class(self.cfg, main_model)
         traindata = getData(
             datafile=self.valid_cfg.train_ds.data_file, 
             model=inference_wrapper,
-            model_arch=self.valid_cfg.emb_type,
             emb_batch_size=self.valid_cfg.emb_batch_size, 
-            prot_model_batch_size=prot_model_batch_size
             )
         trainDataset = SSDataset(traindata)
         train_dataloader = DataLoader(trainDataset, batch_size=self.valid_cfg.batch_size, shuffle=False)
@@ -66,9 +66,7 @@ class SSPredictionCallback(Callback):
         testdata = getData(
             datafile=test_datafile, 
             model=inference_wrapper,
-            model_arch=self.valid_cfg.emb_type,
             emb_batch_size=self.valid_cfg.emb_batch_size,
-            prot_model_batch_size=prot_model_batch_size
             )
         test_dataset = SSDataset(testdata)
         test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False)
@@ -80,7 +78,11 @@ class SSPredictionCallback(Callback):
             results = sspred.main(self.valid_cfg, traindata, train_dataloader, testdata, test_dataloader)
         torch.distributed.barrier()
         self.log_dict(results, rank_zero_only=True)
+        # TODO: replace with release_from_inference
         main_model.unfreeze()
+        if self.valid_cfg.emb_type == "ESM":
+            main_model.model.post_process = post_process
+            main_model.float()
 
 
 class MLPValidationCallback(Callback):
