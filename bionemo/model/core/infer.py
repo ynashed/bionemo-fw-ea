@@ -20,8 +20,9 @@ from pytorch_lightning.core import LightningModule
 
 from nemo.utils import logging
 
+from bionemo.model.utils import _reconfigure_inference_batch
+from bionemo.model.utils import restore_model
 from bionemo.data.utils import pad_token_ids
-from bionemo.model.utils import restore_model, _reconfigure_inference_batch
 
 try:
     from apex.transformer import parallel_state
@@ -35,21 +36,21 @@ except (ImportError, ModuleNotFoundError):
     HAVE_APEX = False
 
 # FIXME: add mask for all non-special tokens (add hiddens_tokens_only)
-
+# TODO: add model-specific prepare_for_inference and release_from_inference methods
 class BaseEncoderDecoderInference(LightningModule):
     '''
     Base class for inference.
     '''
 
-    def __init__(self, cfg):
+    def __init__(self, cfg, model=None):
         super().__init__()
 
         self.cfg = cfg
-        self.model = self.load_model(cfg)
+        self.model = self.load_model(cfg, model=model)
         self._trainer = self.model.trainer
         self.tokenizer = self.model.tokenizer
     
-    def load_model(self, cfg):
+    def load_model(self, cfg, model=None):
         """Load saved model checkpoint
 
         Params:
@@ -59,10 +60,11 @@ class BaseEncoderDecoderInference(LightningModule):
             Loaded model
         """        
         # load model class from config which is required to load the .nemo file
-        model = restore_model(
-            restore_path=cfg.model.downstream_task.restore_from_path,
-            cfg=cfg,
-        )
+        if model is None:
+            model = restore_model(
+                restore_path=cfg.model.downstream_task.restore_from_path,
+                cfg=cfg,
+            )
         # move self to same device as loaded model
         self.to(model.device)
 

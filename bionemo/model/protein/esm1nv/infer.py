@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
 import torch
 from typing import List
 
@@ -24,8 +23,8 @@ class ESM1nvInference(BaseEncoderDecoderInference):
     All inference functions
     '''
 
-    def __init__(self, cfg):
-        super().__init__(cfg=cfg)
+    def __init__(self, cfg, model=None):
+        super().__init__(cfg=cfg, model=model)
         
     def _tokenize(self, sequences: List[str]):
         """
@@ -60,12 +59,13 @@ class ESM1nvInference(BaseEncoderDecoderInference):
         enc_mask[:, 0:2] = 0
         enc_mask = torch.roll(enc_mask, shifts=-1, dims=1)
 
-        if self.cfg.model.post_process:
+        # Want to check actual value in the model and not in the config
+        if self.model.model.post_process:
             hidden_states = hidden_states[0]
 
         return hidden_states, enc_mask
 
-    def load_model(self, cfg):
+    def load_model(self, cfg, model=None):
         """Load saved model checkpoint
 
         Params:
@@ -74,8 +74,8 @@ class ESM1nvInference(BaseEncoderDecoderInference):
         Returns:
             ESM trained model
         """
-        model = super().load_model(cfg)
+        model = super().load_model(cfg, model=model)
         # control post-processing
-        model.model.post_process = cfg.model.post_process
+        # model.model.post_process = cfg.model.post_process
 
         return model

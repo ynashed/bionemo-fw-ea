@@ -14,7 +14,6 @@
 # limitations under the License.
 
 import re
-import pickle
 import torch
 from omegaconf.omegaconf import open_dict
 from omegaconf import OmegaConf
@@ -140,8 +139,12 @@ class TrainerBuilder(object):
         return plugins
 
     @staticmethod
-    def configure_callbacks(cfg):
-        return [ModelSummary(max_depth=3)]
+    def configure_callbacks(cfg, extra_callbacks=[]):
+        callbacks = [ModelSummary(max_depth=3)]
+        callbacks.extend(extra_callbacks)
+        logging.info(f'Selected Callbacks: {[type(c) for c in callbacks]}')
+        return callbacks
+        
 
     @staticmethod
     def configure_strategy(cfg):
@@ -191,14 +194,14 @@ class PredictTrainerBuilder(TrainerBuilder):
     def resume_checkpoint(cfg, trainer):
         pass
 
-def setup_trainer(cfg, builder=None):
+def setup_trainer(cfg, builder=None, callbacks=[]):
     """NeMo Trainer setup functions"""
     if builder is None:
         builder = TrainerBuilder
 
     builder.adjust_config(cfg)
     plugins = builder.configure_plugins(cfg)
-    callbacks = builder.configure_callbacks(cfg)
+    callbacks = builder.configure_callbacks(cfg, callbacks)
     strategy = builder.configure_strategy(cfg)
 
     trainer = Trainer(
@@ -302,6 +305,7 @@ def _reconfigure_inference_batch(global_batch_per_gpu):
             micro_batch_size=global_batch_per_gpu,
             data_parallel_size=cur_data_parallel_world_size,
         )
+
 
 # FIXME: move this to NeMo
 def gather_objects(partial_results_list, main_rank=None):

@@ -61,9 +61,7 @@ class SSDataset(Dataset):
     def __getitem__(self, idx):
         embeddings = self.data.get_embeddings(idx)
         labels = self.data.get_labels(idx)
-        seq_len = len(self.data.input_seq[idx])
-        embeddings = embeddings[:seq_len, :]
-        emb_dim = embeddings.size()[1]
+        seq_len, emb_dim = embeddings.size()
         item_dict = {
             "embeddings": torch.cat([embeddings, torch.zeros((self.data.max_length - seq_len), emb_dim)]), 
             "3state": torch.cat([labels[0], torch.zeros((self.data.max_length - seq_len), 3)]),
@@ -114,19 +112,17 @@ def train_one_epoch(model, traindata, training_loader, loss_fn, optimizer, sched
         loss1 = loss_fn(masked_output0, labels1.permute(0,2,1))
         loss2 = loss_fn(masked_output1, labels2.permute(0,2,1))
         loss3 = loss_fn(masked_output2, labels3.permute(0,2,1))
-        loss = loss1+loss2+loss3
+        loss = loss1 + loss2 + loss3
         # Zero your gradients for every batch!
         optimizer.zero_grad()
         loss.backward()
         # Adjust learning weights
         optimizer.step()
-
-        # Gather data and report
-        running_loss += loss.item()
-        if i % 100 == 99:
-            last_loss = running_loss / i 
-            logging.info("batch {} loss: {}".format(i+1, last_loss))
         scheduler.step()
+
+        # Gather loss
+        running_loss += loss.item()
+
     return running_loss / (i + 1) 
 
 def calculate_accuracy(predicted, labels):
