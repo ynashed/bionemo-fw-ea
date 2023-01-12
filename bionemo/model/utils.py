@@ -177,7 +177,7 @@ class TrainerBuilder(object):
 
 class InferenceTrainerBuilder(TrainerBuilder):
     @staticmethod
-    def configure_callbacks(cfg):
+    def configure_callbacks(cfg, extra_callbacks=[]):
         return []
 
     @staticmethod
