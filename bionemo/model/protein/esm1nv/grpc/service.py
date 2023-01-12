@@ -35,7 +35,9 @@ class InferenceService(esm1nv_pb2_grpc.GenerativeSampler):
 
 
     def SeqToEmbedding(self, spec, context):
-        embeddings = self._inferer.seq_to_embedding(spec.seqs)
+        embeddings, masks = self._inferer.seq_to_hiddens(spec.seqs)
+        embeddings[~masks.bool()] = 0
+        embeddings = embeddings[:, masks.sum(axis=0) != 0, :]
         output = OutputSpec(embeddings=embeddings.flatten().tolist(),
                             dim=embeddings.shape)
         return output

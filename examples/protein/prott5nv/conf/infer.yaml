@@ -3,6 +3,10 @@ defaults:
   # allow this config to override defaults
   - _self_
 
+hydra:
+  searchpath:
+     - /workspace/bionemo/examples/conf/
+
 name: ProtT5_Inference
 desc: Minimum configuration for initializing a ProtT5 model for inference.
 

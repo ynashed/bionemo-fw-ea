@@ -41,16 +41,17 @@ class ESM1nvInference(BaseEncoderDecoderInference):
     def seq_to_hiddens(self, sequences):
         '''
         Transforms Sequences into hidden state.
-        This class should be implemented in a child class, since it is model specific.
-        This class should return only the hidden states, without the special tokens such as
-         <BOS> and <EOS> tokens, for example.
+        Should be implemented in a child class, since it is model specific.
+        This method returns hidden states and masks.
+        Hidden states are returned for all tokens, including <BOS>, <EOS> and padding. 
+        <BOS>, <EOS> and padding are masked out.
 
         Args:
             sequences (list[str]): list of sequences
 
         Returns:
             hidden_states (torch.Tensor, float):
-            enc_mask (torch.Tensor, long): boolean mask for padded sections
+            enc_mask (torch.Tensor, long): boolean mask for special tokens (<BOS> and <EOS>) and padded sections
         '''
         token_ids, enc_mask = self.tokenize(sequences)
         hidden_states = self.model(token_ids, enc_mask, None)
@@ -74,8 +75,16 @@ class ESM1nvInference(BaseEncoderDecoderInference):
         Returns:
             ESM trained model
         """
-        model = super().load_model(cfg, model=model)
         # control post-processing
-        # model.model.post_process = cfg.model.post_process
+        if model is None:
+            post_process = cfg.model.post_process
+        else:
+            post_process = model.model.post_process
+        model = super().load_model(cfg, model=model)
+        
+        model.model.post_process = post_process
+
+        # FIXME: model.half() shouldn't be used, temporary fix
+        model.half()
 
         return model

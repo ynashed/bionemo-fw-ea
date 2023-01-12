@@ -43,9 +43,10 @@ class ProtT5nvInference(BaseEncoderDecoderInference):
     def seq_to_hiddens(self, sequences):
         '''
         Transforms Sequences into hidden state.
-        This class should be implemented in a child class, since it is model specific.
-        This class should return only the hidden states, without the special tokens such as
-         <BOS> and <EOS> tokens, for example.
+        Should be implemented in a child class, since it is model specific.
+        This method returns hidden states and masks.
+        Hiddens states contain paddings but do not contain special tokens 
+        such as <BOS> and <EOS> tokens.
 
         Args:
             sequences (list[str]): list of sequences
