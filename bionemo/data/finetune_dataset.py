@@ -3,8 +3,7 @@ import torch
 import torch.nn as nn
 import pandas as pd
 import numpy as np
-from nemo.utils import logging
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import Dataset
 from pathlib import Path
 from typing import Union
 from torch.nn.utils.rnn import pad_sequence
@@ -45,7 +44,8 @@ class FineTuneDataset(Dataset):
         }
 
 class FineTuneDataModule(BioNeMoDataModule):
-    def __init__(self, cfg, tokenizer_fn):
+    def __init__(self, cfg, tokenizer_fn, trainer):
+        super().__init__(cfg, trainer)
 
         self.data_path = Path(cfg.downstream_task.dataset)
         self.data = FineTuneDataset(self.data_path, tokenizer_fn, input_column = cfg.downstream_task.smis_column, target_column = cfg.downstream_task.target_column)
@@ -75,7 +75,7 @@ class FineTuneDataModule(BioNeMoDataModule):
             Dataset: dataset to use for testing
         """
         raise NotImplementedError()
-
+    
     def adjust_train_dataloader(self,model,dataloader):
         """Allows adjustments to the training dataloader
         This is a good place to adjust the collate function of the dataloader.
@@ -89,3 +89,17 @@ class FineTuneDataModule(BioNeMoDataModule):
         """
 
         dataloader.collate_fn = self.data.custom_collate
+
+    #NOTE implement if upsampling/resuming becomes necessary; Reference FastaDataset implmentation
+    # def sample_train_dataset(self, dataset):
+    #     num_samples = self.train_num_samples
+    #     dataset_dir = os.path.join(self.cfg.dataset_path, 'bionemo',)
+        
+    #     dataset = NeMoUpsampling(
+    #         dataset, num_samples=num_samples,
+    #         cfg=self.cfg,
+    #         data_prefix='benchmark_MoleculeNet_FreeSolv',
+    #         index_mapping_dir=dataset_dir,
+    #         )
+
+    #     return dataset

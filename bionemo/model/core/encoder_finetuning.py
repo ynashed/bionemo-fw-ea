@@ -1,4 +1,4 @@
-from abc import abstractmethod
+from abc import abstractmethod, ABC
 import torch
 from nemo.utils import logging
 from nemo.core.classes import ModelPT
@@ -10,14 +10,22 @@ from nemo.collections.nlp.data.language_modeling.megatron.data_samplers import (
     MegatronPretrainingRandomSampler,
     MegatronPretrainingSampler,
 )
-from apex.transformer import parallel_state
 from bionemo.model.utils import (
     extract_consumed_samples_from_ckpt,
     compute_consumed_samples,
 )
+try:
+    from apex.transformer import parallel_state
 
+    from apex.transformer.pipeline_parallel.utils import (
+        _reconfigure_microbatch_calculator,
+    )
 
-class EncoderFineTuning(ModelPT, Exportable):
+    HAVE_APEX = True
+except (ImportError, ModuleNotFoundError):
+    HAVE_APEX = False
+
+class EncoderFineTuning(ModelPT, Exportable, ABC):
 
     def __init__(self, cfg, trainer):
         super().__init__(cfg, trainer)
@@ -26,7 +34,10 @@ class EncoderFineTuning(ModelPT, Exportable):
                 "Trainer.accumulate_grad_batches currently only supported"
                 " for Trainer.accumulate_grad_batches = 1")
         self.cfg = cfg
-        self.encoder_model = self.setup_encoder_model(cfg, trainer)
+
+        enc_model = self.setup_encoder_model(cfg, trainer)
+        self.encoder_model = self.reconfigure_model(cfg, enc_model)
+
         self.init_consumed_samples = 0
         self.loss_fn = self.build_loss_fn()
         self.task_head = self.build_task_head()
@@ -46,7 +57,32 @@ class EncoderFineTuning(ModelPT, Exportable):
 
     @abstractmethod
     def setup_encoder_model(self, cfg, trainer):
-        pass
+        raise NotImplementedError()
+
+    def reconfigure_model(self, cfg, model):
+        self.to(model.device)
+
+        if parallel_state.is_unitialized():
+            logging.info("DDP is not initialized. Initializing...")
+            def dummy():
+                return
+
+            if model.trainer.strategy.launcher is not None:
+                model.trainer.strategy.launcher.launch(dummy, trainer=model.trainer)
+            model.trainer.strategy.setup_environment()
+
+        cur_data_parallel_world_size = parallel_state.get_data_parallel_world_size()
+
+        _reconfigure_microbatch_calculator(
+            rank=0,  # This doesn't matter since it is only used for logging
+            rampup_batch_size=None,
+            #NOTE depends on global_batch_size being set in config, see MR !95
+            global_batch_size=cfg.global_batch_size,
+            micro_batch_size=cfg.micro_batch_size, 
+            data_parallel_size=cur_data_parallel_world_size,
+        )
+
+        return model
 
     def extract_for_task_head(self, input_tensor):
         return input_tensor

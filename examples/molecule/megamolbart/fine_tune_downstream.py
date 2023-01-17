@@ -1,78 +1,50 @@
 import os
 import torch
 import torch.nn as nn
-import pandas as pd
 import numpy as np
 import bionemo.utils
 import pytorch_lightning as ptl
+from functools import lru_cache
 from nemo.core.config import hydra_runner
 from nemo.utils import logging
-from torch.utils.data import DataLoader, Dataset
-from pytorch_lightning.trainer.trainer import Trainer
-from bionemo.model.molecule.megamolbart import MegaMolBARTModel
-from nemo.core.classes import ModelPT
-from nemo.core.classes.exportable import Exportable
 from omegaconf.omegaconf import OmegaConf, open_dict, DictConfig
-from pathlib import Path
-from typing import Union
-from nemo.utils.app_state import AppState
-from nemo.utils.exp_manager import exp_manager
-from torch.nn.utils.rnn import pad_sequence
-from nemo.collections.nlp.parts.nlp_overrides import NLPDDPPlugin, NLPSaveRestoreConnector
+from bionemo.model.molecule.megamolbart import MegaMolBARTModel
+from nemo.collections.nlp.parts.nlp_overrides import NLPSaveRestoreConnector
 from bionemo.model.core import MLPModel
-from bionemo.core import BioNeMoDataModule
-from bionemo.data.finetune_dataset import FineTuneDataset
+from bionemo.model.core.encoder_finetuning import EncoderFineTuning
 from bionemo.data.finetune_dataset import FineTuneDataModule
+from bionemo.model.utils import (
+    setup_trainer,
+    restore_model,
+)
 
+class FineTuneMegaMolBART(EncoderFineTuning):
 
-class FineTuneMegaMolBART(ModelPT, Exportable):
-
-    def __init__(self, cfg: "DictConfig", trainer: Trainer):
+    def __init__(self, cfg, trainer):
         super().__init__(cfg, trainer=trainer)
+
+        self.batch_target_name = cfg.downstream_task.target_column
+
         self.cfg = cfg
 
-        self.pretrained_model = self.load_model(cfg)
+    def build_loss_fn(self):
+        return bionemo.utils.lookup_or_use(torch.nn, self.cfg.downstream_task.loss_func)
 
-        #set input layer dims of MLP based on hidden_size from pretrained model
-        self.regressor = MLPModel(layer_sizes=[self.pretrained_model._cfg.hidden_size, 128, 1], dropout=0.1)
+    def build_task_head(self):
+        regressor = MLPModel(layer_sizes=[self.encoder_model._cfg.hidden_size, self.cfg.downstream_task.hidden_layer_size, self.cfg.downstream_task.n_outputs],
+            dropout=0.1,
+        )
+        task_head = nn.Sequential(regressor, nn.Flatten(start_dim=0))
+        return task_head
 
-        self.loss_fn = bionemo.utils.lookup_or_use(torch.nn, cfg.downstream_task.loss_func)
+    def setup_encoder_model(self, cfg, trainer):
 
-        #check that decoder exists in megamolbart model and following modules
-        self.pretrained_model.decoder = torch.nn.Identity()
+        pretrained_model = self.load_model(cfg, trainer)
+        pretrained_model.decoder = torch.nn.Identity()
 
-        self.data_module = FineTuneDataModule(self.cfg, self.pretrained_model.tokenizer)
+        return pretrained_model
 
-        self._build_train_valid_datasets()
-        self.setup_training_data(self.cfg)
-        self.setup_validation_data(self.cfg)
-
-        #megatronbart.token_fc = torch.nn.Identity()
-        #megatronbart.loss_fn = torch.nn.Identity()
-        #megatronbart.log_softmax = torch.nn.Identity()
-
-    def forward(self, token_ids, mask):
-        """ Apply SMILES strings to model
-        The dictionary returned will be passed to other functions, so its contents are fairly flexible,
-        except that it must contain the key "token_output" which is the output of the model 
-        (possibly after any fully connected layers) for each token.
-        Arg:
-            token_ids: tensor of token_ids of shape (seq_len, batch_size),
-            mask: bool tensor of padded elems of shape (seq_len, batch_size)
-        Returns:
-            Output from model (dict containing key "token_output")
-        """
-
-        enc_output = self.pretrained_model.encode(tokens_enc=token_ids, enc_mask=mask) #return hiddens
-        embeddings = self.hidden_to_embedding(enc_output, mask) 
-
-        token_output = self.regressor(embeddings.float())
-  
-        output = {'token_output': torch.squeeze(token_output)}
-
-        return output
-
-    def load_model(self, model_cfg):
+    def load_model(self, model_cfg, trainer):
         """Load saved model checkpoint
         Params:
             checkpoint_path: path to nemo checkpoint
@@ -80,16 +52,6 @@ class FineTuneMegaMolBART(ModelPT, Exportable):
             MegaMolBART trained model
         # """
 
-        # trainer required for restoring model parallel models
-        trainer = Trainer(
-            plugins=NLPDDPPlugin(),
-            devices=1,
-            accelerator='gpu',
-            precision=32, #TODO: Run benchmark to verify this value has no or
-            #                     minimum impact on KPIs.
-        )
-
-        app_state = AppState()
         if model_cfg.downstream_task.megamolbart_model_path is not None:
             model = MegaMolBARTModel.restore_from(
                 restore_path=model_cfg.downstream_task.megamolbart_model_path,
@@ -97,10 +59,52 @@ class FineTuneMegaMolBART(ModelPT, Exportable):
                 save_restore_connector=NLPSaveRestoreConnector(),
             )
 
+
+        logging.info(f"Encoder weights frozen set to: {model_cfg.downstream_task.freeze_encoder_weights}")
+        if model_cfg.downstream_task.freeze_encoder_weights:
+            model.freeze()
+
         return model
-    
-    def validation_epoch_end(self, outputs):
-        pass
+
+    # the lru cache is kind of a hacky way to make sure this isn't set up if
+    # it is already initialized, since this function doesn't return anything
+    @lru_cache
+    def data_setup(self):
+        self.data_module = FineTuneDataModule(
+            self.cfg, self.encoder_model.tokenizer, self.trainer,
+        )
+
+    def on_fit_start(self):
+        self.build_train_valid_test_datasets()
+        return super().on_fit_start()
+
+    def build_train_valid_test_datasets(self):
+
+        self._train_ds = self.data_module.get_sampled_train_dataset()
+        self._validation_ds = self.data_module.get_sampled_val_dataset()
+
+    def encoder_forward(self, bart_model, batch: dict):
+        tokens, mask = self.process_batch(batch)
+        enc_output = bart_model.encode(tokens_enc=tokens, enc_mask=mask)
+        output_tensor = self.hidden_to_embedding(enc_output, mask) 
+
+        return output_tensor
+
+    def extract_for_task_head(self, input_tensor):
+        #NOTE investigate using mixed precision to remove need for float casting; maybe use setup_trainer method
+        return input_tensor.float()
+
+    def process_batch(self, batch):
+        """Build the batch."""
+
+        token_ids = batch['token_ids']
+        mask = (token_ids != self.encoder_model.tokenizer.pad_id)
+
+        tk = torch.tensor(token_ids, dtype=torch.int64).cuda()
+
+        mask = torch.tensor(mask, dtype=torch.int64,
+                                    device=token_ids.device)
+        return tk, mask
 
     def hidden_to_embedding(self, enc_output, enc_mask):
         """Computes embedding and padding mask for smiles.
@@ -115,75 +119,11 @@ class FineTuneMegaMolBART(ModelPT, Exportable):
         embeddings = torch.sum(enc_output*enc_mask.unsqueeze(-1), dim=1) / lengths
 
         return embeddings
-
-    def _calc_step(self, batch, batch_idx):
-
-        tokens, enc_mask = self.process_batch(batch)
-        output_tensor = self.forward(tokens, enc_mask)
-
-        target_tokens = batch['target']
-        loss = self.loss_fn(output_tensor['token_output'], target_tokens.float())
-
-        return loss
-
-    def validation_step(self, batch, batch_idx):
-
-        loss = self._calc_step(batch, batch_idx)
-
-        return loss
-
-    def training_step(self, batch, batch_idx):
-
-        loss = self._calc_step(batch, batch_idx)
-        self.log('train_loss', loss, prog_bar=True)
-
-        return loss    
     
-    def process_batch(self, batch):
-        """Build the batch."""
+    def get_target_from_batch(self, batch):
+        ret = batch['target']
 
-        token_ids = batch['token_ids']
-        mask = (token_ids != self.pretrained_model.tokenizer.pad_id)
-
-        tk = torch.tensor(token_ids, dtype=torch.int64).cuda()
-
-        mask = torch.tensor(mask, dtype=torch.int64,
-                                    device=token_ids.device)
-        return tk, mask
-
-    def _build_train_valid_datasets(self):
-
-        self._train_ds = self.data_module.get_sampled_train_dataset()
-        self._validation_ds = self.data_module.get_sampled_val_dataset()
-
-    def setup_training_data(self, cfg):
-        """
-        Setups data loader to be used in training
-
-        Args:
-            cfg: data layer parameters.
-        Returns:
-
-        """
-
-        self._train_dl = DataLoader(self._train_ds, batch_size=cfg.downstream_task.batch_size, drop_last=True)
-        self.data_module.adjust_train_dataloader(self, self._train_dl)
-
-    def setup_validation_data(self, cfg):
-        """
-        Setups data loader to be used in validation
-        Args:
-
-            cfg: data layer parameters.
-        Returns:
-
-        """
-
-        self._validation_dl = DataLoader(self._validation_ds, batch_size=cfg.downstream_task.batch_size, drop_last=True)
-        self.data_module.adjust_val_dataloader(self, self._validation_dl)
-
-    def list_available_models(self):
-        return []
+        return ret.float()
 
 @hydra_runner(config_path="conf", config_name="finetune_config") 
 def main(cfg) -> None:
@@ -194,12 +134,8 @@ def main(cfg) -> None:
     np.random.seed(cfg.model.downstream_task.seed)
     ptl.seed_everything(cfg.model.downstream_task.seed)
 
-    trainer = Trainer(accelerator='gpu', devices=1, max_epochs=cfg.model.downstream_task.epochs, logger=False)
-    exp_manager(trainer, cfg.get("exp_manager", None)) 
-    
-    #NOTE try use setup_trainer from util.py from dev branch (configure_plugins/configure_callbacks/resume_checkpoint may cause error)
-    #trainer = setup_trainer(cfg, builder=FintuneTrainerBuilder())
-    #NOTE instantiate encoder outside of finetuning class to allow for flexibility
+    trainer = setup_trainer(
+         cfg, builder=None)
 
     model = FineTuneMegaMolBART(cfg.model, trainer)
     trainer.fit(model)
