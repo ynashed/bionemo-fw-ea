@@ -118,6 +118,7 @@ class TrainerBuilder(object):
         # we always inferr global batch size based on micro batch size
         with open_dict(cfg.model):
             cfg.model['global_batch_size'] = global_batch_size
+        cfg.trainer['accumulate_grad_batches'] = 1
 
     @staticmethod
     def configure_plugins(cfg):
@@ -287,7 +288,7 @@ def compute_consumed_samples(model, steps_since_resume=0):
     return int(consumed_samples)
 
 
-def _reconfigure_inference_batch(global_batch_per_gpu):
+def _reconfigure_inference_batch(global_batch_per_gpu, global_batch_size=None):
     """Reconfigure microbatch sizes for inference."""
 
     # This should happen only on the last batch of the validation/test dataset with drop_last=False.
@@ -296,12 +297,13 @@ def _reconfigure_inference_batch(global_batch_per_gpu):
         apex.transformer.pipeline_parallel.utils.get_current_global_batch_size()
     )
     cur_data_parallel_world_size = parallel_state.get_data_parallel_world_size()
+    if global_batch_size is None:
+        global_batch_size = global_batch_per_gpu * parallel_state.get_data_parallel_world_size()
     if global_batch_per_gpu != (cur_global_batch // cur_data_parallel_world_size):
         _reconfigure_microbatch_calculator(
             rank=0,
-            rampup_batch_size=None,
-            global_batch_size=global_batch_per_gpu
-            * parallel_state.get_data_parallel_world_size(),
+            rampup_batch_size=None, 
+            global_batch_size=global_batch_size,
             micro_batch_size=global_batch_per_gpu,
             data_parallel_size=cur_data_parallel_world_size,
         )

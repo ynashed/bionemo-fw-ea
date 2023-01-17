@@ -85,7 +85,7 @@ class getData(object):
                 self.hiddens += list(hiddens.cpu().float())
                 self.masks += list(masks.cpu().float())
             
-            _reconfigure_inference_batch(self.prot_model_batch_size)
+            _reconfigure_inference_batch(self.prot_model_batch_size, global_batch_size=self.model.cfg.model.global_batch_size)
 
     def compute_hiddens(self, seqs):
         hiddens, masks = self.model.seq_to_hiddens(seqs)
