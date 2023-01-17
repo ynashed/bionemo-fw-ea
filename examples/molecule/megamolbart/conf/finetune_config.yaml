@@ -8,8 +8,8 @@ trainer:
   precision: 16 # 16, 32
   accelerator: gpu # gpu, cpu
   max_epochs: null # use max_steps instead with NeMo Megatron models
-  max_steps: 2000000 # consumed_samples = global_step * micro_batch_size * data_parallel_size * accumulate_grad_batches
-  log_every_n_steps: 50 # number of interations between logging
+  max_steps: 500 # consumed_samples = global_step * micro_batch_size * data_parallel_size * accumulate_grad_batches
+  log_every_n_steps: 5 # number of interations between logging
   val_check_interval: 8 # set to integer when using steps to determine frequency of validation, use fraction with epochs
   num_sanity_val_steps: 2 # set to 0 or small number to test validation before training
   limit_val_batches: 200 # number of batches in validation step, use fraction for fraction of data
@@ -86,16 +86,24 @@ model:
       max_steps: 1000000 # can also use ${trainer.max_steps} to scale
       min_lr: 1e-5
 
+  data:
+    dataloader_type: 'single'
+    num_workers: 10
+
   downstream_task:
     name: finetune_prediction
     epochs: 25
     seed: 42
     batch_size: 32
+    n_outputs: 1
+    hidden_layer_size: 128
     loss_func: MSELoss
+    dataset_path: "/workspace/"
     dataset: "/workspace/bionemo/benchmark_MoleculeNet_FreeSolv.csv"
     smis_column: 'SMILES'
     target_column: 'y'
     megamolbart_model_path: "/workspace/bionemo/MegaMolBART_0_2_0.nemo" # used to load pretrained megamolbart .nemo file
+    freeze_encoder_weights: True
 
     optim:
       name: adam
