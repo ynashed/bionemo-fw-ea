@@ -20,9 +20,8 @@
 #   - pycairo=1.20.1=py38hf61ee4a_0
 
 
-# TODO: update to nemo's official release when 1.14 is ready
-# ARG BASE_IMAGE=nvcr.io/nvidia/nemo:22.07
-ARG BASE_IMAGE=gitlab-master.nvidia.com/mlivne/nemo_containers:nemo-r1.14.0
+# nemo official release 1.14
+ARG BASE_IMAGE=nvcr.io/nvidia/nemo:22.11
 FROM ${BASE_IMAGE}
 
 ARG GITHUB_ACCESS_TOKEN
