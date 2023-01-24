@@ -41,6 +41,7 @@ model:
       - name: SSPred
         class: SSPredictionCallback
         enabled: True
+        infer_target: bionemo.model.protein.prott5nv.infer.ProtT5nvInference
         emb_type: "T5"
         emb_batch_size: 256
         batch_size: 256

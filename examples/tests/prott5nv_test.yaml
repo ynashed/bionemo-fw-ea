@@ -21,7 +21,7 @@ trainer:
   accumulate_grad_batches: 1
 
 model:
-  global_batch_size: 8
+  global_batch_size: 4
   micro_batch_size: 4
   data:
     data_url: 'https://ftp.uniprot.org/pub/databases/uniprot/uniref/uniref50/uniref50.fasta.gz' 
@@ -30,6 +30,7 @@ model:
       train: x000
       test: x000
       val: x000
+    micro_batch_size: ${model.micro_batch_size}
     data_prefix: null
     data_col: 3 # 0-based
     data_sep: ','

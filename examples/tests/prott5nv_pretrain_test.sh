@@ -43,7 +43,6 @@ execute() {
 
 
 train() {
-    DO_TRAINING="True"
     execute
 }
 
