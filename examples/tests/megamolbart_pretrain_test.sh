@@ -27,6 +27,8 @@ CONFIG_FILE=megamolbart_test
 DATA_MOUNT=${PROJECT_MOUNT}/examples/tests/test_data/molecule
 RESULTS_MOUNT=/tmp/results
 
+TRAINING_ARGS="model.data.dataset_path=${DATA_MOUNT}"
+
 execute() {
     set -x
     python ${PROJECT_MOUNT}/examples/molecule/megamolbart/pretrain.py \
@@ -40,7 +42,6 @@ execute() {
 
 
 train() {
-    DO_TRAINING="True"
     execute
 }
 
@@ -79,7 +80,6 @@ case $ARGS in
 esac
 
 RES=$(cat ${RESULTS_MOUNT}/cmdline_prints | grep "Epoch 0: 100%" | sed 's/^.*\ loss/loss/' | sed 's/.$//')
-echo "RESULT: $RES"
 arrRes=(${RES//,/ })
 echo ${arrRes[0]}" "${arrRes[2]}" "${arrRes[3]}" "${arrRes[4]}" "${arrRes[5]}" "${arrRes[6]}" "${arrRes[7]}" "${arrRes[8]}" "${arrRes[9]} >& ${RESULTS_MOUNT}/result_log
 

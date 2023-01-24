@@ -27,6 +27,8 @@ CONFIG_FILE=esm1nv_test
 DATA_MOUNT=${PROJECT_MOUNT}/examples/tests/test_data
 RESULTS_MOUNT=/tmp/results
 
+TRAINING_ARGS="model.data.dataset_path=${DATA_MOUNT}"
+
 execute() {
     set -x
     python ${PROJECT_MOUNT}/examples/protein/esm1nv/pretrain.py \
@@ -40,7 +42,6 @@ execute() {
 
 
 train() {
-    DO_TRAINING="True"
     execute
 }
 

@@ -11,9 +11,11 @@ trainer:
   max_steps: 500 # consumed_samples = global_step * micro_batch_size * data_parallel_size * accumulate_grad_batches
   val_check_interval: 500
   limit_val_batches: 1
+  accumulate_grad_batches: 1
     
 model:
   micro_batch_size: 4
+  global_batch_size: 4
   pre_process: True # add embedding
   post_process: True # add pooler
   bert_binary_head: False # BERT binary head
@@ -28,7 +30,7 @@ model:
       train: x[000..001]
       test: x[000..001]
       val: x[000..001]
-    micro_batch_size: 4
+    micro_batch_size: ${model.micro_batch_size}
     num_workers: 10
     dataloader_type: single
     data_col: 3 # 0-based

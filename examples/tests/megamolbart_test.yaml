@@ -10,16 +10,18 @@ trainer:
   max_steps: 500 # consumed_samples = global_step * micro_batch_size * data_parallel_size * accumulate_grad_batches
   val_check_interval: 50
   limit_val_batches: 1
+  accumulate_grad_batches: 1
     
 model:
   micro_batch_size: 4
+  global_batch_size: 4
   data:
     dataset_path: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/molecule/ # parent directory for data, contains train / val / test folders
     dataset: # inclusive range of data files to load or can load a single file, e.g. x000.csv
       train: x[000..001]
       test: x[000..001]
       val: x[000..001]
-    micro_batch_size: 4
+    micro_batch_size: ${model.micro_batch_size}
     data_col: 1 # 0-based
     data_sep: ','
     header_lines: 1
