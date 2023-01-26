@@ -39,7 +39,7 @@ EXAMPLE_BASE="/workspace/bionemo/examples"
 
 # Kill all grpc service that may be lingering
 # TODO: This is a WAR
-ps -ef | grep 'python3 -m bionemo.model.*.grpc.service' | awk '{print $2}' | xargs kill -9
+ps -ef | grep 'python3 -m bionemo.model.*.grpc.service' | awk '{print $2}' | xargs kill -9 2>/dev/null
 
 if [ "$MODEL" = "esm-1nv" ]; then
     python3 -m bionemo.model.protein.esm1nv.grpc.service & \

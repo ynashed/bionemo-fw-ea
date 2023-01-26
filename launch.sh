@@ -83,8 +83,6 @@ variables:
         container registry username. e.g., '$oauthtoken' for registry access. Only required to push/pull containers.
     REGISTRY_ACCESS_TOKEN
         container registry access token. e.g., Ckj53jGK... Only required to push/pull containers.
-    GITHUB_ACCESS_TOKEN
-        Git API token to checkout private code repo (required for build only)
     GITHUB_BRANCH
         Git branch to use for building a container, default is main
 
@@ -109,7 +107,6 @@ JUPYTER_PORT=${JUPYTER_PORT:=8888}
 REGISTRY=${REGISTRY:=NotSpecified}
 REGISTRY_USER=${REGISTRY_USER:='$oauthtoken'}
 REGISTRY_ACCESS_TOKEN=${REGISTRY_ACCESS_TOKEN:=NotSpecified}
-GITHUB_ACCESS_TOKEN=${GITHUB_ACCESS_TOKEN:=UserName:PersonalToken}
 GITHUB_BRANCH=${GITHUB_BRANCH:=main}
 
 # Model paths
@@ -140,7 +137,6 @@ if [ $write_env -eq 1 ]; then
     echo REGISTRY=${REGISTRY} >> $LOCAL_ENV
     echo REGISTRY_USER=${REGISTRY_USER} >> $LOCAL_ENV
     echo REGISTRY_ACCESS_TOKEN=${REGISTRY_ACCESS_TOKEN} >> $LOCAL_ENV
-    echo GITHUB_ACCESS_TOKEN=${GITHUB_ACCESS_TOKEN} >> $LOCAL_ENV
     echo GITHUB_BRANCH=${GITHUB_BRANCH} >> $LOCAL_ENV
 fi
 
@@ -183,11 +179,9 @@ DOCKER_CMD="docker run \
 
 
 
-DOCKER_BUILD_CMD="docker build --network host \
+DOCKER_BUILD_CMD="docker build --network host --ssh default \
     -t ${BIONEMO_IMAGE} \
-    --build-arg GITHUB_ACCESS_TOKEN=${GITHUB_ACCESS_TOKEN} \
     --build-arg GITHUB_BRANCH=${GITHUB_BRANCH} \
-    --build-arg NEMO_BRANCH=${NEMO_BRANCH} \
     --no-cache \
     -f setup/Dockerfile"
 
@@ -260,10 +254,6 @@ build() {
                 shift
                 shift
                 ;;
-            -c|--clean)
-                DOCKER_BUILD_CMD="${DOCKER_BUILD_CMD} --no-cache"
-                shift
-                ;;
             *)
                 echo "Unknown option $1. Please --version to specify a version."
                 exit 1
@@ -283,12 +273,15 @@ build() {
         DOCKER_BUILD_CMD="${DOCKER_BUILD_CMD} --build-arg BASE_IMAGE=${BASE_IMAGE}"
     fi
 
-    DOCKER_BUILD_CMD="${DOCKER_BUILD_CMD} --build-arg PACKAGE=${PACKAGE}"
     DOCKER_BUILD_CMD="${DOCKER_BUILD_CMD} -t ${IMG_NAME[0]}:latest"
+
+    # Set up SSH agent for cloning private repo in docker build
+    eval "$(ssh-agent -s)"
+    find ~/.ssh/ -type f -exec grep -l "PRIVATE" {} \; | xargs ssh-add &> /dev/null
 
     echo "Building BioNeMo training container..."
     set -x
-    ${DOCKER_BUILD_CMD} .
+    DOCKER_BUILDKIT=1 ${DOCKER_BUILD_CMD} .
     set +x
     exit
 }
@@ -462,28 +455,7 @@ protoc() {
 
 
 case $1 in
-    protoc)
-        $@
-        ;;
-    download)
-        $@
-        ;;
-    build)
-        $@
-        ;;
-    run)
-        $@
-        ;;
-    push)
-        $@
-        ;;
-    pull)
-        $@
-        ;;
-    dev)
-        $@
-        ;;
-    attach)
+    protoc | download | build | run | push | pull | dev | attach)
         $@
         ;;
     *)
