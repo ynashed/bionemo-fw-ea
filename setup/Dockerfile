@@ -24,14 +24,8 @@
 ARG BASE_IMAGE=nvcr.io/nvidia/nemo:22.11
 FROM ${BASE_IMAGE}
 
-ARG GITHUB_ACCESS_TOKEN
-ARG GITHUB_BRANCH
-ARG GITHUB_REPO=gitlab-master.nvidia.com/clara-discovery/bionemo.git
-# The location of the installed library in the container. Set BIONEMO_PATH env to change this for development purposes.
-ARG BIONEMO_HOME=/opt/nvidia/bionemo 
-ARG NEMO_HOME=/opt/nvidia/nemo
-ARG NEMO_BRANCH
-ARG PACKAGE=0
+ARG GITHUB_BRANCH=dev
+ARG GITHUB_REPO=gitlab-master.nvidia.com:12051/clara-discovery/bionemo.git
 
 # Activating base environment
 ENV TERM=xterm
@@ -49,18 +43,23 @@ RUN pip3 install -r /tmp/requirements.txt
 
 ## PySMILES
 RUN git clone https://github.com/MolecularAI/pysmilesutils.git --branch master /opt/pysmilesutils \
-    && cd /opt/pysmilesutils; pip install .
+    && cd /opt/pysmilesutils && pip install .
 
-RUN git clone --branch ${GITHUB_BRANCH} \
-    https://oauth2:${GITHUB_ACCESS_TOKEN}@${GITHUB_REPO} ${BIONEMO_HOME}
+# The location of the installed library in the container. Set BIONEMO_HOME env to change this for development purposes.
+ARG BIONEMO_HOME=/opt/nvidia/bionemo 
+ENV BIONEMO_HOME=${BIONEMO_HOME}
+
+# Clone using SSH (add the domain as known before)
+RUN mkdir -p -m 0700 ~/.ssh && ssh-keyscan ${GITHUB_REPO%%[:/]*} >> ~/.ssh/known_hosts
+RUN --mount=type=ssh git clone --branch ${GITHUB_BRANCH} ssh://git@${GITHUB_REPO} ${BIONEMO_HOME}
+
+ARG NEMO_HOME=/opt/nvidia/nemo
+ENV NEMO_HOME=${NEMO_HOME}
+
+
+ENV PYTHONPATH=${BIONEMO_HOME}:${BIONEMO_HOME}/generated:${NEMO_HOME}:$PYTHONPATH
 
 # Recompile Megatron helpers -- NOTE this will need to be done if PYTHONPATH changes later
-ENV PYTHONPATH=${BIONEMO_HOME}:${BIONEMO_HOME}/generated:${NEMO_HOME}:$PYTHONPATH
-ENV PACKAGE=${PACKAGE}
-ENV BIONEMO_HOME=${BIONEMO_HOME}
-ENV NEMO_HOME=${NEMO_HOME}
-ENV NEMO_BRANCH=${NEMO_BRANCH}
-
 RUN NEMO_PATH=$(python -c 'import nemo; print(nemo.__path__[0])') && \
    cd ${NEMO_PATH}/collections/nlp/data/language_modeling/megatron && \
    make
