@@ -336,14 +336,7 @@ setup() {
     mkdir -p ${DATA_PATH}
     mkdir -p ${RESULT_PATH}
 
-    # For dev mode, mount the local code for development purpose
-    if [[ $1 == "dev" ]]; then
-        echo "Prepending ${PROJECT_MOUNT} to PYTHONPATH for development"
-        DEV_PYTHONPATH="${PROJECT_MOUNT}:${PROJECT_MOUNT}/generated"  
-        DOCKER_CMD="${DOCKER_CMD} --env PYTHONPATH=${DEV_PYTHONPATH}"
-    else
-        DEV_PYTHONPATH=""
-    fi
+    DEV_PYTHONPATH=""
 
     if [ ! -z "${NEMO_PATH}" ];
     then
@@ -368,6 +361,13 @@ setup() {
     DOCKER_CMD="${DOCKER_CMD} -u $(id -u):$(id -g) "
     # For dev use the models in ./models dir
     DOCKER_CMD="${DOCKER_CMD} -v ${PROJECT_PATH}/models:/model"
+
+    # For dev mode, mount the local code for development purpose
+    if [[ $1 == "dev" ]]; then
+        echo "Prepending ${PROJECT_MOUNT} to PYTHONPATH for development"
+        DEV_PYTHONPATH="${PROJECT_MOUNT}:${PROJECT_MOUNT}/generated:${DEV_PYTHONPATH}"  
+        DOCKER_CMD="${DOCKER_CMD} --env PYTHONPATH=${DEV_PYTHONPATH}"
+    fi
 }
 
 
