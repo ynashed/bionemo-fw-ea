@@ -17,7 +17,7 @@ model:
   data:
     dataset_path: /data/GRCh38.p13 # contains train / val / test folders
     dataset: # inclusive range of data files to load or can load a single file, e.g. x000.csv
-      train: chr22.fna.gz.chunked.fa
+      train: chr[1..19].fna.gz.chunked.fa
       test: chr21.fna.gz.chunked.fa
       val: chr20.fna.gz.chunked.fa
     micro_batch_size: ${model.micro_batch_size}

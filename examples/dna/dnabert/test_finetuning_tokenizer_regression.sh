@@ -39,15 +39,16 @@ python dnabert_pretrain.py ++do_preprocess=True \
 rm -f $MODEL
 rm -f $VOCAB
 rm -r $DATASET_DIR
-rm -rf $FINETUNE_DIR
 
-python splice_site_finetune.py ++task.do_preprocess=True \
+# NOTE: expect an exception unless preprocessing was run with devices=1
+python splice_site_finetune.py ++task.do_preprocess=False \
     ++task.do_training=True \
+    ++task.model.data.root_directory='/tmp' \
     ++task.trainer.devices=2 \
     ++task.trainer.max_steps=4 \
     ++task.trainer.val_check_interval=2 \
     ++task.model.data.dataset_path=$FINETUNE_DIR \
-    ++task.model.data.train_file=$FINETUNE_DIR/splits/train.csv \
+    ++task.model.data.train_file=$FINETUNE_DIR/train.csv \
     ++task.model.data.fasta_directory=$FINETUNE_DIR \
     ++task.model.data.val_file=NULL \
     ++task.model.encoder.checkpoint=$NEMO_FILE
