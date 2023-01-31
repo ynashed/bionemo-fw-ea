@@ -3,20 +3,27 @@ defaults:
 
 task:
   trainer:
-    devices: 2
+    devices: 1
     val_check_interval: 100
     max_steps: 6000
 
   model:
     target_name: 'target'
+    size: 6000
     data:
+      # DO NOT CHANGE, chanbe the container mount rather than the root directory.
+      root_directory: /data
       dataset_path: /workspace/bionemo/examples/dna/data/splice-site-prediction/sampled-data-30k/
+      # Get these paths by running the GRCh38Ensembl99GFF3ResourcePreparer in models/utils/remote.py
       train_file: /workspace/bionemo/examples/dna/data/splice-site-prediction/sampled-data-30k/train.csv
       val_file: /workspace/bionemo/examples/dna/data/splice-site-prediction/sampled-data-30k/val.csv
       predict_file: /workspace/bionemo/examples/dna/data/splice-site-prediction/sampled-data-30k/test.csv
+      # Ensure the fasta files are the same used to create the GFFs which generate the csvs.
       fasta_directory: /workspace/bionemo/examples/dna/data/splice-site-prediction/GRCh38.ensembl.99
       fasta_pattern: Homo_sapiens.GRCh38.dna.chromosome.{}.fa.gz
+
+      train_perc: .8
+      val_perc: .1
+      test_perc: .1
     encoder:
-      # checkpoint: /workspace/bionemo/examples/dna/nemo_experiments/dnabert/2022-10-25_00-04-34/checkpoints/dnabert--val_loss=8.57-step=760400-consumed_samples=3041600.0-last.ckpt
-      # checkpoint: /workspace/bionemo/models/dna/dnabert/checkpoints/dnabert_k_5_n_12_batchsize_32_minlr_0.0001/dnabert--val_loss=2.53-step=966900-consumed_samples=247526400.0.ckpt
       checkpoint: /workspace/bionemo/models/dna/dnabert/checkpoints/dnabert_k_5_n_12_batchsize_32_minlr_0.0001/dnabert_k_5_n_12_batchsize_32_minlr_0.0001.nemo
