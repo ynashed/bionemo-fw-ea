@@ -44,3 +44,22 @@ model:
           sequence: 1
 target: ???  # path to model class to load
 infer_target: ??? # path to inferende class to load
+
+formatters:
+  simple:
+    format: '[%(asctime)s][%(name)s][%(levelname)s] - %(message)s'
+handlers:
+  console:
+    class: logging.StreamHandler
+    formatter: simple
+    stream: ext://sys.stdout
+  file:
+    class: logging.FileHandler
+    formatter: simple
+    filename: /logs/inference.log
+root:
+  level: INFO
+  # handlers: [console, file]
+  handlers: [console]
+
+disable_existing_loggers: false

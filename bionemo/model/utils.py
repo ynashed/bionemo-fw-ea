@@ -48,7 +48,7 @@ try:
 except (ImportError, ModuleNotFoundError):
     HAVE_APEX = False
 
-def set_cfg_key(key, value, cfg_section):
+def set_cfg_key(key, value, cfg_section, msg=""):
     """Adds a value to a config if it is missing
 
     Args:
@@ -66,8 +66,7 @@ def set_cfg_key(key, value, cfg_section):
             cfg_section[key] = value
     elif cfg_section[key] != value:
         raise ValueError(
-            f"{key} set to: {cfg_section[key]}, which conflicts with inferred"
-            f"value: {value}."
+            f"{key}={cfg_section[key]}, which conflicts with target value: {value}.{msg}"
         )
 
 def infer_global_batch_size(
@@ -116,9 +115,18 @@ class TrainerBuilder(object):
             )
 
         # we always inferr global batch size based on micro batch size
-        with open_dict(cfg.model):
-            cfg.model['global_batch_size'] = global_batch_size
-        cfg.trainer['accumulate_grad_batches'] = 1
+        if cfg.get('do_training', False):
+            # when training we validate
+            set_cfg_key('global_batch_size', global_batch_size, cfg.model,
+                        msg=' Please set global_batch_size in the config file to be null or to match global_batch_size = micro_batch_size * data_parallel_size * accumulate_grad_batches')
+        else:
+            # otherwise we override at inference
+            with open_dict(cfg):
+                cfg.model['global_batch_size'] = global_batch_size
+
+        # accumulate_grad_batches must always be 1 for NeMo Megatron
+        with open_dict(cfg):
+            cfg.trainer['accumulate_grad_batches'] = 1
 
     @staticmethod
     def configure_plugins(cfg):

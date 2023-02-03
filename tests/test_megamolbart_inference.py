@@ -18,25 +18,44 @@ from contextlib import contextmanager
 from rdkit import Chem
 
 from hydra import compose, initialize
-from bionemo.model.molecule.megamolbart import NeMoMegaMolBARTWrapper
+from hydra.core.plugins import Plugins
+from hydra.core.config_search_path import ConfigSearchPath
+from hydra.plugins.search_path_plugin import SearchPathPlugin
+import os
+
+from bionemo.model.molecule.megamolbart import MegaMolBARTInference
 
 log = logging.getLogger(__name__)
 
+
 _INFERER = None
-
 CONFIG_PATH = "../examples/molecule/megamolbart/conf"
-
+PREPEND_CONFIG_DIR = os.path.abspath("../examples/conf")
 
 @contextmanager
 def load_model(inf_cfg):
 
     global _INFERER
     if _INFERER is None:
-        _INFERER = NeMoMegaMolBARTWrapper(model_cfg=inf_cfg)
+        _INFERER = MegaMolBARTInference(inf_cfg)
     yield _INFERER
 
 
+# TODO Move to module for use elsewhere -- requires different solution for passing prepended directory
+class SearchPathPrepend(SearchPathPlugin):
+    def manipulate_search_path(self, search_path: ConfigSearchPath) -> None:
+        # Add search_path to the end of the existing search path
+        search_path.prepend( 
+            provider="searchpath-plugin", path=f"file://{PREPEND_CONFIG_DIR}"
+        )
+
+
+def register_searchpath_prepend_plugin() -> None:
+    """Call this function before invoking @hydra.main"""
+    Plugins.instance().register(SearchPathPrepend)
+
 def test_smis_to_hiddens():
+    register_searchpath_prepend_plugin()
     with initialize(config_path=CONFIG_PATH):
         cfg = compose(config_name="infer")
 
@@ -44,15 +63,16 @@ def test_smis_to_hiddens():
             smis = ['c1cc2ccccc2cc1',
                     'COc1cc2nc(N3CCN(C(=O)c4ccco4)CC3)nc(N)c2cc1OC',
                     'CC(=O)C(=O)N1CCC([C@H]2CCCCN2C(=O)c2ccc3c(n2)CCN(C(=O)OC(C)(C)C)C3)CC1']
-            hidden_state, pad_masks = inferer.smis_to_hidden(smis)
+            hidden_state, pad_masks = inferer.seq_to_hiddens(smis)
 
             assert hidden_state is not None
             assert hidden_state.shape[0] == len(smis)
-            assert hidden_state.shape[2] == inferer.cfg.max_position_embeddings
+            assert hidden_state.shape[2] == inferer.model.cfg.max_position_embeddings
             assert pad_masks is not None
 
 
 def test_smis_to_embedding():
+    register_searchpath_prepend_plugin()
     with initialize(config_path=CONFIG_PATH):
         cfg = compose(config_name="infer")
 
@@ -60,14 +80,15 @@ def test_smis_to_embedding():
             smis = ['c1cc2ccccc2cc1',
                     'COc1cc2nc(N3CCN(C(=O)c4ccco4)CC3)nc(N)c2cc1OC',
                     'CC(=O)C(=O)N1CCC([C@H]2CCCCN2C(=O)c2ccc3c(n2)CCN(C(=O)OC(C)(C)C)C3)CC1']
-            embedding = inferer.smis_to_embedding(smis)
+            embedding = inferer.seq_to_embeddings(smis)
 
             assert embedding is not None
             assert embedding.shape[0] == len(smis)
-            assert embedding.shape[1] == inferer.cfg.max_position_embeddings
+            assert embedding.shape[1] == inferer.model.cfg.max_position_embeddings
 
 
 def test_hidden_to_smis():
+    register_searchpath_prepend_plugin()
     with initialize(config_path=CONFIG_PATH):
         cfg = compose(config_name="infer")
 
@@ -75,8 +96,8 @@ def test_hidden_to_smis():
             smis = ['c1cc2ccccc2cc1',
                     'COc1cc2nc(N3CCN(C(=O)c4ccco4)CC3)nc(N)c2cc1OC',
                     'CC(=O)C(=O)N1CCC([C@H]2CCCCN2C(=O)c2ccc3c(n2)CCN(C(=O)OC(C)(C)C)C3)CC1']
-            hidden_state, pad_masks = inferer.smis_to_hidden(smis)
-            infered_smis = inferer.hidden_to_smis(hidden_state, pad_masks)
+            hidden_state, pad_masks = inferer.seq_to_hiddens(smis)
+            infered_smis = inferer.hiddens_to_seq(hidden_state, pad_masks)
             log.info(f'Input SMILES and Infered: {smis}, {infered_smis}')
 
             assert(len(infered_smis) == len(smis))
@@ -95,6 +116,7 @@ def test_hidden_to_smis():
 
 
 def test_sample():
+    register_searchpath_prepend_plugin()
     with initialize(config_path=CONFIG_PATH):
         cfg = compose(config_name="infer")
 
@@ -102,7 +124,13 @@ def test_sample():
             smis = ['c1cc2ccccc2cc1',
                     'COc1cc2nc(N3CCN(C(=O)c4ccco4)CC3)nc(N)c2cc1OC',
                     'CC(=O)C(=O)N1CCC([C@H]2CCCCN2C(=O)c2ccc3c(n2)CCN(C(=O)OC(C)(C)C)C3)CC1']
-            samples = inferer.sample(smis, num_samples=10, sampling_method='greedy-perturbate')
+            samples = inferer.sample(
+                num_samples=3, 
+                sampling_method="greedy-perturbate",
+                scaled_radius=1,
+                topk=4,
+                smis=smis, 
+            )
             samples = set(samples)
             log.info('\n'.join(smis))
             log.info('\n'.join(samples))

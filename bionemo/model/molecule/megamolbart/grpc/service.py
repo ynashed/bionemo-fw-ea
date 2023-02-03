@@ -19,7 +19,7 @@ import logging
 from concurrent import futures
 
 from hydra import compose, initialize
-from bionemo.model.molecule.megamolbart import NeMoMegaMolBARTWrapper
+from bionemo.model.molecule.megamolbart import MegaMolBARTInference
 import megamolbart_pb2_grpc
 from megamolbart_pb2 import OutputSpec
 logger = logging.getLogger(__name__)
@@ -31,17 +31,17 @@ class InferenceService(megamolbart_pb2_grpc.GenerativeSampler):
         if not hasattr(self, '_inferer'):
             with initialize(config_path="../../../../../examples/molecule/megamolbart/conf"):
                 inf_cfg = compose(config_name="infer")
-                self._inferer = NeMoMegaMolBARTWrapper(model_cfg=inf_cfg)
+                self._inferer = MegaMolBARTInference(model_cfg=inf_cfg)
 
 
     def SmilesToEmbedding(self, spec, context):
-        embeddings = self._inferer.smis_to_embedding(spec.smis)
+        embeddings = self._inferer.seq_to_embeddings(spec.smis)
         output = OutputSpec(embeddings=embeddings.flatten().tolist(),
                             dim=embeddings.shape)
         return output
 
     def SmilesToHidden(self, spec, context):
-        hidden_states, pad_masks = self._inferer.smis_to_hidden(spec.smis)
+        hidden_states, pad_masks = self._inferer.seq_to_hiddens(spec.smis)
         output = OutputSpec(hidden_states=hidden_states.flatten().tolist(),
                             dim=hidden_states.shape,
                             masks=pad_masks.flatten().tolist())
@@ -55,7 +55,7 @@ class InferenceService(megamolbart_pb2_grpc.GenerativeSampler):
         hidden_states = torch.FloatTensor(list(spec.hidden_states))
         hidden_states = torch.reshape(hidden_states, tuple(spec.dim)).cuda()
 
-        smis = self._inferer.hidden_to_smis(hidden_states,
+        smis = self._inferer.hiddens_to_seq(hidden_states,
                                             pad_mask)
         output = OutputSpec(smis=smis)
         return output
