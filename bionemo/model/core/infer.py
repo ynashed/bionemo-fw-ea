@@ -15,8 +15,9 @@
 
 from omegaconf import ListConfig
 import torch
-from typing import List
+from typing import List, Union
 from pytorch_lightning.core import LightningModule
+from pandas import Series
 
 from nemo.utils import logging
 
@@ -151,7 +152,30 @@ class BaseEncoderDecoderInference(LightningModule):
         
         return token_ids, mask
 
-    def seq_to_hiddens(self, sequences):
+    def detokenize(self, tokens_ids: List[str]):
+        """
+        Detokenize a matrix of tokens into a list of sequences (i.e., strings).
+
+        Args:
+            tokens_ids (torch.Tensor, long): a matrix of token ids
+
+        Returns:
+            sequences (list[str]): list of sequences
+        """
+        tokens_ids = tokens_ids.cpu().detach().numpy().tolist()
+        sequences = []
+        for i, cur_tokens_id in enumerate(tokens_ids):
+            if self.tokenizer.eos_id in cur_tokens_id:
+                idx = cur_tokens_id.index(self.tokenizer.eos_id)
+                tokens_ids[i] = cur_tokens_id[:idx]
+            else:
+                tokens_ids[i] = [id for id in cur_tokens_id if id != self.tokenizer.pad_id]
+
+        sequences = self.tokenizer.ids_to_text(tokens_ids)
+
+        return sequences
+
+    def seq_to_hiddens(self, sequences: List[str]):
         '''
         Transforms Sequences into hidden state.
         This class should be implemented in a child class, since it is model specific.
@@ -187,7 +211,7 @@ class BaseEncoderDecoderInference(LightningModule):
         
         return embeddings
 
-    def seq_to_embeddings(self, sequences):
+    def seq_to_embeddings(self, sequences: List[str]):
         """Compute hidden-state and padding mask for sequences.
 
         Params
@@ -202,3 +226,74 @@ class BaseEncoderDecoderInference(LightningModule):
         embeddings = self.hiddens_to_embedding(hiddens, enc_mask)
 
         return embeddings
+
+    def hiddens_to_seq(self, hidden_states, enc_mask):
+        '''
+        Transforms hidden state into sequences (i.e., sampling in most cases).
+        This class should be implemented in a child class, since it is model specific.
+        This class should return the sequence with special tokens such as
+         <BOS> and <EOS> tokens, if used.
+
+        Args:
+            hidden_states (torch.Tensor, float):
+            enc_mask (torch.Tensor, long): boolean mask for padded sections
+
+        Returns:
+            sequences (list[str]): list of sequences
+        '''
+        raise NotImplementedError("Please implement in child class")
+
+    @property
+    def supported_sampling_methods(self):
+        """
+        Returns a list of supported sampling methods.
+        Example:
+            ["greedy-perturbate", "beam-search"]
+        """
+        return list(self.default_sampling_kwargs.keys())
+
+    @property
+    def default_sampling_kwargs(self):
+        """
+        Returns a dict of default sampling kwargs per sampling method.
+        Example:
+            {
+                "greedy-perturbate": {"scaled_radius": 1, "topk": 10},
+                "beam-search": {"beam_size": 5, "beam_alpha": 0.6, "beam_min_length": 1, "beam_max_length": 100},
+            }
+            
+        Should be overridden in child class if sampling is supported.
+        """
+        return {}
+    
+    def sample(self,
+               num_samples=1,
+               return_embedding=False,
+               sampling_method=None,
+               **sampling_kwarg):
+        """
+        Sample from the model given sampling_method.
+        
+        Args:
+            num_samples (int): number of samples to generate (depends on sampling method)
+            return_embedding (bool): return embeddings corresponding to each of the samples in addition to the samples
+            sampling_method (str): sampling method to use. Should be replaced with default sampling method in child class
+            sampling_kwarg (dict): kwargs for sampling method. Depends on the sampling method.
+        """
+        raise NotImplementedError(f"Sampling is not supported in this class ({self.__class__.__name__})")
+
+    def __call__(self, sequences: Union[Series, List[str]]) -> torch.Tensor:
+        """
+        Computes embeddings for a list of sequences.
+        Embeddings are detached from model.
+        
+        Params
+            sequences: Pandas Series containing a list of strings or or a list of strings (e.g., SMILES)
+            
+        Returns
+            embeddings
+        """
+        if isinstance(sequences, Series):
+            sequences = sequences.tolist()
+
+        return self.seq_to_embeddings(sequences).float().detach().clone()

@@ -5,7 +5,7 @@ defaults:
 
 hydra:
   searchpath:
-     - /workspace/bionemo/examples/conf/
+     - file:///workspace/bionemo/examples/conf/
 
 name: ProtT5_Inference
 desc: Minimum configuration for initializing a ProtT5 model for inference.

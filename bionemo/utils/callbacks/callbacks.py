@@ -29,9 +29,10 @@ from bionemo.model.protein.downstream import secondary_structure_pred as sspred
 from pytorch_lightning.callbacks import Callback
 
 from bionemo.model.core import MLPLightningModule, MLPModel
-from bionemo.model.molecule.megamolbart import MegaMolBARTValidationInferenceWrapper
+from bionemo.model.molecule.megamolbart import MegaMolBARTInference
 from bionemo.data import SingleValuePredictionDataModule
 
+# TODO: need to test validation in the loop
   
 class SSPredictionCallback(Callback):
     def __init__(self, dset_dict, parent_cfg, plugins: Optional[List] = None):
@@ -120,7 +121,7 @@ class MLPValidationCallback(Callback):
     def on_validation_epoch_start(self, trainer, main_model):
         main_model.freeze()
         
-        inference_wrapper = MegaMolBARTValidationInferenceWrapper(main_model, self.cfg)
+        inference_wrapper = MegaMolBARTInference(self.cfg, model=main_model)
         
         data = SingleValuePredictionDataModule(Path(self.dset_dict['csv_path']),
                                             self.dset_dict['name'],

@@ -19,14 +19,16 @@ from io import StringIO
 import pytest
 
 cfg_template = """
+do_training: {do_training}
 trainer:
-  devices: {devices}
-  num_nodes: {num_nodes}
-  accumulate_grad_batches: {accumulate_grad_batches}
+    devices: {devices}
+    num_nodes: {num_nodes}
+    accumulate_grad_batches: {accumulate_grad_batches}
 model:
-  micro_batch_size: {micro_batch_size}
-  tensor_model_parallel_size: {tensor_model_parallel_size}
-  pipeline_model_parallel_size: {pipeline_model_parallel_size}
+    global_batch_size: {global_batch_size}
+    micro_batch_size: {micro_batch_size}
+    tensor_model_parallel_size: {tensor_model_parallel_size}
+    pipeline_model_parallel_size: {pipeline_model_parallel_size}
 """
 
 def load_cfg_str(cfg):
@@ -34,9 +36,11 @@ def load_cfg_str(cfg):
 
 def test_adjust_config_no_keys():
     cfg = load_cfg_str(cfg_template.format(
+        do_training=False,
         devices=6,
         num_nodes=8,
         accumulate_grad_batches=5,
+        global_batch_size=240,
         micro_batch_size=7,
         tensor_model_parallel_size=2,
         pipeline_model_parallel_size=3,
@@ -47,14 +51,15 @@ def test_adjust_config_no_keys():
 
 def test_adjust_config_errors_on_disagreement():
     cfg = load_cfg_str(cfg_template.format(
+        do_training=True,
         devices=6,
         num_nodes=8,
         accumulate_grad_batches=5,
+        global_batch_size=240,
         micro_batch_size=7,
         tensor_model_parallel_size=2,
         pipeline_model_parallel_size=3,
     ))
-    with open_dict(cfg):
-        cfg.model.global_batch_size = 240
+
     with pytest.raises(ValueError):
         TrainerBuilder.adjust_config(cfg)

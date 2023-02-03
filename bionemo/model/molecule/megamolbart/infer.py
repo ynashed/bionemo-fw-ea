@@ -15,332 +15,133 @@
 
 import logging
 import torch
-from torch.nn.functional import pad
-from pandas import Series
-from typing import List, Union
-from omegaconf import OmegaConf
+from typing import List
 
-from pytorch_lightning.trainer.trainer import Trainer
-from nemo.collections.nlp.parts.nlp_overrides import (NLPDDPStrategy,
-                                                      NLPSaveRestoreConnector)
-from nemo.utils.app_state import AppState
-
-from bionemo.data.utils import pad_token_ids
-from bionemo.data import MoleculeEnumeration
-from bionemo.model.molecule.megamolbart import MegaMolBARTModel
-
+from bionemo.model.core.infer import BaseEncoderDecoderInference
 
 log = logging.getLogger(__name__)
-__all__ = ["NeMoMegaMolBARTWrapper", "MegaMolBARTValidationInferenceWrapper"]
+__all__ = ["MegaMolBARTInference"]
 
-
-# FIXME: switch to be based on BaseEncoderDecoderInference
-
-class NeMoMegaMolBARTWrapper():
+class MegaMolBARTInference(BaseEncoderDecoderInference):
     '''
-    Implements functions to infer using MegaMolBART model
+    All inference functions
     '''
 
-    def __init__(self,
-                 model_cfg=None,
-                 random_weights=False) -> None:
-        super().__init__()
-
-        if model_cfg is None:
-            # TODO: Create a default global variable for this
-            log.info('Loading default configuration...')
-            model_cfg = OmegaConf.load(
-                '/workspace/bionemo/examples/bionemo/conf/infer.yaml')
-        if random_weights:
-            model_cfg['model']['model_path'] = None
-
-        self.model = self.load_model(model_cfg)
-        self.cfg = self.model._cfg
-        self.max_seq_len = self.cfg.max_position_embeddings
-        self.tokenizer = self.model.tokenizer
-
-        pad_size_divisible_by_8 = True if self.cfg.masked_softmax_fusion else False
-        self.mol_enum = MoleculeEnumeration(tokenizer=self.tokenizer,
-                                            seq_length=self.cfg.seq_length,
-                                            pad_size_divisible_by_8=pad_size_divisible_by_8,
-                                            **self.cfg.data)
-        self.mol_enum.encoder_mask = False
-
-        self.mol_enum.encoder_augment = False
-        self.mol_enum.encoder_mask = False
-        self.mol_enum.canonicalize_input = False
-        self.mol_enum.decoder_augment = False
-        self.mol_enum.decoder_mask = False
-        self.mol_enum.mask_prob = 0
-
-    def _tokenize(self, smis: List[str]):
+    def __init__(self, cfg, model=None):
+        super().__init__(cfg=cfg, model=model)
+        
+    def _tokenize(self, sequences: List[str]):
         """
-        MegaMolBART expects input/output format:
+        ProtT5 expects input/output format:
         
         encoder input ids - [tokens] (without <BOS> and <EOS>)
         decoder input ids - <BOS> + [tokens]
         decoder output ids - [tokens] + <EOS>
         """
-        tokens = [self.tokenizer.text_to_tokens(s) for s in smis]
-        token_ids = [self.tokenizer.token_to_ids(t) for t in tokens]
+        # Tokenize sequences
+        token_ids = [self.tokenizer.text_to_ids(s) for s in sequences]
 
-        # Pad token ids (1/True = Active, 0/False = Inactive)
-        token_ids, encoder_mask = pad_token_ids(
-            token_ids, 
-            padding_value=self.tokenizer.pad_id, 
-            pad_size_divisible_by=8 if self.pad_size_divisible_by_8 else 1,  
-            dtype=torch.int64,
-            # FIXME: use model.device
-            device="cuda",
-            )
+        return token_ids
 
-        return token_ids, encoder_mask
-
-    def _transform(self, smis):
+    def seq_to_hiddens(self, sequences):
         '''
-        Transforms SMILES into hidden state.
+        Transforms Sequences into hidden state.
+        Should be implemented in a child class, since it is model specific.
+        This method returns hidden states and masks.
+        Hiddens states contain paddings but do not contain special tokens 
+        such as <BOS> and <EOS> tokens.
 
         Args:
-            smis (list[str]): list of SMILES strings
+            sequences (list[str]): list of sequences
 
         Returns:
-            tokens_enc (torch.Tensor, long): token ID values for samples
             hidden_states (torch.Tensor, float):
             enc_mask (torch.Tensor, long): boolean mask for padded sections
         '''
+        token_ids, enc_mask = self.tokenize(sequences)
+        embedding = self.model.encode(tokens_enc=token_ids, enc_mask=enc_mask)
 
-        tokens_enc, enc_mask = self._tokenize(smis)
-        hidden_states = self.model.encode(tokens_enc, enc_mask)
+        return embedding, enc_mask
 
-        return hidden_states, enc_mask
+    def hiddens_to_seq(self, hidden_states, enc_mask):
+        '''
+        Transforms hidden state into sequences (i.e., sampling in most cases).
+        This class should be implemented in a child class, since it is model specific.
+        This class should return the sequence with special tokens such as
+         <BOS> and <EOS> tokens, if used.
 
-    def load_model(self, model_cfg):
-        """Load saved model checkpoint
-
-        Params:
-            checkpoint_path: path to nemo checkpoint
+        Args:
+            hidden_states (torch.Tensor, float):
+            enc_mask (torch.Tensor, long): boolean mask for padded sections
 
         Returns:
-            MegaMolBART trained model
-        # """
-        torch.set_grad_enabled(False)
-
-        # trainer required for restoring model parallel model
-        trainer = Trainer(
-            plugins=[],
-            devices=1,
-            accelerator='gpu',
-            precision=32, #TODO: Run benchmark to verify this value has no or
-            strategy=NLPDDPStrategy(),
-            #                     minimum impact on KPIs.
-        )
-
-        app_state = AppState()
-        if model_cfg.model.model_path is not None:
-            model = MegaMolBARTModel.restore_from(
-                restore_path=model_cfg.model.model_path,
-                trainer=trainer,
-                save_restore_connector=NLPSaveRestoreConnector(),
-            )
-        else:
-            # Initialize with random weights
-            cfg = OmegaConf.load(
-                '/workspace/bionemo/examples/bionemo/conf/pretrain_base.yaml')
-            cfg.model.num_layers=6
-            cfg.model.hidden_size=512
-            cfg.model.num_attention_heads=8
-            cfg.model.precision = cfg.trainer.precision
-
-            model = MegaMolBARTModel(cfg.model, trainer)
-
-        model.freeze()
-
-        return model
-
-    def smis_to_hidden(self, smis: List[str]):
-        """Compute hidden-state and padding mask for smiles.
-
-        Params
-            smi: string, input SMILES molecule
-
-        Returns
-            hidden-state array and boolean mask
-        """
-        if isinstance(smis, str):
-            smis = [smis]
-
-        hidden_states, enc_masks = self._transform(smis)
-        return hidden_states, enc_masks
-
-    def smis_to_embedding(self, smis: List[str]):
-        """Computes embedding and padding mask for smiles.
-
-        Params
-            smi: string, input SMILES molecule
-
-        Returns
-            hidden-state array and boolean mask
-        """
-        if isinstance(smis, str):
-            smis = [smis]
-
-        hiddens, enc_masks = self.smis_to_hidden(smis)
-        # compute average on active hiddens
-        lengths = enc_masks.sum(dim=1, keepdim=True)
-        if (lengths == 0).any():
-            raise ValueError("Empty input is not supported (no token was proveded in one or more of the inputs)")
-
-        emb = torch.sum(hiddens*enc_masks.unsqueeze(-1), dim=1) / lengths
-
-        return emb
-
-    def hidden_to_smis(self, hidden_states, enc_mask):
-
-        predicted_tokens_ids, _ = self.model.decode(None,
-                                                    enc_mask,
-                                                    self.cfg.max_position_embeddings,
+            sequences (list[str]): list of sequences
+        '''
+        predicted_tokens_ids, _ = self.model.decode(tokens_enc=None,
+                                                    enc_mask=enc_mask,
+                                                    num_tokens_to_generate=self.model.cfg.max_position_embeddings,
                                                     enc_output=hidden_states)
+        sequences = self.detokenize(tokens_ids=predicted_tokens_ids)
+        
+        return sequences
 
-        predicted_tokens_ids = predicted_tokens_ids.cpu().detach().numpy().tolist()
-        for i, predicted_token_id in enumerate(predicted_tokens_ids):
-            if self.tokenizer.eos_id in predicted_token_id:
-                idx = predicted_token_id.index(self.tokenizer.eos_id)
-                predicted_tokens_ids[i] = predicted_token_id[:idx]
-            else:
-                predicted_tokens_ids[i] = [id for id in predicted_token_id if id != self.tokenizer.pad_id]
-
-        smis = self.tokenizer.ids_to_text(predicted_tokens_ids)
-
-        return smis
-
+    @property
+    def default_sampling_kwargs(self):
+        """
+        Returns a dict of default sampling kwargs per sampling method.
+        Example:
+            {
+                "greedy-perturbate": {"scaled_radius": 1, "topk": 10},
+                "beam-search": {"beam_size": 5, "beam_alpha": 0.6, "beam_min_length": 1, "beam_max_length": 100},
+            }
+            
+        Should be overridden in child class if sampling is supported.
+        """
+        return {
+                # smis - a list of SMILES strings to perturbate num_samples times each
+                "greedy-perturbate": {"scaled_radius": 1, "topk": 10, "smis": []},
+            }
+        
     def sample(self,
-               smis,
                num_samples=10,
                return_embedding=False,
-               sampling_method='greedy-perturbate',
-               sampling_kwarg={'scaled_radius': 1, 'topk': 10}):
+               sampling_method="greedy-perturbate",
+               **sampling_kwarg):
         """
-        Sample from model given hidden states and mask
+        Sample from the model given sampling_method.
+        
+        Args:
+            num_samples (int): number of samples to generate (depends on sampling method)
+            return_embedding (bool): return embeddings corresponding to each of the samples in addition to the samples
+            sampling_method (str): sampling method to use. Should be replaced with default sampling method in child class
+            sampling_kwarg (dict): kwargs for sampling method. Depends on the sampling method.
         """
-        hidden_states, enc_masks = self.smis_to_hidden(smis)
-
+        # get sampling kwargs
+        default_sampling_kwarg = self.default_sampling_kwargs
+        if not sampling_method in default_sampling_kwarg:
+            raise ValueError(f'Invalid samping method {sampling_method}, supported sampling methods are {default_sampling_kwarg.keys()}')
+        
+        cur_sampling_kwarg = default_sampling_kwarg[sampling_method].copy()
+        cur_sampling_kwarg.update(sampling_kwarg)
+        sampling_kwarg = cur_sampling_kwarg
+        
+        # execute selected sampling method
         if sampling_method == 'greedy-perturbate':
+            smis = sampling_kwarg["smis"]
+            if not len(smis):
+                raise ValueError(f'No SMILES strings provided for sampling via "smis" argument')
+            
+            hidden_states, enc_masks = self.seq_to_hiddens(smis)
             scaled_radius = sampling_kwarg['scaled_radius']
             sample_masks = enc_masks.repeat_interleave(num_samples, 0)
             perturbed_hiddens = hidden_states.repeat_interleave(num_samples, 0)
             perturbed_hiddens = perturbed_hiddens + (scaled_radius * torch.randn(perturbed_hiddens.shape).to(perturbed_hiddens.device))
 
-            samples = self.hidden_to_smis(perturbed_hiddens, sample_masks)
+            samples = self.hiddens_to_seq(perturbed_hiddens, sample_masks)
             if return_embedding:
-                embs = torch.mean(perturbed_hiddens, dim=1)
-        else:
-            raise ValueError(f'Invalid samping method {sampling_method}')
+                embs = self.hiddens_to_embedding(perturbed_hiddens, sample_masks)
 
         if return_embedding:
             return samples, embs
         else:
             return samples
-
-# TODO refactor this wrapper's functionality into NeMoMegaMolBARTWrapper
-class MegaMolBARTValidationInferenceWrapper:
-    """Inference wrapper for MegaMolBART for use in the training loop"""
-    
-    def __init__(self, megamolbart: MegaMolBARTModel, cfg) -> None:
-        self.mmb = megamolbart
-        self.cfg = cfg
-        self.microbatch_size = self.cfg.model.micro_batch_size
-        
-    def _pad_tensor(self, t: torch.Tensor, n: int) -> torch.Tensor:
-        """
-        Pads first dimension of tensor to nearest multiple of n, rounding up. Zero-fills padded elements
-        
-        Params
-            t: Input tensor
-            n: t will be padded to nearest multiple of n, rounding up
-        
-        Returns
-            Padded tensor or same tensor if t.shape[0] % n == 0
-        """
-        length = t.shape[0]
-        if length % n != 0:
-            m = (length // n) + 1
-            new_length = m * n
-            diff = new_length - length
-            padder = [0 for i in range(t.ndim * 2)]
-            # pad the first dimension only
-            padder[-1] = diff
-            z = pad(t, padder)
-            return z
-        else:
-            return t
-        
-    def _tokenize(self, smis: List[str]):
-        """
-        Tokenizes a list of SMILES strings
-        
-        Params
-            smis: List of strings
-            
-        Returns
-            (token_ids, encoder_mask)
-        """
-        tokens = [self.mmb.tokenizer.text_to_tokens(s) for s in smis]
-        token_ids = [self.mmb.tokenizer.token_to_ids(t) for t in tokens]
-
-        pad_length = max([len(seq) for seq in token_ids])
-        encoder_mask = [([1] * len(seq)) + ([0] * (pad_length - len(seq))) for seq in token_ids]
-        token_ids = [seq + ([self.mmb.tokenizer.pad_id] * (pad_length - len(seq))) for seq in token_ids]
-
-        token_ids = torch.tensor(token_ids, dtype=torch.int64)
-        encoder_mask = torch.tensor(encoder_mask,
-                                    dtype=torch.int64,
-                                    device=token_ids.device)
-
-        return token_ids, encoder_mask
-    
-    def _smis_to_embedding(self, smis: Union[List[str], str]) -> torch.Tensor:
-        """
-        Computes embedding for smiles.
-
-        Params
-            smi: String or list of Strings
-
-        Returns
-            embeddings
-        """
-        if type(smis) is str:
-            smis = [smis]
-        
-        with torch.no_grad():
-            # Calling model.encode() interferes with global microbatch settings and raises errors when reconfigure_microbatch=True.
-            # Workaround: pad and batch smiles to match microbatch size before calling model.encode() with reconfigure_microbatch=False
-            tokens_enc, enc_mask = self._tokenize(smis)
-            tokens_enc_padded, enc_mask_padded = self._pad_tensor(tokens_enc, self.microbatch_size), self._pad_tensor(enc_mask, self.microbatch_size)
-            tokens_enc_split, enc_mask_split = torch.split(tokens_enc_padded, self.microbatch_size, dim=0), torch.split(enc_mask_padded, self.microbatch_size, dim=0)
-            
-            hidden_states_chunked = [self.mmb.encode(tokens_chunk, mask_chunk, reconfigure_microbatch=False) for tokens_chunk, mask_chunk in zip(tokens_enc_split, enc_mask_split)]
-            hidden_states = torch.cat(hidden_states_chunked, dim=0)
-            hidden_states = hidden_states[:tokens_enc.shape[0], ...]
-            
-            enc_mask = enc_mask.to(hidden_states.device)
-                        
-            lengths = enc_mask.sum(dim=1, keepdim=True)
-            if (lengths==0).any():
-                raise ValueError("Empty input is not supported (no token was proveded in one or more of the inputs)")
-            
-            embeddings = torch.sum(hidden_states*enc_mask.unsqueeze(-1), dim=1) / lengths
-        
-        return embeddings
-    
-    def __call__(self, smiles_series: Series) -> torch.Tensor:
-        """
-        Computes embeddings for a list of SMILES
-        
-        Params
-            smiles: Pandas Series containing a list of SMILES strings
-            
-        Returns
-            embeddings
-        """
-        smiles = smiles_series.tolist()
-        return self._smis_to_embedding(smiles).float().detach().clone()

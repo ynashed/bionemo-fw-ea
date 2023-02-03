@@ -58,10 +58,10 @@ def test_seq_to_embedding():
         with load_model(cfg) as inferer:
             seqs = ['MSLKRKNIALIPAAGIGVRFGADKPKQYVEIGSKTVLEHVLGIFERHEAVDLTVVVVSPEDTFADKVQTAFPQVRVWKNGGQTRAETVRNGVAKLLETGLAAETDNILVHDAARCCLPSEALARLIEQAGNAAEGGILAVPVADTLKRAESGQISATVDRSGLWQAQTPQLFQAGLLHRALAAENLGGITDEASAVEKLGVRPLLIQGDARNLKLTQPQDAYIVRLLLDAV',
                     'MIQSQINRNIRLDLADAILLSKAKKDLSFAEIADGTGLAEAFVTAALLGQQALPADAARLVGAKLDLDEDSILLLQMIPLRGCIDDRIPTDPTMYRFYEMLQVYGTTLKALVHEKFGDGIISAINFKLDVKKVADPEGGERAVITLDGKYLPTKPF']
-            embedding = inferer.seq_to_hiddens(seqs)
+            embedding, mask = inferer.seq_to_hiddens(seqs)
             assert embedding is not None
             assert embedding.shape[0] == len(seqs)
-            assert len(embedding.shape) == 2
+            assert len(embedding.shape) == 3
 
 
 def test_long_seq_to_embedding():
