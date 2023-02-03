@@ -17,7 +17,7 @@ BIONEMO_IMAGE=nvcr.io/t6a4nuz8vrsr/bionemo:latest                   # Container 
 GITHUB_BRANCH=v0.3.0_ea1                                            # GitLab branch
 PROJECT_MOUNT=/workspace/bionemo                                     # Location of library in container /workspace/bionemo for dev work or /opt/nvidia/bionemo for non-dev use                                      
 PROJECT_PATH=$(pwd)                                                 # Path of env config and optional development code
-DATA_PATH=${HOME}/data                                              # Path for data download and processing
+DATA_PATH=${HOME}/data                                              # Local Path to save downloaded and processed data
 RESULT_PATH=${HOME}/result/bionemo_experiments                      # Path for training results
 GITHUB_ACCESS_TOKEN=INSERT_GITHUB_ACCESS_TOKEN_HERE                 # Only required for building container from a private branch
 WANDB_API_KEY=$(grep password $HOME/.netrc | cut -d' ' -f4)         # Requires WandB API key configuration
@@ -35,7 +35,7 @@ Once a container has been pulled and the `.env` file has been setup, it can be s
 
 ## Data Processing and Training
 
-The following files are required for data processing or training models:
+In order to prevent downloading and processing of data everytime a new container is launched, be sure to set a valid path at DATA_PATH variable in the .env file. The data will be mounted at `/data` location inside the container and be available for use. The following files are required for data processing or training models:
 
 ### Model Configuration File
 
