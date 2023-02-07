@@ -1,0 +1,9 @@
+{
+    "reduced_train_loss": 5.1657,
+    "global_step": 10.0,
+    "consumed_samples": 36.0,
+    "val_loss": 5.0526,
+    "ss_test_loss": 3.1299,
+    "3-state_accuracy": 38.0552,
+    "8-state_accuracy": 19.2777
+}

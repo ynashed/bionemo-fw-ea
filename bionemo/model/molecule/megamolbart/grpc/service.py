@@ -31,7 +31,7 @@ class InferenceService(megamolbart_pb2_grpc.GenerativeSampler):
         if not hasattr(self, '_inferer'):
             with initialize(config_path="../../../../../examples/molecule/megamolbart/conf"):
                 inf_cfg = compose(config_name="infer")
-                self._inferer = MegaMolBARTInference(model_cfg=inf_cfg)
+                self._inferer = MegaMolBARTInference(cfg=inf_cfg)
 
 
     def SmilesToEmbedding(self, spec, context):
