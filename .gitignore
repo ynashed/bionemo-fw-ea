@@ -13,6 +13,9 @@ fastspeech_output
 .viminfo
 .ssh/*
 .gitconfig
+.redhat/
+.python_history
+.dotnet/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

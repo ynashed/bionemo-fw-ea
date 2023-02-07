@@ -1,12 +1,9 @@
 defaults:
   - base_config
 
-hydra:
-  searchpath:
-    - file://${oc.env:PROJECT_MOUNT}/examples/protein/esm1nv/conf/ # PROJECT_MOUNT is env variable with root location of code e.g. /opt/nividia/bionemo or /workspace/bionemo
-
 trainer:
   devices: 1
+  num_nodes: 1
   max_epochs: 1 # PTL default. In practice we don't usually train for more than 1 epoch.
   max_steps: 500 # consumed_samples = global_step * micro_batch_size * data_parallel_size * accumulate_grad_batches
   val_check_interval: 500
@@ -41,3 +38,10 @@ model:
     seed: ${model.seed}
     max_seq_length: ${model.seq_length}
     data_prefix: null
+
+exp_manager:
+  exp_dir: /tmp/nemo_experiments/esm1nv_pretrain
+  create_wandb_logger: False
+  create_tensorboard_logger: False
+  wandb_logger_kwargs:
+    offline: True

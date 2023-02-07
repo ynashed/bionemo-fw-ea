@@ -1,11 +1,7 @@
 defaults:
   - base_config
 
-hydra:
-  searchpath:
-    - file://${oc.env:PROJECT_MOUNT}/examples/protein/prott5nv/conf/ # PROJECT_MOUNT is env variable with root location of code e.g. /opt/nividia/bionemo or /workspace/bionemo
-
-name: prott5nv_model
+name: prott5nv_sspred
 do_training: True # set to false if data preprocessing steps must be completed
 do_testing: False # set to true to run evaluation on test data after training, requires test_dataset section
 restore_from_path: /model/protein/prott5nv/prott5nv.nemo # used when starting from a .nemo file
@@ -26,7 +22,7 @@ model:
   micro_batch_size: 4
   data:
     data_url: 'https://ftp.uniprot.org/pub/databases/uniprot/uniref/uniref50/uniref50.fasta.gz' 
-    dataset_path: /data/uniref2022_05 # parent directory for data, contains train / val / test folders
+    dataset_path: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/protein # parent directory for data, contains train / val / test folders
     dataset: # inclusive range of data files to load or can load a single file, e.g. x000.csv
       train: x000
       test: x000
@@ -50,9 +46,9 @@ model:
         shuffle: False
         num_workers: 20
         train_ds: 
-          data_file: /data/netsurfp_2.0/train/x000.csv 
+          data_file: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/protein/downstream/train/x000.csv
         test_ds: 
-          data_file: /data/netsurfp_2.0/test/new_pisces.csv 
+          data_file: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/protein/downstream/test/x000.csv
         random_seed: 1234
         optim:
             name: adam
@@ -69,3 +65,9 @@ model:
               warmup_ratio: 0.01
               max_steps: 1000
   
+exp_manager:
+  exp_dir: /tmp/nemo_experiments/prott5nv_sspred
+  create_wandb_logger: False
+  create_tensorboard_logger: False
+  wandb_logger_kwargs:
+    offline: True

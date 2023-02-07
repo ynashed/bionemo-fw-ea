@@ -1,1 +1,0 @@
-loss=2.08 reduced_train_loss=2.200 global_step=499.0 consumed_samples=2e+3 val_loss=0.836 val_reduced_loss=2.150 val_character_accuracy=0.442 val_molecular_accuracy=0.000 val_percent_invalid=0.750]

@@ -14,3 +14,4 @@ ijson
 numpy
 wandb
 einops
+pytest-forked
