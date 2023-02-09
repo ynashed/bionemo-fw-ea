@@ -143,6 +143,7 @@ class EncoderFineTuning(ModelPT, Exportable, ABC):
         output_tensor = self.encoder_forward(self.encoder_model, batch)
         task_input_tensor = self.extract_for_task_head(output_tensor)
         output = self.task_head(task_input_tensor)
+
         return output
 
     def _calc_step(self, batch, batch_idx):
@@ -213,6 +214,7 @@ class EncoderFineTuning(ModelPT, Exportable, ABC):
             averaged_loss = torch.stack(outputs).mean()
         else:
             averaged_loss = torch.nan
+
         self.log('val_loss', averaged_loss, prog_bar=True)
 
     def setup_training_data(self, cfg):

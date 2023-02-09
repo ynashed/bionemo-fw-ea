@@ -16,6 +16,7 @@
 import re
 import torch
 from omegaconf.omegaconf import open_dict
+from omegaconf.listconfig import ListConfig
 from omegaconf import OmegaConf
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks.timer import Timer
@@ -77,6 +78,8 @@ def infer_global_batch_size(
             tensor_model_parallel_size=1,
             pipeline_model_parallel_size=1,
         ):
+
+    n_devices = get_num_devices(n_devices)
     world_size = n_devices * n_nodes
     model_parallel_size = tensor_model_parallel_size * pipeline_model_parallel_size
 
@@ -95,6 +98,13 @@ def infer_global_batch_size(
 
     return global_batch_size
 
+# Use this fucntion to retreive number of devices
+# Handles cases where n_devices is not integer (example: in multirun mode) 
+def get_num_devices(n_devices):
+    if not isinstance(n_devices,int):
+        n_devices = len(n_devices)
+    
+    return n_devices
 
 class TrainerBuilder(object):
     @staticmethod
@@ -105,6 +115,7 @@ class TrainerBuilder(object):
         n_devices = cfg.trainer.devices
         n_nodes = cfg.trainer.num_nodes
         acc_grad_batches = cfg.trainer.get("accumulate_grad_batches", 1)
+
         global_batch_size = infer_global_batch_size(
                 micro_batch_size=micro_batch_size,
                 n_devices=n_devices,
