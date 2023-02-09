@@ -71,20 +71,18 @@ model:
     merge_file: null
 
   optim:
-    name: fused_adam # fused optimizers used by Megatron models
-    lr: 1.0 # max is scaled by Noam scheduler to d_model**(-0.5) * warmup**(-0.5)
+    name: adam
+    lr: 0.001
     betas:
       - 0.9
       - 0.999
     eps: 1e-8
     weight_decay: 0.01
     sched:
-      name: NoamAnnealing
-      d_model: ${model.hidden_size}
-      warmup_steps: 8000 # use to set warmup_steps explicitly or leave as null to calculate
-      warmup_ratio: null # calculate warmup_steps from warmup_ratio * max_steps, but will throw error if max_steps * warmup_ratio < 1
-      max_steps: 1000000 # can also use ${trainer.max_steps} to scale
-      min_lr: 1e-5
+      name: WarmupAnnealing
+      min_lr: 0.00001
+      last_epoch: -1
+      warmup_ratio: 0.01
 
   data:
     dataloader_type: 'single'
