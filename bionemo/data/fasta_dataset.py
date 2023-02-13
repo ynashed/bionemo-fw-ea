@@ -72,6 +72,12 @@ BACKENDS = {
 }
 
 class SafePyfastxFasta(object):
+    ''' SafePyfastxFasta provides safety pytorch distributed by ensuring the pyfastx indexes are created only once.
+    Previously, when more than one device was configured, a race condition would occur where all workers would try to build an index.
+    If an index file already existed, the worker would attempt to use it, leading to a crash. This extension guards against this scenario.
+    
+    Since the original pyfastx is marked as final, we must override getattribute to mimic inheritence. 
+    '''
     def __init__(self, *args, **kwargs):
         if distributed.get_rank() == 0:
             self.fasta = pyfastx.Fasta(*args, **kwargs)
@@ -85,9 +91,6 @@ class SafePyfastxFasta(object):
             return fa
         else:
             return getattr(fa, __name)
-
-    #def __getitem__(self, item):
-    #    return self.fasta[item]
 
     def __iter__(self):
         for seq in self.fasta:
