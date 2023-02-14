@@ -47,13 +47,11 @@ class FineTuneDataModule(BioNeMoDataModule):
     def __init__(self, cfg, tokenizer_fn, trainer):
         super().__init__(cfg, trainer)
 
-        self.data_path = Path(cfg.downstream_task.dataset)
-        self.data = FineTuneDataset(self.data_path, tokenizer_fn, input_column = cfg.downstream_task.smis_column, target_column = cfg.downstream_task.target_column)
+        self.train_data_path = Path(cfg.downstream_task.train_ds.data_file)
+        self.val_data_path = Path(cfg.downstream_task.validation_ds.data_file)
 
-        train_size = int(0.75*len(self.data))
-        val_size = len(self.data) - train_size
-
-        self.train_ds, self.val_ds = torch.utils.data.random_split(self.data, [train_size, val_size])
+        self.train_ds = FineTuneDataset(self.train_data_path, tokenizer_fn, input_column = cfg.downstream_task.smis_column, target_column = cfg.downstream_task.target_column)
+        self.val_ds = FineTuneDataset(self.val_data_path, tokenizer_fn, input_column = cfg.downstream_task.smis_column, target_column = cfg.downstream_task.target_column)
 
     def train_dataset(self):
         """Creates a training dataset
@@ -81,14 +79,14 @@ class FineTuneDataModule(BioNeMoDataModule):
         This is a good place to adjust the collate function of the dataloader.
         """
 
-        dataloader.collate_fn = self.data.custom_collate
+        dataloader.collate_fn = self.train_ds.custom_collate
 
     def adjust_val_dataloader(self, model, dataloader):
         """Allows adjustments to the validation dataloader
         This is a good place to adjust the collate function of the dataloader.
         """
 
-        dataloader.collate_fn = self.data.custom_collate
+        dataloader.collate_fn = self.val_ds.custom_collate
 
     #NOTE implement if upsampling/resuming becomes necessary; Reference FastaDataset implmentation
     # def sample_train_dataset(self, dataset):

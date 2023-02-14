@@ -97,11 +97,14 @@ model:
     hidden_layer_size: 128
     loss_func: MSELoss
     dataset_path: "/workspace/"
-    dataset: "/workspace/bionemo/benchmark_MoleculeNet_FreeSolv.csv"
-    smis_column: 'SMILES'
-    target_column: 'y'
     megamolbart_model_path: "/workspace/bionemo/MegaMolBART_0_2_0.nemo" # used to load pretrained megamolbart .nemo file
     freeze_encoder_weights: True
+    smis_column: 'SMILES'
+    target_column: 'y'
+    train_ds:
+      data_file: "/workspace/bionemo/examples/molecule/megamolbart/train/train.csv"
+    validation_ds:
+      data_file: "/workspace/bionemo/examples/molecule/megamolbart/val/val.csv"
 
     optim:
       name: adam
