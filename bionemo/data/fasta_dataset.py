@@ -79,11 +79,14 @@ class SafePyfastxFasta(object):
     Since the original pyfastx is marked as final, we must override getattribute to mimic inheritence. 
     '''
     def __init__(self, *args, **kwargs):
-        if distributed.get_rank() == 0:
-            self.fasta = pyfastx.Fasta(*args, **kwargs)
-        distributed.barrier()
-        if distributed.get_rank() != 0:
-            self.fasta = pyfastx.Fasta(*args, **kwargs)
+        if distributed.is_available():
+            if distributed.get_rank() == 0:
+                self.fasta = pyfastx.Fasta(*args, **kwargs)
+            distributed.barrier()
+            if distributed.get_rank() != 0:
+                self.fasta = pyfastx.Fasta(*args, **kwargs)
+        else:
+            return pyfastx.Fasta(*args, **kwargs)
 
     def __getattribute__(self, __name: str):
         fa = object.__getattribute__(self, 'fasta')
@@ -390,7 +393,7 @@ class DiscretizeFastaDataset(MappedDataset):
 
 class ConcatFastaDataset(Dataset):
     def __init__(self, files, max_length, backend='file', uppercase=False,
-                 transforms=None,
+                 transforms=None 
                  ):
         """
         Constructs a dataset consisting of multiple FASTA files.
@@ -417,9 +420,11 @@ class ConcatFastaDataset(Dataset):
             transforms = []
         self.transforms = transforms
         self.datasets = []
+
+        pyfastx_cls = SafePyfastxFasta if distributed.is_initialized() else pyfastx.Fasta
         for f in files:
             new_dataset = PyfastxFastaDataset(
-                SafePyfastxFasta(f, uppercase=uppercase),
+                pyfastx_cls(f, uppercase=uppercase),
                 max_length, backend=backend,
             )
             self.datasets.append(self._apply_transforms(new_dataset))
