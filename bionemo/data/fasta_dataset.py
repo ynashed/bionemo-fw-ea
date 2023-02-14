@@ -19,6 +19,7 @@ import pyfastx
 from nemo.core import Dataset
 from functools import lru_cache
 from torch.utils.data import ConcatDataset
+from torch import distributed
 import numpy as np
 from omegaconf import open_dict
 from bionemo.data.mapped_dataset import MappedDataset, NeMoUpsampling
@@ -69,6 +70,34 @@ BACKENDS = {
     'file': _FetchFastxBackend,
     'memory': _InMemoryFastxBackend,
 }
+
+class SafePyfastxFasta(object):
+    ''' SafePyfastxFasta provides safety pytorch distributed by ensuring the pyfastx indexes are created only once.
+    Previously, when more than one device was configured, a race condition would occur where all workers would try to build an index.
+    If an index file already existed, the worker would attempt to use it, leading to a crash. This extension guards against this scenario.
+    
+    Since the original pyfastx is marked as final, we must override getattribute to mimic inheritence. 
+    '''
+    def __init__(self, *args, **kwargs):
+        if distributed.is_available():
+            if distributed.get_rank() == 0:
+                self.fasta = pyfastx.Fasta(*args, **kwargs)
+            distributed.barrier()
+            if distributed.get_rank() != 0:
+                self.fasta = pyfastx.Fasta(*args, **kwargs)
+        else:
+            return pyfastx.Fasta(*args, **kwargs)
+
+    def __getattribute__(self, __name: str):
+        fa = object.__getattribute__(self, 'fasta')
+        if __name == 'fasta':
+            return fa
+        else:
+            return getattr(fa, __name)
+
+    def __iter__(self):
+        for seq in self.fasta:
+            yield seq
 
 
 class PyfastxFastaDataset(Dataset):
@@ -364,7 +393,7 @@ class DiscretizeFastaDataset(MappedDataset):
 
 class ConcatFastaDataset(Dataset):
     def __init__(self, files, max_length, backend='file', uppercase=False,
-                 transforms=None,
+                 transforms=None 
                  ):
         """
         Constructs a dataset consisting of multiple FASTA files.
@@ -391,12 +420,15 @@ class ConcatFastaDataset(Dataset):
             transforms = []
         self.transforms = transforms
         self.datasets = []
+
+        pyfastx_cls = SafePyfastxFasta if distributed.is_initialized() else pyfastx.Fasta
         for f in files:
             new_dataset = PyfastxFastaDataset(
-                pyfastx.Fasta(f, uppercase=uppercase),
+                pyfastx_cls(f, uppercase=uppercase),
                 max_length, backend=backend,
             )
             self.datasets.append(self._apply_transforms(new_dataset))
+
         self._dataset = ConcatDataset(self.datasets)
         self.ids = {}
         self.build_id_index()
@@ -599,15 +631,20 @@ class DNABERTDataModule(BioNeMoDataModule):
         return options
 
     @staticmethod
+    def _custom_get_sentence(x):
+        ''' Replaces lambda usage below so this can be properly pickled. '''
+        return x['seq']
+
+    @staticmethod
     def _get_random_length_truncator():
         sentence_transform = LengthTruncator()
-        sentence_transform.get_sentence = lambda x: x['seq']
+        sentence_transform.get_sentence = DNABERTDataModule._custom_get_sentence
         return sentence_transform
 
     @staticmethod
     def _get_deterministic_length_truncator():
         sentence_transform = DeterministicLengthTruncator()
-        sentence_transform.get_sentence = lambda x: x['seq']
+        sentence_transform.get_sentence = DNABERTDataModule._custom_get_sentence
         return sentence_transform
 
     def _setup_collate(self, model, dataloader, sentence_transform):
@@ -631,7 +668,7 @@ class DNABERTDataModule(BioNeMoDataModule):
         """Creates a Training dataset for DNABERT
 
         Returns:
-            Dataset: A ConcatFastaDataset.
+            Dataset: A Dataset.
 
         """
         ds = self.cfg.dataset.train
@@ -640,7 +677,6 @@ class DNABERTDataModule(BioNeMoDataModule):
         options['discretize'] = self.cfg.discretize_train
 
         dataset = DNABERTDatasetFactory().create_dataset(options)
-
         return dataset
 
     def sample_train_dataset(self, dataset):

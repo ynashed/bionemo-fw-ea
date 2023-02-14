@@ -82,7 +82,7 @@ class RemoteResource(object):
     dest_filename: str
     dest_directory: str
 
-    root_directory: str = "/"  # NOTE, to use a tmpdir, this should be invoked at the toplevel. We could _perhaps_ offer a utility method for getting the tmpdir
+    root_directory: str = "/tmp"
     url: Optional[str] = None
 
     @property
