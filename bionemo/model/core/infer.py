@@ -43,15 +43,17 @@ class BaseEncoderDecoderInference(LightningModule):
     Base class for inference.
     '''
 
-    def __init__(self, cfg, model=None):
+    def __init__(self, cfg, model=None, freeze=True, restore_path=None, training=False):
         super().__init__()
 
         self.cfg = cfg
-        self.model = self.load_model(cfg, model=model)
+        self._freeze_model = freeze
+        self.training = training
+        self.model = self.load_model(cfg, model=model, restore_path=restore_path)
         self._trainer = self.model.trainer
         self.tokenizer = self.model.tokenizer
     
-    def load_model(self, cfg, model=None):
+    def load_model(self, cfg, model=None, restore_path=None):
         """Load saved model checkpoint
 
         Params:
@@ -62,8 +64,10 @@ class BaseEncoderDecoderInference(LightningModule):
         """        
         # load model class from config which is required to load the .nemo file
         if model is None:
+            if restore_path is None:
+                restore_path = cfg.model.downstream_task.restore_from_path
             model = restore_model(
-                restore_path=cfg.model.downstream_task.restore_from_path,
+                restore_path=restore_path,
                 cfg=cfg,
             )
         # move self to same device as loaded model
@@ -87,8 +91,8 @@ class BaseEncoderDecoderInference(LightningModule):
             micro_batch_size=1,  # Make sure that there is no "grad acc" while decoding.
             data_parallel_size=1,  # We check above to make sure that dataparallel size is always 1 at inference.
         )
-
-        model.freeze()
+        if self._freeze_model:
+            model.freeze()
 
         self.model = model
 
@@ -107,7 +111,7 @@ class BaseEncoderDecoderInference(LightningModule):
         # adjust microbatch size
         _reconfigure_inference_batch(global_batch_per_gpu=len(sequences))
         
-        with torch.set_grad_enabled(False):
+        with torch.set_grad_enabled(self._freeze_model):
             for output_type in outputs:
                 if output_type == 'hiddens':
                     hiddens, mask = self.seq_to_hiddens(sequences)

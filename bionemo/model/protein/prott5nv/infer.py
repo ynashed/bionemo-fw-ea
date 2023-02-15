@@ -24,8 +24,8 @@ class ProtT5nvInference(BaseEncoderDecoderInference):
     All inference functions
     '''
 
-    def __init__(self, cfg, model=None):
-        super().__init__(cfg=cfg, model=model)
+    def __init__(self, cfg, model=None, freeze=True, restore_path=None, training=False):
+        super().__init__(cfg=cfg, model=model, freeze=freeze, restore_path=restore_path, training=training)
 
     def _tokenize(self, sequences: List[str]):
         """

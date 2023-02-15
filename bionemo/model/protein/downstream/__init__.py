@@ -13,5 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .secondary_structure_pred import *
-from .get_protein_emb import *
+from .sec_str_pred_model import *
+from .sec_str_pred_data import *
+from .sec_str_finetuning import *
