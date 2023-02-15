@@ -28,9 +28,8 @@ class ResourcePreprocessor(ABC):
 
         remote -> prepare -> prepared data.
     """
-
     root_directory: Optional[str] = RemoteResource.get_env_tmpdir()
-
+    dest_directory: str = 'data'
     def get_checksums(self) -> List[str]:
         return [resource.checksum for resource in self.get_remote_resources()]
 
@@ -55,7 +54,7 @@ class GRCh38p13_ResourcePreprocessor(ResourcePreprocessor):
     we must create a remote resource for each file. Preprocessing therefore requires working on sets of files.
     """
 
-    dest_dir: str = "GRCh38.p13"
+    dest_directory: str = "GRCh38.p13"
 
     def get_remote_resources(self) -> List[RemoteResource]:
         checksums = {
@@ -93,7 +92,7 @@ class GRCh38p13_ResourcePreprocessor(ResourcePreprocessor):
             filename = f"chr{contig}.fna.gz"
             url = basename + filename
             resource = RemoteResource(
-                dest_directory=self.dest_dir,
+                dest_directory=self.dest_directory,
                 dest_filename=filename,
                 root_directory=self.root_directory,
                 checksum=checksums.get(filename),
@@ -125,13 +124,13 @@ class Hg38chromResourcePreprocessor(ResourcePreprocessor):
     """
 
     def get_remote_resources(self) -> List[RemoteResource]:
-        dest_dir = "hg38"
+        dest_directory = "hg38"
 
         checksum = "a5aa5da14ccf3d259c4308f7b2c18cb0"
         url = "https://hgdownload.soe.ucsc.edu/goldenPath/hg38/bigZips/hg38.chromFa.tar.gz"
 
         obj = RemoteResource(
-            dest_directory=dest_dir,
+            dest_directory=dest_directory,
             dest_filename="hg38.chromFa.tar.gz",
             root_directory=self.root_directory,
             checksum=checksum,
@@ -160,8 +159,9 @@ class Hg38chromResourcePreprocessor(ResourcePreprocessor):
         return [str(filepath) for filepath in pathlib.Path(basename).glob("*.fa")]
 
 
+@dataclass
 class GRCh38Ensembl99FastaResourcePreprocessor(ResourcePreprocessor):
-    dest_dir = "GRCh38.ensembl.99"
+    dest_directory = "GRCh38.ensembl.99"
 
     def get_remote_resources(self) -> List[RemoteResource]:
         fasta_checksums = {
@@ -199,7 +199,7 @@ class GRCh38Ensembl99FastaResourcePreprocessor(ResourcePreprocessor):
             fasta_filename = f"Homo_sapiens.GRCh38.dna.chromosome.{contig}.fa.gz"
             fasta_url = fasta_basename + fasta_filename
             fasta_resource = RemoteResource(
-                dest_directory=self.dest_dir,
+                dest_directory=self.dest_directory,
                 dest_filename=fasta_filename,
                 root_directory=self.root_directory,
                 checksum=fasta_checksums.get(fasta_filename),
@@ -229,7 +229,7 @@ class GRCh38Ensembl99GFF3ResourcePreprocessor(ResourcePreprocessor):
     val_perc: float = 0.1
     test_perc: float = 1 - train_perc - val_perc
     size: int = 30000
-    dest_dir: str = "GRCh38.ensembl.99"
+    dest_directory: str = "GRCh38.ensembl.99"
 
     def get_remote_resources(self) -> List[RemoteResource]:
         gff_checksums = {
@@ -267,7 +267,7 @@ class GRCh38Ensembl99GFF3ResourcePreprocessor(ResourcePreprocessor):
             gff_filename = f"Homo_sapiens.GRCh38.99.chromosome.{contig}.gff3.gz"
             gff_url = gff_basename + gff_filename
             gff_resource = RemoteResource(
-                dest_directory=self.dest_dir,
+                dest_directory=self.dest_directory,
                 dest_filename=gff_filename,
                 root_directory=self.root_directory,
                 checksum=gff_checksums.get(gff_filename),
@@ -357,7 +357,7 @@ class GRCh38Ensembl99GFF3ResourcePreprocessor(ResourcePreprocessor):
         val_df = df.iloc[shuffled_indices[train_ub:val_ub]]
         test_df = df.iloc[shuffled_indices[val_ub:test_ub]]
         # save train val test split
-        datadir = Path(self.root_directory) / self.dest_dir
+        datadir = Path(self.root_directory) / self.dest_directory
         os.makedirs(datadir, exist_ok=True)
 
         # Here its prepared and we are ready for whatever comes next.
@@ -485,7 +485,7 @@ class DNABERTPreprocess(DNABERTPreprocessorDataClass):
         # TODO WARN!!!! ultimately we should let our config choose a valid resource.
 
         filenames = GRCh38p13_ResourcePreprocessor(
-            dest_dir=self.genome_dir, root_directory=self.root_directory
+            dest_directory=self.genome_dir, root_directory=self.root_directory
         ).prepare()
 
         preprocessed_files = self.preprocess_fastas(filenames)
@@ -528,7 +528,7 @@ class CorePromoterResourcePreparer(ResourcePreprocessor):
     this comes from the HPDnew database, and is tightly coupled to (which reference?)
     
     """
-
+    dest_directory = "GRCh38.ensembl.99"
     def get_remote_resources(self) -> List[RemoteResource]:
         resource_prom_checksum = (
             "3c4915c7fa367f1dd3d9e86b47efc0eb"  # Downloaded and manually computed.
@@ -544,14 +544,14 @@ class CorePromoterResourcePreparer(ResourcePreprocessor):
         )
 
         resource_prom = FTPRemoteResource(
-            dest_directory="GRCh38.ensembl.99",  # Place it in the same GRCh38 directory
+            dest_directory=self.dest_directory,
             dest_filename="Hs_EPDnew_006_hg38.bed",  # Retain the existing filename
             root_directory=self.root_directory,
             checksum=resource_prom_checksum,
             url=resource_prom_url,
         )
         resource_tata = FTPRemoteResource(
-            dest_directory="GRCh38.ensembl.99",  # Place it in the same GRCh38 directory
+            dest_directory=self.dest_directory,
             dest_filename="promoter_motifs.txt",  # Retain the existing filename
             root_directory=self.root_directory,
             checksum=resource_tata_checksum,

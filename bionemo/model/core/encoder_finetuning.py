@@ -139,7 +139,7 @@ class EncoderFineTuning(ModelPT, Exportable, ABC):
     def on_fit_start(self):
         self.setup_training_data(self.cfg)
         self.setup_validation_data(self.cfg)
-        if self._test_ds is not None:
+        if hasattr(self, '_test_ds'):
             self.setup_test_data(self.cfg)
 
     @abstractmethod
