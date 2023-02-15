@@ -17,8 +17,7 @@ from nemo.core.optim.optimizers import get_optimizer
 from nemo.core.optim.lr_scheduler import get_scheduler
 from omegaconf import OmegaConf
 from nemo.utils import logging
-from torch.utils.data import Dataset
-from bionemo.model.protein.downstream.get_protein_emb import *
+from bionemo.model.protein.downstream.sec_str_pred_data import *
 from nemo.utils import logging
 
 
@@ -48,28 +47,6 @@ class ConvNet(torch.nn.Module):
         diso_Yhat = self.diso_classifier(x).squeeze(dim=-1).permute(0,2,1) # OUT: (B x L x 2)
         return d3_Yhat, d8_Yhat, diso_Yhat
 
-
-class SSDataset(Dataset):
-    """Read data and convert into batches, labels"""
-
-    def __init__(self, data):
-        self.data = data
-
-    def __len__(self):
-        return self.data.length()
-
-    def __getitem__(self, idx):
-        embeddings = self.data.get_embeddings(idx)
-        labels = self.data.get_labels(idx)
-        seq_len, emb_dim = embeddings.size()
-        item_dict = {
-            "embeddings": torch.cat([embeddings, torch.zeros((self.data.max_length - seq_len), emb_dim)]), 
-            "3state": torch.cat([labels[0], torch.zeros((self.data.max_length - seq_len), 3)]),
-            "8state": torch.cat([labels[1], torch.zeros((self.data.max_length - seq_len), 8)]),
-            "2state": torch.cat([labels[2], torch.zeros((self.data.max_length - seq_len), 2)]),
-            "emb_size": seq_len
-            }
-        return item_dict
 
 def prepare_batch(batch):
     max_batch_seq_len = batch["emb_size"].max()

@@ -23,8 +23,8 @@ class ESM1nvInference(BaseEncoderDecoderInference):
     All inference functions
     '''
 
-    def __init__(self, cfg, model=None):
-        super().__init__(cfg=cfg, model=model)
+    def __init__(self, cfg, model=None, freeze=True, restore_path=None, training=False):
+        super().__init__(cfg=cfg, model=model, freeze=freeze, restore_path=restore_path, training=training)
         
     def _tokenize(self, sequences: List[str]):
         """
@@ -66,7 +66,7 @@ class ESM1nvInference(BaseEncoderDecoderInference):
 
         return hidden_states, enc_mask
 
-    def load_model(self, cfg, model=None):
+    def load_model(self, cfg, model=None, restore_path=None):
         """Load saved model checkpoint
 
         Params:
@@ -80,11 +80,12 @@ class ESM1nvInference(BaseEncoderDecoderInference):
             post_process = cfg.model.post_process
         else:
             post_process = model.model.post_process
-        model = super().load_model(cfg, model=model)
+        model = super().load_model(cfg, model=model, restore_path=restore_path)
         
         model.model.post_process = post_process
 
         # FIXME: model.half() shouldn't be used, temporary fix
-        model.half()
+        if not self.training:
+            model.half()
 
         return model

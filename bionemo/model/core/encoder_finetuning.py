@@ -1,3 +1,18 @@
+# Copyright (c) 2023, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from abc import abstractmethod, ABC
 import torch
 from nemo.utils import logging
@@ -42,6 +57,7 @@ class EncoderFineTuning(ModelPT, Exportable, ABC):
         self.loss_fn = self.build_loss_fn()
         self.task_head = self.build_task_head()
         self.predict_dataset = None
+        self.metrics = None
 
     def list_available_models(self):
         return []
@@ -123,7 +139,8 @@ class EncoderFineTuning(ModelPT, Exportable, ABC):
     def on_fit_start(self):
         self.setup_training_data(self.cfg)
         self.setup_validation_data(self.cfg)
-        self.setup_test_data(self.cfg)
+        if self._test_ds is not None:
+            self.setup_test_data(self.cfg)
 
     @abstractmethod
     def data_setup(self):
@@ -148,11 +165,15 @@ class EncoderFineTuning(ModelPT, Exportable, ABC):
 
     def _calc_step(self, batch, batch_idx):
         output_tensor = self.forward(batch)
-        loss = self.loss_fn(output_tensor, self.get_target_from_batch(batch))
-        return loss
+        target = self.get_target_from_batch(batch)
+        loss = self.loss_fn(output_tensor, target)
+        return loss, output_tensor, target
+    
+    def add_metrics(self, metrics):
+        self.metrics = metrics
 
     def training_step(self, batch, batch_idx):
-        loss = self._calc_step(batch, batch_idx)
+        loss, _, _ = self._calc_step(batch, batch_idx)
         reduced_loss = average_losses_across_data_parallel_group([loss])
         self.log('reduced_train_loss', reduced_loss, prog_bar=True)
         # if we wanted to enable gradient accumulation across batches we could
@@ -203,19 +224,36 @@ class EncoderFineTuning(ModelPT, Exportable, ABC):
         return torch.utils.data.DataLoader(
             dataset, batch_sampler=batch_sampler, num_workers=self.cfg.data.num_workers, pin_memory=True,
         )
+    
+    def _step(self, batch, batch_idx, subset):
+        loss, output, target = self._calc_step(batch, batch_idx)
+        reduced_loss = average_losses_across_data_parallel_group([loss])
+        result = {}
+        result[subset + "_loss"] = reduced_loss
+        if self.metrics is not None:
+            for name, m_fun in self.metrics.items():
+                metrics = m_fun(output, target)
+                result[subset + "_" + name] = average_losses_across_data_parallel_group([metrics])
+        return result
 
     def validation_step(self, batch, batch_idx):
-        loss = self._calc_step(batch, batch_idx)
-        reduced_loss = average_losses_across_data_parallel_group([loss])
-        return reduced_loss
+        return self._step(batch, batch_idx, subset="val")
+
+    def test_step(self, batch, batch_idx):
+        return self._step(batch, batch_idx, subset="test")
+
+    def _epoch_end(self, outputs, subset):
+         if len(outputs) > 0:
+            for name, value in outputs[0].items():
+                batch_value = [x[name] for x in outputs]
+                averaged_value = torch.stack(batch_value).mean()
+                self.log(name, averaged_value)
 
     def validation_epoch_end(self, outputs):
-        if len(outputs) > 0:
-            averaged_loss = torch.stack(outputs).mean()
-        else:
-            averaged_loss = torch.nan
+        self._epoch_end(outputs, subset="val")
 
-        self.log('val_loss', averaged_loss, prog_bar=True)
+    def test_epoch_end(self, outputs):
+        self._epoch_end(outputs, subset="test")
 
     def setup_training_data(self, cfg):
         if hasattr(self, '_train_ds'):
