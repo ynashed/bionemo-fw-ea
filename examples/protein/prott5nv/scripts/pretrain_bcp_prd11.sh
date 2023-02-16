@@ -18,17 +18,30 @@
 ####
 # Example shell script to launch training on NGC BCP - PRD11
 ####
+LOCAL_ENV=.env
 
 NGC_ARRAY_SIZE=4  #number of nodes for the job
 NGC_GPUS_PER_NODE=8 #number of gpus per node
 
+WANDB_API_KEY=${WANDB_API_KEY:=NotSpecified}
+DATASET_PATH=${DATASET_PATH:=/workspace/bionemo-fw/ntadimeti/uniref202205_0512_5k}
+EXP_DIR=${EXP_DIR:=/workspace/bionemo-fw/ntadimeti/nemo_experiments/prott5nv/pretrain_small}
+WANDB_LOGGER_NAME=${WANDB_LOGGER_NAME:=prott5nv_4node_bs48_tp1}
+
+# if $LOCAL_ENV file exists, source it to specify my environment
+if [ -e ./$LOCAL_ENV ]
+then
+    echo sourcing environment from ./$LOCAL_ENV
+    . ./$LOCAL_ENV
+fi
+
 read -r -d '' COMMAND <<EOF
-export WANDB_API_KEY=592f78db4f2dcefcb23293ecb68d7dd3fee7be2e && cd /workspace/bionemo/examples/protein/prott5nv && python pretrain.py         --config-path=conf         --config-name=pretrain_small     do_training=True          model.data.dataset_path=/workspace/bionemo-fw/ntadimeti/uniref202205_0512_1k ++model.data.dataset.train=x000 ++model.data.dataset.val=x000 ++model.data.dataset.test=x000 exp_manager.exp_dir=/workspace/bionemo-fw/ntadimeti/nemo_experiments/prott5nv/pretrain_small ++exp_manager.wandb_logger_kwargs.offline=False ++trainer.devices=8 ++trainer.num_nodes=4 model.validation.validation_enabled=False model.micro_batch_size=48 ++exp_manager.wandb_logger_kwargs.name=prott5nv_4node_bs48_tp1 ++trainer.max_steps=50 ++trainer.val_check_interval=50 ++model.global_batch_size=null 
+export WANDB_API_KEY=${WANDB_API_KEY} && cd /workspace/bionemo/examples/protein/prott5nv && python pretrain.py         --config-path=conf         --config-name=pretrain_small     do_training=True          model.data.dataset_path=${DATASET_PATH} ++model.data.dataset.train=x000 ++model.data.dataset.val=x000 ++model.data.dataset.test=x000 exp_manager.exp_dir=${EXP_DIR} ++exp_manager.wandb_logger_kwargs.offline=False ++trainer.devices=8 ++trainer.num_nodes=4 model.validation.validation_enabled=False model.micro_batch_size=48 ++exp_manager.wandb_logger_kwargs.name=${WANDB_LOGGER_NAME} ++trainer.max_steps=50 ++trainer.val_check_interval=50 ++model.global_batch_size=null
 EOF
 
 BCP_COMMAND="bcprun --debug --nnodes=${NGC_ARRAY_SIZE} --npernode=${NGC_GPUS_PER_NODE} --cmd '"${COMMAND}"'"
 
 
-ngc batch run --name "bionemo-fw-prott5nv-pretrain" --priority NORMAL --preempt RUNONCE --total-runtime 2h --ace nv-us-west-2 --instance dgxa100.40g.8.norm --commandline "\"${BCP_COMMAND}"\" --result /results --array-type "PYTORCH" --replicas "4" --image "nvidian/bionemo/bionemo-fw:latest" --org nvidian --team bionemo --datasetid 110553:/data/uniref50 --datasetid 110556:/data/zinc_csv --workspace gyjDJygLRoqhhPsWVgFE0g:/workspace/bionemo-fw:RW --label prott5nv_pretrain --order 50
+echo "ngc batch run --name "bionemo-fw-prott5nv-pretrain" --priority NORMAL --preempt RUNONCE --total-runtime 2h --ace nv-us-west-2 --instance dgxa100.40g.8.norm --commandline "\"${BCP_COMMAND}"\" --result /results --array-type "PYTORCH" --replicas "4" --image "nvidian/bionemo/bionemo-fw:latest" --org nvidian --team bionemo --datasetid 110553:/data/uniref50 --datasetid 110556:/data/zinc_csv --workspace gyjDJygLRoqhhPsWVgFE0g:/workspace/bionemo-fw:RW --label prott5nv_pretrain --order 50" | bash
 
 
