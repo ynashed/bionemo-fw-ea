@@ -20,11 +20,11 @@ from pytorch_lightning import Trainer
 from nemo.utils.get_rank import is_global_rank_zero
 from nemo.utils import logging
 from torch.utils.data import DataLoader
-from bionemo.model.protein.downstream.sec_str_pred_data import *
-from bionemo.model.protein.downstream.secondary_structure_pred import SSDataset
+
+from bionemo.model.protein.downstream import SSDataset, get_data
 from nemo.utils.model_utils import import_class_by_path
 
-from bionemo.model.protein.downstream import secondary_structure_pred as sspred
+from bionemo.model.protein.downstream import sec_str_pred_model as sspred
 
 from pytorch_lightning.callbacks import Callback
 
@@ -59,6 +59,7 @@ class SSPredictionCallback(Callback):
             datafile=self.valid_cfg.train_ds.data_file, 
             model=inference_wrapper,
             emb_batch_size=self.valid_cfg.emb_batch_size, 
+            max_seq_length=self.cfg.model.seq_length
             )
         trainDataset = SSDataset(traindata)
         train_dataloader = DataLoader(trainDataset, batch_size=self.valid_cfg.batch_size, shuffle=False)
@@ -68,6 +69,7 @@ class SSPredictionCallback(Callback):
             datafile=test_datafile, 
             model=inference_wrapper,
             emb_batch_size=self.valid_cfg.emb_batch_size,
+            max_seq_length=self.cfg.model.seq_length
             )
         test_dataset = SSDataset(testdata)
         test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False)
