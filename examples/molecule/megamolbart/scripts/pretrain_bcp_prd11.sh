@@ -35,6 +35,6 @@ EOF
 BCP_COMMAND="bcprun --debug --nnodes=${NGC_ARRAY_SIZE} --npernode=${NGC_GPUS_PER_NODE} --cmd '"${COMMAND}"'"
 
 
-ngc batch run --name "bionemo-fw-megamolbart-pretrain" --priority NORMAL --preempt RUNONCE --total-runtime 2h --ace nv-us-west-2 --instance dgxa100.40g.8.norm --commandline "\"${BCP_COMMAND}"\" --result /results --array-type "PYTORCH" --replicas "4" --image "nvidian/bionemo/bionemo-fw:latest" --org nvidian --team bionemo --datasetid 110553:/data/uniref50 --datasetid 110556:/data/zinc_csv --workspace gyjDJygLRoqhhPsWVgFE0g:/workspace/bionemo-fw:RW --label megamolbart --order 50
+echo "ngc batch run --name "bionemo-fw-megamolbart-pretrain" --priority NORMAL --preempt RUNONCE --total-runtime 2h --ace nv-us-west-2 --instance dgxa100.40g.8.norm --commandline "\"${BCP_COMMAND}"\" --result /results --array-type "PYTORCH" --replicas "4" --image "nvidian/bionemo/bionemo-fw:latest" --org nvidian --team bionemo --datasetid 110553:/data/uniref50 --datasetid 110556:/data/zinc_csv --workspace gyjDJygLRoqhhPsWVgFE0g:/workspace/bionemo-fw:RW --label megamolbart --order 50" | bash
 
 
