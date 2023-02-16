@@ -108,6 +108,7 @@ REGISTRY=${REGISTRY:=NotSpecified}
 REGISTRY_USER=${REGISTRY_USER:='$oauthtoken'}
 REGISTRY_ACCESS_TOKEN=${REGISTRY_ACCESS_TOKEN:=NotSpecified}
 GITHUB_BRANCH=${GITHUB_BRANCH:=main}
+DEV_CONT_NAME=${DEV_CONT_NAME:=bionemo}
 
 # Model paths
 ESM1NV_MODEL="t6a4nuz8vrsr/esm1nv:0.1.0"
@@ -138,11 +139,12 @@ if [ $write_env -eq 1 ]; then
     echo REGISTRY_USER=${REGISTRY_USER} >> $LOCAL_ENV
     echo REGISTRY_ACCESS_TOKEN=${REGISTRY_ACCESS_TOKEN} >> $LOCAL_ENV
     echo GITHUB_BRANCH=${GITHUB_BRANCH} >> $LOCAL_ENV
+    echo DEV_CONT_NAME=${DEV_CONT_NAME} >> $LOCAL_ENV
 fi
 
+# Mount paths
 DATA_MOUNT_PATH="/data"
 RESULT_MOUNT_PATH='/result/nemo_experiments'
-DEV_CONT_NAME='bionemo'
 
 # Additional variables when send in .env file, is used in the script:
 # BASE_IMAGE        Custom Base image for building.
