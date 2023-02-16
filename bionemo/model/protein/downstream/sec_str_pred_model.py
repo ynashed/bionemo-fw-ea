@@ -49,7 +49,7 @@ class ConvNet(torch.nn.Module):
 
 
 def prepare_batch(batch):
-    max_batch_seq_len = batch["emb_size"].max()
+    max_batch_seq_len = batch["seq_len"].max()
     embeddings = batch["embeddings"][:, :max_batch_seq_len, :]
     labels1 = batch["3state"][:, :max_batch_seq_len, :]
     labels2 = batch["8state"][:, :max_batch_seq_len, :]
