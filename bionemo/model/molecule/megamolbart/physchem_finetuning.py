@@ -13,42 +13,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
 import torch
+import torch.nn as nn
+import bionemo.utils
 from functools import lru_cache
-from bionemo.model.protein.downstream.sec_str_pred_model import ConvNet
-from bionemo.model.core.encoder_finetuning import EncoderFineTuning
 from nemo.utils.model_utils import import_class_by_path
-from torch.nn.modules.loss import _WeightedLoss
-from bionemo.model.protein.downstream import mask_tensor, calculate_accuracy, get_data, SSDataModule
+from bionemo.model.core import MLPModel
+from bionemo.model.core.encoder_finetuning import EncoderFineTuning
+from bionemo.data.finetune_dataset import FineTuneDataModule
 
-
-class SSPredLoss(_WeightedLoss):
-    def __init__(self, **kwargs):
-        super(SSPredLoss, self).__init__(**kwargs)
-        self.loss_fn = torch.nn.CrossEntropyLoss()
-
-    def forward(self, input, target):
-        labels1, labels2, labels3 = target
-        mask_list = get_data.tensor2list(labels3)
-        mask_list = np.array(mask_list).reshape(labels3.size()[:2]).tolist()
-        masked_output0 = mask_tensor(mask_list, input[0]).permute(0,2,1)
-        masked_output1 = mask_tensor(mask_list, input[1]).permute(0,2,1)
-        masked_output2 = input[2].permute(0,2,1)
-        loss1 = self.loss_fn(masked_output0, labels1.permute(0,2,1))
-        loss2 = self.loss_fn(masked_output1, labels2.permute(0,2,1))
-        loss3 = self.loss_fn(masked_output2, labels3.permute(0,2,1))
-        loss = loss1 + loss2 + loss3
-        return loss
-
-
-class FineTuneProteinModel(EncoderFineTuning):
+class FineTuneMegaMolBART(EncoderFineTuning):
 
     def __init__(self, cfg, trainer):
         self.full_cfg = cfg
         self.encoder_frozen = self.full_cfg.model.encoder_frozen
         super().__init__(cfg.model, trainer=trainer) 
-    
+        self.batch_target_name = self.cfg.data.target_column
+
     def configure_optimizers(self):
         super().setup_optimization(optim_config=self.cfg.finetuning_optim)
 
@@ -58,10 +39,14 @@ class FineTuneProteinModel(EncoderFineTuning):
             return [self._optimizer], [self._scheduler]
 
     def build_loss_fn(self):
-        return SSPredLoss() 
+        return bionemo.utils.lookup_or_use(torch.nn, self.cfg.downstream_task.loss_func)
 
     def build_task_head(self):
-        task_head = ConvNet(self.full_cfg.model.hidden_size)
+        regressor = MLPModel(layer_sizes=[self.encoder_model.cfg.model.hidden_size, self.cfg.downstream_task.hidden_layer_size, self.cfg.downstream_task.n_outputs],
+            dropout=0.1,
+        )
+        #return regressor
+        task_head = nn.Sequential(regressor, nn.Flatten(start_dim=0))
         return task_head
 
     def setup_encoder_model(self, cfg, trainer):
@@ -73,13 +58,15 @@ class FineTuneProteinModel(EncoderFineTuning):
             training=not self.cfg.encoder_frozen)
         return pretrained_model
 
+    # the lru cache is kind of a hacky way to make sure this isn't set up if
+    # it is already initialized, since this function doesn't return anything
     @lru_cache
     def data_setup(self):
         if self.encoder_frozen:
             model = self.encoder_model
         else:
             model = None
-        self.data_module = SSDataModule(
+        self.data_module = FineTuneDataModule(
             self.cfg, self.trainer, model=model
         )
 
@@ -92,20 +79,18 @@ class FineTuneProteinModel(EncoderFineTuning):
         self._validation_ds = self.data_module.get_sampled_val_dataset()
         self._test_ds = self.data_module.get_sampled_test_dataset()
 
-    def encoder_forward(self, protein_model, batch: dict):
+    def encoder_forward(self, bart_model, batch: dict):
         if self.encoder_frozen:
             enc_output = batch["embeddings"]
         else:
-            enc_output, _ = protein_model.seq_to_hiddens(batch["embeddings"])
-            batch_size, seq_len, emb_dim = enc_output.size()
-            enc_output = torch.cat([enc_output, torch.zeros((batch_size, (self.full_cfg.model.seq_length - seq_len), emb_dim)).to(device=enc_output.device)], dim=1)
-
+            enc_output = bart_model.seq_to_embeddings(batch["embeddings"])
         return enc_output
 
     def extract_for_task_head(self, input_tensor):
         #NOTE investigate using mixed precision to remove need for float casting; maybe use setup_trainer method
         return input_tensor.float()
-  
+    
     def get_target_from_batch(self, batch):
-        state3, state8, state2 = batch['3state'], batch["8state"], batch["2state"]
-        return (state3.float(), state8.float(), state2.float())
+        ret = batch['target']
+
+        return ret.float()

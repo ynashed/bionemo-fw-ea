@@ -1,12 +1,11 @@
 import os
-import pathlib
 import pandas as pd
 import argparse
 from nemo.utils import logging
 
 
 def _process_split(datafile, val_frac, test_frac, output_dir='/tmp/molecule_data/processed/', seed=0):
-    logging.info(f'Splitting file {filename} into train, validation, and test data')
+    logging.info(f'Splitting file {datafile} into train, validation, and test data')
 
     df = pd.read_csv(datafile, header=0)
 

@@ -30,9 +30,8 @@ eight_state_num2label = {0: "_", 1: "E", 2: "G", 3: "T", 4: "H", 5: "S", 6: "B",
 
 
 class SSDataModule(BioNeMoDataModule):
-    def __init__(self, cfg, trainer, tokenizer, model):
+    def __init__(self, cfg, trainer, model):
         super().__init__(cfg, trainer)
-        self.tokenizer=tokenizer
         self.model=model
     
     def train_dataset(self):
