@@ -41,7 +41,7 @@ rm -f $VOCAB
 rm -r $DATASET_DIR
 
 # NOTE: expect an exception unless preprocessing was run with devices=1
-python splice_site_finetune.py ++task.do_preprocess=False \
+python splice_site_finetune.py ++task.do_preprocess=True \
     ++task.do_training=True \
     ++task.model.data.root_directory='/tmp' \
     ++task.trainer.devices=2 \
@@ -50,5 +50,6 @@ python splice_site_finetune.py ++task.do_preprocess=False \
     ++task.model.data.dataset_path=$FINETUNE_DIR \
     ++task.model.data.train_file=$FINETUNE_DIR/train.csv \
     ++task.model.data.fasta_directory=$FINETUNE_DIR \
-    ++task.model.data.val_file=NULL \
+    ++task.model.data.val_file=$FINETUNE_DIR/val.csv \
+    ++task.model.data.predict_file=$FINETUNE_DIR/test.csv \
     ++task.model.encoder.checkpoint=$NEMO_FILE

@@ -55,7 +55,7 @@ def main(cfg) -> None:
     if do_preprocess:
         logging.info("************** Starting Preprocessing ***********")
         preprocessor = GRCh38Ensembl99GFF3ResourcePreprocessor(
-            dest_dir=cfg.task.model.data.dataset_path,  # Set to /data
+            dest_directory=cfg.task.model.data.dataset_path,  # Set to /data
             root_directory=cfg.task.model.data.root_directory,
             train_perc=cfg.task.model.data.train_perc,
             val_perc=cfg.task.model.data.val_perc,
@@ -67,18 +67,18 @@ def main(cfg) -> None:
         # Needed for our actual data loaders. Used inside SpliceSiteDataModule.get_fasta_files()
         fasta_preprocessor = GRCh38Ensembl99FastaResourcePreprocessor(
             root_directory=cfg.task.model.data.root_directory,  # Set to /data
-            dest_dir=cfg.task.model.data.dataset_path,
+            dest_directory=cfg.task.model.data.dataset_path,
         )
         fasta_data_paths = fasta_preprocessor.prepare()
         # Simple assertion is making sure the files in cfg.model.data.train/test/val are the same returned.
         from pathlib import PosixPath
 
         assert PosixPath(cfg.task.model.data.train_file) in _data_paths
-        assert PosixPath(cfg.task.model.data.val_file) in _data_paths
-        assert PosixPath(cfg.task.model.data.predict_file) in _data_paths
+        # Validation technically not required!
         logging.info("*************** Finish Preprocessing ************")
 
     if do_prediction:
+        assert PosixPath(cfg.task.model.data.predict_file) in _data_paths
         predictions_file = cfg.task.get("predictions_output_file")
 
     if do_prediction and predictions_file is None:
