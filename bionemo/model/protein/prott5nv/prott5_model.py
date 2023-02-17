@@ -56,6 +56,18 @@ class ProtT5nvModel(MegatronT5Model):
         # validate cfg
         self._validate_cfg()
 
+    def setup_training_data(self, cfg):
+        super().setup_training_data(cfg)
+
+    def setup_validation_data(self, cfg):
+        super().setup_validation_data(cfg)
+        if hasattr(self, '_validation_dl') and self._validation_dl is not None:
+            self._validation_dl.num_workers = 0
+
+    def setup_test_data(self, cfg):
+        super().setup_test_data(cfg)
+        if hasattr(self, '_test_dl') and self._test_dl is not None:
+            self._test_dl.num_workers=0
 
     def build_train_valid_test_datasets(self):
         logging.info(f'Building {self.model_name} datasets.')
