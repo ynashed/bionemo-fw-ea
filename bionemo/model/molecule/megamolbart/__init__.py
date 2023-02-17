@@ -14,4 +14,5 @@
 # limitations under the License.
 
 from .megamolbart_model import *
+from .physchem_finetuning import *
 from .infer import *
