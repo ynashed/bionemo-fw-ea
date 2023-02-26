@@ -21,13 +21,25 @@ import os
 import requests
 import gzip
 import shutil
+from typing import Optional
 
 __all__ = ['UniRef50Preprocess']
 
+ROOT_DIR = '/tmp/uniref50'
 
 class UniRef50Preprocess(object):
-    def __init__(self) -> None:
+    def __init__(self, root_directory: Optional[str] = ROOT_DIR) -> None:
+        """Pprocess UniRef50 data for pre-training. 
+
+        Args:
+            root_directory (Optional[str], optional): _description_. Defaults to /tmp/uniref50.
+
+
+        Data are downloaded to root_directory/raw (/tmp/uniref50/raw). The split data can be found in
+        root_directory/processed.
+        """
         super().__init__()
+        self.root_directory = pathlib.Path(root_directory)
 
     def _process_file(self, url, download_dir):
         """Download UniRef50 file and unzip
@@ -159,7 +171,7 @@ class UniRef50Preprocess(object):
                 fh.write(output + '\n')
         return
 
-    def _create_data_single_process(self, train_samples, val_samples, test_samples, num_csv_files, fasta_indexer, output_dir):
+    def train_val_test_split(self, train_samples, val_samples, test_samples, num_csv_files, fasta_indexer, output_dir):
         """Create CSV files for train, val, test data
 
         Args:
@@ -185,8 +197,6 @@ class UniRef50Preprocess(object):
 
     def prepare_dataset(self,
                         url='https://ftp.uniprot.org/pub/databases/uniprot/uniref/uniref50/uniref50.fasta.gz',
-                        download_dir='/tmp/uniref50/raw',
-                        output_dir='/tmp/uniref50/processed',
                         num_csv_files=50,
                         val_size=5000,
                         test_size=1000000,
@@ -195,13 +205,13 @@ class UniRef50Preprocess(object):
 
         Args:
             url (str): URL for UniRef50 location.
-            download_dir (str): Download directory for UniRef50 file.
-            output_dir (str): Output directory for CSV data.
             num_csv_files (int): Number of CSV files to create for each train/val/test split.
             val_size (int): Number of protein sequences to put in validation set.
-            test_size (int): Numter of protein sequences to put in test set.
+            test_size (int): Number of protein sequences to put in test set.
             random_seed (int): Random seed.
         """
+        download_dir = self.root_directory.joinpath('raw')
+        output_dir = self.root_directory.joinpath('processed')
 
         file_path = self.process_files(url=url, 
                                        download_dir=download_dir)
@@ -215,9 +225,9 @@ class UniRef50Preprocess(object):
                                                                           random_seed=random_seed)
 
         logging.info(f'Writing processed dataset files to {output_dir}...')
-        self._create_data_single_process(train_samples=train_samples, 
-                                         val_samples=val_samples, 
-                                         test_samples=test_samples, 
-                                         num_csv_files=num_csv_files, 
-                                         fasta_indexer=fasta_indexer, 
-                                         output_dir=output_dir)
+        self.train_val_test_split(train_samples=train_samples, 
+                                  val_samples=val_samples, 
+                                  test_samples=test_samples, 
+                                  num_csv_files=num_csv_files, 
+                                  fasta_indexer=fasta_indexer, 
+                                  output_dir=output_dir)

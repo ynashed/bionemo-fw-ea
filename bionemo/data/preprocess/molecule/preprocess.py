@@ -18,11 +18,14 @@ import sys
 import requests
 import multiprocessing as mp
 import pandas as pd
+import tempfile
+import pathlib
 
 from datetime import datetime
 from subprocess import run
 from multiprocessing import Pool
 from functools import partial
+from typing import Optional
 
 from rdkit import Chem
 
@@ -31,13 +34,26 @@ from nemo.utils import logging
 MAX_LENGTH = 150
 
 
-__all__ = ['SmilesPreprocess']
+__all__ = ['Zinc15Preprocess']
 
-class SmilesPreprocess(object):
+ROOT_DIR = '/tmp/zinc15'
+os.environ['PROJECT_MOUNT'] = os.environ.get('PROJECT_MOUNT', '/workspace/bionemo')
+ZINC_URL_LIST = os.path.join(os.environ['PROJECT_MOUNT'], 'examples/molecule/megamolbart/dataset/ZINC-downloader.txt')
 
-    def __init__(self) -> None:
+class Zinc15Preprocess(object):
+
+    def __init__(self, root_directory: Optional[str] = ROOT_DIR) -> None:
+        """Preprocessing of ZINC15 data into SMILES
+
+        Args:
+            root_directory (Optional[str], optional): String containing the root directory. Defaults to /tmp/zinc15.
+
+        Data are downloaded and canonicalized in root_directory/raw (/tmp/zinc15/raw). The split data can be found in
+        root_directory/processed.
+        """
         super().__init__()
         self.retry = False
+        self.root_directory = pathlib.Path(root_directory)
 
     def _run_cmd(self, cmd, failure_error='Unexpected error while executing bash cmd'):
         logging.debug(f'Running cmd: {cmd}')
@@ -49,7 +65,7 @@ class SmilesPreprocess(object):
             sys.exit(process.returncode)
         return process
 
-    def _process_file(self, url, max_smiles_length=512, download_dir='/tmp/zinc15/raw'):
+    def _process_file(self, url, download_dir, max_smiles_length=512):
 
         filename = url.split('/')[-1]
         if os.path.exists(os.path.join(download_dir, filename)):
@@ -106,7 +122,7 @@ class SmilesPreprocess(object):
         logging.info(f'Processing failure: {e}')
         self.retry = True
 
-    def process_files(self, links_file, pool_size=8, max_smiles_length=512, download_dir='/tmp/zinc15/raw'):
+    def process_files(self, links_file, download_dir, pool_size=8, max_smiles_length=512):
         """
         Download all the files in the links file.
 
@@ -123,7 +139,7 @@ class SmilesPreprocess(object):
         with open(links_file, 'r') as f:
             links = list(set([x.strip() for x in f]))
 
-        download_funct = partial(self._process_file, max_smiles_length=max_smiles_length, download_dir=download_dir)
+        download_funct = partial(self._process_file, download_dir=download_dir, max_smiles_length=max_smiles_length)
 
         while True:
             pool = Pool(processes=pool_size)
@@ -140,7 +156,7 @@ class SmilesPreprocess(object):
             else:
                 break
 
-    def _process_split(self, datafile, val_frac, test_frac, output_dir='/tmp/zinc15/processed/', seed=0):
+    def _process_split(self, datafile, val_frac, test_frac, output_dir, seed=0):
         filename = f'{output_dir}/split_data/{datafile}'
         logging.info(f'Splitting file {filename} into train, validation, and test data')
 
@@ -174,7 +190,7 @@ class SmilesPreprocess(object):
                              seed=0):
         if os.path.exists(output_dir):
             logging.info(f'{output_dir} already exists...')
-            os.rename(output_dir, output_dir +
+            os.rename(output_dir, str(output_dir) +
                       datetime.now().strftime('%Y%m%d%H%M%S'))
 
         split_data = os.path.join(output_dir, 'split_data')
@@ -203,9 +219,7 @@ class SmilesPreprocess(object):
                         train_samples_per_file=10050000,
                         val_samples_per_file=100,
                         test_samples_per_file=50000,
-                        links_file='conf/model/data/ZINC-downloader.txt',
-                        download_dir='/tmp/zinc15/raw',
-                        output_dir='/tmp/zinc15/processed',
+                        links_file=ZINC_URL_LIST,
                         seed=0):
         """
         Download ZINC15 tranches and split into train, valid, and test sets.
@@ -216,10 +230,10 @@ class SmilesPreprocess(object):
             val_samples_per_file (int): number of validation samples per file. Controls number of shards created.
             test_samples_per_file (int): number of test samples per file. Controls number of shards created.
             links_file (str): File containing links to be downloaded.
-            download_dir (str): Directory to download the files to.
-            output_dir (str): Directory to save the processed data to.
             seed (int): Random seed for data splitting
         """
+        download_dir = self.root_directory.joinpath('raw')
+        output_dir = self.root_directory.joinpath('processed')
 
         if os.path.basename(links_file) == 'ZINC-downloader.txt':
                 logging.info(
@@ -229,9 +243,9 @@ class SmilesPreprocess(object):
 
         # If 503 errors or deadlocks are a problem, reduce pool size to 8.
         self.process_files(links_file,
+                           download_dir=download_dir,
                            pool_size=16,
-                           max_smiles_length=max_smiles_length,
-                           download_dir=download_dir)
+                           max_smiles_length=max_smiles_length)
         logging.info('Download complete.')
 
         samples_per_file = [train_samples_per_file, val_samples_per_file, test_samples_per_file]

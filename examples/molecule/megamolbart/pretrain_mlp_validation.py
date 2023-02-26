@@ -34,7 +34,7 @@ from nemo.utils.exp_manager import StatelessTimer, exp_manager
 from bionemo.model.molecule.megamolbart import MegaMolBARTModel
 from bionemo.utils import update_dataclass_config
 from bionemo.utils.callbacks import setup_callbacks
-from bionemo.data import SmilesPreprocess, PhysChemPreprocess
+from bionemo.data import Zinc15Preprocess, PhysChemPreprocess
 import os
 
 def setup_trainer(cfg):
@@ -112,7 +112,7 @@ def main(cfg) -> None:
     else:
         logging.info("************** Starting Data PreProcessing ***********")
         logging.info("Processing data into CSV files")
-        SmilesPreprocess().prepare_dataset(links_file=cfg.model.data.links_file,
+        Zinc15Preprocess().prepare_dataset(links_file=cfg.model.data.links_file,
                                            output_dir=cfg.model.data.dataset_path,
                                            max_smiles_length=cfg.model.seq_length)
         if 'validation' in cfg.model:

@@ -81,7 +81,6 @@ class RemoteResource(object):
     checksum: Optional[str]
     dest_filename: str
     dest_directory: str
-
     root_directory: str = "/tmp"
     url: Optional[str] = None
 
