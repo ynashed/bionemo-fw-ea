@@ -19,7 +19,7 @@ from nemo.core.config import hydra_runner
 from nemo.utils import logging
 
 from bionemo.model.molecule.megamolbart import MegaMolBARTModel
-from bionemo.data import SmilesPreprocess
+from bionemo.data import Zinc15Preprocess
 from bionemo.model.utils import setup_trainer
 from bionemo.utils.callbacks.callback_utils import setup_callbacks
 
@@ -43,7 +43,7 @@ def main(cfg) -> None:
         trainer.fit(model)
     else:
         logging.info("************** Starting Data PreProcessing ***********")
-        SmilesPreprocess().prepare_dataset(links_file=cfg.model.data.links_file,
+        Zinc15Preprocess().prepare_dataset(links_file=cfg.model.data.links_file,
                                            output_dir=cfg.model.data.dataset_path,
                                            max_smiles_length=cfg.model.seq_length)
 

@@ -12,8 +12,6 @@ from omegaconf import OmegaConf, open_dict
 from omegaconf.dictconfig import DictConfig
 import yaml
 import hashlib
-import codecs
-
 
 class BioNemoSearchPathConfig(SearchPathPlugin):
     def __init__(self, prepend_config_dir: Optional[str] = None, 
@@ -148,12 +146,24 @@ def check_expected_training_results(trainer_results: dict, expected_results: dic
 
 
 def get_directory_hash(directory):
-    """Calculate hash of all files in a directory"""
-    md5_hash = hashlib.md5()
+    """Get hash of all files in directory
+
+    Args:
+        directory (str): Path to the directory
+
+    Returns:
+        str: hash
+    """
+    sha_hash = hashlib.md5()
     for root, _, files in os.walk(directory):
-        for name in sorted(files):
-            filepath = os.path.join(root, name)
-            with open(filepath, 'rb') as fh:
-                 data = fh.read()
-                 md5_hash.update(data)
-    return md5_hash.hexdigest()
+        for names in files:
+            filepath = os.path.join(root, names)
+            f1 = open(filepath, 'rb')
+            while 1:
+                # Read file in as little chunks
+                buf = f1.read(4096)
+                if not buf:
+                    break
+                sha_hash.update(hashlib.md5(buf).hexdigest())
+            f1.close()
+    return sha_hash.hexdigest()
