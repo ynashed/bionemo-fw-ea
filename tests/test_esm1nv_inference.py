@@ -17,10 +17,11 @@ import logging
 from contextlib import contextmanager
 import os
 import pathlib 
-
+import pytest
 from hydra import compose, initialize
+
 from bionemo.model.protein.esm1nv import ESM1nvInference
-from bionemo.utils.tests import BioNemoSearchPathConfig, register_searchpath_config_plugin, update_relative_config_dir
+from bionemo.utils.tests import BioNemoSearchPathConfig, register_searchpath_config_plugin, update_relative_config_dir, check_model_exists
 
 log = logging.getLogger(__name__)
 
@@ -55,7 +56,11 @@ def load_model(inf_cfg):
         _INFERER = MODEL_CLASS(inf_cfg)
     yield _INFERER
 
+@pytest.mark.dependency()
+def test_model_exists():
+    check_model_exists("models/protein/esm1nv/esm1nv.nemo")
 
+@pytest.mark.dependency(depends=["test_model_exists"])
 def test_seq_to_embedding():
     cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='infer', config_path=CONFIG_PATH)
     with load_model(cfg) as inferer:
@@ -67,6 +72,7 @@ def test_seq_to_embedding():
         assert len(embedding.shape) == 3
 
 
+@pytest.mark.dependency(depends=["test_model_exists"])
 def test_long_seq_to_embedding():
     long_seq = 'MIQSQINRNIRLDLADAILLSKAKKDLSFAEIADGTGLAEAFVTAALLGQQALPADAARLVGAKLDLDEDSILLLQMIPLRGCIDDRIPTDPTMYRFYEMLQVYGTTLKALVHEKFGDGIISAINFKLDVKKVADPEGGERAVITLDGKYLPTKPF'
     long_seq = long_seq * 10

@@ -192,8 +192,9 @@ function download_model() {
     local model_source=$1
     local model_target=$2
     set -e
-    echo "Downloading model ${model_source} to ${model_target}/${model_filename}..."
-    local TMP_DOWNLOAD_LOC="/tmp/bionemo_downloads"
+    echo "Downloading model ${model_source} to ${model_target}..."
+    local TMP_ROOT=`mktemp -d`
+    local TMP_DOWNLOAD_LOC="${TMP_ROOT}/bionemo_downloads"
     rm -rf ${TMP_DOWNLOAD_LOC}
     mkdir -p ${TMP_DOWNLOAD_LOC}
 
@@ -205,7 +206,7 @@ function download_model() {
         downloaded_model_file="${PROJECT_PATH}/models/${model_basename}"
     else
         download_path=$(ngc registry model download-version \
-            --dest /tmp/bionemo_downloads \
+            --dest ${TMP_DOWNLOAD_LOC} \
             "${model_source}" | grep 'Downloaded local path:')
 
         download_path=$(echo ${download_path} | cut -d ":" -f 2)
@@ -214,9 +215,11 @@ function download_model() {
         downloaded_model_file="${PROJECT_PATH}/models/${model_basename}.nemo"
     fi
     echo "Linking ${downloaded_model_file} to ${model_target}..."
+    mkdir -p $(dirname ${model_target})
     cp ${downloaded_model_file} ${model_target}
     # This file is created to record the version of model
-    touch ${PROJECT_PATH}/models/${model_source//[\/]/_}.version
+    mkdir -p ${PROJECT_PATH}/models/version
+    touch ${PROJECT_PATH}/models/version/${model_source//[\/]/_}.version
     set +e
 }
 

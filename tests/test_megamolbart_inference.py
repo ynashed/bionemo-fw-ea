@@ -19,9 +19,10 @@ from contextlib import contextmanager
 from rdkit import Chem
 import pathlib
 from hydra import compose, initialize
+import pytest
 
 from bionemo.model.molecule.megamolbart import MegaMolBARTInference
-from bionemo.utils.tests import BioNemoSearchPathConfig, register_searchpath_config_plugin, update_relative_config_dir
+from bionemo.utils.tests import BioNemoSearchPathConfig, register_searchpath_config_plugin, update_relative_config_dir, check_model_exists
 
 log = logging.getLogger(__name__)
 
@@ -57,7 +58,11 @@ def load_model(inf_cfg):
         _INFERER = MegaMolBARTInference(inf_cfg)
     yield _INFERER
 
+@pytest.mark.dependency()
+def test_model_exists():
+    check_model_exists("models/molecule/megamolbart/megamolbart.nemo")
 
+@pytest.mark.dependency(depends=["test_model_exists"])
 def test_smis_to_hiddens():
     cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='infer', config_path=CONFIG_PATH)
     with load_model(cfg) as inferer:
@@ -72,6 +77,7 @@ def test_smis_to_hiddens():
         assert pad_masks is not None
 
 
+@pytest.mark.dependency(depends=["test_model_exists"])
 def test_smis_to_embedding():
     cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='infer', config_path=CONFIG_PATH)
 
@@ -86,6 +92,7 @@ def test_smis_to_embedding():
         assert embedding.shape[1] == inferer.model.cfg.max_position_embeddings
 
 
+@pytest.mark.dependency(depends=["test_model_exists"])
 def test_hidden_to_smis():
     cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='infer', config_path=CONFIG_PATH)
 
@@ -112,6 +119,7 @@ def test_hidden_to_smis():
             assert(canonical_smi == canonical_infered_smi)
 
 
+@pytest.mark.dependency(depends=["test_model_exists"])
 def test_sample():
     cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='infer', config_path=CONFIG_PATH)
 
