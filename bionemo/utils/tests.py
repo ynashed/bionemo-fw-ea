@@ -132,8 +132,22 @@ def load_expected_training_results(results_comparison_dir: str, correct_results:
         expected_results = json.load(fh)
     return expected_results
 
+def save_expected_training_results(results_comparison_dir: str, correct_results: str, expected_results: dict):
+    """Saves JSON file containing expected training results
 
-def check_expected_training_results(trainer_results: dict, expected_results: dict, tol: float = 1.0e-4):
+    Args:
+        results_comparison_dir (str): Directory where the pickle file with config is located
+        correct_config (str): Name of the pickle file holding the configuration
+        expected_results (dict): expected training results
+
+    Returns:
+        None
+    """
+    results_path = os.path.join(results_comparison_dir, correct_results)
+    with open(results_path, 'w') as fh:
+        json.dump(expected_results, fh, indent=2, sort_keys=True)
+
+def check_expected_training_results(trainer_results: dict, expected_results: dict, tol: float = 1.0e-4, err_msg: str = ""):
     """Compare expected training results
 
     Args:
@@ -141,11 +155,21 @@ def check_expected_training_results(trainer_results: dict, expected_results: dic
         expected_results (dict): expected training metrics
         tol (float, optional): float comparison tolerance. Defaults to 1.0e-4.
     """
+    mismatched_results = []
     for key in expected_results:
         expected_value = expected_results[key]
         actual_value = trainer_results[key].cpu().numpy().item()
-        assert np.allclose(expected_value, actual_value, atol=tol)
+        if not np.allclose(expected_value, actual_value, atol=tol):
+            mismatched_results.append(f"Expected {key} = {expected_value}, got {actual_value}.")
 
+    assert len(mismatched_results) == 0, f"Training results mismatched: {mismatched_results}{err_msg}"
+
+def check_model_exists(model_fname: str):
+    """
+    Check if model exists and raise error if not.
+    """
+    assert os.path.exists(model_fname), \
+        f"Model file not found model_fname = '{model_fname}', please use 'launch.sh download' to download the model."
 
 def get_directory_hash(directory):
     """Calculate hash of all files in a directory"""

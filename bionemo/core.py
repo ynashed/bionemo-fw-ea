@@ -246,7 +246,7 @@ class BioNeMoBertModel(MegatronBertModel):
 
     # The functions after this are _highly_ similar to the code
     # in ESM model, we should regroup it:
-    def _build_train_valid_test_datasets(self):
+    def build_train_valid_test_datasets(self):
         logging.info('Building Bert datasets.')
 
         self._train_ds = self.data_module.get_sampled_train_dataset()

@@ -12,11 +12,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""
+In order to update test results please use the following command:
 
+UPDATE_EXPECTED_RESULTS=1 pytest examples/tests/test_model_pretrain_and_downstream.py
+"""
 import pytest
 import os
 import pathlib
 from hydra import initialize, compose
+import logging
+
 from bionemo.model.molecule.megamolbart import MegaMolBARTModel
 from bionemo.model.protein.esm1nv import ESM1nvModel
 from bionemo.model.protein.prott5nv import ProtT5nvModel
@@ -30,8 +36,11 @@ from bionemo.utils.tests import ( BioNemoSearchPathConfig,
                                   load_cfg_pickle,
                                   clean_directory,
                                   load_expected_training_results,
+                                  save_expected_training_results,
                                   check_expected_training_results )
 
+# logger
+logger = logging.getLogger(__name__)
 
 # Pretraining and secondary structure prediction tests
 PREPEND_CONFIG_DIR = ['../molecule/megamolbart/conf', '../protein/esm1nv/conf', '../protein/prott5nv/conf', '../protein/prott5nv/conf']
@@ -116,5 +125,13 @@ def test_model_training(prepend_config_path, config_name, model_class, correct_r
 
     results_comparison_dir = os.path.abspath(os.path.join(THIS_FILE_DIR, 'expected_results'))
     expected_results = load_expected_training_results(results_comparison_dir, correct_results)
+    if os.environ.get('UPDATE_EXPECTED_RESULTS', False):
+        logger.warning(f'Updating expected results in {results_comparison_dir}/{correct_results}')
+        save_expected_training_results(results_comparison_dir, correct_results, expected_results)
     trainer_results = trainer.logged_metrics
-    check_expected_training_results(trainer_results, expected_results)
+    check_expected_training_results(
+        trainer_results, 
+        expected_results,
+        err_msg="\nIn order to update please use the folllowing command:\n UPDATE_EXPECTED_RESULTS=1 pytest examples/tests/test_model_pretrain_and_downstream.py"
+    )
+    assert True

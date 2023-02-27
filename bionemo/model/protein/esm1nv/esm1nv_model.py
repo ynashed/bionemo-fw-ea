@@ -96,7 +96,7 @@ class ESM1nvModel(MegatronBertModel):
         if hasattr(self, '_test_dl') and self._test_dl is not None:
             self._test_dl.num_workers=0
 
-    def _build_train_valid_test_datasets(self):
+    def build_train_valid_test_datasets(self):
         logging.info('Building Bert datasets.')
         global_batch_size = self.trainer.world_size * self._cfg.micro_batch_size / self._cfg.tensor_model_parallel_size
         # Compute trianing micro-batch steps: total_global_batch_steps x grad_acumms_per_global_batch
