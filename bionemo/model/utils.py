@@ -20,7 +20,7 @@ from omegaconf.listconfig import ListConfig
 from omegaconf import OmegaConf
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks.timer import Timer
-from lightning_lite.plugins.environments import TorchElasticEnvironment
+from pytorch_lightning.plugins.environments import TorchElasticEnvironment
 from pytorch_lightning.plugins.precision.native_amp import NativeMixedPrecisionPlugin
 from pytorch_lightning.trainer.connectors.checkpoint_connector import (
     CheckpointConnector,

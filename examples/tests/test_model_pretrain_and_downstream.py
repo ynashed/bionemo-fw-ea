@@ -86,11 +86,17 @@ def test_config_parameters(prepend_config_path, config_name, correct_config):
     cfg = get_cfg(prepend_config_path, config_name)
 
     results_comparison_dir = os.path.abspath(os.path.join(THIS_FILE_DIR, 'expected_results'))
-    # pickle_cfg(cfg, results_comparison_dir, correct_config) # will create a new comparison config
+    if os.environ.get('UPDATE_EXPECTED_CFG', False):
+        msg = f'Updating expected config in {results_comparison_dir}/{correct_config}'
+        logger.warning(msg)
+        # will create a new comparison config
+        pickle_cfg(cfg, results_comparison_dir, correct_config) 
+        assert False, msg
 
     original_cfg_dict = load_cfg_pickle(results_comparison_dir, correct_config)
     new_cfg_dict = resolve_cfg(cfg)
-    assert original_cfg_dict == new_cfg_dict
+    assert original_cfg_dict == new_cfg_dict, \
+        f"Mismatch in config {results_comparison_dir}/{correct_config}.\nIn order to update please use the folllowing command:\n UPDATE_EXPECTED_CFG=1 pytest examples/tests/test_model_pretrain_and_downstream.py"
 
 
 @pytest.mark.needs_gpu
@@ -124,11 +130,16 @@ def test_model_training(prepend_config_path, config_name, model_class, correct_r
     trainer.fit(model)
 
     results_comparison_dir = os.path.abspath(os.path.join(THIS_FILE_DIR, 'expected_results'))
-    expected_results = load_expected_training_results(results_comparison_dir, correct_results)
-    if os.environ.get('UPDATE_EXPECTED_RESULTS', False):
-        logger.warning(f'Updating expected results in {results_comparison_dir}/{correct_results}')
-        save_expected_training_results(results_comparison_dir, correct_results, expected_results)
     trainer_results = trainer.logged_metrics
+    if os.environ.get('UPDATE_EXPECTED_RESULTS', False):
+        # update only the keys that are in the current results
+        msg = f'Updating expected results in {results_comparison_dir}/{correct_results}'
+        logger.warning(msg)
+        expected_results_keys = load_expected_training_results(results_comparison_dir, correct_results).keys()
+        save_expected_training_results(results_comparison_dir, correct_results, {k: trainer_results[k].item() for k in expected_results_keys})
+        assert False, msg
+        
+    expected_results = load_expected_training_results(results_comparison_dir, correct_results)
     check_expected_training_results(
         trainer_results, 
         expected_results,

@@ -16,8 +16,12 @@
 import logging
 import torch
 from typing import List
+from functools import partial
+
+from nemo.collections.nlp.modules.common.text_generation_utils import sample_token_greedy, sample_token_topk
 
 from bionemo.model.core.infer import BaseEncoderDecoderInference
+
 
 log = logging.getLogger(__name__)
 __all__ = ["MegaMolBARTInference"]
@@ -63,7 +67,7 @@ class MegaMolBARTInference(BaseEncoderDecoderInference):
 
         return embedding, enc_mask
 
-    def hiddens_to_seq(self, hidden_states, enc_mask):
+    def hiddens_to_seq(self, hidden_states, enc_mask, **kwargs):
         '''
         Transforms hidden state into sequences (i.e., sampling in most cases).
         This class should be implemented in a child class, since it is model specific.
@@ -80,7 +84,9 @@ class MegaMolBARTInference(BaseEncoderDecoderInference):
         predicted_tokens_ids, _ = self.model.decode(tokens_enc=None,
                                                     enc_mask=enc_mask,
                                                     num_tokens_to_generate=self.model.cfg.max_position_embeddings,
-                                                    enc_output=hidden_states)
+                                                    enc_output=hidden_states,
+                                                    **kwargs
+                                                    )
         sequences = self.detokenize(tokens_ids=predicted_tokens_ids)
         
         return sequences
@@ -99,7 +105,9 @@ class MegaMolBARTInference(BaseEncoderDecoderInference):
         """
         return {
                 # smis - a list of SMILES strings to perturbate num_samples times each
-                "greedy-perturbate": {"scaled_radius": 1, "topk": 10, "smis": []},
+                "greedy-perturbate": {"scaled_radius": 1, "smis": []},
+                # top-k limits maximum number of token candidtaes, top-p can further reduce to accumulate top-p probability mass
+                "topk-perturbate": {"scaled_radius": 1, "smis": [], "topk": 0, "top_p": 0.9, "temperature": 1.0},
             }
         
     def sample(self,
@@ -126,7 +134,7 @@ class MegaMolBARTInference(BaseEncoderDecoderInference):
         sampling_kwarg = cur_sampling_kwarg
         
         # execute selected sampling method
-        if sampling_method == 'greedy-perturbate':
+        if sampling_method in ['greedy-perturbate', 'topk-perturbate']:
             smis = sampling_kwarg["smis"]
             if not len(smis):
                 raise ValueError(f'No SMILES strings provided for sampling via "smis" argument')
@@ -137,11 +145,21 @@ class MegaMolBARTInference(BaseEncoderDecoderInference):
             perturbed_hiddens = hidden_states.repeat_interleave(num_samples, 0)
             perturbed_hiddens = perturbed_hiddens + (scaled_radius * torch.randn(perturbed_hiddens.shape).to(perturbed_hiddens.device))
 
-            samples = self.hiddens_to_seq(perturbed_hiddens, sample_masks)
-            if return_embedding:
-                embs = self.hiddens_to_embedding(perturbed_hiddens, sample_masks)
+            if sampling_method == 'greedy-perturbate':
+                samples = self.hiddens_to_seq(perturbed_hiddens, sample_masks, sample_token_fn=sample_token_greedy)
+            elif sampling_method == 'topk-perturbate':
+                top_k = sampling_kwarg['topk']
+                top_p = sampling_kwarg['top_p']
+                temperature = sampling_kwarg['temperature']
+                samples = self.hiddens_to_seq(
+                    perturbed_hiddens, sample_masks, 
+                    sample_token_fn=partial(sample_token_topk, top_k=top_k, top_p=top_p, temperature=temperature),
+                )
+        else:
+            raise ValueError(f'Invalid samping method {sampling_method}, supported sampling methods are {list(default_sampling_kwarg.keys())}')
 
         if return_embedding:
+            embs = self.hiddens_to_embedding(perturbed_hiddens, sample_masks)
             return samples, embs
         else:
             return samples

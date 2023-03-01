@@ -44,7 +44,7 @@ model:
         num_epochs: 5
         check_val_every_n_epoch: 1
         shuffle: False
-        num_workers: 20
+        num_workers: 10
         train_ds: 
           data_file: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/protein/downstream/train/x000.csv
         test_ds: 
