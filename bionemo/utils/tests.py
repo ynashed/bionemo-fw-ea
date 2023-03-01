@@ -145,7 +145,7 @@ def save_expected_training_results(results_comparison_dir: str, correct_results:
     """
     results_path = os.path.join(results_comparison_dir, correct_results)
     with open(results_path, 'w') as fh:
-        json.dump(expected_results, fh, indent=2, sort_keys=True)
+        json.dump(expected_results, fh, indent=4, sort_keys=True)
 
 def check_expected_training_results(trainer_results: dict, expected_results: dict, tol: float = 1.0e-4, err_msg: str = ""):
     """Compare expected training results

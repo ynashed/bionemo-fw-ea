@@ -231,7 +231,7 @@ class BaseEncoderDecoderInference(LightningModule):
 
         return embeddings
 
-    def hiddens_to_seq(self, hidden_states, enc_mask):
+    def hiddens_to_seq(self, hidden_states, enc_mask, **kwargs):
         '''
         Transforms hidden state into sequences (i.e., sampling in most cases).
         This class should be implemented in a child class, since it is model specific.

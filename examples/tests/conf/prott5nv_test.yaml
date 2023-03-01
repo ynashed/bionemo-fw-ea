@@ -31,7 +31,8 @@ model:
     data_col: 3 # 0-based
     data_sep: ','
     header_lines: 1
-  
+    num_workers: 10
+
 exp_manager:
   exp_dir: /tmp/nemo_experiments/prott5nv_pretrain
   create_wandb_logger: False

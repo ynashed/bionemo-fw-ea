@@ -25,6 +25,7 @@ from bionemo.model.molecule.megamolbart import MegaMolBARTInference
 from bionemo.utils.tests import BioNemoSearchPathConfig, register_searchpath_config_plugin, update_relative_config_dir, check_model_exists
 
 log = logging.getLogger(__name__)
+log.setLevel(logging.INFO)
 
 CONFIG_PATH = "../examples/molecule/megamolbart/conf"
 PREPEND_CONFIG_DIR = os.path.abspath("../examples/conf")
@@ -120,7 +121,7 @@ def test_hidden_to_smis():
 
 
 @pytest.mark.dependency(depends=["test_model_exists"])
-def test_sample():
+def test_sample_greedy():
     cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='infer', config_path=CONFIG_PATH)
 
     with load_model(cfg) as inferer:
@@ -131,12 +132,83 @@ def test_sample():
             num_samples=3, 
             sampling_method="greedy-perturbate",
             scaled_radius=1,
-            topk=4,
             smis=smis, 
         )
         samples = set(samples)
         log.info('\n'.join(smis))
         log.info('\n'.join(samples))
+        valid_molecules = []
+        for smi in set(samples):
+            isvalid = False
+            mol = Chem.MolFromSmiles(smi)
+            if mol:
+                isvalid = True
+                valid_molecules.append(smi)
+            log.info(f'Sample: {smi},  {isvalid}')
+
+        log.info('Valid Molecules' + "\n".join(valid_molecules))
+        log.info(f'Total samples = {len(samples)} unique samples {len(set(samples))}  valids {len(valid_molecules)}')
+
+        if len(valid_molecules) < len(samples) * 0.3:
+            log.warning("TOO FEW VALID SAMPLES")
+        assert len(valid_molecules) != 0
+
+def test_sample_topk():
+    cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='infer', config_path=CONFIG_PATH)
+
+    with load_model(cfg) as inferer:
+        smis = ['c1cc2ccccc2cc1',
+                'COc1cc2nc(N3CCN(C(=O)c4ccco4)CC3)nc(N)c2cc1OC',
+                'CC(=O)C(=O)N1CCC([C@H]2CCCCN2C(=O)c2ccc3c(n2)CCN(C(=O)OC(C)(C)C)C3)CC1']
+        samples = inferer.sample(
+            num_samples=3, 
+            sampling_method="topk-perturbate",
+            scaled_radius=0,
+            topk=4,
+            temperature=2,
+            topp=0.0,
+            smis=smis, 
+        )
+        # samples = set(samples)
+        nl = "\n"
+        log.info(f"INPUTS: \n{nl.join(smis)}\n")
+        log.info(f"SAMPLES: \n{nl.join(samples)}\n")
+        valid_molecules = []
+        for smi in set(samples):
+            isvalid = False
+            mol = Chem.MolFromSmiles(smi)
+            if mol:
+                isvalid = True
+                valid_molecules.append(smi)
+            log.info(f'Sample: {smi},  {isvalid}')
+
+        log.info('Valid Molecules' + "\n".join(valid_molecules))
+        log.info(f'Total samples = {len(samples)} unique samples {len(set(samples))}  valids {len(valid_molecules)}')
+
+        if len(valid_molecules) < len(samples) * 0.3:
+            log.warning("TOO FEW VALID SAMPLES")
+        assert len(valid_molecules) != 0
+
+def test_sample_topp():
+    cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='infer', config_path=CONFIG_PATH)
+
+    with load_model(cfg) as inferer:
+        smis = ['c1cc2ccccc2cc1',
+                'COc1cc2nc(N3CCN(C(=O)c4ccco4)CC3)nc(N)c2cc1OC',
+                'CC(=O)C(=O)N1CCC([C@H]2CCCCN2C(=O)c2ccc3c(n2)CCN(C(=O)OC(C)(C)C)C3)CC1']
+        samples = inferer.sample(
+            num_samples=3, 
+            sampling_method="topk-perturbate",
+            scaled_radius=0,
+            topk=0,
+            temperature=2,
+            topp=0.9,
+            smis=smis, 
+        )
+        # samples = set(samples)
+        nl = "\n"
+        log.info(f"INPUTS: \n{nl.join(smis)}\n")
+        log.info(f"SAMPLES: \n{nl.join(samples)}\n")
         valid_molecules = []
         for smi in set(samples):
             isvalid = False
