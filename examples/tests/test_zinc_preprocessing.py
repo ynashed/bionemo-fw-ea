@@ -3,6 +3,8 @@ import os
 import glob
 from omegaconf import OmegaConf
 import pathlib
+import pandas as pd
+from rdkit import Chem
 from bionemo.data import Zinc15Preprocess
 from bionemo.utils.tests import get_directory_hash
 
@@ -108,3 +110,20 @@ def test_prepare_dataset(tmp_directory, download_directory, output_directory, co
                 total_lines += num_samples
 
     assert expected_lines == total_lines
+
+
+@pytest.mark.parametrize('url', (
+    "http://files.docking.org/2D/KA/KAED.txt",  # small mols
+    "http://files.docking.org/2D/AI/AIED.txt",  # large mols
+))
+@pytest.mark.parametrize('max_smiles_length', (20, 100, 200))
+def test_filtering(tmp_directory, download_directory, url, max_smiles_length):
+    preprocessor = Zinc15Preprocess(root_directory=tmp_directory)
+    preprocessor._process_file(url, download_directory, max_smiles_length=max_smiles_length)
+    filtered_data = pd.read_csv(download_directory / os.path.basename(url))
+    if len(filtered_data) > 0:
+        assert filtered_data['SMILES'].map(len).max() <= max_smiles_length
+
+    full_data = pd.read_table(url)
+    num_kept = (full_data['smiles'].map(Chem.CanonSmiles).map(len) <= max_smiles_length).sum()
+    assert len(filtered_data) == num_kept
