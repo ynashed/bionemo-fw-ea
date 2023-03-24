@@ -31,8 +31,6 @@ from rdkit import Chem
 
 from nemo.utils import logging
 
-MAX_LENGTH = 150
-
 
 __all__ = ['Zinc15Preprocess']
 
@@ -74,6 +72,7 @@ class Zinc15Preprocess(object):
 
         logging.info(f'Downloading file {filename}...')
         num_molecules_filtered = 0
+        num_molecules_failed = 0
         try:
             with requests.get(url, stream=True) as r:
                 r.raise_for_status()
@@ -95,11 +94,9 @@ class Zinc15Preprocess(object):
                             mol = Chem.MolFromSmiles(smi)
                             smi = Chem.MolToSmiles(mol, canonical=True)
                         except RuntimeError:
+                            num_molecules_failed += 1
                             continue
 
-                        if len(smi) > MAX_LENGTH:
-                            continue
-                        
                         if len(smi) <= max_smiles_length:
                             f.write(f"{zinc_id},{smi}\n")
                         else:
@@ -108,6 +105,8 @@ class Zinc15Preprocess(object):
             os.rename(tmp_filename, os.path.join(download_dir, filename))
             if num_molecules_filtered > 0:
                 logging.info(f'Filtered {num_molecules_filtered} molecules from {filename} with length longer than {max_smiles_length}')
+            if num_molecules_failed > 0:
+                logging.info(f'Could not process {num_molecules_failed} molecules from {filename}')
             return
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 404:
