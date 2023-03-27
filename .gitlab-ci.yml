@@ -27,7 +27,7 @@ build-and-test:
     - mkdir -p $HOME/.docker
     - echo $DOCKER_AUTH_CONFIG > $HOME/.docker/config.json
   script:
-    - docker build --network host --ssh default --no-cache -t $IMAGE_TAG -f setup/Dockerfile .
+    - docker build --network host --ssh default --no-cache -t $IMAGE_TAG -f setup/Dockerfile-CI-Only .
 
 test-image:
   stage: test
