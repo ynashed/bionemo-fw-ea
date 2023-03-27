@@ -1,0 +1,32 @@
+---
+default:
+  image: docker:20.10.16
+  tags:
+    - kamino-prod
+
+stages:
+  - build
+  - test
+
+services:
+  - docker:20.10.16-dind
+
+variables:
+  DOCKER_HOST: tcp://docker:2376
+  DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
+  DOCKER_TLS_VERIFY: 1
+  DOCKER_TLS_CERTDIR: "/certs"
+  IMAGE_TAG: "gitlab-master.nvidia.com:5005/clara-discovery/bionemo:$CI_COMMIT_SHORT_SHA"
+
+before_script:
+  - until docker info; do sleep 1; done
+
+build-and-test:
+  stage: build
+  script:
+    - docker build --network host --ssh default --no-cache -t $IMAGE_TAG -f setup/Dockerfile .
+
+test-image:
+  stage: test
+  script:
+    - docker image ls
