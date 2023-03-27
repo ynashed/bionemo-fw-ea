@@ -23,6 +23,9 @@ before_script:
 
 build-and-test:
   stage: build
+  before_script:
+    - mkdir -p $HOME/.docker
+    - echo $DOCKER_AUTH_CONFIG > $HOME/.docker/config.json
   script:
     - docker build --network host --ssh default --no-cache -t $IMAGE_TAG -f setup/Dockerfile .
 
