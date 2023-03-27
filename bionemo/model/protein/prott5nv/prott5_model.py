@@ -26,18 +26,20 @@ from nemo.collections.nlp.parts.nlp_overrides import (
 )
 
 class T5SaveRestoreConnector(NLPSaveRestoreConnector):
-    # TODO: find the way to get rid of 128 constant
     # 128 -- is the number of padded vocabulary in MegatronT5Model
-    def __init__(self) -> None:
+    def __init__(self, vocab_size=128) -> None:
         super().__init__()
+        self.vocab_size = vocab_size
+        self.remove_keys = remove_keys
 
     def modify_state_dict(self, conf, state_dict):
         new_state_dict = {}
+        # trunace the word_embeddings and tokens_head
         for key in state_dict.keys():
             if "word_embeddings" in key:
-                new_state_dict[key] = state_dict[key][:128, :]
+                new_state_dict[key] = state_dict[key][:self.vocab_size, :]
             elif "tokens_head" in key:
-                new_state_dict[key] = state_dict[key][:128]
+                new_state_dict[key] = state_dict[key][:self.vocab_size]
             else:
                 new_state_dict[key] = state_dict[key]
 

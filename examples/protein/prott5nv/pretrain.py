@@ -36,7 +36,10 @@ def main(cfg) -> None:
             logging.info("\nRestoring model from .nemo file " + cfg.restore_from_path)
             model = ProtT5nvModel.restore_from(
                 cfg.restore_from_path, cfg.model, trainer=trainer,
-                save_restore_connector=T5SaveRestoreConnector()
+                # 128 -- is the number of padded vocabulary in MegatronT5Model
+                save_restore_connector=T5SaveRestoreConnector(vocab_size=128),
+                # support loading weights with mismatch in embeddings (e.g., alibi)
+                strict=False,
             )
         else:
             model = ProtT5nvModel(cfg.model, trainer=trainer)
