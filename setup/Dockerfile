@@ -20,8 +20,7 @@
 #   - pycairo=1.20.1=py38hf61ee4a_0
 
 
-# FIXME: update to offficial releas. nemo non-official release 1.16
-ARG BASE_IMAGE=gitlab-master.nvidia.com/mlivne/nemo_containers:nemo-r1.16.0
+ARG BASE_IMAGE=nvcr.io/nvidian/bignlp-train:23.03-bd7674a8
 FROM ${BASE_IMAGE}
 
 ARG GITHUB_BRANCH=dev
