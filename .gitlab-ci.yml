@@ -38,10 +38,10 @@ test-image:
     --shm-size=1g \
     --ulimit memlock=-1 \
     --ulimit stack=67108864 \
-    -v $CI_PROJECT_DIR:/workspace/bionemo \
-    -v $MODEL_PATH:/model \
+    -v ${CI_PROJECT_DIR}:/workspace/bionemo \
+    -v ${MODEL_PATH}:/model \
     --env HOME=/workspace/bionemo \
     --env PYTHONPATH=/workspace/bionemo:/workspace/bionemo/generated \
     -w /workspace/bionemo \
     --name bionemo \
-    $IMAGE_TAG pytest
+    ${IMAGE_TAG} pytest
