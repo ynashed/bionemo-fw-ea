@@ -31,8 +31,8 @@ test-image:
   variables:
     MODEL_PATH: $CI_PROJECT_DIR/models
   stage: test
-  script:
-    - docker run --rm \
+  script: -|
+    docker run --rm \
     --network host \
     --gpus all \
     --shm-size=1g \
