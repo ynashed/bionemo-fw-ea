@@ -126,8 +126,7 @@ def test_dataloader_collate(model_path):
     #get number of modifications
     num_mods_total = []
     mask_token_id = tokenizer.get_mask_id()
-    for idx, tok in enumerate(collated_output["tokens"].numpy()):
-       num_mods = 0
+    for idx, tok in enumerate(collated_output["text"].numpy()):
        num_masks = 0
        num_perts = 0
        org_tok = padded_tokens[idx]

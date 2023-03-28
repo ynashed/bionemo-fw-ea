@@ -549,18 +549,16 @@ class BertCollate(object):
         Returns:
             Dict: the keys are the following:
                 {
-                    'tokens' (List[List[int]]): padded and modified sequences
-                        of token IDs,
-                    'loss_mask' (List[List[float]]): same shape as `tokens`. A
-                        1 indicates the token has been modified, otherwise 0,
-                    'labels' (List[List[int]]): same shape as `tokens`.
-                        Contains the padded but non-modified versions of the
-                        token IDs.
-                    'padding_mask' (List[List[float]]): same shape as `tokens`.
-                        1 indicates the corresponding position is not a pad
-                        token. 0 indicates the position is a pad token.
-                    'text' (List[str]): contains the unmodified strings that
-                        were tokenized.
+                    'text' (torch.Tensor[int]): padded and modified sequences of token IDs,
+                    'types' (torch.Tensor[int]): possible types within tokens, in this case set all to 0
+                    'is_random' (torch.Tensor[int]): order of the sequences in the batch, len(is_random) == len(text)
+                    'loss_mask' (List[List[float]]): same shape as `text`. 1 indicates the token has been modified,
+                                                     otherwise 0,
+                    'labels' (List[List[int]]): same shape as `text`. Contains the padded but non-modified versions of
+                                                the token IDs.
+                    'padding_mask' (List[List[float]]): same shape as `text`. 1 indicates the corresponding position
+                                                        is not a pad token. 0 indicates the position is a pad token.
+                    'batch' (List[str]): contains the unmodified strings that were tokenized.
                 }
         """
 
@@ -586,12 +584,16 @@ class BertCollate(object):
         enc_token_ids = torch.tensor(enc_token_ids, dtype=torch.int64)
         padding_mask = torch.tensor(padding_mask, dtype=torch.int64)
         label_ids = torch.tensor(label_ids, dtype=torch.int64)
+        types = torch.zeros_like(enc_token_ids).long() #expected by training & validation methods
+        sentence_order = torch.arange(len(enc_token_ids)).long() #expected by training & validation methods
 
-        collate_output = {'tokens': enc_token_ids,
+        collate_output = {'text': enc_token_ids,
+                          'types': types,
+                          'is_random': sentence_order,
                           'loss_mask': loss_mask,
                           'labels': label_ids,
                           'padding_mask': padding_mask,
-                          'text': batch}
+                          'batch': batch}
 
         return collate_output
 

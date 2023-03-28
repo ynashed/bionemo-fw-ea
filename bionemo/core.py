@@ -258,21 +258,3 @@ class BioNeMoBertModel(MegatronBertModel):
         logging.info(f'Length of test dataset: {len(self._test_ds)}')
         logging.info(f'Finished building Bert datasets.')
         return self._train_ds, self._validation_ds, self._test_ds
-
-    def process_batch(self, batch):
-        """Build the batch."""
-        # Items and their type.
-        keys = ['tokens', 'labels', 'loss_mask', 'padding_mask']
-
-        datatype = torch.int64
-        data = batch
-        data_b = tensor_parallel.broadcast_data(keys, data, datatype)
-
-        # Unpack.
-        tokens = data_b['tokens'].long()
-        loss_mask = data_b['loss_mask'].float()
-        lm_labels = data_b['labels'].long()
-        padding_mask = data_b['padding_mask'].long()
-        types = torch.ones_like(tokens).long() #expected by training & validation methods
-        sentence_order = torch.arange(len(tokens)).long() #expected by training & validation methods
-        return tokens, types, sentence_order, loss_mask, lm_labels, padding_mask

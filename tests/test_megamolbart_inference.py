@@ -37,6 +37,11 @@ _INFERER = None
 os.environ["PROJECT_MOUNT"] = os.environ.get("PROJECT_MOUNT", '/workspace/bionemo')
 THIS_FILE_DIR = pathlib.Path(os.path.abspath(__file__)).parent
 
+_SMIS = ['c1cc2ccccc2cc1',
+         'COc1cc2nc(N3CCN(C(=O)c4ccco4)CC3)nc(N)c2cc1OC',
+         'CC(=O)C(=O)N1CCC([C@H]2CCCCN2C(=O)c2ccc3c(n2)CCN(C(=O)OC(C)(C)C)C3)CC1']
+
+
 def get_cfg(prepend_config_path, config_name, config_path='conf'):
     prepend_config_path = pathlib.Path(prepend_config_path)
 
@@ -59,21 +64,20 @@ def load_model(inf_cfg):
         _INFERER = MegaMolBARTInference(inf_cfg)
     yield _INFERER
 
+
 @pytest.mark.dependency()
 def test_model_exists():
     check_model_exists("models/molecule/megamolbart/megamolbart.nemo")
+
 
 @pytest.mark.dependency(depends=["test_model_exists"])
 def test_smis_to_hiddens():
     cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='infer', config_path=CONFIG_PATH)
     with load_model(cfg) as inferer:
-        smis = ['c1cc2ccccc2cc1',
-                'COc1cc2nc(N3CCN(C(=O)c4ccco4)CC3)nc(N)c2cc1OC',
-                'CC(=O)C(=O)N1CCC([C@H]2CCCCN2C(=O)c2ccc3c(n2)CCN(C(=O)OC(C)(C)C)C3)CC1']
-        hidden_state, pad_masks = inferer.seq_to_hiddens(smis)
+        hidden_state, pad_masks = inferer.seq_to_hiddens(_SMIS)
 
         assert hidden_state is not None
-        assert hidden_state.shape[0] == len(smis)
+        assert hidden_state.shape[0] == len(_SMIS)
         assert hidden_state.shape[2] == inferer.model.cfg.max_position_embeddings
         assert pad_masks is not None
 
@@ -83,13 +87,10 @@ def test_smis_to_embedding():
     cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='infer', config_path=CONFIG_PATH)
 
     with load_model(cfg) as inferer:
-        smis = ['c1cc2ccccc2cc1',
-                'COc1cc2nc(N3CCN(C(=O)c4ccco4)CC3)nc(N)c2cc1OC',
-                'CC(=O)C(=O)N1CCC([C@H]2CCCCN2C(=O)c2ccc3c(n2)CCN(C(=O)OC(C)(C)C)C3)CC1']
-        embedding = inferer.seq_to_embeddings(smis)
+        embedding = inferer.seq_to_embeddings(_SMIS)
 
         assert embedding is not None
-        assert embedding.shape[0] == len(smis)
+        assert embedding.shape[0] == len(_SMIS)
         assert embedding.shape[1] == inferer.model.cfg.max_position_embeddings
 
 
@@ -98,16 +99,13 @@ def test_hidden_to_smis():
     cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='infer', config_path=CONFIG_PATH)
 
     with load_model(cfg) as inferer:
-        smis = ['c1cc2ccccc2cc1',
-                'COc1cc2nc(N3CCN(C(=O)c4ccco4)CC3)nc(N)c2cc1OC',
-                'CC(=O)C(=O)N1CCC([C@H]2CCCCN2C(=O)c2ccc3c(n2)CCN(C(=O)OC(C)(C)C)C3)CC1']
-        hidden_state, pad_masks = inferer.seq_to_hiddens(smis)
+        hidden_state, pad_masks = inferer.seq_to_hiddens(_SMIS)
         infered_smis = inferer.hiddens_to_seq(hidden_state, pad_masks)
-        log.info(f'Input SMILES and Infered: {smis}, {infered_smis}')
+        log.info(f'Input SMILES and Infered: {_SMIS}, {infered_smis}')
 
-        assert(len(infered_smis) == len(smis))
+        assert(len(infered_smis) == len(_SMIS))
 
-        for smi, infered_smi in zip(smis, infered_smis):
+        for smi, infered_smi in zip(_SMIS, infered_smis):
             log.info(f'Input and Infered:{smi},  {infered_smi}')
             input_mol = Chem.MolFromSmiles(smi)
             infer_mol = Chem.MolFromSmiles(infered_smi)
@@ -125,17 +123,14 @@ def test_sample_greedy():
     cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='infer', config_path=CONFIG_PATH)
 
     with load_model(cfg) as inferer:
-        smis = ['c1cc2ccccc2cc1',
-                'COc1cc2nc(N3CCN(C(=O)c4ccco4)CC3)nc(N)c2cc1OC',
-                'CC(=O)C(=O)N1CCC([C@H]2CCCCN2C(=O)c2ccc3c(n2)CCN(C(=O)OC(C)(C)C)C3)CC1']
         samples = inferer.sample(
             num_samples=3, 
             sampling_method="greedy-perturbate",
             scaled_radius=1,
-            smis=smis, 
+            smis=_SMIS,
         )
         samples = set(samples)
-        log.info('\n'.join(smis))
+        log.info('\n'.join(_SMIS))
         log.info('\n'.join(samples))
         valid_molecules = []
         for smi in set(samples):
@@ -153,25 +148,23 @@ def test_sample_greedy():
             log.warning("TOO FEW VALID SAMPLES")
         assert len(valid_molecules) != 0
 
+
 def test_sample_topk():
     cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='infer', config_path=CONFIG_PATH)
 
     with load_model(cfg) as inferer:
-        smis = ['c1cc2ccccc2cc1',
-                'COc1cc2nc(N3CCN(C(=O)c4ccco4)CC3)nc(N)c2cc1OC',
-                'CC(=O)C(=O)N1CCC([C@H]2CCCCN2C(=O)c2ccc3c(n2)CCN(C(=O)OC(C)(C)C)C3)CC1']
         samples = inferer.sample(
             num_samples=3, 
-            sampling_method="topk-perturbate",
+            sampling_method="topkp-perturbate",
             scaled_radius=0,
             topk=4,
             temperature=2,
             topp=0.0,
-            smis=smis, 
+            smis=_SMIS,
         )
         # samples = set(samples)
         nl = "\n"
-        log.info(f"INPUTS: \n{nl.join(smis)}\n")
+        log.info(f"INPUTS: \n{nl.join(_SMIS)}\n")
         log.info(f"SAMPLES: \n{nl.join(samples)}\n")
         valid_molecules = []
         for smi in set(samples):
@@ -189,25 +182,23 @@ def test_sample_topk():
             log.warning("TOO FEW VALID SAMPLES")
         assert len(valid_molecules) != 0
 
+
 def test_sample_topp():
     cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='infer', config_path=CONFIG_PATH)
 
     with load_model(cfg) as inferer:
-        smis = ['c1cc2ccccc2cc1',
-                'COc1cc2nc(N3CCN(C(=O)c4ccco4)CC3)nc(N)c2cc1OC',
-                'CC(=O)C(=O)N1CCC([C@H]2CCCCN2C(=O)c2ccc3c(n2)CCN(C(=O)OC(C)(C)C)C3)CC1']
         samples = inferer.sample(
             num_samples=3, 
-            sampling_method="topk-perturbate",
+            sampling_method="topkp-perturbate",
             scaled_radius=0,
             topk=0,
             temperature=2,
             topp=0.9,
-            smis=smis, 
+            smis=_SMIS,
         )
         # samples = set(samples)
         nl = "\n"
-        log.info(f"INPUTS: \n{nl.join(smis)}\n")
+        log.info(f"INPUTS: \n{nl.join(_SMIS)}\n")
         log.info(f"SAMPLES: \n{nl.join(samples)}\n")
         valid_molecules = []
         for smi in set(samples):
@@ -222,5 +213,45 @@ def test_sample_topp():
         log.info(f'Total samples = {len(samples)} unique samples {len(set(samples))}  valids {len(valid_molecules)}')
 
         if len(valid_molecules) < len(samples) * 0.3:
+            log.warning("TOO FEW VALID SAMPLES")
+        assert len(valid_molecules) != 0
+
+
+def test_beam_search():
+    cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='infer', config_path=CONFIG_PATH)
+
+    beam_size = 5
+
+    with load_model(cfg) as inferer:
+        samples = inferer.sample(
+            num_samples=beam_size,
+            sampling_method="beam-search-perturbate",
+            beam_alpha=0,
+            smis=_SMIS,
+        )
+        assert len(samples) == len(_SMIS)
+        assert len(samples[0]) == beam_size
+
+        nl = "\n"
+        for smi_i, samples_i in zip(_SMIS, samples):
+            log.info(f"INPUT: \n{smi_i}\n")
+            log.info(f"SAMPLES: \n{nl.join(samples_i)}\n")
+
+        samples_flat = [item for sublist in samples for item in sublist]
+        valid_molecules = []
+        for smi in set(samples_flat):
+            isvalid = False
+            mol = Chem.MolFromSmiles(smi)
+            if mol:
+                isvalid = True
+                valid_molecules.append(smi)
+            log.info(f'Sample: {smi},  {isvalid}')
+
+        log.info('Valid Molecules' + "\n".join(valid_molecules))
+
+        log.info(f'Total samples = {len(samples_flat)} unique samples {len(set(samples_flat))} '
+                 f'valids {len(valid_molecules)}')
+
+        if len(valid_molecules) < len(samples_flat) * 0.3:
             log.warning("TOO FEW VALID SAMPLES")
         assert len(valid_molecules) != 0

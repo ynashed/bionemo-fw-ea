@@ -16,7 +16,6 @@
 import re
 import torch
 from omegaconf.omegaconf import open_dict
-from omegaconf.listconfig import ListConfig
 from omegaconf import OmegaConf
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks.timer import Timer
@@ -362,3 +361,16 @@ def gather_objects(partial_results_list, main_rank=None):
         results_list.extend(r)
 
     return results_list
+
+
+def initialize_model_parallel(model):
+    # check whether the DDP is initialized
+    if parallel_state.is_unitialized():
+        logging.info("DDP is not initialized. Initializing...")
+
+        def dummy():
+            return
+
+        if model.trainer.strategy.launcher is not None:
+            model.trainer.strategy.launcher.launch(dummy, trainer=model.trainer)
+        model.trainer.strategy.setup_environment()

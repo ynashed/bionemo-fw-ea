@@ -414,12 +414,13 @@ class KmerBertCollate(BertCollate):
             >>> collate_fn = collate.collate_fn
             >>> random.seed(905)
             >>> collate_fn([s])
-            {'tokens': tensor([[2, 5, 4, 7, 4, 8]]),
+            {'text': tensor([[2, 5, 4, 7, 4, 8]]),
+             'types': tensor([[0, 0, 0, 0, 0, 0]]),
+             'is_random': tensor([0, 1, 2]),
              'loss_mask': tensor([[0, 0, 1, 0, 1, 1]]),
              'labels': tensor([[2, 5, 6, 7, 8, 3]]),
              'padding_mask': tensor([[1, 1, 1, 1, 1, 1]]),
-             'text': ['ACGTCG']}
-
+             'batch': ['ACGTCG']}
         """
         tokenizer = KmerTokenizerAdapter(tokenizer)
         if masking_strategy is None:
