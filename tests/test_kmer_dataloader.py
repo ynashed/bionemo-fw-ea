@@ -60,6 +60,14 @@ expected_token_ids = [
     [2, 4, 1, 5, 0, 0, 0, 0],
 ]
 
+expected_types = [
+    [0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0],
+]
+
+expected_is_random = [0, 1, 2]
+
 expected_loss_mask = [
     [1, 1, 0, 1, 0, 0, 0, 0],
     [0, 0, 1, 0, 0, 0, 0, 0],
@@ -141,9 +149,11 @@ def _setup_dataloader():
     )
     return dataloader
 
-keys = ['tokens', 'loss_mask', 'labels', 'padding_mask', 'text']
+keys = ['text', 'types', 'is_random' ,'loss_mask', 'labels', 'padding_mask', 'batch']
 expectations = [
     expected_token_ids,
+    expected_types,
+    expected_is_random,
     expected_loss_mask,
     expected_labels,
     expected_padding_mask,

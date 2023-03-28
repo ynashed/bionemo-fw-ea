@@ -122,24 +122,6 @@ class ESM1nvModel(MegatronBertModel):
         logging.info(f'Finished building Bert datasets.')
         return self._train_ds, self._validation_ds, self._test_ds
 
-    def process_batch(self, batch):
-        """Build the batch."""
-        # Items and their type.
-        keys = ['tokens', 'labels', 'loss_mask', 'padding_mask']
-
-        datatype = torch.int64
-        data = batch
-        data_b = tensor_parallel.broadcast_data(keys, data, datatype)
-
-        # Unpack.
-        tokens = data_b['tokens'].long()
-        loss_mask = data_b['loss_mask'].float()
-        lm_labels = data_b['labels'].long()
-        padding_mask = data_b['padding_mask'].long()
-        # faking values here for apex parallelism
-        types = torch.zeros(tokens.size(0)).to(loss_mask) #expected by training & validation methods
-        sentence_order = types #expected by training & validation methods
-        return tokens, types, sentence_order, loss_mask, lm_labels, padding_mask
 
     def validation_epoch_end(self, outputs):
         if not outputs:

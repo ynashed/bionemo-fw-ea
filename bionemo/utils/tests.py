@@ -117,35 +117,56 @@ def clean_directory(directory):
     directory.mkdir(parents=True, exist_ok=True)
 
 
-def load_expected_training_results(results_comparison_dir: str, correct_results: str):
+def load_expected_training_results(results_comparison_dir: str, correct_results: str, format: str = 'json'):
     """Load JSON file containing expected training results
 
     Args:
         results_comparison_dir (str): Directory where the pickle file with config is located
         correct_config (str): Name of the pickle file holding the configuration
+        format (str): Format of the serialized file to load, can be json or pickle
 
     Returns:
         dict: expected training results
     """
+    supported_formats = ['json', 'pickle']
     results_path = os.path.join(results_comparison_dir, correct_results)
-    with open(results_path, 'r') as fh:
-        expected_results = json.load(fh)
+    if format == 'json':
+        with open(results_path, 'r') as fh:
+            expected_results = json.load(fh)
+    elif format == 'pickle':
+        with open(results_path, 'rb') as fh:
+            expected_results = pickle.load(fh)
+    else:
+        raise ValueError(f'Invalid file format {format}, supported format {supported_formats}')
+
     return expected_results
 
-def save_expected_training_results(results_comparison_dir: str, correct_results: str, expected_results: dict):
+
+def save_expected_training_results(results_comparison_dir: str, correct_results: str, expected_results: dict,
+                                   file_format: str = 'json'):
     """Saves JSON file containing expected training results
 
     Args:
         results_comparison_dir (str): Directory where the pickle file with config is located
         correct_config (str): Name of the pickle file holding the configuration
         expected_results (dict): expected training results
+        file_format (str): Format of the serialized file to save, can be json or pickle
 
     Returns:
         None
     """
+    supported_formats = ['json', 'pickle']
     results_path = os.path.join(results_comparison_dir, correct_results)
-    with open(results_path, 'w') as fh:
-        json.dump(expected_results, fh, indent=4, sort_keys=True)
+    if file_format == 'json':
+        with open(results_path, 'w') as fh:
+            json.dump(expected_results, fh, indent=4, sort_keys=True)
+
+    elif file_format == 'pickle':
+        with open(results_path, 'wb') as fh:
+            pickle.dump(expected_results, fh)
+    else:
+        raise ValueError(f'Invalid file format {file_format}, supported formats: {supported_formats}')
+
 
 def check_expected_training_results(trainer_results: dict, expected_results: dict, tol: float = 1.0e-4, err_msg: str = ""):
     """Compare expected training results

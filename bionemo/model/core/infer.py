@@ -19,7 +19,7 @@ from typing import List, Union
 from pytorch_lightning.core import LightningModule
 from pandas import Series
 
-from nemo.utils import logging
+from bionemo.model.utils import initialize_model_parallel
 
 from bionemo.model.utils import _reconfigure_inference_batch
 from bionemo.model.utils import restore_model
@@ -74,14 +74,7 @@ class BaseEncoderDecoderInference(LightningModule):
         self.to(model.device)
 
         # check whether the DDP is initialized
-        if parallel_state.is_unitialized():
-            logging.info("DDP is not initialized. Initializing...")
-            def dummy():
-                return
-
-            if model.trainer.strategy.launcher is not None:
-                model.trainer.strategy.launcher.launch(dummy, trainer=model.trainer)
-            model.trainer.strategy.setup_environment()
+        initialize_model_parallel(model)
 
         # Reconfigure microbatch sizes here because on model restore, this will contain the micro/global batch configuration used while training.
         _reconfigure_microbatch_calculator(
@@ -156,18 +149,15 @@ class BaseEncoderDecoderInference(LightningModule):
         
         return token_ids, mask
 
-    def detokenize(self, tokens_ids: List[str]):
+    def _detokenize(self, tokens_ids: List[List[str]]) -> List[str]:
         """
-        Detokenize a matrix of tokens into a list of sequences (i.e., strings).
-
+        Helper method for detokenize method
         Args:
-            tokens_ids (torch.Tensor, long): a matrix of token ids
+            tokens_ids (list[list[str]]): a list with sequence of str stored as list
 
         Returns:
-            sequences (list[str]): list of sequences
+            sequences (list[str]): list of str corresponding to sequences
         """
-        tokens_ids = tokens_ids.cpu().detach().numpy().tolist()
-        sequences = []
         for i, cur_tokens_id in enumerate(tokens_ids):
             if self.tokenizer.eos_id in cur_tokens_id:
                 idx = cur_tokens_id.index(self.tokenizer.eos_id)
@@ -176,6 +166,35 @@ class BaseEncoderDecoderInference(LightningModule):
                 tokens_ids[i] = [id for id in cur_tokens_id if id != self.tokenizer.pad_id]
 
         sequences = self.tokenizer.ids_to_text(tokens_ids)
+        return sequences
+
+    def detokenize(self, tokens_ids: torch.Tensor):
+        """
+        Detokenize a matrix of tokens into a list or nested list of sequences (i.e., strings).
+
+        Args:
+            tokens_ids (torch.Tensor, long): a matrix of token ids
+
+        Returns:
+            sequences (list[str] or list[list[str]]): list of sequences
+        """
+        tensor_dim = len(tokens_ids.size())
+        supported_dims = [2, 3]
+
+        tokens_ids = tokens_ids.cpu().detach().numpy().tolist()
+        if tensor_dim == 2:
+            # For instance, can correspond to the greedy search or topkp sampling where tensors with
+            # predicted tokens ids have shape [batch_size, num_tokens_to_generate]
+            sequences = self._detokenize(tokens_ids=tokens_ids)
+        elif tensor_dim == 3:
+            # For instance, can correspond to the beam search with beam_size >1 where tensors with predicted tokens ids
+            # have shape [batch_size, beam_size, num_tokens_to_generate]
+            sequences = []
+            for tokens_ids_i in tokens_ids:
+                sequences.append(self._detokenize(tokens_ids=tokens_ids_i))
+        else:
+            raise ValueError(f'The shape of the tensor with token_ids is not supported. '
+                             f'Supported numbers of dims: {supported_dims}')
 
         return sequences
 
@@ -232,7 +251,7 @@ class BaseEncoderDecoderInference(LightningModule):
         return embeddings
 
     def hiddens_to_seq(self, hidden_states, enc_mask, **kwargs):
-        '''
+        """
         Transforms hidden state into sequences (i.e., sampling in most cases).
         This class should be implemented in a child class, since it is model specific.
         This class should return the sequence with special tokens such as
@@ -243,8 +262,8 @@ class BaseEncoderDecoderInference(LightningModule):
             enc_mask (torch.Tensor, long): boolean mask for padded sections
 
         Returns:
-            sequences (list[str]): list of sequences
-        '''
+            sequences (list[str] or list[list[str]]): list of sequences
+        """
         raise NotImplementedError("Please implement in child class")
 
     @property
@@ -262,8 +281,8 @@ class BaseEncoderDecoderInference(LightningModule):
         Returns a dict of default sampling kwargs per sampling method.
         Example:
             {
-                "greedy-perturbate": {"scaled_radius": 1, "topk": 10},
-                "beam-search": {"beam_size": 5, "beam_alpha": 0.6, "beam_min_length": 1, "beam_max_length": 100},
+                "greedy-perturbate": {"scaled_radius": 1, "smis": []},
+                "beam-search": {"beam_size": 5, "beam_alpha": 0.6, "smis": []},
             }
             
         Should be overridden in child class if sampling is supported.
