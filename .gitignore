@@ -188,3 +188,4 @@ lightning_logs/
 *.nemo
 *.version
 *.npy
+*.swp
