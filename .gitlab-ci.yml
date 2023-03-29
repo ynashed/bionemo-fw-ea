@@ -4,6 +4,7 @@ default:
   tags:
     - kamino-prod
 
+
 stages:
   - build
   - test
@@ -17,18 +18,20 @@ variables:
   DOCKER_TLS_VERIFY: 1
   DOCKER_TLS_CERTDIR: "/certs"
   IMAGE_TAG: "gitlab-master.nvidia.com:5005/clara-discovery/bionemo"
-  SHA_TAG: "$IMAGE_TAG:CI_COMMIT_SHA"
+  SHA_TAG: "$IMAGE_TAG:$CI_COMMIT_SHA"
 
 
 build:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   variables:
-    LATEST_TAG: "$IMAGE_TAG:$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
+    LATEST_TAG: "$IMAGE_TAG:$CI_MERGE_REQUEST_TARGET_BRANCH_NAME-latest"
   stage: build
   before_script:
     - until docker info; do sleep 1; done
     - mkdir -p $HOME/.docker
     - echo $DOCKER_AUTH_CONFIG > $HOME/.docker/config.json
   script:
-    - docker build --network host --ssh default --no-cache -t $SHA_TAG -f setup/Dockerfile-CI-Only .
+    - docker build --network host --ssh default --no-cache -t $SHA_TAG -t $LATEST_TAG -f setup/Dockerfile-CI-Only .
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - docker push $SHA_TAG
+    - docker push $SHA_TAG $LATEST_TAG
