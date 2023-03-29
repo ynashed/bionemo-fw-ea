@@ -38,4 +38,4 @@ push:
   before_script:
     - until docker info; do sleep 1; done
   script:
-    - docker push $SHA_TAG -a
+    - docker push $SHA_TAG
