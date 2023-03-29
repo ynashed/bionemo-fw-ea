@@ -34,4 +34,5 @@ build:
   script:
     - docker build --network host --ssh default --no-cache -t $SHA_TAG -t $LATEST_TAG -f setup/Dockerfile-CI-Only .
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - docker push $SHA_TAG $LATEST_TAG
+    - docker push $SHA_TAG
+    - docker push $LATEST_TAG
