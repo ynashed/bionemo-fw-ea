@@ -30,8 +30,11 @@ build:
     - echo $DOCKER_AUTH_CONFIG > $HOME/.docker/config.json
   script:
     - docker build --network host --ssh default --no-cache -t $SHA_TAG -f setup/Dockerfile-CI-Only .
+  after_script:
+    - rm -rf $HOME/.docker
+    - docker push $SHA_TAG
 
-push:
+.push:
   stage: build
   needs:
     - build
