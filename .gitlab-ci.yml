@@ -20,15 +20,17 @@ variables:
 
 
 build-and-push:
+  variables:
+    SHA_TAG: "$IMAGE_TAG:CI_COMMIT_SHA"
+    LATEST_TAG: "$IMAGE_TAG:$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
   stage: build
   before_script:
     - until docker info; do sleep 1; done
     - mkdir -p $HOME/.docker
     - echo $DOCKER_AUTH_CONFIG > $HOME/.docker/config.json
-  script: -|
-    docker build --network host --ssh default --no-cache -t $IMAGE_TAG:$CI_COMMIT_SHA -f setup/Dockerfile-CI-Only .
-
-    docker push $IMAGE_TAG -a
+  script:
+    - docker build --network host --ssh default --no-cache -t $IMAGE_TAG:$CI_COMMIT_SHA -f setup/Dockerfile-CI-Only .
+    - docker push $IMAGE_TAG -a
 
 .test-image:
   variables:
