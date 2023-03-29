@@ -18,7 +18,7 @@ variables:
   DOCKER_TLS_CERTDIR: "/certs"
   IMAGE_TAG: "gitlab-master.nvidia.com:5005/clara-discovery/bionemo:$CI_COMMIT_SHORT_SHA"
 
-build-and-test:
+.build-and-test:
   stage: build
   before_script:
     - until docker info; do sleep 1; done
@@ -41,7 +41,7 @@ test-image:
     -v ${CI_PROJECT_DIR}:/workspace/bionemo \
     -v ${MODEL_PATH}:/model \
     --env HOME=/workspace/bionemo \
-    --env PYTHONPATH=/workspace/bionemo:/workspace/bionemo/generated \
+    --env PYTHONPATH='/workspace/bionemo:/workspace/bionemo/generated:' \
     -w /workspace/bionemo \
     --name bionemo \
     ${IMAGE_TAG} pytest
