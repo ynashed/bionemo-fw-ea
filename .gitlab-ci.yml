@@ -30,7 +30,7 @@ test-build:
     - mkdir -p $HOME/.docker
     - echo $DOCKER_AUTH_CONFIG > $HOME/.docker/config.json
   script:
-    - docker build --network host --ssh default --no-cache -t $SHA_TAG -t $LATEST_TAG -f setup/Dockerfile-CI-Only .
+    - docker build --network host --ssh default --no-cache -t $SHA_TAG -f setup/Dockerfile-CI-Only .
 
 build:
   only:
