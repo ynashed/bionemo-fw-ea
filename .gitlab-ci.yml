@@ -1,0 +1,48 @@
+---
+default:
+  image: docker:20.10.16
+  tags:
+    - kamino-prod
+
+
+stages:
+  - mr-build
+  - build-and-push
+
+services:
+  - docker:20.10.16-dind
+
+variables:
+  DOCKER_HOST: tcp://docker:2376
+  DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
+  DOCKER_TLS_VERIFY: 1
+  DOCKER_TLS_CERTDIR: "/certs"
+  IMAGE_REG: "$CI_REGISTRY/clara-discovery/bionemo:"
+  SHA_TAG: "$IMAGE_REG$CI_COMMIT_SHORT_SHA-$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
+  LATEST_TAG: "$IMAGE_REG$CI_MERGE_REQUEST_TARGET_BRANCH_NAME-latest"
+
+test-build:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  stage: mr-build
+  before_script:
+    - until docker info; do sleep 1; done
+    - mkdir -p $HOME/.docker
+    - echo $DOCKER_AUTH_CONFIG > $HOME/.docker/config.json
+  script:
+    - docker build --network host --ssh default --no-cache -t $SHA_TAG -t $LATEST_TAG -f setup/Dockerfile-CI-Only .
+
+build:
+  only:
+    - dev
+    - main
+  stage: build-and-push
+  before_script:
+    - until docker info; do sleep 1; done
+    - mkdir -p $HOME/.docker
+    - echo $DOCKER_AUTH_CONFIG > $HOME/.docker/config.json
+  script:
+    - docker build --network host --ssh default --no-cache -t $SHA_TAG -t $LATEST_TAG -f setup/Dockerfile-CI-Only .
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker push $SHA_TAG
+    - docker push $LATEST_TAG
