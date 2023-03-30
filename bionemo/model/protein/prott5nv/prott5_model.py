@@ -30,7 +30,6 @@ class T5SaveRestoreConnector(NLPSaveRestoreConnector):
     def __init__(self, vocab_size=128) -> None:
         super().__init__()
         self.vocab_size = vocab_size
-        self.remove_keys = remove_keys
 
     def modify_state_dict(self, conf, state_dict):
         new_state_dict = {}
