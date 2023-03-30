@@ -17,15 +17,12 @@ variables:
   DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
   DOCKER_TLS_VERIFY: 1
   DOCKER_TLS_CERTDIR: "/certs"
-  IMAGE_TAG: "gitlab-master.nvidia.com:5005/clara-discovery/bionemo"
-  SHA_TAG: "$IMAGE_TAG:$CI_COMMIT_SHA"
-
+  SHA_TAG: "$CI_REGISTRY:$CI_COMMIT_SHORT_SHA-$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
+  LATEST_TAG: "$CI_REGISTRY:$CI_MERGE_REQUEST_TARGET_BRANCH_NAME-latest"
 
 build:
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-  variables:
-    LATEST_TAG: "$IMAGE_TAG:$CI_MERGE_REQUEST_TARGET_BRANCH_NAME-latest"
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev" || "main"'
   stage: build
   before_script:
     - until docker info; do sleep 1; done
