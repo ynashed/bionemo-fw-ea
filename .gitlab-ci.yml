@@ -18,8 +18,8 @@ variables:
   DOCKER_TLS_VERIFY: 1
   DOCKER_TLS_CERTDIR: "/certs"
   IMAGE_REG: "$CI_REGISTRY/clara-discovery/bionemo:"
-  SHA_TAG: "$IMAGE_REG$CI_COMMIT_SHORT_SHA-$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
-  LATEST_TAG: "$IMAGE_REG$CI_MERGE_REQUEST_TARGET_BRANCH_NAME-latest"
+  SHA_TAG: "$IMAGE_REG$CI_COMMIT_SHORT_SHA-$CI_COMMIT_BRANCH"
+  LATEST_TAG: "$IMAGE_REG$CI_COMMIT_BRANCH-latest"
 
 test-build:
   rules:
@@ -30,7 +30,7 @@ test-build:
     - mkdir -p $HOME/.docker
     - echo $DOCKER_AUTH_CONFIG > $HOME/.docker/config.json
   script:
-    - docker build --network host --ssh default --no-cache -t $SHA_TAG -t $LATEST_TAG -f setup/Dockerfile-CI-Only .
+    - docker build --network host --ssh default --no-cache -t $SHA_TAG -f setup/Dockerfile-CI-Only .
 
 build:
   only:
