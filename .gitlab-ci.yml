@@ -6,8 +6,8 @@ default:
 
 
 stages:
-  - build
-  - test
+  - mr-build
+  - build-and-push
 
 services:
   - docker:20.10.16-dind
@@ -21,10 +21,22 @@ variables:
   SHA_TAG: "$IMAGE_REG$CI_COMMIT_SHORT_SHA-$CI_MERGE_REQUEST_TARGET_BRANCH_NAME"
   LATEST_TAG: "$IMAGE_REG$CI_MERGE_REQUEST_TARGET_BRANCH_NAME-latest"
 
-build:
+test-build:
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "dev" || "main"'
-  stage: build
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  stage: mr-build
+  before_script:
+    - until docker info; do sleep 1; done
+    - mkdir -p $HOME/.docker
+    - echo $DOCKER_AUTH_CONFIG > $HOME/.docker/config.json
+  script:
+    - docker build --network host --ssh default --no-cache -t $SHA_TAG -t $LATEST_TAG -f setup/Dockerfile-CI-Only .
+
+build:
+  only:
+    - dev
+    - main
+  stage: build-and-push
   before_script:
     - until docker info; do sleep 1; done
     - mkdir -p $HOME/.docker
