@@ -7,7 +7,7 @@ model:
     library: 'sentencepiece'
     type: null
     model: /model/protein/prott5nv/vocab/protein_sequence_sentencepiece.model
-    vocab_file: /model/vocab/protein_sequence.vocab
+    vocab_file: /model/vocab/protein_sequence_sentencepiece.vocab
   data:
     # Path to data must be specified by the user.
     data_url: 'https://ftp.uniprot.org/pub/databases/uniprot/uniref/uniref50/uniref50.fasta.gz'

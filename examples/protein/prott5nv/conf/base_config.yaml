@@ -100,7 +100,7 @@ model:
     library: 'sentencepiece'
     type: null
     model: /model/protein/prott5nv/vocab/protein_sequence_sentencepiece.model
-    vocab_file: /model/protein/prott5nv/vocab/protein_sequence.vocab
+    vocab_file: /model/protein/prott5nv/vocab/protein_sequence_sentencepiece.vocab
     merge_file: null
     num_sentinel_tokens: 96 # number of sentinel tokens in T5 model
 
