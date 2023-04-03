@@ -20,11 +20,22 @@ variables:
   IMAGE_REG: "$CI_REGISTRY/clara-discovery/bionemo:"
   SHA_TAG: "$IMAGE_REG$CI_COMMIT_SHORT_SHA-$CI_COMMIT_BRANCH"
   LATEST_TAG: "$IMAGE_REG$CI_COMMIT_BRANCH-latest"
+  COMMIT_BRANCH: "$CI_COMMIT_SHORT_SHA"
+
+test-commit-branch-build:
+  rules:
+    - if: $CI_COMMIT_BRANCH
+  stage: mr-build
+  before_script:
+    - until docker info; do sleep 1; done
+    - mkdir -p $HOME/.docker
+    - echo $DOCKER_AUTH_CONFIG > $HOME/.docker/config.json
+  script:
+    - docker build --network host --ssh default --no-cache -t $COMMIT_BRANCH -f setup/Dockerfile-CI-Only .
 
 test-build:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-    - if: $CI_COMMIT_BRANCH
   stage: mr-build
   before_script:
     - until docker info; do sleep 1; done
