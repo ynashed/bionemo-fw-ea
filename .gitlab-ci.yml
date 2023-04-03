@@ -25,7 +25,7 @@ variables:
 test-commit-branch-build:
   rules:
     - if: $CI_COMMIT_BRANCH
-  stage: mr-build
+  stage: fb-build
   before_script:
     - until docker info; do sleep 1; done
     - mkdir -p $HOME/.docker
