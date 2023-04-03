@@ -6,6 +6,7 @@ default:
 
 
 stages:
+  - fb-build
   - mr-build
   - build-and-push
 
