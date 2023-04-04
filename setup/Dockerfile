@@ -48,9 +48,16 @@ RUN git clone https://github.com/MolecularAI/pysmilesutils.git --branch master /
 ARG BIONEMO_HOME=/opt/nvidia/bionemo 
 ENV BIONEMO_HOME=${BIONEMO_HOME}
 
-# Clone using SSH (add the domain as known before)
-RUN mkdir -p -m 0700 ~/.ssh && ssh-keyscan ${GITHUB_REPO%%[:/]*} >> ~/.ssh/known_hosts
-RUN --mount=type=ssh git clone --branch ${GITHUB_BRANCH} ssh://git@${GITHUB_REPO} ${BIONEMO_HOME}
+# Clone code into repo
+ARG CI_BUILD # set to non-empty string such as "true" if building with CI, otherwise leave empty
+
+## Copy code for CI build
+COPY if [ ! -z $CI_BUILD ] ; then ./ ${BIONEMO_HOME}
+
+## Clone using SSH (add the domain as known before) outside of CI
+RUN if [ -z $CI_BUILD ] ; then mkdir -p -m 0700 ~/.ssh && ssh-keyscan ${GITHUB_REPO%%[:/]*} >> ~/.ssh/known_hosts ; fi
+RUN if [ -z $CI_BUILD ] ; then --mount=type=ssh git clone --branch ${GITHUB_BRANCH} ssh://git@${GITHUB_REPO} ${BIONEMO_HOME} ; fi
+
 
 ARG NEMO_HOME=/opt/nvidia/nemo
 ENV NEMO_HOME=${NEMO_HOME}
