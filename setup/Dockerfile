@@ -52,7 +52,7 @@ ENV BIONEMO_HOME=${BIONEMO_HOME}
 ARG CI_BUILD # set to non-empty string such as "true" if building with CI, otherwise leave empty
 
 ## Copy code for CI build
-COPY if [ ! -z $CI_BUILD ] ; then ./ ${BIONEMO_HOME}
+COPY if [ ! -z $CI_BUILD ] ; then COPY ./ ${BIONEMO_HOME}
 
 ## Clone using SSH (add the domain as known before) outside of CI
 RUN if [ -z $CI_BUILD ] ; then mkdir -p -m 0700 ~/.ssh && ssh-keyscan ${GITHUB_REPO%%[:/]*} >> ~/.ssh/known_hosts ; fi
