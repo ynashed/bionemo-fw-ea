@@ -1,5 +1,4 @@
 # log and data files
-*.pkl
 output
 result
 *.pt
