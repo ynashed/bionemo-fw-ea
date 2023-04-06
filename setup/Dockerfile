@@ -49,14 +49,14 @@ ARG BIONEMO_HOME=/opt/nvidia/bionemo
 ENV BIONEMO_HOME=${BIONEMO_HOME}
 
 # Clone code into repo
-ARG CI_BUILD # set to non-empty string such as "true" if building with CI, otherwise leave empty
+ARG CI_BUILD="false" # set to true "true" if building with CI, otherwise any value will suffice
 
-## Copy code for CI build
-COPY if [ ! -z $CI_BUILD ] ; then COPY ./ ${BIONEMO_HOME}
+## Copy code for CI build -- TODO this doesn't work
+COPY if [ "$CI_BUILD" = "true" ] ; then COPY ./ ${BIONEMO_HOME}
 
-## Clone using SSH (add the domain as known before) outside of CI
-RUN if [ -z $CI_BUILD ] ; then mkdir -p -m 0700 ~/.ssh && ssh-keyscan ${GITHUB_REPO%%[:/]*} >> ~/.ssh/known_hosts ; fi
-RUN if [ -z $CI_BUILD ] ; then --mount=type=ssh git clone --branch ${GITHUB_BRANCH} ssh://git@${GITHUB_REPO} ${BIONEMO_HOME} ; fi
+## If CI_BUILD is not "true", clone using SSH (add the domain as known before) outside of CI
+RUN if [ "$CI_BUILD" != "true" ] ; then mkdir -p -m 0700 ~/.ssh && ssh-keyscan ${GITHUB_REPO%%[:/]*} >> ~/.ssh/known_hosts ; else true ; fi
+RUN --mount=type=ssh if [ "$CI_BUILD" != "true" ] ; then git clone --branch ${GITHUB_BRANCH} ssh://git@${GITHUB_REPO} ${BIONEMO_HOME} ; else true ; fi
 
 
 ARG NEMO_HOME=/opt/nvidia/nemo
