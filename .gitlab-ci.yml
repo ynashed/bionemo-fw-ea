@@ -33,7 +33,7 @@ test-commit-branch-build:
     - mkdir -p $HOME/.docker
     - echo $DOCKER_AUTH_CONFIG > $HOME/.docker/config.json
   script:
-    - docker build --network host --ssh default --no-cache -t $COMMIT_BRANCH --build-arg REPO_INCLUDE=./ -f setup/Dockerfile .
+    - docker build --network host --no-cache -t $COMMIT_BRANCH --build-arg REPO_INCLUDE=./ -f setup/Dockerfile .
 
 test-build:
   rules:
@@ -44,7 +44,7 @@ test-build:
     - mkdir -p $HOME/.docker
     - echo $DOCKER_AUTH_CONFIG > $HOME/.docker/config.json
   script:
-    - docker build --network host --ssh default --no-cache -t $SHA_TAG --build-arg REPO_INCLUDE=./ -f setup/Dockerfile .
+    - docker build --network host --no-cache -t $SHA_TAG --build-arg REPO_INCLUDE=./ -f setup/Dockerfile .
 
 build:
   only:
@@ -56,7 +56,7 @@ build:
     - mkdir -p $HOME/.docker
     - echo $DOCKER_AUTH_CONFIG > $HOME/.docker/config.json
   script:
-    - docker build --network host --ssh default --no-cache -t $SHA_TAG -t $LATEST_TAG --build-arg REPO_INCLUDE=./ -f setup/Dockerfile .
+    - docker build --network host --no-cache -t $SHA_TAG -t $LATEST_TAG --build-arg REPO_INCLUDE=./ -f setup/Dockerfile .
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     - docker push $SHA_TAG
     - docker push $LATEST_TAG
