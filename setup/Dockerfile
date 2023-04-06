@@ -49,19 +49,17 @@ ARG BIONEMO_HOME=/opt/nvidia/bionemo
 ENV BIONEMO_HOME=${BIONEMO_HOME}
 
 # Clone code into repo
-ARG CI_BUILD="false" # set to true "true" if building with CI, otherwise any value will suffice
+# Set REPO_INCLUDE to ./ to copy all code in, for example if building with CI 
+# if the code should be cloned, set REPO_INCLUDE to any existing file, such as README.md
+ARG REPO_INCLUDE=README.md
+COPY ${REPO_INCLUDE} ${BIONEMO_HOME}
 
-## Copy code for CI build -- TODO this doesn't work
-COPY if [ "$CI_BUILD" = "true" ] ; then COPY ./ ${BIONEMO_HOME}
-
-## If CI_BUILD is not "true", clone using SSH (add the domain as known before) outside of CI
-RUN if [ "$CI_BUILD" != "true" ] ; then mkdir -p -m 0700 ~/.ssh && ssh-keyscan ${GITHUB_REPO%%[:/]*} >> ~/.ssh/known_hosts ; else true ; fi
-RUN --mount=type=ssh if [ "$CI_BUILD" != "true" ] ; then git clone --branch ${GITHUB_BRANCH} ssh://git@${GITHUB_REPO} ${BIONEMO_HOME} ; else true ; fi
-
+## If REPO_INCLUDE is not "./", clone repo using SSH outside of CI
+RUN if [ ${REPO_INCLUDE} != "./" ] ; then mkdir -p -m 0700 ~/.ssh && ssh-keyscan ${GITHUB_REPO%%[:/]*} >> ~/.ssh/known_hosts ; else true ; fi
+RUN --mount=type=ssh if [ ${REPO_INCLUDE} != "./" ] ; then rm -rf ${BIONEMO_HOME} && git clone --branch ${GITHUB_BRANCH} ssh://git@${GITHUB_REPO} ${BIONEMO_HOME} ; else true ; fi
 
 ARG NEMO_HOME=/opt/nvidia/nemo
 ENV NEMO_HOME=${NEMO_HOME}
-
 
 ENV PYTHONPATH=${BIONEMO_HOME}:${BIONEMO_HOME}/generated:${NEMO_HOME}:$PYTHONPATH
 
