@@ -23,9 +23,6 @@
 ARG BASE_IMAGE=nvcr.io/nvidian/bignlp-train:23.03-bd7674a8
 FROM ${BASE_IMAGE}
 
-ARG GITHUB_BRANCH=dev
-ARG GITHUB_REPO=gitlab-master.nvidia.com:12051/clara-discovery/bionemo.git
-
 # Activating base environment
 ENV TERM=xterm
 
@@ -44,24 +41,35 @@ RUN pip3 install -r /tmp/requirements.txt
 RUN git clone https://github.com/MolecularAI/pysmilesutils.git --branch master /opt/pysmilesutils \
     && cd /opt/pysmilesutils && pip install .
 
-# The location of the installed library in the container. Set BIONEMO_HOME env to change this for development purposes.
-ARG BIONEMO_HOME=/opt/nvidia/bionemo 
-ENV BIONEMO_HOME=${BIONEMO_HOME}
-
-# Clone using SSH (add the domain as known before)
-RUN mkdir -p -m 0700 ~/.ssh && ssh-keyscan ${GITHUB_REPO%%[:/]*} >> ~/.ssh/known_hosts
-RUN --mount=type=ssh git clone --branch ${GITHUB_BRANCH} ssh://git@${GITHUB_REPO} ${BIONEMO_HOME}
-
-ARG NEMO_HOME=/opt/nvidia/nemo
-ENV NEMO_HOME=${NEMO_HOME}
-
-
-ENV PYTHONPATH=${BIONEMO_HOME}:${BIONEMO_HOME}/generated:${NEMO_HOME}:$PYTHONPATH
-
 # Recompile Megatron helpers -- NOTE this will need to be done if PYTHONPATH changes later
 RUN NEMO_PATH=$(python -c 'import nemo; print(nemo.__path__[0])') && \
    cd ${NEMO_PATH}/collections/nlp/data/language_modeling/megatron && \
    make
+
+#########################################################################################
+# BioNeMo Build
+#########################################################################################
+
+# The location of the installed library in the container. Set BIONEMO_HOME env to change this for development purposes.
+ARG BIONEMO_HOME=/opt/nvidia/bionemo 
+ENV BIONEMO_HOME=${BIONEMO_HOME}
+
+# Clone code into repo
+# Set REPO_INCLUDE to ./ to copy all code in, for example if building with CI 
+# if the code should be cloned, set REPO_INCLUDE to any existing file, such as README.md
+ARG REPO_INCLUDE=README.md
+COPY ${REPO_INCLUDE} ${BIONEMO_HOME}
+
+## If REPO_INCLUDE is not "./", clone repo using SSH outside of CI
+ARG GITHUB_BRANCH=dev
+ARG GITHUB_REPO=gitlab-master.nvidia.com:12051/clara-discovery/bionemo.git
+RUN if [ ${REPO_INCLUDE} != "./" ] ; then mkdir -p -m 0700 ~/.ssh && ssh-keyscan ${GITHUB_REPO%%[:/]*} >> ~/.ssh/known_hosts ; else true ; fi
+RUN --mount=type=ssh if [ ${REPO_INCLUDE} != "./" ] ; then rm -rf ${BIONEMO_HOME} && git clone --branch ${GITHUB_BRANCH} ssh://git@${GITHUB_REPO} ${BIONEMO_HOME} ; else true ; fi
+
+ARG NEMO_HOME=/opt/nvidia/nemo
+ENV NEMO_HOME=${NEMO_HOME}
+
+ENV PYTHONPATH=${BIONEMO_HOME}:${BIONEMO_HOME}/generated:${NEMO_HOME}:$PYTHONPATH
 
 COPY ./setup/startup.sh /opt/nvidia
 COPY ./models /model

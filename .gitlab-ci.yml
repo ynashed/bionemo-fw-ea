@@ -18,6 +18,8 @@ variables:
   DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
   DOCKER_TLS_VERIFY: 1
   DOCKER_TLS_CERTDIR: "/certs"
+  DOCKER_BUILDKIT: 1
+  BUILDKIT_PROGRESS: plain
   IMAGE_REG: "$CI_REGISTRY/clara-discovery/bionemo:"
   SHA_TAG: "$IMAGE_REG$CI_COMMIT_SHORT_SHA-$CI_COMMIT_BRANCH"
   LATEST_TAG: "$IMAGE_REG$CI_COMMIT_BRANCH-latest"
@@ -32,7 +34,7 @@ test-commit-branch-build:
     - mkdir -p $HOME/.docker
     - echo $DOCKER_AUTH_CONFIG > $HOME/.docker/config.json
   script:
-    - docker build --network host --ssh default --no-cache -t $COMMIT_BRANCH -f setup/Dockerfile-CI-Only .
+    - docker build --network host --no-cache -t $COMMIT_BRANCH --build-arg REPO_INCLUDE=./ -f setup/Dockerfile .
 
 test-build:
   rules:
@@ -43,7 +45,7 @@ test-build:
     - mkdir -p $HOME/.docker
     - echo $DOCKER_AUTH_CONFIG > $HOME/.docker/config.json
   script:
-    - docker build --network host --ssh default --no-cache -t $SHA_TAG -f setup/Dockerfile-CI-Only .
+    - docker build --network host --no-cache -t $SHA_TAG --build-arg REPO_INCLUDE=./ -f setup/Dockerfile .
 
 build:
   only:
@@ -55,7 +57,7 @@ build:
     - mkdir -p $HOME/.docker
     - echo $DOCKER_AUTH_CONFIG > $HOME/.docker/config.json
   script:
-    - docker build --network host --ssh default --no-cache -t $SHA_TAG -t $LATEST_TAG -f setup/Dockerfile-CI-Only .
+    - docker build --network host --no-cache -t $SHA_TAG -t $LATEST_TAG --build-arg REPO_INCLUDE=./ -f setup/Dockerfile .
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     - docker push $SHA_TAG
     - docker push $LATEST_TAG
