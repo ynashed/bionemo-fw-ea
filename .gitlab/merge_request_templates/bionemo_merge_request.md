@@ -2,7 +2,7 @@
 
 Add a one line overview of what this PR aims to accomplish.
 
-**Collection**: [Note which collection this PR will affect]
+**Collection**: [Note which collection this MR will affect. e.g., molecule, protein, or core (for generic contributions)]
 
 # Usage
 * You can potentially add a usage example below
