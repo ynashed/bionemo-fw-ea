@@ -101,7 +101,8 @@ def runPipeline(){
         }
 
         stage('Run tests') {
-            sh returnStdout: true, script: "make -k -C ./tests/"
+           // sh returnStdout: true, script: "make -k -C ./tests/"
+            sh returnStdout: true, script: "pytest -v /opt/nvidia/bionemo/tests/"
         }
     }
 }
