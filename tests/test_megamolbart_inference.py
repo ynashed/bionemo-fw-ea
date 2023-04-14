@@ -67,7 +67,7 @@ def load_model(inf_cfg):
 
 @pytest.mark.dependency()
 def test_model_exists():
-    check_model_exists("models/molecule/megamolbart/megamolbart.nemo")
+    check_model_exists("/model/molecule/megamolbart/megamolbart.nemo")
 
 
 @pytest.mark.needs_gpu

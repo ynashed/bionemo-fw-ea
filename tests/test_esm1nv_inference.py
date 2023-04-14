@@ -58,7 +58,7 @@ def load_model(inf_cfg):
 
 @pytest.mark.dependency()
 def test_model_exists():
-    check_model_exists("models/protein/esm1nv/esm1nv.nemo")
+    check_model_exists("/model/protein/esm1nv/esm1nv.nemo")
 
 @pytest.mark.needs_gpu
 @pytest.mark.dependency(depends=["test_model_exists"])
