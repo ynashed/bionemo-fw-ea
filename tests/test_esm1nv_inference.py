@@ -60,6 +60,7 @@ def load_model(inf_cfg):
 def test_model_exists():
     check_model_exists("models/protein/esm1nv/esm1nv.nemo")
 
+@pytest.mark.needs_gpu
 @pytest.mark.dependency(depends=["test_model_exists"])
 def test_seq_to_embedding():
     cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='infer', config_path=CONFIG_PATH)
@@ -72,6 +73,7 @@ def test_seq_to_embedding():
         assert len(embedding.shape) == 3
 
 
+@pytest.mark.needs_gpu
 @pytest.mark.dependency(depends=["test_model_exists"])
 def test_long_seq_to_embedding():
     long_seq = 'MIQSQINRNIRLDLADAILLSKAKKDLSFAEIADGTGLAEAFVTAALLGQQALPADAARLVGAKLDLDEDSILLLQMIPLRGCIDDRIPTDPTMYRFYEMLQVYGTTLKALVHEKFGDGIISAINFKLDVKKVADPEGGERAVITLDGKYLPTKPF'

@@ -70,6 +70,7 @@ def test_model_exists():
     check_model_exists("models/molecule/megamolbart/megamolbart.nemo")
 
 
+@pytest.mark.needs_gpu
 @pytest.mark.dependency(depends=["test_model_exists"])
 def test_smis_to_hiddens():
     cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='infer', config_path=CONFIG_PATH)
@@ -82,6 +83,7 @@ def test_smis_to_hiddens():
         assert pad_masks is not None
 
 
+@pytest.mark.needs_gpu
 @pytest.mark.dependency(depends=["test_model_exists"])
 def test_smis_to_embedding():
     cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='infer', config_path=CONFIG_PATH)
@@ -94,6 +96,7 @@ def test_smis_to_embedding():
         assert embedding.shape[1] == inferer.model.cfg.max_position_embeddings
 
 
+@pytest.mark.needs_gpu
 @pytest.mark.dependency(depends=["test_model_exists"])
 def test_hidden_to_smis():
     cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='infer', config_path=CONFIG_PATH)
@@ -118,6 +121,7 @@ def test_hidden_to_smis():
             assert(canonical_smi == canonical_infered_smi)
 
 
+@pytest.mark.needs_gpu
 @pytest.mark.skip(reason="FIXME: Currently broken")
 @pytest.mark.dependency(depends=["test_model_exists"])
 def test_sample_greedy():
@@ -150,6 +154,7 @@ def test_sample_greedy():
         assert len(valid_molecules) != 0
 
 
+@pytest.mark.needs_gpu
 @pytest.mark.skip(reason="FIXME: Currently broken")
 def test_sample_topk():
     cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='infer', config_path=CONFIG_PATH)
@@ -185,6 +190,7 @@ def test_sample_topk():
         assert len(valid_molecules) != 0
 
 
+@pytest.mark.needs_gpu
 @pytest.mark.skip(reason="FIXME: Currently broken")
 def test_sample_topp():
     cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='infer', config_path=CONFIG_PATH)
@@ -220,6 +226,7 @@ def test_sample_topp():
         assert len(valid_molecules) != 0
 
 
+@pytest.mark.needs_gpu
 @pytest.mark.skip(reason="FIXME: Currently broken")
 def test_beam_search():
     cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='infer', config_path=CONFIG_PATH)
