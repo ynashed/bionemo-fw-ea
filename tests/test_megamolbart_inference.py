@@ -122,7 +122,7 @@ def test_hidden_to_smis():
 
 
 @pytest.mark.needs_gpu
-@pytest.mark.skip(reason="FIXME: Currently broken")
+@pytest.mark.xfail(reason="FIXME: Currently broken")
 @pytest.mark.dependency(depends=["test_model_exists"])
 def test_sample_greedy():
     cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='infer', config_path=CONFIG_PATH)
@@ -155,7 +155,7 @@ def test_sample_greedy():
 
 
 @pytest.mark.needs_gpu
-@pytest.mark.skip(reason="FIXME: Currently broken")
+@pytest.mark.xfail(reason="FIXME: Currently broken")
 def test_sample_topk():
     cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='infer', config_path=CONFIG_PATH)
 
@@ -191,7 +191,7 @@ def test_sample_topk():
 
 
 @pytest.mark.needs_gpu
-@pytest.mark.skip(reason="FIXME: Currently broken")
+@pytest.mark.xfail(reason="FIXME: Currently broken")
 def test_sample_topp():
     cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='infer', config_path=CONFIG_PATH)
 
@@ -227,7 +227,7 @@ def test_sample_topp():
 
 
 @pytest.mark.needs_gpu
-@pytest.mark.skip(reason="FIXME: Currently broken")
+@pytest.mark.xfail(reason="FIXME: Currently broken")
 def test_beam_search():
     cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='infer', config_path=CONFIG_PATH)
 

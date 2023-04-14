@@ -51,7 +51,8 @@ def _adjust_config_for_test(cfg: OmegaConf) -> OmegaConf:
     return cfg
 
 
-@pytest.mark.skip(reason="FIXME: Currently broken")
+@pytest.mark.needs_gpu
+@pytest.mark.xfail(reason="FIXME: Currently broken")
 def test_megamolbart_greedy_beam_search():
     """
     USAGE:
