@@ -15,4 +15,5 @@ numpy
 wandb
 einops
 pytest-forked
+pytest-dependency
 testbook
