@@ -108,6 +108,7 @@ REGISTRY=${REGISTRY:=NotSpecified}
 REGISTRY_USER=${REGISTRY_USER:='$oauthtoken'}
 REGISTRY_ACCESS_TOKEN=${REGISTRY_ACCESS_TOKEN:=NotSpecified}
 GITHUB_BRANCH=${GITHUB_BRANCH:=main}
+GITHUB_REPO=${GITHUB_REPO:=gitlab-master.nvidia.com:12051/clara-discovery/bionemo.git}
 DEV_CONT_NAME=${DEV_CONT_NAME:=bionemo}
 
 # Model paths
@@ -139,6 +140,7 @@ if [ $write_env -eq 1 ]; then
     echo REGISTRY_USER=${REGISTRY_USER} >> $LOCAL_ENV
     echo REGISTRY_ACCESS_TOKEN=${REGISTRY_ACCESS_TOKEN} >> $LOCAL_ENV
     echo GITHUB_BRANCH=${GITHUB_BRANCH} >> $LOCAL_ENV
+    echo GITHUB_REPO=${GITHUB_REPO} >> $LOCAL_ENV
     echo DEV_CONT_NAME=${DEV_CONT_NAME} >> $LOCAL_ENV
 fi
 
@@ -184,6 +186,7 @@ DOCKER_CMD="docker run \
 DOCKER_BUILD_CMD="docker build --network host --ssh default \
     -t ${BIONEMO_IMAGE} \
     --build-arg GITHUB_BRANCH=${GITHUB_BRANCH} \
+    --build-arg GITHUB_REPO=${GITHUB_REPO} \
     --no-cache \
     -f setup/Dockerfile"
 
