@@ -29,7 +29,7 @@ variables:
 test-commit-branch-build:
   rules:
     - if: $CI_COMMIT_BRANCH
-    - when: manual
+      when: manual
   stage: fb-build
   before_script:
     - until docker info; do sleep 1; done
