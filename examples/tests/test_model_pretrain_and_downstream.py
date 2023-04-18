@@ -26,6 +26,7 @@ import logging
 from bionemo.model.molecule.megamolbart import MegaMolBARTModel
 from bionemo.model.protein.esm1nv import ESM1nvModel
 from bionemo.model.protein.prott5nv import ProtT5nvModel
+from bionemo.model.protein.downstream import FineTuneProteinModel
 from bionemo.model.utils import setup_trainer
 from bionemo.utils.callbacks.callback_utils import setup_callbacks
 from bionemo.utils.tests import ( BioNemoSearchPathConfig,
@@ -42,15 +43,58 @@ from bionemo.utils.tests import ( BioNemoSearchPathConfig,
 # logger
 logger = logging.getLogger(__name__)
 
-# Pretraining and secondary structure prediction tests
+# Pretraining, encoder finetuning and secondary structure validation-in-the-loop tests
 
-# FIXME: Currently sspred is currently broken
-PREPEND_CONFIG_DIR = ['../molecule/megamolbart/conf', '../protein/esm1nv/conf', '../protein/prott5nv/conf'] #, '../protein/prott5nv/conf']
-CONFIG_NAME = ['megamolbart_test', 'esm1nv_test', 'prott5nv_test'] #, 'prott5nv_sspred_test']
-CORRECT_CONFIG = ['megamolbart_config.pkl', 'esm1nv_config.pkl', 'prott5nv_config.pkl'] #, 'prott5nv_sspred_config.pkl']
-CORRECT_RESULTS = ['megamolbart_log.json', 'esm1nv_log.json', 'prott5nv_log.json'] #, 'prott5nv_sspred_log.json']
-MODEL_CLASS = [MegaMolBARTModel, ESM1nvModel, ProtT5nvModel] #, ProtT5nvModel]
-MODEL_PARAMETERS = [4146176, 43612544, 198970496, 198970496]
+# FIXME: SS prediction test gives different results if run separately vs in-suite
+
+PREPEND_CONFIG_DIR = [
+    '../molecule/megamolbart/conf', 
+    '../protein/esm1nv/conf', 
+    '../protein/prott5nv/conf', 
+    '../protein/prott5nv/conf', 
+    '../protein/esm1nv/conf',
+ #   '../protein/prott5nv/conf' 
+    ]
+CONFIG_NAME = [
+    'megamolbart_test', 
+    'esm1nv_test', 
+    'prott5nv_test', 
+    'prott5nv_encoder_finetune_test', 
+    'esm1nv_encoder_finetune_test',
+ #   'prott5nv_sspred_test', 
+    ]
+CORRECT_CONFIG = [
+    'megamolbart_config.pkl', 
+    'esm1nv_config.pkl', 
+    'prott5nv_config.pkl', 
+    'prott5nv_encoder_finetune_config.pkl', 
+    'esm1nv_encoder_finetune_config.pkl',
+#    'prott5nv_sspred_config.pkl', 
+    ]
+CORRECT_RESULTS = [
+    'megamolbart_log.json', 
+    'esm1nv_log.json', 
+    'prott5nv_log.json',  
+    'prott5nv_encoder_finetune_log.json', 
+    'esm1nv_encoder_finetune_log.json',
+ #   'prott5nv_sspred_log.json',
+    ]
+MODEL_CLASS = [
+    MegaMolBARTModel, 
+    ESM1nvModel, 
+    ProtT5nvModel, 
+    FineTuneProteinModel, 
+    FineTuneProteinModel,
+#    ProtT5nvModel, 
+    ] 
+MODEL_PARAMETERS = [
+    4146176, 
+    43612544, 
+    198970496, 
+    199145485,
+    43787533,
+ #   198970496,
+    ]
 
 ####
 
@@ -111,7 +155,10 @@ def test_model_size(prepend_config_path, config_name, model_class, model_paramet
     callbacks = setup_callbacks(cfg)
 
     trainer = setup_trainer(cfg, callbacks=callbacks)
-    model = model_class(cfg.model, trainer)
+    if model_class == FineTuneProteinModel:
+        model = model_class(cfg, trainer)
+    else:
+        model = model_class(cfg.model, trainer)
     assert model.num_weights == model_parameters
 
 
@@ -128,7 +175,10 @@ def test_model_training(prepend_config_path, config_name, model_class, correct_r
     callbacks = setup_callbacks(cfg)
     trainer = setup_trainer(cfg, callbacks=callbacks)
 
-    model = model_class(cfg.model, trainer)
+    if model_class == FineTuneProteinModel:
+        model = model_class(cfg, trainer)
+    else:
+        model = model_class(cfg.model, trainer)
     trainer.fit(model)
 
     results_comparison_dir = os.path.abspath(os.path.join(THIS_FILE_DIR, 'expected_results'))

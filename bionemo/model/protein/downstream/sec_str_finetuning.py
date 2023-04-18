@@ -70,7 +70,9 @@ class FineTuneProteinModel(EncoderFineTuning):
             self.full_cfg, 
             freeze=self.encoder_frozen, 
             restore_path=self.full_cfg.restore_from_path,
-            training=not self.cfg.encoder_frozen)
+            training=not self.cfg.encoder_frozen,
+            adjust_config=False
+            )
         return pretrained_model
 
     @lru_cache

@@ -43,9 +43,10 @@ def main(cfg) -> None:
         trainer.fit(model)
     else:
         logging.info("************** Starting Data PreProcessing ***********")
-        Zinc15Preprocess().prepare_dataset(links_file=cfg.model.data.links_file,
-                                           output_dir=cfg.model.data.dataset_path,
-                                           max_smiles_length=cfg.model.seq_length)
+        preproc = Zinc15Preprocess(root_directory=cfg.model.data.dataset_path)
+        preproc.prepare_dataset(links_file=cfg.model.data.links_file,
+                                max_smiles_length=cfg.model.seq_length
+                                )
 
     if cfg.do_testing:
         logging.info("************** Starting Testing ***********")
