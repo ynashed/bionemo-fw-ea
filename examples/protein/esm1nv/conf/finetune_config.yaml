@@ -3,9 +3,9 @@ defaults:
   - pretrain_small
 do_training: True # set to false if data preprocessing steps must be completed
 do_testing: True # set to true to run evaluation on test data after training
-restore_from_path: /model/protein/esm1nv/esm1nv.nemo 
-target: bionemo.model.protein.esm1nv.ESM1nvModel
-infer_target: bionemo.model.protein.esm1nv.infer.ESM1nvInference
+restore_from_path: /model/protein/esm1nv/esm1nv.nemo # path to nemo checkpoint of the protein model
+target: bionemo.model.protein.esm1nv.ESM1nvModel # target class for protein model
+infer_target: bionemo.model.protein.esm1nv.infer.ESM1nvInference # target inference class for protein model
 
 trainer:
   devices: 2 # number of GPUs or CPUs
@@ -22,10 +22,10 @@ exp_manager:
     name: ${name}_finetuning_encoder_frozen_${model.encoder_frozen}
 
 model:
-  encoder_frozen: True
-  post_process: False
+  encoder_frozen: True # encoder trainable or frozen
+  post_process: False # must be False for downstream task
   micro_batch_size: 128 # NOTE: adjust to occupy ~ 90% of GPU memory
-  global_batch_size: null
+  global_batch_size: null # if null will be computed automatically
   tensor_model_parallel_size: 1  # model parallelism
   
   data:
@@ -38,7 +38,7 @@ model:
       data_file: /data/netsurfp_2.0/test/new_pisces.csv
     num_workers: 0
   
-  finetuning_optim:
+  finetuning_optim: # optimizer parameters for downstream task model
     name: adam
     lr: 0.0001
     betas:

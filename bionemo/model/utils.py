@@ -16,6 +16,7 @@
 import re
 import torch
 from omegaconf.omegaconf import open_dict
+from nemo.utils.get_rank import is_global_rank_zero
 from omegaconf import OmegaConf
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks.timer import Timer
@@ -213,12 +214,13 @@ class PredictTrainerBuilder(TrainerBuilder):
     def resume_checkpoint(cfg, trainer):
         pass
 
-def setup_trainer(cfg, builder=None, callbacks=[]):
+def setup_trainer(cfg, builder=None, callbacks=[], adjust_config=True):
     """NeMo Trainer setup functions"""
     if builder is None:
         builder = TrainerBuilder
 
-    builder.adjust_config(cfg)
+    if adjust_config:
+        builder.adjust_config(cfg)
     plugins = builder.configure_plugins(cfg)
     callbacks = builder.configure_callbacks(cfg, callbacks)
     strategy = builder.configure_strategy(cfg)
@@ -231,15 +233,15 @@ def setup_trainer(cfg, builder=None, callbacks=[]):
     return trainer
 
 
-def setup_inference_trainer(cfg, builder=None):
+def setup_inference_trainer(cfg, builder=None, adjust_config=True):
     """NeMo Trainer setup functions for inference"""
     if builder is None:
         builder = InferenceTrainerBuilder
 
-    return setup_trainer(cfg, builder)
+    return setup_trainer(cfg, builder, adjust_config=adjust_config)
 
 
-def restore_model(restore_path, trainer=None, cfg=None, model_cls=None):
+def restore_model(restore_path, trainer=None, cfg=None, model_cls=None, adjust_config=True):
     """Restore model from checkpoint"""
     logging.info(f"Restoring model from {restore_path}")
 
@@ -260,7 +262,7 @@ def restore_model(restore_path, trainer=None, cfg=None, model_cls=None):
 
     # build trainer if not provided
     if trainer is None:
-        trainer = setup_inference_trainer(cfg=cfg)
+        trainer = setup_inference_trainer(cfg=cfg, adjust_config=adjust_config)
 
     # enforce trainer precition
     with open_dict(cfg):

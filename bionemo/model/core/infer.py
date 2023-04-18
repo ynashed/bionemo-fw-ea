@@ -43,11 +43,12 @@ class BaseEncoderDecoderInference(LightningModule):
     Base class for inference.
     '''
 
-    def __init__(self, cfg, model=None, freeze=True, restore_path=None, training=False):
+    def __init__(self, cfg, model=None, freeze=True, restore_path=None, training=False, adjust_config=True):
         super().__init__()
 
         self.cfg = cfg
         self._freeze_model = freeze
+        self.adjust_config = adjust_config
         self.training = training
         self.model = self.load_model(cfg, model=model, restore_path=restore_path)
         self._trainer = self.model.trainer
@@ -69,6 +70,7 @@ class BaseEncoderDecoderInference(LightningModule):
             model = restore_model(
                 restore_path=restore_path,
                 cfg=cfg,
+                adjust_config=self.adjust_config
             )
         # move self to same device as loaded model
         self.to(model.device)

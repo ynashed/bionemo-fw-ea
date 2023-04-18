@@ -15,6 +15,7 @@
 
 from abc import abstractmethod, ABC
 import torch
+from nemo.collections.nlp.parts.nlp_overrides import NLPSaveRestoreConnector
 from nemo.utils import logging
 from nemo.core.classes import ModelPT
 from nemo.core.classes.exportable import Exportable
@@ -48,6 +49,7 @@ class EncoderFineTuning(ModelPT, Exportable, ABC):
             raise ValueError(
                 "Trainer.accumulate_grad_batches currently only supported"
                 " for Trainer.accumulate_grad_batches = 1")
+        self._save_restore_connector = NLPSaveRestoreConnector()
         self.cfg = cfg
 
         enc_model = self.setup_encoder_model(cfg, trainer)
