@@ -349,6 +349,14 @@ setup() {
         DEV_PYTHONPATH="${DEV_PYTHONPATH}:/workspace/nemo"
     fi
 
+        # For dev use the models in /models dir
+    if [ ! -z "${MODEL_PATH}" ];
+    then
+        DOCKER_CMD="${DOCKER_CMD} -v ${MODEL_PATH}:/model "
+    else
+        DOCKER_CMD="${DOCKER_CMD} -v ${PROJECT_PATH}/models:/model "
+    fi
+
     if [ ! -z "${CHEM_BENCH_PATH}" ];
     then
         DOCKER_CMD="${DOCKER_CMD} -v ${CHEM_BENCH_PATH}:/workspace/chembench "
@@ -364,8 +372,6 @@ setup() {
     DOCKER_CMD="${DOCKER_CMD} -v /etc/group:/etc/group:ro "
     DOCKER_CMD="${DOCKER_CMD} -v /etc/shadow:/etc/shadow:ro "
     DOCKER_CMD="${DOCKER_CMD} -u $(id -u):$(id -g) "
-    # For dev use the models in ./models dir
-    DOCKER_CMD="${DOCKER_CMD} -v ${PROJECT_PATH}/models:/model"
 
     # For dev mode, mount the local code for development purpose
     if [[ $1 == "dev" ]]; then

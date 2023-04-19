@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import os
+import math
 from omegaconf.dictconfig import DictConfig
 from pytorch_lightning.trainer.trainer import Trainer
 
@@ -35,10 +36,34 @@ class T5SaveRestoreConnector(NLPSaveRestoreConnector):
         new_state_dict = {}
         # trunace the word_embeddings and tokens_head
         for key in state_dict.keys():
-            if "word_embeddings" in key:
-                new_state_dict[key] = state_dict[key][:self.vocab_size, :]
-            elif "tokens_head" in key:
-                new_state_dict[key] = state_dict[key][:self.vocab_size]
+            if ("word_embeddings" in key) or ("tokens_head" in key):
+                # initialize with pretrained word embeddings 
+                token_embeddings = state_dict[key]
+                logging.info(f"Updating key={key}, token_embeddings.shape={token_embeddings.shape}, vocab_size={self.vocab_size}")
+                # tile token_embeddings to be at least self.vocab_size
+                dims = (math.ceil(self.vocab_size / token_embeddings.shape[0]),)
+                # we want to tile only first dimension
+                if len(token_embeddings.shape) == 2:
+                    dims += (1,)
+                token_embeddings = token_embeddings.tile(dims=dims)
+                new_state_dict[key] = token_embeddings[:self.vocab_size]
+            elif key.endswith("encoder_embedding.position_embeddings.weight") or key.endswith("decoder_embedding.position_embeddings.weight"):
+                position_embeddings = state_dict[key]
+                # allow changing the position embeddings for learned_abs
+                if "encoder_embedding" in key:
+                    if "encoder" in conf:
+                        max_position_embeddings = conf.encoder.max_position_embeddings
+                    else:
+                        max_position_embeddings = conf.max_position_embeddings
+                else:
+                    if "decoder" in conf:
+                        max_position_embeddings = conf.decoder.max_position_embeddings
+                    else:
+                        max_position_embeddings = conf.max_position_embeddings
+                logging.info(f"Updating key={key}, position_embeddings.shape={position_embeddings.shape}, max_position_embeddings={max_position_embeddings}")
+                # tile position_embeddings to be at least max_position_embeddings
+                position_embeddings = position_embeddings.tile((math.ceil(max_position_embeddings / position_embeddings.shape[0]), 1))
+                new_state_dict[key] = position_embeddings[:max_position_embeddings]
             else:
                 new_state_dict[key] = state_dict[key]
 
