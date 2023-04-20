@@ -1,0 +1,51 @@
+defaults:
+  - base_infer_config
+  # allow this config to override defaults
+  - _self_
+
+hydra:
+  searchpath:
+     - file://${oc.env:BIONEMO_HOME}/examples/conf/
+     - file:///workspace/bionemo/examples/conf/
+
+name: MegaMolBARTRetro_TopK_test
+desc: Evaluation of MegaMolBARTModel for retrosynthesis based on topK test and beam search sampling
+
+
+test_name: test_top${inference.sampling_kwargs.beam_size}
+
+inference:
+  sampling_method: "beam-search"
+  sampling_kwargs:
+    beam_size: 10
+    beam_alpha: 0
+  topk_beams: [1, 5, 10]
+  augment: False
+  output_predictions: True
+  limit_batches: null # optional parameters that controls number of batches processed by topK test
+
+model:
+  downstream_task:
+    restore_from_path: null
+  data:
+    # AstraZeneca dataset used to train MolBART on USPTO50K
+    dataset_path: /data/uspto_50k/processed/test/data.csv
+    output_fname: /result/nemo_experiments/${test_name}
+    batch_size: 10 # the model have an input of batch_size x beam_size  after one iteration of the beam search
+    seed: 42
+    data_impl: "csv_fields_mmap"
+    data_impl_kwargs:
+      csv_fields_mmap:
+        newline_int: 10 # byte-value of newline
+        header_lines: 1 # skip first N header lines
+        workers: ${model.data.num_workers} # number of workers when creating missing index files (null defaults to cpu_num // 2)
+        sort_dataset_paths: False # if True datasets will be sorted by name
+        data_sep: ',' # string to split text into columns
+        # field names and corresponding columns to use for data
+        data_fields:
+          products: 3
+          reactants: 2
+    input_name: products
+    target_name: reactants
+    use_upsampling: False
+    num_samples: null # the whole dataset is taken if null

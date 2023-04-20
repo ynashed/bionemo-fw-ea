@@ -104,15 +104,14 @@ class ESM1nvModel(MegatronBertModel):
         eval_iters = (max_train_steps // self.trainer.val_check_interval + 1) * self.trainer.limit_val_batches
         test_iters = self.trainer.limit_test_batches
 
-        train_valid_test_num_samples = [
-            int (max_train_steps * global_batch_size),
-            int (eval_iters * global_batch_size),
-            int (test_iters * global_batch_size),
-        ]
+        train_valid_test_num_samples = {
+            'train': int(max_train_steps * global_batch_size),
+            'val': int(eval_iters * global_batch_size),
+            'test': int(test_iters * global_batch_size),
+            }
 
         self._train_ds, self._validation_ds, self._test_ds = megamolbart_build_train_valid_test_datasets(
             cfg=self._cfg.data,
-            trainer=self.trainer,
             train_valid_test_num_samples=train_valid_test_num_samples
         )
 

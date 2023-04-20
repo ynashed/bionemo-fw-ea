@@ -37,6 +37,8 @@ from nemo.utils.exp_manager import StatelessTimer, exp_manager
 from nemo.utils.model_utils import import_class_by_path
 from nemo.utils.app_state import AppState
 
+from nemo.utils.distributed import initialize_distributed
+
 try:
     import apex
     from apex.transformer import parallel_state
@@ -376,3 +378,15 @@ def initialize_model_parallel(model):
         if model.trainer.strategy.launcher is not None:
             model.trainer.strategy.launcher.launch(dummy, trainer=model.trainer)
         model.trainer.strategy.setup_environment()
+
+
+def initialize_distributed_parallel_state(local_rank: int = 0, tensor_model_parallel_size:int = 1,
+                                          pipeline_model_parallel_size: int = 1,
+                                          pipeline_model_parallel_split_rank: int = 0):
+    initialize_distributed(args=OmegaConf.create({'local_rank': local_rank}))
+
+    if parallel_state.is_unitialized():
+        logging.info("DDP is not initialized. Initializing...")
+        parallel_state.initialize_model_parallel(tensor_model_parallel_size_=tensor_model_parallel_size,
+                                                 pipeline_model_parallel_size_=pipeline_model_parallel_size,
+                                                 pipeline_model_parallel_split_rank_=pipeline_model_parallel_split_rank)

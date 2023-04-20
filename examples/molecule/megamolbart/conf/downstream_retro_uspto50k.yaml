@@ -1,0 +1,59 @@
+## Configuration of the training of the MegaMolBARTRetro given randomly initialized weights or a pretrained model
+## on USPTO 50K dataset given its splits consistent with data used for MolBART training and testing originally available
+## under https://az.app.box.com/s/7eci3nd9vy0xplqniitpk02rbg9q2zcq/file/854847820319#:~:text=by%20Ross%20Irwin-,Download,-Sign%20up
+## USPTO 50K dataset consists of ~50K reaction records labelled by a reaction type
+
+## MegaMolBART model architecture is compliant with the model downloaded by
+## executing ./launch.sh download from https://catalog.ngc.nvidia.com/orgs/nvidia/teams/clara/models/megamolbart_0_2
+
+defaults:
+  - pretrain_base
+
+name: MegaMolBARTRetro_uspto50k
+
+trainer:
+  num_nodes: 1
+  limit_val_batches: 1. # number of batches in validation step, use fraction for fraction of data
+  max_steps: 3000 # pretrained model converges quicker
+  log_every_n_steps: 100 # number training steps between logging
+  val_check_interval: 1000
+
+model:
+  name: ${name}
+  pretrain_model_path: /model/molecule/megamolbart/megamolbart.nemo # set to null to start from randomly initialize weights
+  # model architecture compatible with MegaMolBart model downloaded by executing ./launch.sh download
+  # from https://catalog.ngc.nvidia.com/orgs/nvidia/teams/clara/models/megamolbart_0_2
+  num_layers: 6
+  hidden_size: 512
+  num_attention_heads: 8
+
+  data:
+    ## configuration of dataset for fine-tuning
+    encoder_mask: False # should be always set to false in fine-tuning
+    decoder_mask: False # should be always set to false in fine-tuning
+
+    ## configuration of dataset for fine-tuning on USPTO_50K
+    # AstraZeneca dataset used to train MolBART on USPTO50K. The file can be manually downloaded from the original repo
+    # https://az.app.box.com/s/7eci3nd9vy0xplqniitpk02rbg9q2zcq/file/854847820319#:~:text=by%20Ross%20Irwin-,Download,-Sign%20up
+    ngc_dataset_id: 1605561 # TODO change the location of this dataset to be available for the users when the framework is released!
+    filename_raw: uspto_50.pickle
+    dataset_path: /data/uspto_50k/
+    data_impl: "csv_fields_mmap"
+    data_impl_kwargs:
+      csv_fields_mmap:
+        newline_int: 10 # byte-value of newline
+        header_lines: 1 # skip first N header lines
+        workers: ${model.data.num_workers} # number of workers when creating missing index files (null defaults to cpu_num // 2)
+        sort_dataset_paths: False # if True datasets will be sorted by name
+        data_sep: ',' # string to split text into columns
+        # field names and corresponding columns to use for data
+        data_fields:
+          products: 3
+          reactants: 2
+    input_name: products
+    target_name: reactants
+
+exp_manager:
+  wandb_logger_kwargs:
+    project: ${model.name}
+    name: ${model.name}
