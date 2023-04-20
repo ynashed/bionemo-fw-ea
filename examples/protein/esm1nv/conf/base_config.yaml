@@ -102,13 +102,28 @@ model:
     data_prefix: "" # must be null or ""
     num_workers: 0
     dataloader_type: single # cyclic
-    header_lines: 1
-    data_col: 1
-    data_sep: ','
-    sort_dataset_paths: True
+    reset_position_ids: False # Reset position ids after end-of-document token
+    reset_attention_mask: False # Reset attention mask after end-of-document token
+    eod_mask_loss: False # Mask loss for the end of document tokens
+    masked_lm_prob: 0.15 # Probability of replacing a token with mask.
+    short_seq_prob: 0.1 # Probability of producing a short sequence.
+    skip_lines: 0
     drop_last: False
-    newline_int: 10
-  
+    pin_memory: False
+    data_impl: "csv_mmap"
+    data_impl_kwargs:
+      csv_mmap:
+        header_lines: 1
+        newline_int: 10 # byte-value of newline
+        workers: ${model.data.num_workers} # number of workers when creating missing index files (null defaults to cpu_num // 2)
+        sort_dataset_paths: True # if True datasets will be sorted by name
+        data_sep: ',' # string to split text into columns
+        # column number of csv to take values from
+        data_col: 1
+    use_upsampling: True # if the data should be upsampled to max number of steps in the training
+    seed: ${model.seed} # Random seed
+    max_seq_length: ${model.seq_length} # Maximum input sequence length. Longer sequences are truncated
+
   optim:
     name: fused_adam # fused optimizers used by Megatron model
     lr: 2e-4

@@ -16,3 +16,4 @@
 from .megamolbart_model import *
 from .physchem_finetuning import *
 from .infer import *
+from .megamolbart_downstream_retro import *
