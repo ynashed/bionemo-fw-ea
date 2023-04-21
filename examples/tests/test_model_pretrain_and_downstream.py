@@ -13,9 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-In order to update test results please use the following command:
+In order to update test results or configs please use the following command:
 
 UPDATE_EXPECTED_RESULTS=1 pytest examples/tests/test_model_pretrain_and_downstream.py
+UPDATE_EXPECTED_CFG=1 pytest examples/tests/test_model_pretrain_and_downstream.py
 """
 import pytest
 import os
@@ -23,9 +24,10 @@ import pathlib
 from hydra import initialize, compose
 import logging
 
-from bionemo.model.molecule.megamolbart import MegaMolBARTModel
+from bionemo.model.molecule.megamolbart import MegaMolBARTModel, MegaMolBARTRetroModel
 from bionemo.model.protein.esm1nv import ESM1nvModel
 from bionemo.model.protein.prott5nv import ProtT5nvModel
+from bionemo.model.protein.downstream import FineTuneProteinModel
 from bionemo.model.utils import setup_trainer
 from bionemo.utils.callbacks.callback_utils import setup_callbacks
 from bionemo.utils.tests import ( BioNemoSearchPathConfig,
@@ -37,22 +39,72 @@ from bionemo.utils.tests import ( BioNemoSearchPathConfig,
                                   clean_directory,
                                   load_expected_training_results,
                                   save_expected_training_results,
-                                  check_expected_training_results )
+                                  check_expected_training_results,
+                                  check_model_exists)
+
+from nemo.collections.nlp.parts.nlp_overrides import NLPSaveRestoreConnector
 
 # logger
 logger = logging.getLogger(__name__)
 
-# Pretraining and secondary structure prediction tests
+# Pretraining, encoder finetuning and secondary structure validation-in-the-loop tests
+# FIXME: SS prediction test gives different results if run separately vs in-suite
 
-# FIXME: Currently sspred is currently broken
-PREPEND_CONFIG_DIR = ['../molecule/megamolbart/conf', '../protein/esm1nv/conf', '../protein/prott5nv/conf'] #, '../protein/prott5nv/conf']
-CONFIG_NAME = ['megamolbart_test', 'esm1nv_test', 'prott5nv_test'] #, 'prott5nv_sspred_test']
-CORRECT_CONFIG = ['megamolbart_config.pkl', 'esm1nv_config.pkl', 'prott5nv_config.pkl'] #, 'prott5nv_sspred_config.pkl']
-CORRECT_RESULTS = ['megamolbart_log.json', 'esm1nv_log.json', 'prott5nv_log.json'] #, 'prott5nv_sspred_log.json']
-MODEL_CLASS = [MegaMolBARTModel, ESM1nvModel, ProtT5nvModel] #, ProtT5nvModel]
-MODEL_PARAMETERS = [4146176, 43612544, 198970496, 198970496]
+PREPEND_CONFIG_DIR = [
+    '../molecule/megamolbart/conf',
+    '../molecule/megamolbart/conf', 
+    '../protein/esm1nv/conf', 
+    '../protein/prott5nv/conf', 
+    '../protein/prott5nv/conf', 
+    '../protein/esm1nv/conf',
+ #   '../protein/prott5nv/conf' 
+    ]
+CONFIG_NAME = [
+    'megamolbart_downstream_retro_test',
+    'megamolbart_test', 
+    'esm1nv_test', 
+    'prott5nv_test', 
+    'prott5nv_encoder_finetune_test', 
+    'esm1nv_encoder_finetune_test',
+ #   'prott5nv_sspred_test', 
+    ]
+CORRECT_CONFIG = [
+    'megamolbart_retro_config.pkl',
+    'megamolbart_config.pkl', 
+    'esm1nv_config.pkl', 
+    'prott5nv_config.pkl', 
+    'prott5nv_encoder_finetune_config.pkl', 
+    'esm1nv_encoder_finetune_config.pkl',
+#    'prott5nv_sspred_config.pkl', 
+    ]
+CORRECT_RESULTS = [
+    'megamolbart_retro_log.json',
+    'megamolbart_log.json', 
+    'esm1nv_log.json', 
+    'prott5nv_log.json',  
+    'prott5nv_encoder_finetune_log.json', 
+    'esm1nv_encoder_finetune_log.json',
+ #   'prott5nv_sspred_log.json',
+    ]
+MODEL_CLASS = [
+    MegaMolBARTRetroModel,
+    MegaMolBARTModel, 
+    ESM1nvModel, 
+    ProtT5nvModel, 
+    FineTuneProteinModel, 
+    FineTuneProteinModel,
+#    ProtT5nvModel, 
+    ]
+MODEL_PARAMETERS = [
+    45058048,
+    4146176, 
+    43612544, 
+    198970496, 
+    199145485,
+    43787533,
+ #   198970496,
+    ]
 
-####
 
 os.environ['PROJECT_MOUNT'] = os.environ.get('PROJECT_MOUNT', '/workspace/bionemo')
 THIS_FILE_DIR = pathlib.Path(os.path.abspath(__file__)).parent
@@ -111,7 +163,10 @@ def test_model_size(prepend_config_path, config_name, model_class, model_paramet
     callbacks = setup_callbacks(cfg)
 
     trainer = setup_trainer(cfg, callbacks=callbacks)
-    model = model_class(cfg.model, trainer)
+    if model_class == FineTuneProteinModel:
+        model = model_class(cfg, trainer)
+    else:
+        model = model_class(cfg.model, trainer)
     assert model.num_weights == model_parameters
 
 
@@ -128,7 +183,18 @@ def test_model_training(prepend_config_path, config_name, model_class, correct_r
     callbacks = setup_callbacks(cfg)
     trainer = setup_trainer(cfg, callbacks=callbacks)
 
-    model = model_class(cfg.model, trainer)
+
+    pretrain_model_path = cfg.model.get('pretrain_model_path', None)
+    if pretrain_model_path is not None:
+        check_model_exists(pretrain_model_path)
+        model = model_class.restore_from(restore_path=pretrain_model_path, trainer=trainer,
+                                         save_restore_connector=NLPSaveRestoreConnector(),
+                                         override_config_path=cfg)
+    else:
+        if model_class == FineTuneProteinModel:
+            model = model_class(cfg, trainer)
+        else:
+            model = model_class(cfg.model, trainer)
     trainer.fit(model)
 
     results_comparison_dir = os.path.abspath(os.path.join(THIS_FILE_DIR, 'expected_results'))
@@ -137,8 +203,18 @@ def test_model_training(prepend_config_path, config_name, model_class, correct_r
         # update only the keys that are in the current results
         msg = f'Updating expected results in {results_comparison_dir}/{correct_results}'
         logger.warning(msg)
-        expected_results_keys = load_expected_training_results(results_comparison_dir, correct_results).keys()
-        save_expected_training_results(results_comparison_dir, correct_results, {k: trainer_results[k].item() for k in expected_results_keys})
+
+        try:
+            expected_results_keys = load_expected_training_results(results_comparison_dir, correct_results).keys()
+
+        except FileNotFoundError:
+            # if expected results are not found and UPDATE_EXPECTED_RESULTS is True,
+            # the script generates expected results
+            logger.warning(f'Expected results not found. Saving all training metrics')
+            expected_results_keys = trainer_results.keys()
+
+        save_expected_training_results(results_comparison_dir, correct_results,
+                                       {k: trainer_results[k].item() for k in expected_results_keys})
         assert False, msg
         
     expected_results = load_expected_training_results(results_comparison_dir, correct_results)

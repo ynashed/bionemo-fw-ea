@@ -30,13 +30,11 @@ model:
     micro_batch_size: ${model.micro_batch_size}
     num_workers: 10
     dataloader_type: single
-    data_col: 3 # 0-based
-    data_sep: ','
-    header_lines: 1
+    data_impl_kwargs:
+      csv_mmap:
+        data_col: 3 # 0-based
     modify_percent: 0.1
     perturb_percent: 0.5
-    seed: ${model.seed}
-    max_seq_length: ${model.seq_length}
     data_prefix: null
 
 exp_manager:

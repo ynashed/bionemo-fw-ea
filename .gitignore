@@ -12,6 +12,7 @@ fastspeech_output
 .viminfo
 .ssh/*
 .gitconfig
+notebooks
 .redhat/
 .python_history
 .dotnet/

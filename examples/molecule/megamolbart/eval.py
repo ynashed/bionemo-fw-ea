@@ -20,9 +20,8 @@ from pytorch_lightning.trainer.trainer import Trainer
 from torch.utils.data import DataLoader
 
 from bionemo.model.molecule.megamolbart import MegaMolBARTModel
-from nemo.collections.nlp.modules.common.megatron.megatron_init import fake_initialize_model_parallel
+from bionemo.model.utils import initialize_model_parallel
 from nemo.collections.nlp.parts.nlp_overrides import NLPDDPPlugin, NLPSaveRestoreConnector
-from nemo.utils.app_state import AppState
 
 assert torch.cuda.is_available()
 
@@ -85,26 +84,10 @@ def main():
         precision=args.precision,
     )
 
-    app_state = AppState()
-    if args.tensor_model_parallel_size > 1 or args.pipeline_model_parallel_size > 1:
-        app_state.model_parallel_size = args.tensor_model_parallel_size * args.pipeline_model_parallel_size
-        (
-            app_state.tensor_model_parallel_rank,
-            app_state.pipeline_model_parallel_rank,
-            app_state.model_parallel_size,
-            app_state.data_parallel_size,
-            app_state.pipeline_model_parallel_split_rank,
-        ) = fake_initialize_model_parallel(
-            world_size=app_state.model_parallel_size,
-            rank=trainer.global_rank,
-            tensor_model_parallel_size_=args.tensor_model_parallel_size,
-            pipeline_model_parallel_size_=args.pipeline_model_parallel_size,
-            pipeline_model_parallel_split_rank_=args.pipeline_model_parallel_split_rank,
-        )
-
     model = MegaMolBARTModel.restore_from(
         restore_path=args.model_file, trainer=trainer, save_restore_connector=NLPSaveRestoreConnector(),
     )
+    initialize_model_parallel(model)
     model.freeze()
 
     request = {

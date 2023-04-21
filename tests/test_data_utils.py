@@ -21,7 +21,7 @@ from torch.utils.data import TensorDataset
 
 
 test_dataset = TensorDataset(
-    torch.tensor(torch.arange(24 * 3).reshape(24, 3))
+    torch.arange(24 * 3).reshape(24, 3)
 )
 
 

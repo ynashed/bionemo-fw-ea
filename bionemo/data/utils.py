@@ -478,3 +478,49 @@ def handle_index(dataset, idx):
     elif idx < 0:
         raise IndexError(f'Index out of range: {idx}')
     return idx
+
+
+def download_dataset_from_ngc(ngc_dataset_id: int, dest: Optional[str] = None, dir: Optional[str] = None,
+                              exclude: Optional[str] = None, file: Optional[str] = None,
+                              format_type: Optional[str] = None, resume: Optional[str] = None,
+                              dry_run: bool = False, debug: bool = False, compress_file: bool = False) -> str:
+    """
+    Downloads dataset from NGC. Please refer to the documentation for more details:
+    https://docs.ngc.nvidia.com/cli/cmd_dataset.html
+    NGC CLI install: https://ngc.nvidia.com/setup/installers/cli
+    Args:
+        ngc_dataset_id: NGC id of the dataset
+        dest: path to store the downloaded files. If None, default is set to  "."
+        dir: directories to download from dataset. Supports standard Unix shell-style wildcards
+        exclude: exclude files or directories from the downloaded dataset. Supports standard Unix shell-style wildcards
+        file: specify individual files to download from the dataset. Supports standard Unix shell-style wildcards
+        format_type: specify the output format type, possible choices: ascii, csv, json. if None, default is set to ascii
+        resume: resume the download for the dataset. Specify the file name saved by the download. Files will be downloaded to the directory of the file name.
+        dry_run: list total size of the download without performing the download
+        debug: enable debug mode
+        compress_file: download the entire dataset directory as a zip file
+    Returns:
+        path to the folder where dataset is downloaded
+    """
+    cmd = f"ngc dataset download "
+    if dest:
+        cmd += f'--dest {dest} '
+    if dir:
+        cmd += f'--dir {dir} '
+    if exclude:
+        cmd += f'--exclude {exclude} '
+    if file:
+        cmd += f'--file {file} '
+    if format_type:
+        cmd += f'--format_type {format_type} '
+    if resume:
+        cmd += f'--resume {resume} '
+    if debug:
+        cmd += '--debug '
+    if dry_run:
+        cmd += '--dry-run '
+    if compress_file:
+        cmd += '--zip '
+
+    os.system(f"{cmd} {ngc_dataset_id}")
+    return os.path.join(dest, str(ngc_dataset_id))

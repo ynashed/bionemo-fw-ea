@@ -1,9 +1,9 @@
 {
-    "3-state_accuracy": 38.0536003112793,
-    "8-state_accuracy": 19.26066017150879,
+    "3-state_accuracy": 38.02753448486328,
+    "8-state_accuracy": 19.263202667236328,
     "consumed_samples": 36.0,
     "global_step": 10.0,
     "reduced_train_loss": 5.165653228759766,
-    "ss_test_loss": 3.1299393954559873,
+    "ss_test_loss": 3.12993939842206,
     "val_loss": 5.05261754989624
 }
