@@ -30,6 +30,7 @@ log.setLevel(logging.INFO)
 CONFIG_PATH = "../examples/molecule/megamolbart/conf"
 PREPEND_CONFIG_DIR = os.path.abspath("../examples/conf")
 MODEL_CLASS = MegaMolBARTInference
+CHECKPOINT_PATH = "/model/molecule/megamolbart/megamolbart.nemo"
 
 ####
 
@@ -65,13 +66,12 @@ def load_model(inf_cfg):
     yield _INFERER
 
 
-@pytest.mark.dependency()
 def test_model_exists():
-    check_model_exists("/model/molecule/megamolbart/megamolbart.nemo")
+    check_model_exists(CHECKPOINT_PATH)
 
 
 @pytest.mark.needs_gpu
-@pytest.mark.dependency(depends=["test_model_exists"])
+@pytest.mark.skip_if_no_file(CHECKPOINT_PATH)
 def test_smis_to_hiddens():
     cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='infer', config_path=CONFIG_PATH)
     with load_model(cfg) as inferer:
@@ -84,7 +84,7 @@ def test_smis_to_hiddens():
 
 
 @pytest.mark.needs_gpu
-@pytest.mark.dependency(depends=["test_model_exists"])
+@pytest.mark.skip_if_no_file(CHECKPOINT_PATH)
 def test_smis_to_embedding():
     cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='infer', config_path=CONFIG_PATH)
 
@@ -97,7 +97,7 @@ def test_smis_to_embedding():
 
 
 @pytest.mark.needs_gpu
-@pytest.mark.dependency(depends=["test_model_exists"])
+@pytest.mark.skip_if_no_file(CHECKPOINT_PATH)
 def test_hidden_to_smis():
     cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='infer', config_path=CONFIG_PATH)
 
@@ -122,7 +122,7 @@ def test_hidden_to_smis():
 
 
 @pytest.mark.needs_gpu
-@pytest.mark.dependency(depends=["test_model_exists"])
+@pytest.mark.skip_if_no_file(CHECKPOINT_PATH)
 def test_sample_greedy():
     cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='infer', config_path=CONFIG_PATH)
 

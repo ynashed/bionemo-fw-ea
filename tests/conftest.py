@@ -132,3 +132,10 @@ def pytest_configure(config):
 
 def pytest_runtest_setup(item):
     _regression_test_filter(item)
+
+
+@pytest.fixture(autouse=True)
+def skip_if_file_missing(request):
+    if request.node.get_closest_marker('skip_if_no_file'):
+        if not os.path.exists(request.node.get_closest_marker('skip_if_no_file').args[0]):
+            pytest.skip('skipped because model does not exist')
