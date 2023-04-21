@@ -28,6 +28,7 @@ log = logging.getLogger(__name__)
 CONFIG_PATH = "../examples/protein/prott5nv/conf"
 PREPEND_CONFIG_DIR = os.path.abspath("../examples/conf")
 MODEL_CLASS = ProtT5nvInference
+CHECKPOINT_PATH = "/model/protein/prott5nv/prott5nv.nemo"
 
 ####
 
@@ -57,12 +58,11 @@ def load_model(inf_cfg):
         _INFERER = ProtT5nvInference(inf_cfg)
     yield _INFERER
 
-@pytest.mark.dependency()
 def test_model_exists():
-    check_model_exists("/model/protein/prott5nv/prott5nv.nemo")
+    check_model_exists(CHECKPOINT_PATH)
 
 @pytest.mark.needs_gpu
-@pytest.mark.dependency(depends=["test_model_exists"])
+@pytest.mark.skip_if_no_file(CHECKPOINT_PATH)
 def test_seq_to_embedding():
     cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='infer', config_path=CONFIG_PATH)
     with load_model(cfg) as inferer:
@@ -76,7 +76,7 @@ def test_seq_to_embedding():
 
 
 @pytest.mark.needs_gpu
-@pytest.mark.dependency(depends=["test_model_exists"])
+@pytest.mark.skip_if_no_file(CHECKPOINT_PATH)
 def test_long_seq_to_embedding():
     long_seq = 'MIQSQINRNIRLDLADAILLSKAKKDLSFAEIADGTGLAEAFVTAALLGQQALPADAARLVGAKLDLDEDSILLLQMIPLRGCIDDRIPTDPTMYRFYEMLQVYGTTLKALVHEKFGDGIISAINFKLDVKKVADPEGGERAVITLDGKYLPTKPF'
     long_seq = long_seq * 10
