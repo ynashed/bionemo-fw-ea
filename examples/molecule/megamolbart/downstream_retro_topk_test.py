@@ -187,6 +187,8 @@ def main(cfg) -> None:
     batch_size = cfg.model.data.batch_size
 
     trainer = Trainer(**cfg.trainer)
+    initialize_distributed_parallel_state(local_rank=0, tensor_model_parallel_size=1, pipeline_model_parallel_size=1,
+                                          pipeline_model_parallel_split_rank=0)
 
     restore_path = cfg.model.downstream_task.get('restore_from_path', None)
     assert restore_path is not None, f'To run this test either a .nemo or .ckpt of the model should be provided'
@@ -201,8 +203,6 @@ def main(cfg) -> None:
         checkpoint_path = inject_model_parallel_rank(restore_path)
         trainer._checkpoint_connector = CheckpointConnector(trainer, resume_from_checkpoint=checkpoint_path)
         model = MegaMolBARTRetroModel.load_from_checkpoint(checkpoint_path, trainer=trainer)
-    initialize_distributed_parallel_state(local_rank=0, tensor_model_parallel_size=1, pipeline_model_parallel_size=1,
-                                          pipeline_model_parallel_split_rank=0)
 
     dataset = build_typed_dataset(dataset_paths=cfg.model.data.dataset_path,
                                   data_impl=cfg.model.data.data_impl, use_upsampling=cfg.model.data.use_upsampling,
@@ -212,7 +212,7 @@ def main(cfg) -> None:
                                                 pad_size_divisible_by_8=True,
                                                 encoder_augment=augment, encoder_mask=False,
                                                 decoder_augment=False, decoder_mask=False,
-                                                canonicalize_input=False,
+                                                canonicalize_input=True,
                                                 input_name=cfg.model.data.input_name,
                                                 target_name=cfg.model.data.target_name,
                                                 ).collate_fn
