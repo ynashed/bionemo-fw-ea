@@ -49,16 +49,19 @@ def tb(grpc_server, notebook_path=NOTEBOOK_PATH):
         yield tb
 
 
+@pytest.mark.needs_gpu
 def test_ipynb_smis_to_hidden(tb):
     output = tb.cell_output_text(5)
     assert output == '(torch.Size([2, 45, 512]), torch.Size([2, 45]))'
 
 
+@pytest.mark.needs_gpu
 def test_ipynb_smis_to_embedding(tb):
     output = tb.cell_output_text(7)
     assert output == 'torch.Size([2, 512])'
 
 
+@pytest.mark.needs_gpu
 def test_ipynb_hidden_to_smis(tb):
     output = tb.cell_output_text(9)
     assert output == "['c1ccc2ccccc2c1', 'COc1cc2nc(N3CCN(C(=O)c4ccco4)CC3)nc(N)c2cc1OC']"

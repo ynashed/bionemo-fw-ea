@@ -20,7 +20,8 @@
 #   - pycairo=1.20.1=py38hf61ee4a_0
 
 
-ARG BASE_IMAGE=nvcr.io/nvidian/bignlp-train:23.03-bd7674a8
+# TODO switch to 23.03 when it's available (we need at least NeMo at commit aaa0ccacf)
+ARG BASE_IMAGE=nvcr.io/nvidian/nemo-nightly-main:23-03-21
 FROM ${BASE_IMAGE}
 
 # Activating base environment
