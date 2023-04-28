@@ -28,7 +28,7 @@ variables:
 
 test-commit-branch-build:
   rules:
-    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_BRANCH && $CI_COMMIT_BRANCH != "main" && $CI_COMMIT_BRANCH != "dev"
       when: manual
   stage: fb-build
   before_script:
