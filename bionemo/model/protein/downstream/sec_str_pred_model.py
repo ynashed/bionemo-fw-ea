@@ -19,12 +19,27 @@ from omegaconf import OmegaConf
 from nemo.utils import logging
 from bionemo.model.protein.downstream.sec_str_pred_data import *
 from nemo.utils import logging
+from torch.nn.modules.loss import _WeightedLoss
+from typing import List
 
+class SSPredLoss(_WeightedLoss):
+    def __init__(self, **kwargs):
+        super(SSPredLoss, self).__init__(**kwargs)
+        self.loss_fn = torch.nn.CrossEntropyLoss()
+
+    def forward(self, input, target, masks):
+        assert len(input) == len(target)
+        loss = 0
+        for i in range(len(input)):
+            masked_out = mask_tensor(masks[i], input[i]).permute(0, 2, 1)
+            cur_loss = self.loss_fn(masked_out, target[i].permute(0, 2, 1))
+            loss += cur_loss
+        return loss
 
 #Network architecture for secondary structure prediction. { display-mode: "form" }
 #Convolutional neural network (two convolutional layers) to predict secondary structure
 class ConvNet(torch.nn.Module):
-    def __init__(self, embed_dim):
+    def __init__(self, embed_dim: int, output_sizes: List[int]):
         super(ConvNet, self).__init__()
         # This is only called "elmo_feature_extractor" for historic reason
         # CNN weights are trained on ProtT5 embeddings
@@ -34,44 +49,51 @@ class ConvNet(torch.nn.Module):
                         torch.nn.Dropout(0.25),
                         )
         n_final_in = 32
-        self.dssp3_classifier = torch.nn.Conv2d(n_final_in, 3, kernel_size=(7,1), padding=(3,0)) # 7
-        self.dssp8_classifier = torch.nn.Conv2d(n_final_in, 8, kernel_size=(7,1), padding=(3,0))
-        self.diso_classifier = torch.nn.Conv2d(n_final_in, 2, kernel_size=(7,1), padding=(3,0))       
+        self.class_heads = torch.nn.ModuleList([])
+        for head_size in output_sizes:
+            self.class_heads.append(torch.nn.Conv2d(n_final_in, head_size, kernel_size=(7,1), padding=(3,0)))
 
     def forward(self, x):
         # IN: X = (B x L x F); OUT: (B x F x L, 1)
         x = x.permute(0,2,1).unsqueeze(dim=-1)
         x = self.elmo_feature_extractor(x) # OUT: (B x 32 x L x 1)
-        d3_Yhat = self.dssp3_classifier(x).squeeze(dim=-1).permute(0,2,1) # OUT: (B x L x 3)
-        d8_Yhat = self.dssp8_classifier(x).squeeze(dim=-1).permute(0,2,1) # OUT: (B x L x 8)
-        diso_Yhat = self.diso_classifier(x).squeeze(dim=-1).permute(0,2,1) # OUT: (B x L x 2)
-        return d3_Yhat, d8_Yhat, diso_Yhat
+        outputs = []
+        for head in self.class_heads:
+            output = head(x)
+            outputs.append(output.squeeze(dim=-1).permute(0,2,1)) # OUT: (B x L x output_size)
+        return outputs 
 
 
-def prepare_batch(batch):
+def prepare_batch(batch, label_names):
+    num_labels = len(label_names)
     max_batch_seq_len = batch["seq_len"].max()
     embeddings = batch["embeddings"][:, :max_batch_seq_len, :]
-    labels1 = batch["3state"][:, :max_batch_seq_len, :]
-    labels2 = batch["8state"][:, :max_batch_seq_len, :]
-    labels3 = batch["2state"][:, :max_batch_seq_len, :]
-    return embeddings.to("cuda"), labels1.to("cuda"), labels2.to("cuda"), labels3.to("cuda")
+    labels = []
+    masks = []
+    for i in range(num_labels):
+        cur_label = batch[label_names[i]][:, :max_batch_seq_len, :]
+        labels.append(cur_label.to("cuda"))
+        mask = batch["_".join(["mask", label_names[i]])][:, :max_batch_seq_len].to("cuda")
+        masks.append(mask)
+    return embeddings.to("cuda"), labels, masks
 
-def mask_tensor(mask_list, tensor):
+def mask_tensor(mask, tensor):
     dims = tensor.size()
-    mask_tensor = torch.tensor(np.array(mask_list).repeat((dims[2])).reshape(dims[0], -1, dims[2])).to("cuda")
-    output_tensor = torch.mul(mask_tensor, tensor)
+    mask = torch.repeat_interleave(mask, dims[2]).reshape(dims[0], -1, dims[2]).to("cuda")
+    output_tensor = torch.mul(mask, tensor)
 
     return output_tensor
 
 def train_one_epoch(model, traindata, training_loader, loss_fn, optimizer, scheduler):
     running_loss = 0.
-    last_loss = 0.
     # Here, we use enumerate(training_loader) instead of
     # iter(training_loader) so that we can track the batch
     # index and do some intra-epoch reporting
     for i, data in enumerate(tqdm(training_loader)):
         # Every data instance is an input + label pair
-        inputs, labels1, labels2, labels3 = prepare_batch(data)
+        inputs, labels, masks = prepare_batch(data, 
+                                             traindata.label_names
+                                             )
         # Make predictions for this batch
         torch.set_grad_enabled(True)
         outputs = model(inputs)
@@ -81,15 +103,8 @@ def train_one_epoch(model, traindata, training_loader, loss_fn, optimizer, sched
         # CrossEntropyLoss expected input dims: B X C X L : Batch X Classes X SequenceLength
         # Output from Model : B X L X C : Batch X SequenceLength X Classes
         # Permute the outputs and labels to CrossEntropyLoss expected dimension order
-        mask_list = traindata.tensor2list(labels3)
-        mask_list = np.array(mask_list).reshape(labels3.size()[:2]).tolist()
-        masked_output0 = mask_tensor(mask_list, outputs[0]).permute(0,2,1)
-        masked_output1 = mask_tensor(mask_list, outputs[1]).permute(0,2,1)
-        masked_output2 = outputs[2].permute(0,2,1)
-        loss1 = loss_fn(masked_output0, labels1.permute(0,2,1))
-        loss2 = loss_fn(masked_output1, labels2.permute(0,2,1))
-        loss3 = loss_fn(masked_output2, labels3.permute(0,2,1))
-        loss = loss1 + loss2 + loss3
+        loss = loss_fn(outputs, labels, masks)
+ 
         # Zero your gradients for every batch!
         optimizer.zero_grad()
         loss.backward()
@@ -124,7 +139,7 @@ def setup_optim(cfg, model):
 
 def train(cfg, model, traindata, train_dataloader):
     """Train and Save the model."""
-    loss_fn = torch.nn.CrossEntropyLoss()
+    loss_fn = SSPredLoss()
     optimizer, scheduler = setup_optim(cfg, model)
     
     for epoch in range(cfg.num_epochs):
@@ -135,52 +150,39 @@ def train(cfg, model, traindata, train_dataloader):
         logging.info('Training Avg Loss: {}'.format(avg_loss))
        
 def test(model, data, dataloader):
-    loss_fn = torch.nn.CrossEntropyLoss()
+    loss_fn = SSPredLoss()
     running_vloss = 0.0
     avg_vloss = 0.0
-    avg_three_state_acc = 0.0
-    avg_eight_state_acc = 0.0
-    avg_two_state_acc = 0.0
-    for i, vdata in enumerate(tqdm(dataloader)):
-        vinputs, vlabels1, vlabels2, vlabels3 = prepare_batch(vdata)
+    avg_acc = [0.0] * len(data.labels_sizes)
+    for n, vdata in enumerate(tqdm(dataloader)):
+        vinputs, vlabels, mask = prepare_batch(vdata, data.label_names)
         voutputs = model(vinputs)
         # We only compute loss for resolved components. So multiply all outputs with labels3 before
-        mask_list = data.tensor2list(vlabels3)
-        masked_output0 = mask_tensor(mask_list, voutputs[0]).permute(0,2,1)
-        masked_output1 = mask_tensor(mask_list, voutputs[1]).permute(0,2,1)
-        masked_output2 = mask_tensor(mask_list, voutputs[2]).permute(0,2,1)
-        vloss1 = loss_fn(masked_output0, vlabels1.permute(0,2,1))
-        vloss2 = loss_fn(masked_output1, vlabels2.permute(0,2,1))
-        vloss3 = loss_fn(masked_output2, vlabels3.permute(0,2,1))
-        vloss = vloss1 + vloss2 + vloss3
+        vloss = loss_fn(voutputs, vlabels, mask)
         running_vloss += vloss
 
-        label_three_state_seq = data.num2label(vlabels1, "three_state")
-        pred_three_state_seq = data.num2label(voutputs[0], "three_state")
-        label_eight_state_seq = data.num2label(vlabels2, "eight_state")
-        pred_eight_state_seq = data.num2label(voutputs[1], "eight_state")
-
-        label_two_state_seq = data.tensor2list(vlabels3)
-        label_two_state_seq = [str(x) for x in label_two_state_seq]
-        pred_two_state_seq = data.tensor2list(voutputs[2])
-        pred_two_state_seq = [str(x) for x in pred_two_state_seq]
-
-        avg_three_state_acc += calculate_accuracy(pred_three_state_seq, label_three_state_seq)
-        avg_eight_state_acc += calculate_accuracy(pred_eight_state_seq, label_eight_state_seq)
-        avg_two_state_acc += calculate_accuracy(pred_two_state_seq, label_two_state_seq)
-
-    avg_vloss = running_vloss / (i + 1)
-    avg_three_state_acc = avg_three_state_acc / (i + 1)
-    avg_eight_state_acc = avg_eight_state_acc / (i + 1)
-    avg_two_state_acc = avg_two_state_acc / (i + 1)
-    avg_acc = [avg_three_state_acc, avg_eight_state_acc, avg_two_state_acc]
+        for i in range(len(avg_acc)):
+            avg_acc[i] += (sec_str_pred_accuracy(voutputs, vlabels, i))
+        
+    avg_vloss = running_vloss / (n + 1)
+    for i in range(len(avg_acc)):
+        avg_acc[i] = avg_acc[i] / (n + 1)
     return avg_vloss, avg_acc
+
+def sec_str_pred_accuracy(outputs: List, targets: List, label_id: int):
+    output = outputs[label_id]
+    target = targets[label_id]
+    seq_len = list(target.sum(axis=2).sum(axis=1).cpu().numpy().astype("int"))
+    target_seq = target.argmax(2)
+    pred_seq = output.argmax(2)
+    acc = [calculate_accuracy(pred[:l], label[:l]) for (l, pred, label) in zip(seq_len, pred_seq, target_seq)]
+    return torch.tensor(np.mean(acc), device="cuda")
 
 
 def main(cfg, traindata, train_dataloader, testdata, test_dataloader) -> None:
 
     pretrain_model_hidden_size = traindata.get_hidden_size()
-    model = ConvNet(pretrain_model_hidden_size).to("cuda")
+    model = ConvNet(pretrain_model_hidden_size, output_sizes=traindata.labels_sizes).to("cuda")
     logging.info("Starting Secondary Structure Training...")
     train(cfg, model, traindata, train_dataloader)
     

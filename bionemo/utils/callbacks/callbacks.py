@@ -13,6 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+three_state_label2num = {"C": 0, "H": 1, "E": 2}
+eight_state_label2num = {"_": 0, "E": 1, "G": 2, "T": 3, "H": 4, "S": 5, "B": 6, "I": 7}
+resolved_label2num = {"0": 0, "1": 1}
+
+three_state_num2label = {0: "C", 1: "H", 2: "E"}
+eight_state_num2label = {0: "_", 1: "E", 2: "G", 3: "T", 4: "H", 5: "S", 6: "B", 7: "I"}
+resolved_num2label = {0: "0", 1: "1"}
+
+import copy
 import torch
 from pathlib import Path
 from typing import List, Optional
@@ -21,7 +30,7 @@ from nemo.utils.get_rank import is_global_rank_zero
 from nemo.utils import logging
 from torch.utils.data import DataLoader
 
-from bionemo.model.protein.downstream import SSDataset, get_data
+from bionemo.model.protein.downstream import SSDataModule, SSDataset, get_data
 from nemo.utils.model_utils import import_class_by_path
 
 from bionemo.model.protein.downstream import sec_str_pred_model as sspred
@@ -41,7 +50,8 @@ class SSPredictionCallback(Callback):
         self.plugins = plugins
         self.cfg = parent_cfg
         valid_cfg = [c for c in self.cfg.model.validation.datasets if c['name'] == "SSPred"]
-        assert len(valid_cfg) == 1
+        if len(valid_cfg) != 1:
+            raise ValueError("Validation config for SSPred wasn't provided or more than one config was provided")
         self.valid_cfg = valid_cfg[0]
     
     def on_validation_epoch_end(self, trainer, main_model):
@@ -55,30 +65,29 @@ class SSPredictionCallback(Callback):
             main_model.model.post_process = False
         infer_class = import_class_by_path(self.valid_cfg.infer_target)
         inference_wrapper = infer_class(self.cfg, main_model)
-        traindata = get_data(
-            datafile=self.valid_cfg.train_ds.data_file, 
-            model=inference_wrapper,
-            emb_batch_size=self.valid_cfg.emb_batch_size, 
-            max_seq_length=self.cfg.model.seq_length
-            )
-        trainDataset = SSDataset(traindata)
-        train_dataloader = DataLoader(trainDataset, batch_size=self.valid_cfg.batch_size, shuffle=False)
-        logging.info("SS prediction training dataloader created...")
-        test_datafile = self.valid_cfg.test_ds.data_file
-        testdata = get_data(
-            datafile=test_datafile, 
-            model=inference_wrapper,
-            emb_batch_size=self.valid_cfg.emb_batch_size,
-            max_seq_length=self.cfg.model.seq_length
-            )
-        test_dataset = SSDataset(testdata)
-        test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False)
-        logging.info("SS prediction test dataloader created...")
+        new_cfg = copy.deepcopy(self.cfg.model)
+        new_cfg.data = copy.deepcopy(self.valid_cfg)
+        ss_data_module = SSDataModule(
+            new_cfg, trainer, model=inference_wrapper
+        )
+        train_dataset = ss_data_module.get_sampled_train_dataset()
+        train_dataloader = DataLoader(train_dataset, 
+                                      batch_size=self.valid_cfg.batch_size, 
+                                      shuffle=False)
+        test_dataset = ss_data_module.get_sampled_test_dataset()
+        test_dataloader = DataLoader(test_dataset, 
+                                     batch_size=self.valid_cfg.batch_size, 
+                                     shuffle=False)
         results = {}
         # For multi-node training it's important to process data first using all processes
         # before starting to train the SS prediction model on rank 0
         if is_global_rank_zero():
-            results = sspred.main(self.valid_cfg, traindata, train_dataloader, testdata, test_dataloader)
+            results = sspred.main(self.valid_cfg, 
+                                  train_dataset.data, 
+                                  train_dataloader, 
+                                  test_dataset.data, 
+                                  test_dataloader
+                                  )
         torch.distributed.barrier()
         self.log_dict(results, rank_zero_only=True)
         # TODO: replace with release_from_inference

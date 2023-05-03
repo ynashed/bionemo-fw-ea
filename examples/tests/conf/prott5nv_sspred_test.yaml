@@ -40,15 +40,20 @@ model:
         infer_target: bionemo.model.protein.prott5nv.infer.ProtT5nvInference
         emb_type: "T5"
         emb_batch_size: 256
+        max_seq_length: ${model.seq_length}
         batch_size: 256
         num_epochs: 5
         check_val_every_n_epoch: 1
         shuffle: False
         num_workers: 10
-        train_ds: 
-          data_file: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/protein/downstream/train/x000.csv
-        test_ds: 
-          data_file: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/protein/downstream/test/x000.csv
+        dataset_path: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/protein/downstream
+        dataset: 
+            train: x000
+            test: x000
+        labels_size: [3, 8, 2]
+        mask_col: ["resolved", "resolved", null]
+        labels_col: ["3state","8state", "resolved"]
+        sequence_col: "sequence"
         random_seed: 1234
         optim:
             name: adam
