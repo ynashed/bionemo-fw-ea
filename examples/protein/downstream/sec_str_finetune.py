@@ -19,43 +19,42 @@ from omegaconf.omegaconf import OmegaConf
 from bionemo.model.utils import (
     setup_trainer,
 )
-from bionemo.model.protein.downstream import FineTuneProteinModel, calculate_accuracy, get_data
-import numpy as np
-import torch
-
-def sec_str_pred_accuracy(output, target, name):
-    seq_len = list(target.sum(axis=2).sum(axis=1).cpu().numpy().astype("int"))
-    target_seq = [get_data.num2label(label.unsqueeze(0), name) for label in target]
-    pred_seq = [get_data.num2label(output.unsqueeze(0), name) for output in output]
-    acc = [calculate_accuracy(pred[:l], label[:l]) for (l, pred, label) in zip(seq_len, pred_seq, target_seq)]
-    return torch.tensor(np.mean(acc), device="cuda")
-
-def three_state_accuracy(output, target):
-    return sec_str_pred_accuracy(output[0], target[0], name="three_state")
-
-def eight_state_accuracy(output, target):
-    return sec_str_pred_accuracy(output[1], target[1], name="eight_state")
+from bionemo.data import FLIPSSPreprocess
+from bionemo.model.protein.downstream import FineTuneProteinModel
+from bionemo.model.protein.downstream.sec_str_pred_model import sec_str_pred_accuracy
 
 
-#@hydra_runner(config_path="../esm1nv/conf", config_name="finetune_config") # ESM
-@hydra_runner(config_path="../prott5nv/conf", config_name="finetune_config") # ProtT5
+@hydra_runner(config_path="../esm1nv/conf", config_name="finetune_config") # ESM
+#@hydra_runner(config_path="../prott5nv/conf", config_name="finetune_config") # ProtT5
 def main(cfg) -> None:
 
     logging.info("\n\n************* Finetune config ****************")
     logging.info(f'\n{OmegaConf.to_yaml(cfg)}')
+    
+    if cfg.do_training:
+        logging.info("************** Starting Training ***********")
+        trainer = setup_trainer(cfg, builder=None)
+        model = FineTuneProteinModel(cfg, trainer)
+        metrics = {}
+        metrics_args = {}
+        for idx, name in enumerate(cfg.model.data.labels_col):
+            metrics[name + "_accuracy"] = sec_str_pred_accuracy
+            metrics_args[name + "_accuracy"] = {"label_id": idx}
 
-    trainer = setup_trainer(cfg, builder=None)
-
-    model = FineTuneProteinModel(cfg, trainer)
-    metrics = {"three_state_accuracy": three_state_accuracy, "eight_state_accuracy": eight_state_accuracy}
-    model.add_metrics(metrics=metrics)
-    trainer.fit(model)
-
-    if cfg.do_testing:
-        if "test_ds" in cfg.model.data:
-            trainer.test(model)
-        else:
-            raise UserWarning("Skipping testing, test dataset file was not provided. Please specify 'test_ds.data_file' in yaml config")
+        model.add_metrics(metrics=metrics, metrics_args=metrics_args)
+        trainer.fit(model)
+        logging.info("************** Finished Training ***********")
+        if cfg.do_testing:
+            logging.info("************** Starting Testing ***********")
+            if "test" in cfg.model.data.dataset:
+                trainer.test(model)
+            else:
+                raise UserWarning("Skipping testing, test dataset file was not provided. Please specify 'test_ds.data_file' in yaml config")
+            logging.info("************** Finished Testing ***********")
+    else:
+        logging.info("************** Starting Preprocessing ***********")
+        preprocessor = FLIPSSPreprocess()
+        preprocessor.prepare_dataset(output_dir=cfg.model.data.dataset_path)
 
 if __name__ == '__main__':
     main()

@@ -57,7 +57,7 @@ PREPEND_CONFIG_DIR = [
     '../protein/prott5nv/conf', 
     '../protein/prott5nv/conf', 
     '../protein/esm1nv/conf',
- #   '../protein/prott5nv/conf' 
+    '../protein/prott5nv/conf' 
     ]
 CONFIG_NAME = [
     'megamolbart_downstream_retro_test',
@@ -66,7 +66,7 @@ CONFIG_NAME = [
     'prott5nv_test', 
     'prott5nv_encoder_finetune_test', 
     'esm1nv_encoder_finetune_test',
- #   'prott5nv_sspred_test', 
+    'prott5nv_sspred_test', 
     ]
 CORRECT_CONFIG = [
     'megamolbart_retro_config.pkl',
@@ -75,7 +75,7 @@ CORRECT_CONFIG = [
     'prott5nv_config.pkl', 
     'prott5nv_encoder_finetune_config.pkl', 
     'esm1nv_encoder_finetune_config.pkl',
-#    'prott5nv_sspred_config.pkl', 
+    'prott5nv_sspred_config.pkl', 
     ]
 CORRECT_RESULTS = [
     'megamolbart_retro_log.json',
@@ -84,7 +84,7 @@ CORRECT_RESULTS = [
     'prott5nv_log.json',  
     'prott5nv_encoder_finetune_log.json', 
     'esm1nv_encoder_finetune_log.json',
- #   'prott5nv_sspred_log.json',
+    'prott5nv_sspred_log.json',
     ]
 MODEL_CLASS = [
     MegaMolBARTRetroModel,
@@ -93,7 +93,7 @@ MODEL_CLASS = [
     ProtT5nvModel, 
     FineTuneProteinModel, 
     FineTuneProteinModel,
-#    ProtT5nvModel, 
+    ProtT5nvModel, 
     ]
 MODEL_PARAMETERS = [
     45058048,
@@ -102,7 +102,7 @@ MODEL_PARAMETERS = [
     198970496, 
     199145485,
     43787533,
- #   198970496,
+    198970496,
     ]
 
 

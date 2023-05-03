@@ -32,12 +32,15 @@ model:
           num_epochs: 10
           shuffle: True
           num_workers: 20
-          train_ds: 
-            data_file: /data/netsurfp_2.0/train/x000.csv 
-          validation_ds: 
-            data_file: /data/netsurfp_2.0/test/new_pisces.csv 
-          test_ds: 
-            data_file: /data/netsurfp_2.0/test/new_pisces.csv #"/data/netsurfp_2.0/test/casp12.csv"
+          dataset_path: /data/netsurfp_2.0
+          dataset:
+            train: x000
+            val: x000
+            test: new_pisces
+          sequence_col : "sequence" # name of column with protein sequence in csv file
+          labels_col: ["3state","8state", "resolved"] # names of label columns in csv file
+          labels_size: [3, 8, 2] # number of classes in each label
+          mask_col: ["resolved", "resolved", null] # names of mask columns in csv file, masks must be 0 or 1
           random_seed: 1234
           optim:
               name: adam

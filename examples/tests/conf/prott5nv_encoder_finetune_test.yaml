@@ -33,12 +33,15 @@ model:
   
   data:
     emb_batch_size: ${model.micro_batch_size}
-    train_ds: 
-      data_file: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/protein/downstream/train/x000.csv  
-    validation_ds: 
-      data_file: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/protein/downstream/test/x000.csv  
-    test_ds: 
-      data_file: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/protein/downstream/test/x000.csv
+    dataset_path: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/protein/downstream
+    dataset:
+      train: x000
+      test: x000
+      val: x000
+    labels_size: [3, 8, 2]
+    mask_col: ["resolved", "resolved", null]
+    labels_col: ["3state","8state", "resolved"]
+    sequence_col: "sequence"
     num_workers: 0
     max_seq_length: ${model.seq_length}
   

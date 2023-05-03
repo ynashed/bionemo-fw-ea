@@ -168,11 +168,13 @@ class EncoderFineTuning(ModelPT, Exportable, ABC):
     def _calc_step(self, batch, batch_idx):
         output_tensor = self.forward(batch)
         target = self.get_target_from_batch(batch)
-        loss = self.loss_fn(output_tensor, target)
+        masks = [batch[key] for key in batch.keys() if "mask" in key]
+        loss = self.loss_fn(output_tensor, target, masks)
         return loss, output_tensor, target
     
-    def add_metrics(self, metrics):
+    def add_metrics(self, metrics, metrics_args=None):
         self.metrics = metrics
+        self.metrics_args = metrics_args
 
     def training_step(self, batch, batch_idx):
         loss, _, _ = self._calc_step(batch, batch_idx)
@@ -234,7 +236,7 @@ class EncoderFineTuning(ModelPT, Exportable, ABC):
         result[subset + "_loss"] = reduced_loss
         if self.metrics is not None:
             for name, m_fun in self.metrics.items():
-                metrics = m_fun(output, target)
+                metrics = m_fun(output, target, **self.metrics_args[name])
                 result[subset + "_" + name] = average_losses_across_data_parallel_group([metrics])
         return result
 

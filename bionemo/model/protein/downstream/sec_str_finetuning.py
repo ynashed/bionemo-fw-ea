@@ -13,33 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
 import torch
 from functools import lru_cache
 from bionemo.model.protein.downstream.sec_str_pred_model import ConvNet
 from bionemo.model.core.encoder_finetuning import EncoderFineTuning
 from nemo.utils.model_utils import import_class_by_path
-from torch.nn.modules.loss import _WeightedLoss
-from bionemo.model.protein.downstream import mask_tensor, calculate_accuracy, get_data, SSDataModule
-
-
-class SSPredLoss(_WeightedLoss):
-    def __init__(self, **kwargs):
-        super(SSPredLoss, self).__init__(**kwargs)
-        self.loss_fn = torch.nn.CrossEntropyLoss()
-
-    def forward(self, input, target):
-        labels1, labels2, labels3 = target
-        mask_list = get_data.tensor2list(labels3)
-        mask_list = np.array(mask_list).reshape(labels3.size()[:2]).tolist()
-        masked_output0 = mask_tensor(mask_list, input[0]).permute(0,2,1)
-        masked_output1 = mask_tensor(mask_list, input[1]).permute(0,2,1)
-        masked_output2 = input[2].permute(0,2,1)
-        loss1 = self.loss_fn(masked_output0, labels1.permute(0,2,1))
-        loss2 = self.loss_fn(masked_output1, labels2.permute(0,2,1))
-        loss3 = self.loss_fn(masked_output2, labels3.permute(0,2,1))
-        loss = loss1 + loss2 + loss3
-        return loss
+from bionemo.model.protein.downstream import SSDataModule
+from bionemo.model.protein.downstream.sec_str_pred_model import SSPredLoss
 
 
 class FineTuneProteinModel(EncoderFineTuning):
@@ -61,7 +41,8 @@ class FineTuneProteinModel(EncoderFineTuning):
         return SSPredLoss() 
 
     def build_task_head(self):
-        task_head = ConvNet(self.full_cfg.model.hidden_size)
+        task_head = ConvNet(self.full_cfg.model.hidden_size, 
+                            output_sizes=self.cfg.data.labels_size)
         return task_head
 
     def setup_encoder_model(self, cfg, trainer):
@@ -109,5 +90,7 @@ class FineTuneProteinModel(EncoderFineTuning):
         return input_tensor.float()
   
     def get_target_from_batch(self, batch):
-        state3, state8, state2 = batch['3state'], batch["8state"], batch["2state"]
-        return (state3.float(), state8.float(), state2.float())
+        target = []
+        for key in self.data_module.train_ds.label_names:
+            target.append(batch[key].float())
+        return target
