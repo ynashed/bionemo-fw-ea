@@ -49,7 +49,7 @@ def main(cfg) -> None:
         logging.info("************** Starting Preprocessing ***********")
         preprocessor = UniRef50Preprocess()
         preprocessor.prepare_dataset(url=cfg.model.data.data_url,
-                                 output_dir=cfg.model.data.dataset_path)
+                                     output_dir=cfg.model.data.dataset_path)
 
 
 
