@@ -36,7 +36,7 @@ then
 fi
 
 read -r -d '' COMMAND <<EOF
-export WANDB_API_KEY=${WANDB_API_KEY} && cd /workspace/bionemo/examples/protein/esm1nv && python pretrain.py         --config-path=conf         --config-name=pretrain_small     do_training=True          model.data.dataset_path=${DATASET_PATH} ++model.data.dataset.train=x000 ++model.data.dataset.val=x000 ++model.data.dataset.test=x000 exp_manager.exp_dir=${EXP_DIR} ++exp_manager.wandb_logger_kwargs.offline=False ++trainer.devices=8 ++trainer.num_nodes=4 model.validation.validation_enabled=False model.micro_batch_size=128 ++exp_manager.wandb_logger_kwargs.name=${WANDB_LOGGER_NAME} ++trainer.max_steps=100 ++trainer.val_check_interval=50 model.data.num_workers=0 ++model.tensor_model_parallel_size=1 ++trainer.accumulate_grad_batches=1 ++exp_manager.checkpoint_callback_params.always_save_nemo=False
+export WANDB_API_KEY=${WANDB_API_KEY} && cd /workspace/bionemo/examples/protein/esm1nv && python pretrain.py         --config-path=conf         --config-name=pretrain_small     do_training=True          model.data.dataset_path=${DATASET_PATH} ++model.data.dataset.train=x000 ++model.data.dataset.val=x000 ++model.data.dataset.test=x000 exp_manager.exp_dir=${EXP_DIR} ++exp_manager.wandb_logger_kwargs.offline=False ++trainer.devices=8 ++trainer.num_nodes=4 model.validation.validation_enabled=False model.micro_batch_size=128 ++exp_manager.wandb_logger_kwargs.name=${WANDB_LOGGER_NAME} ++trainer.max_steps=100 ++trainer.val_check_interval=50 ++model.tensor_model_parallel_size=1 ++trainer.accumulate_grad_batches=1 ++exp_manager.checkpoint_callback_params.always_save_nemo=False
 EOF
 
 BCP_COMMAND="bcprun --debug --nnodes=${NGC_ARRAY_SIZE} --npernode=${NGC_GPUS_PER_NODE} --cmd '"${COMMAND}"'"

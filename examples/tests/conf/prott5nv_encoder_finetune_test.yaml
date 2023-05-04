@@ -42,7 +42,7 @@ model:
     mask_col: ["resolved", "resolved", null]
     labels_col: ["3state","8state", "resolved"]
     sequence_col: "sequence"
-    num_workers: 0
+    num_workers: 8
     max_seq_length: ${model.seq_length}
   
   finetuning_optim:

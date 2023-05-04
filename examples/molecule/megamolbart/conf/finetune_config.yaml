@@ -56,7 +56,7 @@ model:
       data_file: /workspace/bionemo/physchem/SAMPL_splits/val.csv 
     test_ds: 
       data_file: /workspace/bionemo/physchem/SAMPL_splits/test.csv
-    num_workers: 0
+    num_workers: 8
   
   finetuning_optim:
     name: adam
