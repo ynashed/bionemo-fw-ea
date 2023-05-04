@@ -197,6 +197,7 @@ class UniRef50Preprocess(object):
 
     def prepare_dataset(self,
                         url='https://ftp.uniprot.org/pub/databases/uniprot/uniref/uniref50/uniref50.fasta.gz',
+                        output_dir=None,
                         num_csv_files=50,
                         val_size=5000,
                         test_size=1000000,
@@ -211,7 +212,9 @@ class UniRef50Preprocess(object):
             random_seed (int): Random seed.
         """
         download_dir = self.root_directory.joinpath('raw')
-        output_dir = self.root_directory.joinpath('processed')
+        if output_dir is None:
+            output_dir = self.root_directory.joinpath('processed')
+
 
         file_path = self.process_files(url=url, 
                                        download_dir=download_dir)
