@@ -42,13 +42,12 @@ from bionemo.utils.tests import ( BioNemoSearchPathConfig,
                                   check_expected_training_results,
                                   check_model_exists)
 
-from nemo.collections.nlp.parts.nlp_overrides import NLPSaveRestoreConnector
+from bionemo.utils import BioNeMoSaveRestoreConnector
 
 # logger
 logger = logging.getLogger(__name__)
 
 # Pretraining, encoder finetuning and secondary structure validation-in-the-loop tests
-# FIXME: SS prediction test gives different results if run separately vs in-suite
 
 PREPEND_CONFIG_DIR = [
     '../molecule/megamolbart/conf',
@@ -188,7 +187,7 @@ def test_model_training(prepend_config_path, config_name, model_class, correct_r
     if pretrain_model_path is not None:
         check_model_exists(pretrain_model_path)
         model = model_class.restore_from(restore_path=pretrain_model_path, trainer=trainer,
-                                         save_restore_connector=NLPSaveRestoreConnector(),
+                                         save_restore_connector=BioNeMoSaveRestoreConnector(),
                                          override_config_path=cfg)
     else:
         if model_class == FineTuneProteinModel:

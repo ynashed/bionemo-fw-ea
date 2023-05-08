@@ -13,11 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from .connectors import *
 from collections import defaultdict
 from dataclasses import asdict
 from typing import Union
-
-from nemo.utils import logging
 
 
 def update_dataclass_config(cfg, dataset_config_class):
