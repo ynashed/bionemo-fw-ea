@@ -15,7 +15,8 @@
 
 from omegaconf.omegaconf import OmegaConf
 
-from bionemo.model.protein.prott5nv import ProtT5nvModel, T5SaveRestoreConnector
+from bionemo.model.protein.prott5nv import ProtT5nvModel
+from bionemo.utils import BioNeMoSaveRestoreConnector
 from nemo.core.config import hydra_runner
 from nemo.utils import logging
 from bionemo.data import UniRef50Preprocess
@@ -37,7 +38,7 @@ def main(cfg) -> None:
             model = ProtT5nvModel.restore_from(
                 cfg.restore_from_path, cfg.model, trainer=trainer,
                 # 128 -- is the number of padded vocabulary in MegatronT5Model
-                save_restore_connector=T5SaveRestoreConnector(vocab_size=128),
+                save_restore_connector=BioNeMoSaveRestoreConnector(vocab_size=128),
                 # support loading weights with mismatch in embeddings (e.g., alibi)
                 strict=False,
             )

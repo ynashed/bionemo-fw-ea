@@ -20,6 +20,7 @@ from nemo.utils import logging
 from bionemo.data import UniRef50Preprocess
 from bionemo.model.protein.esm1nv import ESM1nvModel
 from bionemo.model.utils import setup_trainer
+from bionemo.utils import BioNeMoSaveRestoreConnector
 
 from nemo.collections.nlp.parts.nlp_overrides import NLPSaveRestoreConnector
 from bionemo.utils.callbacks.callback_utils import setup_callbacks
@@ -39,7 +40,7 @@ def main(cfg) -> None:
             logging.info("\nRestoring model from .nemo file " + cfg.restore_from_path)
             model = ESM1nvModel.restore_from(
                 cfg.restore_from_path, cfg.model, trainer=trainer,
-                save_restore_connector=NLPSaveRestoreConnector()
+                save_restore_connector=BioNeMoSaveRestoreConnector()
             )
         else:
             model = ESM1nvModel(cfg.model, trainer)

@@ -1,5 +1,7 @@
 defaults:
   - base_config
+restore_from_path: null # used when starting from a .nemo file
+
 model:
   tokenizer:
     library: 'sentencepiece'
@@ -27,6 +29,7 @@ model:
           enabled: True
           emb_type: "ESM"
           infer_target: bionemo.model.protein.esm1nv.infer.ESM1nvInference
+          max_seq_length: ${model.seq_length}
           emb_batch_size: 256
           batch_size: 64
           num_epochs: 10

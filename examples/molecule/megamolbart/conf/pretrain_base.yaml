@@ -63,7 +63,7 @@ model:
   decoder_arch: 'transformer' # Options ['transformer', 'normformer']
   activation: 'gelu' # Options ['gelu', 'geglu', 'swiglu', 'reglu']
   headscale: False # Whether to learn extra parameters that scale the output of the each self-attention head.
-  share_word_embeddings: True # If True share encoder/decoder embeddings
+  share_token_embeddings: True # If True share encoder/decoder embeddings
   share_decoder_tokens_head_embeddings: False # If True share decoder embeddings and decoder projection to logits
 
   tokenizer:
