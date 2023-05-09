@@ -28,6 +28,7 @@ from bionemo.model.molecule.megamolbart import MegaMolBARTModel, MegaMolBARTRetr
 from bionemo.model.protein.esm1nv import ESM1nvModel
 from bionemo.model.protein.prott5nv import ProtT5nvModel
 from bionemo.model.protein.downstream import FineTuneProteinModel
+from bionemo.model.molecule.megamolbart import FineTuneMegaMolBART
 from bionemo.model.utils import setup_trainer
 from bionemo.utils.callbacks.callback_utils import setup_callbacks
 from bionemo.utils.tests import ( BioNemoSearchPathConfig,
@@ -56,7 +57,8 @@ PREPEND_CONFIG_DIR = [
     '../protein/prott5nv/conf', 
     '../protein/prott5nv/conf', 
     '../protein/esm1nv/conf',
-    '../protein/prott5nv/conf' 
+    '../protein/prott5nv/conf',
+    '../molecule/megamolbart/conf',
     ]
 CONFIG_NAME = [
     'megamolbart_downstream_retro_test',
@@ -65,7 +67,8 @@ CONFIG_NAME = [
     'prott5nv_test', 
     'prott5nv_encoder_finetune_test', 
     'esm1nv_encoder_finetune_test',
-    'prott5nv_sspred_test', 
+    'prott5nv_sspred_test',
+    'megamolbart_physchem_test',
     ]
 CORRECT_CONFIG = [
     'megamolbart_retro_config.pkl',
@@ -74,7 +77,8 @@ CORRECT_CONFIG = [
     'prott5nv_config.pkl', 
     'prott5nv_encoder_finetune_config.pkl', 
     'esm1nv_encoder_finetune_config.pkl',
-    'prott5nv_sspred_config.pkl', 
+    'prott5nv_sspred_config.pkl',
+    'megamolbart_physchem_config.pkl',
     ]
 CORRECT_RESULTS = [
     'megamolbart_retro_log.json',
@@ -84,6 +88,7 @@ CORRECT_RESULTS = [
     'prott5nv_encoder_finetune_log.json', 
     'esm1nv_encoder_finetune_log.json',
     'prott5nv_sspred_log.json',
+    'megamolbart_physchem_log.json',
     ]
 MODEL_CLASS = [
     MegaMolBARTRetroModel,
@@ -92,7 +97,8 @@ MODEL_CLASS = [
     ProtT5nvModel, 
     FineTuneProteinModel, 
     FineTuneProteinModel,
-    ProtT5nvModel, 
+    ProtT5nvModel,
+    FineTuneMegaMolBART,
     ]
 MODEL_PARAMETERS = [
     45058048,
@@ -102,6 +108,7 @@ MODEL_PARAMETERS = [
     199145485,
     43787533,
     198970496,
+    66817,
     ]
 
 
@@ -162,7 +169,7 @@ def test_model_size(prepend_config_path, config_name, model_class, model_paramet
     callbacks = setup_callbacks(cfg)
 
     trainer = setup_trainer(cfg, callbacks=callbacks)
-    if model_class == FineTuneProteinModel:
+    if model_class == FineTuneProteinModel or model_class == FineTuneMegaMolBART:
         model = model_class(cfg, trainer)
     else:
         model = model_class(cfg.model, trainer)
@@ -190,7 +197,7 @@ def test_model_training(prepend_config_path, config_name, model_class, correct_r
                                          save_restore_connector=BioNeMoSaveRestoreConnector(),
                                          override_config_path=cfg)
     else:
-        if model_class == FineTuneProteinModel:
+        if model_class == FineTuneProteinModel or model_class == FineTuneMegaMolBART:
             model = model_class(cfg, trainer)
         else:
             model = model_class(cfg.model, trainer)

@@ -168,8 +168,8 @@ class EncoderFineTuning(ModelPT, Exportable, ABC):
     def _calc_step(self, batch, batch_idx):
         output_tensor = self.forward(batch)
         target = self.get_target_from_batch(batch)
-        masks = [batch[key] for key in batch.keys() if "mask" in key]
-        loss = self.loss_fn(output_tensor, target, masks)
+        loss = self.loss_fn(output_tensor, target)
+
         return loss, output_tensor, target
     
     def add_metrics(self, metrics, metrics_args=None):
