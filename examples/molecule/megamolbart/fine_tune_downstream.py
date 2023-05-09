@@ -17,6 +17,7 @@ from nemo.core.config import hydra_runner
 from nemo.utils import logging
 from omegaconf.omegaconf import OmegaConf
 from bionemo.model.molecule.megamolbart import FineTuneMegaMolBART
+from bionemo.data import PhysChemPreprocess
 from bionemo.model.utils import (
     setup_trainer,
 )
@@ -32,14 +33,29 @@ def main(cfg) -> None:
          cfg, builder=None)
 
     model = FineTuneMegaMolBART(cfg, trainer)
-    trainer.fit(model)
+
+    if cfg.do_training:
+        logging.info("************** Starting Training ***********")
+        trainer.fit(model)
+        logging.info("************** Finished Training ***********")
+    else:
+        logging.info("************** Starting Data PreProcessing ***********")
+        PhysChemPreprocess().prepare_dataset(links_file=cfg.model.data.links_file,
+                                                 output_dir=cfg.model.data.dataset_path)
+        
+        if cfg.model.data.split_data:
+            PhysChemPreprocess()._process_split(links_file=cfg.model.data.links_file,
+                                                    output_dir=cfg.model.data.dataset_path, 
+                                                    test_frac=cfg.model.data.test_frac, 
+                                                    val_frac=cfg.model.data.val_frac)
+        logging.info("************** Finished Data PreProcessing ***********")
+
 
     if cfg.do_testing:
         if "test_ds" in cfg.model.data:
             trainer.test(model)
         else:
             raise UserWarning("Skipping testing, test dataset file was not provided. Please specify 'test_ds.data_file' in yaml config")
-
 
 if __name__ == '__main__':
     main()

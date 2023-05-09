@@ -10,11 +10,11 @@ infer_target: bionemo.model.molecule.megamolbart.infer.MegaMolBARTInference
 trainer:
   devices: 1 # number of GPUs or CPUs
   num_nodes: 1
-  max_epochs: 100 # use max_steps instead with NeMo Megatron models
-  max_steps: 10000 # consumed_samples = global_step * micro_batch_size * data_parallel_size * accumulate_grad_batches
+  max_epochs: 50 # use max_steps instead with NeMo Megatron models
+  max_steps: 20 # consumed_samples = global_step * micro_batch_size * data_parallel_size * accumulate_grad_batches
   val_check_interval: 8 # set to integer when using steps to determine frequency of validation, use fraction with epochs
-  limit_val_batches: 20 # number of batches in validation step, use fraction for fraction of data
-  limit_test_batches: 100 # number of batches in test step, use fraction for fraction of data
+  limit_val_batches: 1 # number of batches in validation step, use fraction for fraction of data
+  limit_test_batches: 1 # number of batches in test step, use fraction for fraction of data
 
 exp_manager:
   wandb_logger_kwargs:
@@ -51,11 +51,11 @@ model:
     target_column: 'expt'
     emb_batch_size: ${model.micro_batch_size}
     train_ds: 
-      data_file: /workspace/bionemo/physchem/SAMPL_splits/train.csv
+      data_file: /workspace/bionemo/examples/tests/test_data/molecule/phys_chem/train/train.csv
     validation_ds: 
-      data_file: /workspace/bionemo/physchem/SAMPL_splits/val.csv 
+      data_file: /workspace/bionemo/examples/tests/test_data/molecule/phys_chem/val/val.csv 
     test_ds: 
-      data_file: /workspace/bionemo/physchem/SAMPL_splits/test.csv
+      data_file: /workspace/bionemo/examples/tests/test_data/molecule/phys_chem/test/test.csv
     num_workers: 0
   
   finetuning_optim:

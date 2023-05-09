@@ -94,3 +94,10 @@ class FineTuneProteinModel(EncoderFineTuning):
         for key in self.data_module.train_ds.label_names:
             target.append(batch[key].float())
         return target
+
+    def _calc_step(self, batch, batch_idx):
+        output_tensor = self.forward(batch)
+        target = self.get_target_from_batch(batch)
+        masks = [batch[key] for key in batch.keys() if "mask" in key]
+        loss = self.loss_fn(output_tensor, target, masks)
+        return loss, output_tensor, target
