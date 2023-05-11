@@ -39,7 +39,7 @@ model:
       train: x000
       test: x000
       val: x000
-    num_workers: 0
+    num_workers: 8
     labels_size: [3, 8, 2]
     mask_col: ["resolved", "resolved", null]
     labels_col: ["3state","8state", "resolved"]

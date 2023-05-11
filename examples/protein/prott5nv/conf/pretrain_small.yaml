@@ -23,7 +23,7 @@ model:
         sort_dataset_paths: False # if True datasets will be sorted by name
         data_col: 3 # specifies which column in the csv file contains training data, 0-based
         data_sep: ',' # string to split text into columns
-    num_workers: 0 # number of workers to be used for dataset preprocessing. 0 -- all available workers
+    num_workers: 8
   validation:
       validation_enabled: True
       datasets:
