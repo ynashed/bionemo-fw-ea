@@ -181,14 +181,16 @@ DOCKER_CMD="docker run \
     -e NUMBA_CACHE_DIR=/tmp/ "
 
 
-
-
+# add current git hash as docker image metadata
+BIONEMO_GIT_HASH=`git rev-parse --short HEAD`
 DOCKER_BUILD_CMD="docker build --network host --ssh default \
     -t ${BIONEMO_IMAGE} \
     --build-arg GITHUB_BRANCH=${GITHUB_BRANCH} \
     --build-arg GITHUB_REPO=${GITHUB_REPO} \
     --no-cache \
+    --label com.nvidia.bionemo.git_hash=${BIONEMO_GIT_HASH} \
     -f setup/Dockerfile"
+
 
 
 function download_model() {

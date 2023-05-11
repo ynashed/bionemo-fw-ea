@@ -24,6 +24,13 @@
 ARG BASE_IMAGE=nvcr.io/nvidian/nemo-nightly-main:23-03-21
 FROM ${BASE_IMAGE}
 
+# Below labels should be updated to match BASE_IMAGE
+LABEL "com.nvidia.nemo.release"="r1.17.0"
+LABEL "com.nvidia.nemo.git_hash"=""
+LABEL "com.nvidia.nemo.description"="Nightly build"
+# bionemo git_hash is determined on-the-fly in launch.sh
+# LABEL "com.nvidia.bionemo.git_hash"="?????"
+
 # Activating base environment
 ENV TERM=xterm
 
