@@ -83,8 +83,6 @@ variables:
         container registry username. e.g., '$oauthtoken' for registry access. Only required to push/pull containers.
     REGISTRY_ACCESS_TOKEN
         container registry access token. e.g., Ckj53jGK... Only required to push/pull containers.
-    GITHUB_BRANCH
-        Git branch to use for building a container, default is main
 
 EOF
     exit
@@ -107,8 +105,6 @@ JUPYTER_PORT=${JUPYTER_PORT:=8888}
 REGISTRY=${REGISTRY:=NotSpecified}
 REGISTRY_USER=${REGISTRY_USER:='$oauthtoken'}
 REGISTRY_ACCESS_TOKEN=${REGISTRY_ACCESS_TOKEN:=NotSpecified}
-GITHUB_BRANCH=${GITHUB_BRANCH:=main}
-GITHUB_REPO=${GITHUB_REPO:=gitlab-master.nvidia.com:12051/clara-discovery/bionemo.git}
 DEV_CONT_NAME=${DEV_CONT_NAME:=bionemo}
 
 # Model paths
@@ -139,8 +135,6 @@ if [ $write_env -eq 1 ]; then
     echo REGISTRY=${REGISTRY} >> $LOCAL_ENV
     echo REGISTRY_USER=${REGISTRY_USER} >> $LOCAL_ENV
     echo REGISTRY_ACCESS_TOKEN=${REGISTRY_ACCESS_TOKEN} >> $LOCAL_ENV
-    echo GITHUB_BRANCH=${GITHUB_BRANCH} >> $LOCAL_ENV
-    echo GITHUB_REPO=${GITHUB_REPO} >> $LOCAL_ENV
     echo DEV_CONT_NAME=${DEV_CONT_NAME} >> $LOCAL_ENV
 fi
 
@@ -186,8 +180,6 @@ DOCKER_CMD="docker run \
 BIONEMO_GIT_HASH=`git rev-parse --short HEAD`
 DOCKER_BUILD_CMD="docker build --network host --ssh default \
     -t ${BIONEMO_IMAGE} \
-    --build-arg GITHUB_BRANCH=${GITHUB_BRANCH} \
-    --build-arg GITHUB_REPO=${GITHUB_REPO} \
     --no-cache \
     --label com.nvidia.bionemo.git_hash=${BIONEMO_GIT_HASH} \
     -f setup/Dockerfile"

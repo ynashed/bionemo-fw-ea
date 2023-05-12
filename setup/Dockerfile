@@ -65,17 +65,9 @@ RUN NEMO_PATH=$(python -c 'import nemo; print(nemo.__path__[0])') && \
 ARG BIONEMO_HOME=/opt/nvidia/bionemo 
 ENV BIONEMO_HOME=${BIONEMO_HOME}
 
-# Clone code into repo
-# Set REPO_INCLUDE to ./ to copy all code in, for example if building with CI 
-# if the code should be cloned, set REPO_INCLUDE to any existing file, such as README.md
-ARG REPO_INCLUDE=README.md
-COPY ${REPO_INCLUDE} ${BIONEMO_HOME}
-
-## If REPO_INCLUDE is not "./", clone repo using SSH outside of CI
-ARG GITHUB_BRANCH=dev
-ARG GITHUB_REPO=gitlab-master.nvidia.com:12051/clara-discovery/bionemo.git
-RUN if [ ${REPO_INCLUDE} != "./" ] ; then mkdir -p -m 0700 ~/.ssh && ssh-keyscan ${GITHUB_REPO%%[:/]*} >> ~/.ssh/known_hosts ; else true ; fi
-RUN --mount=type=ssh if [ ${REPO_INCLUDE} != "./" ] ; then rm -rf ${BIONEMO_HOME} && git clone --branch ${GITHUB_BRANCH} ssh://git@${GITHUB_REPO} ${BIONEMO_HOME} ; else true ; fi
+# Copy the repo
+# TODO make sure that we don't include internal stuff
+COPY ./ ${BIONEMO_HOME}
 
 ARG NEMO_HOME=/opt/nvidia/nemo
 ENV NEMO_HOME=${NEMO_HOME}
