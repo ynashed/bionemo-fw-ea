@@ -2,7 +2,12 @@ __pycache__
 *.pyc
 *.pyo
 *.pyd
+
+# model files
 *.nemo
+*.version
+models/version/**
+
 .Python
 env
 pip-log.txt
@@ -18,3 +23,9 @@ coverage.xml
 .git
 ./.vscode-server
 ./outputs
+
+# data file indexes
+*.idx
+*.idx.npy
+*.idx.info
+*_indexmap_*.npy
