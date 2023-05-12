@@ -180,7 +180,6 @@ DOCKER_CMD="docker run \
 BIONEMO_GIT_HASH=`git rev-parse --short HEAD`
 DOCKER_BUILD_CMD="docker build --network host --ssh default \
     -t ${BIONEMO_IMAGE} \
-    --no-cache \
     --label com.nvidia.bionemo.git_hash=${BIONEMO_GIT_HASH} \
     -f setup/Dockerfile"
 
@@ -245,11 +244,16 @@ pull() {
 build() {
     local IMG_NAME=($(echo ${BIONEMO_IMAGE} | tr ":" "\n"))
     local PACKAGE=0
+    local CLEAN=0
 
     while [[ $# -gt 0 ]]; do
         case $1 in
             -p|--pkg)
                 PACKAGE=1
+                shift
+                ;;
+            -c|--clean)
+                CLEAN=1
                 shift
                 ;;
             -b|--base-image)
@@ -269,6 +273,11 @@ build() {
         set -e
         download
         set +e
+    fi
+
+    if [ ${CLEAN} -eq 1 ]
+    then
+        DOCKER_BUILD_CMD="${DOCKER_BUILD_CMD} --no-cache"
     fi
 
     if [ ! -z "${BASE_IMAGE}" ];
