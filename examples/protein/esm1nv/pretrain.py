@@ -22,7 +22,6 @@ from bionemo.model.protein.esm1nv import ESM1nvModel
 from bionemo.model.utils import setup_trainer
 from bionemo.utils import BioNeMoSaveRestoreConnector
 
-from nemo.collections.nlp.parts.nlp_overrides import NLPSaveRestoreConnector
 from bionemo.utils.callbacks.callback_utils import setup_callbacks
 
 @hydra_runner(config_path="../../../examples/protein/esm1nv/conf", config_name="pretrain_small")
