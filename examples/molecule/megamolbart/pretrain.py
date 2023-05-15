@@ -22,6 +22,7 @@ from bionemo.model.molecule.megamolbart import MegaMolBARTModel
 from bionemo.data import Zinc15Preprocess
 from bionemo.model.utils import setup_trainer
 from bionemo.utils.callbacks.callback_utils import setup_callbacks
+from bionemo.utils import BioNeMoSaveRestoreConnector
 
 @hydra_runner(config_path="conf", config_name="pretrain_xsmall_span_aug")
 def main(cfg) -> None:
@@ -31,16 +32,26 @@ def main(cfg) -> None:
     callbacks = setup_callbacks(cfg)
 
     trainer = setup_trainer(cfg, callbacks=callbacks)
-    model = MegaMolBARTModel(cfg.model, trainer)
-
+    
     logging.info("************** Model parameters and their sizes ***********")
-    for name, param in model.named_parameters():
-        logging.info(f'{name}: {param.size()}')
-        logging.info("***********************************************************")
 
     if cfg.do_training:
         logging.info("************** Starting Training ***********")
+        if cfg.restore_from_path:
+            logging.info("\nRestoring model from .nemo file " + cfg.restore_from_path)
+            model = MegaMolBARTModel.restore_from(
+                cfg.restore_from_path, cfg.model, trainer=trainer,
+                save_restore_connector=BioNeMoSaveRestoreConnector()
+            )
+        else:
+            model = MegaMolBARTModel(cfg.model, trainer)
+
         trainer.fit(model)
+
+        for name, param in model.named_parameters():
+            logging.info(f'{name}: {param.size()}')
+            logging.info("***********************************************************")
+
     else:
         logging.info("************** Starting Data PreProcessing ***********")
         preproc = Zinc15Preprocess(root_directory=cfg.model.data.dataset_path)
