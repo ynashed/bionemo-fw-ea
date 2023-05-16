@@ -25,22 +25,12 @@ from bionemo.model.dna.dnabert.splice_site_prediction import (
 )
 from bionemo.model.utils import (
     setup_trainer,
-    PredictTrainerBuilder,
+    InferenceTrainerBuilder,
 )
-
-import numpy as np
-import pytorch_lightning as pl
-import pandas as pd
-
 from bionemo.data.preprocess.dna.preprocess import (
     GRCh38Ensembl99FastaResourcePreprocessor,
     GRCh38Ensembl99GFF3ResourcePreprocessor,
 )
-from bionemo.model.dna.dnabert.splice_site_prediction import (
-    SpliceSiteBERTPredictionModel,
-)
-from bionemo.model.utils import PredictTrainerBuilder, setup_trainer
-
 
 @hydra_runner(config_path="conf", config_name="dnabert_config_splice_site")
 def main(cfg) -> None:
@@ -91,7 +81,7 @@ def main(cfg) -> None:
     pl.seed_everything(seed)
 
     trainer = setup_trainer(
-        cfg.task, builder=PredictTrainerBuilder() if not do_training else None
+        cfg.task, builder=InferenceTrainerBuilder() if not do_training else None
     )
     model = SpliceSiteBERTPredictionModel(cfg.task.model, trainer)
 
