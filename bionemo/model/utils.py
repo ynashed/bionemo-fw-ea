@@ -16,7 +16,6 @@
 import re
 import torch
 from omegaconf.omegaconf import open_dict
-from nemo.utils.get_rank import is_global_rank_zero
 from omegaconf import OmegaConf
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks.timer import Timer
@@ -206,17 +205,7 @@ class InferenceTrainerBuilder(TrainerBuilder):
     def resume_checkpoint(cfg, trainer):
         pass
 
-# FIXME: consolidate this with InferenceTrainerBuilder
-class PredictTrainerBuilder(TrainerBuilder):
-    @staticmethod
-    def configure_callbacks(cfg):
-        return []
-
-    @staticmethod
-    def resume_checkpoint(cfg, trainer):
-        pass
-
-def setup_trainer(cfg, builder=None, callbacks=[], adjust_config=True):
+def setup_trainer(cfg, builder=None, callbacks=[], adjust_config=True, verbose=True):
     """NeMo Trainer setup functions"""
     if builder is None:
         builder = TrainerBuilder
@@ -232,6 +221,12 @@ def setup_trainer(cfg, builder=None, callbacks=[], adjust_config=True):
     )
     exp_manager(trainer, cfg.get("exp_manager", None))
     builder.resume_checkpoint(cfg, trainer)
+
+    # log trainer configuration (which might be different from input cfg)
+    if verbose:
+        logging.info("\n\n************** Trainer configuration ***********")
+        logging.info(f'\n{OmegaConf.to_yaml(cfg)}')
+
     return trainer
 
 
@@ -329,43 +324,6 @@ def _reconfigure_inference_batch(global_batch_per_gpu, global_batch_size=None):
             micro_batch_size=global_batch_per_gpu,
             data_parallel_size=cur_data_parallel_world_size,
         )
-
-
-# FIXME: move this to NeMo
-def gather_objects(partial_results_list, main_rank=None):
-    """
-    Collect results from all GPUs.
-    Useful for inference over multiple GPUs with DDP.
-
-    Args:
-        partial_results_list: list of partial results from each GPU
-        main_rank: rank of the main process to collect results from all GPUs (useful for collecting results in a target rank)
-    """
-    # do not fail when DDP is not initialized
-    if parallel_state.is_unitialized():
-        return partial_results_list
-
-    rank = parallel_state.get_data_parallel_rank()
-    world_size = parallel_state.get_data_parallel_world_size()
-    # return input when no DDP is used
-    if world_size == 1:
-        return partial_results_list
-
-    gathered_results = [None for _ in range(world_size)]
-    torch.distributed.all_gather_object(gathered_results, partial_results_list)
-
-    # return None to non-main ranks
-    if main_rank is not None:
-        if rank != main_rank:
-            return None
-
-    # return collected results
-    results_list = []
-    for r in gathered_results:
-        results_list.extend(r)
-
-    return results_list
-
 
 def initialize_model_parallel(model):
     # check whether the DDP is initialized

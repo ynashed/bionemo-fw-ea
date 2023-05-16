@@ -30,9 +30,7 @@ from bionemo.data.memmap_fasta_fields_dataset import FASTAFieldsMemmapDataset
 from bionemo.data.memmap_csv_fields_dataset import CSVFieldsMemmapDataset
 from bionemo.data.mapped_dataset import FilteredMappedDataset
 from bionemo.data.utils import expand_dataset_paths
-# from nemo.utils.distributed import gather_objects
-# FIXME: move this to NeMo
-from bionemo.model.utils import gather_objects
+from nemo.utils.distributed import gather_objects
 from nemo.utils.model_utils import import_class_by_path
 
 @hydra_runner(config_path="conf", config_name="infer")
