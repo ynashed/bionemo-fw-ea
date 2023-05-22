@@ -65,7 +65,7 @@ class Zinc15Preprocess(object):
 
     def _process_file(self, url, download_dir, max_smiles_length=512):
 
-        filename = url.split('/')[-1]
+        filename = os.path.basename(url)
         if os.path.exists(os.path.join(download_dir, filename)):
             logging.info(f'{url} already downloaded...')
             return
@@ -238,7 +238,7 @@ class Zinc15Preprocess(object):
                 logging.info(
                              f'NOTE: It appears the all ZINC15 tranches have been selected for processing. '\
                                'Processing all of the ZINC15 tranches can require up to a day, depending on resources. '\
-                               'To test on a subset set model.data.links_file to ZINC-downloader-test.txt')
+                               'To test on a subset set model.data.links_file to ZINC-downloader-sample.txt')
 
         # If 503 errors or deadlocks are a problem, reduce pool size to 8.
         self.process_files(links_file,

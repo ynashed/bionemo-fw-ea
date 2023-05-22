@@ -116,7 +116,7 @@ srun \
         model.global_batch_size=${GLOBAL_BATCH_SIZE} \
         model.tokenizer.model=/opt/nvidia/bionemo/models/vocab/megamolbart.model \
         model.tokenizer.vocab_file=/opt/nvidia/bionemo/models/vocab/megamolbart.vocab \
-        model.data.links_file=/opt/nvidia/bionemo/examples/bionemo/conf/dataset/ZINC-downloader-test.txt \
+        model.data.links_file=/opt/nvidia/bionemo/examples/bionemo/conf/dataset/ZINC-downloader-sample.txt \
         model.data.dataset.val=x000-small
 
 set +x

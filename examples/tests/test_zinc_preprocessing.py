@@ -1,4 +1,5 @@
 import pytest
+import requests_mock
 import os
 import glob
 from omegaconf import OmegaConf
@@ -9,21 +10,21 @@ from bionemo.data import Zinc15Preprocess
 from bionemo.utils.tests import get_directory_hash
 
 os.environ['PROJECT_MOUNT'] = os.environ.get('PROJECT_MOUNT', '/workspace/bionemo')
+TEST_DATA_DIR = os.path.join(os.environ['PROJECT_MOUNT'], 'examples/tests/test_data/molecule/zinc15')
 ROOT_DIR = 'zinc15'
-SAMPLE_DATA = os.path.join(os.environ['PROJECT_MOUNT'], 
-                           'examples/molecule/megamolbart/dataset/ZINC-downloader-test.txt')
 CONFIG = {'max_smiles_length': 512,
-               'train_samples_per_file': 1000,
-               'val_samples_per_file': 100,
-               'test_samples_per_file': 100,
-               'links_file': SAMPLE_DATA,
-               'pool_size': 4,
-               'seed': 0}
+          'train_samples_per_file': 1000,
+          'val_samples_per_file': 100,
+          'test_samples_per_file': 100,
+          'links_file': os.path.join(TEST_DATA_DIR, 'ZINC-downloader-test.txt'),
+          'pool_size': 4,
+          'seed': 0}
 HEADER = 'zinc_id,smiles'
-TRAIN_VAL_TEST_HASHES = {'train': '5d1b2856c12fa37972a68f12167eadf3', 
-                         'val': '92f5a0e37644f849effd64e17412fb76', 
-                         'test': '0d6332df6c3b985d00e0664e3d3fde07'}
-
+TRAIN_VAL_TEST_HASHES = {'train': 'fe599545f23995a56dde9e1533b12e35', 
+                         'val': 'f9df93c66c777b9e815614577b58fb1b', 
+                         'test': '73af6d6084a7665de7b706fe26593b5c'}
+MAX_LENGTH_URLS = ["http://files.docking.org/2D/KA/KAED.txt",  # small mols
+                   "http://files.docking.org/2D/AI/AIED.txt"]  # large mols
 ##############
 
 @pytest.fixture(scope="session")
@@ -33,7 +34,7 @@ def tmp_directory(tmp_path_factory, root_directory=ROOT_DIR):
     return tmp_path_factory.getbasetemp()
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def download_directory(tmp_directory):
     """Create the temporary directory for testing and the download directory"""
     download_directory = pathlib.Path(os.path.join(tmp_directory, 'raw'))
@@ -41,18 +42,27 @@ def download_directory(tmp_directory):
     return download_directory
 
 
-@pytest.fixture()
+@pytest.fixture(scope="session")
 def output_directory(tmp_directory):
     """Create the directory for processed data"""
     download_dir = pathlib.Path(os.path.join(tmp_directory, 'processed'))
     download_dir.mkdir(parents=True, exist_ok=True)
     return download_dir
 
-
+# TODO mocker could probably be made into a fixture
+@requests_mock.Mocker(kw='mocker')
 @pytest.mark.parametrize('config', 
                          [(CONFIG)])
-def test_process_files(tmp_directory, download_directory, config):
+def test_process_files(tmp_directory, download_directory, config, **kwargs):
     cfg = OmegaConf.create(config)
+
+    mocker = kwargs['mocker']
+    with open(cfg.links_file, 'r') as fl:
+        for url in fl:
+            url = url.strip()
+            data_filename = os.path.basename(url)
+            with open(os.path.join(TEST_DATA_DIR, data_filename), 'r') as fh:
+                mocker.get(url, text=fh.read())
 
     preproc = Zinc15Preprocess(root_directory=tmp_directory)
     preproc.process_files(links_file=cfg.links_file, 
@@ -73,10 +83,19 @@ def test_process_files(tmp_directory, download_directory, config):
     assert tranche_files == expected_tranche_files
 
 
+@requests_mock.Mocker(kw='mocker')
 @pytest.mark.parametrize('config, header, hash_dict', 
                          [(CONFIG, HEADER, TRAIN_VAL_TEST_HASHES)])
-def test_prepare_dataset(tmp_directory, download_directory, output_directory, config, header, hash_dict):
+def test_prepare_dataset(tmp_directory, download_directory, output_directory, config, header, hash_dict, **kwargs):
     cfg = OmegaConf.create(config)
+
+    mocker = kwargs['mocker']
+    with open(cfg.links_file, 'r') as fl:
+        for url in fl:
+            url = url.strip()
+            data_filename = os.path.basename(url)
+            with open(os.path.join(TEST_DATA_DIR, data_filename), 'r') as fh:
+                mocker.get(url, text=fh.read())
 
     preproc = Zinc15Preprocess(root_directory=tmp_directory)
     preproc.prepare_dataset(max_smiles_length=cfg.max_smiles_length,
@@ -112,18 +131,21 @@ def test_prepare_dataset(tmp_directory, download_directory, output_directory, co
     assert expected_lines == total_lines
 
 
-@pytest.mark.parametrize('url', (
-    "http://files.docking.org/2D/KA/KAED.txt",  # small mols
-    "http://files.docking.org/2D/AI/AIED.txt",  # large mols
-))
+@requests_mock.Mocker(kw='mocker')
+@pytest.mark.parametrize('url', MAX_LENGTH_URLS)
 @pytest.mark.parametrize('max_smiles_length', (20, 100, 200))
-def test_filtering(tmp_directory, download_directory, url, max_smiles_length):
-    preprocessor = Zinc15Preprocess(root_directory=tmp_directory)
-    preprocessor._process_file(url, download_directory, max_smiles_length=max_smiles_length)
-    filtered_data = pd.read_csv(download_directory / os.path.basename(url))
+def test_filtering(tmp_directory, download_directory, url, max_smiles_length, **kwargs):
+    data_filename = os.path.basename(url)
+    mocker = kwargs['mocker']
+    with open(os.path.join(TEST_DATA_DIR, data_filename), 'r') as fh:
+        mocker.get(url, text=fh.read())
+
+    preproc = Zinc15Preprocess(root_directory=tmp_directory)
+    preproc._process_file(url, download_directory, max_smiles_length)
+    filtered_data = pd.read_csv(download_directory / data_filename)
     if len(filtered_data) > 0:
         assert filtered_data['SMILES'].map(len).max() <= max_smiles_length
 
-    full_data = pd.read_table(url)
+    full_data = pd.read_table(os.path.join(TEST_DATA_DIR, data_filename))
     num_kept = (full_data['smiles'].map(Chem.CanonSmiles).map(len) <= max_smiles_length).sum()
     assert len(filtered_data) == num_kept
