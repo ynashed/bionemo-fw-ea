@@ -185,7 +185,11 @@ examples/neural_graphs/*.yml
 .netrc
 .tmp/
 lightning_logs/
+lightning_logs.txt
+nemo_log*.txt
+nemo_error_log*.txt
 *.nemo
 *.version
 *.npy
 *.swp
+*.idx.info

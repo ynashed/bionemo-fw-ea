@@ -75,7 +75,7 @@ model:
 
   data:
     # PROJECT_MOUNT is env variable with root location of code e.g. /opt/nividia/bionemo or /workspace/bionemo
-    links_file: ${oc.env:PROJECT_MOUNT}/examples/molecule/megamolbart/dataset/ZINC-downloader.txt # Set to ZINC-downloader-test.txt for demo
+    links_file: ${oc.env:PROJECT_MOUNT}/examples/molecule/megamolbart/dataset/ZINC-downloader.txt # Set to ZINC-downloader-sample.txt for demo
     dataset_path: /data/zinc_csv # parent directory for data, contains train / val / test folders. Needs to be writeable for index creation.
     dataset: # inclusive range of data files to load or can load a single file, e.g. x000 or x[000..186]
       train: x[000..186] # Range is for full dataset

@@ -17,3 +17,4 @@ einops
 pytest-forked
 pytest-dependency
 testbook
+requests_mock

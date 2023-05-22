@@ -83,10 +83,10 @@ bash pretrain_quick.sh \
 train
 ```
 
-For preprocessing MegaMolBART data, a large amount (~100GB) of data in the form of multiple files must be downloaded for the selected ZINC15 tranches. To test the preprocessing and training on a subset of the files, change the filename in the `links_file` setting in the [config file](./examples/molecule/megamolbart/conf/pretrain_base.yaml) from `ZINC-downloader.txt` to `ZINC-downloader-test.txt`, e.g.:
+For preprocessing MegaMolBART data, a large amount (~100GB) of data in the form of multiple files must be downloaded for the selected ZINC15 tranches. To test the preprocessing and training on a subset of the files, change the filename in the `links_file` setting in the [config file](./examples/molecule/megamolbart/conf/pretrain_base.yaml) from `ZINC-downloader.txt` to `ZINC-downloader-sample.txt`, e.g.:
 
 ```yaml
-links_file: '${oc.env:PROJECT_MOUNT}/examples/molecule/megamolbart/dataset/ZINC-downloader-test.txt' # to process a subset of the ZINC15 data
+links_file: '${oc.env:PROJECT_MOUNT}/examples/molecule/megamolbart/dataset/ZINC-downloader-sample.txt' # to process a subset of the ZINC15 data
 ```
 
 For more advanced customization, additional training arguments can be added to the shell script. Alternatively, the Python training commands executed by the script can be run directly.

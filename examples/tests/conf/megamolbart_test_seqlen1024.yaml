@@ -36,7 +36,7 @@ exp_manager:
 
   # data:
   #   # PROJECT_MOUNT is env variable with root location of code e.g. /opt/nividia/bionemo or /workspace/bionemo
-  #   links_file: ${oc.env:PROJECT_MOUNT}/examples/molecule/megamolbart/dataset/ZINC-downloader-test.txt # Set to ZINC-downloader-test.txt for demo
+  #   links_file: ${oc.env:PROJECT_MOUNT}/examples/molecule/megamolbart/dataset/ZINC-downloader-sample.txt # Set to ZINC-downloader-sample.txt for demo
   #   dataset_path: /workspace/bionemo/data/zinc_csv/processed # parent directory for data, contains train / val / test folders. Needs to be writeable for index creation.
   #   dataset: # inclusive range of data files to load or can load a single file, e.g. x000 or x[000..186]
   #     train: x000 # Range is for full dataset
