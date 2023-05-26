@@ -12,7 +12,7 @@ trainer:
     
 model:
   micro_batch_size: 4
-  global_batch_size: 4
+  global_batch_size: null
   data:
     dataset_path: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/reaction/ # parent directory for data, contains train / val / test folders
     micro_batch_size: ${model.micro_batch_size}

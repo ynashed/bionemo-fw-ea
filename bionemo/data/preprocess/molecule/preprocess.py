@@ -219,6 +219,7 @@ class Zinc15Preprocess(object):
                         val_samples_per_file=100,
                         test_samples_per_file=50000,
                         links_file=ZINC_URL_LIST,
+                        output_dir=None,
                         seed=0):
         """
         Download ZINC15 tranches and split into train, valid, and test sets.
@@ -232,7 +233,8 @@ class Zinc15Preprocess(object):
             seed (int): Random seed for data splitting
         """
         download_dir = self.root_directory.joinpath('raw')
-        output_dir = self.root_directory.joinpath('processed')
+        if output_dir is None:
+            output_dir = self.root_directory.joinpath('processed')
 
         if os.path.basename(links_file) == 'ZINC-downloader.txt':
                 logging.info(

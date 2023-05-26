@@ -56,7 +56,8 @@ def main(cfg) -> None:
         logging.info("************** Starting Data PreProcessing ***********")
         preproc = Zinc15Preprocess(root_directory=cfg.model.data.dataset_path)
         preproc.prepare_dataset(links_file=cfg.model.data.links_file,
-                                max_smiles_length=cfg.model.seq_length
+                                max_smiles_length=cfg.model.seq_length,
+                                output_dir=cfg.model.data.dataset_path,
                                 )
 
     if cfg.do_testing:

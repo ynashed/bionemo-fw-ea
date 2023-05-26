@@ -24,6 +24,20 @@ from omegaconf.dictconfig import DictConfig
 from pytorch_lightning.trainer.trainer import Trainer
 from rdkit import Chem, RDLogger
 
+try:
+    from apex.transformer.pipeline_parallel.utils import get_num_microbatches
+    HAVE_APEX = True
+
+except (ImportError, ModuleNotFoundError):
+    HAVE_APEX = False
+
+try:
+    from megatron.core.pipeline_parallel.schedules import get_forward_backward_func
+    HAVE_MEGATRON_CORE = True
+
+except (ImportError, ModuleNotFoundError):
+    HAVE_MEGATRON_CORE = False
+
 from bionemo.data import DatasetTypes
 from bionemo.utils import flatten_dict
 
@@ -197,8 +211,48 @@ class MegaMolBARTModelBase(MegatronLMEncoderDecoderModel):
 
         self.log_dict(logged_results, prog_bar=True)
 
+
+    def validation_step_logits(self, batch, batch_idx):
+        tensor_shape = [self.max_encoder_seq_length, self.cfg.micro_batch_size, self.cfg.encoder.hidden_size]
+        arg_names = ['enc_input_ids', 'enc_attn_mask', 'dec_input_ids', 'dec_attn_mask']
+        (
+            encoder_input_ids,
+            decoder_input_ids,
+            loss_mask,
+            lm_labels,
+            encoder_attn_mask,
+            decoder_attn_mask,
+        ) = self.process_global_batch(batch)
+        batch_for_pipeline = [encoder_input_ids, encoder_attn_mask, decoder_input_ids, decoder_attn_mask]
+        forward_step_func = self._get_forward_output_only_func(arg_names=arg_names, output_name="logits")
+        fwd_bwd_function = get_forward_backward_func()
+
+        output_tensor = fwd_bwd_function(
+            forward_step_func=forward_step_func,
+            data_iterator=iter([batch_for_pipeline,]),
+            model=[self.enc_dec_model],
+            num_microbatches=get_num_microbatches(),
+            forward_only=True,
+            tensor_shape=tensor_shape,
+            decoder_seq_length=self.max_decoder_seq_length,
+            dtype=self.autocast_dtype,
+            grad_scaler=self.trainer.precision_plugin.scaler.scale if self.cfg.precision == 16 else None,
+            enable_autocast=self.enable_autocast,
+        )
+
+        if output_tensor:
+            # average across micro batches
+            logits_tensors_list = [o['logits'] for o in output_tensor]
+            logits_tensor = torch.concat(logits_tensors_list)
+        else:
+            # we're not on the last pipeline stage so no output
+            logits_tensor = []
+
+        return logits_tensor
+
+
     def validation_step(self, batch, batch_idx):
-        loss_mean = super().validation_step(batch, batch_idx)
+        loss_mean = super().validation_step(iter([batch,]), batch_idx)
         token_logits = self.validation_step_logits(batch, batch_idx)
         tokens_enc, tokens_dec, loss_mask, labels, enc_mask, dec_mask = \
             self.process_global_batch(batch)

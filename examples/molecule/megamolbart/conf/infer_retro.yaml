@@ -14,8 +14,8 @@ desc: Minimum configuration for initializing a fine-tuned MegaMolBART model for 
 
 model:
   tokenizer:
-    vocab_path: /model/molecule/megamolbart/vocab/megamolbart.vocab
-    model_path: /model/molecule/megamolbart/vocab/megamolbart.model
+    vocab_path: /tokenizers/molecule/megamolbart/vocab/megamolbart.vocab
+    model_path: /tokenizers/molecule/megamolbart/vocab/megamolbart.model
   downstream_task:
     # TODO update with the official retro path when the checkpoint is ready
     restore_from_path: /result/nemo_experiments/MegaMolBARTRetro_uspto50k_random_init/MegaMolBARTRetro_uspto50k_random_init/checkpoints/MegaMolBARTRetro_uspto50k_random_init.nemo
@@ -38,5 +38,5 @@ model:
     input_name: products
     target_name: reactants
 
-target: bionemo.model.molecule.megamolbart.megamolbart_finetuning_retro.MegaMolBARTRetroModel # path to model class to load
+target: bionemo.model.molecule.megamolbart.megamolbart_downstream_retro.MegaMolBARTRetroModel # path to model class to load
 infer_target: bionemo.model.molecule.megamolbart.infer.MegaMolBARTInference # path to inferende class to load

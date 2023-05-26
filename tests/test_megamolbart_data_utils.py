@@ -17,8 +17,8 @@ PREPEND_DIR = "../examples/tests/"
 CONFIG_PATH = os.path.join(PREPEND_DIR, 'conf')
 PREPEND_CONFIG_DIR = '../examples/molecule/megamolbart/conf'
 
-TOKENIZER_MODEL = '/model/molecule/megamolbart/vocab/megamolbart.model'
-TOKENIZER_VOCAB = '/model/molecule/megamolbart/vocab/megamolbart.vocab'
+TOKENIZER_MODEL = '/tokenizers/molecule/megamolbart/vocab/megamolbart.model'
+TOKENIZER_VOCAB = '/tokenizers/molecule/megamolbart/vocab/megamolbart.vocab'
 SEQ_LEN = 512
 SEED = 42
 

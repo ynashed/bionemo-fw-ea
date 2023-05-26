@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import torch
+from torch.cuda.amp import autocast
 from typing import List
 
 from bionemo.model.core.infer import BaseEncoderDecoderInference
@@ -54,7 +55,9 @@ class ESM1nvInference(BaseEncoderDecoderInference):
             enc_mask (torch.Tensor, long): boolean mask for special tokens (<BOS> and <EOS>) and padded sections
         '''
         token_ids, enc_mask = self.tokenize(sequences)
-        hidden_states = self.model(token_ids, enc_mask, None)
+        # FIXME this autocast shouldn't be needed
+        with autocast(enabled=self.model.enable_autocast):
+            hidden_states = self.model(token_ids, enc_mask, None)
 
         # ignore <BOS> and <EOS> tokens
         enc_mask[:, 0:2] = 0
@@ -83,9 +86,5 @@ class ESM1nvInference(BaseEncoderDecoderInference):
         model = super().load_model(cfg, model=model, restore_path=restore_path)
         
         model.model.post_process = post_process
-
-        # FIXME: model.half() shouldn't be used, temporary fix
-        if not self.training:
-            model.half()
 
         return model

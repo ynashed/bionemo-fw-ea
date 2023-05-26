@@ -21,7 +21,7 @@ from torch.utils.data import DataLoader
 
 from bionemo.model.molecule.megamolbart import MegaMolBARTModel
 from bionemo.model.utils import initialize_model_parallel
-from nemo.collections.nlp.parts.nlp_overrides import NLPDDPPlugin, NLPSaveRestoreConnector
+from nemo.collections.nlp.parts.nlp_overrides import NLPDDPStrategy, NLPSaveRestoreConnector
 
 assert torch.cuda.is_available()
 
@@ -78,7 +78,7 @@ def main():
 
     # trainer required for restoring model parallel model
     trainer = Trainer(
-        plugins=NLPDDPPlugin(),
+        strategy=NLPDDPStrategy(),
         devices=args.tensor_model_parallel_size * args.pipeline_model_parallel_size,
         accelerator='gpu',
         precision=args.precision,

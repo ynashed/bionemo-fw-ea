@@ -67,7 +67,7 @@ fi
 read -r -d '' COMMAND <<EOF
  export WANDB_API_KEY=${WANDB_API_KEY} && \
  cd /workspace/bionemo/examples/protein/downstream && \
- python sec_str_finetune.py --config-path=${CONFIG_PATH} \
+ python downstream_sec_str.py --config-path=${CONFIG_PATH} \
  --config-name=finetune_config exp_manager.exp_dir=${EXP_DIR} \
  exp_manager.wandb_logger_kwargs.offline=False \
  trainer.devices=${NGC_GPUS_PER_NODE} \

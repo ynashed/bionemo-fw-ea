@@ -41,7 +41,7 @@ model:
   data:
     # Preprocessing data params
     links_file: /workspace/bionemo/examples/molecule/megamolbart/dataset/PhysChem-downloader.txt
-    dataset_path: /workspace/bionemo/physchem
+    dataset_path: /data/physchem
     split_data: True
     val_frac: 0.15 # proportion of samples used for validation set
     test_frac: 0.15 # proportion of samples used for test set
@@ -51,11 +51,11 @@ model:
     target_column: 'expt'
     emb_batch_size: ${model.micro_batch_size}
     train_ds: 
-      data_file: /workspace/bionemo/physchem/SAMPL_splits/train.csv
+      data_file: /data/physchem/SAMPL_splits/train.csv
     validation_ds: 
-      data_file: /workspace/bionemo/physchem/SAMPL_splits/val.csv 
+      data_file: /data/physchem/SAMPL_splits/val.csv
     test_ds: 
-      data_file: /workspace/bionemo/physchem/SAMPL_splits/test.csv
+      data_file: /data/physchem/SAMPL_splits/test.csv
     num_workers: 8
   
   finetuning_optim:

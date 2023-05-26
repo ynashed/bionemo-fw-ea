@@ -23,7 +23,7 @@ rm -f $VOCAB
 rm -rf $DATASET_DIR
 
 set -e
-python dnabert_pretrain.py ++do_preprocess=True \
+python pretrain.py ++do_preprocess=True \
     ++trainer.devices=2 \
     ++trainer.max_steps=4 \
     ++trainer.val_check_interval=2 \
@@ -41,7 +41,7 @@ rm -f $VOCAB
 rm -r $DATASET_DIR
 
 # NOTE: expect an exception unless preprocessing was run with devices=1
-python splice_site_finetune.py ++task.do_preprocess=True \
+python downstream_splice_site.py ++task.do_preprocess=True \
     ++task.do_training=True \
     ++task.model.data.root_directory='/tmp' \
     ++task.trainer.devices=2 \

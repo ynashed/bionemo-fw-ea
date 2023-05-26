@@ -12,8 +12,8 @@ desc: Minimum configuration for initializing a ProtT5 model for inference.
 
 model:
   tokenizer:
-    vocab_path: /model/protein/prott5nv/vocab/protein_sequence_sentencepiece.vocab
-    model_path: /model/protein/prott5nv/vocab/protein_sequence_sentencepiece.model
+    vocab_path: /tokenizers/protein/prott5nv/vocab/protein_sequence_sentencepiece.vocab
+    model_path: /tokenizers/protein/prott5nv/vocab/protein_sequence_sentencepiece.model
   downstream_task:
     restore_from_path: "/model/protein/prott5nv/prott5nv.nemo"
     outputs: [embeddings, hiddens] # Which outputs to extract per sample (a value or list). Possible values: hiddens, embeddings.

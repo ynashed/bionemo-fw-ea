@@ -20,16 +20,15 @@
 #   - pycairo=1.20.1=py38hf61ee4a_0
 
 
-# TODO switch to 23.03 when it's available (we need at least NeMo at commit aaa0ccacf)
-ARG BASE_IMAGE=nvcr.io/nvidian/nemo-nightly-main:23-03-21
+ARG BASE_IMAGE=nvcr.io/nvidia/nemo:23.03
 FROM ${BASE_IMAGE}
 
-# Below labels should be updated to match BASE_IMAGE
-LABEL "com.nvidia.nemo.release"="r1.17.0"
-LABEL "com.nvidia.nemo.git_hash"=""
-LABEL "com.nvidia.nemo.description"="Nightly build"
-# bionemo git_hash is determined on-the-fly in launch.sh
-# LABEL "com.nvidia.bionemo.git_hash"="?????"
+# Please populate the labels below if using a custom base container (ie not NeMo GA)
+# For nightly NeMo builds, only com.nvidia.nemo.description should be provided
+# (release and git_hash labels are filled automatically).
+# LABEL "com.nvidia.nemo.release"="r1.19.0"
+# LABEL "com.nvidia.nemo.git_hash"="a5fbsegy"
+# LABEL "com.nvidia.nemo.description"="Cusotom build with XYZ fixed"
 
 # Activating base environment
 ENV TERM=xterm
@@ -80,7 +79,7 @@ ENV NEMO_HOME=${NEMO_HOME}
 ENV PYTHONPATH=${BIONEMO_HOME}:${BIONEMO_HOME}/generated:${NEMO_HOME}:$PYTHONPATH
 
 COPY ./setup/startup.sh /opt/nvidia
-COPY ./models /model
+COPY ./tokenizers /tokenizers
 
 RUN mkdir -p /workspace/bionemo
 RUN ln -s /opt/nvidia/bionemo/examples/ /workspace/bionemo/examples
