@@ -31,7 +31,7 @@ from bionemo.model.utils import (
     compute_consumed_samples,
 )
 try:
-    from apex.transformer import parallel_state
+    from megatron.core import parallel_state
 
     from apex.transformer.pipeline_parallel.utils import (
         _reconfigure_microbatch_calculator,

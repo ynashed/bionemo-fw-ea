@@ -13,8 +13,9 @@ task:
     data:
       # DO NOT CHANGE, chanbe the container mount rather than the root directory.
       root_directory: /data
+      # FIXME move from /workspace to /data
       dataset_path: /workspace/bionemo/examples/dna/data/splice-site-prediction/sampled-data-30k/
-      # Get these paths by running the GRCh38Ensembl99GFF3ResourcePreparer in models/utils/remote.py
+      # Get these paths by running the GRCh38Ensembl99GFF3ResourcePreprocessor in bionemo/data/preprocess/dna/preprocess.py
       train_file: /workspace/bionemo/examples/dna/data/splice-site-prediction/sampled-data-30k/train.csv
       val_file: /workspace/bionemo/examples/dna/data/splice-site-prediction/sampled-data-30k/val.csv
       predict_file: /workspace/bionemo/examples/dna/data/splice-site-prediction/sampled-data-30k/test.csv
@@ -26,4 +27,5 @@ task:
       val_perc: .1
       test_perc: .1
     encoder:
+      # FIXME make checkpoint available as /model/dna/dnabert/dnabert.nemo
       checkpoint: /workspace/bionemo/models/dna/dnabert/checkpoints/dnabert_k_5_n_12_batchsize_32_minlr_0.0001/dnabert_k_5_n_12_batchsize_32_minlr_0.0001.nemo

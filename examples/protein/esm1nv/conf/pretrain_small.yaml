@@ -6,8 +6,8 @@ model:
   tokenizer:
     library: 'sentencepiece'
     type: null
-    model: /model/protein/esm1nv/vocab/protein_sequence_sentencepiece.model
-    vocab_file: /model/vocab/protein_sequence_sentencepiece.vocab
+    model: /tokenizers/protein/esm1nv/vocab/protein_sequence_sentencepiece.model
+    vocab_file: /tokenizers/vocab/protein_sequence_sentencepiece.vocab
   data:
     dataset_path: /data/uniref2022_05 # parent directory for data, contains train / val / test folders. Needs to be writeable for index creation.
     dataset: # inclusive range of data files to load x[000..049] or can a single file, e.g. x000

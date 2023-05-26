@@ -26,8 +26,6 @@ from bionemo.model.utils import restore_model
 from bionemo.data.utils import pad_token_ids
 
 try:
-    from apex.transformer import parallel_state
-
     from apex.transformer.pipeline_parallel.utils import (
         _reconfigure_microbatch_calculator,
     )

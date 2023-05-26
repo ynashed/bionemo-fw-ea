@@ -12,7 +12,7 @@ trainer:
     
 model:
   micro_batch_size: 4
-  global_batch_size: 4
+  global_batch_size: null
   data:
     dataset_path: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/molecule/ # parent directory for data, contains train / val / test folders
     dataset: # inclusive range of data files to load or can load a single file, e.g. x000.csv

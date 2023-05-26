@@ -17,6 +17,8 @@ trainer:
   limit_test_batches: 1 # number of batches in test step, use fraction for fraction of data
 
 exp_manager:
+  create_wandb_logger: False
+  create_tensorboard_logger: False
   wandb_logger_kwargs:
     project: ${name}_finetuning
     name: ${name}_finetuning_encoder_frozen_${model.encoder_frozen}

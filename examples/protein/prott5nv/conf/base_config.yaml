@@ -51,7 +51,7 @@ exp_manager:
 model:
   # model parallelism
   micro_batch_size: 1
-  global_batch_size: 2 # must be divisible by micro_batch_size * devices * accumulate_grad_batches, will use more micro batches to reach global batch size, must be divisible by 
+  global_batch_size: null # compute automatically
   tensor_model_parallel_size: 1
   pipeline_model_parallel_size: 1
   resume_from_checkpoint: null #/code/nemo/collections/nlp/data/language_modeling/megatron/nemo_experiments/bionemo_prott5_220m_from_pretrained_16_nodes/checkpoints/megatron_t5--val_loss=1.50-step=999999-consumed_samples=2047997952.0.ckpt # manually set the checkpoint file to load from
@@ -101,8 +101,8 @@ model:
   tokenizer:
     library: 'sentencepiece'
     type: null
-    model: /model/protein/prott5nv/vocab/protein_sequence_sentencepiece.model
-    vocab_file: /model/protein/prott5nv/vocab/protein_sequence_sentencepiece.vocab
+    model: /tokenizers/protein/prott5nv/vocab/protein_sequence_sentencepiece.model
+    vocab_file: /tokenizers/protein/prott5nv/vocab/protein_sequence_sentencepiece.vocab
     merge_file: null
     num_sentinel_tokens: 96 # number of sentinel tokens in T5 model
 

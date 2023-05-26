@@ -49,7 +49,7 @@ protein_sequences = [
 
 def get_tokenizer_model_paths():
     dirname = Path(__file__).parent.parent
-    file_list = dirname.glob('models/protein/*/vocab/protein_sequence_sentencepiece.model')
+    file_list = dirname.glob('tokenizers/protein/*/vocab/protein_sequence_sentencepiece.model')
     file_list = [str(x) for x in file_list]
     return file_list
 

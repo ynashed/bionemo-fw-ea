@@ -20,28 +20,28 @@ from omegaconf import OmegaConf
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks.timer import Timer
 from pytorch_lightning.plugins.environments import TorchElasticEnvironment
-from pytorch_lightning.plugins.precision.native_amp import NativeMixedPrecisionPlugin
 from pytorch_lightning.trainer.connectors.checkpoint_connector import (
     CheckpointConnector,
 )
 from pytorch_lightning.callbacks import ModelSummary
+import pytorch_lightning as pl
 
 from nemo.collections.nlp.parts.nlp_overrides import (
     GradScaler,
+    MegatronHalfPrecisionPlugin,
     NLPDDPStrategy,
     NLPSaveRestoreConnector,
+    PipelineMixedPrecisionPlugin,
 )
 from nemo.utils import logging
 from nemo.utils.exp_manager import StatelessTimer, exp_manager
 from nemo.utils.model_utils import import_class_by_path
 from nemo.utils.app_state import AppState
 
-from nemo.utils.distributed import initialize_distributed
-
 try:
-    import apex
-    from apex.transformer import parallel_state
+    from megatron.core import parallel_state
 
+    import apex
     from apex.transformer.pipeline_parallel.utils import (
         _reconfigure_microbatch_calculator,
     )
@@ -149,10 +149,12 @@ class TrainerBuilder(object):
                 scaler = GradScaler(
                     init_scale=cfg.model.get("native_amp_init_scale", 2 ** 32),
                     growth_interval=cfg.model.get("native_amp_growth_interval", 1000),
+                    hysteresis=cfg.model.get('hysteresis', 2),
                 )
-            plugins.append(
-                NativeMixedPrecisionPlugin(precision=16, device="cuda", scaler=scaler)
-            )
+            if cfg.model.get('megatron_amp_O2', False):
+                plugins.append(MegatronHalfPrecisionPlugin(precision=cfg.trainer.precision, device='cuda', scaler=scaler))
+            else:
+                plugins.append(PipelineMixedPrecisionPlugin(precision=cfg.trainer.precision, device='cuda', scaler=scaler))
 
         if cfg.get("cluster_type", None) == "BCP":
             plugins.append(TorchElasticEnvironment())
@@ -170,7 +172,12 @@ class TrainerBuilder(object):
     @staticmethod
     def configure_strategy(cfg):
         # DDP communication hooks cause errors when used with megatron pipeline parallel
-        return NLPDDPStrategy(no_ddp_communication_hook=True)
+        return NLPDDPStrategy(
+            no_ddp_communication_hook=True,
+            # Allocate gradients in a contiguous bucket to save memory (less fragmentation and buffer memory)
+            gradient_as_bucket_view=cfg.model.get('gradient_as_bucket_view', True),
+            find_unused_parameters=False,
+        )
 
     @staticmethod
     def resume_checkpoint(cfg, trainer):
@@ -337,14 +344,22 @@ def initialize_model_parallel(model):
             model.trainer.strategy.launcher.launch(dummy, trainer=model.trainer)
         model.trainer.strategy.setup_environment()
 
-
 def initialize_distributed_parallel_state(local_rank: int = 0, tensor_model_parallel_size:int = 1,
                                           pipeline_model_parallel_size: int = 1,
                                           pipeline_model_parallel_split_rank: int = 0):
-    initialize_distributed(args=OmegaConf.create({'local_rank': local_rank}))
+    # initialize pytorch DDP
+    if not torch.distributed.is_initialized():
+        logging.info("pytorch DDP is not initialized. Initializing with pytorch-lightening...")
+        trainer = pl.Trainer(gpus=1, strategy='ddp', num_nodes=1)
+        def dummy():
+            return
+
+        if trainer.strategy.launcher is not None:
+            trainer.strategy.launcher.launch(dummy, trainer=trainer)
+        trainer.strategy.setup_environment()
 
     if parallel_state.is_unitialized():
-        logging.info("DDP is not initialized. Initializing...")
-        parallel_state.initialize_model_parallel(tensor_model_parallel_size_=tensor_model_parallel_size,
-                                                 pipeline_model_parallel_size_=pipeline_model_parallel_size,
-                                                 pipeline_model_parallel_split_rank_=pipeline_model_parallel_split_rank)
+        logging.info("Megatron DDP is not initialized. Initializing...")
+        parallel_state.initialize_model_parallel(tensor_model_parallel_size=tensor_model_parallel_size,
+                                                 pipeline_model_parallel_size=pipeline_model_parallel_size,
+                                                 pipeline_model_parallel_split_rank=pipeline_model_parallel_split_rank)

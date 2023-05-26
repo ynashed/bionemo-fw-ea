@@ -18,7 +18,7 @@ from typing import Optional, Union, Iterable, Dict, List
 
 from nemo.collections.common.tokenizers import TokenizerSpec
 
-from nemo_chem.data.dataloader.collate import TokenizerAdapterSpec
+from bionemo.data.dataloader.collate import TokenizerAdapterSpec
 
 
 DEFAULT_PAD_TOKEN = "<PAD>"

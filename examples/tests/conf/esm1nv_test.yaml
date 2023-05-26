@@ -12,15 +12,15 @@ trainer:
     
 model:
   micro_batch_size: 4
-  global_batch_size: 4
+  global_batch_size: null
   pre_process: True # add embedding
   post_process: True # add pooler
   bert_binary_head: False # BERT binary head
   tokenizer:
     library: 'sentencepiece'
     type: null
-    model: /model/protein/esm1nv/vocab/protein_sequence_sentencepiece.model
-    vocab_file: /model/protein/esm1nv/vocab/protein_sequence_sentencepiece.vocab
+    model: /tokenizers/protein/esm1nv/vocab/protein_sequence_sentencepiece.model
+    vocab_file: /tokenizers/protein/esm1nv/vocab/protein_sequence_sentencepiece.vocab
   data:
     dataset_path: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/protein # parent directory for data, contains train / val / test folders
     dataset: # inclusive range of data files to load or can load a single file, e.g. x000.csv

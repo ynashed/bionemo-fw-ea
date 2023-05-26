@@ -27,7 +27,7 @@ model:
   name: ${name}-united-token_head
   # model parallelism
   micro_batch_size: 32
-  global_batch_size: ${multiply:${multiply:${trainer.devices}, ${trainer.num_nodes}}, ${.micro_batch_size}}
+  global_batch_size: null
   tensor_model_parallel_size: 1 # model parallelism
   pipeline_model_parallel_size: 1
   resume_from_checkpoint: null # manually set the checkpoint file to load from
@@ -69,8 +69,8 @@ model:
   tokenizer:
     library: 'regex'
     type: null
-    model: /model/molecule/megamolbart/vocab/megamolbart.model
-    vocab_file: /model/molecule/megamolbart/vocab/megamolbart.vocab
+    model: /tokenizers/molecule/megamolbart/vocab/megamolbart.model
+    vocab_file: /tokenizers/molecule/megamolbart/vocab/megamolbart.vocab
     merge_file: null
 
   data:

@@ -46,6 +46,7 @@ from bionemo.utils.tests import ( BioNemoSearchPathConfig,
 from bionemo.utils import BioNeMoSaveRestoreConnector
 
 # logger
+logging.getLogger('nemo_logger').setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 # Pretraining, encoder finetuning and secondary structure validation-in-the-loop tests

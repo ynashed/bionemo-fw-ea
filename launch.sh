@@ -154,6 +154,7 @@ RESULT_MOUNT_PATH='/result/nemo_experiments'
 # CHEM_BENCH_PATH   Path to chembench source code. Used for generating benchmark
 #                   data
 # MODEL_PATH        Local dir to be mounted to /model
+# TOKENIZERS_PATH   Local dir to be mounted to /tokenizers
 
 # Compare Docker version to find Nvidia Container Toolkit support.
 # Please refer https://github.com/NVIDIA/nvidia-docker
@@ -174,7 +175,7 @@ DOCKER_CMD="docker run \
     -p ${JUPYTER_PORT}:8888 \
     -v ${DATA_PATH}:${DATA_MOUNT_PATH} \
     -v ${RESULT_PATH}:${RESULT_MOUNT_PATH} \
-    --shm-size=1g \
+    --shm-size=4g \
     --ulimit memlock=-1 \
     --ulimit stack=67108864 \
     -e TMPDIR=/tmp/ \
@@ -361,6 +362,13 @@ setup() {
     else
         DOCKER_CMD="${DOCKER_CMD} -v ${PROJECT_PATH}/models:/model "
     fi
+        # For dev use the tokenizers in /tokenizers dir
+    if [ ! -z "${TOKENIZERS_PATH}" ];
+    then
+        DOCKER_CMD="${DOCKER_CMD} -v ${TOKENIZERS_PATH}:/tokenizers "
+    else
+        DOCKER_CMD="${DOCKER_CMD} -v ${PROJECT_PATH}/tokenizers:/tokenizers "
+    fi
 
     if [ ! -z "${CHEM_BENCH_PATH}" ];
     then
@@ -369,7 +377,7 @@ setup() {
     fi
 
     DOCKER_CMD="${DOCKER_CMD} --env WANDB_API_KEY=$WANDB_API_KEY"
-    
+
     # For development work
     echo "Mounting ${PROJECT_PATH} at ${PROJECT_MOUNT} for development"
     DOCKER_CMD="${DOCKER_CMD} -v ${PROJECT_PATH}:${PROJECT_MOUNT} -e HOME=${PROJECT_MOUNT} -w ${PROJECT_MOUNT} "
@@ -381,7 +389,7 @@ setup() {
     # For dev mode, mount the local code for development purpose
     if [[ $1 == "dev" ]]; then
         echo "Prepending ${PROJECT_MOUNT} to PYTHONPATH for development"
-        DEV_PYTHONPATH="${PROJECT_MOUNT}:${PROJECT_MOUNT}/generated:${DEV_PYTHONPATH}"  
+        DEV_PYTHONPATH="${PROJECT_MOUNT}:${PROJECT_MOUNT}/generated:${DEV_PYTHONPATH}"
         DOCKER_CMD="${DOCKER_CMD} --env PYTHONPATH=${DEV_PYTHONPATH}"
     fi
 }
