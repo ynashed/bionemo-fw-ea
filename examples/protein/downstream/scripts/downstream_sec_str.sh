@@ -39,6 +39,7 @@ INSTANCE="dgx1v.32g.2.norm"
 ORG=nvidian
 TEAM=clara-lifesciences
 LABEL=ml__bionemo
+WL_LABEL=wl___other___bionemo 
 JOB_NAME=ml-model.bionemo-fw-${PROTEIN_MODEL}-finetune
 WORKSPACE= # Your NGC workspace ID goes here
 
@@ -65,9 +66,7 @@ then
 fi
 
 read -r -d '' COMMAND <<EOF
- export WANDB_API_KEY=${WANDB_API_KEY} && \
- cd /workspace/bionemo/examples/protein/downstream && \
- python downstream_sec_str.py --config-path=${CONFIG_PATH} \
+ python sec_str_finetune.py --config-path=${CONFIG_PATH} \
  --config-name=finetune_config exp_manager.exp_dir=${EXP_DIR} \
  exp_manager.wandb_logger_kwargs.offline=False \
  trainer.devices=${NGC_GPUS_PER_NODE} \
@@ -82,8 +81,7 @@ read -r -d '' COMMAND <<EOF
  trainer.accumulate_grad_batches=${ACCUMULATE_GRAD_BATCHES}
 EOF
 
-BCP_COMMAND="bcprun --debug --nnodes=${NGC_ARRAY_SIZE} --npernode=${NGC_GPUS_PER_NODE} --cmd '"${COMMAND}"'"
+BCP_COMMAND="bcprun --debug --nnodes=${NGC_ARRAY_SIZE} --npernode=${NGC_GPUS_PER_NODE} -w /workspace/bionemo/examples/protein/downstream -e WANDB_API_KEY=${WANDB_API_KEY} --cmd '"${COMMAND}"'"
 
-echo "ngc batch run --name "${JOB_NAME}" --priority NORMAL --preempt RUNONCE --total-runtime 2h --ace "${ACE}" --instance "${INSTANCE}" --commandline "\"${BCP_COMMAND}"\" --result /result/ngc_log --replicas "1" --image "${CONTAINER_IMAGE}" --org ${ORG} --team ${TEAM} --workspace ${WORKSPACE}:/result --datasetid ${DATASET_ID}:/data/netsurfp_2.0 --label ${LABEL}" | bash
-
+echo "ngc batch run --name "${JOB_NAME}" --priority NORMAL --preempt RUNONCE --total-runtime 2h --ace "${ACE}" --instance "${INSTANCE}" --commandline "\"${BCP_COMMAND}"\" --result /result/ngc_log --replicas "1" --image "${CONTAINER_IMAGE}" --org ${ORG} --team ${TEAM} --workspace ${WORKSPACE}:/result --datasetid ${DATASET_ID}:/data/netsurfp_2.0 --label ${LABEL} --label ${WL_LABEL}" | bash
 
