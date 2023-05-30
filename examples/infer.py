@@ -104,11 +104,16 @@ def main(cfg) -> None:
         for i in range(batch_size):
             predictions.append({k: cast_to_numpy(batch_predictions[k][i]) for k in pred_keys})
     
-    # extract active hiddens
-    if ("hiddens" in predictions[0]) and ("mask" in predictions[0]):
+    # extract active hiddens if needed
+    if "hiddens" in cfg.model.downstream_task.outputs:
+        if ("hiddens" in predictions[0]) and ("mask" in predictions[0]):
+            for p in predictions:
+                p["hiddens"] = p['hiddens'][p['mask']]
+                del p['mask']
+    else:
         for p in predictions:
-            p["hiddens"] = p['hiddens'][p['mask']]
             del p['mask']
+            del p['hiddens']
 
     # collect all results when using DDP
     logging.info("Collecting results from all GPUs...")
@@ -117,7 +122,7 @@ def main(cfg) -> None:
     if predictions is None:
         return
     
-    # from here only rank 0 should contiue
+    # from here only rank 0 should continue
     output_fname = cfg.model.data.output_fname
     if not output_fname:
         output_fname = f"{cfg.model.data.dataset_path}.pkl"  
