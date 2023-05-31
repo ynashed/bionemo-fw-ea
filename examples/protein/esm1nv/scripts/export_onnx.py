@@ -27,12 +27,14 @@ with initialize(config_path="../conf"):
     cfg = compose(config_name="infer")
     inferer = ESM1nvInference(cfg)
     model = inferer.model.cuda()
+    if model.enable_autocast:
+        model = model.half()
 
     # Convert to torchscript
     seqs = ['MSLKRKNIALIPAAGIGVRFGADKPKQYVEIGSKTVLEHVLGIFERHEAVDLTVVVVSPEDTFADKVQTAFPQVRVWKNGGQTRAETVRNGVAKLLETGLAAETDNILVHDAARCCLPSEALARLIEQAGNAAEGGILAVPVADTLKRAESGQISATVDRSGLWQAQTPQLFQAGLLHRALAAENLGGITDEASAVEKLGVRPLLIQGDARNLKLTQPQDAYIVRLLLDAV',
             'MIQSQINRNIRLDLADAILLSKAKKDLSFAEIADGTGLAEAFVTAALLGQQALPADAARLVGAKLDLDEDSILLLQMIPLRGCIDDRIPTDPTMYRFYEMLQVYGTTLKALVHEKFGDGIISAINFKLDVKKVADPEGGERAVITLDGKYLPTKPF']
 
-    tokens_enc, enc_mask = inferer._tokenize(seqs)
+    tokens_enc, enc_mask = inferer.tokenize(seqs)
 
     # print("simple inference: ", inferer.seq_to_embedding(seqs))
 
