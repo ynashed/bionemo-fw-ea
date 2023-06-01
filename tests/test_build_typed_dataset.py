@@ -1,4 +1,5 @@
 from omegaconf import OmegaConf, open_dict
+import pytest
 
 from bionemo.data.dataset_builder_utils import build_typed_dataset, _DATA_IMPL_TYPE_CLS, _CSV_MMAP_TYPE, \
     _CSV_FIELDS_MMAP_TYPE, _FASTA_FIELDS_MMAP_TYPE
@@ -74,6 +75,7 @@ def test_dataset_builder_csv_fields_mmap():
     assert len(dataset_2) == (2 * len(dataset))
 
 
+@pytest.mark.needs_gpu
 def test_dataset_builder_upsampling():
     # MegaMolBART downstream task retrosynthesis
     filepath = 'examples/tests/test_data/reaction/processed/test/data.csv'

@@ -2,13 +2,14 @@
 default:
   image: docker:20.10.16
   tags:
-    - kamino-prod
+    - kamino-dev-linux-dind
 
 
 stages:
-  - fb-build
-  - mr-build
-  - build-and-push
+  - build
+  - download
+  - test
+  - deploy
 
 services:
   - docker:20.10.16-dind
@@ -20,48 +21,120 @@ variables:
   DOCKER_TLS_CERTDIR: "/certs"
   DOCKER_BUILDKIT: 1
   BUILDKIT_PROGRESS: plain
-  IMAGE_REG: "$CI_REGISTRY/clara-discovery/bionemo:"
-  SHA_TAG: "$IMAGE_REG$CI_COMMIT_SHORT_SHA-$CI_COMMIT_BRANCH"
-  LATEST_TAG: "$IMAGE_REG$CI_COMMIT_BRANCH-latest"
-  COMMIT_BRANCH: "$CI_COMMIT_SHORT_SHA"
+  PIPELINE_TAG: "$CI_REGISTRY_IMAGE:pipeline-$CI_PIPELINE_ID"
+  SHA_TAG: "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA-$CI_COMMIT_BRANCH"
+  LATEST_TAG: "$CI_REGISTRY_IMAGE:$CI_COMMIT_BRANCH-latest"
   NGC_TAG: "nvcr.io/nvidian/clara-lifesciences/bionemo_ci:latest"
+  NEMO_NIGHTLY_TAG: "nvcr.io/nvidian/nemo-nightly:latest-nightly-main"
+  NIGHTLY:
+    value: "false"
+    options:
+      - "false"
+      - "true"
+    description: "Wether to use nightly NeMo docker image as base. Set to 'false' by default."
 
-test-commit-branch-build:
-  rules:
-    - if: $CI_COMMIT_BRANCH && $CI_COMMIT_BRANCH != "main" && $CI_COMMIT_BRANCH != "dev"
-      when: manual
-  stage: fb-build
+
+.docker-setup:
   before_script:
     - until docker info; do sleep 1; done
     - mkdir -p $HOME/.docker
     - echo $DOCKER_AUTH_CONFIG > $HOME/.docker/config.json
-  script:
-    - docker build --network host --no-cache -t $COMMIT_BRANCH --build-arg REPO_INCLUDE=./ -f setup/Dockerfile .
 
-test-build:
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-  stage: mr-build
-  before_script:
-    - until docker info; do sleep 1; done
-    - mkdir -p $HOME/.docker
-    - echo $DOCKER_AUTH_CONFIG > $HOME/.docker/config.json
+
+.build-common:
+  extends:
+    - .docker-setup
+  stage: build
   script:
-    - docker build --network host --no-cache -t $SHA_TAG --build-arg REPO_INCLUDE=./ -f setup/Dockerfile .
+    - if [[ $NIGHTLY = true ]]; then
+        base="--build-arg BASE_IMAGE=$NEMO_NIGHTLY_TAG";
+      else
+        base="";
+      fi
+    - docker build --network host --no-cache ${base} --label com.nvidia.bionemo.git_hash=${CI_COMMIT_SHORT_SHA}
+      -t $PIPELINE_TAG --build-arg REPO_INCLUDE=./ -f setup/Dockerfile .
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker push $PIPELINE_TAG
+
 
 build:
-  only:
-    - dev
-    - main
-  stage: build-and-push
+  extends:
+    - .build-common
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: manual
+    - if: $CI_COMMIT_BRANCH == "dev"
+    - if: $CI_COMMIT_BRANCH == "main"
+    - when: manual
+
+
+get-checkpoints:
+  image: ubuntu:20.04
+  stage: download
+  variables:
+    NGC_CLI_FORMAT_TYPE: ascii
+    NGC_CLI_ORG: nvidian
+    NGC_CLI_TEAM: clara-lifesciences
+  rules:
+    - when: on_success
   before_script:
-    - until docker info; do sleep 1; done
-    - mkdir -p $HOME/.docker
-    - echo $DOCKER_AUTH_CONFIG > $HOME/.docker/config.json
+    - apt update && apt install -y wget unzip
+    - wget --content-disposition https://ngc.nvidia.com/downloads/ngccli_linux.zip && unzip ngccli_linux.zip && chmod u+x ngc-cli/ngc
+    - export PATH=$PATH:$PWD/ngc-cli
   script:
-    - docker build --network host --no-cache --label com.nvidia.bionemo.git_hash=${CI_COMMIT_SHORT_SHA}
-      -t $SHA_TAG -t $LATEST_TAG -t $NGC_TAG --build-arg REPO_INCLUDE=./ -f setup/Dockerfile .
+    - ./launch.sh download
+  artifacts:
+    paths:
+      - models
+    expire_in: 1 day
+
+
+.unit-tests-common:
+  image:
+    name: "$PIPELINE_TAG"
+    entrypoint: [""]
+  stage: test
+  rules:
+    - when: on_success
+  dependencies:
+    - build
+    - get-checkpoints
+  before_script:
+    - mkdir /model
+    - cp -r models/* /model
+  script:
+    - cd /opt/nvidia/bionemo/
+
+
+unit-test-cpu:
+  extends:
+    - .unit-tests-common
+  script:
+    - !reference [.unit-tests-common, script]
+    - pytest -v -m "not needs_gpu"
+
+
+unit-test-gpu:
+  extends:
+  - .unit-tests-common
+  tags:
+    - kamino-dev-gpu
+  script:
+    - !reference [.unit-tests-common, script]
+    - pytest -v -m "needs_gpu" -k "not test_model_training"
+
+
+dev-deploy:
+  extends:
+    - .docker-setup
+  stage: deploy
+  rules:
+    - if: $CI_COMMIT_BRANCH == "dev" && $NIGHTLY != "true"
+    - if: $CI_COMMIT_BRANCH == "main" && $NIGHTLY != "true"
+  script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - docker push $SHA_TAG
+    - docker tag $PIPELINE_TAG $SHA_TAG
+    - docker tag $PIPELINE_TAG $LATEST_TAG
+    - docker tag $PIPELINE_TAG $NGC_TAG
     - docker push $LATEST_TAG
     - docker push $NGC_TAG

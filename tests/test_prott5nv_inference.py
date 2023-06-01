@@ -58,10 +58,13 @@ def load_model(inf_cfg):
         _INFERER = ProtT5nvInference(inf_cfg)
     yield _INFERER
 
+
+@pytest.mark.needs_checkpoint
 def test_model_exists():
     check_model_exists(CHECKPOINT_PATH)
 
 @pytest.mark.needs_gpu
+@pytest.mark.needs_checkpoint
 @pytest.mark.skip_if_no_file(CHECKPOINT_PATH)
 def test_seq_to_embedding():
     cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='infer', config_path=CONFIG_PATH)
@@ -76,6 +79,7 @@ def test_seq_to_embedding():
 
 
 @pytest.mark.needs_gpu
+@pytest.mark.needs_checkpoint
 @pytest.mark.skip_if_no_file(CHECKPOINT_PATH)
 def test_long_seq_to_embedding():
     long_seq = 'MIQSQINRNIRLDLADAILLSKAKKDLSFAEIADGTGLAEAFVTAALLGQQALPADAARLVGAKLDLDEDSILLLQMIPLRGCIDDRIPTDPTMYRFYEMLQVYGTTLKALVHEKFGDGIISAINFKLDVKKVADPEGGERAVITLDGKYLPTKPF'
