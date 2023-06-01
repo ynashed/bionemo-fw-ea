@@ -1,5 +1,6 @@
 import os
 
+import pytest
 import pytorch_lightning as pl
 import torch
 from nemo.collections.common.tokenizers.regex_tokenizer import RegExTokenizer
@@ -26,6 +27,7 @@ TOKENIZER = RegExTokenizer().load_tokenizer(regex_file=TOKENIZER_MODEL, vocab_fi
 NUM_SAMPLES = {'train': 5, 'val': 5, 'test': 5}
 
 
+@pytest.mark.needs_gpu
 def test_megamolbart_build_train_valid_test_datasets():
     cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='megamolbart_test', config_path=CONFIG_PATH)
 
@@ -40,6 +42,7 @@ def test_megamolbart_build_train_valid_test_datasets():
     assert test_ds[4] == 'O[C@H]1COCCN(CCn2cccn2)C1'
 
 
+@pytest.mark.needs_gpu
 def test_megamolbart_retro_build_train_valid_test_datasets():
     cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='megamolbart_downstream_retro_test', config_path=CONFIG_PATH)
 

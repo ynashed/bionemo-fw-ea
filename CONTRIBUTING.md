@@ -30,6 +30,7 @@ UPDATE_EXPECTED_RESULTS=1  pytest examples/tests/test_model_pretrain_and_downstr
 UPDATE_EXPECTED_CFG=1 pytest examples/tests/test_model_pretrain_and_downstream.py
 ```
 
+After testing your code locally, test your code in the CI. Go to your merge requst -> "Pipelines" and trigger the pipeline by clicking an arrow sign.
 
 # General principles
 1. **User-oriented**: make it easy for end users, even at the cost of writing more code in the background
