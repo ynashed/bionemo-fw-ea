@@ -128,14 +128,14 @@ dev-deploy:
   extends:
     - .docker-setup
   stage: deploy
-  # rules:
-  #   - if: $CI_COMMIT_BRANCH == "dev" && $NIGHTLY != "true"
-  #   - if: $CI_COMMIT_BRANCH == "main" && $NIGHTLY != "true"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "dev" && $NIGHTLY != "true"
+    - if: $CI_COMMIT_BRANCH == "main" && $NIGHTLY != "true"
   script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     - docker pull $PIPELINE_TAG
     - docker tag $PIPELINE_TAG $SHA_TAG
     - docker tag $PIPELINE_TAG $LATEST_TAG
-    # - docker tag $PIPELINE_TAG $NGC_TAG
+    - docker tag $PIPELINE_TAG $NGC_TAG
     - docker push $LATEST_TAG
-    # - docker push $NGC_TAG
+    - docker push $NGC_TAG
