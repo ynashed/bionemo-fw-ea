@@ -178,7 +178,7 @@ DOCKER_CMD="docker run \
 
 # add current git hash as docker image metadata
 BIONEMO_GIT_HASH=`git rev-parse --short HEAD`
-DOCKER_BUILD_CMD="docker build --network host --ssh default \
+DOCKER_BUILD_CMD="docker build --network host \
     -t ${BIONEMO_IMAGE} \
     --label com.nvidia.bionemo.git_hash=${BIONEMO_GIT_HASH} \
     -f setup/Dockerfile"
@@ -286,10 +286,6 @@ build() {
     fi
 
     DOCKER_BUILD_CMD="${DOCKER_BUILD_CMD} -t ${IMG_NAME[0]}:latest"
-
-    # Set up SSH agent for cloning private repo in docker build
-    eval "$(ssh-agent -s)"
-    find ~/.ssh/ -type f -exec grep -l "PRIVATE" {} \; | xargs ssh-add &> /dev/null
 
     echo "Building BioNeMo training container..."
     set -x
