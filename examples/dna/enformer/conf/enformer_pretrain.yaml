@@ -1,0 +1,23 @@
+
+defaults:
+ - enformer_base
+ - _self_
+
+do_training: True
+restore_from_path: null
+
+model:
+  metrics:
+    organisms:
+      human:
+        num_targets: 5313
+      mouse:
+        num_targets: 1643
+
+  optim:
+    lr: 5e-4
+    sched:
+      name: LinearLR
+      start_factor: 0.000001 # essentially 0, but cannot be 0
+      total_iters: 5000
+      end_factor: 1.0
