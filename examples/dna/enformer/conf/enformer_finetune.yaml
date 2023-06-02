@@ -1,0 +1,29 @@
+
+defaults:
+ - enformer_base
+ - _self_
+
+restore_from_path: ??? # user must provide a checkpoint which will be fine-tuned
+
+model:
+  metrics:
+    organisms:
+      human:
+        num_targets: 5313
+
+  optim:
+    lr: 1e-4
+
+trainer:
+  max_steps : 30_000
+
+exp_manager:
+  name: check
+  exp_dir: /results
+  version: finetune
+  resume_if_exists: False
+  checkpoint_callback_params:
+    save_top_k : 1
+    monitor: rpearson_human
+    mode: max
+    

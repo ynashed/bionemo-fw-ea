@@ -15,6 +15,11 @@ numpy
 wandb
 einops
 pytest-forked
+pyfaidx==0.7.2
+webdataset==0.2.33
+polars==0.16.7
+more_itertools
 pytest-dependency
 testbook
+git+https://github.com/prokotg/tfrecord@float16zlib
 requests_mock

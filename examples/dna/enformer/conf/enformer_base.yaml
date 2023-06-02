@@ -1,0 +1,74 @@
+do_preprocess: False
+do_training: True
+do_testing: False
+
+model:
+  dim : 1536
+  depth : 11
+  heads : 8
+  output_heads :
+    human : 5313
+    mouse: 1643
+  target_length : 896
+  attn_dim_key : 64
+  dropout_rate : 0.4
+  attn_dropout : 0.05
+  pos_dropout : 0.01
+  use_checkpointing : False
+  use_convnext : False
+  num_downsamples : 7    # genetic sequence is downsampled 2 ** 7 :: 128x in default Enformer - can be changed for higher resolution
+  dim_divisible_by : 128
+  seed: 44
+  micro_batch_size: 1
+  tensor_model_parallel_size: 1
+  pipeline_model_parallel_size: 1
+  resume_from_checkpoint: null
+  context_length: 196_608 # perceptive window size of an input sequence
+  native_amp_init_scale: 65536 # default 2 ** 32 results in NaNs
+
+  data:
+    bucket_name: basenji_barnyard # google bucket that stores tfrecords with Basenji2 dataset
+    tfdata_path: /tfdata # where tfrecords should be downloaded to
+    webdataset_path: /webdata # where preprocessed data will be stored in
+    compress: False  # whether shards should be compressed
+    num_workers: 1
+
+  train_ds:
+    dataset_path: ${model.data.webdataset_path}
+    batch_size: ${model.micro_batch_size}
+
+  validation_ds:
+    dataset_path: ${model.data.webdataset_path}
+    batch_size: ${model.micro_batch_size}
+
+  test_ds:
+    dataset_path: ${model.data.webdataset_path}
+    batch_size: ${model.micro_batch_size}
+
+  optim:
+    name: fused_adam
+
+trainer:
+  # the effective batch size should be 64
+  devices: 8
+  accelerator : gpu
+  precision: 32
+  num_nodes: 8
+  max_steps : 150_000 # pre-training default as in the paper
+  max_epochs: 1 # step-based training
+  val_check_interval: 500
+  check_val_every_n_epoch : null
+  logger: False
+  enable_checkpointing: False # checkpointing is done by NeMo exp_manager
+  sync_batchnorm: True
+
+exp_manager:
+  name: check
+  exp_dir: /results
+  version: pretrain
+  resume_if_exists: True
+  resume_ignore_no_checkpoint: True
+  checkpoint_callback_params:
+    save_top_k : 1
+    monitor: rpearson_human
+    mode: max

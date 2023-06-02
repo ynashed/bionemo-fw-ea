@@ -41,6 +41,10 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
         wget git unzip tmux vim tree && \
     rm -rf /var/lib/apt/lists/*
 
+# install Google Cloud SDK so that users can authethicate while pulling data from GCP buckets
+RUN mkdir /google-sdk && cd /google-sdk && curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-427.0.0-linux-x86_64.tar.gz \
+    && tar -xvf google-cloud-cli-427.0.0-linux-x86_64.tar.gz && ./google-cloud-sdk/install.sh -q --rc-path /etc/bash.bashrc
+
 COPY setup/requirements.txt /tmp/requirements.txt
 RUN pip3 install -r /tmp/requirements.txt
 
