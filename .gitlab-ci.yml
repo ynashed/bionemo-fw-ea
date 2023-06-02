@@ -137,5 +137,6 @@ dev-deploy:
     - docker tag $PIPELINE_TAG $SHA_TAG
     - docker tag $PIPELINE_TAG $LATEST_TAG
     - docker tag $PIPELINE_TAG $NGC_TAG
+    - docker push $SHA_TAG
     - docker push $LATEST_TAG
     - docker push $NGC_TAG
