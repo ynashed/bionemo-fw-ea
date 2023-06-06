@@ -15,7 +15,7 @@
 
 from omegaconf import ListConfig
 import torch
-from typing import List, Union
+from typing import List, Union, Dict
 from pytorch_lightning.core import LightningModule
 from pandas import Series
 
@@ -305,7 +305,7 @@ class BaseEncoderDecoderInference(LightningModule):
         """
         raise NotImplementedError(f"Sampling is not supported in this class ({self.__class__.__name__})")
 
-    def __call__(self, sequences: Union[Series, List[str]]) -> torch.Tensor:
+    def __call__(self, sequences: Union[Series, Dict, List[str]]) -> torch.Tensor:
         """
         Computes embeddings for a list of sequences.
         Embeddings are detached from model.
@@ -316,7 +316,20 @@ class BaseEncoderDecoderInference(LightningModule):
         Returns
             embeddings
         """
+        ids = None
         if isinstance(sequences, Series):
             sequences = sequences.tolist()
+        if isinstance(sequences, Dict):
+            ids = sequences["id"]
+            sequences = sequences["sequence"]
+        result_dict = {}
+        hiddens, enc_mask = self.seq_to_hiddens(sequences)
+        embeddings = self.hiddens_to_embedding(hiddens, enc_mask)
+        result_dict["embeddings"] = embeddings.float().detach().clone()
+        result_dict["hiddens"] = hiddens.float().detach().clone()
+        result_dict["mask"] = enc_mask.detach().clone()
+        result_dict["sequence"] = sequences
+        if ids is not None:
+            result_dict["id"] = ids
 
-        return self.seq_to_embeddings(sequences).float().detach().clone()
+        return result_dict
