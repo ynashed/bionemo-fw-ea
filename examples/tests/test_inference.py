@@ -68,19 +68,15 @@ def get_cfg(prepend_config_path, config_name, config_path='conf'):
 
 
 @pytest.mark.needs_gpu
-@pytest.mark.parametrize('prepend_config_path, config_name', 
-                         list(zip(PREPEND_CONFIG_DIR, CONFIG_NAME)))
-def test_model_inference(prepend_config_path, config_name):
+@pytest.mark.parametrize('prepend_config_path, config_name, hidden_size',
+                         list(zip(PREPEND_CONFIG_DIR, CONFIG_NAME, HIDDEN_SIZE)))
+def test_model_inference(prepend_config_path, config_name, hidden_size):
     '''Check that number of model weights are correct'''
 
     cfg = get_cfg(prepend_config_path, config_name)
     clean_directory(cfg.exp_manager.exp_dir)
     infer.main(cfg)
 
-@pytest.mark.parametrize('prepend_config_path, config_name, hidden_size',
-                         list(zip(PREPEND_CONFIG_DIR, CONFIG_NAME, HIDDEN_SIZE)))
-def test_embeddings_file(prepend_config_path, config_name, hidden_size):
-    cfg = get_cfg(prepend_config_path, config_name)
     embeddings = pickle.load(open(cfg.model.data.output_fname, "rb"))
     dict_keys = cfg.model.downstream_task.outputs + ["sequence", "id"]
     for emb in embeddings:
