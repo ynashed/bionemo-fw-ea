@@ -26,37 +26,42 @@
 # TODO: this script assumes that model checkpoint is already in the container
 
 LOCAL_ENV=.env
-CONTAINER_IMAGE=nvidian/clara-lifesciences/bionemo-dev-mkorshunova:latest
+
+CONTAINER_IMAGE=nvidian/clara-lifesciences/bionemo-dev-camirr:latest 
  
-# Model architecture -- can be prott5nv or esm1nv
-PROTEIN_MODEL=esm1nv #prott5nv 
+# Model architecture -- should be megamolbart
+MODEL=megamolbart
+
+#Experiment description
+DWNSTRM_TASK=physchem
+EXP_TAG="" # customize EXP_TAG to add additional information
 
 # NGC specific parameters
 NGC_ARRAY_SIZE=1  #number of nodes for the job
 NGC_GPUS_PER_NODE=2 #number of gpus per node
 REPLICAS=1 #equal to the number of nodes
 ACE=nv-us-west-2
-INSTANCE="dgx1v.32g.2.norm"
+INSTANCE="dgx1v.32g.2.norm" #"dgx1v.16g.8.norm"
 ORG=nvidian
 TEAM=clara-lifesciences
 LABEL=ml__bionemo
-WL_LABEL=wl___other___bionemo 
-JOB_NAME=ml-model.bionemo-fw-${PROTEIN_MODEL}-finetune
+WL_LABEL=wl___other___bionemo
+JOB_NAME=ml-model.bionemo-fw-${MODEL}-downstream-${DWNSTRM_TASK}-${EXP_TAG}
 WORKSPACE= # Your NGC workspace ID goes here
 
 # Model specific parameters
 ACCUMULATE_GRAD_BATCHES=1
 ENCODER_FROZEN=True
 TENSOR_MODEL_PARALLEL_SIZE=1
-RESTORE_FROM_PATH=/model/protein/${PROTEIN_MODEL}/${PROTEIN_MODEL}.nemo
-MICRO_BATCH_SIZE=64
+RESTORE_FROM_PATH=/model/molecule/${MODEL}/${MODEL}.nemo
+MICRO_BATCH_SIZE=32
 
 # Dataset and logging parameters
 WANDB_API_KEY= # Your personal WandB API key goes here
-DATASET_ID=105217
-EXP_DIR=/workspace/nemo_experiments/${PROTEIN_MODEL}/sec_str_finetune_encoder_frozen-${ENCODER_FROZEN}_tp${TENSOR_MODEL_PARALLEL_SIZE}_grad_acc${ACCUMULATE_GRAD_BATCHES}
-WANDB_LOGGER_NAME=${PROTEIN_MODEL}_sec_str_finetune_encoder_frozen-${ENCODER_FROZEN}_tp${TENSOR_MODEL_PARALLEL_SIZE}_grad_acc${ACCUMULATE_GRAD_BATCHES}
-CONFIG_PATH=../${PROTEIN_MODEL}/conf
+DATASET_ID=1607058
+EXP_DIR=/workspace/nemo_experiments/${MODEL}/phys_chem_finetune_encoder_frozen-${ENCODER_FROZEN}_tp${TENSOR_MODEL_PARALLEL_SIZE}_grad_acc${ACCUMULATE_GRAD_BATCHES}
+WANDB_LOGGER_NAME=${MODEL}_phys_chem_finetune_encoder_frozen-${ENCODER_FROZEN}_tp${TENSOR_MODEL_PARALLEL_SIZE}_grad_acc${ACCUMULATE_GRAD_BATCHES}_${EXP_TAG}
+CONFIG_PATH=./conf
 
 
 # if $LOCAL_ENV file exists, source it to specify my environment
@@ -67,23 +72,25 @@ then
 fi
 
 read -r -d '' COMMAND <<EOF
- python sec_str_finetune.py --config-path=${CONFIG_PATH} \
+ python downstream_physchem.py --config-path=${CONFIG_PATH} \
  --config-name=finetune_config exp_manager.exp_dir=${EXP_DIR} \
  exp_manager.wandb_logger_kwargs.offline=False \
  trainer.devices=${NGC_GPUS_PER_NODE} \
  trainer.num_nodes=${NGC_ARRAY_SIZE} \
- model.validation.validation_enabled=False \
  model.micro_batch_size=${MICRO_BATCH_SIZE} \
+ model.data.train_ds.data_file=/data/physchem/SAMPL_splits/train.csv \
+ model.data.validation_ds.data_file=/data/physchem/SAMPL_splits/val.csv \
+ model.data.test_ds.data_file=/data/physchem/SAMPL_splits/test.csv \
  exp_manager.wandb_logger_kwargs.name=${WANDB_LOGGER_NAME} \
- trainer.val_check_interval=50 model.global_batch_size=null \
+ trainer.val_check_interval=8 model.global_batch_size=null \
  model.encoder_frozen=${ENCODER_FROZEN} \
  model.tensor_model_parallel_size=${TENSOR_MODEL_PARALLEL_SIZE} \
  restore_from_path=${RESTORE_FROM_PATH} \
  trainer.accumulate_grad_batches=${ACCUMULATE_GRAD_BATCHES}
 EOF
 
-BCP_COMMAND="bcprun --debug --nnodes=${NGC_ARRAY_SIZE} --npernode=${NGC_GPUS_PER_NODE} -w /workspace/bionemo/examples/protein/downstream -e WANDB_API_KEY=${WANDB_API_KEY} --cmd '"${COMMAND}"'"
+BCP_COMMAND="bcprun --debug --nnodes=${NGC_ARRAY_SIZE} --npernode=${NGC_GPUS_PER_NODE} -w /workspace/bionemo/examples/molecule/megamolbart -e WANDB_API_KEY=${WANDB_API_KEY} --cmd '"${COMMAND}"'"
 
 #Add --array-type "MPI" to command below for multinode jobs
-echo "ngc batch run --name "${JOB_NAME}" --priority NORMAL --preempt RUNONCE --total-runtime 2h --ace "${ACE}" --instance "${INSTANCE}" --commandline "\"${BCP_COMMAND}"\" --result /result/ngc_log --replicas "${REPLICAS}" --image "${CONTAINER_IMAGE}" --org ${ORG} --team ${TEAM} --workspace ${WORKSPACE}:/result --datasetid ${DATASET_ID}:/data/netsurfp_2.0 --label ${LABEL} --label ${WL_LABEL}" | bash
+echo "ngc batch run --name "${JOB_NAME}" --priority NORMAL --preempt RUNONCE --total-runtime 2h --ace "${ACE}" --instance "${INSTANCE}" --commandline "\"${BCP_COMMAND}"\" --result /result/ngc_log --replicas "${REPLICAS}" --image "${CONTAINER_IMAGE}" --org ${ORG} --team ${TEAM} --workspace ${WORKSPACE}:/result --datasetid ${DATASET_ID}:/data/physchem/SAMPL_splits/ --label ${LABEL} --label ${WL_LABEL}" | bash
 
