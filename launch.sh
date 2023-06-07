@@ -384,7 +384,11 @@ setup() {
     DOCKER_CMD="${DOCKER_CMD} -u $(id -u):$(id -g) "
 
     # For dev mode, mount the local code for development purpose
+    # and mount .ssh dir for working with git
     if [[ $1 == "dev" ]]; then
+        echo "Mounting ~/.ssh up for development"
+        DOCKER_CMD="$DOCKER_CMD -v ${HOME}/.ssh:${HOME}/.ssh:ro"
+
         echo "Prepending ${PROJECT_MOUNT} to PYTHONPATH for development"
         DEV_PYTHONPATH="${PROJECT_MOUNT}:${PROJECT_MOUNT}/generated:${DEV_PYTHONPATH}"
         DOCKER_CMD="${DOCKER_CMD} --env PYTHONPATH=${DEV_PYTHONPATH}"
