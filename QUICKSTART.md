@@ -15,14 +15,14 @@ The [`launch.sh` script](./launch.sh) can be used for a number of tasks, includi
 ```bash
 BIONEMO_IMAGE=nvcr.io/t6a4nuz8vrsr/bionemo:latest                   # Container with tag
 GITHUB_BRANCH=v0.3.0_ea1                                            # GitLab branch
-PROJECT_MOUNT=/workspace/bionemo                                     # Location of library in container /workspace/bionemo for dev work or /opt/nvidia/bionemo for non-dev use                                      
+PROJECT_MOUNT=/workspace/bionemo                                    # Location of library in container /workspace/bionemo for dev work or /opt/nvidia/bionemo for non-dev use                                      
 PROJECT_PATH=$(pwd)                                                 # Path of env config and optional development code
 DATA_PATH=${HOME}/data                                              # Local Path to save downloaded and processed data
 RESULT_PATH=${HOME}/result/bionemo_experiments                      # Path for training results
 GITHUB_ACCESS_TOKEN=INSERT_GITHUB_ACCESS_TOKEN_HERE                 # Only required for building container from a private branch
 WANDB_API_KEY=$(grep password $HOME/.netrc | cut -d' ' -f4)         # Requires WandB API key configuration
 JUPYTER_PORT=8888                                                   # Jupyter port for inference notebooks
-REGISTRY_ACCESS_TOKEN=$(grep apikey ~/.ngc/config | cut -d' ' -f3)  # Requires NGC cli configuration
+REGISTRY_ACCESS_TOKEN=$(grep -m 1 apikey ~/.ngc/config | cut -d' ' -f3) # Requires NGC cli configuration
 REGISTRY_USER=$oauthtoken                                           # Only required for registry login
 REGISTRY=NotSpecified                                               # Only required for registry login
 ```
