@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright (c) 2022, NVIDIA CORPORATION.
+# Copyright (c) 2023, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,6 +14,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+source download_models.sh
 
 ###############################################################################
 #
@@ -70,6 +72,8 @@ variables:
         Path on workstation or cluster to code, e.g., /home/user/code/bionemo
     DATA_PATH
         Path on workstation or cluster to data, e.g., /data
+    MODEL_PATH
+        Location of the models when downloaded. Defaults to '$PROJECT_PATH/models' on workstation or /model in container.
     RESULT_PATH
         Path on workstation or cluster to directory for results, e.g. /home/user/results/nemo_experiments
     WANDB_API_KEY
@@ -81,8 +85,18 @@ variables:
         Container registry URL. e.g., nvcr.io. Only required to push/pull containers.
     REGISTRY_USER
         container registry username. e.g., '$oauthtoken' for registry access. Only required to push/pull containers.
-    REGISTRY_ACCESS_TOKEN
-        container registry access token. e.g., Ckj53jGK... Only required to push/pull containers.
+    GITHUB_BRANCH
+        Git branch to use for building a container, default is main
+    DEV_CONT_NAME
+        Docker name for development container
+    NGC_CLI_API_KEY
+        NGC API key -- this is required for downloading models and other assets. Run `ngc config --help` for details.
+    NGC_CLI_ORG
+        NGC organization name. Default is nvidian. Run `ngc config --help` for details.
+    NGC_CLI_TEAM
+        NGC team name.  Run `ngc config --help` for details.
+    NGC_CLI_FORMAT_TYPE
+        NGC cli format. Default is ascii.  Run `ngc config --help` for details.
 
 EOF
     exit
@@ -95,22 +109,23 @@ BIONEMO_WORKSPACE=/workspace/bionemo # Location of examples / config files and w
 
 
 # Defaults for `.env` file
-BIONEMO_IMAGE=${BIONEMO_IMAGE:=nvcr.io/t6a4nuz8vrsr/bionemo:latest}
+BIONEMO_IMAGE=${BIONEMO_IMAGE:=nvcr.io/nvidian/clara-lifesciences/bionemo_ci:latest}
 PROJECT_MOUNT=${PROJECT_MOUNT:=/workspace/bionemo}
 PROJECT_PATH=${PROJECT_PATH:=$(pwd)}
 DATA_PATH=${DATA_PATH:=/tmp}
+MODEL_PATH=${MODEL_PATH:=${PROJECT_PATH}/models}
 RESULT_PATH=${RESULT_PATH:=${HOME}/results/nemo_experiments}
 WANDB_API_KEY=${WANDB_API_KEY:=NotSpecified}
 JUPYTER_PORT=${JUPYTER_PORT:=8888}
 REGISTRY=${REGISTRY:=NotSpecified}
 REGISTRY_USER=${REGISTRY_USER:='$oauthtoken'}
-REGISTRY_ACCESS_TOKEN=${REGISTRY_ACCESS_TOKEN:=NotSpecified}
+GITHUB_BRANCH=${GITHUB_BRANCH:=main}
+GITHUB_REPO=${GITHUB_REPO:=gitlab-master.nvidia.com:12051/clara-discovery/bionemo.git}
 DEV_CONT_NAME=${DEV_CONT_NAME:=bionemo}
-
-# Model paths
-ESM1NV_MODEL="t6a4nuz8vrsr/esm1nv:0.1.0"
-PROTT5NV_MODEL="t6a4nuz8vrsr/prott5nv:0.1.0"
-MEGAMOLBART_MODEL="https://api.ngc.nvidia.com/v2/models/nvidia/clara/megamolbart_0_2/versions/0.2.0/zip"
+NGC_CLI_API_KEY=${NGC_CLI_API_KEY:=NotSpecified}
+NGC_CLI_ORG=${NGC_CLI_ORG:=nvidian}
+NGC_CLI_TEAM=${NGC_CLI_TEAM:=NotSpecified}
+NGC_CLI_FORMAT_TYPE=${NGC_CLI_FORMAT_TYPE:=ascii}
 
 # if $LOCAL_ENV file exists, source it to specify my environment
 if [ -e ./$LOCAL_ENV ]
@@ -129,13 +144,19 @@ if [ $write_env -eq 1 ]; then
     echo PROJECT_MOUNT=${PROJECT_MOUNT} >> $LOCAL_ENV
     echo PROJECT_PATH=${PROJECT_PATH} >> $LOCAL_ENV
     echo DATA_PATH=${DATA_PATH} >> $LOCAL_ENV
+    echo MODEL_PATH=${MODEL_PATH} >> $LOCAL_ENV
     echo RESULT_PATH=${RESULT_PATH} >> $LOCAL_ENV
     echo WANDB_API_KEY=${WANDB_API_KEY} >> $LOCAL_ENV
     echo JUPYTER_PORT=${JUPYTER_PORT} >> $LOCAL_ENV
     echo REGISTRY=${REGISTRY} >> $LOCAL_ENV
     echo REGISTRY_USER=${REGISTRY_USER} >> $LOCAL_ENV
-    echo REGISTRY_ACCESS_TOKEN=${REGISTRY_ACCESS_TOKEN} >> $LOCAL_ENV
+    echo GITHUB_BRANCH=${GITHUB_BRANCH} >> $LOCAL_ENV
+    echo GITHUB_REPO=${GITHUB_REPO} >> $LOCAL_ENV
     echo DEV_CONT_NAME=${DEV_CONT_NAME} >> $LOCAL_ENV
+    echo NGC_CLI_API_KEY=${NGC_CLI_API_KEY} >> $LOCAL_ENV
+    echo NGC_CLI_ORG=${NGC_CLI_ORG} >> $LOCAL_ENV
+    echo NGC_CLI_TEAM=${NGC_CLI_TEAM} >> $LOCAL_ENV
+    echo NGC_CLI_FORMAT_TYPE=${NGC_CLI_FORMAT_TYPE} >> $LOCAL_ENV
 fi
 
 # Mount paths
@@ -145,10 +166,9 @@ RESULT_MOUNT_PATH='/result/nemo_experiments'
 # Additional variables when send in .env file, is used in the script:
 # BASE_IMAGE        Custom Base image for building.
 # NEMO_PATH         Path to NeMo source cdoe.
-# CHEM_BENCH_PATH   Path to chembench source code. Used for generating benchmark
-#                   data
-# MODEL_PATH        Local dir to be mounted to /model
-# TOKENIZERS_PATH   Local dir to be mounted to /tokenizers
+# CHEM_BENCH_PATH   Path to chembench source code. Used for generating benchmark data
+# MODEL_PATH        Workstation directory to be mounted to /model inside container
+# TOKENIZERS_PATH   Workstation directory to be mounted to /tokenizers inside container
 
 # Compare Docker version to find Nvidia Container Toolkit support.
 # Please refer https://github.com/NVIDIA/nvidia-docker
@@ -184,58 +204,24 @@ DOCKER_BUILD_CMD="docker build --network host \
     -f setup/Dockerfile"
 
 
-
-function download_model() {
-    local model_source=$1
-    local model_target=$2
-    set -e
-    echo "Downloading model ${model_source} to ${model_target}..."
-    local TMP_ROOT=`mktemp -d`
-    local TMP_DOWNLOAD_LOC="${TMP_ROOT}/bionemo_downloads"
-    rm -rf ${TMP_DOWNLOAD_LOC}
-    mkdir -p ${TMP_DOWNLOAD_LOC}
-
-    if [[ ${model_source} = http* ]]; then
-        wget -q --show-progress ${model_source} -O ${TMP_DOWNLOAD_LOC}/model.zip
-        download_path=$(unzip -o ${TMP_DOWNLOAD_LOC}/model.zip -d ${PROJECT_PATH}/models | grep "inflating:")
-        download_path=$(echo ${download_path} | cut -d ":" -f 2)
-        model_basename=$(basename ${download_path})
-        downloaded_model_file="${PROJECT_PATH}/models/${model_basename}"
-    else
-        download_path=$(ngc registry model download-version \
-            --dest ${TMP_DOWNLOAD_LOC} \
-            "${model_source}" | grep 'Downloaded local path:')
-
-        download_path=$(echo ${download_path} | cut -d ":" -f 2)
-        model_basename=$(basename ${download_path} | cut -d "_" -f 1)
-        cp ${download_path}/${model_basename}".nemo" ${PROJECT_PATH}/models
-        downloaded_model_file="${PROJECT_PATH}/models/${model_basename}.nemo"
-    fi
-    echo "Linking ${downloaded_model_file} to ${model_target}..."
-    mkdir -p $(dirname ${model_target})
-    cp ${downloaded_model_file} ${model_target}
-    # This file is created to record the version of model
-    mkdir -p ${PROJECT_PATH}/models/version
-    touch ${PROJECT_PATH}/models/version/${model_source//[\/]/_}.version
-    set +e
+download() {
+    mkdir -p ${MODEL_PATH}
+    download_bionemo_models ${MODEL_PATH}
 }
 
 
-function download() {
-    download_model \
-        "${MEGAMOLBART_MODEL}" \
-        "${PROJECT_PATH}/models/molecule/megamolbart/megamolbart.nemo"
-    download_model \
-        "${ESM1NV_MODEL}" \
-        "${PROJECT_PATH}/models/protein/esm1nv/esm1nv.nemo"
-    download_model \
-        "${PROTT5NV_MODEL}" \
-        "${PROJECT_PATH}/models/protein/prott5nv/prott5nv.nemo"
+docker_login() {
+    local ngc_api_key_is_set_=$(ngc_api_key_is_set)
+    if [ $ngc_api_key_is_set_ == true ]; then
+        docker login ${REGISTRY} -u ${REGISTRY_USER} -p ${NGC_CLI_API_KEY}
+    else
+        echo 'Docker login has been skipped. Container pushing and pulling may fail.'
+    fi
 }
 
 
 pull() {
-    docker login ${REGISTRY} -u ${REGISTRY_USER} -p ${REGISTRY_ACCESS_TOKEN}
+    docker_login
     docker pull ${BIONEMO_IMAGE}
     exit
 }
@@ -317,7 +303,7 @@ push() {
 
     local IMG_NAME=($(echo ${BIONEMO_IMAGE} | tr ":" "\n"))
 
-    docker login ${REGISTRY} -u ${REGISTRY_USER} -p ${REGISTRY_ACCESS_TOKEN}
+    docker_login
     docker push ${IMG_NAME[0]}:latest
     docker push ${BIONEMO_IMAGE}
 
@@ -343,7 +329,7 @@ push() {
 setup() {
     mkdir -p ${DATA_PATH}
     mkdir -p ${RESULT_PATH}
-
+    mkdir -p ${MODEL_PATH}
     DEV_PYTHONPATH=""
 
     if [ ! -z "${NEMO_PATH}" ];
@@ -352,14 +338,9 @@ setup() {
         DEV_PYTHONPATH="${DEV_PYTHONPATH}:/workspace/nemo"
     fi
 
-        # For dev use the models in /models dir
-    if [ ! -z "${MODEL_PATH}" ];
-    then
-        DOCKER_CMD="${DOCKER_CMD} -v ${MODEL_PATH}:/model "
-    else
-        DOCKER_CMD="${DOCKER_CMD} -v ${PROJECT_PATH}/models:/model "
-    fi
-        # For dev use the tokenizers in /tokenizers dir
+    DOCKER_CMD="${DOCKER_CMD} -v ${MODEL_PATH}:/model "
+    
+    # For dev use the tokenizers in /tokenizers dir
     if [ ! -z "${TOKENIZERS_PATH}" ];
     then
         DOCKER_CMD="${DOCKER_CMD} -v ${TOKENIZERS_PATH}:/tokenizers "
@@ -373,7 +354,12 @@ setup() {
         DEV_PYTHONPATH="${DEV_PYTHONPATH}:/workspace/chembench"
     fi
 
+    DOCKER_CMD="${DOCKER_CMD} --env MODEL_PATH=/model"
     DOCKER_CMD="${DOCKER_CMD} --env WANDB_API_KEY=$WANDB_API_KEY"
+    DOCKER_CMD="${DOCKER_CMD} --env NGC_CLI_API_KEY=$NGC_CLI_API_KEY"
+    DOCKER_CMD="${DOCKER_CMD} --env NGC_CLI_ORG=$NGC_CLI_ORG"
+    DOCKER_CMD="${DOCKER_CMD} --env NGC_CLI_TEAM=$NGC_CLI_TEAM"
+    DOCKER_CMD="${DOCKER_CMD} --env NGC_CLI_FORMAT_TYPE=$NGC_CLI_FORMAT_TYPE"
 
     # For development work
     echo "Mounting ${PROJECT_PATH} at ${PROJECT_MOUNT} for development"
@@ -435,6 +421,7 @@ Available options are -a(--additional-args), -i(--image), -d(--demon) and -c(--c
     exit
 }
 
+
 run() {
     CMD='bash'
     while [[ $# -gt 0 ]]; do
@@ -456,6 +443,7 @@ run() {
     set +x
     exit
 }
+
 
 attach() {
     set -x

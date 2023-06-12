@@ -1,6 +1,6 @@
 #!/bin/bash
-
-# Copyright (c) 2022, NVIDIA CORPORATION.
+#
+# Copyright (c) 2023, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,14 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set -e
-set -x
-
-PACKAGE=$1
-
-if [ ${PACKAGE} -eq 1 ]
-then
-    echo "Coping model from /tmp/models/ ..."
-    cp -r /tmp/model/* /model
-    tree /model/
-fi
+# BioNeMo Models
+ESM1NV_MODEL="t6a4nuz8vrsr/esm1nv:0.1.0"
+PROTT5NV_MODEL="t6a4nuz8vrsr/prott5nv:0.1.0"
+MEGAMOLBART_MODEL="https://api.ngc.nvidia.com/v2/models/nvidia/clara/megamolbart_0_2/versions/0.2.0/zip"
