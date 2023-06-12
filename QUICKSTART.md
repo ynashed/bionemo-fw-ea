@@ -13,17 +13,24 @@ NeMo provides optional logging with Tensorboard and Weights and Biases. Use of W
 The [`launch.sh` script](./launch.sh) can be used for a number of tasks, including pulling and running the BioNeMo container. First, clone this repo to your workstation to create the project directory. The script requires a settings file called `.env`. This file will automatically be created in the project directory if it does not exist on first launch, but below is an example of the file. If created manually, it should be named `.env` and placed inside the project directory. All of the variables are described in the `usage` section of [`launch.sh`](./launch.sh) in this directory. Missing variables will be substituted for the defaults in the script.
 
 ```bash
-BIONEMO_IMAGE=nvcr.io/t6a4nuz8vrsr/bionemo:latest                   # Container with tag
-PROJECT_MOUNT=/workspace/bionemo                                    # Location of library in container /workspace/bionemo for dev work or /opt/nvidia/bionemo for non-dev use                                      
-PROJECT_PATH=$(pwd)                                                 # Path of env config and optional development code
-DATA_PATH=${HOME}/data                                              # Local Path to save downloaded and processed data
-RESULT_PATH=${HOME}/result/bionemo_experiments                      # Path for training results
-WANDB_API_KEY=$(grep password $HOME/.netrc | cut -d' ' -f4)         # Requires WandB API key configuration
-JUPYTER_PORT=8888                                                   # Jupyter port for inference notebooks
-REGISTRY_ACCESS_TOKEN=$(grep -m 1 apikey ~/.ngc/config | cut -d' ' -f3) # Requires NGC cli configuration
-REGISTRY_USER=$oauthtoken                                           # Only required for registry login
-REGISTRY=NotSpecified                                               # Only required for registry login
+BIONEMO_IMAGE=nvcr.io/nvidian/clara-lifesciences/bionemo_ci:latest       # Container with tag
+BIONEMO_PATH=/workspace/bionemo                                          # Location of code to be used /workspace/bionemo or /opt/nvidia/bionemo
+PROJECT_PATH=$(pwd)                                                      # Path of env config and optional development code
+DATA_PATH=${HOME}/data                                                   # Local path to save downloaded and processed data
+RESULT_PATH=${HOME}/result/bionemo_experiments                           # Path for training results
+WANDB_API_KEY=$(grep password $HOME/.netrc | cut -d' ' -f4)              # WandB logging requires API key configuration
+JUPYTER_PORT=8888                                                        # Jupyter port for inference notebooks
+PROJECT_MOUNT=/workspace/bionemo                                         # Location of library in container /workspace/bionemo for dev work or /opt/nvidia/bionemo for non-dev use                                      
+GITHUB_ACCESS_TOKEN=INSERT_GITHUB_ACCESS_TOKEN_HERE                      # Only required for building container from a private branch
+GITHUB_BRANCH=v0.3.0_ea1                                                 # GitLab branch
+REGISTRY=nvcr.io                                                         # Only required for registry login
+REGISTRY_USER='$oauthtoken'                                              # Only required for registry login
+NGC_CLI_API_KEY=$(grep -m 1 apikey ~/.ngc/config | head -n 1 | cut -d' ' -f3) # Requires NGC cli configuration
+NGC_CLI_ORG=nvidian
+NGC_CLI_TEAM=clara-lifesciences
+NGC_CLI_FORMAT_TYPE=ascii
 ```
+
 
 ## Docker Container
 
@@ -112,4 +119,4 @@ NeMo can create a Tensorboard file in the results directory, if logging to Tenso
 
 ## Inference 
 
-Trained BioNeMo models are provided on NGC for use. These models can be loaded with a gRPC interface provided in BioNeMo. Example notebooks are provided in the corresponding `nbs` directory in `examples`, e.g. `examples/molecule/megamolbart/nbs`. First, download the pretrained models with `bash launch.sh download`, which will require an [NGC API key](https://docs.nvidia.com/ngc/ngc-overview/index.html#generating-api-key) to be configured. Then, to launch the gRPC interface and a Jupyter notebook service in the corresponding directory, ensure that `JUPYTER_PORT` is set correctly in the `.env` file, then run `bash.launch.sh dev -c <model_name>`, where `<model_name>` is one of the following: `megamolbart`, `prott5nv`, `esm-1nv`. Then open a browser at `http://<<HOST_NAME>>:$JUPYTER_PORT` to execute the notebook.
+Trained BioNeMo models are provided on NGC for use. These models can be loaded with a gRPC interface provided in BioNeMo. Example notebooks are provided in the corresponding `nbs` directory in `examples`, e.g. `examples/molecule/megamolbart/nbs`. First, download the pretrained models with `bash launch.sh download`, which will require an [NGC API key](https://docs.nvidia.com/ngc/ngc-overview/index.html#generating-api-key) to be configured. Alternatively, the models can be downloaded inside the container by running `source download_models.sh && download_bionemo_models`. Then, to launch the gRPC interface and a Jupyter notebook service in the corresponding directory, ensure that `JUPYTER_PORT` is set correctly in the `.env` file, then run `bash.launch.sh dev -c <model_name>`, where `<model_name>` is one of the following: `megamolbart`, `prott5nv`, `esm-1nv`. Then open a browser at `http://<<HOST_NAME>>:$JUPYTER_PORT` to execute the notebook.

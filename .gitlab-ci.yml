@@ -69,20 +69,19 @@ build:
 
 
 get-checkpoints:
-  image: ubuntu:20.04
+  image:
+    name: "$PIPELINE_TAG"
+    entrypoint: [""]
   stage: download
   variables:
     NGC_CLI_FORMAT_TYPE: ascii
     NGC_CLI_ORG: nvidian
     NGC_CLI_TEAM: clara-lifesciences
+    MODEL_PATH: models
   rules:
     - when: on_success
-  before_script:
-    - apt update && apt install -y wget unzip
-    - wget --content-disposition https://ngc.nvidia.com/downloads/ngccli_linux.zip && unzip ngccli_linux.zip && chmod u+x ngc-cli/ngc
-    - export PATH=$PATH:$PWD/ngc-cli
   script:
-    - ./launch.sh download
+    - source download_models.sh && download_bionemo_models
   artifacts:
     paths:
       - models

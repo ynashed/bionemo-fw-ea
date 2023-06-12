@@ -42,15 +42,19 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # install Google Cloud SDK so that users can authethicate while pulling data from GCP buckets
-RUN mkdir /google-sdk && cd /google-sdk && curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-427.0.0-linux-x86_64.tar.gz \
-    && tar -xvf google-cloud-cli-427.0.0-linux-x86_64.tar.gz && ./google-cloud-sdk/install.sh -q --rc-path /etc/bash.bashrc
+RUN mkdir /google-sdk && cd /google-sdk && curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-427.0.0-linux-x86_64.tar.gz && \
+    tar -xvf google-cloud-cli-427.0.0-linux-x86_64.tar.gz && ./google-cloud-sdk/install.sh -q --rc-path /etc/bash.bashrc
 
 COPY setup/requirements.txt /tmp/requirements.txt
 RUN pip3 install -r /tmp/requirements.txt
 
-## PySMILES
-RUN git clone https://github.com/MolecularAI/pysmilesutils.git --branch master /opt/pysmilesutils \
-    && cd /opt/pysmilesutils && pip install .
+## Install NGC cli in container for artifact download
+ENV NGC_CLI_INSTALL_PREFIX=/usr/local/bin
+RUN wget --directory-prefix=/tmp --content-disposition https://ngc.nvidia.com/downloads/ngccli_linux.zip && \
+    unzip /tmp/ngccli_linux.zip -d ${NGC_CLI_INSTALL_PREFIX} && \
+    chmod u+x ${NGC_CLI_INSTALL_PREFIX}/ngc-cli/ngc && \
+    ln -fns  ${NGC_CLI_INSTALL_PREFIX}/ngc-cli/ngc ${NGC_CLI_INSTALL_PREFIX}/ngc && \
+    rm /tmp/ngccli_linux.zip
 
 # Recompile Megatron helpers -- NOTE this will need to be done if PYTHONPATH changes later
 RUN NEMO_PATH=$(python -c 'import nemo; print(nemo.__path__[0])') && \
