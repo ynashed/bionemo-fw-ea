@@ -85,8 +85,6 @@ variables:
         Container registry URL. e.g., nvcr.io. Only required to push/pull containers.
     REGISTRY_USER
         container registry username. e.g., '$oauthtoken' for registry access. Only required to push/pull containers.
-    GITHUB_BRANCH
-        Git branch to use for building a container, default is main
     DEV_CONT_NAME
         Docker name for development container
     NGC_CLI_API_KEY
@@ -119,8 +117,6 @@ WANDB_API_KEY=${WANDB_API_KEY:=NotSpecified}
 JUPYTER_PORT=${JUPYTER_PORT:=8888}
 REGISTRY=${REGISTRY:=NotSpecified}
 REGISTRY_USER=${REGISTRY_USER:='$oauthtoken'}
-GITHUB_BRANCH=${GITHUB_BRANCH:=main}
-GITHUB_REPO=${GITHUB_REPO:=gitlab-master.nvidia.com:12051/clara-discovery/bionemo.git}
 DEV_CONT_NAME=${DEV_CONT_NAME:=bionemo}
 NGC_CLI_API_KEY=${NGC_CLI_API_KEY:=NotSpecified}
 NGC_CLI_ORG=${NGC_CLI_ORG:=nvidian}
@@ -150,8 +146,6 @@ if [ $write_env -eq 1 ]; then
     echo JUPYTER_PORT=${JUPYTER_PORT} >> $LOCAL_ENV
     echo REGISTRY=${REGISTRY} >> $LOCAL_ENV
     echo REGISTRY_USER=${REGISTRY_USER} >> $LOCAL_ENV
-    echo GITHUB_BRANCH=${GITHUB_BRANCH} >> $LOCAL_ENV
-    echo GITHUB_REPO=${GITHUB_REPO} >> $LOCAL_ENV
     echo DEV_CONT_NAME=${DEV_CONT_NAME} >> $LOCAL_ENV
     echo NGC_CLI_API_KEY=${NGC_CLI_API_KEY} >> $LOCAL_ENV
     echo NGC_CLI_ORG=${NGC_CLI_ORG} >> $LOCAL_ENV
@@ -161,13 +155,11 @@ fi
 
 # Mount paths
 DATA_MOUNT_PATH="/data"
-RESULT_MOUNT_PATH='/result/nemo_experiments'
+RESULT_MOUNT_PATH="/result/nemo_experiments"
 
-# Additional variables when send in .env file, is used in the script:
+# Additional variables that will be used in the script when sent in the .env file:
 # BASE_IMAGE        Custom Base image for building.
-# NEMO_PATH         Path to NeMo source cdoe.
-# CHEM_BENCH_PATH   Path to chembench source code. Used for generating benchmark data
-# MODEL_PATH        Workstation directory to be mounted to /model inside container
+# NEMO_HOME         Path to external copy of NeMo source code, which is mounted at /workspace/nemo. This allows a different version of NeMo to be used with code.
 # TOKENIZERS_PATH   Workstation directory to be mounted to /tokenizers inside container
 
 # Compare Docker version to find Nvidia Container Toolkit support.
@@ -332,9 +324,10 @@ setup() {
     mkdir -p ${MODEL_PATH}
     DEV_PYTHONPATH=""
 
-    if [ ! -z "${NEMO_PATH}" ];
+    if [ ! -z "${NEMO_HOME}" ];
     then
-        DOCKER_CMD="${DOCKER_CMD} -v ${NEMO_PATH}:/workspace/nemo "
+        DOCKER_CMD="${DOCKER_CMD} -v ${NEMO_HOME}:/workspace/nemo "
+        DOCKER_CMD="${DOCKER_CMD} --env NEMO_HOME=${NEMO_HOME} "
         DEV_PYTHONPATH="${DEV_PYTHONPATH}:/workspace/nemo"
     fi
 
@@ -346,12 +339,6 @@ setup() {
         DOCKER_CMD="${DOCKER_CMD} -v ${TOKENIZERS_PATH}:/tokenizers "
     else
         DOCKER_CMD="${DOCKER_CMD} -v ${PROJECT_PATH}/tokenizers:/tokenizers "
-    fi
-
-    if [ ! -z "${CHEM_BENCH_PATH}" ];
-    then
-        DOCKER_CMD="${DOCKER_CMD} -v ${CHEM_BENCH_PATH}:/workspace/chembench "
-        DEV_PYTHONPATH="${DEV_PYTHONPATH}:/workspace/chembench"
     fi
 
     DOCKER_CMD="${DOCKER_CMD} --env MODEL_PATH=/model"

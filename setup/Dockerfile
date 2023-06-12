@@ -56,7 +56,7 @@ RUN wget --directory-prefix=/tmp --content-disposition https://ngc.nvidia.com/do
     ln -fns  ${NGC_CLI_INSTALL_PREFIX}/ngc-cli/ngc ${NGC_CLI_INSTALL_PREFIX}/ngc && \
     rm /tmp/ngccli_linux.zip
 
-# Recompile Megatron helpers -- NOTE this will need to be done if PYTHONPATH changes later
+# Recompile Megatron helpers -- NOTE this may need to be done before running job later
 RUN NEMO_PATH=$(python -c 'import nemo; print(nemo.__path__[0])') && \
    cd ${NEMO_PATH}/collections/nlp/data/language_modeling/megatron && \
    make
@@ -70,10 +70,10 @@ ARG BIONEMO_HOME=/opt/nvidia/bionemo
 ENV BIONEMO_HOME=${BIONEMO_HOME}
 
 # Copy the repo
-# TODO make sure that we don't include internal stuff
 COPY ./ ${BIONEMO_HOME}
 
-ARG NEMO_HOME=/opt/nvidia/nemo
+# NEMO_HOME must be unset for default NeMo install in /usr/local/lib/python3.8/dist-packages/nemo
+ARG NEMO_HOME
 ENV NEMO_HOME=${NEMO_HOME}
 
 ENV PYTHONPATH=${BIONEMO_HOME}:${BIONEMO_HOME}/generated:${NEMO_HOME}:$PYTHONPATH
