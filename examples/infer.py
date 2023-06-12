@@ -15,6 +15,8 @@
 
 """
 Runs inference over all models. Supports extracting embeddings, and hiddens.
+
+NOTE: If out of memory (OOM) error occurs, try spliting the data to multiple smaller files.
 """
 
 import pickle
