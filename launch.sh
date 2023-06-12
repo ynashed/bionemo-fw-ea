@@ -83,8 +83,6 @@ variables:
         container registry username. e.g., '$oauthtoken' for registry access. Only required to push/pull containers.
     REGISTRY_ACCESS_TOKEN
         container registry access token. e.g., Ckj53jGK... Only required to push/pull containers.
-    GITHUB_BRANCH
-        Git branch to use for building a container, default is main
 
 EOF
     exit
@@ -107,8 +105,6 @@ JUPYTER_PORT=${JUPYTER_PORT:=8888}
 REGISTRY=${REGISTRY:=NotSpecified}
 REGISTRY_USER=${REGISTRY_USER:='$oauthtoken'}
 REGISTRY_ACCESS_TOKEN=${REGISTRY_ACCESS_TOKEN:=NotSpecified}
-GITHUB_BRANCH=${GITHUB_BRANCH:=main}
-GITHUB_REPO=${GITHUB_REPO:=gitlab-master.nvidia.com:12051/clara-discovery/bionemo.git}
 DEV_CONT_NAME=${DEV_CONT_NAME:=bionemo}
 
 # Model paths
@@ -139,8 +135,6 @@ if [ $write_env -eq 1 ]; then
     echo REGISTRY=${REGISTRY} >> $LOCAL_ENV
     echo REGISTRY_USER=${REGISTRY_USER} >> $LOCAL_ENV
     echo REGISTRY_ACCESS_TOKEN=${REGISTRY_ACCESS_TOKEN} >> $LOCAL_ENV
-    echo GITHUB_BRANCH=${GITHUB_BRANCH} >> $LOCAL_ENV
-    echo GITHUB_REPO=${GITHUB_REPO} >> $LOCAL_ENV
     echo DEV_CONT_NAME=${DEV_CONT_NAME} >> $LOCAL_ENV
 fi
 
@@ -184,11 +178,8 @@ DOCKER_CMD="docker run \
 
 # add current git hash as docker image metadata
 BIONEMO_GIT_HASH=`git rev-parse --short HEAD`
-DOCKER_BUILD_CMD="docker build --network host --ssh default \
+DOCKER_BUILD_CMD="docker build --network host \
     -t ${BIONEMO_IMAGE} \
-    --build-arg GITHUB_BRANCH=${GITHUB_BRANCH} \
-    --build-arg GITHUB_REPO=${GITHUB_REPO} \
-    --no-cache \
     --label com.nvidia.bionemo.git_hash=${BIONEMO_GIT_HASH} \
     -f setup/Dockerfile"
 
@@ -253,11 +244,16 @@ pull() {
 build() {
     local IMG_NAME=($(echo ${BIONEMO_IMAGE} | tr ":" "\n"))
     local PACKAGE=0
+    local CLEAN=0
 
     while [[ $# -gt 0 ]]; do
         case $1 in
             -p|--pkg)
                 PACKAGE=1
+                shift
+                ;;
+            -c|--clean)
+                CLEAN=1
                 shift
                 ;;
             -b|--base-image)
@@ -279,16 +275,17 @@ build() {
         set +e
     fi
 
+    if [ ${CLEAN} -eq 1 ]
+    then
+        DOCKER_BUILD_CMD="${DOCKER_BUILD_CMD} --no-cache"
+    fi
+
     if [ ! -z "${BASE_IMAGE}" ];
     then
         DOCKER_BUILD_CMD="${DOCKER_BUILD_CMD} --build-arg BASE_IMAGE=${BASE_IMAGE}"
     fi
 
     DOCKER_BUILD_CMD="${DOCKER_BUILD_CMD} -t ${IMG_NAME[0]}:latest"
-
-    # Set up SSH agent for cloning private repo in docker build
-    eval "$(ssh-agent -s)"
-    find ~/.ssh/ -type f -exec grep -l "PRIVATE" {} \; | xargs ssh-add &> /dev/null
 
     echo "Building BioNeMo training container..."
     set -x
@@ -387,7 +384,11 @@ setup() {
     DOCKER_CMD="${DOCKER_CMD} -u $(id -u):$(id -g) "
 
     # For dev mode, mount the local code for development purpose
+    # and mount .ssh dir for working with git
     if [[ $1 == "dev" ]]; then
+        echo "Mounting ~/.ssh up for development"
+        DOCKER_CMD="$DOCKER_CMD -v ${HOME}/.ssh:${HOME}/.ssh:ro"
+
         echo "Prepending ${PROJECT_MOUNT} to PYTHONPATH for development"
         DEV_PYTHONPATH="${PROJECT_MOUNT}:${PROJECT_MOUNT}/generated:${DEV_PYTHONPATH}"
         DOCKER_CMD="${DOCKER_CMD} --env PYTHONPATH=${DEV_PYTHONPATH}"

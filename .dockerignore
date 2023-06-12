@@ -1,10 +1,15 @@
-__pycache__
-*.pyc
-*.pyo
-*.pyd
-*.nemo
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.pyd
+
+# model files
+**/*.nemo
+**/*.version
+./models/
+
 .Python
-env
+.env
 pip-log.txt
 pip-delete-this-directory.txt
 .tox
@@ -13,8 +18,38 @@ pip-delete-this-directory.txt
 .cache
 nosetests.xml
 coverage.xml
-*,cover
+*.cover
 *.log
 .git
 ./.vscode-server
+.pytest_cache
+.gnupg
+
+# data file indexes
+**/*.idx
+**/*.idx.npy
+**/*.idx.info
+**/*_indexmap_*.npy
+
+# experiments artifacts
+**/nemo_experiments/
+**/navigator_workspace/
+**/tap_results/
+**/.ipynb_checkpoints/
+**/.ipython
 ./outputs
+.jupyter
+**/lightning_logs
+**/*.npy
+
+# internal
+ci/
+internal/
+
+# configs
+.config/
+.local/
+.ngc
+.bash_history
+.ssh
+.gitconfig
