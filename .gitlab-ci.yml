@@ -15,15 +15,22 @@ services:
   - docker:20.10.16-dind
 
 variables:
+  NGC_REGISTRY_IMAGE: "nvcr.io/nvidian/clara-lifesciences/bionemo"
+  DOCKER_TAG_PREFIX:
+    value: "$NGC_REGISTRY_IMAGE"
+    options:
+      - "$CI_REGISTRY_IMAGE"
+      - "$NGC_REGISTRY_IMAGE"
+    description: "Allows to control wether NGC or gitlab registry is used"
   DOCKER_HOST: tcp://docker:2376
   DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
   DOCKER_TLS_VERIFY: 1
   DOCKER_TLS_CERTDIR: "/certs"
   DOCKER_BUILDKIT: 1
   BUILDKIT_PROGRESS: plain
-  PIPELINE_TAG: "$CI_REGISTRY_IMAGE:pipeline-$CI_PIPELINE_ID"
-  SHA_TAG: "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA-$CI_COMMIT_BRANCH"
-  LATEST_TAG: "$CI_REGISTRY_IMAGE:$CI_COMMIT_BRANCH-latest"
+  PIPELINE_TAG: "$DOCKER_TAG_PREFIX:pipeline-$CI_PIPELINE_ID"
+  SHA_TAG: "$DOCKER_TAG_PREFIX:$CI_COMMIT_SHORT_SHA-$CI_COMMIT_BRANCH"
+  LATEST_TAG: "$DOCKER_TAG_PREFIX:$CI_COMMIT_BRANCH-latest"
   NGC_TAG: "nvcr.io/nvidian/clara-lifesciences/bionemo_ci:latest"
   NEMO_NIGHTLY_TAG: "nvcr.io/nvidian/nemo-nightly:latest-nightly-main"
   NIGHTLY:
