@@ -60,14 +60,6 @@ class MegaMolBARTRetroModel(MegaMolBARTModelBase):
             consumed_samples = 0
             self._test_dl = self.build_data_loader(self._test_ds, consumed_samples, num_workers=0)
 
-    def validation_step(self, batch, batch_idx):
-        logs = super().validation_step(batch, batch_idx)
-
-        for log_name, log_value in logs.items():
-            self.log('val_' + log_name + '_step', log_value, prog_bar=True, rank_zero_only=True)
-
-        return logs
-
     def predict_step(self, batch: List[torch.Tensor], batch_idx: int, dataloader_idx: Optional[int] = None) -> dict:
         self.freeze()
         tokens_enc, _, _, _, enc_mask, _ = self.process_global_batch(batch)
