@@ -1,8 +1,6 @@
 ---
 default:
   image: docker:20.10.16
-  tags:
-    - kamino-dev-linux-dind
 
 
 stages:
@@ -42,6 +40,8 @@ variables:
 
 
 .docker-setup:
+  tags:
+    - dind
   before_script:
     - until docker info; do sleep 1; done
     - mkdir -p $HOME/.docker
@@ -79,6 +79,8 @@ get-checkpoints:
   image:
     name: "$PIPELINE_TAG"
     entrypoint: [""]
+  tags:
+    - generic
   stage: download
   variables:
     NGC_CLI_FORMAT_TYPE: ascii
@@ -115,6 +117,8 @@ get-checkpoints:
 unit-test-cpu:
   extends:
     - .unit-tests-common
+  tags:
+    - cpu
   script:
     - !reference [.unit-tests-common, script]
     - pytest -v -m "not needs_gpu"
@@ -124,7 +128,7 @@ unit-test-gpu:
   extends:
   - .unit-tests-common
   tags:
-    - kamino-dev-gpu
+    - gpu
   script:
     - !reference [.unit-tests-common, script]
     - pytest -v -m "needs_gpu" -k "not test_model_training"
