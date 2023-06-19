@@ -15,7 +15,7 @@ services:
 variables:
   NGC_REGISTRY_IMAGE: "nvcr.io/nvidian/clara-lifesciences/bionemo"
   DOCKER_TAG_PREFIX:
-    value: "$NGC_REGISTRY_IMAGE"
+    value: "$CI_REGISTRY_IMAGE"
     options:
       - "$CI_REGISTRY_IMAGE"
       - "$NGC_REGISTRY_IMAGE"
