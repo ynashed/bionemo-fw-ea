@@ -75,7 +75,7 @@ build:
     - when: manual
 
 
-get-checkpoints:
+.get-checkpoints:
   image:
     name: "$PIPELINE_TAG"
     entrypoint: [""]
@@ -106,10 +106,10 @@ get-checkpoints:
     - when: on_success
   dependencies:
     - build
-    - get-checkpoints
-  before_script:
-    - mkdir /model
-    - cp -r models/* /model
+    # - get-checkpoints
+  # before_script:
+  #   - mkdir /model
+  #   - cp -r models/* /model
   script:
     - cd /opt/nvidia/bionemo/
 
