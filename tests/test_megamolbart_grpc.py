@@ -65,6 +65,7 @@ def get_hidden_states(smis, grpc_stub):
     return hidden_states, masks
 
 
+@pytest.mark.needs_checkpoint
 @pytest.mark.needs_gpu
 @pytest.mark.parametrize('smis', [SMILES])
 def test_smis_to_embedding(grpc_server, grpc_stub, smis):
@@ -75,6 +76,7 @@ def test_smis_to_embedding(grpc_server, grpc_stub, smis):
     assert embeddings.shape == (2, 512)
 
 
+@pytest.mark.needs_checkpoint
 @pytest.mark.needs_gpu
 @pytest.mark.parametrize('smis', [SMILES])
 def test_smis_to_hidden(grpc_server, grpc_stub, smis):
@@ -83,6 +85,7 @@ def test_smis_to_hidden(grpc_server, grpc_stub, smis):
     assert masks.shape == (2, 45)
 
 
+@pytest.mark.needs_checkpoint
 @pytest.mark.needs_gpu
 @pytest.mark.parametrize('smis', [SMILES])
 def test_hidden_to_smis(grpc_server, grpc_stub, smis):

@@ -45,6 +45,7 @@ def grpc_stub():
     return GenerativeSamplerStub(channel)
 
 
+@pytest.mark.needs_checkpoint
 @pytest.mark.needs_gpu
 @pytest.mark.parametrize('seqs', [SEQS])
 def test_seq_to_embedding(grpc_server, grpc_stub, seqs):
