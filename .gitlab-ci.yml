@@ -121,7 +121,7 @@ unit-test-cpu:
     - cpu
   script:
     - !reference [.unit-tests-common, script]
-    - pytest -v -m "not needs_gpu"
+    - pytest -v -m "not needs_gpu and not needs_checkpoint"
 
 
 unit-test-gpu:
@@ -131,7 +131,7 @@ unit-test-gpu:
     - gpu
   script:
     - !reference [.unit-tests-common, script]
-    - pytest -v -m "needs_gpu" -k "not test_model_training"
+    - pytest -v -m "needs_gpu and not needs_checkpoint" -k "not test_model_training"
 
 
 dev-deploy:
