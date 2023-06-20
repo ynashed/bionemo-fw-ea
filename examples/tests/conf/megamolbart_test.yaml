@@ -24,6 +24,9 @@ model:
     data_sep: ','
     header_lines: 1
     num_workers: 10
+  
+  dwnstr_task_validation:
+    enabled: False
 
 exp_manager:
   exp_dir: /tmp/nemo_experiments/megamolbart_pretrain

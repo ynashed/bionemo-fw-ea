@@ -43,21 +43,20 @@ model:
   data:
     # Preprocessing data params
     links_file: /workspace/bionemo/examples/molecule/megamolbart/dataset/PhysChem-downloader.txt
-    dataset_path: /workspace/bionemo/physchem
+    dataset_path: /workspace/bionemo/examples/tests/test_data/molecule/phys_chem
     split_data: True
     val_frac: 0.15 # proportion of samples used for validation set
     test_frac: 0.15 # proportion of samples used for test set
 
     # Finetuning data params
-    smis_column: 'smiles'
+    task_type: 'regression'
+    sequence_column: 'smiles'
     target_column: 'expt'
     emb_batch_size: ${model.micro_batch_size}
-    train_ds: 
-      data_file: /workspace/bionemo/examples/tests/test_data/molecule/phys_chem/train/train.csv
-    validation_ds: 
-      data_file: /workspace/bionemo/examples/tests/test_data/molecule/phys_chem/val/val.csv 
-    test_ds: 
-      data_file: /workspace/bionemo/examples/tests/test_data/molecule/phys_chem/test/test.csv
+    dataset:
+      train: train
+      val: val
+      test: test
     num_workers: 0
   
   finetuning_optim:

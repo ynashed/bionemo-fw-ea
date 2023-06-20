@@ -20,7 +20,7 @@ from functools import lru_cache
 from nemo.utils.model_utils import import_class_by_path
 from bionemo.model.core import MLPModel
 from bionemo.model.core.encoder_finetuning import EncoderFineTuning
-from bionemo.data.finetune_dataset import FineTuneDataModule
+from bionemo.data.datasets.single_value_dataset import SingleValueDataModule
 
 class FineTuneMegaMolBART(EncoderFineTuning):
 
@@ -66,7 +66,7 @@ class FineTuneMegaMolBART(EncoderFineTuning):
             model = self.encoder_model
         else:
             model = None
-        self.data_module = FineTuneDataModule(
+        self.data_module = SingleValueDataModule(
             self.cfg, self.trainer, model=model
         )
 

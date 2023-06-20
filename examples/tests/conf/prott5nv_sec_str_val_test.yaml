@@ -31,47 +31,44 @@ model:
     data_col: 3 # 0-based
     data_sep: ','
     header_lines: 1
-  validation:
-    validation_enabled: True
-    datasets:
-      - name: SSPred
-        class: SSPredictionCallback
-        enabled: True
-        infer_target: bionemo.model.protein.prott5nv.infer.ProtT5nvInference
-        emb_type: "T5"
-        emb_batch_size: 256
-        max_seq_length: ${model.seq_length}
-        batch_size: 256
-        num_epochs: 5
-        check_val_every_n_epoch: 1
-        shuffle: False
-        num_workers: 10
-        dataset_path: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/protein/downstream
-        dataset: 
-            train: x000
-            test: x000
-        labels_size: [3, 8, 2]
-        mask_col: ["resolved", "resolved", null]
-        labels_col: ["3state","8state", "resolved"]
-        sequence_col: "sequence"
-        random_seed: 1234
-        optim:
-            name: adam
-            lr: 0.0001
-            betas:
-              - 0.9
-              - 0.999
-            eps: 1e-8
-            weight_decay: 0.01
-            sched:
-              name: WarmupAnnealing
-              min_lr: 0.00001
-              last_epoch: -1
-              warmup_ratio: 0.01
-              max_steps: 1000
+  dwnstr_task_validation:
+    enabled: True
+    dataset:
+      class: PerTokenPredictionCallback
+      task_type: classification
+      infer_target: bionemo.model.protein.prott5nv.infer.ProtT5nvInference
+      max_seq_length: ${model.seq_length}
+      emb_batch_size: 128
+      batch_size: 128
+      num_epochs: 2
+      shuffle: True
+      num_workers: 10
+      dataset_path: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/protein/downstream
+      dataset: 
+        train: x000
+        test: x000
+      labels_size: [3, 8, 2]
+      mask_col: ["resolved", "resolved", null]
+      labels_col: ["3state","8state", "resolved"]
+      sequence_col: "sequence"
+      random_seed: 1234
+      optim:
+        name: adam
+        lr: 0.0001
+        betas:
+          - 0.9
+          - 0.999
+        eps: 1e-8
+        weight_decay: 0.01
+        sched:
+          name: WarmupAnnealing
+          min_lr: 0.00001
+          last_epoch: -1
+          warmup_ratio: 0.01
+          max_steps: 1000
   
 exp_manager:
-  exp_dir: /tmp/nemo_experiments/prott5nv_sspred
+  exp_dir: /tmp/nemo_experiments/prott5nv_sec_str_val
   create_wandb_logger: False
   create_tensorboard_logger: False
   wandb_logger_kwargs:

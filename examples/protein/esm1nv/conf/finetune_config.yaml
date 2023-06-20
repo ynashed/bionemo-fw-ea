@@ -30,7 +30,7 @@ model:
   
   data:
     data_url: 'http://data.bioembeddings.com/public/FLIP/fasta/secondary_structure/'
-    dataset_path: /data/FLIP_SS
+    dataset_path: /data/FLIP/secondary_structure
     dataset:
       train: x000
       val: x000

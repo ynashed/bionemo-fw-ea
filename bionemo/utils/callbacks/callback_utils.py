@@ -49,8 +49,8 @@ def _select_validation_callbacks(cfg) -> List:
         List of selected validation callback config dicts
     """
     valid_cbs = []
-    if 'validation' in cfg.model and cfg.model.validation['validation_enabled']:
-        valid_cbs = [dset for dset in cfg.model.validation.datasets if dset['enabled']]
+    if 'dwnstr_task_validation' in cfg.model and cfg.model.dwnstr_task_validation['enabled']:
+        valid_cbs = [cfg.model.dwnstr_task_validation.dataset]
     return valid_cbs
 
 def setup_callbacks(cfg, plugins: Optional[List] = None) -> List:

@@ -84,13 +84,21 @@ class PhysChemPreprocess(object):
             val_df = df.sample(n=val_samples, random_state=seed)
             df = df.drop(val_df.index)  # remove validation data from training data
 
-            splits_path = os.path.join(dir_path, filename.split('.')[0]+'_splits')
-
+            splits_path = os.path.join(dir_path, filename.split('.')[0])
             os.makedirs(splits_path, exist_ok=True)
 
-            df.to_csv(f'{splits_path}/train.csv', index=False)
-            test_df.to_csv(f'{splits_path}/test.csv', index=False)
-            val_df.to_csv(f'{splits_path}/val.csv', index=False)
+            train_path = os.path.join(splits_path, "train")
+            os.makedirs(train_path, exist_ok=True)
+
+            val_path = os.path.join(splits_path, "val")
+            os.makedirs(val_path, exist_ok=True)
+
+            test_path = os.path.join(splits_path, "test")
+            os.makedirs(test_path, exist_ok=True)
+
+            df.to_csv(f'{train_path}/x000.csv', index=False)
+            test_df.to_csv(f'{val_path}/x000.csv', index=False)
+            val_df.to_csv(f'{test_path}/x000.csv', index=False)
 
             del df
             del test_df

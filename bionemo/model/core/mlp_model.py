@@ -1,3 +1,18 @@
+# Copyright (c) 2023, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 from typing import Union, Optional, List
 import json
 
@@ -7,6 +22,12 @@ from pytorch_lightning import LightningModule
 
 from nemo.utils import logging
 import bionemo.utils
+
+import torch
+from nemo.utils import logging
+from nemo.utils import logging
+from typing import List
+
 
 class MLPModel(nn.Module):
     def __init__(self, 
@@ -35,70 +56,4 @@ class MLPModel(nn.Module):
             
         x = self.linear_layers[-1](x)
         return x
-
-class MLPLightningModule(LightningModule):
-    def __init__(self, 
-                 dset_name: str, 
-                 mlp_model: MLPModel, 
-                 loss_func: Union[str, nn.Module], 
-                 optimizer: Union[str, torch.optim.Optimizer], 
-                 lr=0.001):
-        """
-        LightningModule capturing training logic for MLPModel
-        
-        Params
-            dset_name: String
-            mlp_model: MLPModel instance
-            loss_func: String or PyTorch loss function
-            optimizer: String or PyTorch optimizer
-            lr: Float
-        """
-        super().__init__()
-        self.mlp_model = mlp_model
-        self.loss_func = bionemo.utils.lookup_or_use(torch.nn, loss_func)
-        self.optim = optimizer
-        self.lr = lr
-        self.dset_name = dset_name
-        
-    def forward(self, x):
-        return self.mlp_model(x)
-        
-    def training_step(self, batch, batch_idx):
-        x, y = batch
-        output = torch.squeeze(self.mlp_model(x))
-        loss = self.loss_func(output, y)
-        return loss
-    
-    def on_validation_start(self) -> None:
-        self.best_val_loss = float('inf')
-        self.best_val_epoch = -1
-    
-    def on_validation_epoch_start(self) -> None:
-        # track validation loss for current epoch
-        self.current_val_loss = 0
-        self.num_val_steps = 0
-    
-    def validation_step(self, batch, batch_idx):
-        x, y = batch
-        output = torch.squeeze(self.mlp_model(x))
-        loss = self.loss_func(output, y)
-        self.current_val_loss += loss.item()
-        self.num_val_steps += 1
-        return loss
-    
-    def on_validation_epoch_end(self) -> None:
-        mean_epoch_loss = self.current_val_loss / self.num_val_steps
-        
-        if mean_epoch_loss < self.best_val_loss:
-            self.best_val_loss = mean_epoch_loss
-            self.best_val_epoch = self.current_epoch
-            
-        if self.current_epoch == self.trainer.max_epochs - 1:
-            results_dict = {}
-            results_dict[f'{self.dset_name}_val_mlp_best-loss'] = self.best_val_loss
-            results_dict[f'{self.dset_name}_val_mlp_best-epoch'] = self.best_val_epoch
-            self.log_dict(results_dict)
-            logging.info(f'\nMLP Validation Results:\n{json.dumps(results_dict, indent=2, default=str)}')
-                
-    def configure_optimizers(self):
-        return bionemo.utils.lookup_or_use(torch.optim, self.optim, self.mlp_model.parameters(), lr=self.lr)
+   

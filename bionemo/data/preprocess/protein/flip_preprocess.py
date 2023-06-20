@@ -23,9 +23,9 @@ import urllib.request
 import re
 
 
-__all__ = ['FLIPSSPreprocess']
+__all__ = ['FLIPPreprocess']
 
-ROOT_DIR = '/tmp/flip_ss'
+ROOT_DIR = '/tmp/FLIP'
 
 import re
 from typing import Dict, List
@@ -41,7 +41,7 @@ def get_attributes_from_seq(sequences: List) -> Dict[str, Dict[str, str]]:
                                                                          sequence.description)}
     return result
 
-class FLIPSSPreprocess(object):
+class FLIPPreprocess(object):
     def __init__(self, 
                  root_directory: Optional[str] = ROOT_DIR,
                  seq_filename="sequences.fasta", 

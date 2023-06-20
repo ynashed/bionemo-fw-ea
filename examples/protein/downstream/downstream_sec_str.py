@@ -19,9 +19,9 @@ from omegaconf.omegaconf import OmegaConf
 from bionemo.model.utils import (
     setup_trainer,
 )
-from bionemo.data import FLIPSSPreprocess
+from bionemo.data import FLIPPreprocess
 from bionemo.model.protein.downstream import FineTuneProteinModel
-from bionemo.model.protein.downstream.sec_str_pred_model import sec_str_pred_accuracy
+from bionemo.data.metrics import per_token_accuracy
 
 
 @hydra_runner(config_path="../esm1nv/conf", config_name="finetune_config") # ESM
@@ -38,7 +38,7 @@ def main(cfg) -> None:
         metrics = {}
         metrics_args = {}
         for idx, name in enumerate(cfg.model.data.labels_col):
-            metrics[name + "_accuracy"] = sec_str_pred_accuracy
+            metrics[name + "_accuracy"] = per_token_accuracy
             metrics_args[name + "_accuracy"] = {"label_id": idx}
 
         model.add_metrics(metrics=metrics, metrics_args=metrics_args)
@@ -53,7 +53,7 @@ def main(cfg) -> None:
             logging.info("************** Finished Testing ***********")
     else:
         logging.info("************** Starting Preprocessing ***********")
-        preprocessor = FLIPSSPreprocess()
+        preprocessor = FLIPPreprocess()
         preprocessor.prepare_dataset(output_dir=cfg.model.data.dataset_path)
 
 if __name__ == '__main__':

@@ -68,7 +68,7 @@ CONFIG_NAME = [
     'prott5nv_test', 
     'prott5nv_encoder_finetune_test', 
     'esm1nv_encoder_finetune_test',
-    'prott5nv_sspred_test',
+    'prott5nv_sec_str_val_test',
     'megamolbart_physchem_test',
     ]
 CORRECT_CONFIG = [
@@ -78,7 +78,7 @@ CORRECT_CONFIG = [
     'prott5nv_config.pkl', 
     'prott5nv_encoder_finetune_config.pkl', 
     'esm1nv_encoder_finetune_config.pkl',
-    'prott5nv_sspred_config.pkl',
+    'prott5nv_sec_str_val_config.pkl',
     'megamolbart_physchem_config.pkl',
     ]
 CORRECT_RESULTS = [
@@ -88,7 +88,7 @@ CORRECT_RESULTS = [
     'prott5nv_log.json',  
     'prott5nv_encoder_finetune_log.json', 
     'esm1nv_encoder_finetune_log.json',
-    'prott5nv_sspred_log.json',
+    'prott5nv_sec_str_val_log.json',
     'megamolbart_physchem_log.json',
     ]
 MODEL_CLASS = [
