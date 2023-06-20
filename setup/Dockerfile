@@ -50,7 +50,8 @@ RUN pip3 install -r /tmp/requirements.txt
 
 ## Install NGC cli in container for artifact download
 ENV NGC_CLI_INSTALL_PREFIX=/usr/local/bin
-RUN wget --directory-prefix=/tmp --content-disposition https://ngc.nvidia.com/downloads/ngccli_linux.zip && \
+RUN wget --directory-prefix=/tmp --content-disposition \
+    "https://api.ngc.nvidia.com/v2/resources/nvidia/ngc-apps/ngc_cli/versions/3.23.0/files/ngccli_linux.zip" && \
     unzip /tmp/ngccli_linux.zip -d ${NGC_CLI_INSTALL_PREFIX} && \
     chmod u+x ${NGC_CLI_INSTALL_PREFIX}/ngc-cli/ngc && \
     ln -fns  ${NGC_CLI_INSTALL_PREFIX}/ngc-cli/ngc ${NGC_CLI_INSTALL_PREFIX}/ngc && \
