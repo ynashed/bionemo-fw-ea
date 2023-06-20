@@ -735,9 +735,7 @@ class DNABERTDataModule(BioNeMoDataModule):
         return self._setup_collate(model, dataloader, sentence_transform)
 
     def adjust_val_dataloader(self, model, dataloader):
-        dataloader.num_workers = 0
         return self._setup_eval_dataloader(model, dataloader)
 
     def adjust_test_dataloader(self, model, dataloader):
-        dataloader.num_workers = 0
         return self._setup_eval_dataloader(model, dataloader)
