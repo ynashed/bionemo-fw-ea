@@ -68,6 +68,7 @@ def get_cfg(prepend_config_path, config_name, config_path='conf'):
 
 
 @pytest.mark.needs_gpu
+@pytest.mark.needs_checkpoint
 @pytest.mark.parametrize('prepend_config_path, config_name, hidden_size',
                          list(zip(PREPEND_CONFIG_DIR, CONFIG_NAME, HIDDEN_SIZE)))
 def test_model_inference(prepend_config_path, config_name, hidden_size):

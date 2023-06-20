@@ -159,6 +159,8 @@ def test_sample_greedy():
 
 
 @pytest.mark.needs_gpu
+@pytest.mark.needs_checkpoint
+@pytest.mark.skip_if_no_file(CHECKPOINT_PATH)
 def test_sample_topk():
     cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='infer', config_path=CONFIG_PATH)
 
@@ -194,6 +196,8 @@ def test_sample_topk():
 
 
 @pytest.mark.needs_gpu
+@pytest.mark.needs_checkpoint
+@pytest.mark.skip_if_no_file(CHECKPOINT_PATH)
 def test_sample_topp():
     cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='infer', config_path=CONFIG_PATH)
 
@@ -229,6 +233,8 @@ def test_sample_topp():
 
 
 @pytest.mark.needs_gpu
+@pytest.mark.needs_checkpoint
+@pytest.mark.skip_if_no_file(CHECKPOINT_PATH)
 def test_beam_search():
     cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='infer', config_path=CONFIG_PATH)
 
