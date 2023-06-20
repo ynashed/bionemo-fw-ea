@@ -47,15 +47,15 @@ function setup_model() {
         downloaded_model_file="${base_directory}/${model_basename}"
         rm -rf ${tmp_download_loc}/model.zip
     else
-        download_path=$(ngc registry model download-version \
+        ngc registry model download-version \
             --dest ${tmp_download_loc} \
-            "${model_source}" | grep 'Downloaded local path:')
+            "${model_source}"
 
-        download_path=$(echo ${download_path} | cut -d ":" -f 2)
-        model_basename=$(basename ${download_path} | cut -d "_" -f 1)
-        mv ${download_path}/${model_basename}".nemo" ${base_directory}
+        download_path=$(ls ${tmp_download_loc}/*/*.nemo)
+        model_basename=$(basename ${download_path%.nemo})
+        mv ${download_path} ${base_directory}
         downloaded_model_file="${base_directory}/${model_basename}.nemo"
-        rm -rf ${download_path}
+        rm -rf ${tmp_download_loc}/*
     fi
 
     echo "Linking ${downloaded_model_file} to ${model_target}..."
