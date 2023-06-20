@@ -118,6 +118,10 @@ def prott5_build_dataset(
     favor_long_ngrams,
     data_impl_kwargs
     ):
+    # do not load a dataset when num_samples is 0
+    if num_samples == 0:
+        return None
+    
     if data_impl in ["text_mmap", "csv_mmap"]:
         if "tokenizer" not in data_impl_kwargs:
             if isinstance(data_impl_kwargs, DictConfig):

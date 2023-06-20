@@ -16,8 +16,8 @@ trainer:
   max_steps: 1000000 # consumed_samples = global_step * micro_batch_size * data_parallel_size * accumulate_grad_batches
   log_every_n_steps: 10 # number of interations between logging
   val_check_interval: 2000 # set to integer when using steps to determine frequency of validation, use fraction with epochs
-  limit_val_batches: 50 # number of batches in validation step, use fraction for fraction of data
-  limit_test_batches: 500 # number of batches in test step, use fraction for fraction of data
+  limit_val_batches: 50 # number of batches in validation step, use fraction for fraction of data, 0 to disable
+  limit_test_batches: 500 # number of batches in test step, use fraction for fraction of data, 0 to disable
   accumulate_grad_batches: 1
   gradient_clip_val: 1.0
   benchmark: False

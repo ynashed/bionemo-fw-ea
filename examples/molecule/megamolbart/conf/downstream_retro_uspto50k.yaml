@@ -13,7 +13,7 @@ name: MegaMolBARTRetro_uspto50k
 
 trainer:
   num_nodes: 1
-  limit_val_batches: 20 # the training dataset is of size ~5K samples
+  limit_val_batches: 20 # number of batches in validation step, use fraction for fraction of data, 0 to disable (the training dataset is of size ~5K samples)
   max_steps: 20000 # pretrained model converges quicker and the training dataset is of size ~45K samples
   log_every_n_steps: 100 # number training steps between logging
   val_check_interval: 200
