@@ -90,6 +90,7 @@ build:
   rules:
     - when: on_success
   script:
+    - export NGC_CLI_ORG NGC_CLI_TEAM NGC_CLI_FORMAT_TYPE NGC_CLI_API_KEY MODEL_PATH
     - source download_models.sh && download_bionemo_models
   artifacts:
     paths:
