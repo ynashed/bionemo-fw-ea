@@ -49,6 +49,7 @@ def tb(grpc_server, notebook_path=NOTEBOOK_PATH):
         yield tb
 
 
+@pytest.mark.needs_checkpoint
 @pytest.mark.needs_gpu
 def test_ipynb_seq_to_hidden(tb):
     output = tb.cell_output_text(5)

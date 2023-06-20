@@ -161,6 +161,7 @@ def test_config_parameters(prepend_config_path, config_name, correct_config):
 
 
 @pytest.mark.needs_gpu
+@pytest.mark.needs_checkpoint
 @pytest.mark.parametrize('prepend_config_path, config_name, model_class, model_parameters', 
                          list(zip(PREPEND_CONFIG_DIR, CONFIG_NAME, MODEL_CLASS, MODEL_PARAMETERS)))
 def test_model_size(prepend_config_path, config_name, model_class, model_parameters):
