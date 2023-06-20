@@ -52,7 +52,7 @@ def main(cfg) -> None:
 
 
     if cfg.do_testing:
-        if "test_ds" in cfg.model.data:
+        if "test" in cfg.model.data.dataset:
             trainer.test(model)
         else:
             raise UserWarning("Skipping testing, test dataset file was not provided. Please specify 'test_ds.data_file' in yaml config")

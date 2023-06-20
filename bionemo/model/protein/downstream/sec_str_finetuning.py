@@ -15,11 +15,10 @@
 
 import torch
 from functools import lru_cache
-from bionemo.model.protein.downstream.sec_str_pred_model import ConvNet
+from bionemo.model.core import ConvNet, PerTokenMaskedCrossEntropyLoss
 from bionemo.model.core.encoder_finetuning import EncoderFineTuning
 from nemo.utils.model_utils import import_class_by_path
-from bionemo.model.protein.downstream import SSDataModule
-from bionemo.model.protein.downstream.sec_str_pred_model import SSPredLoss
+from bionemo.data.datasets.per_token_value_dataset import PerTokenValueDataModule, PerTokenValueDataset
 
 
 class FineTuneProteinModel(EncoderFineTuning):
@@ -38,7 +37,7 @@ class FineTuneProteinModel(EncoderFineTuning):
             return [self._optimizer], [self._scheduler]
 
     def build_loss_fn(self):
-        return SSPredLoss() 
+        return PerTokenMaskedCrossEntropyLoss()
 
     def build_task_head(self):
         task_head = ConvNet(self.full_cfg.model.hidden_size, 
@@ -62,7 +61,7 @@ class FineTuneProteinModel(EncoderFineTuning):
             model = self.encoder_model
         else:
             model = None
-        self.data_module = SSDataModule(
+        self.data_module = PerTokenValueDataModule(
             self.cfg, self.trainer, model=model
         )
 
@@ -90,14 +89,21 @@ class FineTuneProteinModel(EncoderFineTuning):
         return input_tensor.float()
   
     def get_target_from_batch(self, batch):
-        target = []
-        for key in self.data_module.train_ds.label_names:
-            target.append(batch[key].float())
-        return target
+        _, (labels, masks) = PerTokenValueDataset.prepare_batch(batch, self._train_ds)
+        padded_labels = []
+        padded_masks = []
+        for i in range(len(labels)):
+            label = labels[i]
+            mask = masks[i]
+            batch_size, seq_len, n_labels = label.size()
+            label = torch.cat([label, torch.zeros((batch_size, (self.full_cfg.model.seq_length - seq_len), n_labels)).to(device=label.device)], dim=1)
+            mask = torch.cat([mask, torch.zeros((batch_size, (self.full_cfg.model.seq_length - seq_len))).to(device=mask.device)], dim=1)
+            padded_labels.append(label)
+            padded_masks.append(mask)
+        return (padded_labels, padded_masks)
 
     def _calc_step(self, batch, batch_idx):
         output_tensor = self.forward(batch)
         target = self.get_target_from_batch(batch)
-        masks = [batch[key] for key in batch.keys() if "mask" in key]
-        loss = self.loss_fn(output_tensor, target, masks)
+        loss = self.loss_fn(output_tensor, target)
         return loss, output_tensor, target

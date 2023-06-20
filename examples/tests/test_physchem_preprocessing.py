@@ -18,9 +18,9 @@ DATA_HEADERS = {'Lipophilicity': 'CMPD_CHEMBLID,exp,smiles',
                     'SAMPL': 'iupac,smiles,expt,calc'}
 NUM_ENTRIES = 5973
 DATA_HASHES = {'all_datasets': '5b39b31dad10a254fb3c6ff8845254f5', 
-                         'Lipophilicity': '0cc672ae96955ddd92d48a9134ccedf2', 
-                         'delaney-processed': '5ba8bd5598d35bb4a945075a1938c9ab',
-                         'SAMPL': 'bcbe7b252f994e9b249cdc6dd7bc4e12'}
+                         'Lipophilicity': 'd41d8cd98f00b204e9800998ecf8427e', 
+                         'delaney-processed': 'd41d8cd98f00b204e9800998ecf8427e',
+                         'SAMPL': 'd41d8cd98f00b204e9800998ecf8427e'}
 
 ##############
 

@@ -60,5 +60,5 @@ model:
       warmup_steps: 100
       max_steps: 1000
   
-  validation:
-    validation_enabled: False
+  dwnstr_task_validation:
+    enabled: False

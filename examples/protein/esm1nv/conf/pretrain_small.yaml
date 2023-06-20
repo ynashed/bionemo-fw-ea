@@ -21,41 +21,38 @@ model:
         data_col: 3 # 0-based
     modify_percent: 0.1 # Percentage of characters in a protein sequence to modify. (Modification means replacing with another amino acid or with a mask token)
     perturb_percent: 0.5 # Of the modify_percent, what percentage of characters are to be replaced with another amino acid.
-  validation:
-      validation_enabled: True
-      datasets:
-        - name: SSPred
-          class: SSPredictionCallback
-          enabled: True
-          emb_type: "ESM"
-          infer_target: bionemo.model.protein.esm1nv.infer.ESM1nvInference
-          max_seq_length: ${model.seq_length}
-          emb_batch_size: 256
-          batch_size: 64
-          num_epochs: 10
-          shuffle: True
-          num_workers: 20
-          dataset_path: /data/netsurfp_2.0
-          dataset:
-            train: x000
-            val: x000
-            test: new_pisces
-          sequence_col : "sequence" # name of column with protein sequence in csv file
-          labels_col: ["3state","8state", "resolved"] # names of label columns in csv file
-          labels_size: [3, 8, 2] # number of classes in each label
-          mask_col: ["resolved", "resolved", null] # names of mask columns in csv file, masks must be 0 or 1
-          random_seed: 1234
-          optim:
-              name: adam
-              lr: 0.0001
-              betas:
-                - 0.9
-                - 0.999
-              eps: 1e-8
-              weight_decay: 0.01
-              sched:
-                name: WarmupAnnealing
-                min_lr: 0.00001
-                last_epoch: -1
-                warmup_ratio: 0.01
-                max_steps: 1000
+  dwnstr_task_validation:
+    enabled: True
+    dataset:
+      class: PerTokenPredictionCallback
+      task_type: classification
+      infer_target: bionemo.model.protein.esm1nv.infer.ESM1nvInference
+      max_seq_length: ${model.seq_length}
+      emb_batch_size: 128
+      batch_size: 128
+      num_epochs: 10
+      shuffle: True
+      num_workers: 8
+      dataset_path: /data/FLIP/secondary_structure
+      dataset:
+        train: x000
+        test: x000
+      sequence_col : "sequence" # name of column with protein sequence in csv file
+      labels_col: ["3state", "resolved"] # names of label columns in csv file
+      labels_size: [3, 2] # number of classes in each label
+      mask_col: ["resolved", null] # names of mask columns in csv file, masks must be 0 or 1
+      random_seed: 1234
+      optim:
+        name: adam
+        lr: 0.0001
+        betas:
+          - 0.9
+          - 0.999
+        eps: 1e-8
+        weight_decay: 0.01
+        sched:
+          name: WarmupAnnealing
+          min_lr: 0.00001
+          last_epoch: -1
+          warmup_ratio: 0.01
+          max_steps: 1000

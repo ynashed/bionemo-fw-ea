@@ -17,7 +17,7 @@ from omegaconf.omegaconf import OmegaConf
 from nemo.core.config import hydra_runner
 from nemo.utils import logging
 
-from bionemo.data import UniRef50Preprocess
+from bionemo.data import UniRef50Preprocess, FLIPPreprocess
 from bionemo.model.protein.esm1nv import ESM1nvModel
 from bionemo.model.utils import setup_trainer
 from bionemo.utils import BioNeMoSaveRestoreConnector
@@ -50,6 +50,10 @@ def main(cfg) -> None:
         preprocessor = UniRef50Preprocess()
         preprocessor.prepare_dataset(url=cfg.model.data.data_url,
                                      output_dir=cfg.model.data.dataset_path)
+        # Downloading and preprocessing data for downstream task validation
+        if cfg.model.dwnstr_task_validation.enabled:
+            flip_preprocessor = FLIPPreprocess()
+            flip_preprocessor.prepare_dataset(output_dir=cfg.model.dwnstr_task_validation.dataset.dataset_path)
 
 
 

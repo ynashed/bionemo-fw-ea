@@ -19,7 +19,7 @@ from bionemo.model.protein.prott5nv import ProtT5nvModel
 from bionemo.utils import BioNeMoSaveRestoreConnector
 from nemo.core.config import hydra_runner
 from nemo.utils import logging
-from bionemo.data import UniRef50Preprocess
+from bionemo.data import UniRef50Preprocess, FLIPPreprocess
 from bionemo.model.utils import setup_trainer
 from bionemo.utils.callbacks.callback_utils import setup_callbacks
 
@@ -52,6 +52,10 @@ def main(cfg) -> None:
         preprocessor = UniRef50Preprocess()
         preprocessor.prepare_dataset(url=cfg.model.data.data_url,
                                  output_dir=cfg.model.data.dataset_path)
+        # Downloading and preprocessing data for downstream task validation
+        if cfg.model.dwnstr_task_validation.enabled:
+            flip_preprocessor = FLIPPreprocess()
+            flip_preprocessor.prepare_dataset(output_dir=cfg.model.dwnstr_task_validation.dataset.dataset_path)
 
 
 if __name__ == '__main__':

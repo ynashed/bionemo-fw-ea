@@ -24,29 +24,26 @@ model:
         data_col: 3 # specifies which column in the csv file contains training data, 0-based
         data_sep: ',' # string to split text into columns
     num_workers: 8
-  validation:
-      validation_enabled: True
-      datasets:
-        - name: SSPred
-          class: SSPredictionCallback
-          enabled: True
-          emb_type: "T5"
+  dwnstr_task_validation:
+      enabled: True
+      dataset:
+          class: PerTokenPredictionCallback
+          task_type: classification
           infer_target: bionemo.model.protein.prott5nv.infer.ProtT5nvInference
           max_seq_length: ${model.seq_length}
           emb_batch_size: 128
           batch_size: 128
           num_epochs: 10
           shuffle: True
-          num_workers: 20
-          dataset_path: /data/netsurfp_2.0
+          num_workers: 8
+          dataset_path: /data/FLIP/secondary_structure
           dataset:
             train: x000
-            val: x000
-            test: new_pisces
+            test: x000
           sequence_col : "sequence" # name of column with protein sequence in csv file
-          labels_col: ["3state","8state", "resolved"] # names of label columns in csv file
-          labels_size: [3, 8, 2] # number of classes in each label
-          mask_col: ["resolved", "resolved", null] # names of mask columns in csv file, masks must be 0 or 1
+          labels_col: ["3state", "resolved"] # names of label columns in csv file
+          labels_size: [3, 2] # number of classes in each label
+          mask_col: ["resolved", null] # names of mask columns in csv file, masks must be 0 or 1
           random_seed: 1234
           optim:
               name: adam

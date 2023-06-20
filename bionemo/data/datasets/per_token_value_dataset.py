@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import gc
 import os
 import torch
 import numpy as np
@@ -27,6 +28,7 @@ from bionemo.tokenizer.label2id_tokenizer import Label2IDTokenizer
 from typing import List, Optional
 from bionemo.data.utils import expand_dataset_paths
 
+
 def columns_in_header(cols: List[str], 
                       header: List[str], 
                       allow_none: Optional[bool] =False):
@@ -37,7 +39,8 @@ def columns_in_header(cols: List[str],
             raise ValueError("Column name {} is not in file header {}".format(col, header))
     return True  
 
-class SSDataModule(BioNeMoDataModule):
+
+class PerTokenValueDataModule(BioNeMoDataModule):
     def __init__(self, cfg, trainer, model):
         super().__init__(cfg, trainer)
         self.model=model
@@ -84,14 +87,14 @@ class SSDataModule(BioNeMoDataModule):
             Dataset: dataset to use for training
         """
         self.train_ds = self._create_dataset("train", 
-                                    self.cfg.dataset.train)
-        return SSDataset(self.train_ds)
+                                             self.cfg.dataset.train)
+        return PerTokenValueDataset(self.train_ds)
 
     def val_dataset(self):
         if "val" in self.cfg.dataset:
             self.val_ds = self._create_dataset("val", 
                                         self.cfg.dataset.val)
-            return SSDataset(self.val_ds)
+            return PerTokenValueDataset(self.val_ds)
         else:
             pass
 
@@ -99,14 +102,12 @@ class SSDataModule(BioNeMoDataModule):
         if "test" in self.cfg.dataset:
             self.test_ds = self._create_dataset("test", 
                                         self.cfg.dataset.test)
-            return SSDataset(self.test_ds)
+            return PerTokenValueDataset(self.test_ds)
         else:
             pass
 
 
-class SSDataset(Dataset):
-    """Read data and convert into batches, labels"""
-
+class PerTokenValueDataset(Dataset):
     def __init__(self, data):
         self.data = data
 
@@ -136,6 +137,30 @@ class SSDataset(Dataset):
             mask_padding = torch.zeros((self.data.max_length - seq_len))
             item_dict["_".join(["mask", name])] = torch.cat([mask, mask_padding])
         return item_dict
+    
+    def free_memory(self):
+        members = [attr for attr in dir(self.data) if not callable(getattr(self.data, attr)) and not attr.startswith("_")]
+        for m in members:
+            self.data.__delattr__(m)
+        gc.collect()
+
+
+    @staticmethod
+    def prepare_batch(batch, data):
+        label_names = data.data.label_names
+        num_labels = len(label_names)
+        max_batch_seq_len = batch["seq_len"].max()
+        embeddings = batch["embeddings"]
+        if not isinstance(embeddings, list):
+          embeddings = embeddings[:, :max_batch_seq_len, :].to("cuda")
+        labels = []
+        masks = []
+        for i in range(num_labels):
+            cur_label = batch[label_names[i]][:, :max_batch_seq_len, :]
+            labels.append(cur_label.to("cuda"))
+            mask = batch["_".join(["mask", label_names[i]])][:, :max_batch_seq_len].to("cuda")
+            masks.append(mask)
+        return embeddings, (labels, masks)
 
 
 class get_data(object):
@@ -248,7 +273,10 @@ class get_data(object):
         for strings in (labels_str):
             cur_labels = []
             for i in range(len(strings)):
-                ids = tokenizers[i].text_to_ids(strings[i])
+                try:
+                    ids = tokenizers[i].text_to_ids(strings[i])
+                except:
+                    pass
                 cur_one_hot = []
                 for id_ in ids:
                     cur_one_hot.append(one_hot[i][id_])
