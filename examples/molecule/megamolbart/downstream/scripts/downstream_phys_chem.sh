@@ -78,9 +78,9 @@ read -r -d '' COMMAND <<EOF
  trainer.devices=${NGC_GPUS_PER_NODE} \
  trainer.num_nodes=${NGC_ARRAY_SIZE} \
  model.micro_batch_size=${MICRO_BATCH_SIZE} \
- model.data.train_ds.data_file=/data/physchem/SAMPL_splits/train.csv \
- model.data.validation_ds.data_file=/data/physchem/SAMPL_splits/val.csv \
- model.data.test_ds.data_file=/data/physchem/SAMPL_splits/test.csv \
+ model.data.train_ds.data_file=/data/physchem/SAMPL/train/x000.csv \
+ model.data.validation_ds.data_file=/data/physchem/SAMPL/val/x000.csv \
+ model.data.test_ds.data_file=/data/physchem/SAMPL/test/x000.csv \
  exp_manager.wandb_logger_kwargs.name=${WANDB_LOGGER_NAME} \
  trainer.val_check_interval=8 model.global_batch_size=null \
  model.encoder_frozen=${ENCODER_FROZEN} \
@@ -91,6 +91,6 @@ EOF
 
 BCP_COMMAND="bcprun --debug --nnodes=${NGC_ARRAY_SIZE} --npernode=${NGC_GPUS_PER_NODE} -w /workspace/bionemo/examples/molecule/megamolbart -e WANDB_API_KEY=${WANDB_API_KEY} --cmd '"${COMMAND}"'"
 
-#Add --array-type "MPI" to command below for multinode jobs
+#Add --array-type "PYTORCH" to command below for multinode jobs
 echo "ngc batch run --name "${JOB_NAME}" --priority NORMAL --preempt RUNONCE --total-runtime 2h --ace "${ACE}" --instance "${INSTANCE}" --commandline "\"${BCP_COMMAND}"\" --result /result/ngc_log --replicas "${REPLICAS}" --image "${CONTAINER_IMAGE}" --org ${ORG} --team ${TEAM} --workspace ${WORKSPACE}:/result --datasetid ${DATASET_ID}:/data/physchem/SAMPL_splits/ --label ${LABEL} --label ${WL_LABEL}" | bash
 

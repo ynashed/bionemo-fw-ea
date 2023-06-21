@@ -28,8 +28,8 @@ model:
   tensor_model_parallel_size: 1  # model parallelism
   
   data:
-    data_url: 'http://data.bioembeddings.com/public/FLIP/fasta/secondary_structure/'
-    dataset_path: /data/FLIP_SS
+    task_name: secondary_structure # only secondary_structure is supported for encoder finetuning
+    dataset_path: /data/FLIP/secondary_structure
     dataset:
       train: x000
       val: x000

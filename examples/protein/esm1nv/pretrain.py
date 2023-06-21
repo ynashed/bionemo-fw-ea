@@ -53,7 +53,13 @@ def main(cfg) -> None:
         # Downloading and preprocessing data for downstream task validation
         if cfg.model.dwnstr_task_validation.enabled:
             flip_preprocessor = FLIPPreprocess()
-            flip_preprocessor.prepare_dataset(output_dir=cfg.model.dwnstr_task_validation.dataset.dataset_path)
+            if "task_name" not in cfg.model.dwnstr_task_validation.dataset:
+                task_name = cfg.model.dwnstr_task_validation.dataset.dataset_path.split("/")[-1]
+            else:
+                task_name = cfg.model.dwnstr_task_validation.dataset.task_name
+            flip_preprocessor.prepare_dataset(output_dir=cfg.model.dwnstr_task_validation.dataset.dataset_path,
+                                              task_name=task_name)
+
 
 
 
