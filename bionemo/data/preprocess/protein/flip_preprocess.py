@@ -83,11 +83,9 @@ def get_attributes_from_seq(sequences: List) -> Dict[str, Dict[str, str]]:
     """
     result = dict()
     for sequence in sequences:
-        try:
-            result[sequence.name] = {key: value for key, value in re.findall(r"([A-Z_]+)=(-?[A-z0-9]+-?[A-z0-9]*[.0-9]*)", 
-                                                                         sequence.description)}
-        except:
-            pass
+        result[sequence.name] = {key: value for key, value in re.findall(r"([A-Z_]+)=(-?[A-z0-9]+-?[A-z0-9]*[.0-9]*)", 
+                                                                        sequence.description)}
+        
     return result
 
 class FLIPPreprocess(object):
