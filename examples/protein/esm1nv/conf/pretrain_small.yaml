@@ -33,6 +33,7 @@ model:
       num_epochs: 10
       shuffle: True
       num_workers: 8
+      task_name: secondary_structure
       dataset_path: /data/FLIP/secondary_structure
       dataset:
         train: x000

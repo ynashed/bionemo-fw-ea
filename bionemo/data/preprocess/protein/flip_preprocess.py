@@ -30,6 +30,52 @@ ROOT_DIR = '/tmp/FLIP'
 import re
 from typing import Dict, List
 
+SEQUENCE_FNAME = {
+    "aav": "seven_vs_many.fasta",
+    "bind": "from_publication.fasta",
+    "conservation": "sequences.fasta",
+    "gb1": "two_vs_rest.fasta",
+    "meltome": "mixed_split.fasta",
+    "sav": "mixed.fasta",
+    "scl": "mixed_soft.fasta",
+    "secondary_structure": "sequences.fasta"
+}
+
+LABELS_FNAME = {
+    "aav": "seven_vs_many.fasta",
+    "bind": "from_publication.fasta",
+    "conservation": "sampled.fasta",
+    "gb1": "two_vs_rest.fasta",
+    "meltome": "mixed_split.fasta",
+    "sav": "mixed.fasta",
+    "scl": "mixed_soft.fasta",
+    "secondary_structure": "sampled.fasta"
+}
+
+RESOLVED_FNAME = {
+    "aav": None,
+    "bind": None,
+    "conservation": None,
+    "gb1": None,
+    "meltome": None,
+    "sav": None,
+    "scl": None,
+    "secondary_structure": "resolved.fasta"
+}
+
+HEADER = {
+    "aav": ["id", "sequence", "target"],
+    "bind": ["id", "sequence", "target"],
+    "conservation": ["id", "sequence", "conservation"],
+    "gb1": ["id", "sequence", "target"],
+    "meltome": ["id", "sequence", "target"],
+    "sav": ["id", "sequence", "target"],
+    "scl": ["id", "sequence", "scl_label"],
+    "secondary_structure": ["id", "sequence", "3state", "resolved"],
+}
+
+URL_PREFIX = "http://data.bioembeddings.com/public/FLIP/fasta/"
+
 def get_attributes_from_seq(sequences: List) -> Dict[str, Dict[str, str]]:
     """
     :param sequences: a list of SeqRecords
@@ -37,43 +83,44 @@ def get_attributes_from_seq(sequences: List) -> Dict[str, Dict[str, str]]:
     """
     result = dict()
     for sequence in sequences:
-        result[sequence.name] = {key: value for key, value in re.findall(r"([A-Z_]+)=(-?[A-z0-9]+-?[A-z0-9]*[.0-9]*)", 
+        try:
+            result[sequence.name] = {key: value for key, value in re.findall(r"([A-Z_]+)=(-?[A-z0-9]+-?[A-z0-9]*[.0-9]*)", 
                                                                          sequence.description)}
+        except:
+            pass
     return result
 
 class FLIPPreprocess(object):
     def __init__(self, 
                  root_directory: Optional[str] = ROOT_DIR,
-                 seq_filename="sequences.fasta", 
-                 labels_filename="sampled.fasta",
-                 resolved_filename="resolved.fasta"
                  ):
         super().__init__()
         self.root_directory = pathlib.Path(root_directory) 
-        self.seq_filename = seq_filename
-        self.labels_filename = labels_filename
-        self.resolved_filename = resolved_filename  
 
-    def download_FLIP_data(self, download_dir, url):
-        filenames = [self.seq_filename, self.labels_filename, self.resolved_filename]
+    def download_FLIP_data(self, download_dir, task_name="secondary_structure"):
+        url = URL_PREFIX + task_name + "/"
+        filenames = [SEQUENCE_FNAME[task_name], LABELS_FNAME[task_name], RESOLVED_FNAME[task_name]]
         exists = os.path.exists(download_dir)
         if not exists:
             os.makedirs(download_dir)
         all_file_paths = []
         for filename in filenames:
-            file_url = url + filename
-            file_path = os.path.join(download_dir, filename)
-            all_file_paths.append(file_path)
-            req = urllib.request.Request(
-                file_url,
-                headers={
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
-                },
-            )
-            response = urllib.request.urlopen(req)
-            with open(file_path, "w") as f:
-                f.write(response.read().decode("utf-8"))
-            logging.info(f"{filename} downloaded successfully!")
+            if filename is not None:
+                file_url = url + filename
+                file_path = os.path.join(download_dir, filename)
+                all_file_paths.append(file_path)
+                req = urllib.request.Request(
+                    file_url,
+                    headers={
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"
+                    },
+                )
+                response = urllib.request.urlopen(req)
+                with open(file_path, "w") as f:
+                    f.write(response.read().decode("utf-8"))
+                logging.info(f"{filename} downloaded successfully!")
+            else:
+                all_file_paths.append(None)
         
         return all_file_paths
 
@@ -101,9 +148,13 @@ class FLIPPreprocess(object):
                         labels_indexer,
                         resolved_indexer,
                         num_csv_files,
-                        output_dir):
+                        output_dir, 
+                        task_name):
         name_to_seqs = {seq.name: str(seq.seq) for seq in sequence_indexer}
-        name_to_masks = {mask.name: str(mask.seq) for mask in resolved_indexer}
+        if resolved_indexer is not None:
+            name_to_masks = {mask.name: str(mask.seq) for mask in resolved_indexer}
+        else:
+            name_to_masks = None
         name_to_labels = {label.name: str(label.seq) for label in labels_indexer}
         for split_name, record_id_list in zip(['train', 'val', 'test'], [train_samples, val_samples, test_samples]):
             logging.info(f'Saving {split_name} split...')
@@ -116,7 +167,8 @@ class FLIPPreprocess(object):
                                       seq_dict=name_to_seqs,
                                       labels_dict=name_to_labels,
                                       masks_dict=name_to_masks, 
-                                      output_dir=output_dir)
+                                      output_dir=output_dir,
+                                      task_name=task_name)
         return
 
     def _csv_files_writer(self, 
@@ -127,25 +179,29 @@ class FLIPPreprocess(object):
                           labels_dict, 
                           masks_dict,
                           output_dir, 
-                          delimiter=","):
+                          task_name,
+                          delimiter=",",):
         split_path = os.path.join(output_dir, split_name)
         pathlib.Path(split_path).mkdir(parents=True, exist_ok=True)
         file_name = os.path.join(split_path, f'x{str(file_index).zfill(3)}.csv')
 
         with open(file_name, 'w') as fh:
-            header_str = delimiter.join(['id', 'sequence', '3state', 'resolved'])
+            header_str = ",".join(HEADER[task_name])
             fh.write(header_str + '\n')
             for record_id in record_id_list:
                 sequence = seq_dict[record_id]
                 labels = labels_dict[record_id]
-                mask = masks_dict[record_id]
-                output = delimiter.join([record_id, sequence, labels, str(mask)]) 
+                if masks_dict is not None:
+                    mask = masks_dict[record_id]
+                    output = delimiter.join([record_id, sequence, labels, str(mask)]) 
+                else:
+                    output = delimiter.join([record_id, sequence, labels])
                 fh.write(output + '\n')
         return       
 
     def prepare_dataset(self,
                         output_dir,
-                        url="http://data.bioembeddings.com/public/FLIP/fasta/secondary_structure/",
+                        task_name="secondary_structure",
                         num_csv_files=1,
                         ):
         """Download FLIP secondary structure dataset and split into train, valid, and test sets.
@@ -155,14 +211,18 @@ class FLIPPreprocess(object):
             url (str): URL for FLIP SS dataset location.
             num_csv_files (int): Number of CSV files to create for each train/val/test split.
         """
-        download_dir = self.root_directory.joinpath('raw')
+        download_dir = os.path.join(self.root_directory, task_name, 'raw')
         exists = os.path.exists(output_dir)
         if not exists:
             os.makedirs(output_dir)
-        seq_path, labels_path, resolved_path = self.download_FLIP_data(download_dir=download_dir, url=url)
+        seq_path, labels_path, resolved_path = self.download_FLIP_data(download_dir=download_dir, 
+                                                                       task_name=task_name)
         sequence_indexer = pyfastx.Fasta(seq_path, build_index=True, uppercase=True)
         labels_indexer = pyfastx.Fasta(labels_path, build_index=True, uppercase=True)
-        resolved_indexer = pyfastx.Fasta(resolved_path, build_index=True, uppercase=True)
+        if resolved_path is not None:
+            resolved_indexer = pyfastx.Fasta(resolved_path, build_index=True, uppercase=True)
+        else:
+            resolved_indexer = None
         logging.info('FLIP data download complete.')
 
         logging.info('Processing FLIP dataset.')
@@ -176,5 +236,6 @@ class FLIPPreprocess(object):
                              sequence_indexer=sequence_indexer,
                              labels_indexer=labels_indexer,
                              resolved_indexer=resolved_indexer, 
-                             output_dir=output_dir)
+                             output_dir=output_dir, 
+                             task_name=task_name)
         logging.info(f'FLIP dataset preprocessing completed')

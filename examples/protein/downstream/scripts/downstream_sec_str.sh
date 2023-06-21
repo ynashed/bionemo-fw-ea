@@ -84,6 +84,6 @@ EOF
 
 BCP_COMMAND="bcprun --debug --nnodes=${NGC_ARRAY_SIZE} --npernode=${NGC_GPUS_PER_NODE} -w /workspace/bionemo/examples/protein/downstream -e WANDB_API_KEY=${WANDB_API_KEY} --cmd '"${COMMAND}"'"
 
-#Add --array-type "MPI" to command below for multinode jobs
+#Add --array-type "PYTORCH" to command below for multinode jobs
 echo "ngc batch run --name "${JOB_NAME}" --priority NORMAL --preempt RUNONCE --total-runtime 2h --ace "${ACE}" --instance "${INSTANCE}" --commandline "\"${BCP_COMMAND}"\" --result /result/ngc_log --replicas "${REPLICAS}" --image "${CONTAINER_IMAGE}" --org ${ORG} --team ${TEAM} --workspace ${WORKSPACE}:/result --datasetid ${DATASET_ID}:/data/netsurfp_2.0 --label ${LABEL} --label ${WL_LABEL}" | bash
 

@@ -49,12 +49,14 @@ def main(cfg) -> None:
             if "test" in cfg.model.data.dataset:
                 trainer.test(model)
             else:
-                raise UserWarning("Skipping testing, test dataset file was not provided. Please specify 'test_ds.data_file' in yaml config")
+                raise UserWarning("Skipping testing, test dataset file was not provided. Please specify 'dataset.test' in yaml config")
             logging.info("************** Finished Testing ***********")
     else:
         logging.info("************** Starting Preprocessing ***********")
         preprocessor = FLIPPreprocess()
-        preprocessor.prepare_dataset(output_dir=cfg.model.data.dataset_path)
+        preprocessor.prepare_dataset(output_dir=cfg.model.data.dataset_path, 
+                                     task_name=cfg.model.data.task_name)
+
 
 if __name__ == '__main__':
     main()

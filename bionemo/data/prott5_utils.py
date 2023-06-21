@@ -47,6 +47,11 @@ def _build_dataset(
     if dataset_type != "t5":
         raise ValueError("Invalid dataset_type: ", dataset_type)
 
+    min_seq_length_dec = round(max_seq_length * masked_lm_prob * 2 + 1)
+
+    if  min_seq_length_dec > max_seq_length_dec:
+        raise ValueError(f'Cannot have seq_length_dec ({max_seq_length_dec}) less than seq_length * masked_lm_prob * 2 + 1 ({min_seq_length_dec}). Increase seq_length_dec or decrease masked_lm_prob')
+
     # Indexed dataset.
     indexed_dataset = get_indexed_dataset_(data_prefix, data_impl, skip_warmup, data_impl_kwargs=data_impl_kwargs)
     total_num_of_documents = indexed_dataset.doc_idx.shape[0] - 1
