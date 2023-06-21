@@ -13,26 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import gzip
 import os
-import pathlib
-import shutil
-import tarfile
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from hashlib import md5
-from pathlib import Path
-from typing import List, Optional
+
+from typing import Optional
 from urllib import request
 
-import numpy as np
-import pandas as pd
 import requests
 from nemo.utils import logging
-
-from bionemo.data.dna.splice_site_dataset import ChrSpliceSitesDataset
-from bionemo.data.fasta_dataset import ConcatDataset
-from bionemo.utils.gff import build_donor_acceptors_midpoints, parse_gff3
 
 
 @dataclass
