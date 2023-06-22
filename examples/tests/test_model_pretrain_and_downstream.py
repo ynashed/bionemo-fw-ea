@@ -18,6 +18,7 @@ In order to update test results or configs please use the following command:
 UPDATE_EXPECTED_RESULTS=1 pytest examples/tests/test_model_pretrain_and_downstream.py
 UPDATE_EXPECTED_CFG=1 pytest examples/tests/test_model_pretrain_and_downstream.py
 """
+import torch
 import pytest
 import os
 import pathlib
@@ -184,7 +185,7 @@ def test_model_size(prepend_config_path, config_name, model_class, model_paramet
                          list(zip(PREPEND_CONFIG_DIR, CONFIG_NAME, MODEL_CLASS, CORRECT_RESULTS)))
 def test_model_training(prepend_config_path, config_name, model_class, correct_results):
     '''Run short model training and ensure key metrics are identical'''
-
+    torch.manual_seed(0)
     cfg = get_cfg(prepend_config_path, config_name)
     clean_directory(cfg.exp_manager.exp_dir)
 

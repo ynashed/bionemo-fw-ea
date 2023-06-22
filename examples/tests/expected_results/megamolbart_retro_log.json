@@ -1,17 +1,13 @@
 {
     "consumed_samples": 1996.0,
     "global_step": 500.0,
-    "grad_norm": 3.1303186416625977,
+    "grad_norm": 3.2123427391052246,
     "loss_scale": 65536.0,
-    "lr": 2.9831642677891068e-05,
-    "reduced_train_loss": 0.42197638750076294,
+    "lr": 2.9584589356090873e-05,
+    "reduced_train_loss": 0.4268048107624054,
     "val_character_accuracy": 0.8333333134651184,
-    "val_character_accuracy_step": 0.8333333134651184,
-    "val_loss": 0.3344249129295349,
-    "val_loss_step": 0.504366397857666,
+    "val_loss": 0.3350629210472107,
     "val_molecular_accuracy": 0.0,
-    "val_molecular_accuracy_step": 0.0,
     "val_percent_invalid": 0.0,
-    "val_percent_invalid_step": 0.0,
-    "val_reduced_loss": 0.504366397857666
+    "val_reduced_loss": 0.5069183111190796
 }

@@ -1,8 +1,13 @@
 {
-    "test_3state_accuracy": 38.64061263584008,
-    "test_8state_accuracy": 14.041692929511253,
-    "consumed_samples": 36.0,
-    "global_step": 10.0,
-    "reduced_train_loss": 5.165653228759766,
-    "val_loss": 5.05261754989624
+    "consumed_samples": 796.0,
+    "dwnstr_task_val_loss": 1.244935319630404,
+    "global_step": 200.0,
+    "grad_norm": 1.7947642803192139,
+    "loss_scale": 32768.0,
+    "lr": 1.283881465496961e-05,
+    "reduced_train_loss": 1.5524500608444214,
+    "test_3state_accuracy": 42.89080932433402,
+    "test_8state_accuracy": 37.77328484233034,
+    "test_resolved_accuracy": 90.79124812659802,
+    "val_loss": 1.5604580640792847
 }

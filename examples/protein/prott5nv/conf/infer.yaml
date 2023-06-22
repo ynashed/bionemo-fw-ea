@@ -18,7 +18,7 @@ model:
     restore_from_path: "/model/protein/prott5nv/prott5nv.nemo"
     outputs: [embeddings, hiddens] # Which outputs to extract per sample (a value or list). Possible values: hiddens, embeddings.
   data:
-    dataset_path: /data/FLIP_SS/test/x000 # full path to dataset (can include range or a list)
+    dataset_path: /data/FLIP/secondary_structure/test/x000 # full path to dataset (can include range or a list)
 
 target: bionemo.model.protein.prott5nv.prott5_model.ProtT5nvModel # path to model class to load
 infer_target: bionemo.model.protein.prott5nv.infer.ProtT5nvInference # path to inferende class to load

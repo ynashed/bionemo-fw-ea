@@ -1,7 +1,7 @@
 defaults:
   - base_config
 
-name: prott5nv_sspred
+name: prott5nv_sec_str_val
 do_training: True # set to false if data preprocessing steps must be completed
 do_testing: False # set to true to run evaluation on test data after training, requires test_dataset section
 restore_from_path: /model/protein/prott5nv/prott5nv.nemo # used when starting from a .nemo file
@@ -11,8 +11,8 @@ trainer:
   num_nodes: 1
   accelerator: gpu
   precision: 16
-  max_steps: 10 # consumed_samples = global_step * micro_batch_size * data_parallel_size * accumulate_grad_batches
-  val_check_interval: 10
+  max_steps: 200 # consumed_samples = global_step * micro_batch_size * data_parallel_size * accumulate_grad_batches
+  val_check_interval: 200
   limit_val_batches: 1
   accumulate_grad_batches: 1
   num_sanity_val_steps: 0
@@ -40,7 +40,7 @@ model:
       max_seq_length: ${model.seq_length}
       emb_batch_size: 128
       batch_size: 128
-      num_epochs: 2
+      num_epochs: 5
       shuffle: True
       num_workers: 10
       dataset_path: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/protein/downstream
@@ -54,7 +54,7 @@ model:
       random_seed: 1234
       optim:
         name: adam
-        lr: 0.0001
+        lr: 0.001
         betas:
           - 0.9
           - 0.999
