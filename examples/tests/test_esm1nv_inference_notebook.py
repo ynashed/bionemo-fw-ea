@@ -52,5 +52,5 @@ def tb(grpc_server, notebook_path=NOTEBOOK_PATH):
 @pytest.mark.needs_checkpoint
 @pytest.mark.needs_gpu
 def test_ipynb_seq_to_hidden(tb):
-    output = tb.cell_output_text(5)
+    output = tb.cell_output_text(6)
     assert output == 'torch.Size([2, 41, 768])'
