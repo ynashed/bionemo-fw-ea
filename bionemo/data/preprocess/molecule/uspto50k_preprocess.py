@@ -61,7 +61,8 @@ class USPTO50KPreprocess:
             return local_filepath
 
         logging.info(f'Downloading dataset with id {ngc_dataset_id} from NGC to {local_filepath}...')
-        os.makedirs(self.download_dir, exist_ok=True)
+        if not os.path.exists(self.download_dir):
+            os.makedirs(self.download_dir, exist_ok=True)
         try:
             temp_dir = download_dataset_from_ngc(ngc_dataset_id=ngc_dataset_id, dest=self.data_dir)
             temp_filepath = os.path.join(temp_dir, filename)
