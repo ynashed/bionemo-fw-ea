@@ -107,7 +107,6 @@ get-checkpoints:
   rules:
     - when: on_success
   dependencies:
-    - build
     - get-checkpoints
   before_script:
     - mkdir /model
@@ -141,6 +140,7 @@ dev-deploy:
   extends:
     - .docker-setup
   stage: deploy
+  dependencies: []
   rules:
     - if: $CI_COMMIT_BRANCH == "dev" && $NIGHTLY != "true"
     - if: $CI_COMMIT_BRANCH == "main" && $NIGHTLY != "true"
