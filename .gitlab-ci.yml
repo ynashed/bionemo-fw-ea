@@ -49,6 +49,7 @@ variables:
     - until docker info; do sleep 1; done
     - mkdir -p $HOME/.docker
     - echo $DOCKER_AUTH_CONFIG > $HOME/.docker/config.json
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
 
 
 .build-common:
@@ -63,7 +64,6 @@ variables:
       fi
     - docker build --network host --no-cache ${base} --label com.nvidia.bionemo.git_hash=${CI_COMMIT_SHORT_SHA}
       -t $PIPELINE_TAG -f setup/Dockerfile .
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     - docker push $PIPELINE_TAG
 
 
@@ -146,7 +146,6 @@ dev-deploy:
     - if: $CI_COMMIT_BRANCH == "main" && $NIGHTLY != "true"
     - if: $CI_COMMIT_BRANCH == "bionemo-rc2306-v1" && $NIGHTLY != "true"
   script:
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     - docker pull $PIPELINE_TAG
     - docker tag $PIPELINE_TAG $SHA_TAG
     - docker tag $PIPELINE_TAG $LATEST_TAG
