@@ -29,7 +29,7 @@ variables:
   PIPELINE_TAG: "$DOCKER_TAG_PREFIX:pipeline-$CI_PIPELINE_ID"
   SHA_TAG: "$DOCKER_TAG_PREFIX:$CI_COMMIT_SHORT_SHA-$CI_COMMIT_BRANCH"
   LATEST_TAG: "$DOCKER_TAG_PREFIX:$CI_COMMIT_BRANCH-latest"
-  NGC_TAG: "nvcr.io/nvidian/clara-lifesciences/bionemo_ci:latest"
+  NGC_TAG: "$NGC_REGISTRY_IMAGE:$CI_COMMIT_BRANCH"
   NEMO_NIGHTLY_TAG: "nvcr.io/nvidian/nemo-nightly:latest-nightly-main"
   NIGHTLY:
     value: "false"
@@ -75,6 +75,7 @@ build:
       when: manual
     - if: $CI_COMMIT_BRANCH == "dev"
     - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "bionemo-rc2306-v1"
     - when: manual
 
 
@@ -143,6 +144,7 @@ dev-deploy:
   rules:
     - if: $CI_COMMIT_BRANCH == "dev" && $NIGHTLY != "true"
     - if: $CI_COMMIT_BRANCH == "main" && $NIGHTLY != "true"
+    - if: $CI_COMMIT_BRANCH == "bionemo-rc2306-v1" && $NIGHTLY != "true"
   script:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     - docker pull $PIPELINE_TAG
