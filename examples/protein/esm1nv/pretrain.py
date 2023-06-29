@@ -48,7 +48,8 @@ def main(cfg) -> None:
     else:
         logging.info("************** Starting Preprocessing ***********")
         preprocessor = UniRef50Preprocess()
-        preprocessor.prepare_dataset(url=cfg.model.data.data_url,
+        preprocessor.prepare_dataset(ngc_registry_target=cfg.model.data.ngc_registry_target,
+                                     ngc_registry_version=cfg.model.data.ngc_registry_version,
                                      output_dir=cfg.model.data.dataset_path)
         # Downloading and preprocessing data for downstream task validation
         if cfg.model.dwnstr_task_validation.enabled:
@@ -59,8 +60,6 @@ def main(cfg) -> None:
                 task_name = cfg.model.dwnstr_task_validation.dataset.task_name
             flip_preprocessor.prepare_dataset(output_dir=cfg.model.dwnstr_task_validation.dataset.dataset_path,
                                               task_name=task_name)
-
-
 
 
 if __name__ == '__main__':

@@ -67,8 +67,8 @@ def main(cfg):
         data_preprocessor = USPTO50KPreprocess(max_smiles_length=cfg.model.data.max_seq_length,
                                                data_dir=cfg.model.data.dataset_path)
 
-        data_preprocessor.prepare_dataset(ngc_dataset_id=cfg.model.data.ngc_dataset_id,
-                                          filename_raw=cfg.model.data.filename_raw,
+        data_preprocessor.prepare_dataset(ngc_registry_target=cfg.model.data.ngc_registry_target,
+                                          ngc_registry_version=cfg.model.data.ngc_registry_version,
                                           force=True)
         logging.info("************** Finished Data PreProcessing ***********")
 

@@ -50,8 +50,9 @@ def main(cfg) -> None:
     else:
         logging.info("************** Starting Preprocessing ***********")
         preprocessor = UniRef50Preprocess()
-        preprocessor.prepare_dataset(url=cfg.model.data.data_url,
-                                 output_dir=cfg.model.data.dataset_path)
+        preprocessor.prepare_dataset(ngc_registry_target=cfg.model.data.ngc_registry_target,
+                                     ngc_registry_version=cfg.model.data.ngc_registry_version,
+                                     output_dir=cfg.model.data.dataset_path)
         # Downloading and preprocessing data for downstream task validation
         if cfg.model.dwnstr_task_validation.enabled:
             flip_preprocessor = FLIPPreprocess()

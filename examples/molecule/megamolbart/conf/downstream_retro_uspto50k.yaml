@@ -36,9 +36,10 @@ model:
     ## configuration of dataset for fine-tuning on USPTO_50K
     # AstraZeneca dataset used to train MolBART on USPTO50K. The file can be manually downloaded from the original repo
     # https://az.app.box.com/s/7eci3nd9vy0xplqniitpk02rbg9q2zcq/file/854847820319#:~:text=by%20Ross%20Irwin-,Download,-Sign%20up
-    ngc_dataset_id: 1605561 # TODO change the location of this dataset to be available for the users when the framework is released!
-    filename_raw: uspto_50.pickle
-    dataset_path: /data/uspto_50k/
+    ngc_registry_target: uspto_50k_dataset
+    ngc_registry_version: v23.06
+    dataset_path: /data/uspto_50k_dataset # TODO how to determine this
+
     data_impl: "csv_fields_mmap"
     data_impl_kwargs:
       csv_fields_mmap:

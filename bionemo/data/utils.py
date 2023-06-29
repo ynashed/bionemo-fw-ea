@@ -22,6 +22,9 @@ import os
 import torch
 import gzip
 import shutil
+import hashlib
+import json
+import subprocess
 from omegaconf import DictConfig, open_dict
 from pytorch_lightning.trainer.trainer import Trainer
 
@@ -52,6 +55,7 @@ def expand_dataset_paths(filepath: str, ext: str) -> List[str]:
     dataset_paths = list(braceexpand.braceexpand(filepath))
     return dataset_paths
 
+
 def check_paths_exist(dataset_paths):
     """Check that the expanded dataset paths are valid and they exist."""
     errors = []
@@ -59,6 +63,7 @@ def check_paths_exist(dataset_paths):
         if not os.path.exists(filepath):
             errors.append(filepath)
     return errors
+
 
 def gunzip(i: str, o: str, exist_ok: bool = False):
     """Unzips a gzipped file
@@ -193,6 +198,7 @@ class DatasetBuilderSpec(object):
         `dataset` attribute.
         """
         raise NotImplementedError()
+
 
 def get_filepath(options):
     filepath = cfg_get_key(options['cfg'], 'dataset_path', default='')
@@ -403,9 +409,11 @@ def build_train_valid_test_datasets(
 
     return (train_dataset, validation_dataset, test_dataset)
 
+
 def cfg_get_key(cfg, key, default=None):
     with open_dict(cfg):
         return cfg.get(key, default)
+
 
 def pad_token_ids(token_ids, padding_value=0, padding_len=None, pad_size_divisible_by=1,  **convert_to_kwargs):
     """
@@ -448,6 +456,7 @@ def pad_token_ids(token_ids, padding_value=0, padding_len=None, pad_size_divisib
 
     return (masked_token_ids, mask)
 
+
 def handle_index(dataset, idx):
     """
     Remaps negative indices and handles numpy int indices.
@@ -480,10 +489,159 @@ def handle_index(dataset, idx):
     return idx
 
 
-def download_dataset_from_ngc(ngc_dataset_id: int, dest: Optional[str] = None, dir: Optional[str] = None,
-                              exclude: Optional[str] = None, file: Optional[str] = None,
-                              format_type: Optional[str] = None, resume: Optional[str] = None,
-                              dry_run: bool = False, debug: bool = False, compress_file: bool = False) -> str:
+def verify_checksum_matches(file_path: str, expected_checksum: str) -> bool:
+    """Verify that file checksum matches expected value
+
+    Args:
+        file_path (str): Path to file
+        expected_checksum (str): Checksum value
+
+    Returns:
+        bool: True if checksum matches else false
+    """
+    
+    file_hash = hashlib.md5(open(file_path, 'rb').read()).hexdigest()
+    if file_hash == expected_checksum:
+        matches = True
+    else:
+        matches = False
+        logging.info(f'Checksum verification failed. Expected {expected_checksum} but got {file_hash}.')
+    return matches
+
+
+def get_ngc_registry_file_list(ngc_registry_target: str,
+                               ngc_registry_version: str,
+                               ngc_org: str, 
+                               ngc_team: Optional[str] = None) -> List[str]:
+    """
+    Get listing of NGC registry files:
+    https://docs.ngc.nvidia.com/cli/cmd_registry.html
+    NGC CLI install: https://ngc.nvidia.com/setup/installers/cli
+    Args:
+        ngc_registry_target: NGC registry target name for dataset
+        ngc_registry_version: NGC registry version for dataset
+        ngc_org: NGC organization
+        ngc_team: NGC team, Optional and defaults to None
+    Returns:
+        list of file names
+    """
+    filelist_cmd = f'ngc registry resource info --format_type json --files '
+    filelist_cmd += f'--org {ngc_org} '
+    
+    target = ngc_org
+    if ngc_team:
+        filelist_cmd += f'--team {ngc_team} '
+        target += '/' + ngc_team
+
+    target += '/' + ngc_registry_target
+    filelist_cmd += f' {target}:{ngc_registry_version}'
+    
+    try:
+        result = subprocess.run(filelist_cmd, capture_output=True, shell=True, check=True)
+        if result.stderr:
+            logging.warning(result.stderr.decode())
+        json_output = result.stdout.strip()
+        file_list = json.loads(json_output)['file_list']
+        file_list = list(map(lambda x: x['path'], file_list))
+    except subprocess.CalledProcessError as e:
+        logging.error(f'File list retrival failed: {e}')
+        file_list = []
+    except Exception as e:
+        logging.error(f'File list retrival failed for command \'{filelist_cmd}\' and output \'{json_output}\'')
+        file_list = []
+
+    return file_list
+
+
+def download_registry_from_ngc(ngc_registry_target: str,
+                               ngc_registry_version: str,
+                               ngc_org: str, 
+                               ngc_team: Optional[str] = None, 
+                               dest: Optional[str] = '.', 
+                               exclude: Optional[str] = None, 
+                               expected_checksum: Optional[str] = None,
+                               file: Optional[str] = None,
+                               format_type: Optional[str] = None, 
+                               debug: bool = False) -> str:
+    """
+    Downloads data from NGC registry. Please refer to the documentation for more details:
+    https://docs.ngc.nvidia.com/cli/cmd_registry.html
+    NGC CLI install: https://ngc.nvidia.com/setup/installers/cli
+    Args:
+        ngc_registry_target: NGC registry target name for dataset
+        ngc_registry_version: NGC registry version for dataset
+        ngc_org: NGC organization
+        ngc_team: NGC team, Optional and defaults to None
+        dest: path to store the downloaded files. If None, default is set to  "."
+        exclude: exclude files or directories from the downloaded dataset. Supports standard Unix shell-style wildcards
+        expected_checksum: expected checksum value
+        file: specify individual files to download from the dataset. Supports standard Unix shell-style wildcards
+        format_type: specify the output format type, possible choices: ascii, csv, json. if None, default is set to ascii
+        debug: enable debug mode
+    Returns:
+        path to the folder where dataset is downloaded
+    """
+
+    download_cmd = f'ngc registry resource download-version '
+
+    if dest:
+        download_cmd += f'--dest {dest} '
+    if exclude:
+        download_cmd += f'--exclude {exclude} '
+    if file:
+        download_cmd += f'--file {file} '
+    if format_type:
+        download_cmd += f'--format_type {format_type} '
+    if debug:
+        download_cmd += '--debug '
+
+    download_cmd += f'--org {ngc_org} '
+    
+    target = ngc_org
+    if ngc_team:
+        download_cmd += f'--team {ngc_team} '
+        target += '/' + ngc_team
+
+    target += '/' + ngc_registry_target
+    download_cmd += f' {target}:{ngc_registry_version}'
+
+    # Determine if file is already downloaded
+    file_list = get_ngc_registry_file_list(ngc_registry_target, ngc_registry_version, ngc_org, ngc_team)
+
+    download_file = True
+    if expected_checksum and file_list:
+        if len(file_list) > 1:
+            logging.info(f'Checksum verification not supported if resource contains more than one file.')
+        else:
+            file_name = file_list[0]
+            download_dir = os.path.join(dest, f'{ngc_registry_target}_v{ngc_registry_version}')
+            if os.path.exists(os.path.join(download_dir, file_name)):
+                hash_path = os.path.join(download_dir, file_name)
+                download_file = False if verify_checksum_matches(hash_path, expected_checksum) else True
+
+    if download_file:
+        os.system(download_cmd)
+    else:
+        logging.info(f'Download of {target} to {hash_path} skipped because file exists and MD5 checksums match.')
+
+    downloaded_file_list = os.listdir(download_dir)
+
+    # TODO update logic if there is more than one downloaded file present
+    assert len(downloaded_file_list) == 1, AssertionError(f'Expected only one downloaded file got {len(downloaded_file_list)}.')
+    file_path = os.path.join(download_dir, downloaded_file_list[0])
+    return file_path
+
+
+def download_dataset_from_ngc(ngc_dataset_id: int, 
+                              dest: Optional[str] = None, 
+                              dir: Optional[str] = None,
+                              exclude: Optional[str] = None, 
+                              file: Optional[str] = None,
+                              format_type: Optional[str] = None, 
+                              resume: Optional[str] = None,
+                              dry_run: bool = False, 
+                              debug: bool = False, 
+                              compress_file: bool = False) -> str:
     """
     Downloads dataset from NGC. Please refer to the documentation for more details:
     https://docs.ngc.nvidia.com/cli/cmd_dataset.html

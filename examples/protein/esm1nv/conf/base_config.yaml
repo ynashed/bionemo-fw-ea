@@ -98,7 +98,8 @@ model:
   activations_checkpoint_num_layers: 1 
 
   data:
-    data_url: 'https://ftp.uniprot.org/pub/databases/uniprot/uniref/uniref50/uniref50.fasta.gz' 
+    ngc_registry_target: uniref50_2022_05
+    ngc_registry_version: v23.06
     data_prefix: "" # must be null or ""
     num_workers: 8
     dataloader_type: single # cyclic

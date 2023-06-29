@@ -23,16 +23,20 @@ import gzip
 import shutil
 from typing import Optional
 
+from bionemo.data.utils import download_registry_from_ngc, get_ngc_registry_file_list, verify_checksum_matches
+
 __all__ = ['UniRef50Preprocess']
 
 ROOT_DIR = '/tmp/uniref50'
+MD5_CHECKSUM = 'e619d3689749562d743f8ecf29a7a7c2'
 
 class UniRef50Preprocess(object):
-    def __init__(self, root_directory: Optional[str] = ROOT_DIR) -> None:
-        """Pprocess UniRef50 data for pre-training. 
+    def __init__(self, root_directory: Optional[str] = ROOT_DIR, checksum: Optional[str] = MD5_CHECKSUM) -> None:
+        """Prepocess UniRef50 data for pre-training. 
 
         Args:
-            root_directory (Optional[str], optional): _description_. Defaults to /tmp/uniref50.
+            root_directory (Optional[str]): Directory for download. Defaults to /tmp/uniref50.
+            checksum (Optional[str]): Checksum for file
 
 
         Data are downloaded to root_directory/raw (/tmp/uniref50/raw). The split data can be found in
@@ -40,6 +44,7 @@ class UniRef50Preprocess(object):
         """
         super().__init__()
         self.root_directory = pathlib.Path(root_directory)
+        self.checksum = checksum
 
     def _process_file(self, url, download_dir):
         """Download UniRef50 file and unzip
@@ -99,7 +104,7 @@ class UniRef50Preprocess(object):
                     f'Could not download file {url}: {e.response.status_code}')
                 raise e
 
-    def process_files(self, url, download_dir):
+    def process_files_uniprot(self, url, download_dir):
         """Download the UniRef50 fasta file and decompress it.
 
         Parameters:
@@ -116,6 +121,46 @@ class UniRef50Preprocess(object):
         os.makedirs(download_dir, exist_ok=True)
         file_path = self._process_file(url=url, download_dir=download_dir)
         return file_path
+
+    @staticmethod
+    def process_files_ngc(ngc_registry_target, ngc_registry_version, download_dir, output_dir, checksum):
+        # TODO create base preprocessing class with this method
+        assert os.environ.get('NGC_CLI_API_KEY', False), AssertionError("""NGC API key not defined as environment variable "NGC_CLI_API_KEY".
+                                                                           Aborting resource download.""")
+        ngc_org = os.environ.get('NGC_CLI_ORG', None)
+        assert ngc_org, AssertionError('NGC org must be defined by the environment variable NGC_CLI_ORG')
+        ngc_team  = os.environ.get('NGC_CLI_TEAM', None)
+
+        # Check if resource already exists at final destination
+        file_list = get_ngc_registry_file_list(ngc_registry_target, ngc_registry_version, ngc_org, ngc_team)        
+        file_exists = False
+        if len(file_list) > 1:
+            logging.info(f'Checksum verification not supported if resource contains more than one file.')
+        else:
+            file_name = file_list[0]
+            output_path = os.path.join(output_dir, file_name)
+            if os.path.exists(output_path):
+                file_exists = True if verify_checksum_matches(output_path, checksum) else False
+        
+        # Download resource and copy if needed
+        if not file_exists:
+            os.makedirs(download_dir, exist_ok=True)
+            tmp_download_path = download_registry_from_ngc(ngc_registry_target=ngc_registry_target, 
+                                                           ngc_registry_version=ngc_registry_version, 
+                                                           ngc_org=ngc_org, 
+                                                           ngc_team=ngc_team,
+                                                           dest=download_dir,
+                                                           expected_checksum=checksum)
+
+            # Move to destination directory and clean up
+            file_name = os.path.basename(tmp_download_path)
+            output_path = os.path.join(output_dir, file_name) # Ensures output_path is defined when file is downloaded
+            shutil.copyfile(tmp_download_path, output_path)
+            logging.info(f'Download complete at {output_path}.')
+        else:
+            logging.info(f'File download skipped because file exists at {output_path} and has expected checksum.')
+
+        return output_path   
 
     @staticmethod
     def _index_fasta_data(fasta_indexer, val_size, test_size, random_seed):
@@ -196,7 +241,10 @@ class UniRef50Preprocess(object):
         return
 
     def prepare_dataset(self,
+                        ngc_registry_target=None,
+                        ngc_registry_version=None,
                         url='https://ftp.uniprot.org/pub/databases/uniprot/uniref/uniref50/uniref50.fasta.gz',
+                        source='ngc',
                         output_dir=None,
                         num_csv_files=50,
                         val_size=5000,
@@ -211,13 +259,24 @@ class UniRef50Preprocess(object):
             test_size (int): Number of protein sequences to put in test set.
             random_seed (int): Random seed.
         """
+
         download_dir = self.root_directory.joinpath('raw')
         if output_dir is None:
             output_dir = self.root_directory.joinpath('processed')
+        os.makedirs(output_dir, exist_ok=True)
 
+        if source == 'ngc':
+            assert ngc_registry_target is not None
+            assert ngc_registry_version is not None
+            file_path = self.process_files_ngc(ngc_registry_target=ngc_registry_target, 
+                                               ngc_registry_version=ngc_registry_version, 
+                                               download_dir=download_dir,
+                                               output_dir=output_dir,
+                                               checksum=self.checksum)
 
-        file_path = self.process_files(url=url, 
-                                       download_dir=download_dir)
+        elif source == 'uniprot':
+            file_path = self.process_files_uniprot(url=url, download_dir=download_dir)
+
         logging.info('UniRef50 data processing complete.')
 
         logging.info('Indexing UniRef50 dataset.')

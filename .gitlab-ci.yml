@@ -37,6 +37,9 @@ variables:
       - "false"
       - "true"
     description: "Wether to use nightly NeMo docker image as base. Set to 'false' by default."
+  NGC_CLI_FORMAT_TYPE: ascii
+  NGC_CLI_ORG: nvidian
+  NGC_CLI_TEAM: clara-lifesciences
 
 
 .docker-setup:
@@ -83,9 +86,6 @@ get-checkpoints:
     - generic
   stage: download
   variables:
-    NGC_CLI_FORMAT_TYPE: ascii
-    NGC_CLI_ORG: nvidian
-    NGC_CLI_TEAM: clara-lifesciences
     MODEL_PATH: models
   rules:
     - when: on_success
@@ -113,6 +113,7 @@ get-checkpoints:
     - cp -r models/* /model
   script:
     - cd /opt/nvidia/bionemo/
+    - export NGC_CLI_ORG NGC_CLI_TEAM NGC_CLI_FORMAT_TYPE NGC_CLI_API_KEY
 
 
 unit-test-cpu:

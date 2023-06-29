@@ -21,7 +21,8 @@ model:
   global_batch_size: 4
   micro_batch_size: 4
   data:
-    data_url: 'https://ftp.uniprot.org/pub/databases/uniprot/uniref/uniref50/uniref50.fasta.gz' 
+    ngc_registry_target: uniref50_2022_05
+    ngc_registry_version: v23.06
     dataset_path: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/protein # parent directory for data, contains train / val / test folders
     dataset: # inclusive range of data files to load or can load a single file, e.g. x000.csv
       train: x000
