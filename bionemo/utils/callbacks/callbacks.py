@@ -49,7 +49,8 @@ class DownstreamValidationCallback(Callback):
         main_model.freeze()
         args = {}
         if "ESM" in self.valid_cfg.infer_target:
-            main_model.half()
+            if main_model.enable_autocast:
+                main_model.half()
             post_process = main_model.model.post_process
             main_model.model.post_process = False
             args["post_process"] = post_process
