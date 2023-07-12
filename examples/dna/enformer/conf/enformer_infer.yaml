@@ -1,0 +1,11 @@
+
+defaults:
+ - enformer_finetune
+ - _self_
+
+restore_from_path: ???
+infer_path: ??? # path to a FASTA file that contains sequence to predict on 
+
+model:
+  predictions_output_path: ??? # where prediction results will be stored
+  predictions_write_mode: sep # please refer to bionemo.model.dna.enformer.writer.FastaRecordsWriter
