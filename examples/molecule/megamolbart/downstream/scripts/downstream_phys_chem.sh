@@ -78,7 +78,8 @@ read -r -d '' COMMAND <<EOF
  trainer.devices=${NGC_GPUS_PER_NODE} \
  trainer.num_nodes=${NGC_ARRAY_SIZE} \
  model.micro_batch_size=${MICRO_BATCH_SIZE} \
- model.data.dataset_path=/data/physchem/SAMPL \
+ model.data.dataset_path=/data/physchem/ \
+ model.data.task_name=SAMPL \
  model.data.dataset.train=x000 \
  model.data.dataset.val=x000 \
  model.data.dataset.test=x000 \

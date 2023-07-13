@@ -118,7 +118,8 @@ class SingleValueDataModule(BioNeMoDataModule):
         return tokenizer
 
     def _create_dataset(self, split, files):
-        datafiles = os.path.join(self.cfg.dataset_path, 
+        datafiles = os.path.join(self.cfg.dataset_path,
+                                 self.cfg.task_name, 
                                  split, 
                                  files)
         datafiles = expand_dataset_paths(datafiles, ".csv")

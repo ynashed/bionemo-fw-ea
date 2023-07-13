@@ -24,7 +24,8 @@ model:
       num_epochs: 10
       shuffle: True
       num_workers: 8
-      dataset_path: /data/physchem/SAMPL
+      dataset_path: /data/physchem/
+      task_name: SAMPL
       dataset:
         train: x000
         test: x000

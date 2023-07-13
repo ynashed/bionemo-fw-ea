@@ -41,12 +41,13 @@ model:
   data:
     # Preprocessing data params
     links_file: /workspace/bionemo/examples/molecule/megamolbart/dataset/PhysChem-downloader.txt
-    dataset_path: /data/physchem/SAMPL
+    dataset_path: /data/physchem/ #sets the location where all three physchem datasets will be downloaded
     split_data: True
     val_frac: 0.15 # proportion of samples used for validation set
     test_frac: 0.15 # proportion of samples used for test set
 
     # Finetuning data params
+    task_name: SAMPL #specifies which MoleculeNet physchem dataset to use for training, expected values: SAMPL, Lipophilicity, or delaney-processed
     task_type: 'regression'
     sequence_column: 'smiles'
     target_column: 'expt'

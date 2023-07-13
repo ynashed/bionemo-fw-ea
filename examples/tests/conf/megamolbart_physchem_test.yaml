@@ -43,12 +43,13 @@ model:
   data:
     # Preprocessing data params
     links_file: /workspace/bionemo/examples/molecule/megamolbart/dataset/PhysChem-downloader.txt
-    dataset_path: /workspace/bionemo/examples/tests/test_data/molecule/phys_chem
+    dataset_path: /workspace/bionemo/examples/tests/test_data/molecule
     split_data: True
     val_frac: 0.15 # proportion of samples used for validation set
     test_frac: 0.15 # proportion of samples used for test set
 
     # Finetuning data params
+    task_name: phys_chem
     task_type: 'regression'
     sequence_column: 'smiles'
     target_column: 'expt'
