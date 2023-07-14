@@ -48,14 +48,22 @@ variables:
   before_script:
     - until docker info; do sleep 1; done
     - mkdir -p $HOME/.docker
-    - echo $DOCKER_AUTH_CONFIG > $HOME/.docker/config.json
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker login -u '$oauthtoken' -p $NGC_CLI_API_KEY nvcr.io
 
 
-.build-common:
+# TODO: consider splitting this into build-base and build-devel
+build:
   extends:
     - .docker-setup
   stage: build
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: manual
+    - if: $CI_COMMIT_BRANCH == "dev"
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "bionemo-rc2306-v1"
+    - when: manual
   script:
     - if [[ $NIGHTLY = true ]]; then
         base="--build-arg BASE_IMAGE=$NEMO_NIGHTLY_TAG";
@@ -65,18 +73,10 @@ variables:
     - docker build --network host --no-cache ${base} --label com.nvidia.bionemo.git_hash=${CI_COMMIT_SHORT_SHA}
       -t $PIPELINE_TAG -f setup/Dockerfile .
     - docker push $PIPELINE_TAG
-
-
-build:
-  extends:
-    - .build-common
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
-      when: manual
-    - if: $CI_COMMIT_BRANCH == "dev"
-    - if: $CI_COMMIT_BRANCH == "main"
-    - if: $CI_COMMIT_BRANCH == "bionemo-rc2306-v1"
-    - when: manual
+    - docker build --network host --no-cache --build-arg BIONEMO_IMAGE="$PIPELINE_TAG"
+      --build-arg TPL_REPO=https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab-master.nvidia.com/dl/gwe/torch_performance_linter
+      -t $PIPELINE_TAG-devel -f internal/Dockerfile-devel .
+    - docker push $PIPELINE_TAG-devel
 
 
 get-checkpoints:
@@ -153,3 +153,10 @@ dev-deploy:
     - docker push $SHA_TAG
     - docker push $LATEST_TAG
     - docker push $NGC_TAG
+    - docker pull $PIPELINE_TAG-devel
+    - docker tag $PIPELINE_TAG-devel $SHA_TAG-devel
+    - docker tag $PIPELINE_TAG-devel $LATEST_TAG-devel
+    - docker tag $PIPELINE_TAG-devel $NGC_TAG-devel
+    - docker push $SHA_TAG-devel
+    - docker push $LATEST_TAG-devel
+    - docker push $NGC_TAG-devel

@@ -43,8 +43,7 @@ coverage.xml
 **/*.npy
 
 # internal
-ci/
-internal/
+.gitlab-ci.yaml
 
 # configs
 .config/

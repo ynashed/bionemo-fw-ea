@@ -1,0 +1,19 @@
+
+ARG BIONEMO_IMAGE
+FROM ${BIONEMO_IMAGE}
+
+RUN python3 -m pip install git+https://github.com/NVIDIA/dllogger@v1.0.0#egg=dllogger
+
+RUN pip install git+https://gitlab-master.nvidia.com/dl/gwe/torch_automated_profiler@abc09214
+RUN mkdir -p -m 0700 ~/.ssh && ssh-keyscan gitlab-master.nvidia.com >> ~/.ssh/known_hosts || :
+ARG TPL_REPO=ssh://git@gitlab-master.nvidia.com:12051/dl/gwe/torch_performance_linter
+RUN --mount=type=ssh pip install git+${TPL_REPO}
+
+# FIXME: our runners cant see sc-hw-artf.nvidia.com
+# RUN pip install jet-api --upgrade \
+#     --extra-index-url https://sc-hw-artf.nvidia.com/api/pypi/hw-joc-pypi/simple \
+#     --extra-index-url https://sc-hw-artf.nvidia.com/api/pypi/compute-pypi/simple
+
+ARG BIONEMO_HOME=/opt/nvidia/bionemo
+# COPY ./ci/perf ${BIONEMO_HOME}/ci/perf
+COPY ./internal ${BIONEMO_HOME}/internal
