@@ -187,10 +187,6 @@ class Zinc15Preprocess(object):
                              test_samples_per_file, 
                              pool_size=8, 
                              seed=0):
-        if os.path.exists(output_dir):
-            logging.info(f'{output_dir} already exists...')
-            os.rename(output_dir, str(output_dir) +
-                      datetime.now().strftime('%Y%m%d%H%M%S'))
 
         split_data = os.path.join(output_dir, 'split_data')
         os.makedirs(split_data, exist_ok=True)
@@ -235,6 +231,11 @@ class Zinc15Preprocess(object):
         download_dir = self.root_directory.joinpath('raw')
         if output_dir is None:
             output_dir = self.root_directory.joinpath('processed')
+
+        if os.path.exists(output_dir):
+            logging.info(f'{output_dir} already exists...')
+            os.rename(output_dir, str(output_dir) +
+                      datetime.now().strftime('%Y%m%d%H%M%S'))
 
         if os.path.basename(links_file) == 'ZINC-downloader.txt':
                 logging.info(
