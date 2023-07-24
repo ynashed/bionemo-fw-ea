@@ -38,7 +38,7 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y \
         python3-setuptools python3-dev swig \
-        wget git unzip tmux vim tree && \
+        wget git unzip tmux vim tree xterm && \
     rm -rf /var/lib/apt/lists/*
 
 # install Google Cloud SDK so that users can authethicate while pulling data from GCP buckets
@@ -67,7 +67,7 @@ RUN NEMO_PATH=$(python -c 'import nemo; print(nemo.__path__[0])') && \
 #########################################################################################
 
 # The location of the installed library in the container. Set BIONEMO_HOME env to change this for development purposes.
-ARG BIONEMO_HOME=/opt/nvidia/bionemo 
+ARG BIONEMO_HOME=/opt/nvidia/bionemo
 ENV BIONEMO_HOME=${BIONEMO_HOME}
 
 # Copy the repo
