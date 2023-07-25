@@ -30,12 +30,12 @@ Alternatively you can start server for sampling new sequences with MegaMolBART:
 python examples/triton/sampling_server.py --config-path /workspace/bionemo/examples/molecule/megamolbart/conf &
 ```
 
-Under the hood, the scripts use `hyrda` and load model configuration for `infer.yaml` present in the specified cofig directory,
+Under the hood, the scripts use `hydra` and load model configuration from `infer.yaml` present in the specified config directory,
 so you can provide custom configuration by specifying a different yaml or overriding particular arguments.
 
 # Querying the Server
 
-Regardless of the model and server type selected, you cand send a query with the client script:
+Regardless of the model and server type selected, you can send a query with the client script:
 ```
 python examples/triton/client.py --sequences SEQUENCES [SEQUENCES ...] [--output_path OUTPUT_PATH]
 ```
