@@ -13,11 +13,17 @@
 # limitations under the License.
 
 import math
+import tarfile
+import yaml
+from typing import Optional, Union
 from nemo.utils import logging
 
 from nemo.collections.nlp.parts.nlp_overrides import (
     NLPSaveRestoreConnector,
 )
+import torch
+from omegaconf import OmegaConf
+from pytorch_lightning.trainer.trainer import Trainer
 
 __all__ = ['BioNeMoSaveRestoreConnector']
 
@@ -34,6 +40,26 @@ class BioNeMoSaveRestoreConnector(NLPSaveRestoreConnector):
     def __init__(self, vocab_size=None) -> None:
         super().__init__()
         self.vocab_size = vocab_size
+
+
+    def restore_from(self, calling_cls, 
+        restore_path: str,
+        override_config_path: Optional[Union[OmegaConf, str]] = None,
+        map_location: Optional[torch.device] = None,
+        strict: bool = True,
+        return_config: bool = False,
+        trainer: Trainer = None):
+
+        with tarfile.open(restore_path, "r") as tar:
+            _yaml = tar.extractfile('./model_config.yaml')
+            obj = yaml.safe_load(_yaml)
+
+        if 'target' in obj:
+            if not obj['target'] == f"{calling_cls.__module__}.{calling_cls.__name__}":
+                raise TypeError(f"Restored model is not the same class as the model invoked. restored: {obj['target']}, invoked: {calling_cls}")
+        else:
+            logging.warn(f"No 'target' field in {restore_path=}, cannot guarantee the correct model is restored. Use a newer .nemo file or proceed at your own risk.")
+        return super().restore_from(calling_cls, restore_path, override_config_path, map_location, strict, return_config, trainer)
 
     def modify_state_dict(self, conf, state_dict):
         new_state_dict = {}
