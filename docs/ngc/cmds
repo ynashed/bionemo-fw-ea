@@ -9,14 +9,15 @@ Commands for uploading containers are in launch.sh script.
 ## Model Upload
 
 ```shell
-ORG=t6a4nuz8vrsr
+ORG=nvidian
+TEAM=clara-lifesciences
 MODEL_PATH=/data/bionemo/models/esm1nv.nemo
 
 ngc registry model upload-version \
     --gpu-model A100 \
     --org nvstaging \
     --source $MODEL_PATH \
-    nvcr.io/${ORG}/esm1nv:0.1.0
+    ${ORG}/${TEAM}/esm1nv:23.06
 ```
 
 
