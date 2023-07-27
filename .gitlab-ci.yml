@@ -30,6 +30,7 @@ variables:
   SHA_TAG: "$DOCKER_TAG_PREFIX:$CI_COMMIT_SHORT_SHA-$CI_COMMIT_BRANCH"
   LATEST_TAG: "$DOCKER_TAG_PREFIX:$CI_COMMIT_BRANCH-latest"
   NGC_TAG: "$NGC_REGISTRY_IMAGE:$CI_COMMIT_BRANCH"
+  RC_NGC_TAG_PREFIX: "nvcr.io/nv-drug-discovery-dev/bionemo"
   NEMO_NIGHTLY_TAG: "nvcr.io/nvidian/nemo-nightly:latest-nightly-main"
   NIGHTLY:
     value: "false"
@@ -165,3 +166,10 @@ dev-deploy:
     - docker push $SHA_TAG-devel
     - docker push $LATEST_TAG-devel
     - docker push $NGC_TAG-devel
+    - if [[ $CI_COMMIT_BRANCH == "bionemo-rc2306-v1" ]]; then
+        RC_VER=`printf %02d $((RC_VER+1))` &&
+        RC_NGC_TAG="${RC_NGC_TAG_PREFIX}:${RC_VER}" &&
+        docker tag $PIPELINE_TAG $RC_NGC_TAG &&
+        docker push $RC_NGC_TAG &&
+        curl --request PUT "https://gitlab-master.nvidia.com/api/v4/projects/${CI_PROJECT_ID}/variables/RC_VER&job_token=${CI_JOB_TOKEN}" --form "value=${RC_VER}";
+      fi
