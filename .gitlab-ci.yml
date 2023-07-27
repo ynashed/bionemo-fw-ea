@@ -151,6 +151,9 @@ dev-deploy:
     - if: $CI_COMMIT_BRANCH == "dev" && $NIGHTLY != "true"
     - if: $CI_COMMIT_BRANCH == "main" && $NIGHTLY != "true"
     - if: $CI_COMMIT_BRANCH == "bionemo-rc2306-v1" && $NIGHTLY != "true"
+  before_script:
+    - !reference [.docker-setup, before_script]
+    - apk update && apk add curl
   script:
     - docker pull $PIPELINE_TAG
     - docker tag $PIPELINE_TAG $SHA_TAG
