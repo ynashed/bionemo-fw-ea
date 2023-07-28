@@ -174,7 +174,7 @@ dev-deploy:
         docker tag $PIPELINE_TAG $RC_NGC_TAG &&
         docker push $RC_NGC_TAG &&
         RC_VER=`printf %02d $((RC_VER+1))` &&
-        RC_NGC_TAG="${RC_NGC_TAG_PREFIX}:${RC_VER}" &&
+        RC_NGC_TAG="${RC_NGC_TAG_PREFIX}:rc2306-${RC_VER}" &&
         docker tag $PIPELINE_TAG $RC_NGC_TAG &&
         docker push $RC_NGC_TAG &&
         curl --request PUT --header "PRIVATE-TOKEN: ${RW_API_TOKEN}" "https://gitlab-master.nvidia.com/api/v4/projects/${CI_PROJECT_ID}/variables/RC_VER" --form "value=${RC_VER}";
