@@ -228,6 +228,9 @@ class Zinc15Preprocess(object):
             links_file (str): File containing links to be downloaded.
             seed (int): Random seed for data splitting
         """
+
+        logging.info('Download and preprocess of ZINC15 data does not currently use GPU. Workstation or CPU-only instance recommended.')
+
         download_dir = self.root_directory.joinpath('raw')
         if output_dir is None:
             output_dir = self.root_directory.joinpath('processed')

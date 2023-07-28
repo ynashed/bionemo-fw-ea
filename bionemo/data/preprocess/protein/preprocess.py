@@ -260,6 +260,8 @@ class UniRef50Preprocess(object):
             random_seed (int): Random seed.
         """
 
+        logging.info('Download and preprocess of UniRef50 data does not currently use GPU. Workstation or CPU-only instance recommended.')
+
         download_dir = self.root_directory.joinpath('raw')
         if output_dir is None:
             output_dir = self.root_directory.joinpath('processed')
