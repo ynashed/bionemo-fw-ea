@@ -29,15 +29,21 @@ def main(cfg) -> None:
     logging.info("\n\n************* Fintune config ****************")
     logging.info(f'\n{OmegaConf.to_yaml(cfg)}')
 
-    trainer = setup_trainer(
-         cfg, builder=None)
 
-    model = FineTuneMegaMolBART(cfg, trainer)
+    if cfg.do_training or cfg.do_testing:
+        trainer = setup_trainer(
+             cfg, builder=None)
+        model = FineTuneMegaMolBART(cfg, trainer)
 
     if cfg.do_training:
         logging.info("************** Starting Training ***********")
         trainer.fit(model)
         logging.info("************** Finished Training ***********")
+        if cfg.do_testing:
+            if "test" in cfg.model.data.dataset:
+                trainer.test(model)
+            else:
+                raise UserWarning("Skipping testing, test dataset file was not provided. Please specify 'test_ds.data_file' in yaml config")
     else:
         logging.info("************** Starting Data PreProcessing ***********")
         PhysChemPreprocess().prepare_dataset(links_file=cfg.model.data.links_file,
@@ -49,13 +55,6 @@ def main(cfg) -> None:
                                                     test_frac=cfg.model.data.test_frac, 
                                                     val_frac=cfg.model.data.val_frac)
         logging.info("************** Finished Data PreProcessing ***********")
-
-
-    if cfg.do_testing:
-        if "test" in cfg.model.data.dataset:
-            trainer.test(model)
-        else:
-            raise UserWarning("Skipping testing, test dataset file was not provided. Please specify 'test_ds.data_file' in yaml config")
 
 if __name__ == '__main__':
     main()
