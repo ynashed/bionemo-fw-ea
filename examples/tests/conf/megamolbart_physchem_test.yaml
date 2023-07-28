@@ -55,9 +55,9 @@ model:
     target_column: 'expt'
     emb_batch_size: ${model.micro_batch_size}
     dataset:
-      train: train
-      val: val
-      test: test
+      train: x000
+      val: x000
+      test: x000
     num_workers: 0
   
   finetuning_optim:

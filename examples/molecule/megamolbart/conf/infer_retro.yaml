@@ -18,7 +18,7 @@ model:
     model_path: /tokenizers/molecule/megamolbart/vocab/megamolbart.model
   downstream_task:
     # TODO update with the official retro path when the checkpoint is ready
-    restore_from_path: /result/nemo_experiments/MegaMolBARTRetro_uspto50k_random_init/MegaMolBARTRetro_uspto50k_random_init/checkpoints/MegaMolBARTRetro_uspto50k_random_init.nemo
+    restore_from_path: /model/molecule/megamolbart/megamolbart_retro.nemo
     outputs: [embeddings, hiddens] # Which outputs to extract per sample (a value or list). Possible values: hiddens, embeddings.
   data:
     # TODO exchange with whole dataset if needed

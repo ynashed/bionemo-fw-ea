@@ -93,6 +93,8 @@ get-checkpoints:
   script:
     - export NGC_CLI_ORG NGC_CLI_TEAM NGC_CLI_FORMAT_TYPE NGC_CLI_API_KEY MODEL_PATH
     - source download_models.sh && download_bionemo_models
+    - setup_model "nvidian/clara-lifesciences/megamolbart_retro:0.1.0" 
+        "${MODEL_PATH}" "molecule/megamolbart/megamolbart_retro.nemo"
   artifacts:
     paths:
       - models
@@ -131,6 +133,9 @@ unit-test-gpu:
   - .unit-tests-common
   tags:
     - gpu
+  before_script:
+    - !reference [.unit-tests-common, before_script]
+    - nvidia-smi
   script:
     - !reference [.unit-tests-common, script]
     - pytest -v -m "needs_gpu" -k "not test_model_training"
