@@ -192,9 +192,8 @@ def test_model_training(prepend_config_path, config_name, model_class, correct_r
     callbacks = setup_callbacks(cfg)
     trainer = setup_trainer(cfg, callbacks=callbacks)
 
-
-    pretrain_model_path = cfg.model.get('pretrain_model_path', None)
-    if pretrain_model_path is not None:
+    if model_class == MegaMolBARTRetroModel:
+        pretrain_model_path = cfg.get('restore_from_path', None)
         check_model_exists(pretrain_model_path)
         model = model_class.restore_from(restore_path=pretrain_model_path, trainer=trainer,
                                          save_restore_connector=BioNeMoSaveRestoreConnector(),

@@ -20,9 +20,7 @@ from bionemo.data.preprocess.molecule.uspto50k_preprocess import USPTO50KPreproc
 from bionemo.model.molecule.megamolbart import MegaMolBARTRetroModel
 from bionemo.model.utils import setup_trainer
 
-from nemo.collections.nlp.parts.nlp_overrides import (
-    NLPSaveRestoreConnector,
-)
+from bionemo.utils import BioNeMoSaveRestoreConnector
 
 
 @hydra_runner(config_path="conf", config_name="downstream_retro_uspto50k")
@@ -32,13 +30,13 @@ def main(cfg):
 
     trainer = setup_trainer(cfg)
 
-    pretrain_model_path = cfg.model.get('pretrain_model_path', None)
-    if pretrain_model_path is not None:
+    if cfg.restore_from_path:
+        logging.info("\nRestoring model from .nemo file " + cfg.restore_from_path)
         # this method restores state dict from the finetuninig's checkpoint if it is available
         # otherwise loads weights from the "restore_path" model. Also, it overwrites the pretrained model
         # config by the finetuninig config
-        model = MegaMolBARTRetroModel.restore_from(restore_path=pretrain_model_path, trainer=trainer,
-                                                   save_restore_connector=NLPSaveRestoreConnector(),
+        model = MegaMolBARTRetroModel.restore_from(restore_path=cfg.restore_from_path, trainer=trainer,
+                                                   save_restore_connector=BioNeMoSaveRestoreConnector(),
                                                    override_config_path=cfg)
     else:
         model = MegaMolBARTRetroModel(cfg.model, trainer)

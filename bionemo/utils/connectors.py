@@ -56,7 +56,7 @@ class BioNeMoSaveRestoreConnector(NLPSaveRestoreConnector):
 
         if 'target' in obj:
             if not obj['target'] == f"{calling_cls.__module__}.{calling_cls.__name__}":
-                raise TypeError(f"Restored model is not the same class as the model invoked. restored: {obj['target']}, invoked: {calling_cls}")
+                logging.warning(f"Restored model is not the same class as the model invoked. restored: {obj['target']}, invoked: {calling_cls}")
         else:
             logging.warn(f"No 'target' field in {restore_path=}, cannot guarantee the correct model is restored. Use a newer .nemo file or proceed at your own risk.")
         return super().restore_from(calling_cls, restore_path, override_config_path, map_location, strict, return_config, trainer)
