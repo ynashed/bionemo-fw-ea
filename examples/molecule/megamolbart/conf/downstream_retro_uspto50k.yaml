@@ -10,6 +10,8 @@ defaults:
   - pretrain_base
 
 name: MegaMolBARTRetro_uspto50k
+# model architecture compatible with MegaMolBart model downloaded by executing ./launch.sh download
+restore_from_path: /model/molecule/megamolbart/megamolbart.nemo # set to null to start from randomly initialize weights
 
 trainer:
   num_nodes: 1
@@ -20,9 +22,6 @@ trainer:
 
 model:
   name: ${name}
-  pretrain_model_path: /model/molecule/megamolbart/megamolbart.nemo # set to null to start from randomly initialize weights
-  # model architecture compatible with MegaMolBart model downloaded by executing ./launch.sh download
-  # from https://catalog.ngc.nvidia.com/orgs/nvidia/teams/clara/models/megamolbart_0_2
   micro_batch_size: 256
   num_layers: 6
   hidden_size: 512
