@@ -77,6 +77,11 @@ elif [ "$MODEL" = "megamolbart" ]; then
             --NotebookApp.token='' \
             --NotebookApp.password_required=False
 
+# In the case user runs bash for an interactive terminal, add a tag
+# to terminal prompt for ease of use.
+elif [ "$MODEL" = "bash" ]; then
+    bash --rcfile /docker_bashrc
+
 elif [ "$#" -gt 0 ]; then
     ${MODEL}
 

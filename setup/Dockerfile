@@ -86,6 +86,8 @@ COPY ./tokenizers /tokenizers
 
 RUN mkdir -p /workspace/bionemo
 RUN ln -s /opt/nvidia/bionemo/examples/ /workspace/bionemo/examples
+RUN echo 'export PS1="(bionemo docker) $PS1"' > /docker_bashrc
+
 WORKDIR /workspace
 
 ENTRYPOINT ["/opt/nvidia/startup.sh"]
