@@ -194,3 +194,4 @@ nemo_error_log*.txt
 *.npy
 *.swp
 *.idx.info
+.dgl/

@@ -23,6 +23,12 @@
 ARG BASE_IMAGE=nvcr.io/nvidia/nemo:23.03
 FROM ${BASE_IMAGE}
 
+WORKDIR /workspace/
+
+# copy built DGL and install it
+# dgl_builder is created with setup/Dockerfile.dgl_builder
+COPY --from=gitlab-master.nvidia.com:5005/clara-discovery/bionemo:dgl_builder /dgl ./dgl
+RUN cd dgl/python && python setup.py install && cd ../.. && rm -rf dgl
 # Please populate the labels below if using a custom base container (ie not NeMo GA)
 # For nightly NeMo builds, only com.nvidia.nemo.description should be provided
 # (release and git_hash labels are filled automatically).
