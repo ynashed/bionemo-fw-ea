@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import re
 from nemo.collections.nlp.data.language_modeling.text_memmap_dataset import TextMemMapDataset
 
 __all__ = ["CSVFieldsMemmapDataset"]
@@ -52,8 +53,9 @@ class CSVFieldsMemmapDataset(TextMemMapDataset):
         _build_data_from_text = super()._build_data_from_text
         # extract id and sequence and tokenize (if needed)
         data = {}
-        text_fields = text.split(self._data_sep)
+        rule = self._data_sep + '\s*(?=(?:[^"]*"[^"]*")*[^"]*$)'
+        text_fields = re.split(r'{}'.format(rule), text)
         for field_name, field_idx in self._data_fields.items():
-            data[field_name] = _build_data_from_text(text_fields[field_idx])
+            data[field_name] = _build_data_from_text(text_fields[field_idx].strip('\"').strip())
 
         return data
