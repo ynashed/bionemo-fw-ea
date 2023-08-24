@@ -130,6 +130,41 @@ model:
       max_steps: 1000000 # can also use ${trainer.max_steps} to scale
       min_lr: 1e-5
 
+  dwnstr_task_validation:
+    enabled: False
+    dataset:
+      class: SingleValuePredictionCallback
+      task_type: regression
+      infer_target: bionemo.model.molecule.megamolbart.infer.MegaMolBARTInference
+      max_seq_length: ${model.seq_length}
+      emb_batch_size: 128
+      batch_size: 128
+      num_epochs: 10
+      shuffle: True
+      num_workers: 8
+      dataset_path: /data/physchem/
+      task_name: SAMPL
+      dataset:
+        train: x000
+        test: x000
+      sequence_column: 'smiles'
+      target_column: 'expt'
+      random_seed: 1234
+      optim:
+        name: adam
+        lr: 0.0001
+        betas:
+          - 0.9
+          - 0.999
+        eps: 1e-8
+        weight_decay: 0.01
+        sched:
+          name: WarmupAnnealing
+          min_lr: 0.00001
+          last_epoch: -1
+          warmup_ratio: 0.01
+          max_steps: 1000
+
 exp_manager:
   name: ${name}
 

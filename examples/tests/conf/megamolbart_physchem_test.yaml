@@ -42,8 +42,8 @@ model:
 
   data:
     # Preprocessing data params
-    links_file: /workspace/bionemo/examples/molecule/megamolbart/dataset/PhysChem-downloader.txt
-    dataset_path: /workspace/bionemo/examples/tests/test_data/molecule/phys_chem
+    links_file: ${oc.env:PROJECT_MOUNT}/examples/molecule/megamolbart/dataset/PhysChem-downloader.txt
+    dataset_path: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/molecule/phys_chem
     split_data: True
     val_frac: 0.15 # proportion of samples used for validation set
     test_frac: 0.15 # proportion of samples used for test set

@@ -132,9 +132,13 @@ def main(cfg) -> None:
     if os.path.exists(cfg.model.data.output_fname):
         logging.warning(f"Output path {output_fname} already exists, appending a unique id to the path")
         output_fname += "." + str(uuid.uuid4())
-            
+
+    if ~os.path.exists(output_fname):
+        os.makedirs(os.path.dirname(output_fname), exist_ok=True)
+
     logging.info(f"Saving {len(predictions)} samples to output_fname = {output_fname}")
     pickle.dump(predictions, open(output_fname, "wb"))
-    
+
+
 if __name__ == '__main__':
     main()

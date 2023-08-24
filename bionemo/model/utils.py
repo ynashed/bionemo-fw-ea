@@ -26,6 +26,8 @@ from pytorch_lightning.trainer.connectors.checkpoint_connector import (
 from pytorch_lightning.callbacks import ModelSummary
 import pytorch_lightning as pl
 
+from bionemo.tests.utils import add_test_callbacks
+
 from nemo.collections.nlp.parts.nlp_overrides import (
     GradScaler,
     MegatronHalfPrecisionPlugin,
@@ -212,6 +214,7 @@ class InferenceTrainerBuilder(TrainerBuilder):
     def resume_checkpoint(cfg, trainer):
         pass
 
+
 def setup_trainer(cfg, builder=None, callbacks=[], adjust_config=True, verbose=True):
     """NeMo Trainer setup functions"""
     if builder is None:
@@ -220,7 +223,10 @@ def setup_trainer(cfg, builder=None, callbacks=[], adjust_config=True, verbose=T
     if adjust_config:
         builder.adjust_config(cfg)
     plugins = builder.configure_plugins(cfg)
+    mode = "train" if cfg.get("do_training", False) else "test"
     callbacks = builder.configure_callbacks(cfg, callbacks)
+    add_test_callbacks(cfg, callbacks=callbacks,
+                       mode="infer" if builder == InferenceTrainerBuilder else mode)
     strategy = builder.configure_strategy(cfg)
 
     trainer = Trainer(
@@ -228,7 +234,6 @@ def setup_trainer(cfg, builder=None, callbacks=[], adjust_config=True, verbose=T
     )
     exp_manager(trainer, cfg.get("exp_manager", None))
     builder.resume_checkpoint(cfg, trainer)
-
     # log trainer configuration (which might be different from input cfg)
     if verbose:
         logging.info("\n\n************** Trainer configuration ***********")

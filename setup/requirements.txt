@@ -24,3 +24,4 @@ testbook
 git+https://github.com/prokotg/tfrecord@float16zlib
 requests_mock
 nvidia-pytriton==0.1.5
+git+https://github.com/NVIDIA/dllogger@v1.0.0#egg=dllogger

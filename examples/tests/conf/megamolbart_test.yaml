@@ -27,6 +27,16 @@ model:
   
   dwnstr_task_validation:
     enabled: False
+    dataset:
+      emb_batch_size: 32
+      batch_size: ${.emb_batch_size}
+      num_epochs: 1
+      dataset_path: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/molecule/phys_chem
+      task_name: SAMPL
+      dataset:
+        train: x000
+        val: x000
+        test: x000
 
 exp_manager:
   exp_dir: /tmp/nemo_experiments/megamolbart_pretrain

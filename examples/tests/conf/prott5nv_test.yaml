@@ -34,6 +34,15 @@ model:
     header_lines: 1
     num_workers: 10
 
+  dwnstr_task_validation:
+    dataset:
+      emb_batch_size: 24
+      batch_size: ${.emb_batch_size}
+      num_epochs: 1
+      task_name: downstream
+      dataset_path: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/protein/downstream
+
+
 exp_manager:
   exp_dir: /tmp/nemo_experiments/prott5nv_pretrain
   create_wandb_logger: False

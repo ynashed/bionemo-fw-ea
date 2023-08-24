@@ -23,6 +23,7 @@ import pytest
 import os
 import pathlib
 from hydra import initialize, compose
+from hydra.core.global_hydra import GlobalHydra
 import logging
 
 from bionemo.model.molecule.megamolbart import MegaMolBARTModel, MegaMolBARTRetroModel
@@ -126,6 +127,11 @@ def get_cfg(prepend_config_path, config_name, config_path='conf'):
             self.prepend_config_dir = update_relative_config_dir(prepend_config_path, THIS_FILE_DIR)
 
     register_searchpath_config_plugin(TestSearchPathConfig)
+
+    if GlobalHydra.instance().is_initialized():
+        # in case another hydra is running
+        GlobalHydra.instance().clear()
+
     with initialize(config_path=config_path):
         cfg = compose(config_name=config_name)
 

@@ -13,6 +13,7 @@ from omegaconf.dictconfig import DictConfig
 import yaml
 import hashlib
 import codecs
+from nemo.utils import logging
 
 
 class BioNemoSearchPathConfig(SearchPathPlugin):
@@ -157,6 +158,7 @@ def save_expected_training_results(results_comparison_dir: str, correct_results:
     """
     supported_formats = ['json', 'pickle']
     results_path = os.path.join(results_comparison_dir, correct_results)
+    logging.info(f'Saving expected training results to {results_path}')
     if file_format == 'json':
         with open(results_path, 'w') as fh:
             json.dump(expected_results, fh, indent=4, sort_keys=True)

@@ -15,6 +15,7 @@ exp_manager:
   create_checkpoint_callback: False
 
 model:
+  micro_batch_size: ${model.data.batch_size}
   downstream_task:
     restore_from_path: ??? # path of pretrained model to be used in inference
     outputs: [embeddings, hiddens] # Which outputs to extract per sample (a value or list). Possible values: hiddens, embeddings.

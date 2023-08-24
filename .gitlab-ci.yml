@@ -7,6 +7,7 @@ stages:
   - build
   - download
   - test
+  - jet
   - deploy
 
 services:
@@ -41,6 +42,7 @@ variables:
   NGC_CLI_FORMAT_TYPE: ascii
   NGC_CLI_ORG: nvidian
   NGC_CLI_TEAM: clara-lifesciences
+  JET_WORKLOADS_REF_MAIN: "bionemo/training-unit-tests"
 
 
 .docker-setup:
@@ -94,7 +96,7 @@ get-checkpoints:
   script:
     - export NGC_CLI_ORG NGC_CLI_TEAM NGC_CLI_FORMAT_TYPE NGC_CLI_API_KEY MODEL_PATH
     - source download_models.sh && download_bionemo_models
-    - setup_model "nvidian/clara-lifesciences/megamolbart_retro:0.1.0" 
+    - setup_model "nvidian/clara-lifesciences/megamolbart_retro:0.1.0"
         "${MODEL_PATH}" "molecule/megamolbart/megamolbart_retro.nemo"
   artifacts:
     paths:
@@ -140,6 +142,102 @@ unit-test-gpu:
   script:
     - !reference [.unit-tests-common, script]
     - pytest -v -m "needs_gpu" -k "not test_model_training"
+
+
+.jet-generate-template:
+  tags:
+    - generic
+  stage: jet
+  dependencies:
+    - build
+  variables:
+    CMD: 'yq e ".spec.source.image = \"${PIPELINE_TAG}\"" -i builds/bionemo.yaml'
+    JET_WORKLOADS_DIR: "/builds/clara-discovery/workloads-registry"
+    JET_WORKLOADS_REPO_URL: "gitlab-master.nvidia.com/dl/jet/workloads-registry"
+  before_script:
+    - apk update && apk add git yq
+    - if [ -d "$JET_WORKLOADS_DIR" ]; then rm -rf $JET_WORKLOADS_DIR; fi
+    - git clone https://gitlab-ci-token:${JET_WORKLOADS_TOKEN}@$JET_WORKLOADS_REPO_URL $JET_WORKLOADS_DIR
+    - cd $JET_WORKLOADS_DIR
+    - git checkout -f $JET_WORKLOADS_REF_MAIN
+    - git checkout -b $JET_WORKLOADS_REF_EPHEMERAL
+    - git config --global user.email "bionemo@ci.nvidia.com"
+    - git config --global user.name "BioNeMo CI"
+  script:
+    - eval "$CMD"
+    - git add .; git commit -m'Dynamic configuration - ${CI_PIPELINE_ID} - replaced docker image in build config'
+    - git push origin $JET_WORKLOADS_REF_EPHEMERAL
+
+
+.jet-trigger-template:
+  stage: jet
+  inherit:
+    variables: false
+  variables:
+    JET_WORKLOADS_REF: ""
+    JET_WORKLOADS_QUERY: type == 'recipe'
+    JET_BUILDS_PLATFORMS: linux/amd64
+  trigger:
+    project: dl/jet/ci
+    strategy: depend
+
+
+jet-generate:
+  extends: .jet-generate-template
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      when: manual
+      allow_failure: true
+      variables:
+        JET_WORKLOADS_REF_EPHEMERAL: "ephemeral/bionemo/${CI_PIPELINE_ID}"
+    - if: $CI_COMMIT_BRANCH == "dev"
+      variables:
+        JET_WORKLOADS_REF_EPHEMERAL: "ephemeral/bionemo/${CI_COMMIT_BRANCH}/${CI_PIPELINE_ID}"
+    - if: $CI_COMMIT_BRANCH == "main"
+      variables:
+        JET_WORKLOADS_REF_EPHEMERAL: "ephemeral/bionemo/${CI_COMMIT_BRANCH}/${CI_PIPELINE_ID}"
+
+
+jet-trigger:
+    needs: [jet-generate]
+    extends:
+      - .jet-trigger-template
+    inherit:
+      variables:
+        - CI_PIPELINE_ID
+        - CI_COMMIT_BRANCH
+    rules:
+      - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+        variables:
+          JET_WORKLOADS_REF: "ephemeral/bionemo/${CI_PIPELINE_ID}"
+      - if: $CI_COMMIT_BRANCH == "dev"
+        variables:
+          JET_WORKLOADS_REF: "ephemeral/bionemo/${CI_COMMIT_BRANCH}/${CI_PIPELINE_ID}"
+      - if: $CI_COMMIT_BRANCH == "main"
+        variables:
+          JET_WORKLOADS_REF: "ephemeral/bionemo/${CI_COMMIT_BRANCH}/${CI_PIPELINE_ID}"
+
+
+# TODO use image: gitlab-master.nvidia.com:5005/dl/jet/api:latest
+jet-test:
+  needs: [jet-trigger]
+  image:
+    name: "${PIPELINE_TAG}-devel"
+    entrypoint: [""]
+  tags:
+    - generic
+  stage: jet
+  when: on_success
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "dev"
+    - if: $CI_COMMIT_BRANCH == "main"
+  before_script:
+    - export RO_API_TOKEN CI_PROJECT_ID CI_PIPELINE_ID GITLAB_USER_LOGIN CI_JOB_JWT
+    - jet secrets jwt-login jwt/nvidia/gitlab-master bionemo-ci $CI_JOB_JWT
+  script:
+    - echo "CI_PROJECT_ID ${CI_PROJECT_ID}, CI PIPELINE_ID ${CI_PIPELINE_ID}"
+    - bash internal/jet/scripts/run_jet_test.sh
 
 
 dev-deploy:
