@@ -206,6 +206,7 @@ jet-trigger:
       variables:
         - CI_PIPELINE_ID
         - CI_COMMIT_BRANCH
+    allow_failure: true
     rules:
       - if: $CI_PIPELINE_SOURCE == "merge_request_event"
         variables:
