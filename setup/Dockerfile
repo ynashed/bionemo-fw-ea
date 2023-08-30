@@ -20,7 +20,7 @@
 #   - pycairo=1.20.1=py38hf61ee4a_0
 
 
-ARG BASE_IMAGE=nvcr.io/nvidia/nemo:23.03
+ARG BASE_IMAGE=nvcr.io/nvidia/nemo:23.06
 FROM ${BASE_IMAGE}
 
 WORKDIR /workspace/
