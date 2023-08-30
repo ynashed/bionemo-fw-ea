@@ -14,6 +14,5 @@ RUN pip install jet-api --upgrade \
     --extra-index-url https://sc-hw-artf.nvidia.com/api/pypi/hw-joc-pypi/simple \
     --extra-index-url https://sc-hw-artf.nvidia.com/api/pypi/compute-pypi/simple
 
-ARG BIONEMO_HOME=/opt/nvidia/bionemo
 COPY ./internal ${BIONEMO_HOME}/internal
 COPY CONTRIBUTING.md ${BIONEMO_HOME}/
