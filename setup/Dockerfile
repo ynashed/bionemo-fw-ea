@@ -78,9 +78,15 @@ ARG BIONEMO_HOME=/opt/nvidia/bionemo
 ENV BIONEMO_HOME=${BIONEMO_HOME}
 
 # Copy the repo
-# FIXME removed dirs can be present in previous layers, we should copy only what we need
-COPY ./ ${BIONEMO_HOME}
-RUN rm -rf ${BIONEMO_HOME}/ci ${BIONEMO_HOME}/internal
+COPY LICENSE README.md artifact_paths download_models.sh launch.sh pytest.ini ${BIONEMO_HOME}/
+COPY bionemo ${BIONEMO_HOME}/bionemo
+COPY docs ${BIONEMO_HOME}/docs
+COPY examples ${BIONEMO_HOME}/examples
+COPY generated ${BIONEMO_HOME}/generated
+COPY hydra_plugins ${BIONEMO_HOME}/hydra_plugins
+COPY proto ${BIONEMO_HOME}/proto
+COPY setup ${BIONEMO_HOME}/setup
+COPY tests ${BIONEMO_HOME}/tests
 
 # NEMO_HOME must be unset for default NeMo install in /usr/local/lib/python3.8/dist-packages/nemo
 ARG NEMO_HOME
