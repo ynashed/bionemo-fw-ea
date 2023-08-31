@@ -1,6 +1,6 @@
 #!/bin/bash
-#
-# Copyright (c) 2023, NVIDIA CORPORATION.
+
+# Copyright (c) 2022, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,10 +14,3 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-# BioNeMo Models
-ESM1NV_MODEL="nvidian/clara-lifesciences/esm1nv:23.06"
-PROTT5NV_MODEL="nvidian/clara-lifesciences/prott5nv:23.06"
-MEGAMOLBART_MODEL="nvidian/clara-lifesciences/megamolbart:23.06"
-EQUIDOCK_DIPS_MODEL="nvidian/clara-lifesciences/equidock:dips.23.08"
-EQUIDOCK_DB5_MODEL="nvidian/clara-lifesciences/equidock:db5.23.08"

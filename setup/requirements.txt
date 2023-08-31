@@ -25,3 +25,8 @@ git+https://github.com/prokotg/tfrecord@float16zlib
 requests_mock
 nvidia-pytriton==0.1.5
 git+https://github.com/NVIDIA/dllogger@v1.0.0#egg=dllogger
+POT==0.7.0
+dgllife==0.2.8
+biopandas==0.2.8
+joblib==1.1.0
+dill

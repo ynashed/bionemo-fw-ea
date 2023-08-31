@@ -88,4 +88,12 @@ download_bionemo_models() {
         "${PROTT5NV_MODEL}" \
         "${MODEL_PATH}" \
         "protein/prott5nv/prott5nv.nemo"
+    setup_model \
+        "${EQUIDOCK_DIPS_MODEL}" \
+        "${MODEL_PATH}" \
+        "protein/equidock/equidock_dips.nemo"
+    setup_model \
+        "${EQUIDOCK_DB5_MODEL}" \
+        "${MODEL_PATH}" \
+        "protein/equidock/equidock_db5.nemo"
 }
