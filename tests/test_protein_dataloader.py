@@ -16,8 +16,6 @@
 import pytest
 import glob
 import math
-import os
-from pathlib import Path
 import torch
 from bionemo.data import ProteinBertCollate, SentencePieceTokenizerAdapter
 from nemo.collections.common.tokenizers.sentencepiece_tokenizer import SentencePieceTokenizer
@@ -48,8 +46,7 @@ protein_sequences = [
 ]
 
 def get_tokenizer_model_paths():
-    dirname = Path(__file__).parent.parent
-    file_list = dirname.glob('tokenizers/protein/*/vocab/protein_sequence_sentencepiece.model')
+    file_list = glob.glob('/tokenizers/protein/*/vocab/protein_sequence_sentencepiece.model')
     file_list = [str(x) for x in file_list]
     return file_list
 
