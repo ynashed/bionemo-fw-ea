@@ -14,7 +14,7 @@ services:
   - docker:20.10.16-dind
 
 variables:
-  NGC_REGISTRY_IMAGE: "nvcr.io/nvidian/clara-lifesciences/bionemo"
+  NGC_REGISTRY_IMAGE: "nvcr.io/nvidian/cvai_bnmo_trng/bionemo"
   DOCKER_TAG_PREFIX:
     value: "$CI_REGISTRY_IMAGE"
     options:
@@ -41,6 +41,7 @@ variables:
     description: "Wether to use nightly NeMo docker image as base. Set to 'false' by default."
   NGC_CLI_FORMAT_TYPE: ascii
   NGC_CLI_ORG: nvidian
+  # FIXME: change to cvai_bnmo_trng when we move data and checkpoints
   NGC_CLI_TEAM: clara-lifesciences
   JET_WORKLOADS_REF_MAIN: "bionemo/training-unit-tests"
 

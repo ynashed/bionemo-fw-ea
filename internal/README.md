@@ -7,7 +7,7 @@
 
 The image are tagged with `<base container tag>-devel`, so the tags are:
 * `gitlab-master.nvidia.com/clara-discovery/bionemo:dev-latest-devel`
-* `nvcr.io/nvidian/clara-lifesciences/bionemo:dev-devel` (same image as above)
+* `nvcr.io/nvidian/cvai_bnmo_trng/bionemo:dev-devel` (same image as above)
 * `gitlab-master.nvidia.com/clara-discovery/bionemo:pipeline-<pipeline ID>-devel`
 
 See [Building devel docker image manually](#building-devel-docker-image-manually) for instructions on how to build your own image.
