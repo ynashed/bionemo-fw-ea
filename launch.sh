@@ -107,7 +107,7 @@ BIONEMO_WORKSPACE=/workspace/bionemo # Location of examples / config files and w
 
 
 # Defaults for `.env` file
-BIONEMO_IMAGE=${BIONEMO_IMAGE:=nvcr.io/nvidian/clara-lifesciences/bionemo_ci:latest}
+BIONEMO_IMAGE=${BIONEMO_IMAGE:=nvcr.io/nvidian/cvai_bnmo_trng/bionemo:dev}
 PROJECT_MOUNT=${PROJECT_MOUNT:=/workspace/bionemo}
 PROJECT_PATH=${PROJECT_PATH:=$(pwd)}
 DATA_PATH=${DATA_PATH:=/tmp}
