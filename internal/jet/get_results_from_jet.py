@@ -167,8 +167,8 @@ def get_results_from_jet(jet_workloads_ref: Optional[str], pipeline_id: Optional
                 output_i["obj_workloads_registry"] = workloads_info
 
                 output_i["env_info"] = {}
-                output_i["env_info"]["gpu"] = result["nested_gpu"]
-                output_i["env_info"]["cpu"] = result["obj_cpu"]
+                output_i["env_info"]["gpu"] = result.get("nested_gpu", None)
+                output_i["env_info"]["cpu"] = result.get("obj_cpu", None)
         else:
             raise ValueError("Only job_type recipe or build are supported.")
 
