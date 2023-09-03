@@ -103,6 +103,9 @@ model:
     drop_last: False
     pin_memory: False
     data_impl: "csv_mmap"
+    # Supported kwargs (with default values): 
+    #     text_mmap (newline_int=10, header_lines=0, workers=None, sort_dataset_paths=True)
+    #     csv_mmap (newline_int=10, header_lines=0,workers=None, sort_dataset_paths=True, data_col=1, data_sep=",")
     data_impl_kwargs:
       csv_mmap:
         newline_int: 10 # byte-value of newline

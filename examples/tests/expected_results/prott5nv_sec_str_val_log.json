@@ -1,6 +1,6 @@
 {
     "consumed_samples": 796.0,
-    "dwnstr_task_val_loss": 1.244935319630404,
+    "dwnstr_task_val_loss": 1.2449353098517928,
     "global_step": 200.0,
     "grad_norm": 1.7947642803192139,
     "loss_scale": 32768.0,

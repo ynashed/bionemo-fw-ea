@@ -130,20 +130,24 @@ model:
     ngc_registry_target: uniref50_2022_05
     ngc_registry_version: v23.06
     dataset_path: /data/uniref2022_05 # parent directory for data, contains train / val / test folders
-    dataset: # inclusive range of data files to load or can load a single file, e.g. x000.csv
+    dataset: # inclusive range of data files to load or can load a single file (e.g. x000.csv). See data_impl for default file extentions
       train: x000
       test: x000
       val: x000
     data_prefix: null # must be "" or null
     index_mapping_dir: null # path to save index mapping .npy files, by default will save in the same location as data_prefix
-    data_impl: csv_mmap # mmap, retmmap, text_mmap, csv_mmap
+    data_impl: csv_mmap # mmap, retmmap, text_mmap, csv_mmap (.csv will be added to dataset file names if missing)
+    # Supported kwargs (with default values): 
+    #     text_mmap (newline_int=10, header_lines=0, workers=None, sort_dataset_paths=True)
+    #     csv_mmap (newline_int=10, header_lines=0,workers=None, sort_dataset_paths=True, data_col=1, data_sep=",")
     data_impl_kwargs: # currently used only for text_mmap, csv_mmap (should be data_impl dependant)
-        newline_int: 10 # byte-value of newline
-        header_lines: 1 # skip first N header lines
-        workers: null # number of workers when creating missing index files (null defaults to cpu_num // 2)
-        sort_dataset_paths: False # if True datasets will be sorted by name
-        data_col: 3 # column to use for data
-        data_sep: ',' # string to split text into columns
+      csv_mmap:
+          newline_int: 10 # byte-value of newline
+          header_lines: 1 # skip first N header lines
+          workers: null # number of workers when creating missing index files (null defaults to cpu_num // 2)
+          sort_dataset_paths: False # if True datasets will be sorted by name
+          data_col: 3 # column to use for data
+          data_sep: ',' # string to split text into columns
     seq_length: ${model.seq_length} # Input sequence length
     seq_length_dec: 256 # Target sequence length. Must be at least (seq_length * masked_lm_prob * 2 + 1)
     skip_warmup: True

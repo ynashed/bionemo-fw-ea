@@ -134,7 +134,13 @@ def prott5_build_dataset(
 
             data_impl_kwargs["tokenizer"] = tokenizer
     
-    fnames = expand_dataset_paths(data_prefix, ".csv")
+    # only for csv_mmap we enforce the extension to be .csv (for backward compatibility)
+    if data_impl == "csv_mmap":
+        ext = ".csv"
+    else:
+        ext = ""
+        
+    fnames = expand_dataset_paths(data_prefix, ext)
     weights = [1. / len(fnames)] * len(fnames)
 
     # Build individual datasets

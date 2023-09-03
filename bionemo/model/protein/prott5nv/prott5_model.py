@@ -71,7 +71,7 @@ class ProtT5nvModel(MegatronT5Model):
             "permutation": self._cfg.data.get('permutation', False),
             "whole_word_masking": self._cfg.data.get('whole_word_masking', False),
             "favor_long_ngrams": self._cfg.data.get('favor_long_ngrams', False),
-            "data_impl_kwargs": self._cfg.data.get('data_impl_kwargs', {})
+            "data_impl_kwargs": self._cfg.data.data_impl_kwargs.get(self._cfg.data.data_impl, {})
         }
 
         dataset_path = self._cfg.data.dataset_path
