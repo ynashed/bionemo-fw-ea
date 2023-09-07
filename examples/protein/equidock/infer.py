@@ -37,7 +37,7 @@ from nemo.core.config import hydra_runner
 
 from bionemo.model.protein.equidock.utils.train_utils import batchify_and_create_hetero_graphs_inference
 from bionemo.data.equidock.protein_utils import preprocess_unbound_bound, protein_to_graph_unbound_bound, get_residues, get_rot_mat, extract_to_dir
-from bionemo.model.protein.equidock.setup_trainer import EquiDockInference
+from bionemo.model.protein.equidock.infer import EquiDockInference
 
 
 os.environ['DGLBACKEND'] = 'pytorch'
@@ -45,7 +45,7 @@ torch.set_float32_matmul_precision("high")
 BIONEMO_ROOT = pathlib.Path(bionemo.__file__).parent.parent.as_posix()
 
 
-@hydra_runner(config_path="conf", config_name="inference")
+@hydra_runner(config_path="conf", config_name="infer")
 def main(cfg) -> None:
     logging.info("\n\n************** Experiment configuration ***********")
     logging.info(f"\n{OmegaConf.to_yaml(cfg)}")

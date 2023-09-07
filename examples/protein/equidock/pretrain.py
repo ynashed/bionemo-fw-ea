@@ -23,7 +23,8 @@ modify parameters from conf/*.yaml
 """
 from bionemo.model.utils import setup_trainer
 from bionemo.data.equidock import DataManager
-from bionemo.model.protein.equidock.nemo_model import EquiDock
+from bionemo.model.protein.equidock.equidock_model import EquiDock
+from bionemo.data.equidock.preprocess import preprocess
 from nemo.core.connectors.save_restore_connector import SaveRestoreConnector
 from nemo.utils import logging
 from nemo.core.config import hydra_runner
@@ -38,12 +39,29 @@ torch.set_float32_matmul_precision("high")
 torch.multiprocessing.set_sharing_strategy('file_system')
 
 
-@hydra_runner(config_path="conf", config_name="finetune")
+@hydra_runner(config_path="conf", config_name="pretrain")  # config_name options [finetune, pretrain]
 def main(cfg) -> None:
     logging.info("\n\n************** Experiment configuration ***********")
     logging.info(f"\n{OmegaConf.to_yaml(cfg)}")
 
     logging.info(f"\n Dataset name {cfg.data.data_name}")
+    train_cfg = cfg.model.train_ds
+    test_cfg = cfg.model.test_ds
+    val_cfg = cfg.model.validation_ds
+
+    if not cfg.do_testing:
+
+        logging.info(f"\n Preprocessing validation dataset!")
+        logging.info(f"\n{OmegaConf.to_yaml(val_cfg)}")
+        preprocess(val_cfg)
+
+        logging.info(f"\n Preprocessing testing dataset!")
+        logging.info(f"\n{OmegaConf.to_yaml(test_cfg)}")
+        preprocess(test_cfg)
+
+        logging.info(f"\n Preprocessing training dataset!")
+        logging.info(f"\n{OmegaConf.to_yaml(train_cfg)}")
+        preprocess(train_cfg)
 
     if cfg.data.num_workers != 0:
         try:
