@@ -1,0 +1,23 @@
+##
+## The minimal set of changes to scale the ESM2nv-8M to 650M
+##
+
+defaults:
+  - pretrain_esm2_8M
+restore_from_path: null # used when starting from a .nemo file
+
+name: ESM2nv-650M
+
+model:
+  num_layers: 33
+  hidden_size: 1280
+  ffn_hidden_size: 5120 # Transformer FFN hidden size. Usually 4 * hidden_size.
+
+  # model/data parallelism
+  tensor_model_parallel_size: 1 # model parallelism
+  pipeline_model_parallel_size: 1 # model parallelism
+  micro_batch_size: 2
+
+  # Enable/disable downstream task validation in the loop
+  dwnstr_task_validation:
+    enabled: False

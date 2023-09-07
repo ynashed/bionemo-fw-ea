@@ -1,0 +1,68 @@
+##
+## A faithful reproduction of the ESM-2 architecture and training parameters originally developed by META-ai
+## using NVIDIA NeMo building blocks. Original model https://github.com/facebookresearch/esm
+##
+
+defaults:
+  - base_config
+restore_from_path: null # used when starting from a .nemo file
+
+name: ESM2nv-8M
+
+trainer:
+  max_steps: 500000
+  gradient_clip_val: 0
+
+model:
+  # ESM2-specific parameters
+  seq_length: 512
+  num_layers: 6
+  hidden_size: 320
+  ffn_hidden_size: 1280 # Transformer FFN hidden size. Usually 4 * hidden_size.
+  num_attention_heads: 20
+  # TODO # position_embedding_type: rope # ESM2 uses relative positional encoding 'ROPE' to extrapolate to longer sequences unseen during training
+  hidden_dropout: 0 # ESM2 removes dropout from hidden layers and attention
+  tensor_model_parallel_size: 1 # model parallelism
+  pipeline_model_parallel_size: 1 # model parallelism
+
+  optim:
+    lr: 4e-4
+    weight_decay: 0.01
+    betas:
+      - 0.9
+      - 0.98
+    sched: # TODO tune this or get info from paper
+      name: CosineAnnealing
+      warmup_steps: 2000
+      constant_steps: 50000
+      min_lr: 4e-5
+
+  # These parameters are similar to pretrain_ESM1b_small
+  tokenizer: # TODO this will be changed to tokenizer from HF
+    # library: 'huggingface'
+    # type: 'BertWordPieceLowerCase'
+    # model_name: "facebook/esm2_t30_8M_UR50D"
+    # model: null
+    # vocab_file: null
+    # merge_file: null
+    # pad_id: 1
+    library: 'sentencepiece'
+    type: null
+    model: /tokenizers/protein/esm1nv/vocab/protein_sequence_sentencepiece.model
+    vocab_file: /tokenizers/vocab/protein_sequence_sentencepiece.vocab
+  data:
+    dataset_path: /data/uniref2022_05 # parent directory for data, contains train / val / test folders. Needs to be writeable for index creation.
+    dataset: # inclusive range of data files to load x[000..049] or can a single file, e.g. x000
+      train: x[000..049]
+      test: x[000..049]
+      val: x[000..049]
+    micro_batch_size: 32
+    global_batch_size: null
+    num_workers: 10
+    data_impl_kwargs:
+      csv_mmap:
+        data_col: 3 # 0-based
+    modify_percent: 0.1 # Percentage of characters in a protein sequence to modify. (Modification means replacing with another amino acid or with a mask token)
+    perturb_percent: 0.5 # Of the modify_percent, what percentage of characters are to be replaced with another amino acid.
+  dwnstr_task_validation:
+    enabled: True
