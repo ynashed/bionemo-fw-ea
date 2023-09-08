@@ -20,7 +20,7 @@ model:
   hidden_size: 320
   ffn_hidden_size: 1280 # Transformer FFN hidden size. Usually 4 * hidden_size.
   num_attention_heads: 20
-  # TODO # position_embedding_type: rope # ESM2 uses relative positional encoding 'ROPE' to extrapolate to longer sequences unseen during training
+  position_embedding_type: rope # ESM2 uses relative positional encoding 'ROPE' to extrapolate to longer sequences unseen during training
   hidden_dropout: 0 # ESM2 removes dropout from hidden layers and attention
   tensor_model_parallel_size: 1 # model parallelism
   pipeline_model_parallel_size: 1 # model parallelism
