@@ -63,6 +63,8 @@ class ESM1nvModel(MegatronBertModel):
             legacy=False,
         )
         # patch tokenizer for use with HF esm tokenizer
+        # We could alternatively write another  adapter for the `AutoTokenizer` from HF,
+        # but the inconsistency is so small we opted to be more concise here
         if self._cfg.tokenizer.library == 'huggingface' and \
                 str(model_name).startswith('facebook/esm2'):
             self.tokenizer.tokenizer.vocab = self.tokenizer.tokenizer.get_vocab()
