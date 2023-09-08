@@ -56,10 +56,15 @@ class ESM1nvModel(MegatronBertModel):
         """
         self.tokenizer = get_nmt_tokenizer(
             library=self._cfg.tokenizer.library,
+            model_name=self._cfg.tokenizer.get('model_name'),
             tokenizer_model=self.register_artifact("tokenizer.model", self._cfg.tokenizer.model),
             vocab_file=self.register_artifact("tokenizer.vocab_file", self._cfg.tokenizer.vocab_file),
             legacy=False,
         )
+        # patch tokenizer for use with HF esm tokenizer
+        if self._cfg.tokenizer.library == 'huggingface' and \
+                str(self._cfg.tokenizer.model_name).startswith('facebook/esm2'):
+            self.tokenizer.tokenizer.vocab = self.tokenizer.tokenizer.get_vocab()
 
     def build_pretraining_data_loader(self, dataset, consumed_samples):
         """Buld dataloader given an input dataset."""
