@@ -54,16 +54,19 @@ class ESM1nvModel(MegatronBertModel):
         Override this method to use an external tokenizer.
         All tokenizers are expected to provide compatible interface.
         """
+        model_name = self._cfg.tokenizer.get('model_name')
         self.tokenizer = get_nmt_tokenizer(
             library=self._cfg.tokenizer.library,
-            model_name=self._cfg.tokenizer.get('model_name'),
+            model_name=model_name,
             tokenizer_model=self.register_artifact("tokenizer.model", self._cfg.tokenizer.model),
             vocab_file=self.register_artifact("tokenizer.vocab_file", self._cfg.tokenizer.vocab_file),
             legacy=False,
         )
         # patch tokenizer for use with HF esm tokenizer
+        # We could alternatively write another  adapter for the `AutoTokenizer` from HF,
+        # but the inconsistency is so small we opted to be more concise here
         if self._cfg.tokenizer.library == 'huggingface' and \
-                str(self._cfg.tokenizer.model_name).startswith('facebook/esm2'):
+                str(model_name).startswith('facebook/esm2'):
             self.tokenizer.tokenizer.vocab = self.tokenizer.tokenizer.get_vocab()
 
     def build_pretraining_data_loader(self, dataset, consumed_samples):
