@@ -194,6 +194,9 @@ jet-generate:
     - if: $CI_COMMIT_BRANCH == "dev"
       variables:
         JET_WORKLOADS_REF_EPHEMERAL: "ephemeral/bionemo/${CI_COMMIT_BRANCH}/${CI_PIPELINE_ID}"
+    - if: $CI_COMMIT_BRANCH == "dev-next"
+      variables:
+        JET_WORKLOADS_REF_EPHEMERAL: "ephemeral/bionemo/${CI_COMMIT_BRANCH}/${CI_PIPELINE_ID}"
     - if: $CI_COMMIT_BRANCH == "main"
       variables:
         JET_WORKLOADS_REF_EPHEMERAL: "ephemeral/bionemo/${CI_COMMIT_BRANCH}/${CI_PIPELINE_ID}"
@@ -207,12 +210,14 @@ jet-trigger:
       variables:
         - CI_PIPELINE_ID
         - CI_COMMIT_BRANCH
-    allow_failure: true
     rules:
       - if: $CI_PIPELINE_SOURCE == "merge_request_event"
         variables:
           JET_WORKLOADS_REF: "ephemeral/bionemo/${CI_PIPELINE_ID}"
       - if: $CI_COMMIT_BRANCH == "dev"
+        variables:
+          JET_WORKLOADS_REF: "ephemeral/bionemo/${CI_COMMIT_BRANCH}/${CI_PIPELINE_ID}"
+      - if: $CI_COMMIT_BRANCH == "dev-next"
         variables:
           JET_WORKLOADS_REF: "ephemeral/bionemo/${CI_COMMIT_BRANCH}/${CI_PIPELINE_ID}"
       - if: $CI_COMMIT_BRANCH == "main"
@@ -230,10 +235,10 @@ jet-test:
     - generic
   stage: jet
   when: on_success
-  allow_failure: true
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     - if: $CI_COMMIT_BRANCH == "dev"
+    - if: $CI_COMMIT_BRANCH == "dev-next"
     - if: $CI_COMMIT_BRANCH == "main"
   before_script:
     - export RO_API_TOKEN CI_PROJECT_ID CI_PIPELINE_ID GITLAB_USER_LOGIN CI_JOB_JWT

@@ -22,7 +22,7 @@ from nemo.collections.nlp.parts.nlp_overrides import NLPSaveRestoreConnector
 from nemo.utils import logging
 from nemo.utils.model_utils import import_class_by_path
 
-from bionemo.model.protein.equidock.nemo_model import EquiDock
+from bionemo.model.protein.equidock.equidock_model import EquiDock
 from bionemo.model.utils import setup_inference_trainer, parallel_state, _reconfigure_microbatch_calculator
 
 

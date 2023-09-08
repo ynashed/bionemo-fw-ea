@@ -88,5 +88,5 @@ srun \
     --container-workdir /opt/nvidia/bionemo/examples/protein/equidock \
     --export WANDB_API_KEY="${WANDB_API_KEY}" \
     bash -c "cd   /opt/nvidia/bionemo/examples/protein/equidock ;
-    python train.py  --config-path=conf    --config-name=train    exp_manager.wandb_logger_kwargs.job_type="${JOB_TYPE}"    exp_manager.wandb_logger_kwargs.name=${EXP_NAME}    trainer.num_nodes=${SLURM_JOB_NUM_NODES}    trainer.devices=${SLURM_NTASKS_PER_NODE}    model.micro_batch_size=${MICRO_BATCH_SIZE}"
+    python pretrain.py  --config-path=conf    --config-name=pretrain    exp_manager.wandb_logger_kwargs.job_type="${JOB_TYPE}"    exp_manager.wandb_logger_kwargs.name=${EXP_NAME}    trainer.num_nodes=${SLURM_JOB_NUM_NODES}    trainer.devices=${SLURM_NTASKS_PER_NODE}    model.micro_batch_size=${MICRO_BATCH_SIZE}"
 set +x

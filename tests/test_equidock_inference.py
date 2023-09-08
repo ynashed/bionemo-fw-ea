@@ -34,7 +34,7 @@ from bionemo.model.protein.equidock.utils.train_utils import batchify_and_create
 from bionemo.utils.tests import BioNemoSearchPathConfig, register_searchpath_config_plugin, update_relative_config_dir, check_model_exists
 
 from bionemo.model.protein.equidock.loss_metrics.eval import Meter_Unbound_Bound
-from bionemo.model.protein.equidock.setup_trainer import EquiDockInference
+from bionemo.model.protein.equidock.infer import EquiDockInference
 
 from bionemo.model.protein.equidock.loss_metrics.eval import rigid_transform_Kabsch_3D, rigid_transform_Kabsch_3D_torch
 
