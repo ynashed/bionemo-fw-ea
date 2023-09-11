@@ -135,7 +135,7 @@ model:
       test: x000
       val: x000
     data_prefix: null # must be "" or null
-    index_mapping_dir: null # path to save index mapping .npy files, by default will save in the same location as data_prefix
+    index_mapping_dir: null # path to store cached indexing files (if empty, will be stored in the same directory as dataset_path)
     data_impl: csv_mmap # mmap, retmmap, text_mmap, csv_mmap (.csv will be added to dataset file names if missing)
     # Supported kwargs (with default values): 
     #     text_mmap (newline_int=10, header_lines=0, workers=None, sort_dataset_paths=True)
@@ -146,7 +146,7 @@ model:
           header_lines: 1 # skip first N header lines
           workers: null # number of workers when creating missing index files (null defaults to cpu_num // 2)
           sort_dataset_paths: False # if True datasets will be sorted by name
-          data_col: 3 # column to use for data
+          data_col: ??? # column to use for data
           data_sep: ',' # string to split text into columns
     seq_length: ${model.seq_length} # Input sequence length
     seq_length_dec: 256 # Target sequence length. Must be at least (seq_length * masked_lm_prob * 2 + 1)

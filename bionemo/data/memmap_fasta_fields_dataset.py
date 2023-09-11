@@ -37,6 +37,7 @@ class FASTAFieldsMemmapDataset(TextMemMapDataset):
                  data_fields={"data": 0},
                  strip_first_element=True,
                  collpase_sequence_elements=True,
+                 index_mapping_dir=None,
                  ):
         """
         Args:
@@ -48,6 +49,7 @@ class FASTAFieldsMemmapDataset(TextMemMapDataset):
             data_fields: dictionary of field names and their indices
             strip_first_element: whether to strip the first element of the sequence from all text past first space
             collpase_sequence_elements: whether to collapse all sequence elements into a single string (all but first)
+            index_mapping_dir: directory to store index mapping cached files
         """
         super().__init__(
             dataset_paths=dataset_paths,
@@ -56,6 +58,7 @@ class FASTAFieldsMemmapDataset(TextMemMapDataset):
             workers=workers,
             tokenizer=tokenizer,
             sort_dataset_paths=sort_dataset_paths,
+            index_mapping_dir=index_mapping_dir,
         )
         
         self._data_fields = data_fields

@@ -12,6 +12,9 @@ model:
   num_layers: 2
   hidden_size: 256
   num_attention_heads: 4
-
+  data:
+    data_impl_kwargs:
+      csv_mmap:
+        data_col: 1
   dwnstr_task_validation:
     enabled: True

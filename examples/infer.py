@@ -62,10 +62,10 @@ def main(cfg) -> None:
 
     if cfg.model.data.data_impl == "csv_fields_mmap":
         dataset_paths = expand_dataset_paths(cfg.model.data.dataset_path, ext=".csv")
-        ds = CSVFieldsMemmapDataset(dataset_paths, **cfg.model.data.data_impl_kwargs.get("csv_fields_mmap", {}))
+        ds = CSVFieldsMemmapDataset(dataset_paths, index_mapping_dir=cfg.model.data.index_mapping_dir, **cfg.model.data.data_impl_kwargs.get("csv_fields_mmap", {}))
     elif cfg.model.data.data_impl == "fasta_fields_mmap":
         dataset_paths = expand_dataset_paths(cfg.model.data.dataset_path, ext=".fasta")
-        ds = FASTAFieldsMemmapDataset(dataset_paths, **cfg.model.data.data_impl_kwargs.get("fasta_fields_mmap", {}))
+        ds = FASTAFieldsMemmapDataset(dataset_paths, index_mapping_dir=cfg.model.data.index_mapping_dir, **cfg.model.data.data_impl_kwargs.get("fasta_fields_mmap", {}))
     else:
         raise ValueError(f'Unknown data_impl: {cfg.model.data.data_impl}')
      

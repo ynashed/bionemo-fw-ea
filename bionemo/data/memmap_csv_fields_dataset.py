@@ -34,6 +34,7 @@ class CSVFieldsMemmapDataset(TextMemMapDataset):
                 # data_fields - dict of field names and their corresponding indices 
                 data_sep=',',
                 data_fields={"data": 0},
+                index_mapping_dir=None,
                  ):
         super().__init__(
             dataset_paths=dataset_paths,
@@ -42,6 +43,7 @@ class CSVFieldsMemmapDataset(TextMemMapDataset):
             workers=workers,
             tokenizer=tokenizer,
             sort_dataset_paths=sort_dataset_paths,
+            index_mapping_dir=index_mapping_dir,
         )
 
         self._data_fields = data_fields
