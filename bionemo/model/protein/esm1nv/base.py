@@ -66,11 +66,15 @@ class ESMnvEmbedding(Embedding):
             *args,
             token_dropout=False,
             use_attention_mask=False,
+            mask_token_id=None,
             **kwargs,
             ):
         super(ESMnvEmbedding, self).__init__(*args, **kwargs)
         self.token_dropout = token_dropout
         self.use_attention_mask = use_attention_mask
+        if mask_token_id is None:
+            mask_token_id = torch.nan
+        self.mask_token_id = mask_token_id
 
     def forward(
             self,
@@ -79,12 +83,58 @@ class ESMnvEmbedding(Embedding):
             token_type_ids=None,
             attention_mask=None,
             ):
-        # TODO update to use attention mask
-        return super(ESMnvEmbedding, self).forward(
-            input_ids,
-            position_ids=position_ids,
-            token_type_ids=token_type_ids,
+        words_embeddings = self.word_embeddings(input_ids)
+
+        # BIONEMO: add custom logic for attention masking and token dropout
+        embeddings_mask = None
+        if attention_mask is not None and (self.token_dropout or self.use_attention_mask):
+            embeddings_mask = ~attention_mask[:, 0, :, 0]
+
+        if embeddings_mask is not None and self.token_dropout:
+            words_embeddings = words_embeddings.masked_fill((input_ids == self.mask_token_id).unsqueeze(-1), 0.0)
+            mask_ratio_train = 0.15 * 0.8  # Hardcoded as the ratio used in all ESM model training runs
+            src_lengths = embeddings_mask.sum(-1)
+            is_mask_token = input_ids == self.mask_token_id
+            mask_ratio_observed = (is_mask_token).sum(-1).float() / src_lengths
+            words_embeddings = (words_embeddings * (1 - mask_ratio_train) / (1 - mask_ratio_observed)[:, None, None]).to(
+                words_embeddings.dtype
             )
+        # END BIONEMO
+
+        if self.position_embedding_type == 'learned_absolute':
+            assert position_ids is not None
+            position_embeddings = self.position_embeddings(position_ids)
+            embeddings = words_embeddings + position_embeddings
+        else:
+            embeddings = words_embeddings
+        if token_type_ids is not None:
+            assert self.tokentype_embeddings is not None
+            embeddings = embeddings + self.tokentype_embeddings(token_type_ids)
+        else:
+            assert self.tokentype_embeddings is None
+
+        # BIONEMO: include attention masking from ESM2
+        if embeddings_mask is not None and self.use_attention_mask:
+            embeddings = (embeddings * embeddings_mask.unsqueeze(-1)).to(embeddings.dtype)
+        # END BIONEMO
+
+        # Data format change to avoid explicit tranposes : [b s h] --> [s b h].
+        if self.transpose_batch_sequence:
+            embeddings = embeddings.transpose(0, 1).contiguous()
+
+        # If the input flag for fp32 residual connection is set, convert for float.
+        if self.fp32_residual_connection:
+            embeddings = embeddings.float()
+
+        # Dropout.
+        if self.sequence_parallel:
+            embeddings = tensor_parallel.mappings.scatter_to_sequence_parallel_region(embeddings)
+            with tensor_parallel.random.get_cuda_rng_tracker().fork():
+                embeddings = self.embedding_dropout(embeddings)
+        else:
+            embeddings = self.embedding_dropout(embeddings)
+
+        return embeddings
 
 class ESMnvTransformerLanguageModel(TransformerLanguageModel):
     # BIONEMO: This is copy/paste/edited from NeMo. Parts that are
@@ -154,6 +204,7 @@ class ESMnvTransformerLanguageModel(TransformerLanguageModel):
         # BIONEMO: New arguments
         embedding_token_dropout=False,
         embedding_use_attention_mask=False,
+        mask_token_id=None,
     ):
         super(TransformerLanguageModel, self).__init__(share_token_embeddings=share_embeddings_and_output_weights)
 
@@ -201,6 +252,7 @@ class ESMnvTransformerLanguageModel(TransformerLanguageModel):
                 # BIONEMO: New arguments
                 token_dropout=embedding_token_dropout,
                 use_attention_mask=embedding_use_attention_mask,
+                mask_token_id=mask_token_id,
             )
             self._embedding_key = 'embedding'
 
@@ -548,6 +600,7 @@ def esm_get_language_model(
     # BIONEMO: new arguments
     embedding_token_dropout=False,
     embedding_use_attention_mask=False,
+    mask_token_id=None,
 ):
     """Build language model and return along with the key to save."""
     if kv_channels is None:
@@ -628,6 +681,7 @@ def esm_get_language_model(
         # BIONEMO: add arguments
         embedding_token_dropout=embedding_token_dropout,
         embedding_use_attention_mask=embedding_use_attention_mask,
+        mask_token_id=mask_token_id,
     )
     # key used for checkpoints.
     language_model_key = 'language_model'
@@ -672,6 +726,7 @@ class ESMnvBertModel(BertModel):
         # BIONEMO: use custom  arguments
         embedding_token_dropout=False,
         embedding_use_attention_mask=False,
+        mask_token_id=None,
     ):
         super(BertModel, self).__init__()
         self.fp16_lm_cross_entropy = fp16_lm_cross_entropy
@@ -722,6 +777,7 @@ class ESMnvBertModel(BertModel):
             # BIONEMO: use new arguments
             embedding_token_dropout=embedding_token_dropout,
             embedding_use_attention_mask=embedding_use_attention_mask,
+            mask_token_id=mask_token_id,
         )
 
         self.initialize_word_embeddings(
@@ -788,6 +844,7 @@ class ESMnvMegatronBertModel(MegatronBertModel):
             # BIONEMO: use custom flags
             embedding_token_dropout=self.cfg.get("embedding_token_dropout", False),
             embedding_use_attention_mask=self.cfg.get("embedding_use_attention_mask", False),
+            mask_token_id=self.cfg.get("mask_token_id", None)
         )
 
         return model
