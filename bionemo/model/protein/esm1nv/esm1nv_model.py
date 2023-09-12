@@ -19,7 +19,7 @@ from omegaconf.dictconfig import DictConfig
 from pytorch_lightning.trainer.trainer import Trainer
 
 from nemo.core.neural_types import NeuralType
-from nemo.collections.nlp.models.language_modeling.megatron_bert_model import MegatronBertModel
+from bionemo.model.protein.esm1nv.base import ESMnvMegatronBertModel
 from nemo.collections.nlp.modules.common.megatron.utils import (
     average_losses_across_data_parallel_group,
 )
@@ -40,7 +40,7 @@ except (ImportError, ModuleNotFoundError):
 
 __all__ = ["ESM1nvModel"]
 
-class ESM1nvModel(MegatronBertModel):
+class ESM1nvModel(ESMnvMegatronBertModel):
     """
     ESM1nv pretraining
     """
