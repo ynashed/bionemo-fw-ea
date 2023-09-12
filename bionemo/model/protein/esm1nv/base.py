@@ -727,6 +727,7 @@ class ESMnvBertModel(BertModel):
         embedding_token_dropout=False,
         embedding_use_attention_mask=False,
         mask_token_id=None,
+        attention_dropout=0.1,
     ):
         super(BertModel, self).__init__()
         self.fp16_lm_cross_entropy = fp16_lm_cross_entropy
@@ -775,6 +776,7 @@ class ESMnvBertModel(BertModel):
             sequence_parallel=sequence_parallel,
             position_embedding_type=position_embedding_type,
             # BIONEMO: use new arguments
+            attention_dropout=attention_dropout,
             embedding_token_dropout=embedding_token_dropout,
             embedding_use_attention_mask=embedding_use_attention_mask,
             mask_token_id=mask_token_id,
@@ -844,7 +846,8 @@ class ESMnvMegatronBertModel(MegatronBertModel):
             # BIONEMO: use custom flags
             embedding_token_dropout=self.cfg.get("embedding_token_dropout", False),
             embedding_use_attention_mask=self.cfg.get("embedding_use_attention_mask", False),
-            mask_token_id=self.cfg.get("mask_token_id", None)
+            mask_token_id=self.cfg.get("mask_token_id", None),
+            attention_dropout=self.cfg.get("attention_dropout", 0.1),
         )
 
         return model
