@@ -5,6 +5,7 @@ from nemo.collections.nlp.modules.common.megatron.language_model import (
 )
 from nemo.collections.nlp.models.language_modeling.megatron.bert_model import BertModel
 from nemo.collections.nlp.models.language_modeling.megatron_bert_model import MegatronBertModel
+from bionemo.model.protein.esm1nv.transformer import ESMnvParallelTransformer
 # Imports needed for redefinition of TransformerLanguageModel
 import torch
 
@@ -205,6 +206,8 @@ class ESMnvTransformerLanguageModel(TransformerLanguageModel):
         embedding_token_dropout=False,
         embedding_use_attention_mask=False,
         mask_token_id=None,
+        # NEW BIONEMO ARGS
+        use_esm_attention=False,
     ):
         super(TransformerLanguageModel, self).__init__(share_token_embeddings=share_embeddings_and_output_weights)
 
@@ -298,7 +301,7 @@ class ESMnvTransformerLanguageModel(TransformerLanguageModel):
             )
 
         # Transformer.
-        self.encoder = ParallelTransformer(
+        self.encoder = ESMnvParallelTransformer(
             init_method=self.init_method,
             output_layer_init_method=self.output_layer_init_method,
             num_layers=self.num_layers,
@@ -351,6 +354,8 @@ class ESMnvTransformerLanguageModel(TransformerLanguageModel):
             ub_tp_comm_overlap=ub_tp_comm_overlap,
             position_embedding_type=position_embedding_type,
             use_flash_attention=use_flash_attention,
+            # NEW BIONEMO ARGs
+            use_esm_attention=use_esm_attention,
         )
         self._encoder_key = 'encoder'
 
@@ -601,6 +606,8 @@ def esm_get_language_model(
     embedding_token_dropout=False,
     embedding_use_attention_mask=False,
     mask_token_id=None,
+    # NEW BIONEMO ARGS
+    use_esm_attention=False,
 ):
     """Build language model and return along with the key to save."""
     if kv_channels is None:
@@ -682,6 +689,8 @@ def esm_get_language_model(
         embedding_token_dropout=embedding_token_dropout,
         embedding_use_attention_mask=embedding_use_attention_mask,
         mask_token_id=mask_token_id,
+        # NEW BIONEMO ARGS
+        use_esm_attention=use_esm_attention,
     )
     # key used for checkpoints.
     language_model_key = 'language_model'
@@ -728,6 +737,8 @@ class ESMnvBertModel(BertModel):
         embedding_use_attention_mask=False,
         mask_token_id=None,
         attention_dropout=0.1,
+        normalize_attention_scores=True,
+        use_esm_attention=False,
     ):
         super(BertModel, self).__init__()
         self.fp16_lm_cross_entropy = fp16_lm_cross_entropy
@@ -780,6 +791,8 @@ class ESMnvBertModel(BertModel):
             embedding_token_dropout=embedding_token_dropout,
             embedding_use_attention_mask=embedding_use_attention_mask,
             mask_token_id=mask_token_id,
+            normalize_attention_scores=normalize_attention_scores,
+            use_esm_attention=use_esm_attention,
         )
 
         self.initialize_word_embeddings(
@@ -848,6 +861,8 @@ class ESMnvMegatronBertModel(MegatronBertModel):
             embedding_use_attention_mask=self.cfg.get("embedding_use_attention_mask", False),
             mask_token_id=self.cfg.get("mask_token_id", None),
             attention_dropout=self.cfg.get("attention_dropout", 0.1),
+            normalize_attention_scores=self.cfg.get("normalize_attention_scores", True),
+            use_esm_attention=self.cfg.get("use_esm_attention", False),
         )
 
         return model
