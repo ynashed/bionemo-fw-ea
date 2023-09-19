@@ -82,6 +82,7 @@ from nemo.collections.nlp.modules.common.megatron.transformer import (
     remove_bias_from_layernorm,
 )
 from bionemo.model.protein.esm1nv.attention import ESMnvParallelAttention
+from bionemo.model.protein.esm1nv.mlp import ESMnvParallelMLP
 ## END BIONEMO
 
 class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
@@ -136,6 +137,7 @@ class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
         use_flash_attention=False,
         # NEW BIONEMO ARGS
         use_esm_attention=False,
+        esm_gelu=False,
     ):
         super(ParallelTransformerLayer_, self).__init__()
 
@@ -396,7 +398,7 @@ class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
                 dropout=moe_dropout,
             )
         else:
-            self.mlp = ParallelMLP(
+            self.mlp = ESMnvParallelMLP(
                 init_method=init_method,
                 output_layer_init_method=output_layer_init_method,
                 hidden_size=hidden_size,
@@ -415,6 +417,8 @@ class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
                 sequence_parallel=sequence_parallel,
                 gradient_accumulation_fusion=gradient_accumulation_fusion,
                 dropout=ffn_dropout,
+                # BIONEOM ARGS
+                esm_gelu=esm_gelu,
             )
 
 
@@ -464,6 +468,7 @@ class ESMnvParallelTransformerLayer(ESMnvParallelTransformerLayer_):
         use_flash_attention=False,
         # NEW BIONEMO ARGS
         use_esm_attention=False,
+        esm_gelu=False,
     ):
         super(ESMnvParallelTransformerLayer, self).__init__(
             init_method=init_method,
@@ -509,6 +514,7 @@ class ESMnvParallelTransformerLayer(ESMnvParallelTransformerLayer_):
             use_flash_attention=use_flash_attention,
             # NEW BIONEMO ARGS
             use_esm_attention=use_esm_attention,
+            esm_gelu=esm_gelu,
         )
 
         # Dtype for forward pass - ignore amp O2
@@ -627,6 +633,7 @@ class ESMnvParallelTransformer(ParallelTransformer):
         use_flash_attention=False,
         # NEW BIONEMO ARGS
         use_esm_attention=False,
+        esm_gelu=False,
     ):
         super(ParallelTransformer, self).__init__()
 
@@ -811,6 +818,7 @@ class ESMnvParallelTransformer(ParallelTransformer):
                     use_flash_attention=use_flash_attention,
                     # NEW BIONEMO ARGS
                     use_esm_attention=use_esm_attention,
+                    esm_gelu=esm_gelu,
                 )
 
         if parallel_state.get_virtual_pipeline_model_parallel_world_size() is not None:

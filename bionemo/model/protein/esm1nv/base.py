@@ -208,6 +208,7 @@ class ESMnvTransformerLanguageModel(TransformerLanguageModel):
         mask_token_id=None,
         # NEW BIONEMO ARGS
         use_esm_attention=False,
+        esm_gelu=False,
     ):
         super(TransformerLanguageModel, self).__init__(share_token_embeddings=share_embeddings_and_output_weights)
 
@@ -356,6 +357,7 @@ class ESMnvTransformerLanguageModel(TransformerLanguageModel):
             use_flash_attention=use_flash_attention,
             # NEW BIONEMO ARGs
             use_esm_attention=use_esm_attention,
+            esm_gelu=esm_gelu,
         )
         self._encoder_key = 'encoder'
 
@@ -608,6 +610,7 @@ def esm_get_language_model(
     mask_token_id=None,
     # NEW BIONEMO ARGS
     use_esm_attention=False,
+    esm_gelu=False,
 ):
     """Build language model and return along with the key to save."""
     if kv_channels is None:
@@ -691,6 +694,7 @@ def esm_get_language_model(
         mask_token_id=mask_token_id,
         # NEW BIONEMO ARGS
         use_esm_attention=use_esm_attention,
+        esm_gelu=esm_gelu,
     )
     # key used for checkpoints.
     language_model_key = 'language_model'
@@ -739,6 +743,7 @@ class ESMnvBertModel(BertModel):
         attention_dropout=0.1,
         normalize_attention_scores=True,
         use_esm_attention=False,
+        esm_gelu=False,
     ):
         super(BertModel, self).__init__()
         self.fp16_lm_cross_entropy = fp16_lm_cross_entropy
@@ -793,6 +798,7 @@ class ESMnvBertModel(BertModel):
             mask_token_id=mask_token_id,
             normalize_attention_scores=normalize_attention_scores,
             use_esm_attention=use_esm_attention,
+            esm_gelu=esm_gelu,
         )
 
         self.initialize_word_embeddings(
@@ -863,6 +869,7 @@ class ESMnvMegatronBertModel(MegatronBertModel):
             attention_dropout=self.cfg.get("attention_dropout", 0.1),
             normalize_attention_scores=self.cfg.get("normalize_attention_scores", True),
             use_esm_attention=self.cfg.get("use_esm_attention", False),
+            esm_gelu=self.cfg.get("esm_gelu", False),
         )
 
         return model
