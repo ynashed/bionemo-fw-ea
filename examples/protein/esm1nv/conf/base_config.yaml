@@ -124,7 +124,7 @@ model:
         sort_dataset_paths: True # if True datasets will be sorted by name
         data_sep: ',' # string to split text into columns
         # column number of csv to take values from
-        data_col: ???
+        data_col: 3
     use_upsampling: True # if the data should be upsampled to max number of steps in the training
     seed: ${model.seed} # Random seed
     max_seq_length: ${model.seq_length} # Maximum input sequence length. Longer sequences are truncated

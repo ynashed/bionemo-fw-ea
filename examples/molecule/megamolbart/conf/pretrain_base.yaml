@@ -115,7 +115,7 @@ model:
         sort_dataset_paths: True # if True datasets will be sorted by name
         data_sep: ',' # string to split text into columns
         # column number of csv to take values from
-        data_col: ???
+        data_col: 1
     use_upsampling: True # if the data should be upsampled to max number of steps in the training
 
   optim:

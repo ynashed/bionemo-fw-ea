@@ -38,6 +38,7 @@ model:
     ngc_registry_target: uspto_50k_dataset
     ngc_registry_version: v23.06
     dataset_path: /data/uspto_50k_dataset # TODO how to determine this
+    index_mapping_dir: null
 
     data_impl: "csv_fields_mmap"
     data_impl_kwargs:
