@@ -146,7 +146,7 @@ model:
           header_lines: 1 # skip first N header lines
           workers: null # number of workers when creating missing index files (null defaults to cpu_num // 2)
           sort_dataset_paths: False # if True datasets will be sorted by name
-          data_col: null # column to use for data
+          data_col: 3 # column to use for data
           data_sep: ',' # string to split text into columns
     seq_length: ${model.seq_length} # Input sequence length
     seq_length_dec: 256 # Target sequence length. Must be at least (seq_length * masked_lm_prob * 2 + 1)
