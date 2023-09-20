@@ -20,8 +20,15 @@ model:
   hidden_size: 320
   ffn_hidden_size: 1280 # Transformer FFN hidden size. Usually 4 * hidden_size.
   num_attention_heads: 20
+  megatron_legacy: True
   position_embedding_type: rope # ESM2 uses relative positional encoding 'ROPE' to extrapolate to longer sequences unseen during training
   hidden_dropout: 0 # ESM2 removes dropout from hidden layers and attention
+  embedding_use_attention_mask: True # ESM2 uses attention masking on the embeddings
+  embedding_token_dropout: True # ESM2 rescales embeddings based on masked tokens
+  mask_token_id: ${.tokenizer.mask_id} # Needed for token dropout rescaling
+  attention_dropout: 0.0 # ESM2 does not use attention dropout
+  use_esm_attention: True # Use specific attention modifications for ESM2
+  normalize_attention_scores: False # ESM2 does not use normalized attention scores
   tensor_model_parallel_size: 1 # model parallelism
   pipeline_model_parallel_size: 1 # model parallelism
 
@@ -31,7 +38,7 @@ model:
     betas:
       - 0.9
       - 0.98
-    sched: # TODO tune this or get info from paper
+    sched:
       name: CosineAnnealing
       warmup_steps: 2000
       constant_steps: 50000
@@ -42,6 +49,7 @@ model:
     library: 'huggingface'
     type: 'BertWordPieceLowerCase'
     model_name: "facebook/esm2_t6_8M_UR50D"
+    mask_id: 32
     model: null
     vocab_file: null
     merge_file: null
