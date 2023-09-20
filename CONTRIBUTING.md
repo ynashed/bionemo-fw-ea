@@ -67,13 +67,18 @@ The MR pipeline must be completed successfully if MR is to be merged. The subseq
 
 JET stage is manually triggered to avoid unnecessary pipelines in JET to be run. To trigger it, click on the button `jet-generate` in your MR pipeline window.
 
+Before MR is ready to be merged, all CI pipelines must be completed and successful. Otherwise, the merge is blocked.
+
 ## Type of changes to the codebase that can be merged WITHOUT `jet` stage being triggered
-Before MR is ready to be merged, all CI pipelines must be completed and successful. One stage of a pipeline is called `jet` and triggers comprehensive performance and convergence tests of BioNeMo models in [JET](https://jet.nvidia.com/docs). The tests are more comprehensive than the tests invoked by `pytest examples/tests/test_model_pretrain_and_downstream.py -k test_model_training`. 
-This stage is resources- and time-consuming and can be **OMITTED** for some changes to the codebase by `JET_NOT_REQUIRED` label as one of MR's labels. The changes to the changes to the codebase that are eligible for NOT running `jet` stage are:
-* docstrings update in `*.py` files
+One stage of a pipeline is called `jet` and triggers comprehensive performance and convergence tests of BioNeMo models in [JET](https://jet.nvidia.com/docs). The tests are more comprehensive than the tests invoked by `pytest examples/tests/test_model_pretrain_and_downstream.py -k test_model_training`. 
+This stage is resources- and time-consuming and can be **OMITTED** for some changes to the codebase by `JET_NOT_REQUIRED` label as one of MR's labels. The changes to the codebase that are eligible for NOT running `jet` stage are:
+* docstrings update in `.py` files
 * code cleanup not related to refactoring of code (ie deleting unused imports or blank lines, improving lines formatting) in `*.py` files
-* improving hydra configs docs ( `*.yaml`, `*.yml`)
-* updating files with extension different than `*.py` and different than `*.yaml`, `*.yml`
+* improving hydra configs docstrings (comments and descriptions) in  `*.yaml`, `*.yml`
+* changes to `Dockerfile` or `requirements.txt` that **DO NOT** affect model performance or convergence. Changes that **REQUIRE** `jet` stage are, for instance, python package update or a NeMo container version update.
+* updating files with extensions different than `*.py`, `*.yaml`, `*.yml`,  `Dockerfile` or `requirements.txt` that **DO NOT** affect model performance or convergence
+
+As a final remark, most of the changes to files with extensions different than `*.py`, `*.yaml`, `*.yml`,  `Dockerfile` or `requirements.txt` DO REQUIRE `jet` stage to be run, should be carefully tested and ARE NOT eligible to use `JET_NOT_REQUIRE` label as they affect model performance or convergence.
 
 # General principles
 1. **User-oriented**: make it easy for end users, even at the cost of writing more code in the background
