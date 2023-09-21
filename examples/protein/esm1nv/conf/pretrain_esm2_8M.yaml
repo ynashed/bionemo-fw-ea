@@ -13,7 +13,10 @@ trainer:
   max_steps: 500000
   gradient_clip_val: 0
 
+use_cpu_initialization: False
+
 model:
+  precision: 16
   # ESM2-specific parameters
   seq_length: 512
   num_layers: 6
@@ -31,6 +34,8 @@ model:
   normalize_attention_scores: False # ESM2 does not use normalized attention scores
   tensor_model_parallel_size: 1 # model parallelism
   pipeline_model_parallel_size: 1 # model parallelism
+  esm_gelu: True # ESM2 uses custom gelu in the ML layer
+  bias_gelu_fusion: False
 
   optim:
     lr: 4e-4
