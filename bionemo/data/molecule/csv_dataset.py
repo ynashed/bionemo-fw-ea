@@ -44,6 +44,7 @@ class MoleculeCsvDataset(Dataset):
                  cfg,
                  workers=None,
                  num_samples=None,
+                 index_mapping_dir=None,
                  ):
         super().__init__()
 
@@ -64,6 +65,7 @@ class MoleculeCsvDataset(Dataset):
             sort_dataset_paths=cfg.get('sort_dataset_paths'),
             data_col=cfg.get('data_col'),
             data_sep=cfg.get('data_sep'),
+            index_mapping_dir=index_mapping_dir,
         )
         # create mapping to a single epoch with num_samples
         self._build_samples_mapping()

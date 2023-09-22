@@ -65,7 +65,11 @@ def build_typed_dataset(dataset_paths: Union[str, List[str]], data_impl: str, us
     assert len(errors) == 0, "Following files do not exist %s" % ' '.join(errors)
     logging.info(f'Loading data from {", ".join(dataset_paths)}')
 
-    dataset: Dataset = dataset_cls(dataset_paths=dataset_paths, **data_impl_kwargs)
+    index_mapping_dir = cfg.get("index_mapping_dir", os.path.dirname(dataset_paths[0]))
+    dataset: Dataset = dataset_cls(
+        dataset_paths=dataset_paths, 
+        index_mapping_dir=index_mapping_dir, 
+        **data_impl_kwargs)
 
     if use_upsampling:
         assert num_samples is not None, 'To enable upsampling, "num_samples" need to be specified as ' \
@@ -74,6 +78,6 @@ def build_typed_dataset(dataset_paths: Union[str, List[str]], data_impl: str, us
         if data_prefix is None:
             data_prefix = os.path.commonprefix(dataset_paths)
         dataset = NeMoUpsampling(dataset, num_samples=num_samples, cfg=cfg, data_prefix=data_prefix,
-                                 index_mapping_dir=os.path.dirname(dataset_paths[0]), max_seq_length=cfg.max_seq_length,
+                                 index_mapping_dir=index_mapping_dir, max_seq_length=cfg.max_seq_length,
                                  seed=cfg.seed)
     return dataset

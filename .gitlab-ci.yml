@@ -186,9 +186,10 @@ unit-test-gpu:
 jet-generate:
   extends: .jet-generate-template
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_LABELS =~ /JET_NOT_REQUIRED/
+      when: never
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_LABELS !~ /JET_NOT_REQUIRED/
       when: manual
-      allow_failure: true
       variables:
         JET_WORKLOADS_REF_EPHEMERAL: "ephemeral/bionemo/${CI_PIPELINE_ID}"
     - if: $CI_COMMIT_BRANCH == "dev"
@@ -211,7 +212,9 @@ jet-trigger:
         - CI_PIPELINE_ID
         - CI_COMMIT_BRANCH
     rules:
-      - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_LABELS =~ /JET_NOT_REQUIRED/
+        when: never
+      - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_LABELS !~ /JET_NOT_REQUIRED/
         variables:
           JET_WORKLOADS_REF: "ephemeral/bionemo/${CI_PIPELINE_ID}"
       - if: $CI_COMMIT_BRANCH == "dev"
@@ -236,7 +239,9 @@ jet-test:
   stage: jet
   when: on_success
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_LABELS =~ /JET_NOT_REQUIRED/
+      when: never
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_LABELS !~ /JET_NOT_REQUIRED/
     - if: $CI_COMMIT_BRANCH == "dev"
     - if: $CI_COMMIT_BRANCH == "dev-next"
     - if: $CI_COMMIT_BRANCH == "main"

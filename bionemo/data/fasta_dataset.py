@@ -210,7 +210,7 @@ class InternallyIndexedFastaMemMapDataset(Dataset):
     'CATA'
     """
     def __init__(self, dataset_paths, max_length, workers=None,
-            sort_dataset_paths=True,
+            sort_dataset_paths=True, index_mapping_dir=None,
     ):
         """
         Args:
@@ -231,6 +231,7 @@ class InternallyIndexedFastaMemMapDataset(Dataset):
             header_lines=1,
             workers=workers,
             sort_dataset_paths=sort_dataset_paths,
+            index_mapping_dir=index_mapping_dir,
         )
 
         self.n_cumulative_entries = self._dataset.midx_bins

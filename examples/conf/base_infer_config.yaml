@@ -25,6 +25,7 @@ model:
     # Path to data must be specified by the user.
     dataset_path: ??? # full path to dataset (can include range or a list)
     output_fname: "" # output file, inferred based on dataset_path if empty
+    index_mapping_dir: null # path to store cached indexing files (if empty, will be stored in the same directory as dataset_path)
     data_fields_map: # name which data_fields shoud be used for sequence/id (dataset dependant)
       sequence: "sequence"
       id: "id"

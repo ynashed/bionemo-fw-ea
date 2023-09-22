@@ -14,6 +14,7 @@
 
 import os
 from omegaconf.dictconfig import DictConfig
+from omegaconf import open_dict
 from pytorch_lightning.trainer.trainer import Trainer
 
 from nemo.collections.nlp.models.language_modeling.megatron_t5_model import MegatronT5Model
@@ -73,6 +74,9 @@ class ProtT5nvModel(MegatronT5Model):
             "favor_long_ngrams": self._cfg.data.get('favor_long_ngrams', False),
             "data_impl_kwargs": self._cfg.data.data_impl_kwargs.get(self._cfg.data.data_impl, {})
         }
+        # we add here index_mapping_dir to data_impl_kwargs (which are data_impl specific)
+        with open_dict(kwargs["data_impl_kwargs"]):
+            kwargs["data_impl_kwargs"]["index_mapping_dir"] = self._cfg.data.get('index_mapping_dir', None)
 
         dataset_path = self._cfg.data.dataset_path
         ds_train = self._cfg.data.dataset.train

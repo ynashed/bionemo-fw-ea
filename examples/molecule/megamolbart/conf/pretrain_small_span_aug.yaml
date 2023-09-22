@@ -12,3 +12,7 @@ model:
   num_layers: 6
   hidden_size: 512
   num_attention_heads: 8
+  data:
+    data_impl_kwargs:
+      csv_mmap:
+        data_col: 1
