@@ -21,11 +21,11 @@ from bionemo.model.utils import (
 )
 from bionemo.data import FLIPPreprocess
 from bionemo.model.protein.downstream import FineTuneProteinModel
-from bionemo.data.metrics import per_token_accuracy
+from bionemo.data.metrics import per_token_accuracy, accuracy, mse
 
 
-@hydra_runner(config_path="../esm1nv/conf", config_name="finetune_config") # ESM
-#@hydra_runner(config_path="../prott5nv/conf", config_name="finetune_config") # ProtT5
+@hydra_runner(config_path="../esm1nv/conf", config_name="downstream_flip_sec_str") # ESM
+#@hydra_runner(config_path="../prott5nv/conf", config_name="downstream_flip_sec_str") # ProtT5
 def main(cfg) -> None:
 
     logging.info("\n\n************* Finetune config ****************")
@@ -37,9 +37,16 @@ def main(cfg) -> None:
         model = FineTuneProteinModel(cfg, trainer)
         metrics = {}
         metrics_args = {}
-        for idx, name in enumerate(cfg.model.data.labels_col):
-            metrics[name + "_accuracy"] = per_token_accuracy
-            metrics_args[name + "_accuracy"] = {"label_id": idx}
+        for idx, name in enumerate(cfg.model.data.target_column):
+            if cfg.model.data.task_type == "token-level-classification":
+                metrics[name + "_accuracy"] = per_token_accuracy
+                metrics_args[name + "_accuracy"] = {"label_id": idx}
+            elif cfg.model.data.task_type == "classification":
+                metrics[name + "_accuracy"] = accuracy
+                metrics_args[name + "_accuracy"] = {}
+            elif cfg.model.data.task_type == "regression":
+                metrics[name + "_MSE"] = mse
+                metrics_args[name + "_MSE"] = {}
 
         model.add_metrics(metrics=metrics, metrics_args=metrics_args)
         trainer.fit(model)
@@ -54,8 +61,7 @@ def main(cfg) -> None:
     else:
         logging.info("************** Starting Preprocessing ***********")
         preprocessor = FLIPPreprocess()
-        preprocessor.prepare_dataset(output_dir=cfg.model.data.dataset_path, 
-                                     task_name=cfg.model.data.task_name)
+        preprocessor.prepare_all_datasets(output_dir=cfg.model.data.preprocessed_data_path)
 
 
 if __name__ == '__main__':

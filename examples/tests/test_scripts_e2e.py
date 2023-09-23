@@ -58,7 +58,7 @@ def get_data_overrides(script_or_cfg_path: str) -> str:
         f'update this function, patterns might be wrong'
 
     task = {
-        'molecule': 'phys_chem',
+        'molecule': 'phys_chem/SAMPL',
         'protein': 'downstream',
     }
 

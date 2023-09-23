@@ -71,7 +71,7 @@ class ValidationTrainer:
         avg_metrics = {}
         self.model.eval()
         for n, vdata in enumerate(tqdm(test_dataloader)):
-            vinputs, vlabels = test_dataset.prepare_batch(vdata, test_dataset)
+            vinputs, vlabels = test_dataset.prepare_batch(vdata, test_dataset, task=self.cfg.task_type)
             voutputs = self.model(vinputs)
             vloss = self.loss_fn(voutputs, vlabels)
             running_vloss += vloss
@@ -86,7 +86,7 @@ class ValidationTrainer:
     def train_one_epoch(self, model, train_dataset, train_dataloader, loss_fn, optimizer, scheduler):
         running_loss = 0.
         for i, data in enumerate(tqdm(train_dataloader)):
-            inputs, labels = train_dataset.prepare_batch(data, train_dataset)
+            inputs, labels = train_dataset.prepare_batch(data, train_dataset, task=self.cfg.task_type)
             torch.set_grad_enabled(True)
             outputs = model(inputs)
             loss = loss_fn(outputs, labels)

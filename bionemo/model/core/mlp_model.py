@@ -32,7 +32,7 @@ from typing import List
 class MLPModel(nn.Module):
     def __init__(self, 
                  layer_sizes: Optional[List[int]] = None, 
-                 dropout: float = 0.1, 
+                 dropout: float = 0.25, 
                  activation_function: Optional[nn.Module] = None):
         """
         Simple MLP Model for validation on benchmark datasets
@@ -52,7 +52,7 @@ class MLPModel(nn.Module):
 
     def forward(self, x):
         for layer in self.linear_layers[:-1]:
-            x = self.act(self.dropout(layer(x)))
+            x = self.dropout(self.act(layer(x)))
             
         x = self.linear_layers[-1](x)
         return x

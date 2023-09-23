@@ -14,11 +14,12 @@
 # limitations under the License.
 
 import torch
+import bionemo.utils
 from functools import lru_cache
-from bionemo.model.core import ConvNet, PerTokenMaskedCrossEntropyLoss
+from bionemo.model.core import ConvNet, PerTokenMaskedCrossEntropyLoss, MLPModel
 from bionemo.model.core.encoder_finetuning import EncoderFineTuning
 from nemo.utils.model_utils import import_class_by_path
-from bionemo.data.datasets.per_token_value_dataset import PerTokenValueDataModule, PerTokenValueDataset
+from bionemo.data.datasets import PerTokenValueDataModule, PerTokenValueDataset, SingleValueDataset, SingleValueDataModule
 
 
 class FineTuneProteinModel(EncoderFineTuning):
@@ -26,8 +27,9 @@ class FineTuneProteinModel(EncoderFineTuning):
     def __init__(self, cfg, trainer):
         self.full_cfg = cfg
         self.encoder_frozen = self.full_cfg.model.encoder_frozen
-        super().__init__(cfg.model, trainer=trainer) 
-    
+        self.task_type = self.full_cfg.model.data.task_type
+        super().__init__(cfg.model, trainer=trainer)
+
     def configure_optimizers(self):
         super().setup_optimization(optim_config=self.cfg.finetuning_optim)
 
@@ -37,11 +39,32 @@ class FineTuneProteinModel(EncoderFineTuning):
             return [self._optimizer], [self._scheduler]
 
     def build_loss_fn(self):
-        return PerTokenMaskedCrossEntropyLoss()
+        if self.task_type in ['regression', 'classification']:
+            loss = bionemo.utils.lookup_or_use(
+                torch.nn, self.cfg.loss_func
+            )
+        elif self.task_type == 'token-level-classification':
+            loss = PerTokenMaskedCrossEntropyLoss()
+        return loss
 
     def build_task_head(self):
-        task_head = ConvNet(self.full_cfg.model.hidden_size, 
-                            output_sizes=self.cfg.data.labels_size)
+        if self.task_type in ['regression', 'classification']:
+            if len(self.cfg.data.target_sizes) != 1:
+                raise ValueError("Classification and regression tasks do not support multi-head predictions")
+            task_head = MLPModel(
+                layer_sizes=[
+                    self.encoder_model.cfg.model.hidden_size,
+                    self.cfg.hidden_layer_size,
+                    self.cfg.data.target_sizes[0]
+                ],
+                dropout=0.1,
+            )
+
+        elif self.task_type == 'token-level-classification':
+            task_head = ConvNet(
+                self.full_cfg.model.hidden_size, 
+                output_sizes=self.cfg.data.target_sizes
+            )
         return task_head
 
     def setup_encoder_model(self, cfg, trainer):
@@ -61,9 +84,15 @@ class FineTuneProteinModel(EncoderFineTuning):
             model = self.encoder_model
         else:
             model = None
-        self.data_module = PerTokenValueDataModule(
-            self.cfg, self.trainer, model=model
-        )
+
+        if self.task_type in ['regression', 'classification']:
+            self.data_module = SingleValueDataModule(
+                self.cfg, self.trainer, model=model
+            )
+        elif self.task_type == 'token-level-classification':
+            self.data_module = PerTokenValueDataModule(
+                self.cfg, self.trainer, model=model
+            )
 
     def on_fit_start(self):
         self.build_train_valid_test_datasets()
@@ -104,6 +133,9 @@ class FineTuneProteinModel(EncoderFineTuning):
 
     def _calc_step(self, batch, batch_idx):
         output_tensor = self.forward(batch)
-        target = self.get_target_from_batch(batch)
+        if self.task_type in ['regression', 'classification']:
+            _, target = SingleValueDataset.prepare_batch(batch, self._train_ds, task=self.task_type)
+        elif self.task_type == 'token-level-classification':
+            target = self.get_target_from_batch(batch)
         loss = self.loss_fn(output_tensor, target)
         return loss, output_tensor, target

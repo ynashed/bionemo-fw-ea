@@ -31,7 +31,7 @@ model:
       emb_batch_size: 32
       batch_size: ${.emb_batch_size}
       num_epochs: 1
-      dataset_path: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/molecule/phys_chem
+      dataset_path: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/molecule/phys_chem/SAMPL
       task_name: SAMPL
       dataset:
         train: x000

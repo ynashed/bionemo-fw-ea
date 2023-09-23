@@ -237,6 +237,7 @@ class EncoderFineTuning(ModelPT, Exportable, ABC):
         if self.metrics is not None:
             for name, m_fun in self.metrics.items():
                 metrics = m_fun(output, target, **self.metrics_args[name])
+                metrics = torch.tensor(metrics).to("cuda")
                 result[subset + "_" + name] = average_losses_across_data_parallel_group([metrics])
         return result
 

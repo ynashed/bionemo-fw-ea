@@ -47,11 +47,11 @@ def main(cfg) -> None:
     else:
         logging.info("************** Starting Data PreProcessing ***********")
         PhysChemPreprocess().prepare_dataset(links_file=cfg.model.data.links_file,
-                                                 output_dir=cfg.model.data.dataset_path)
+                                                 output_dir=cfg.model.data.preprocessed_data_path)
         
         if cfg.model.data.split_data:
             PhysChemPreprocess()._process_split(links_file=cfg.model.data.links_file,
-                                                    output_dir=cfg.model.data.dataset_path, 
+                                                    output_dir=cfg.model.data.preprocessed_data_path, 
                                                     test_frac=cfg.model.data.test_frac, 
                                                     val_frac=cfg.model.data.val_frac)
         logging.info("************** Finished Data PreProcessing ***********")

@@ -46,8 +46,12 @@ class PerTokenValueDataModule(BioNeMoDataModule):
         self.model=model
         self.tokenizers = [
             Label2IDTokenizer() 
-            for _ in range(len(self.cfg.labels_size))
+            for _ in range(len(self.cfg.target_sizes))
             ]
+        if "shuffle" in self.cfg.keys():
+            self.shuffle = self.cfg.shuffle
+        else:
+            self.shuffle = False
     
     def _update_tokenizers(self, tok, labels):
         tokenizers = [tok[i].build_vocab(np.array(labels)[:, i]) 
@@ -64,10 +68,10 @@ class PerTokenValueDataModule(BioNeMoDataModule):
             model=self.model,
             max_seq_length=self.cfg.max_seq_length, 
             emb_batch_size=self.cfg.emb_batch_size,
-            labels_size=self.cfg.labels_size,
-            mask_col=self.cfg.mask_col,
-            labels_col=self.cfg.labels_col,
-            sequence_col=self.cfg.sequence_col,
+            labels_size=self.cfg.target_sizes,
+            mask_col=self.cfg.mask_column,
+            labels_col=self.cfg.target_column,
+            sequence_col=self.cfg.sequence_column,
         )
         self.tokenizers = self._update_tokenizers(
             self.tokenizers, 
@@ -88,7 +92,7 @@ class PerTokenValueDataModule(BioNeMoDataModule):
         """
         self.train_ds = self._create_dataset("train", 
                                              self.cfg.dataset.train)
-        return PerTokenValueDataset(self.train_ds)
+        return PerTokenValueDataset(self.train_ds, shuffle=self.shuffle)
 
     def val_dataset(self):
         if "val" in self.cfg.dataset:
@@ -108,13 +112,19 @@ class PerTokenValueDataModule(BioNeMoDataModule):
 
 
 class PerTokenValueDataset(Dataset):
-    def __init__(self, data):
+    def __init__(self, data, shuffle=False):
         self.data = data
+        self.idxs = list(range(self.data.length()))
+        self.shuffle = shuffle
+        if shuffle:
+            np.random.shuffle(self.idxs) 
 
     def __len__(self):
         return self.data.length()
 
     def __getitem__(self, idx):
+        if self.shuffle:
+            idx = self.idxs[idx]
         embeddings = self.data.get_embeddings(idx)
         if isinstance(embeddings, str):
             seq_len = len(embeddings)
@@ -146,7 +156,7 @@ class PerTokenValueDataset(Dataset):
 
 
     @staticmethod
-    def prepare_batch(batch, data):
+    def prepare_batch(batch, data, task=None):
         label_names = data.data.label_names
         num_labels = len(label_names)
         max_batch_seq_len = batch["seq_len"].max()
