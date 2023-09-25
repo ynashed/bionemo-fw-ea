@@ -18,7 +18,7 @@ def run_jet_downstream_pipeline(jet_workloads_ref_default: str, jet_workloads_re
                                 gpus: Optional[Union[List[int], int]] = None,
                                 precision: Optional[Union[List[int], int]] = None,
                                 batch_size: Optional[Union[List[int], int]] = None,
-                                setup_jet_api: bool = False, dry_run: bool = False):
+                                jet_filter: Optional[str] = None, setup_jet_api: bool = False, dry_run: bool = False):
     """
     Runs JET tests for a model or docker specified by the arguments.
 
@@ -94,6 +94,9 @@ def run_jet_downstream_pipeline(jet_workloads_ref_default: str, jet_workloads_re
         gpus: number(s) of devices (gpus) to be tested
         precision: precision(s) to be tested
         batch_size: batch size(s) to be tested
+        jet_filter: query used in JET Api to filter workloads in the JET config and run only subset of them.
+                   It has the pandas format and should not contain double quotation mark (replaced to single ones).
+                   More info about the syntax in https://jet.nvidia.com/docs/workloads/filtering/
         setup_jet_api: should JET API to be installed and setup during the execution of the script?
         dry_run: should a test run be executed?
                  (Without uploading to JET Workloads Registry and running pipelines in JET CI)
@@ -142,8 +145,15 @@ def run_jet_downstream_pipeline(jet_workloads_ref_default: str, jet_workloads_re
     jet_pipeline_runner = JetPipelineHandler(jet_workloads_ref=jet_workload_ref)
     if setup_jet_api:
         jet_pipeline_runner.setup_jet_api()
-    jet_pipeline_runner.get_workload_info(dry_run=dry_run)
-    jet_pipeline_runner.run_jet_pipeline(dry_run=dry_run)
+
+    if jet_filter is not None:
+        jet_filter = jet_filter.replace('"', "'")
+        jet_filter = f" and {jet_filter}"
+    else:
+        jet_filter = ""
+    jet_filter = f"\"type == 'recipe'{jet_filter}\""
+    jet_pipeline_runner.get_workload_info(jet_filter=jet_filter, dry_run=dry_run)
+    jet_pipeline_runner.run_jet_pipeline(jet_filter=jet_filter, dry_run=dry_run)
 
     print(f"The pipeline was run for Jet Workloads Registry reference: {jet_workload_ref}")
 
@@ -195,6 +205,8 @@ if __name__ == '__main__':
                         help='List of ints that specify different batch sizes to test')
 
     ### Other
+    parser.add_argument('--filter', type=str, default=None,
+                        help='Query in the pandas format used to filter workloads in the JET config and run only subset of them.')
     parser.add_argument('--setup_jet_api', action='store_true', default=False,
                         help='Should JET API to be installed and setup during the execution of the script?')
     parser.add_argument('--dry_run', action='store_true', default=False, help='Should a test run be executed?')
@@ -207,5 +219,5 @@ if __name__ == '__main__':
                                 docker_image=args.image, config_path=args.config_path, config_name=args.config_name,
                                 script_path=args.script_path, variant=args.variant,
                                 model=args.model, extra_overwrites=args.extra_overwrites,
-                                nodes=args.nodes, gpus=args.gpus, precision=args.precision,
-                                batch_size=args.batch_size, setup_jet_api=args.setup_jet_api, dry_run=args.dry_run)
+                                nodes=args.nodes, gpus=args.gpus, precision=args.precision, batch_size=args.batch_size,
+                                jet_filter=args.filter, setup_jet_api=args.setup_jet_api, dry_run=args.dry_run)
