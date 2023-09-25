@@ -83,14 +83,8 @@ from nemo.collections.nlp.modules.common.megatron.transformer import (
 )
 from bionemo.model.protein.esm1nv.attention import ESMnvParallelAttention
 from bionemo.model.protein.esm1nv.mlp import ESMnvParallelMLP
+from bionemo.model.protein.esm1nv.layernorm import esm_get_layer_norm
 
-def esm_get_layer_norm(normalized_shape, *args, **kwargs):
-    use_pt_layernorm = kwargs.pop('use_pt_layernorm', False)
-    if use_pt_layernorm:
-        eps = kwargs.pop('eps', 1e-05)
-        return torch.nn.LayerNorm(normalized_shape, eps=eps, elementwise_affine=True)
-    else:
-        return get_layer_norm(normalized_shape, *args, **kwargs)
 ## END BIONEMO
 
 class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
@@ -147,6 +141,7 @@ class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
         use_esm_attention=False,
         esm_gelu=False,
         use_pt_layernorm=False,
+        use_pt_mlp_out=False,
     ):
         super(ParallelTransformerLayer_, self).__init__()
 
@@ -436,6 +431,8 @@ class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
                 dropout=ffn_dropout,
                 # BIONEOM ARGS
                 esm_gelu=esm_gelu,
+                use_pt_layernorm=use_pt_layernorm,
+                use_pt_mlp_out=use_pt_mlp_out,
             )
 
 
@@ -487,6 +484,7 @@ class ESMnvParallelTransformerLayer(ESMnvParallelTransformerLayer_):
         use_esm_attention=False,
         esm_gelu=False,
         use_pt_layernorm=False,
+        use_pt_mlp_out=False,
     ):
         super(ESMnvParallelTransformerLayer, self).__init__(
             init_method=init_method,
@@ -534,6 +532,7 @@ class ESMnvParallelTransformerLayer(ESMnvParallelTransformerLayer_):
             use_esm_attention=use_esm_attention,
             esm_gelu=esm_gelu,
             use_pt_layernorm=use_pt_layernorm,
+            use_pt_mlp_out=use_pt_mlp_out,
         )
 
         # Dtype for forward pass - ignore amp O2
@@ -654,6 +653,7 @@ class ESMnvParallelTransformer(ParallelTransformer):
         use_esm_attention=False,
         esm_gelu=False,
         use_pt_layernorm=False,
+        use_pt_mlp_out=False,
     ):
         super(ParallelTransformer, self).__init__()
 
@@ -840,6 +840,7 @@ class ESMnvParallelTransformer(ParallelTransformer):
                     use_esm_attention=use_esm_attention,
                     esm_gelu=esm_gelu,
                     use_pt_layernorm=use_pt_layernorm,
+                    use_pt_mlp_out=use_pt_mlp_out,
                 )
 
         if parallel_state.get_virtual_pipeline_model_parallel_world_size() is not None:
