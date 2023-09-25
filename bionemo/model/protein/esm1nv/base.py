@@ -209,6 +209,8 @@ class ESMnvTransformerLanguageModel(TransformerLanguageModel):
         # NEW BIONEMO ARGS
         use_esm_attention=False,
         esm_gelu=False,
+        use_pt_layernorm=False,
+        use_pt_mlp_out=False,
     ):
         super(TransformerLanguageModel, self).__init__(share_token_embeddings=share_embeddings_and_output_weights)
 
@@ -358,6 +360,8 @@ class ESMnvTransformerLanguageModel(TransformerLanguageModel):
             # NEW BIONEMO ARGs
             use_esm_attention=use_esm_attention,
             esm_gelu=esm_gelu,
+            use_pt_layernorm=use_pt_layernorm,
+            use_pt_mlp_out=use_pt_mlp_out,
         )
         self._encoder_key = 'encoder'
 
@@ -611,6 +615,8 @@ def esm_get_language_model(
     # NEW BIONEMO ARGS
     use_esm_attention=False,
     esm_gelu=False,
+    use_pt_layernorm=False,
+    use_pt_mlp_out=False,
 ):
     """Build language model and return along with the key to save."""
     if kv_channels is None:
@@ -695,6 +701,8 @@ def esm_get_language_model(
         # NEW BIONEMO ARGS
         use_esm_attention=use_esm_attention,
         esm_gelu=esm_gelu,
+        use_pt_layernorm=use_pt_layernorm,
+        use_pt_mlp_out=use_pt_mlp_out,
     )
     # key used for checkpoints.
     language_model_key = 'language_model'
@@ -744,6 +752,8 @@ class ESMnvBertModel(BertModel):
         normalize_attention_scores=True,
         use_esm_attention=False,
         esm_gelu=False,
+        use_pt_layernorm=False,
+        use_pt_mlp_out=False,
     ):
         super(BertModel, self).__init__()
         self.fp16_lm_cross_entropy = fp16_lm_cross_entropy
@@ -799,6 +809,8 @@ class ESMnvBertModel(BertModel):
             normalize_attention_scores=normalize_attention_scores,
             use_esm_attention=use_esm_attention,
             esm_gelu=esm_gelu,
+            use_pt_layernorm=use_pt_layernorm,
+            use_pt_mlp_out=use_pt_mlp_out,
         )
 
         self.initialize_word_embeddings(
@@ -870,6 +882,8 @@ class ESMnvMegatronBertModel(MegatronBertModel):
             normalize_attention_scores=self.cfg.get("normalize_attention_scores", True),
             use_esm_attention=self.cfg.get("use_esm_attention", False),
             esm_gelu=self.cfg.get("esm_gelu", False),
+            use_pt_layernorm=self.cfg.get("use_pt_layernorm", False),
+            use_pt_mlp_out=self.cfg.get("use_pt_mlp_out", False),
         )
 
         return model
