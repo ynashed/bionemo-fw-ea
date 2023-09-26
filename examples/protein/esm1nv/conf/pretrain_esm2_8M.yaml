@@ -36,6 +36,8 @@ model:
   pipeline_model_parallel_size: 1 # model parallelism
   esm_gelu: True # ESM2 uses custom gelu in the ML layer
   bias_gelu_fusion: False
+  use_pt_layernorm: True # Use pytorch implementation of layernorm instead of fused nemo layernorm. Important for equivalency of results with ESM2.
+  use_pt_mlp_out: True # Use pytorch implementation of attention output mlp instead of the nemo version. Important for equivalency of results with ESM2.
 
   optim:
     lr: 4e-4
