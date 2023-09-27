@@ -83,6 +83,8 @@ from nemo.collections.nlp.modules.common.megatron.transformer import (
 )
 from bionemo.model.protein.esm1nv.attention import ESMnvParallelAttention
 from bionemo.model.protein.esm1nv.mlp import ESMnvParallelMLP
+from bionemo.model.protein.esm1nv.layernorm import esm_get_layer_norm
+
 ## END BIONEMO
 
 class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
@@ -138,6 +140,8 @@ class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
         # NEW BIONEMO ARGS
         use_esm_attention=False,
         esm_gelu=False,
+        use_pt_layernorm=False,
+        use_pt_mlp_out=False,
     ):
         super(ParallelTransformerLayer_, self).__init__()
 
@@ -181,8 +185,9 @@ class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
         if self.layer_type != LayerType.retrieval_decoder_after_self_attn:
             # Layernorm on the input data.
             if normalization == 'layernorm':
-                self.input_layernorm = get_layer_norm(
-                    hidden_size, layernorm_epsilon, persist_layer_norm, sequence_parallel
+                self.input_layernorm = esm_get_layer_norm(
+                    hidden_size, layernorm_epsilon, persist_layer_norm, sequence_parallel,
+                    use_pt_layernorm=use_pt_layernorm,
                 )
             elif normalization == 'layernorm1p':
                 self.input_layernorm = LayerNorm1P(
@@ -202,7 +207,7 @@ class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
             self.self_attention = ESMnvParallelAttention(
                 init_method=init_method,
                 output_layer_init_method=output_layer_init_method,
-                layer_number=layer_number,
+                layer_number=0 if use_esm_attention else layer_number,
                 num_attention_heads=num_attention_heads,
                 hidden_size=hidden_size,
                 attention_type=AttnType.self_attn,
@@ -231,8 +236,9 @@ class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
 
             if transformer_block_type == 'normformer':
                 if normalization == 'layernorm':
-                    self.post_attention_normformer_norm = get_layer_norm(
-                        hidden_size, layernorm_epsilon, persist_layer_norm
+                    self.post_attention_normformer_norm = esm_get_layer_norm(
+                        hidden_size, layernorm_epsilon, persist_layer_norm,
+                        use_pt_layernorm=use_pt_layernorm,
                     )
                 else:
                     self.post_attention_normformer_norm = MixedFusedRMSNorm(hidden_size, layernorm_epsilon)
@@ -241,8 +247,9 @@ class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
                 #  the post_attention_layernorm is used for layermorm after mlp
                 # don't need it for decoder_pre_mlp and post_ln
                 if normalization == 'layernorm':
-                    self.post_attention_layernorm = get_layer_norm(
-                        hidden_size, layernorm_epsilon, persist_layer_norm, sequence_parallel
+                    self.post_attention_layernorm = esm_get_layer_norm(
+                        hidden_size, layernorm_epsilon, persist_layer_norm, sequence_parallel,
+                        use_pt_layernorm=use_pt_layernorm,
                     )
                 elif normalization == 'layernorm1p':
                     self.post_attention_layernorm = LayerNorm1P(
@@ -264,8 +271,9 @@ class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
         if self.layer_type == LayerType.retrieval_decoder_after_self_attn and self.transformer_block_type == 'post_ln':
             # Layernorm on the attention output
             if normalization == 'layernorm':
-                self.post_attention_layernorm = get_layer_norm(
-                    hidden_size, layernorm_epsilon, persist_layer_norm, sequence_parallel
+                self.post_attention_layernorm = esm_get_layer_norm(
+                    hidden_size, layernorm_epsilon, persist_layer_norm, sequence_parallel,
+                    use_pt_layernorm=use_pt_layernorm,
                 )
             elif normalization == 'layernorm1p':
                 self.post_attention_layernorm = LayerNorm1P(
@@ -305,8 +313,9 @@ class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
             # Normformer normalization
             if transformer_block_type == 'normformer':
                 if normalization == 'layernorm':
-                    self.post_inter_attention_normformer_norm = get_layer_norm(
-                        hidden_size, layernorm_epsilon, persist_layer_norm, sequence_parallel
+                    self.post_inter_attention_normformer_norm = esm_get_layer_norm(
+                        hidden_size, layernorm_epsilon, persist_layer_norm, sequence_parallel,
+                        use_pt_layernorm=use_pt_layernorm,
                     )
                 elif normalization == 'layernorm1p':
                     self.post_inter_attention_normformer_norm = LayerNorm1P(
@@ -317,8 +326,9 @@ class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
 
             # Layernorm on the attention output.
             if normalization == 'layernorm':
-                self.post_inter_attention_layernorm = get_layer_norm(
-                    hidden_size, layernorm_epsilon, persist_layer_norm, sequence_parallel
+                self.post_inter_attention_layernorm = esm_get_layer_norm(
+                    hidden_size, layernorm_epsilon, persist_layer_norm, sequence_parallel,
+                    use_pt_layernorm=use_pt_layernorm,
                 )
             elif normalization == 'layernorm1p':
                 self.post_inter_attention_layernorm = LayerNorm1P(
@@ -352,8 +362,9 @@ class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
             # Normformer normalization
             if transformer_block_type == 'normformer':
                 if normalization == 'layernorm':
-                    self.post_inter_attention_normformer_norm = get_layer_norm(
-                        hidden_size, layernorm_epsilon, persist_layer_norm, sequence_parallel
+                    self.post_inter_attention_normformer_norm = esm_get_layer_norm(
+                        hidden_size, layernorm_epsilon, persist_layer_norm, sequence_parallel,
+                        use_pt_layernorm=use_pt_layernorm,
                     )
                 elif normalization == 'layernorm1p':
                     self.post_inter_attention_normformer_norm = LayerNorm1P(
@@ -364,8 +375,9 @@ class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
 
             # Layernorm on the attention output.
             if normalization == 'layernorm':
-                self.post_inter_attention_layernorm = get_layer_norm(
-                    hidden_size, layernorm_epsilon, persist_layer_norm, sequence_parallel
+                self.post_inter_attention_layernorm = esm_get_layer_norm(
+                    hidden_size, layernorm_epsilon, persist_layer_norm, sequence_parallel,
+                    use_pt_layernorm=use_pt_layernorm,
                 )
             elif normalization == 'layernorm1p':
                 self.post_inter_attention_layernorm = LayerNorm1P(
@@ -419,6 +431,8 @@ class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
                 dropout=ffn_dropout,
                 # BIONEOM ARGS
                 esm_gelu=esm_gelu,
+                use_pt_layernorm=use_pt_layernorm,
+                use_pt_mlp_out=use_pt_mlp_out,
             )
 
 
@@ -469,6 +483,8 @@ class ESMnvParallelTransformerLayer(ESMnvParallelTransformerLayer_):
         # NEW BIONEMO ARGS
         use_esm_attention=False,
         esm_gelu=False,
+        use_pt_layernorm=False,
+        use_pt_mlp_out=False,
     ):
         super(ESMnvParallelTransformerLayer, self).__init__(
             init_method=init_method,
@@ -515,6 +531,8 @@ class ESMnvParallelTransformerLayer(ESMnvParallelTransformerLayer_):
             # NEW BIONEMO ARGS
             use_esm_attention=use_esm_attention,
             esm_gelu=esm_gelu,
+            use_pt_layernorm=use_pt_layernorm,
+            use_pt_mlp_out=use_pt_mlp_out,
         )
 
         # Dtype for forward pass - ignore amp O2
@@ -634,6 +652,8 @@ class ESMnvParallelTransformer(ParallelTransformer):
         # NEW BIONEMO ARGS
         use_esm_attention=False,
         esm_gelu=False,
+        use_pt_layernorm=False,
+        use_pt_mlp_out=False,
     ):
         super(ParallelTransformer, self).__init__()
 
@@ -819,6 +839,8 @@ class ESMnvParallelTransformer(ParallelTransformer):
                     # NEW BIONEMO ARGS
                     use_esm_attention=use_esm_attention,
                     esm_gelu=esm_gelu,
+                    use_pt_layernorm=use_pt_layernorm,
+                    use_pt_mlp_out=use_pt_mlp_out,
                 )
 
         if parallel_state.get_virtual_pipeline_model_parallel_world_size() is not None:
@@ -862,8 +884,9 @@ class ESMnvParallelTransformer(ParallelTransformer):
         if self.post_process and self.transformer_block_type != 'post_ln':
             # Final layer norm before output.
             if normalization == 'layernorm':
-                self.final_layernorm = get_layer_norm(
-                    hidden_size, layernorm_epsilon, persist_layer_norm, sequence_parallel=sequence_parallel
+                self.final_layernorm = esm_get_layer_norm(
+                    hidden_size, layernorm_epsilon, persist_layer_norm, sequence_parallel=sequence_parallel,
+                    use_pt_layernorm=use_pt_layernorm,
                 )
             elif normalization == 'layernorm1p':
                 self.final_layernorm = LayerNorm1P(

@@ -15,7 +15,7 @@ trainer:
   val_check_interval: 200
   limit_val_batches: 1
   accumulate_grad_batches: 1
-  num_sanity_val_steps: 0
+  num_sanity_val_steps: 1
 
 model:
   global_batch_size: null
@@ -36,7 +36,7 @@ model:
     enabled: True
     dataset:
       class: PerTokenPredictionCallback
-      task_type: classification
+      task_type: token-level-classification
       infer_target: bionemo.model.protein.prott5nv.infer.ProtT5nvInference
       max_seq_length: ${model.seq_length}
       emb_batch_size: 128
@@ -44,14 +44,15 @@ model:
       num_epochs: 5
       shuffle: True
       num_workers: 10
+      task_name: downstream
       dataset_path: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/protein/downstream
       dataset: 
         train: x000
         test: x000
-      labels_size: [3, 8, 2]
-      mask_col: ["resolved", "resolved", null]
-      labels_col: ["3state","8state", "resolved"]
-      sequence_col: "sequence"
+      target_sizes: [3, 8, 2]
+      mask_column: ["resolved", "resolved", null]
+      target_column: ["3state","8state", "resolved"]
+      sequence_column: "sequence"
       random_seed: 1234
       optim:
         name: adam

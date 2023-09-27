@@ -116,14 +116,14 @@ class PerTokenPredictionCallback(DownstreamValidationCallback):
         self.data_class = PerTokenValueDataModule
         self.metrics = {}
         self.metrics_args = {}
-        for idx, name in enumerate(self.valid_cfg.labels_col):
-            if self.valid_cfg.task_type == "classification":
+        for idx, name in enumerate(self.valid_cfg.target_column):
+            if self.valid_cfg.task_type == "token-level-classification":
                 self.metrics[name + "_accuracy"] = per_token_accuracy
                 self.metrics_args[name + "_accuracy"] = {"label_id": idx}
             else:
-                raise ValueError("Invalid task_type was provided {}. Supported task_type: 'classification'".format(self.valid_cfg.task_type))
+                raise ValueError("Invalid task_type was provided {}. Supported task_type: 'token-level-classification'".format(self.valid_cfg.task_type))
         pretrain_model_hidden_size = self.cfg.model.hidden_size
-        output_sizes = self.valid_cfg.labels_size
+        output_sizes = self.valid_cfg.target_sizes
         self.dwnstr_model = ConvNet(pretrain_model_hidden_size, output_sizes=output_sizes).to("cuda")
         self.loss_fn = PerTokenMaskedCrossEntropyLoss()
 

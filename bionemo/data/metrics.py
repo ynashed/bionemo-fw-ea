@@ -29,7 +29,7 @@ def accuracy(output, target):
         output = output.detach().to("cpu").numpy()
     if torch.is_tensor(target):    
         target = target.detach().to("cpu").numpy()
-    return accuracy_score(output.argmax(axis=1), target.argmax(axis=1))
+    return accuracy_score(output.argmax(axis=1), target)
 
 
 def calculate_accuracy(predicted, labels, mask):

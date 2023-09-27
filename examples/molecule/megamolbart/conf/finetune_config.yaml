@@ -41,7 +41,8 @@ model:
   data:
     # Preprocessing data params
     links_file: ${oc.env:PROJECT_MOUNT}/examples/molecule/megamolbart/dataset/PhysChem-downloader.txt
-    dataset_path: /data/physchem/ #sets the location where all three physchem datasets will be downloaded
+    preprocessed_data_path: /data/physchem/ #sets the location physchem dataset will be downloaded
+    dataset_path: ${model.data.preprocessed_data_path}/${model.data.task_name} 
     split_data: True
     val_frac: 0.15 # proportion of samples used for validation set
     test_frac: 0.15 # proportion of samples used for test set
@@ -57,6 +58,7 @@ model:
       val: x000
       test: x000
     num_workers: 8
+    shuffle: False
   
   finetuning_optim:
     name: adam

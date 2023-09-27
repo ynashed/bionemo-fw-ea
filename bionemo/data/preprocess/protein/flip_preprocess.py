@@ -32,7 +32,7 @@ from typing import Dict, List
 
 SEQUENCE_FNAME = {
     "aav": "seven_vs_many.fasta",
-    "bind": "from_publication.fasta",
+    "bind": "sequences.fasta",
     "conservation": "sequences.fasta",
     "gb1": "two_vs_rest.fasta",
     "meltome": "mixed_split.fasta",
@@ -42,13 +42,13 @@ SEQUENCE_FNAME = {
 }
 
 LABELS_FNAME = {
-    "aav": "seven_vs_many.fasta",
-    "bind": "from_publication.fasta",
+    "aav": None,
+    "bind":"from_publication.fasta",
     "conservation": "sampled.fasta",
-    "gb1": "two_vs_rest.fasta",
-    "meltome": "mixed_split.fasta",
-    "sav": "mixed.fasta",
-    "scl": "mixed_soft.fasta",
+    "gb1": None,
+    "meltome": None,
+    "sav": None,
+    "scl": None,
     "secondary_structure": "sampled.fasta"
 }
 
@@ -153,7 +153,11 @@ class FLIPPreprocess(object):
             name_to_masks = {mask.name: str(mask.seq) for mask in resolved_indexer}
         else:
             name_to_masks = None
-        name_to_labels = {label.name: str(label.seq) for label in labels_indexer}
+        if labels_indexer is not None:
+            name_to_labels = {label.name: str(label.seq) for label in labels_indexer}
+        else:
+            seq_attr = get_attributes_from_seq(sequence_indexer)
+            name_to_labels = {key: seq_attr[key]["TARGET"] for key in seq_attr.keys()}
         for split_name, record_id_list in zip(['train', 'val', 'test'], [train_samples, val_samples, test_samples]):
             logging.info(f'Saving {split_name} split...')
 
@@ -196,6 +200,15 @@ class FLIPPreprocess(object):
                     output = delimiter.join([record_id, sequence, labels])
                 fh.write(output + '\n')
         return       
+    
+    def prepare_all_datasets(self,
+                             output_dir="/data/FLIP",
+                             num_csv_files=1):
+        tasks_list = ["aav", "bind", "conservation", "gb1", "meltome", "sav", "scl", "secondary_structure"]
+        for task_name in tasks_list:
+            self.prepare_dataset(os.path.join(output_dir, task_name), 
+                                 task_name=task_name, 
+                                 num_csv_files=num_csv_files)
 
     def prepare_dataset(self,
                         output_dir,
@@ -216,7 +229,10 @@ class FLIPPreprocess(object):
         seq_path, labels_path, resolved_path = self.download_FLIP_data(download_dir=download_dir, 
                                                                        task_name=task_name)
         sequence_indexer = pyfastx.Fasta(seq_path, build_index=True, uppercase=True)
-        labels_indexer = pyfastx.Fasta(labels_path, build_index=True, uppercase=True)
+        if labels_path is not None:
+            labels_indexer = pyfastx.Fasta(labels_path, build_index=True, uppercase=True)
+        else: 
+            labels_indexer = None
         if resolved_path is not None:
             resolved_indexer = pyfastx.Fasta(resolved_path, build_index=True, uppercase=True)
         else:
@@ -224,7 +240,10 @@ class FLIPPreprocess(object):
         logging.info('FLIP data download complete.')
 
         logging.info('Processing FLIP dataset.')
-        train_samples, val_samples, test_samples = self.get_train_val_test_splits(labels_indexer)
+        if labels_indexer is not None:
+            train_samples, val_samples, test_samples = self.get_train_val_test_splits(labels_indexer)
+        else:
+            train_samples, val_samples, test_samples = self.get_train_val_test_splits(sequence_indexer)
         
         logging.info(f'Writing processed dataset files to {output_dir}...')
         self.write_csv_files(train_samples=train_samples, 

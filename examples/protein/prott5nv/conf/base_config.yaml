@@ -181,7 +181,7 @@ model:
     enabled: False
     dataset:
       class: PerTokenPredictionCallback
-      task_type: classification
+      task_type: token-level-classification
       infer_target: bionemo.model.protein.prott5nv.infer.ProtT5nvInference
       max_seq_length: ${model.seq_length}
       emb_batch_size: 128
@@ -190,14 +190,14 @@ model:
       shuffle: True
       num_workers: 8
       task_name: secondary_structure
-      dataset_path: /data/FLIP/secondary_structure
+      dataset_path: /data/FLIP/${model.dwnstr_task_validation.dataset.task_name}
       dataset:
         train: x000
         test: x000
-      sequence_col: "sequence" # name of column with protein sequence in csv file
-      labels_col: [ "3state", "resolved" ] # names of label columns in csv file
-      labels_size: [ 3, 2 ] # number of classes in each label
-      mask_col: [ "resolved", null ] # names of mask columns in csv file, masks must be 0 or 1
+      sequence_column: "sequence" # name of column with protein sequence in csv file
+      target_column: [ "3state", "resolved" ] # names of label columns in csv file
+      target_sizes: [ 3, 2 ] # number of classes in each label
+      mask_column: [ "resolved", null ] # names of mask columns in csv file, masks must be 0 or 1
       random_seed: 1234
       optim:
         name: adam

@@ -41,6 +41,7 @@ except (ImportError, ModuleNotFoundError):
 
 # BIONEMO Imports
 from nemo.collections.nlp.modules.common.megatron.mlp import ParallelMLP
+from bionemo.model.protein.esm1nv.layernorm import esm_get_layer_norm
 # END BIONEMO
 
 # BIONEMO: copy gelu function from esm
@@ -76,6 +77,8 @@ class ESMnvParallelMLP(ParallelMLP):
         dropout=0.0,
         # BIONEMO ARGS
         esm_gelu=False,
+        use_pt_layernorm=False,
+        use_pt_mlp_out=False,
         # END BIONEMO
     ):
         super(ParallelMLP, self).__init__()
@@ -88,6 +91,7 @@ class ESMnvParallelMLP(ParallelMLP):
         self.activation = activation
         self.dropout = dropout
         self.dtype = dtype
+        self.esm_layer = use_pt_mlp_out
         self.set_accepted_adapter_types([MLPInfusedAdapterConfig._target_])
 
         supported_activations = [
@@ -190,24 +194,28 @@ class ESMnvParallelMLP(ParallelMLP):
             self.activation_func = squared_relu
 
         # Project back to h.
-        self.dense_4h_to_h = tensor_parallel.RowParallelLinear(
-            ffn_hidden_size,
-            hidden_size,
-            input_is_parallel=True,
-            init_method=output_layer_init_method,
-            skip_bias_add=True,
-            use_cpu_initialization=use_cpu_initialization,
-            params_dtype=dtype,
-            bias=bias,
-            sequence_parallel_enabled=sequence_parallel,
-            gradient_accumulation_fusion=gradient_accumulation_fusion,
-        )
+        if use_pt_mlp_out:
+            self.dense_4h_to_h = torch.nn.Linear(ffn_hidden_size, hidden_size, bias=bias, dtype=dtype)
+        else:
+            self.dense_4h_to_h = tensor_parallel.RowParallelLinear(
+                ffn_hidden_size,
+                hidden_size,
+                input_is_parallel=True,
+                init_method=output_layer_init_method,
+                skip_bias_add=True,
+                use_cpu_initialization=use_cpu_initialization,
+                params_dtype=dtype,
+                bias=bias,
+                sequence_parallel_enabled=sequence_parallel,
+                gradient_accumulation_fusion=gradient_accumulation_fusion,
+            )
 
         # Normformer normalization
         if transformer_block_type == 'normformer':
             if normalization == 'layernorm':
-                self.normalization = get_layer_norm(
-                    ffn_hidden_size // get_tensor_model_parallel_world_size(), layernorm_epsilon, persist_layer_norm
+                self.normalization = esm_get_layer_norm(
+                    ffn_hidden_size // get_tensor_model_parallel_world_size(), layernorm_epsilon, persist_layer_norm,
+                    use_pt_layernorm=use_pt_layernorm,
                 )
             elif normalization == 'layernorm1p':
                 self.normalization = LayerNorm1P(
@@ -219,4 +227,57 @@ class ESMnvParallelMLP(ParallelMLP):
                 self.normalization = MixedFusedRMSNorm(
                     ffn_hidden_size // get_tensor_model_parallel_world_size(), layernorm_epsilon
                 )
+
+    def forward(self, hidden_states):
+
+        # [s, b, 4hp]
+        intermediate_parallel, bias_parallel = self.dense_h_to_4h(hidden_states)
+
+        if self.fast_glu_activation:
+            intermediate_parallel, intermediate_parallel_2 = torch.chunk(intermediate_parallel, 2, dim=-1)
+            if bias_parallel is not None:
+                bias_parallel, bias_parallel_2 = torch.chunk(bias_parallel, 2, dim=-1)
+        elif self.glu_activation_family and not self.fast_glu_activation:
+            intermediate_parallel_2, bias_parallel_2 = self.dense_h_to_4h_2(hidden_states)
+
+        if self.bias_activation_fusion:
+            if self.activation == 'gelu':
+                intermediate_parallel = fused_bias_gelu(intermediate_parallel, bias_parallel)
+            elif self.activation in ['geglu', 'fast-geglu']:
+                intermediate_parallel = fused_bias_geglu(
+                    intermediate_parallel, bias_parallel, intermediate_parallel_2, bias_parallel_2
+                )
+
+        elif self.glu_activation_family and not self.bias_activation_fusion:
+            if bias_parallel is not None:
+                intermediate_parallel = self.activation_func(intermediate_parallel + bias_parallel) * (
+                    intermediate_parallel_2 + bias_parallel_2
+                )
+            else:
+                intermediate_parallel = self.activation_func(intermediate_parallel) * intermediate_parallel_2
+
+        else:
+            if bias_parallel is not None:
+                intermediate_parallel = self.activation_func(intermediate_parallel + bias_parallel)
+            else:
+                intermediate_parallel = self.activation_func(intermediate_parallel)
+
+        if self.dropout > 0:
+            intermediate_parallel = F.dropout(intermediate_parallel, p=self.dropout, training=self.training)
+
+        infused_adapter = self.get_adapter_module(AdapterName.MLP_INFUSED)
+        if infused_adapter:
+            intermediate_parallel = infused_adapter(intermediate_parallel)
+
+        # Normformer normalization
+        if self.transformer_block_type == 'normformer':
+            intermediate_parallel = self.normalization(intermediate_parallel)
+
+        # [s, b, h]
+        if self.esm_layer:
+            output = self.dense_4h_to_h(intermediate_parallel)
+            output_bias = torch.zeros(size=(hidden_states.shape[-1],)).to(output.device)
+        else:
+            output, output_bias = self.dense_4h_to_h(intermediate_parallel)
+        return output, output_bias
 

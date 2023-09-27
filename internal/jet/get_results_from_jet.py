@@ -1,5 +1,7 @@
 import logging
 import os
+import datetime
+import numpy as np
 from argparse import ArgumentParser
 from typing import Optional
 
@@ -12,8 +14,8 @@ logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
 
 
 def get_results_from_jet(jet_workloads_ref: Optional[str], pipeline_id: Optional[int] = None,
-                         s_id: Optional[int] = None,
-                         jet_workloads_ref_pattern: Optional[str] = None, limit: Optional[int] = 1000,
+                         s_id: Optional[int] = None, jet_workloads_ref_pattern: Optional[str] = None,
+                         duration: Optional[str] = None, limit: Optional[int] = 1000,
                          only_completed: bool = False, save_dir: Optional[str] = None,
                          print_script: bool = False) -> None:
     """
@@ -37,6 +39,9 @@ def get_results_from_jet(jet_workloads_ref: Optional[str], pipeline_id: Optional
     # Get pipeline id-related results
     python internal/jet/get_results_from_jet.py --pipeline_id 9469458
 
+    # Get results for tests completed on dev branch for
+    python internal/jet/get_results_from_jet.py --jet_workloads_ref_pattern "ephemeral/bionemo/dev/.*"
+
     # Get results for tests based on reference pattern, ie ephemeral branches
     python internal/jet/get_results_from_jet.py --jet_workloads_ref_pattern "ephemeral/bionemo/.*"
 
@@ -51,13 +56,17 @@ def get_results_from_jet(jet_workloads_ref: Optional[str], pipeline_id: Optional
         pipeline_id: optional, pipeline ID in JET CI
         s_id: optional, workload_id in JET CI
         jet_workloads_ref_pattern: optional, regex of query to filter results from Kibana, optional
+        duration: optional, specifies period in the past to include jobs from till now,
+                  either by date from which to include as ISO-8601-formatted datetime string (ie '2023-01-01T15:00' or '2023-01-01')
+                  or duration, ie 1d, 5d, 1w, 2w, 1M, 2M, 1y, 2y
         limit: default set to 1000, limit of results to extract
         only_completed: default True, should only successfully completed jobs be returned?
         save_dir: optional, directory to save csv with results
         print_script: if to print script with commands to the console when the job execution failed and docker info
     """
 
-    log_service = JETInstance(env="prod").log_service()
+    jet_instance = JETInstance(env="prod")
+    log_service = jet_instance.log_service()
     query = JETLogsQuery().filter(Field("obj_workload.obj_labels.origin") == "bionemo")
 
     if jet_workloads_ref_pattern is not None:
@@ -76,6 +85,17 @@ def get_results_from_jet(jet_workloads_ref: Optional[str], pipeline_id: Optional
         logging.info(f'Query results for Jet CI workload id: {s_id}')
         query = query.filter(Field("s_id") == s_id)
 
+    if duration is not None:
+        if any([duration.endswith(s) for s in ['d', 'w', 'M', 'y']]):
+            query = query.filter(Field('ts_created') >= f'now-{duration}')
+        else:
+            try:
+                datetime.date.fromisoformat(duration)
+                query = query.filter(Field('ts_created') >= duration)
+
+            except ValueError:
+                logging.error(f"Invalid duration string: {str}. Proceeding without filtering results by date")
+
     if only_completed:
         query = query.filter(Field("l_exit_code") == 0.0)
 
@@ -93,7 +113,8 @@ def get_results_from_jet(jet_workloads_ref: Optional[str], pipeline_id: Optional
 
     pipelines = []
     for result in tqdm.tqdm(results, desc="Loading data from Kibana"):
-        output_i = {}
+        output_i = {'duration': result.get("d_duration", None),
+                    'timestamp': result.get('@timestamp', None)}
 
         ci_info = result.get("obj_ci", {})
         workloads_info = result.get("obj_workloads_registry", {})
@@ -106,6 +127,7 @@ def get_results_from_jet(jet_workloads_ref: Optional[str], pipeline_id: Optional
         output_i["jet_workloads_ref"] = workloads_info.get("s_commit_ref", None)
         output_i["ci_pipeline_id"] = pipeline_id
         output_i["ci_job_id"] = ci_info.get("l_job_id")
+        output_i["ci_job_duration"] = ci_info.get("d_job_duration", None)
         output_i["ci_job_name"] = ci_info.get("s_job_name")
         output_i["ci_job_status"] = ci_info.get("s_job_status")
 
@@ -119,7 +141,14 @@ def get_results_from_jet(jet_workloads_ref: Optional[str], pipeline_id: Optional
         msg_output_details = f'{output_i["job_key"]} with status: ' \
                              f'{"SUCCESS" if (output_i["exit_code"] is not None and output_i["exit_code"] == 0) else "FAILED"} ' \
                              f'\nJET Workloads ref: {output_i["jet_workloads_ref"]}, JET pipeline id: {pipeline_id}, ' \
-                             f'JET job id: {output_i["ci_job_id"]}, JET workload id: {output_i["s_id"]}'
+                             f'JET job id: {output_i["ci_job_id"]}, JET workload id: {output_i["s_id"]}, ' \
+                             f'Timestamp: {output_i["timestamp"]}, '
+
+        if output_i['ci_job_duration'] is not None:
+            msg_output_details += f'\nJET job duration: {round(output_i["ci_job_duration"], 3)}s'
+
+        if output_i['duration'] is not None:
+            msg_output_details += f"\nScript execution time: {round(output_i['duration'], 3)}s"
 
         if output_i["job_type"] == "build":
             docker_img_info = obj_workload["obj_spec"]["obj_source"]
@@ -176,6 +205,18 @@ def get_results_from_jet(jet_workloads_ref: Optional[str], pipeline_id: Optional
         output.append(output_i)
 
     df = pd.DataFrame(output)
+    if s_id is None and len(results) > 1:
+        print('\n\n')
+        jet_ci = jet_instance.gitlab_ci()
+        pipelines_duration = [jet_ci.project.pipelines.get(pipeline_id).duration for pipeline_id in pipelines]
+        logging.info(f"Duration stats of jobs in {len(pipelines)} pipeline(s) {','.join(pipelines)} "
+                     f"resulting in {df.shape[0] - 1} jobs: \n"
+                     f"Pipeline completion: total {round(sum(pipelines_duration), 1)}s , mean: {round(np.mean(pipelines_duration), 1)}s, "
+                     f"median: {round(np.median(pipelines_duration), 1)}s, min: {round(min(pipelines_duration), 1)}s, max: {round(max(pipelines_duration), 1)}s\n"
+                     f"Jobs execution (scripts execution plus queueing time): : total: {round(df.ci_job_duration.sum(), 1)}s , mean: {round(df.ci_job_duration.mean(), 1)}s, "
+                     f"median: {round(df.ci_job_duration.median(), 1)}s, min: {round(df.ci_job_duration.min(), 1)}s, max: {round(df.ci_job_duration.max(), 1)}s\n"
+                     f"Scripts execution: total: {round(df.duration.sum(), 1)}s , mean: {round(df.duration.mean(), 1)}s, "
+                     f"median: {round(df.duration.median(), 1)}s, min: {round(df.duration.min(), 1)}s, max: {round(df.duration.max(), 1)}s")
     if save_dir is not None:
         filename = f'jet_query_{"_".join(pipelines)}.csv'
         filepath = os.path.join(save_dir, filename)
@@ -189,6 +230,7 @@ if __name__ == '__main__':
                         help='Reference (branch) in JET Workloads Registry, optional')
     parser.add_argument('--pipeline_id', type=int, default=None, help='Pipeline ID in JET CI, optional')
     parser.add_argument('--s_id', type=str, default=None, help='Workload ID in JET CI, optional')
+    parser.add_argument('--d', type=str, default=None, help='specifies period in the past to include jobs from')
     parser.add_argument('--jet_workloads_ref_pattern', type=str, default=None,
                         help='Regex of query to filter results from Kibana, optional')
     parser.add_argument('--save_dir', type=str, default=None, help='Directory to save csv with results, optional')
@@ -199,5 +241,6 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     get_results_from_jet(jet_workloads_ref=args.jet_workloads_ref, pipeline_id=args.pipeline_id, s_id=args.s_id,
-                         jet_workloads_ref_pattern=args.jet_workloads_ref_pattern, save_dir=args.save_dir,
-                         only_completed=args.only_completed, limit=args.limit, print_script=args.print_script)
+                         jet_workloads_ref_pattern=args.jet_workloads_ref_pattern, duration=args.d,
+                         save_dir=args.save_dir, only_completed=args.only_completed, limit=args.limit,
+                         print_script=args.print_script)

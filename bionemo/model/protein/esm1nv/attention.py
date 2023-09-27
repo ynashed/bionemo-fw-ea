@@ -208,7 +208,11 @@ class ESMnvCoreAttention(CoreAttention):
         attention_scores = matmul_result.view(b, np, sq, sk)
         # BIONEMO CUSTOM ATTENTION MASKING
         if self.use_esm_attention:
-            attention_probs = self.scale_mask_softmax(attention_scores + attention_mask, None)
+            # NOTE: the slicing here is make he attention_mask the same shape as the extended
+            #  attention ask in ESM2. The multiplication by -3.4028e+38 is similarly motivated
+            #  by ESM2's maskikng approach, which forces softmax of attention scores for
+            #  masked entries to be close to 0.
+            attention_probs = self.scale_mask_softmax(attention_scores + attention_mask[:, :, 0:1, :] * -3.4028e+38, None)
         # END BIONEMO
         else:
             if attention_bias is not None:

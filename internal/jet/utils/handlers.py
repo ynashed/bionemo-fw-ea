@@ -136,15 +136,16 @@ class JetPipelineHandler:
         """
         self.jet_workloads_ref = jet_workloads_ref
 
-    def run_jet_pipeline(self, dry_run: bool = False):
+    def run_jet_pipeline(self, jet_filter: Optional[str] = "\"type == 'recipe'\"", dry_run: bool = False):
         """
         Runs jet pipeline for reference
         Args:
+            jet_filter: the pandas format of the query to run only a subset of jobs in the workload
             dry_run: if true, the dry-run mode of JET API is enabled and the pipeline is not sent to the JET CI
 
         """
         cmd = (
-            f"jet ci run -w {self.jet_workloads_ref} -f 'type == \"recipe\"'"
+            f"jet ci run -w {self.jet_workloads_ref} -f {jet_filter}"
         )
         if dry_run:
             cmd += " --dry-run"
@@ -162,19 +163,20 @@ class JetPipelineHandler:
         wait_before_execute_cmd(cmd=cmd)
         subprocess.check_call(cmd, shell=True)
 
-    def get_workload_info(self, query: Optional[str] = "\"type == 'recipe'\"", dry_run: bool = False):
+    def get_workload_info(self, jet_filter: Optional[str] = "\"type == 'recipe'\"", dry_run: bool = False):
         """
         Gets information about a workloads given its reference in JET Workloads Registry
         Args:
-            query: the pandas format of the query to filter the info about the workload
+            jet_filter: the pandas format of the query to filter by JET API the info about the workload. 
+                    More info about the syntax in https://jet.nvidia.com/docs/workloads/filtering/
             dry_run: if true, the try-catch prints the error msg but the method is executed
 
         Returns:
 
         """
         cmd = f"jet workloads --registry-ref {self.jet_workloads_ref} list"
-        if query is not None:
-            cmd += f" -f {query}"
+        if jet_filter is not None:
+            cmd += f" -f {jet_filter}"
 
         wait_before_execute_cmd(cmd=cmd)
         try:

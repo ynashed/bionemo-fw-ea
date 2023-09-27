@@ -32,16 +32,17 @@ model:
   tensor_model_parallel_size: 1  # model parallelism
   
   data:
+    task_type: token-level-classification
     emb_batch_size: ${model.micro_batch_size}
     dataset_path: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/protein/downstream
     dataset:
       train: x000
       test: x000
       val: x000
-    labels_size: [3, 8, 2]
-    mask_col: ["resolved", "resolved", null]
-    labels_col: ["3state","8state", "resolved"]
-    sequence_col: "sequence"
+    sequence_column: "sequence" 
+    target_column: ["3state","8state", "resolved"] 
+    target_sizes: [3, 8, 2] 
+    mask_column: ["resolved", "resolved", null]
     num_workers: 8
     max_seq_length: ${model.seq_length}
   
