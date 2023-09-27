@@ -7,7 +7,7 @@ defaults:
   - base_config
 restore_from_path: null # used when starting from a .nemo file
 
-name: ESM2nv-8M
+name: esm2-8M
 
 trainer:
   max_steps: 500000

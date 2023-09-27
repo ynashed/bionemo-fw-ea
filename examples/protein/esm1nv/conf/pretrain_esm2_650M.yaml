@@ -6,7 +6,7 @@ defaults:
   - pretrain_esm2_8M
 restore_from_path: null # used when starting from a .nemo file
 
-name: ESM2nv-650M
+name: esm2-650M
 
 model:
   num_layers: 33
