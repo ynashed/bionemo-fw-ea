@@ -191,6 +191,12 @@ class UniRef50Preprocess(object):
         return train_samples, val_samples, test_samples
 
     @staticmethod
+    def _protein_sequence_filewriter_map(args):
+        ''' enables p.map '''
+        ordered_args = args['fasta_indexer'], args['record_id_list'], args['file_index'], args['split_name'], args['output_dir'], args['delimiter']
+        return UniRef50Preprocess._protein_sequence_filewriter(*ordered_args)
+
+    @staticmethod
     def _protein_sequence_filewriter(fasta_indexer, record_id_list, file_index, split_name, output_dir, delimiter=','):
         """CSV file writer for FASTA data
 
@@ -207,6 +213,10 @@ class UniRef50Preprocess(object):
         pathlib.Path(split_path).mkdir(parents=True, exist_ok=True)
         file_name = os.path.join(split_path, f'x{str(file_index).zfill(3)}.csv')
 
+        # TODO is this the right way to add this?
+        if type(fasta_indexer) == str:
+            _idx = pyfastx.Fasta(fasta_indexer, build_index=True, uppercase=True, key_func=lambda x: x.split()[0][len("UniRef90_"):])
+        fasta_indexer = _idx
         with open(file_name, 'w') as fh:
             header_str = delimiter.join(['record_id', 'record_name', 'sequence_length', 'sequence'])
             fh.write(header_str + '\n')
