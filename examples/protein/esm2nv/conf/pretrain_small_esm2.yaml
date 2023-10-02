@@ -10,23 +10,20 @@ model:
     model: /tokenizers/protein/esm1nv/vocab/protein_sequence_sentencepiece.model
     vocab_file: /tokenizers/vocab/protein_sequence_sentencepiece.vocab
   data:
-    cluster_map_json_path: /data/uniref2022_05/fake-uniref/fake_uniref_cluster-mapping.json
-    dataset_path: /data/uniref2022_05/fake_uf_map # parent directory for data, contains train / val / test folders. Needs to be writeable for index creation.
+    micro_batch_size: ${model.micro_batch_size}
+    num_workers: 1
+    #num_workers: 10
+
     dataset: # inclusive range of data files to load x[000..049] or can a single file, e.g. x000
       train: x[000..049]
       test: x[000..049]
       val: x[000..049]
-    micro_batch_size: ${model.micro_batch_size}
-    #num_workers: 10
-    num_workers: 1
-    # Supported kwargs (with default values): 
-    #     text_mmap (newline_int=10, header_lines=0, workers=None, sort_dataset_paths=True)
-    #     csv_mmap (newline_int=10, header_lines=0,workers=None, sort_dataset_paths=True, data_col=1, data_sep=",")
     data_impl_kwargs:
       csv_mmap:
         data_col: 1 # 0-based
         # Rest of these are inherited
-
+    cluster_map_json_path: /data/uniref2022_05/fake-uniref/fake_uniref_cluster-mapping.json
+    dataset_path: /data/uniref2022_05/fake_uf_map # parent directory for data, contains train / val / test folders. Needs to be writeable for index creation.
     uf90:
       uniref90_path: /data/uniref2022_05/fake_uf_map90 # created and populated my preprocessing
       dataset: 
