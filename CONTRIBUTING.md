@@ -7,9 +7,10 @@ Don't create branches directly in the main repo.
 **Send your MRs to the `dev` branch**
 
 1) Make sure your MR does one thing. Have a clear answer to "What does this MR do?"
-2) Follow the default MR template 
+2) Make sure you have the linters enabled via pre-commit hooks (`pre-commit install`)
+2) Follow the default MR template
 3) Make sure all unit tests finish successfully before running MR pipeline by invoking `pytest` in `bionemo` folder
-4) Run `pytest examples/tests/test_model_pretrain_and_downstream.py -k test_model_training`, if changes to the codebase are made in training or inference-related pyton scripts (these tests are less comprehensive than tests in JET but can help you to spot issues before running `jet` stage in CI) 
+4) Run `pytest examples/tests/test_model_pretrain_and_downstream.py -k test_model_training`, if changes to the codebase are made in training or inference-related pyton scripts (these tests are less comprehensive than tests in JET but can help you to spot issues before running `jet` stage in CI)
 4) Make sure you added necessary tests and documentation changes (could be just comments in the config files) for the feature in your MR
 5) Rebase your feature branch with the latest `dev` to include any new changes that have been added. Resolve merge conflicts, if any
 6) Send your MR and request a review
@@ -35,11 +36,11 @@ srun -t 00:30:00 -J unit-tests -N 1 -o=<OUTPUT_PATH>/pytest-slurm-%A.out --conta
 
 After testing your code locally, trigger tests in the MR's CI. Go to your MR -> "Pipelines" and trigger the pipeline by clicking an arrow sign or click on the pipeline id and trigger stages manually.
 
-### Adding unit tests for new classes or methods 
+### Adding unit tests for new classes or methods
 Add unit tests under `tests` to examine use cases of new classes or methods that are being added to the codebase. The names of scripts must be of a format `test_*.py`. Check other scripts in this folder for help on how to write tests.
 
 ### Adding unit tests for new models
-Add short training or inference unit tests to `examples/tests` that are run by `examples/tests/test_model_pretrain_and_downstream.py` . The tests shouldn't be resource- and time-hungry (use ideally 1 GPU, 1 node and a small batch size) and use small data samples. It would involve: 
+Add short training or inference unit tests to `examples/tests` that are run by `examples/tests/test_model_pretrain_and_downstream.py` . The tests shouldn't be resource- and time-hungry (use ideally 1 GPU, 1 node and a small batch size) and use small data samples. It would involve:
 * adding data samples under `examples/tests/test_data`
 * adding training or inference configs for unit tests to `examples/tests/conf` based on the configs that are used to pretrain, finetune or run inference of a new model (ie following the logic of the other configs in this folder)
 * generate expected configs by running `UPDATE_EXPECTED_CFG=1 pytest examples/tests/test_model_pretrain_and_downstream.py`
@@ -47,7 +48,7 @@ Add short training or inference unit tests to `examples/tests` that are run by `
 * run `examples/tests/test_model_pretrain_and_downstream.py`
 
 ### Changes to the unit tested expected results and configs
-Remember, that reproducibility of the training and inference results in pytorch is not guaranteed, see more in [Reproducibility](https://pytorch.org/docs/stable/notes/randomness.html) . 
+Remember, that reproducibility of the training and inference results in pytorch is not guaranteed, see more in [Reproducibility](https://pytorch.org/docs/stable/notes/randomness.html) .
 The small discrepancies between expected results in the unit test `test_model_training` are expected. If larger differences are observed and are not expected (ie convergence regression), it might be an indication that your changes to the codebase are affecting training or inference performance.  You may need to consult other BioNeMo developers.
 
 If your changes modify expected test results or test configs and are **anticipated**, they can be updated with the following commands:
@@ -70,7 +71,7 @@ JET stage is manually triggered to avoid unnecessary pipelines in JET to be run.
 Before MR is ready to be merged, all CI pipelines must be completed and successful. Otherwise, the merge is blocked.
 
 ## Type of changes to the codebase that can be merged WITHOUT `jet` stage being triggered
-One stage of a pipeline is called `jet` and triggers comprehensive performance and convergence tests of BioNeMo models in [JET](https://jet.nvidia.com/docs). The tests are more comprehensive than the tests invoked by `pytest examples/tests/test_model_pretrain_and_downstream.py -k test_model_training`. 
+One stage of a pipeline is called `jet` and triggers comprehensive performance and convergence tests of BioNeMo models in [JET](https://jet.nvidia.com/docs). The tests are more comprehensive than the tests invoked by `pytest examples/tests/test_model_pretrain_and_downstream.py -k test_model_training`.
 This stage is resources- and time-consuming and can be **OMITTED** for some changes to the codebase by `JET_NOT_REQUIRED` label as one of MR's labels. The changes to the codebase that are eligible for NOT running `jet` stage are:
 * docstrings update in `.py` files
 * code cleanup not related to refactoring of code (ie deleting unused imports or blank lines, improving lines formatting) in `*.py` files
@@ -83,7 +84,7 @@ As a final remark, most of the changes to files with extensions different than `
 # General principles
 1. **User-oriented**: make it easy for end users, even at the cost of writing more code in the background
 1. **Robust**: make it hard for users to make mistakes.
-1. **Well-tested**: please add simple, fast unit tests. 
+1. **Well-tested**: please add simple, fast unit tests.
 1. **Reusable**: for every piece of code, think about how it can be reused in the future and make it easy to reuse.
 1. **Readable**: code should be easy to read and well documented (with comments and docstrings).
 1. **Legal**: if you copy even one line of code from the Internet, make sure that the code allows the license that BioNeMo supports. Give credit and link back to the code.
@@ -104,4 +105,4 @@ As a final remark, most of the changes to files with extensions different than `
 1. Loggers are preferred to print. In BioNeMo, you can use logger from ``from nemo.utils import logging``
 1. Private functions (functions starting with ``_``) shouldn't be called outside its host file.
 1. If a comment lasts multiple lines, use ``'''`` instead of ``#``.
- 
+

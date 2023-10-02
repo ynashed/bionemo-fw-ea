@@ -23,9 +23,15 @@ The easiest way to develop or test the training of in-development code is to mou
 
 It may also be necessary to recompile the Megatron helpers, which can be done by running the script `setup/recompile_megatron_helper.sh`. This recompilation should also be done immediately before training starts on clusters as a best practice.
 
+The auto-formatter and linter are setup via precommit hooks. To use them,
+```
+pip install pre-commit
+pre-commit install
+```
+
 ### Build and Start Container from Source
 
-The `launch.sh` script for configuration of the required `.env` file) can be used to build and push containers to a registry and start a container for interactive work. See the instructions inside the script for more information. 
+The `launch.sh` script for configuration of the required `.env` file) can be used to build and push containers to a registry and start a container for interactive work. See the instructions inside the script for more information.
 
 Once the `.env` script is created, a container can be pulled by running `bash launch.sh pull`. The setup for BioNeMo training and inference is quite involved and requires the use of a Docker container. Due to this complexity, it is highly suggested to pull a prebuilt container. However, if a container must be built, it can be done by running `bash launch.sh build -p`. Executing this command will require an [NGC API key](https://docs.nvidia.com/ngc/ngc-overview/index.html#generating-api-key) to be configured. If pushing to a registry is desired, `bash launch.sh push` will complete this task.
 
