@@ -206,6 +206,7 @@ class Uniref90ClusterMappingDataset(MappedDataset):
             seed=None, 
             index_mapping_dir=None,
             name=None,
+            force_regen_sample_mapping=False,
         ):
         '''
         Creates a mapped dataset mapping samples from uniref50_dataset to cluster members inside uniref90_dataset. 
@@ -236,8 +237,10 @@ class Uniref90ClusterMappingDataset(MappedDataset):
             indexmap_filename = os.path.join(index_mapping_dir, os.path.basename(data_prefix))
         else:
             indexmap_filename = data_prefix
+
+        # At this point we have the directory
         self.cluster_member_map = indexmap_filename
-        self.cluster_member_map= f'_{name}_sample_mapping_cache.json'
+        self.cluster_member_map += f'seed{seed}_sample_mapping_cache.json'
         # this gets invoked to create the cluster map, which is used in create_sample_map
 
         # Cluster map should be passed in some unknown format. Using pre-created JSON for now.
@@ -245,7 +248,7 @@ class Uniref90ClusterMappingDataset(MappedDataset):
 
         # What do we want to do with this?
         # We must do this in order to create our sample mapping
-        self.uniref90_samplemap = self._create_sample_mapping_cache(self.cluster_member_map, uniref90_dataset, force=False)
+        self.uniref90_samplemap = self._create_sample_mapping_cache(self.cluster_member_map, uniref90_dataset, force=force_regen_sample_mapping)
         # Pass in the dataset that sample_mapping indicies correspond to
         self.uniref50_dataset = uniref50_dataset
         num_samples=0 # This has no effect on behavior
@@ -323,6 +326,8 @@ class Uniref90ClusterMappingDataset(MappedDataset):
         logging.info(f"Creating sample mapping for {len(self.uniref50_dataset)} samples.")
         for a in self.uniref50_dataset:
             if a in self.cluster_map:
+                # TODO: make this respect the global seed. 
+                #           nemo fetch rng => fork => (now its ready for choice)
                 selected_sample_id = random.choice(self.cluster_map[a])
             else:
                 # These are probably from bad versions

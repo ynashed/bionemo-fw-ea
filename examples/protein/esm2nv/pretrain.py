@@ -32,12 +32,8 @@ def main(cfg) -> None:
     logging.info(f'\n{OmegaConf.to_yaml(cfg)}')
 
     callbacks = setup_callbacks(cfg)
-
     trainer = setup_trainer(cfg, callbacks=callbacks)
-    print("CONFG BELOW====================================================")
 
-    with open("uf90-resampling.yaml", 'w')  as fd:
-        fd.write(OmegaConf.to_yaml(cfg))
     if cfg.do_training:
         logging.info("************** Starting Training ***********")
         if cfg.restore_from_path:
@@ -48,20 +44,6 @@ def main(cfg) -> None:
             )
         else:
             model = esm1nv_model.ESM2nvModel(cfg.model, trainer)
-            # Great, now how do I verify ths is all working? do the datasets work right now?
-
-        # NOTE this still wont quite do it
-        #       this is going to let us inspect the dataset after it has been initialized, but it will not tell us what the underlying
-        #       dataset should have been (e.g. the uf50 dataset AND the uf90 dataset should be yielding results for this test)
-        from bionemo.model.utils import initialize_distributed_parallel_state
-        initialize_distributed_parallel_state(local_rank=0, tensor_model_parallel_size=1,pipeline_model_parallel_size=1, pipeline_model_parallel_split_rank=0)
-        train_ds, val_ds2, test_ds2 = esm1nv_model.ESM2nvModel._build_train_valid_test_datasets(trainer, cfg.model)
-        train_ds: Uniref90ClusterMappingDataset = train_ds
-        uf50 = train_ds.uniref50_dataset
-        for i, (uf50, uf90) in enumerate(zip(uf50, train_ds)):
-            if i > 10: sys.exit()
-            print(uf50, uf90['sequence_id'], uf90['sequence'])
-            assert uf50.split("UniRef50_")[1] in uf90['sequence_id'].split("UniRef90_")[1]
         trainer.fit(model)
         logging.info("************** Finished Training ***********")
     else:

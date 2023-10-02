@@ -234,17 +234,17 @@ class ESM2nvModel(ESM1nvModel):
 
             data_prefix= ds.data_prefix
             index_mapping_dir = ds.index_mapping_dir
-            # TODO: how do we set private seeds?
-            seed = 1337
 
             # Setup the resampling
             ds = Uniref90ClusterMappingDataset(
                 uniref50_dataset=ds, 
                 uniref90_dataset=uniref90_dataset, 
                 data_prefix=data_prefix,  # used for index creation
-                seed=seed, # used for rng, although awkward because global statehood
+                seed=model_cfg.seed, # used for rng, although awkward because global statehood
                 index_mapping_dir=index_mapping_dir, # stores index
-                cluster_map_json_path=model_cfg.data.cluster_map_json_path
+                cluster_map_json_path=model_cfg.data.cluster_map_json_path,
+                name=ds.name,
+                force_regen_sample_mapping=model_cfg.data.force_regen_sample_mapping
             )
 
             results.append(ds)
