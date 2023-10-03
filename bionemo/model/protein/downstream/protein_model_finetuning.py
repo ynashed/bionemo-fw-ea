@@ -13,17 +13,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import torch
-import bionemo.utils
 from functools import lru_cache
-from bionemo.model.core import ConvNet, PerTokenMaskedCrossEntropyLoss, MLPModel
-from bionemo.model.core.encoder_finetuning import EncoderFineTuning
+
+import torch
 from nemo.utils.model_utils import import_class_by_path
-from bionemo.data.datasets import PerTokenValueDataModule, PerTokenValueDataset, SingleValueDataset, SingleValueDataModule
+
+import bionemo.utils
+from bionemo.data.datasets import (
+    PerTokenValueDataModule,
+    PerTokenValueDataset,
+    SingleValueDataModule,
+    SingleValueDataset,
+)
+from bionemo.model.core import ConvNet, MLPModel, PerTokenMaskedCrossEntropyLoss
+from bionemo.model.core.encoder_finetuning import EncoderFineTuning
 
 
 class FineTuneProteinModel(EncoderFineTuning):
-
     def __init__(self, cfg, trainer):
         self.full_cfg = cfg
         self.encoder_frozen = self.full_cfg.model.encoder_frozen
@@ -40,9 +46,7 @@ class FineTuneProteinModel(EncoderFineTuning):
 
     def build_loss_fn(self):
         if self.task_type in ['regression', 'classification']:
-            loss = bionemo.utils.lookup_or_use(
-                torch.nn, self.cfg.loss_func
-            )
+            loss = bionemo.utils.lookup_or_use(torch.nn, self.cfg.loss_func)
         elif self.task_type == 'token-level-classification':
             loss = PerTokenMaskedCrossEntropyLoss()
         return loss
@@ -55,27 +59,24 @@ class FineTuneProteinModel(EncoderFineTuning):
                 layer_sizes=[
                     self.encoder_model.cfg.model.hidden_size,
                     self.cfg.hidden_layer_size,
-                    self.cfg.data.target_sizes[0]
+                    self.cfg.data.target_sizes[0],
                 ],
                 dropout=0.1,
             )
 
         elif self.task_type == 'token-level-classification':
-            task_head = ConvNet(
-                self.full_cfg.model.hidden_size, 
-                output_sizes=self.cfg.data.target_sizes
-            )
+            task_head = ConvNet(self.full_cfg.model.hidden_size, output_sizes=self.cfg.data.target_sizes)
         return task_head
 
     def setup_encoder_model(self, cfg, trainer):
         infer_class = import_class_by_path(self.full_cfg.infer_target)
         pretrained_model = infer_class(
-            self.full_cfg, 
-            freeze=self.encoder_frozen, 
+            self.full_cfg,
+            freeze=self.encoder_frozen,
             restore_path=self.full_cfg.restore_from_path,
             training=not self.cfg.encoder_frozen,
-            adjust_config=False
-            )
+            adjust_config=False,
+        )
         return pretrained_model
 
     @lru_cache
@@ -86,13 +87,9 @@ class FineTuneProteinModel(EncoderFineTuning):
             model = None
 
         if self.task_type in ['regression', 'classification']:
-            self.data_module = SingleValueDataModule(
-                self.cfg, self.trainer, model=model
-            )
+            self.data_module = SingleValueDataModule(self.cfg, self.trainer, model=model)
         elif self.task_type == 'token-level-classification':
-            self.data_module = PerTokenValueDataModule(
-                self.cfg, self.trainer, model=model
-            )
+            self.data_module = PerTokenValueDataModule(self.cfg, self.trainer, model=model)
 
     def on_fit_start(self):
         self.build_train_valid_test_datasets()
@@ -109,14 +106,22 @@ class FineTuneProteinModel(EncoderFineTuning):
         else:
             enc_output, _ = protein_model.seq_to_hiddens(batch["embeddings"])
             batch_size, seq_len, emb_dim = enc_output.size()
-            enc_output = torch.cat([enc_output, torch.zeros((batch_size, (self.full_cfg.model.seq_length - seq_len), emb_dim)).to(device=enc_output.device)], dim=1)
+            enc_output = torch.cat(
+                [
+                    enc_output,
+                    torch.zeros((batch_size, (self.full_cfg.model.seq_length - seq_len), emb_dim)).to(
+                        device=enc_output.device
+                    ),
+                ],
+                dim=1,
+            )
 
         return enc_output
 
     def extract_for_task_head(self, input_tensor):
-        #NOTE investigate using mixed precision to remove need for float casting; maybe use setup_trainer method
+        # NOTE investigate using mixed precision to remove need for float casting; maybe use setup_trainer method
         return input_tensor.float()
-  
+
     def get_target_from_batch(self, batch):
         _, (labels, masks) = PerTokenValueDataset.prepare_batch(batch, self._train_ds)
         padded_labels = []
@@ -125,8 +130,19 @@ class FineTuneProteinModel(EncoderFineTuning):
             label = labels[i]
             mask = masks[i]
             batch_size, seq_len, n_labels = label.size()
-            label = torch.cat([label, torch.zeros((batch_size, (self.full_cfg.model.seq_length - seq_len), n_labels)).to(device=label.device)], dim=1)
-            mask = torch.cat([mask, torch.zeros((batch_size, (self.full_cfg.model.seq_length - seq_len))).to(device=mask.device)], dim=1)
+            label = torch.cat(
+                [
+                    label,
+                    torch.zeros((batch_size, (self.full_cfg.model.seq_length - seq_len), n_labels)).to(
+                        device=label.device
+                    ),
+                ],
+                dim=1,
+            )
+            mask = torch.cat(
+                [mask, torch.zeros((batch_size, (self.full_cfg.model.seq_length - seq_len))).to(device=mask.device)],
+                dim=1,
+            )
             padded_labels.append(label)
             padded_masks.append(mask)
         return (padded_labels, padded_masks)

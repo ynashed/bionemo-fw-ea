@@ -12,13 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from nemo.collections.nlp.data.language_modeling.megatron.blendable_dataset import BlendableDataset
+from nemo.collections.nlp.data.language_modeling.megatron.dataset_utils import get_indexed_dataset_
+from nemo.utils import logging
 from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
 
 from bionemo.data.utils import expand_dataset_paths
-from nemo.collections.nlp.data.language_modeling.megatron.blendable_dataset import BlendableDataset
-from nemo.collections.nlp.data.language_modeling.megatron.dataset_utils import get_indexed_dataset_
-from nemo.utils import logging
+
 
 def _build_dataset(
     cfg,
@@ -43,14 +44,15 @@ def _build_dataset(
     favor_long_ngrams=False,
     data_impl_kwargs={},
 ):
-
     if dataset_type != "t5":
         raise ValueError("Invalid dataset_type: ", dataset_type)
 
     min_seq_length_dec = round(max_seq_length * masked_lm_prob * 2 + 1)
 
-    if  min_seq_length_dec > max_seq_length_dec:
-        raise ValueError(f'Cannot have seq_length_dec ({max_seq_length_dec}) less than seq_length * masked_lm_prob * 2 + 1 ({min_seq_length_dec}). Increase seq_length_dec or decrease masked_lm_prob')
+    if min_seq_length_dec > max_seq_length_dec:
+        raise ValueError(
+            f'Cannot have seq_length_dec ({max_seq_length_dec}) less than seq_length * masked_lm_prob * 2 + 1 ({min_seq_length_dec}). Increase seq_length_dec or decrease masked_lm_prob'
+        )
 
     # Indexed dataset.
     indexed_dataset = get_indexed_dataset_(data_prefix, data_impl, skip_warmup, data_impl_kwargs=data_impl_kwargs)
@@ -61,16 +63,16 @@ def _build_dataset(
 
     def build_t5_dataset(name):
         from nemo.collections.nlp.data.language_modeling.megatron.t5_dataset import T5Dataset
-        
+
         dataset = None
-        kwargs = dict(
-            name=name,
-            data_prefix=data_prefix,
-            num_epochs=None,
-            max_num_samples=int(num_samples),
-            max_seq_length=max_seq_length,
-            seed=seed,
-        )
+        kwargs = {
+            'name': name,
+            'data_prefix': data_prefix,
+            'num_epochs': None,
+            'max_num_samples': int(num_samples),
+            'max_seq_length': max_seq_length,
+            'seed': seed,
+        }
         if dataset_type == "t5":
             assert tokenizer is not None, "Tokenizer is required for T5 dataset"
             logging.info("Instatiating T5 Dataset ...")
@@ -121,27 +123,27 @@ def prott5_build_dataset(
     permutation,
     whole_word_masking,
     favor_long_ngrams,
-    data_impl_kwargs
-    ):
+    data_impl_kwargs,
+):
     # do not load a dataset when num_samples is 0
     if num_samples == 0:
         return None
-    
+
     if data_impl in ["text_mmap", "csv_mmap"]:
         if "tokenizer" not in data_impl_kwargs:
             if isinstance(data_impl_kwargs, DictConfig):
                 data_impl_kwargs = OmegaConf.to_object(data_impl_kwargs)
 
             data_impl_kwargs["tokenizer"] = tokenizer
-    
+
     # only for csv_mmap we enforce the extension to be .csv (for backward compatibility)
     if data_impl == "csv_mmap":
         ext = ".csv"
     else:
         ext = ""
-        
+
     fnames = expand_dataset_paths(data_prefix, ext)
-    weights = [1. / len(fnames)] * len(fnames)
+    weights = [1.0 / len(fnames)] * len(fnames)
 
     # Build individual datasets
     datasets = []

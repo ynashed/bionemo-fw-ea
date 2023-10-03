@@ -1,29 +1,20 @@
-import math
 
 import torch
-import torch.nn.functional as F
-from einops import rearrange, repeat
-
+from einops import rearrange
 from nemo.collections.nlp.modules.common.megatron.adapters.parallel_adapters import (
-    AdapterName,
     InfusedAdapterConfig,
     LoraKQVAdapterConfig,
     LoraKVAdapterConfig,
     LoraQAdapterConfig,
 )
-from nemo.collections.nlp.modules.common.megatron.fused_softmax import MatchedScaleMaskSoftmax
-from nemo.collections.nlp.modules.common.megatron.module import MegatronModule
-from nemo.collections.nlp.modules.common.megatron.position_embedding import XPOSPositionEmbedding
 from nemo.collections.nlp.modules.common.megatron.position_embedding.rotary_position_embedding import (
     apply_rotary_pos_emb,
 )
 from nemo.collections.nlp.modules.common.megatron.utils import (
     ApexGuardDefaults,
-    _cast_if_autocast_enabled,
-    attention_mask_func,
 )
 from nemo.collections.nlp.parts import utils_funcs
-from nemo.core import adapter_mixins
+
 
 try:
     from apex.transformer.enums import AttnMaskType, AttnType
@@ -32,7 +23,6 @@ try:
     HAVE_APEX = True
 
 except (ImportError, ModuleNotFoundError):
-
     HAVE_APEX = False
 
     # fake missing classes with None attributes
@@ -45,7 +35,6 @@ try:
     HAVE_MEGATRON_CORE = True
 
 except (ImportError, ModuleNotFoundError):
-
     HAVE_MEGATRON_CORE = False
 
 try:
@@ -56,20 +45,22 @@ try:
     HAVE_FLASH_ATTENTION = True
 
 except (ImportError, ModuleNotFoundError):
-
     HAVE_FLASH_ATTENTION = False
 
     flash_attn_unpadded_func, flash_attn_func = None, None
     unpad_input, pad_input = None, None
 
 # BIONEMO imports
-from nemo.collections.nlp.modules.common.megatron.attention import ParallelAttention, CoreAttention
+from nemo.collections.nlp.modules.common.megatron.attention import CoreAttention, ParallelAttention
+
+
 # END BIONEMO
 
+
 class ESMnvCoreAttention(CoreAttention):
-    """ Region where selective activation recomputation is applied.
-        See Figure 3. in Reducing Activation Recomputation in Large Transformer Models
-        https://arxiv.org/pdf/2205.05198.pdf for more details.
+    """Region where selective activation recomputation is applied.
+    See Figure 3. in Reducing Activation Recomputation in Large Transformer Models
+    https://arxiv.org/pdf/2205.05198.pdf for more details.
 
     """
 
@@ -125,7 +116,7 @@ class ESMnvCoreAttention(CoreAttention):
         # ==================================================
         # BIONEMO custom attention normalization
         if self.use_esm_attention:
-            query_layer = query_layer * self.hidden_size_per_attention_head ** -0.5
+            query_layer = query_layer * self.hidden_size_per_attention_head**-0.5
         # END BIONEMO
         # TODO: figure out how to do this
         # apply relative positional encoding (rotary embedding)
@@ -212,7 +203,9 @@ class ESMnvCoreAttention(CoreAttention):
             #  attention mask in ESM2. The multiplication by -3.4028e+38 is similarly motivated
             #  by ESM2's maskikng approach, which forces softmax of attention scores for
             #  masked entries to be close to 0.
-            attention_probs = self.scale_mask_softmax(attention_scores + attention_mask[:, :, 0:1, :] * -3.4028e+38, None)
+            attention_probs = self.scale_mask_softmax(
+                attention_scores + attention_mask[:, :, 0:1, :] * -3.4028e38, None
+            )
         # END BIONEMO
         else:
             if attention_bias is not None:
@@ -244,7 +237,6 @@ class ESMnvCoreAttention(CoreAttention):
 
 
 class ESMnvParallelAttention(ParallelAttention):
-
     def __init__(
         self,
         init_method,

@@ -13,30 +13,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Union, Optional, List
-import json
+from typing import List, Optional
 
-import torch
 import torch.nn as nn
-from pytorch_lightning import LightningModule
-
-from nemo.utils import logging
-import bionemo.utils
-
-import torch
-from nemo.utils import logging
-from nemo.utils import logging
-from typing import List
 
 
 class MLPModel(nn.Module):
-    def __init__(self, 
-                 layer_sizes: Optional[List[int]] = None, 
-                 dropout: float = 0.25, 
-                 activation_function: Optional[nn.Module] = None):
+    def __init__(
+        self,
+        layer_sizes: Optional[List[int]] = None,
+        dropout: float = 0.25,
+        activation_function: Optional[nn.Module] = None,
+    ):
         """
         Simple MLP Model for validation on benchmark datasets
-        
+
         Params
             layer_sizes: List of layer sizes. By default: [256, 128, 1]
             dropout: float
@@ -46,14 +37,13 @@ class MLPModel(nn.Module):
         if layer_sizes is None:
             layer_sizes = [256, 128, 1]
         self.linear_layers = nn.ModuleList([nn.Linear(i, o) for i, o in zip(layer_sizes[:-1], layer_sizes[1:])])
-        self.layer_norm = nn.LayerNorm(layer_sizes[0]) 
+        self.layer_norm = nn.LayerNorm(layer_sizes[0])
         self.act = nn.ReLU() if activation_function is None else activation_function
         self.dropout = nn.Dropout(p=dropout)
 
     def forward(self, x):
         for layer in self.linear_layers[:-1]:
             x = self.dropout(self.act(layer(x)))
-            
+
         x = self.linear_layers[-1](x)
         return x
-   

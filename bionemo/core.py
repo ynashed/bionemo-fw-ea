@@ -15,11 +15,8 @@
 
 from abc import abstractmethod
 from functools import lru_cache
-from apex.transformer import tensor_parallel
-import torch
-from nemo.collections.nlp.models.language_modeling.megatron_bert_model import (
-    MegatronBertModel
-)
+
+from nemo.collections.nlp.models.language_modeling.megatron_bert_model import MegatronBertModel
 from nemo.utils import logging
 
 
@@ -63,7 +60,9 @@ class BioNeMoDataModule(object):
         self._val_dataset = None
         self._test_dataset = None
         self.train_num_samples, self.val_num_samples, self.test_num_samples = [
-            None, None, None,
+            None,
+            None,
+            None,
         ]
 
     @abstractmethod
@@ -136,9 +135,9 @@ class BioNeMoDataModule(object):
         test_iters = self.get_total_test_batches()
 
         self.train_num_samples, self.val_num_samples, self.test_num_samples = [
-            int (max_train_steps * global_batch_size),
-            int (eval_iters * global_batch_size),
-            int (test_iters * global_batch_size),
+            int(max_train_steps * global_batch_size),
+            int(eval_iters * global_batch_size),
+            int(test_iters * global_batch_size),
         ]
 
     def sample_train_dataset(self, dataset):
@@ -211,7 +210,6 @@ class BioNeMoDataModule(object):
         return self.test_dataset()
 
 
-
 def _assert_attr(o, attr, scope):
     if not hasattr(o, attr):
         raise AttributeError(f"Must assign '{attr}' before {scope} call")
@@ -256,5 +254,5 @@ class BioNeMoBertModel(MegatronBertModel):
         logging.info(f'Length of train dataset: {len(self._train_ds)}')
         logging.info(f'Length of val dataset: {len(self._validation_ds)}')
         logging.info(f'Length of test dataset: {len(self._test_ds)}')
-        logging.info(f'Finished building Bert datasets.')
+        logging.info('Finished building Bert datasets.')
         return self._train_ds, self._validation_ds, self._test_ds

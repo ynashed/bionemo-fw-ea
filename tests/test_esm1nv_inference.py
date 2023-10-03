@@ -14,14 +14,21 @@
 # limitations under the License.
 
 import logging
-from contextlib import contextmanager
 import os
-import pathlib 
+import pathlib
+from contextlib import contextmanager
+
 import pytest
 from hydra import compose, initialize
 
 from bionemo.model.protein.esm1nv import ESM1nvInference
-from bionemo.utils.tests import BioNemoSearchPathConfig, register_searchpath_config_plugin, update_relative_config_dir, check_model_exists
+from bionemo.utils.tests import (
+    BioNemoSearchPathConfig,
+    check_model_exists,
+    register_searchpath_config_plugin,
+    update_relative_config_dir,
+)
+
 
 log = logging.getLogger(__name__)
 
@@ -35,6 +42,7 @@ CHECKPOINT_PATH = "/model/protein/esm1nv/esm1nv.nemo"
 _INFERER = None
 os.environ["PROJECT_MOUNT"] = os.environ.get("PROJECT_MOUNT", '/workspace/bionemo')
 THIS_FILE_DIR = pathlib.Path(os.path.abspath(__file__)).parent
+
 
 def get_cfg(prepend_config_path, config_name, config_path='conf'):
     prepend_config_path = pathlib.Path(prepend_config_path)
@@ -50,12 +58,14 @@ def get_cfg(prepend_config_path, config_name, config_path='conf'):
 
     return cfg
 
+
 @contextmanager
 def load_model(inf_cfg):
     global _INFERER
     if _INFERER is None:
         _INFERER = MODEL_CLASS(inf_cfg)
     yield _INFERER
+
 
 @pytest.mark.needs_checkpoint
 def test_model_exists():
@@ -68,8 +78,10 @@ def test_model_exists():
 def test_seq_to_embedding():
     cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='infer', config_path=CONFIG_PATH)
     with load_model(cfg) as inferer:
-        seqs = ['MSLKRKNIALIPAAGIGVRFGADKPKQYVEIGSKTVLEHVLGIFERHEAVDLTVVVVSPEDTFADKVQTAFPQVRVWKNGGQTRAETVRNGVAKLLETGLAAETDNILVHDAARCCLPSEALARLIEQAGNAAEGGILAVPVADTLKRAESGQISATVDRSGLWQAQTPQLFQAGLLHRALAAENLGGITDEASAVEKLGVRPLLIQGDARNLKLTQPQDAYIVRLLLDAV',
-                'MIQSQINRNIRLDLADAILLSKAKKDLSFAEIADGTGLAEAFVTAALLGQQALPADAARLVGAKLDLDEDSILLLQMIPLRGCIDDRIPTDPTMYRFYEMLQVYGTTLKALVHEKFGDGIISAINFKLDVKKVADPEGGERAVITLDGKYLPTKPF']
+        seqs = [
+            'MSLKRKNIALIPAAGIGVRFGADKPKQYVEIGSKTVLEHVLGIFERHEAVDLTVVVVSPEDTFADKVQTAFPQVRVWKNGGQTRAETVRNGVAKLLETGLAAETDNILVHDAARCCLPSEALARLIEQAGNAAEGGILAVPVADTLKRAESGQISATVDRSGLWQAQTPQLFQAGLLHRALAAENLGGITDEASAVEKLGVRPLLIQGDARNLKLTQPQDAYIVRLLLDAV',
+            'MIQSQINRNIRLDLADAILLSKAKKDLSFAEIADGTGLAEAFVTAALLGQQALPADAARLVGAKLDLDEDSILLLQMIPLRGCIDDRIPTDPTMYRFYEMLQVYGTTLKALVHEKFGDGIISAINFKLDVKKVADPEGGERAVITLDGKYLPTKPF',
+        ]
         embedding, mask = inferer.seq_to_hiddens(seqs)
         assert embedding is not None
         assert embedding.shape[0] == len(seqs)
@@ -85,8 +97,10 @@ def test_long_seq_to_embedding():
 
     cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='infer', config_path=CONFIG_PATH)
     with load_model(cfg) as inferer:
-        seqs = ['MSLKRKNIALIPAAGIGVRFGADKPKQYVEIGSKTVLEHVLGIFERHEAVDLTVVVVSPEDTFADKVQTAFPQVRVWKNGGQTRAETVRNGVAKLLETGLAAETDNILVHDAARCCLPSEALARLIEQAGNAAEGGILAVPVADTLKRAESGQISATVDRSGLWQAQTPQLFQAGLLHRALAAENLGGITDEASAVEKLGVRPLLIQGDARNLKLTQPQDAYIVRLLLDAV',
-                long_seq]
+        seqs = [
+            'MSLKRKNIALIPAAGIGVRFGADKPKQYVEIGSKTVLEHVLGIFERHEAVDLTVVVVSPEDTFADKVQTAFPQVRVWKNGGQTRAETVRNGVAKLLETGLAAETDNILVHDAARCCLPSEALARLIEQAGNAAEGGILAVPVADTLKRAESGQISATVDRSGLWQAQTPQLFQAGLLHRALAAENLGGITDEASAVEKLGVRPLLIQGDARNLKLTQPQDAYIVRLLLDAV',
+            long_seq,
+        ]
         try:
             inferer.seq_to_hiddens(seqs)
             assert False

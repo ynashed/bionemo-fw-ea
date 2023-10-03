@@ -14,20 +14,9 @@
 # limitations under the License.
 
 import re
-import torch
-from omegaconf.omegaconf import open_dict
-from omegaconf import OmegaConf
-from pytorch_lightning import Trainer
-from pytorch_lightning.callbacks.timer import Timer
-from pytorch_lightning.plugins.environments import TorchElasticEnvironment
-from pytorch_lightning.trainer.connectors.checkpoint_connector import (
-    CheckpointConnector,
-)
-from pytorch_lightning.callbacks import ModelSummary
+
 import pytorch_lightning as pl
-
-from bionemo.tests.utils import add_test_callbacks
-
+import torch
 from nemo.collections.nlp.parts.nlp_overrides import (
     GradScaler,
     MegatronHalfPrecisionPlugin,
@@ -36,21 +25,33 @@ from nemo.collections.nlp.parts.nlp_overrides import (
     PipelineMixedPrecisionPlugin,
 )
 from nemo.utils import logging
+from nemo.utils.app_state import AppState
 from nemo.utils.exp_manager import StatelessTimer, exp_manager
 from nemo.utils.model_utils import import_class_by_path
-from nemo.utils.app_state import AppState
+from omegaconf import OmegaConf
+from omegaconf.omegaconf import open_dict
+from pytorch_lightning import Trainer
+from pytorch_lightning.callbacks import ModelSummary
+from pytorch_lightning.callbacks.timer import Timer
+from pytorch_lightning.plugins.environments import TorchElasticEnvironment
+from pytorch_lightning.trainer.connectors.checkpoint_connector import (
+    CheckpointConnector,
+)
+
+from bionemo.tests.utils import add_test_callbacks
+
 
 try:
-    from megatron.core import parallel_state
-
     import apex
     from apex.transformer.pipeline_parallel.utils import (
         _reconfigure_microbatch_calculator,
     )
+    from megatron.core import parallel_state
 
     HAVE_APEX = True
 except (ImportError, ModuleNotFoundError):
     HAVE_APEX = False
+
 
 def set_cfg_key(key, value, cfg_section, msg=""):
     """Adds a value to a config if it is missing
@@ -64,24 +65,21 @@ def set_cfg_key(key, value, cfg_section, msg=""):
         ValueError: If `key` already exists in `cfg_section` and is different
             than `value`.
     """
-    if key not in cfg_section or \
-            cfg_section.get(key) is None:
+    if key not in cfg_section or cfg_section.get(key) is None:
         with open_dict(cfg_section):
             cfg_section[key] = value
     elif cfg_section[key] != value:
-        raise ValueError(
-            f"{key}={cfg_section[key]}, which conflicts with target value: {value}.{msg}"
-        )
+        raise ValueError(f"{key}={cfg_section[key]}, which conflicts with target value: {value}.{msg}")
+
 
 def infer_global_batch_size(
-            micro_batch_size,
-            n_devices=1,
-            n_nodes=1,
-            accumulate_grad_batches=1,
-            tensor_model_parallel_size=1,
-            pipeline_model_parallel_size=1,
-        ):
-
+    micro_batch_size,
+    n_devices=1,
+    n_nodes=1,
+    accumulate_grad_batches=1,
+    tensor_model_parallel_size=1,
+    pipeline_model_parallel_size=1,
+):
     n_devices = get_num_devices(n_devices)
     world_size = n_devices * n_nodes
     model_parallel_size = tensor_model_parallel_size * pipeline_model_parallel_size
@@ -101,13 +99,15 @@ def infer_global_batch_size(
 
     return global_batch_size
 
+
 # Use this fucntion to retreive number of devices
-# Handles cases where n_devices is not integer (example: in multirun mode) 
+# Handles cases where n_devices is not integer (example: in multirun mode)
 def get_num_devices(n_devices):
-    if not isinstance(n_devices,int):
+    if not isinstance(n_devices, int):
         n_devices = len(n_devices)
-    
+
     return n_devices
+
 
 class TrainerBuilder(object):
     @staticmethod
@@ -120,19 +120,23 @@ class TrainerBuilder(object):
         acc_grad_batches = cfg.trainer.get("accumulate_grad_batches", 1)
 
         global_batch_size = infer_global_batch_size(
-                micro_batch_size=micro_batch_size,
-                n_devices=n_devices,
-                n_nodes=n_nodes,
-                accumulate_grad_batches=acc_grad_batches,
-                tensor_model_parallel_size=tensor_model_parallel_size,
-                pipeline_model_parallel_size=pipeline_model_parallel_size,
-            )
+            micro_batch_size=micro_batch_size,
+            n_devices=n_devices,
+            n_nodes=n_nodes,
+            accumulate_grad_batches=acc_grad_batches,
+            tensor_model_parallel_size=tensor_model_parallel_size,
+            pipeline_model_parallel_size=pipeline_model_parallel_size,
+        )
 
         # we always inferr global batch size based on micro batch size
         if cfg.get('do_training', False):
             # when training we validate
-            set_cfg_key('global_batch_size', global_batch_size, cfg.model,
-                        msg=' Please set global_batch_size in the config file to be null or to match global_batch_size = micro_batch_size * data_parallel_size * accumulate_grad_batches')
+            set_cfg_key(
+                'global_batch_size',
+                global_batch_size,
+                cfg.model,
+                msg=' Please set global_batch_size in the config file to be null or to match global_batch_size = micro_batch_size * data_parallel_size * accumulate_grad_batches',
+            )
         else:
             # otherwise we override at inference
             with open_dict(cfg):
@@ -149,14 +153,18 @@ class TrainerBuilder(object):
             scaler = None
             if cfg.trainer.precision == 16:
                 scaler = GradScaler(
-                    init_scale=cfg.model.get("native_amp_init_scale", 2 ** 32),
+                    init_scale=cfg.model.get("native_amp_init_scale", 2**32),
                     growth_interval=cfg.model.get("native_amp_growth_interval", 1000),
                     hysteresis=cfg.model.get('hysteresis', 2),
                 )
             if cfg.model.get('megatron_amp_O2', False):
-                plugins.append(MegatronHalfPrecisionPlugin(precision=cfg.trainer.precision, device='cuda', scaler=scaler))
+                plugins.append(
+                    MegatronHalfPrecisionPlugin(precision=cfg.trainer.precision, device='cuda', scaler=scaler)
+                )
             else:
-                plugins.append(PipelineMixedPrecisionPlugin(precision=cfg.trainer.precision, device='cuda', scaler=scaler))
+                plugins.append(
+                    PipelineMixedPrecisionPlugin(precision=cfg.trainer.precision, device='cuda', scaler=scaler)
+                )
 
         if cfg.get("cluster_type", None) == "BCP":
             plugins.append(TorchElasticEnvironment())
@@ -169,7 +177,6 @@ class TrainerBuilder(object):
         callbacks.extend(extra_callbacks)
         logging.info(f'Selected Callbacks: {[type(c) for c in callbacks]}')
         return callbacks
-        
 
     @staticmethod
     def configure_strategy(cfg):
@@ -187,18 +194,16 @@ class TrainerBuilder(object):
         if cfg.model.resume_from_checkpoint is not None:
             resume_from_checkpoint = cfg.model.resume_from_checkpoint
         else:
-            resume_from_checkpoint = (
-                trainer._checkpoint_connector.resume_from_checkpoint_fit_path
-            )
+            resume_from_checkpoint = trainer._checkpoint_connector.resume_from_checkpoint_fit_path
         logging.info(f"Resuming training from checkpoint: {resume_from_checkpoint}")
 
-        trainer._checkpoint_connector = CheckpointConnector(
-            trainer, resume_from_checkpoint=resume_from_checkpoint
-        )
+        trainer._checkpoint_connector = CheckpointConnector(trainer, resume_from_checkpoint=resume_from_checkpoint)
         # Override timer callback to a stateless one
         for idx, callback in enumerate(trainer.callbacks):
             if isinstance(callback, Timer):
-                trainer.callbacks[idx] = StatelessTimer(cfg.trainer.max_time,)
+                trainer.callbacks[idx] = StatelessTimer(
+                    cfg.trainer.max_time,
+                )
 
         # hydra interpolation does not work here as the interpolation key is lost when PTL saves hparams
         with open_dict(cfg):
@@ -225,13 +230,10 @@ def setup_trainer(cfg, builder=None, callbacks=[], adjust_config=True, verbose=T
     plugins = builder.configure_plugins(cfg)
     mode = "train" if cfg.get("do_training", False) else "test"
     callbacks = builder.configure_callbacks(cfg, callbacks)
-    add_test_callbacks(cfg, callbacks=callbacks,
-                       mode="infer" if builder == InferenceTrainerBuilder else mode)
+    add_test_callbacks(cfg, callbacks=callbacks, mode="infer" if builder == InferenceTrainerBuilder else mode)
     strategy = builder.configure_strategy(cfg)
 
-    trainer = Trainer(
-        plugins=plugins, strategy=strategy, callbacks=callbacks, **cfg.trainer
-    )
+    trainer = Trainer(plugins=plugins, strategy=strategy, callbacks=callbacks, **cfg.trainer)
     exp_manager(trainer, cfg.get("exp_manager", None))
     builder.resume_checkpoint(cfg, trainer)
     # log trainer configuration (which might be different from input cfg)
@@ -291,13 +293,9 @@ def restore_model(restore_path, trainer=None, cfg=None, model_cls=None, adjust_c
 # back upstream into NeMo
 def extract_consumed_samples_from_ckpt(ckpt_path):
     try:
-        init_consumed_samples = int(
-            float(re.findall(r"consumed_samples\=([0-9]+.[0-9]+)", ckpt_path)[0])
-        )
+        init_consumed_samples = int(float(re.findall(r"consumed_samples\=([0-9]+.[0-9]+)", ckpt_path)[0]))
     except (ValueError, TypeError, IndexError):
-        logging.warning(
-            "Cannot parse the checkpoint file to get the consumed samples. assume it is zero."
-        )
+        logging.warning("Cannot parse the checkpoint file to get the consumed samples. assume it is zero.")
         init_consumed_samples = 0
 
     return init_consumed_samples
@@ -322,20 +320,19 @@ def _reconfigure_inference_batch(global_batch_per_gpu, global_batch_size=None):
 
     # This should happen only on the last batch of the validation/test dataset with drop_last=False.
     # apex.transformer.pipeline_parallel.utils.get_current_global_batch_size()
-    cur_global_batch = (
-        apex.transformer.pipeline_parallel.utils.get_current_global_batch_size()
-    )
+    cur_global_batch = apex.transformer.pipeline_parallel.utils.get_current_global_batch_size()
     cur_data_parallel_world_size = parallel_state.get_data_parallel_world_size()
     if global_batch_size is None:
         global_batch_size = global_batch_per_gpu * parallel_state.get_data_parallel_world_size()
     if global_batch_per_gpu != (cur_global_batch // cur_data_parallel_world_size):
         _reconfigure_microbatch_calculator(
             rank=0,
-            rampup_batch_size=None, 
+            rampup_batch_size=None,
             global_batch_size=global_batch_size,
             micro_batch_size=global_batch_per_gpu,
             data_parallel_size=cur_data_parallel_world_size,
         )
+
 
 def initialize_model_parallel(model):
     # check whether the DDP is initialized
@@ -349,13 +346,18 @@ def initialize_model_parallel(model):
             model.trainer.strategy.launcher.launch(dummy, trainer=model.trainer)
         model.trainer.strategy.setup_environment()
 
-def initialize_distributed_parallel_state(local_rank: int = 0, tensor_model_parallel_size:int = 1,
-                                          pipeline_model_parallel_size: int = 1,
-                                          pipeline_model_parallel_split_rank: int = 0):
+
+def initialize_distributed_parallel_state(
+    local_rank: int = 0,
+    tensor_model_parallel_size: int = 1,
+    pipeline_model_parallel_size: int = 1,
+    pipeline_model_parallel_split_rank: int = 0,
+):
     # initialize pytorch DDP
     if not torch.distributed.is_initialized():
         logging.info("pytorch DDP is not initialized. Initializing with pytorch-lightening...")
         trainer = pl.Trainer(gpus=1, strategy='ddp', num_nodes=1)
+
         def dummy():
             return
 
@@ -365,6 +367,8 @@ def initialize_distributed_parallel_state(local_rank: int = 0, tensor_model_para
 
     if parallel_state.is_unitialized():
         logging.info("Megatron DDP is not initialized. Initializing...")
-        parallel_state.initialize_model_parallel(tensor_model_parallel_size=tensor_model_parallel_size,
-                                                 pipeline_model_parallel_size=pipeline_model_parallel_size,
-                                                 pipeline_model_parallel_split_rank=pipeline_model_parallel_split_rank)
+        parallel_state.initialize_model_parallel(
+            tensor_model_parallel_size=tensor_model_parallel_size,
+            pipeline_model_parallel_size=pipeline_model_parallel_size,
+            pipeline_model_parallel_split_rank=pipeline_model_parallel_split_rank,
+        )

@@ -1,4 +1,5 @@
 from typing import List
+
 from omegaconf import OmegaConf
 from pytorch_lightning import Callback
 
@@ -22,10 +23,14 @@ def add_test_callbacks(cfg: OmegaConf, callbacks: List[Callback], mode: str = "t
         append_to_json = dllogger_callbacks_kwargs.get("append_to_json", True)
         use_existing_dllogger = dllogger_callbacks_kwargs.get("use_existing_dllogger", False)
         warmup = dllogger_callbacks_kwargs.get("warmup", 0)
-        dllogger = DLLogger(json_file=json_file, append_to_json=append_to_json,
-                            use_existing_dllogger=use_existing_dllogger)
-        callbacks.append(PerfLoggingCallback(dllogger=dllogger, global_batch_size=cfg.model.global_batch_size,
-                                             mode=mode, warmup=warmup))
+        dllogger = DLLogger(
+            json_file=json_file, append_to_json=append_to_json, use_existing_dllogger=use_existing_dllogger
+        )
+        callbacks.append(
+            PerfLoggingCallback(
+                dllogger=dllogger, global_batch_size=cfg.model.global_batch_size, mode=mode, warmup=warmup
+            )
+        )
 
     if cfg.get("create_trainer_metric_callback", False):
         trainer_metric_callback_kwargs = cfg.get("trainer_metric_callback_kwargs", {})

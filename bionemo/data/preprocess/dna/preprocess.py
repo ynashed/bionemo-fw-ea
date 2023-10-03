@@ -35,17 +35,17 @@ from tfrecord.torch.dataset import TFRecordDataset
 
 from bionemo.data.dna.splice_site_dataset import ChrSpliceSitesDataset
 from bionemo.data.fasta_dataset import ConcatDataset
+from bionemo.data.preprocess import ResourcePreprocessor
 from bionemo.data.utils import expand_dataset_paths, gunzip
 from bionemo.tokenizer.dna_tokenizer import KmerTokenizer
 from bionemo.utils.fasta import FastaSplitNs
 from bionemo.utils.gff import build_donor_acceptors_midpoints, parse_gff3
 from bionemo.utils.remote import FTPRemoteResource, RemoteResource
-from bionemo.data.preprocess import ResourcePreprocessor
 
 
 @dataclass
 class GRCh38p13_ResourcePreprocessor(ResourcePreprocessor):
-    """ ResourcePreprocessor for the human genome assembly produced by encode.
+    """ResourcePreprocessor for the human genome assembly produced by encode.
     GRCh38.p13, all primary chromosomes are downloaded. Since this resource does not create an archive for contigs,
     we must create a remote resource for each file. Preprocessing therefore requires working on sets of files.
     """
@@ -81,7 +81,7 @@ class GRCh38p13_ResourcePreprocessor(ResourcePreprocessor):
         }
 
         basename = "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.39_GRCh38.p13/GCF_000001405.39_GRCh38.p13_assembly_structure/Primary_Assembly/assembled_chromosomes/FASTA/"
-        resources = list()
+        resources = []
 
         # Check the remote for the filename structure, one for each autosome.
         for contig in list(range(1, 23)) + ["X", "Y"]:
@@ -101,20 +101,18 @@ class GRCh38p13_ResourcePreprocessor(ResourcePreprocessor):
         """Logs and downloads the passed resource.
 
         resource: RemoteResource - Resource to be prepared.
-        
+
         Returns - the absolute destination path for the downloaded resource
         """
         logging.info(f"Downloading {resource.url}")
         return resource.download_resource()
 
     def prepare(self):
-        return [
-            self.prepare_resource(resource) for resource in self.get_remote_resources()
-        ]
+        return [self.prepare_resource(resource) for resource in self.get_remote_resources()]
 
 
 class Hg38chromResourcePreprocessor(ResourcePreprocessor):
-    """ Prepackaged object for downloading hg38 chroms from UCSC. Returns the GenomeResource object associated with it.
+    """Prepackaged object for downloading hg38 chroms from UCSC. Returns the GenomeResource object associated with it.
     Methods like these should be tightly coupled with the data, and should NOT be very reusable. They specify a specific way
     to download and prepare a specific dataset. We should chose from a predefine set of pipelines.
     """
@@ -135,7 +133,7 @@ class Hg38chromResourcePreprocessor(ResourcePreprocessor):
         return [obj]
 
     def prepare(self) -> List[str]:
-        """ hg38 prepare method:
+        """hg38 prepare method:
 
         Download the remote tarball to a local temp file
         Unpack the tarball
@@ -188,7 +186,7 @@ class GRCh38Ensembl99FastaResourcePreprocessor(ResourcePreprocessor):
         }
 
         fasta_basename = "http://ftp.ensembl.org/pub/release-99/fasta/homo_sapiens/dna/"
-        resources = list()
+        resources = []
 
         # Check the remote for the filename structure, one for each autosome.
         for contig in list(range(1, 23)) + ["X", "Y"]:
@@ -210,14 +208,12 @@ class GRCh38Ensembl99FastaResourcePreprocessor(ResourcePreprocessor):
         return resource.fully_qualified_dest_filename
 
     def prepare(self):
-        return [
-            self.prepare_resource(resource) for resource in self.get_remote_resources()
-        ]
+        return [self.prepare_resource(resource) for resource in self.get_remote_resources()]
 
 
 @dataclass
 class GRCh38Ensembl99GFF3ResourcePreprocessor(ResourcePreprocessor):
-    """ Downloads the Ensembl datasets required for SpliceSite prediction in the DNABERT publication.
+    """Downloads the Ensembl datasets required for SpliceSite prediction in the DNABERT publication.
     We download the gff files as well, as we dont currently have another usecase for this reference.
     """
 
@@ -255,7 +251,7 @@ class GRCh38Ensembl99GFF3ResourcePreprocessor(ResourcePreprocessor):
             "Homo_sapiens.GRCh38.99.chromosome.Y.gff3.gz": "549fee6028a3b992637f6d8d775160fb",
         }
 
-        resources = list()
+        resources = []
         gff_basename = "http://ftp.ensembl.org/pub/release-99/gff3/homo_sapiens/"
 
         # Check the remote for the filename structure, one for each autosome.
@@ -281,7 +277,7 @@ class GRCh38Ensembl99GFF3ResourcePreprocessor(ResourcePreprocessor):
     def _get_chr_from_filename(filename):
         """Built for the GRCh38.99 Ensembl filenames.
 
-        "prefix/Homo_sapiens.GRCh38.99.chromosome.Y.gff3.gz" -> 'Y' 
+        "prefix/Homo_sapiens.GRCh38.99.chromosome.Y.gff3.gz" -> 'Y'
         """
         before, after = filename.split("chromosome")
         _, _chr, gff3, gz = after.split(".")
@@ -289,9 +285,7 @@ class GRCh38Ensembl99GFF3ResourcePreprocessor(ResourcePreprocessor):
 
     def prepare(self) -> List[str]:
         # download the resources
-        gff_gzs = [
-            self.prepare_resource(resource) for resource in self.get_remote_resources()
-        ]
+        gff_gzs = [self.prepare_resource(resource) for resource in self.get_remote_resources()]
         chrs = [self._get_chr_from_filename(filename) for filename in gff_gzs]
         gffs = [filename[:-3] for filename in gff_gzs]
 
@@ -303,7 +297,7 @@ class GRCh38Ensembl99GFF3ResourcePreprocessor(ResourcePreprocessor):
         datasets = []
         for _chr, gff_filename in zip(chrs, gffs):
             # Filter non-autosomes
-            if not str(_chr) in set(map(str, range(1, 23))):
+            if str(_chr) not in set(map(str, range(1, 23))):
                 continue
             gff_contents = parse_gff3(gff_filename)
             donor_acceptor_midpoints = build_donor_acceptors_midpoints(gff_contents)
@@ -335,9 +329,7 @@ class GRCh38Ensembl99GFF3ResourcePreprocessor(ResourcePreprocessor):
         indices0 = np.random.choice(len(df0), size=sizes[0], replace=False)
         indices1 = np.random.choice(len(df1), size=sizes[1], replace=False)
         indices2 = np.random.choice(len(df2), size=sizes[2], replace=False)
-        sites_sample_df = pd.concat(
-            [df0.iloc[indices0], df1.iloc[indices1], df2.iloc[indices2]]
-        )
+        sites_sample_df = pd.concat([df0.iloc[indices0], df1.iloc[indices1], df2.iloc[indices2]])
 
         # train val test split dataset sizes
         n_total = len(df)
@@ -391,7 +383,8 @@ class DNABERTPreprocess(DNABERTPreprocessorDataClass):
         """
         super().__init__(*args, **kwargs)
         self._validate_tokenizer_args(
-            self.tokenizer_model_path, self.tokenizer_vocab_path,
+            self.tokenizer_model_path,
+            self.tokenizer_vocab_path,
         )
 
     def build_tokenizer(self, model_output_name, vocab_output_name, k):
@@ -405,7 +398,8 @@ class DNABERTPreprocess(DNABERTPreprocessorDataClass):
         tokenizer = KmerTokenizer(k=k)
         tokenizer.build_vocab_from_k()
         tokenizer.save_vocab(
-            model_file=model_output_name, vocab_file=vocab_output_name,
+            model_file=model_output_name,
+            vocab_file=vocab_output_name,
         )
         return tokenizer
 
@@ -459,25 +453,20 @@ class DNABERTPreprocess(DNABERTPreprocessorDataClass):
                     preprocessed_index = preprocessed_filenames.index(fa_file)
                 except ValueError:
                     raise ValueError(
-                        f"File: {fa_file} from {split} config: {pattern} not "
-                        f"found in {preprocessed_filenames}."
+                        f"File: {fa_file} from {split} config: {pattern} not " f"found in {preprocessed_filenames}."
                     )
 
-                file_exists_in_split_dir = os.path.exists(
-                    os.path.join(split_dir, fa_file)
-                )
+                file_exists_in_split_dir = os.path.exists(os.path.join(split_dir, fa_file))
                 if file_exists_in_split_dir:
                     logging.warning(
-                        f"File: {fa_file} not copied to {split} split"
-                        f" directory because it already exists."
+                        f"File: {fa_file} not copied to {split} split" f" directory because it already exists."
                     )
                 else:
                     logging.info(f"Copying file: {fa_file} to {split_dir}")
                     shutil.copy(preprocessed_files[preprocessed_index], split_dir)
 
     def preprocess(self):
-        """Preprocesses for the DNABERT model
-        """
+        """Preprocesses for the DNABERT model"""
         # TODO WARN!!!! ultimately we should let our config choose a valid resource.
 
         filenames = GRCh38p13_ResourcePreprocessor(
@@ -490,7 +479,9 @@ class DNABERTPreprocess(DNABERTPreprocessorDataClass):
         self.split_train_val_test_chrs(preprocessed_files)
 
         self.build_tokenizer(
-            self.tokenizer_model_path, self.tokenizer_vocab_path, self.tokenizer_k,
+            self.tokenizer_model_path,
+            self.tokenizer_vocab_path,
+            self.tokenizer_k,
         )
 
     def preprocess_fastas(self, filenames):
@@ -509,9 +500,7 @@ class DNABERTPreprocess(DNABERTPreprocessorDataClass):
         for fasta in fasta_preprocessor.get_elements():
             preprocessed_file = fasta_preprocessor.get_chunked_name(fasta)
             if os.path.exists(preprocessed_file):
-                logging.warning(
-                    f"Splitting skipped: already processed " f"{preprocessed_file}"
-                )
+                logging.warning(f"Splitting skipped: already processed " f"{preprocessed_file}")
             else:
                 fasta_preprocessor.apply(fasta)
             preprocessed_files.append(preprocessed_file)
@@ -519,25 +508,21 @@ class DNABERTPreprocess(DNABERTPreprocessorDataClass):
 
 
 class CorePromoterResourcePreparer(ResourcePreprocessor):
-    """ This class is responsible for downloading the appropriate files for core promoter prediction.
+    """This class is responsible for downloading the appropriate files for core promoter prediction.
 
     this comes from the HPDnew database, and is tightly coupled to (which reference?)
-    
+
     """
+
     dest_directory = "GRCh38.ensembl.99"
+
     def get_remote_resources(self) -> List[RemoteResource]:
-        resource_prom_checksum = (
-            "3c4915c7fa367f1dd3d9e86b47efc0eb"  # Downloaded and manually computed.
-        )
+        resource_prom_checksum = "3c4915c7fa367f1dd3d9e86b47efc0eb"  # Downloaded and manually computed.
         resource_tata_checksum = "340f62c2162e44523be6328618313868"
 
-        resource_prom_url = (
-            "ftp://ccg.epfl.ch:21/epdnew/H_sapiens/006/Hs_EPDnew_006_hg38.bed"
-        )
+        resource_prom_url = "ftp://ccg.epfl.ch:21/epdnew/H_sapiens/006/Hs_EPDnew_006_hg38.bed"
 
-        resource_tata_url = (
-            "ftp://ccg.epfl.ch:21/epdnew/H_sapiens/006/db/promoter_motifs.txt"
-        )
+        resource_tata_url = "ftp://ccg.epfl.ch:21/epdnew/H_sapiens/006/db/promoter_motifs.txt"
 
         resource_prom = FTPRemoteResource(
             dest_directory=self.dest_directory,
@@ -558,11 +543,13 @@ class CorePromoterResourcePreparer(ResourcePreprocessor):
     def prepare(self) -> List:
         # Just download? Anything else?
         resources = self.get_remote_resources()
-        logging.info(f"Downloading promoter resources")
+        logging.info("Downloading promoter resources")
         return [r.download_resource() for r in resources]
+
 
 Organism = Literal['human', 'mouse']
 Subset = Literal['train', 'valid', 'test']
+
 
 class BasenjiDatasetPreprocessor:
     """
@@ -576,6 +563,7 @@ class BasenjiDatasetPreprocessor:
      - compress: if compression should be applied to WebDataset shards
      - bucket_name: GCP bucket name where TFRecords can be pulled from
     """
+
     def __init__(self, dataset_cfg: OmegaConf):
         self.cfg = dataset_cfg
 
@@ -584,18 +572,18 @@ class BasenjiDatasetPreprocessor:
 
     def _dst_pth(self, organism: Organism):
         return os.path.join(self.cfg.webdataset_path, organism)
-    
+
     def _get_tfrecords_iterator(self, organism: Organism, subset: Subset) -> Iterator[Any]:
-        tfrecords = sorted(glob.glob(os.path.join(self._src_pth(organism), 'tfrecords', f'{subset}-*.tfr')),
-                        key=lambda x: int(x.split('-')[-1].split('.')[0]))
+        tfrecords = sorted(
+            glob.glob(os.path.join(self._src_pth(organism), 'tfrecords', f'{subset}-*.tfr')),
+            key=lambda x: int(x.split('-')[-1].split('.')[0]),
+        )
         for tfrecord_path in tfrecords:
             # store in float16 as original data is stored in float16
             # casting to 32bit precision should be done through dataloaders
-            tfrecords_dataset = TFRecordDataset(tfrecord_path, 
-                                                index_path=None, 
-                                                
-                                                description={"target": "float16"}, 
-                                                compression_type='zlib')
+            tfrecords_dataset = TFRecordDataset(
+                tfrecord_path, index_path=None, description={"target": "float16"}, compression_type='zlib'
+            )
             yield from tfrecords_dataset
 
     def _write_single_split(self, organism: Organism, subset: Subset):
@@ -608,17 +596,20 @@ class BasenjiDatasetPreprocessor:
         with wds.ShardWriter(pattern=wd_subset_pattern, maxsize=5e8, compress=self.cfg.compress, mode=0o777) as sink:
             for example in tfrecords_iterator:
                 sample = {
-                '__key__' : str(processed_count),
-                'target.pth': example['target'].reshape(metadata['target_length'], metadata['num_targets'])
+                    '__key__': str(processed_count),
+                    'target.pth': example['target'].reshape(metadata['target_length'], metadata['num_targets']),
                 }
                 sink.write(sample)
                 processed_count += 1
-        
+
         if processed_count != metadata[f'{subset}_seqs']:
-            warnings.warn(f"Read {processed_count} examples from TFrecords but \
+            warnings.warn(
+                f"Read {processed_count} examples from TFrecords but \
                           manifest says there should be {metadata[f'{subset}_seqs']}. \
-                          Your dataset might be incomplete.", BytesWarning)
-    
+                          Your dataset might be incomplete.",
+                BytesWarning,
+            )
+
     def _download(self) -> subprocess.CompletedProcess:
         # despite gsutil available via Python API, it does not offer multiprocessing download
         os.makedirs(self.cfg.tfdata_path, exist_ok=True)
@@ -626,7 +617,6 @@ class BasenjiDatasetPreprocessor:
         return subprocess.run(cmd)
 
     def _decompress_atlas(self, organism: Organism):
-
         from bionemo.data.dna.enformer.basenji_dataset import ATLAS_NAMES
 
         org_atlas_name = ATLAS_NAMES[organism]
@@ -636,7 +626,7 @@ class BasenjiDatasetPreprocessor:
         with gzip.open(atlas_src_path, 'r') as f_in, open(atlas_dst_path, 'wb') as f_out:
             logging.info(f"Decompressing {atlas_src_path} to {atlas_dst_path}")
             shutil.copyfileobj(f_in, f_out)
-            
+
     def _move_metadata(self, organism: Organism):
         org_dest = self._dst_pth(organism)
         os.makedirs(org_dest, exist_ok=True)

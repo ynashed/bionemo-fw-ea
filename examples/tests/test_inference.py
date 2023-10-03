@@ -13,44 +13,36 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import os
-import pytest
 import pathlib
 import pickle
-import logging
-from hydra import initialize, compose
 
-from bionemo.utils.tests import ( BioNemoSearchPathConfig,
-                                  register_searchpath_config_plugin,
-                                  update_relative_config_dir,
-                                  clean_directory)
+import pytest
+from hydra import compose, initialize
 
 import examples.infer as infer
+from bionemo.utils.tests import (
+    BioNemoSearchPathConfig,
+    clean_directory,
+    register_searchpath_config_plugin,
+    update_relative_config_dir,
+)
+
 
 # logger
 logging.getLogger('nemo_logger').setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
-PREPEND_CONFIG_DIR = [
-    '../conf/',
-    '../conf/',
-    '../conf/'
-    ]
+PREPEND_CONFIG_DIR = ['../conf/', '../conf/', '../conf/']
 
-CONFIG_NAME = [
-    'prott5nv_infer',
-    'esm1nv_infer',
-    'megamolbart_infer'
-    ]
+CONFIG_NAME = ['prott5nv_infer', 'esm1nv_infer', 'megamolbart_infer']
 
-HIDDEN_SIZE = [
-    768,
-    768,
-    512
-]
+HIDDEN_SIZE = [768, 768, 512]
 
 os.environ['PROJECT_MOUNT'] = os.environ.get('PROJECT_MOUNT', '/workspace/bionemo')
 THIS_FILE_DIR = pathlib.Path(os.path.abspath(__file__)).parent
+
 
 def get_cfg(prepend_config_path, config_name, config_path='conf'):
     prepend_config_path = pathlib.Path(prepend_config_path)
@@ -69,8 +61,9 @@ def get_cfg(prepend_config_path, config_name, config_path='conf'):
 
 @pytest.mark.needs_gpu
 @pytest.mark.needs_checkpoint
-@pytest.mark.parametrize('prepend_config_path, config_name, hidden_size',
-                         list(zip(PREPEND_CONFIG_DIR, CONFIG_NAME, HIDDEN_SIZE)))
+@pytest.mark.parametrize(
+    'prepend_config_path, config_name, hidden_size', list(zip(PREPEND_CONFIG_DIR, CONFIG_NAME, HIDDEN_SIZE))
+)
 def test_model_inference(prepend_config_path, config_name, hidden_size):
     '''Check that number of model weights are correct'''
 
@@ -87,5 +80,4 @@ def test_model_inference(prepend_config_path, config_name, hidden_size):
         if "hiddens" in dict_keys:
             assert emb["hiddens"].shape == (len(emb["sequence"]), hidden_size)
         if "embeddings" in dict_keys:
-            assert emb["embeddings"].shape == (hidden_size, )
-        
+            assert emb["embeddings"].shape == (hidden_size,)

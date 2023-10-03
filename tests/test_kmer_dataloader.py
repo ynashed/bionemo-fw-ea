@@ -13,25 +13,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from unittest import TestCase
+
+import numpy.testing as npt
 import pytest
+
 from bionemo.data import (
-    KmerBertCollate,
-    KmerTokenizerAdapter,
     BertMasking,
     DeterministicLengthTruncator,
+    KmerBertCollate,
+    KmerTokenizerAdapter,
     LengthTruncator,
     SpanMasking,
 )
 from bionemo.tokenizer import KmerTokenizer
 
-import numpy.testing as npt
-from unittest import TestCase
 
 tc = TestCase()
 
-build_sequences = [
-    'ACGTAG'
-]
+build_sequences = ['ACGTAG']
 
 example_sequences = [
     'ACGTA',
@@ -39,8 +39,10 @@ example_sequences = [
     'NNNN',
 ]
 
+
 def _setup_tokenizer():
     return KmerTokenizer(3).build_vocab(build_sequences)
+
 
 def _setup_mock_sampler():
     return MockSampler(
@@ -49,10 +51,9 @@ def _setup_mock_sampler():
             [2],
             [3, 1],
         ],
-        tokens_to_sample=[
-            1, 7, 5
-        ]
+        tokens_to_sample=[1, 7, 5],
     )
+
 
 expected_token_ids = [
     [7, 4, 6, 4, 3, 0, 0, 0],
@@ -86,9 +87,7 @@ expected_padding_mask = [
     [1, 1, 1, 1, 0, 0, 0, 0],
 ]
 
-expected_text = [
-    'ACGTA', 'AGA', 'NNNN'
-]
+expected_text = ['ACGTA', 'AGA', 'NNNN']
 
 
 class MockCallable(object):
@@ -134,6 +133,7 @@ class MockSampler(object):
         self.sample_indices = MockCallable(indices_to_sample)
         self.sample_token_id = MockCallable(tokens_to_sample)
 
+
 def _setup_dataloader():
     tokenizer = KmerTokenizerAdapter(_setup_tokenizer())
     dataloader = KmerBertCollate(
@@ -145,11 +145,12 @@ def _setup_dataloader():
             perturb_percent=0.5,
             modify_percent=0.5,
             sampler=_setup_mock_sampler(),
-            ),
+        ),
     )
     return dataloader
 
-keys = ['text', 'types', 'is_random' ,'loss_mask', 'labels', 'padding_mask', 'batch']
+
+keys = ['text', 'types', 'is_random', 'loss_mask', 'labels', 'padding_mask', 'batch']
 expectations = [
     expected_token_ids,
     expected_types,
@@ -159,10 +160,9 @@ expectations = [
     expected_padding_mask,
     expected_text,
 ]
-@pytest.mark.parametrize(
-    "key,expected",
-    zip(keys, expectations)
-)
+
+
+@pytest.mark.parametrize("key,expected", zip(keys, expectations))
 def test_collate_fn(key, expected):
     dataloader = _setup_dataloader()
 
@@ -170,13 +170,23 @@ def test_collate_fn(key, expected):
 
     npt.assert_array_equal(collated_output[key], expected)
 
+
 def test_span_masking_extension():
     masking_strategy = SpanMasking(
-        tokenizer=KmerTokenizerAdapter(_setup_tokenizer()),
-        seed_probability=0, span_length=2
-        )
+        tokenizer=KmerTokenizerAdapter(_setup_tokenizer()), seed_probability=0, span_length=2
+    )
     seqs = [
-        ['A', 'C', 'G', 'T', 'A', 'A', 'A', 'E', 'T', ],
+        [
+            'A',
+            'C',
+            'G',
+            'T',
+            'A',
+            'A',
+            'A',
+            'E',
+            'T',
+        ],
         ['TGIF', 'LMNOP', 'C', 'G', 'E', 'AA', 'B', 'E', 'F'],
     ]
     exp = [
@@ -198,6 +208,7 @@ def test_span_masking_extension():
     npt.assert_array_equal(exp, obs)
     npt.assert_array_equal(exp_loss_mask, obs_loss_mask)
 
+
 def test_length_sampler():
     length_sampler = LengthTruncator()
 
@@ -217,9 +228,7 @@ def test_length_sampler():
     length_sampler(seqs)
 
     # now add in some mocked values to test the sampling logic
-    length_sampler.sample_length = MockCallable(
-        [4, 7]
-    )
+    length_sampler.sample_length = MockCallable([4, 7])
     length_sampler.sample_probability = MockCallable(
         [0.1, 0.6, 0.4999],
     )
@@ -227,16 +236,13 @@ def test_length_sampler():
     obs = length_sampler(seqs)
     tc.assertListEqual(exp, obs)
 
+
 def test_deterministic_length_sampler():
     length_sampler = DeterministicLengthTruncator()
     hash_number = 99911934912
-    seqs = length_sampler._hash = MockCallable(
-        [hash_number] * 6
-    )
+    seqs = length_sampler._hash = MockCallable([hash_number] * 6)
 
-    seqs = [
-        'ACGTA', 'ACGTA'
-    ]
+    seqs = ['ACGTA', 'ACGTA']
 
     exp = ['ACG', 'ACG']
 

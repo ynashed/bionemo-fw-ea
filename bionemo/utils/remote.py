@@ -16,7 +16,6 @@
 import os
 from dataclasses import dataclass
 from hashlib import md5
-
 from typing import Optional
 from urllib import request
 
@@ -26,7 +25,7 @@ from nemo.utils import logging
 
 @dataclass
 class RemoteResource(object):
-    """ Responsible for downloading remote files, along with optional processing of downloaded files for downstream usecases.
+    """Responsible for downloading remote files, along with optional processing of downloaded files for downstream usecases.
 
     Each object is invoked through either its constructor (setting up the destination and checksum), or through a pre-configured class method.
     `download_resource()` contains the core functionality, which is to download the file at `url` to the fully qualified filename. Class methods
@@ -87,7 +86,7 @@ class RemoteResource(object):
         return os.path.join(self.fully_qualified_dest_folder, self.dest_filename)
 
     def exists_or_create_destination_directory(self, exist_ok=True):
-        """ Checks that the `fully_qualified_destination_directory` exists, if it does not, the directory is created (or fails).
+        """Checks that the `fully_qualified_destination_directory` exists, if it does not, the directory is created (or fails).
 
         exists_ok: Triest to create `fully_qualified_dest_folder` if it doesnt already exist.
         """
@@ -95,11 +94,11 @@ class RemoteResource(object):
 
     @staticmethod
     def get_env_tmpdir():
-        """ Convenience method that exposes the environment TMPDIR variable. """
+        """Convenience method that exposes the environment TMPDIR variable."""
         return os.environ.get("TMPDIR")
 
     def download_resource(self, overwrite=False) -> str:
-        """ Downloads the resource to its specified fully_qualified_dest name.
+        """Downloads the resource to its specified fully_qualified_dest name.
 
         Returns: the fully qualified destination filename.
         """
@@ -107,9 +106,7 @@ class RemoteResource(object):
 
         if not self.check_exists() or overwrite:
             logging.info(f"Downloading resource: {self.url}")
-            with requests.get(self.url, stream=True) as r, open(
-                self.fully_qualified_dest_filename, "wb"
-            ) as fd:
+            with requests.get(self.url, stream=True) as r, open(self.fully_qualified_dest_filename, "wb") as fd:
                 r.raise_for_status()
                 for bytes in r:
                     fd.write(bytes)
@@ -120,15 +117,13 @@ class RemoteResource(object):
         return self.fully_qualified_dest_filename
 
     def check_exists(self):
-        """ returns true if `fully_qualified_dest_filename` exists and the checksum matches `self.checksum` """
+        """returns true if `fully_qualified_dest_filename` exists and the checksum matches `self.checksum`"""
         if os.path.exists(self.fully_qualified_dest_filename):
             with open(self.fully_qualified_dest_filename, "rb") as fd:
                 data = fd.read()
                 result = md5(data).hexdigest()
             if self.checksum is None:
-                logging.info(
-                    f"No checksum provided, filename exists. Assuming it is complete."
-                )
+                logging.info("No checksum provided, filename exists. Assuming it is complete.")
                 matches = True
             else:
                 matches = result == self.checksum
@@ -139,7 +134,7 @@ class RemoteResource(object):
 
 class FTPRemoteResource(RemoteResource):
     def download_resource(self, overwrite=False) -> str:
-        """ Downloads the resource to its specified fully_qualified_dest name.
+        """Downloads the resource to its specified fully_qualified_dest name.
 
         Returns: the fully qualified destination filename.
         """

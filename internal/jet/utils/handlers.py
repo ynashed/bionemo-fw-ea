@@ -8,6 +8,7 @@ from typing import Optional
 
 __all__ = ["JetGitRepoHandler", "JetPipelineHandler"]
 
+
 def wait_before_execute_cmd(cmd: str, nsec: int = 5):
     """
     Forces a waiting period before executing a command
@@ -31,9 +32,12 @@ class JetGitRepoHandler:
     The ephemeral branches in the repository are delete periodically.
     """
 
-    def __init__(self, jet_workloads_ref_default: str,
-                 jet_workloads_repo_path: Optional[str] = None,
-                 jet_workloads_ref_ephemeral: Optional[str] = None):
+    def __init__(
+        self,
+        jet_workloads_ref_default: str,
+        jet_workloads_repo_path: Optional[str] = None,
+        jet_workloads_ref_ephemeral: Optional[str] = None,
+    ):
         """
         Args:
             jet_workloads_ref_default: the default reference to access basic configuration of tests in
@@ -75,14 +79,15 @@ class JetGitRepoHandler:
             self._clone_jet_workloads_repo()
 
     def _clone_jet_workloads_repo(self):
-
         print(f"Cloning git JET Workloads Registry to {self.jet_workloads_repo_path}")
         cmd = f"git clone {self.jet_workloads_repo_url} {self.jet_workloads_repo_path}"
         wait_before_execute_cmd(cmd=cmd)
         subprocess.check_call(cmd, shell=True)
-        assert os.path.exists(self.jet_workloads_repo_path), f"JET Workloads Registry path " \
-                                                             f"{self.jet_workloads_repo_path} does not exists after " \
-                                                             f"cloning the repository: {self.jet_workloads_repo_url} "
+        assert os.path.exists(self.jet_workloads_repo_path), (
+            f"JET Workloads Registry path "
+            f"{self.jet_workloads_repo_path} does not exists after "
+            f"cloning the repository: {self.jet_workloads_repo_url} "
+        )
 
     def setup_local_ephemeral_branch(self):
         """
@@ -110,8 +115,9 @@ class JetGitRepoHandler:
             dry_run: if false, the ephemeral branch is not pushed to the remote repository
 
         """
-        if self.jet_workloads_ref_ephemeral is None or \
-                not self.jet_workloads_ref_ephemeral.startswith(self.prefix_ref_ephemeral):
+        if self.jet_workloads_ref_ephemeral is None or not self.jet_workloads_ref_ephemeral.startswith(
+            self.prefix_ref_ephemeral
+        ):
             self.setup_local_ephemeral_branch()
         cmd = (
             f"git add . && git commit -m'Add temporary bionemo workloads' && "
@@ -132,7 +138,7 @@ class JetPipelineHandler:
 
     def __init__(self, jet_workloads_ref: str):
         """
-            jet_workloads_ref: reference to branch in JET Workloads Registry o run pipeline for
+        jet_workloads_ref: reference to branch in JET Workloads Registry o run pipeline for
         """
         self.jet_workloads_ref = jet_workloads_ref
 
@@ -144,9 +150,7 @@ class JetPipelineHandler:
             dry_run: if true, the dry-run mode of JET API is enabled and the pipeline is not sent to the JET CI
 
         """
-        cmd = (
-            f"jet ci run -w {self.jet_workloads_ref} -f {jet_filter}"
-        )
+        cmd = f"jet ci run -w {self.jet_workloads_ref} -f {jet_filter}"
         if dry_run:
             cmd += " --dry-run"
         wait_before_execute_cmd(cmd=cmd)
@@ -158,7 +162,7 @@ class JetPipelineHandler:
         Sets up JET APi for the first time users
 
         """
-        cmd = f"jet secrets login;jet secrets pull"
+        cmd = "jet secrets login;jet secrets pull"
 
         wait_before_execute_cmd(cmd=cmd)
         subprocess.check_call(cmd, shell=True)
@@ -167,7 +171,7 @@ class JetPipelineHandler:
         """
         Gets information about a workloads given its reference in JET Workloads Registry
         Args:
-            jet_filter: the pandas format of the query to filter by JET API the info about the workload. 
+            jet_filter: the pandas format of the query to filter by JET API the info about the workload.
                     More info about the syntax in https://jet.nvidia.com/docs/workloads/filtering/
             dry_run: if true, the try-catch prints the error msg but the method is executed
 

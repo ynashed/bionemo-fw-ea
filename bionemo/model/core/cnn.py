@@ -12,15 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import torch
-from nemo.core.optim.optimizers import get_optimizer
-from nemo.core.optim.lr_scheduler import get_scheduler
-from omegaconf import OmegaConf
-from nemo.utils import logging
-from bionemo.data.datasets.per_token_value_dataset import *
-from nemo.utils import logging
-from torch.nn.modules.loss import _WeightedLoss
 from typing import List
+
+import torch
+from torch.nn.modules.loss import _WeightedLoss
+
+from bionemo.data.datasets.per_token_value_dataset import *
+
 
 class PerTokenMaskedCrossEntropyLoss(_WeightedLoss):
     def __init__(self, **kwargs):
@@ -37,7 +35,7 @@ class PerTokenMaskedCrossEntropyLoss(_WeightedLoss):
             cur_loss = self.loss_fn(masked_out, target[i].permute(0, 2, 1))
             loss += cur_loss
         return loss
-    
+
 
 class ConvNet(torch.nn.Module):
     def __init__(self, embed_dim: int, output_sizes: List[int]):
@@ -45,24 +43,24 @@ class ConvNet(torch.nn.Module):
         # This is only called "elmo_feature_extractor" for historic reason
         # CNN weights are trained on ProtT5 embeddings
         self.elmo_feature_extractor = torch.nn.Sequential(
-                        torch.nn.Conv2d(embed_dim, 32, kernel_size=(7,1), padding=(3,0) ), # 7x32
-                        torch.nn.ReLU(),
-                        torch.nn.Dropout(0.25),
-                        )
+            torch.nn.Conv2d(embed_dim, 32, kernel_size=(7, 1), padding=(3, 0)),  # 7x32
+            torch.nn.ReLU(),
+            torch.nn.Dropout(0.25),
+        )
         n_final_in = 32
         self.class_heads = torch.nn.ModuleList([])
         for head_size in output_sizes:
-            self.class_heads.append(torch.nn.Conv2d(n_final_in, head_size, kernel_size=(7,1), padding=(3,0)))
+            self.class_heads.append(torch.nn.Conv2d(n_final_in, head_size, kernel_size=(7, 1), padding=(3, 0)))
 
     def forward(self, x):
         # IN: X = (B x L x F); OUT: (B x F x L, 1)
-        x = x.permute(0,2,1).unsqueeze(dim=-1)
-        x = self.elmo_feature_extractor(x) # OUT: (B x 32 x L x 1)
+        x = x.permute(0, 2, 1).unsqueeze(dim=-1)
+        x = self.elmo_feature_extractor(x)  # OUT: (B x 32 x L x 1)
         outputs = []
         for head in self.class_heads:
             output = head(x)
-            outputs.append(output.squeeze(dim=-1).permute(0,2,1)) # OUT: (B x L x output_size)
-        return outputs 
+            outputs.append(output.squeeze(dim=-1).permute(0, 2, 1))  # OUT: (B x L x output_size)
+        return outputs
 
 
 def mask_tensor(mask, tensor):
@@ -71,4 +69,3 @@ def mask_tensor(mask, tensor):
     output_tensor = torch.mul(mask, tensor)
 
     return output_tensor
- 

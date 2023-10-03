@@ -14,5 +14,5 @@
 # limitations under the License.
 
 from .collate import *
-from .protein_collate import *
 from .kmer_collate import *
+from .protein_collate import *

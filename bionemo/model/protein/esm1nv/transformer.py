@@ -4,34 +4,20 @@ nemo/collections/nlp/modules/common/megatron/transformer.py
 This files mainly serves to redirect the transformer's attention through
 a custom bionemo attention layer.
 """
-from contextlib import nullcontext
-from typing import Any, Callable, Optional
 
 import torch
-import torch.nn as nn
-from einops import rearrange
-
 from nemo.collections.common.parts.adapter_modules import LinearAdapterConfig
 from nemo.collections.nlp.modules.common.megatron.adapters.parallel_adapters import (
-    AdapterName,
     ParallelLinearAdapterConfig,
 )
 from nemo.collections.nlp.modules.common.megatron.attention import ParallelAttention, ParallelChunkedCrossAttention
-from nemo.collections.nlp.modules.common.megatron.fused_bias_dropout_add import (
-    bias_dropout_add,
-    bias_dropout_add_fused_inference,
-    bias_dropout_add_fused_train,
-    dropout_add,
-)
-from nemo.collections.nlp.modules.common.megatron.fused_layer_norm import get_layer_norm
 from nemo.collections.nlp.modules.common.megatron.layer_norm_1p import LayerNorm1P, LPLayerNorm
 from nemo.collections.nlp.modules.common.megatron.layer_type import LayerType
-from nemo.collections.nlp.modules.common.megatron.mlp import ParallelMLP, SwitchMLP
-from nemo.collections.nlp.modules.common.megatron.module import MegatronModule
+from nemo.collections.nlp.modules.common.megatron.mlp import SwitchMLP
 from nemo.collections.nlp.modules.common.megatron.utils import ApexGuardDefaults
 from nemo.collections.nlp.parts import utils_funcs
-from nemo.core import adapter_mixins
 from nemo.utils import logging
+
 
 try:
     from apex.normalization import MixedFusedRMSNorm
@@ -40,7 +26,6 @@ try:
     HAVE_APEX = True
 
 except (ImportError, ModuleNotFoundError):
-
     HAVE_APEX = False
 
     # fake missing classes with None attributes
@@ -52,13 +37,11 @@ try:
     HAVE_MEGATRON_CORE = True
 
 except (ImportError, ModuleNotFoundError):
-
     HAVE_MEGATRON_CORE = False
 
 try:
     from transformer_engine.common import recipe
-    from transformer_engine.pytorch import TransformerLayer, fp8_autocast
-    from transformer_engine.pytorch.distributed import checkpoint as te_checkpoint
+    from transformer_engine.pytorch import TransformerLayer
 
     HAVE_TE = True
 
@@ -74,18 +57,22 @@ except:
                 "Transformer Engine was not found. transformer_engine.pytorch.transformer.TransformerLayer will not work. Please see the NeMo README for installation instructions: https://github.com/NVIDIA/NeMo#megatron-gpt."
             )
 
+
 ## BIONEMO imports
 from nemo.collections.nlp.modules.common.megatron.transformer import (
-    ParallelTransformer,
     AutocastTransformerLayer,
+    ParallelTransformer,
     ParallelTransformerLayer_,
     remove_bias_from_layernorm,
 )
+
 from bionemo.model.protein.esm1nv.attention import ESMnvParallelAttention
-from bionemo.model.protein.esm1nv.mlp import ESMnvParallelMLP
 from bionemo.model.protein.esm1nv.layernorm import esm_get_layer_norm
+from bionemo.model.protein.esm1nv.mlp import ESMnvParallelMLP
+
 
 ## END BIONEMO
+
 
 class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
     """A single transformer layer.
@@ -186,7 +173,10 @@ class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
             # Layernorm on the input data.
             if normalization == 'layernorm':
                 self.input_layernorm = esm_get_layer_norm(
-                    hidden_size, layernorm_epsilon, persist_layer_norm, sequence_parallel,
+                    hidden_size,
+                    layernorm_epsilon,
+                    persist_layer_norm,
+                    sequence_parallel,
                     use_pt_layernorm=use_pt_layernorm,
                 )
             elif normalization == 'layernorm1p':
@@ -237,7 +227,9 @@ class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
             if transformer_block_type == 'normformer':
                 if normalization == 'layernorm':
                     self.post_attention_normformer_norm = esm_get_layer_norm(
-                        hidden_size, layernorm_epsilon, persist_layer_norm,
+                        hidden_size,
+                        layernorm_epsilon,
+                        persist_layer_norm,
                         use_pt_layernorm=use_pt_layernorm,
                     )
                 else:
@@ -248,7 +240,10 @@ class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
                 # don't need it for decoder_pre_mlp and post_ln
                 if normalization == 'layernorm':
                     self.post_attention_layernorm = esm_get_layer_norm(
-                        hidden_size, layernorm_epsilon, persist_layer_norm, sequence_parallel,
+                        hidden_size,
+                        layernorm_epsilon,
+                        persist_layer_norm,
+                        sequence_parallel,
                         use_pt_layernorm=use_pt_layernorm,
                     )
                 elif normalization == 'layernorm1p':
@@ -272,7 +267,10 @@ class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
             # Layernorm on the attention output
             if normalization == 'layernorm':
                 self.post_attention_layernorm = esm_get_layer_norm(
-                    hidden_size, layernorm_epsilon, persist_layer_norm, sequence_parallel,
+                    hidden_size,
+                    layernorm_epsilon,
+                    persist_layer_norm,
+                    sequence_parallel,
                     use_pt_layernorm=use_pt_layernorm,
                 )
             elif normalization == 'layernorm1p':
@@ -314,7 +312,10 @@ class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
             if transformer_block_type == 'normformer':
                 if normalization == 'layernorm':
                     self.post_inter_attention_normformer_norm = esm_get_layer_norm(
-                        hidden_size, layernorm_epsilon, persist_layer_norm, sequence_parallel,
+                        hidden_size,
+                        layernorm_epsilon,
+                        persist_layer_norm,
+                        sequence_parallel,
                         use_pt_layernorm=use_pt_layernorm,
                     )
                 elif normalization == 'layernorm1p':
@@ -327,7 +328,10 @@ class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
             # Layernorm on the attention output.
             if normalization == 'layernorm':
                 self.post_inter_attention_layernorm = esm_get_layer_norm(
-                    hidden_size, layernorm_epsilon, persist_layer_norm, sequence_parallel,
+                    hidden_size,
+                    layernorm_epsilon,
+                    persist_layer_norm,
+                    sequence_parallel,
                     use_pt_layernorm=use_pt_layernorm,
                 )
             elif normalization == 'layernorm1p':
@@ -363,7 +367,10 @@ class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
             if transformer_block_type == 'normformer':
                 if normalization == 'layernorm':
                     self.post_inter_attention_normformer_norm = esm_get_layer_norm(
-                        hidden_size, layernorm_epsilon, persist_layer_norm, sequence_parallel,
+                        hidden_size,
+                        layernorm_epsilon,
+                        persist_layer_norm,
+                        sequence_parallel,
                         use_pt_layernorm=use_pt_layernorm,
                     )
                 elif normalization == 'layernorm1p':
@@ -376,7 +383,10 @@ class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
             # Layernorm on the attention output.
             if normalization == 'layernorm':
                 self.post_inter_attention_layernorm = esm_get_layer_norm(
-                    hidden_size, layernorm_epsilon, persist_layer_norm, sequence_parallel,
+                    hidden_size,
+                    layernorm_epsilon,
+                    persist_layer_norm,
+                    sequence_parallel,
                     use_pt_layernorm=use_pt_layernorm,
                 )
             elif normalization == 'layernorm1p':
@@ -688,7 +698,7 @@ class ESMnvParallelTransformer(ParallelTransformer):
                 if self.activations_checkpoint_method == 'uniform':
                     logging.info(
                         (
-                            f'Using uniform activation checkpointing with granularity selective forces all layers to use checkpointing.'
+                            'Using uniform activation checkpointing with granularity selective forces all layers to use checkpointing.'
                         )
                     )
                 elif self.activations_checkpoint_method == 'block':
@@ -700,7 +710,7 @@ class ESMnvParallelTransformer(ParallelTransformer):
                     )
                 else:
                     raise ValueError(
-                        f'activations_checkpoint_method should be "uniform" or "block" when using granularity selective.'
+                        'activations_checkpoint_method should be "uniform" or "block" when using granularity selective.'
                     )
             elif self.activations_checkpoint_granularity == 'full':
                 if self.activations_checkpoint_method in ['uniform', 'block']:
@@ -713,10 +723,10 @@ class ESMnvParallelTransformer(ParallelTransformer):
                         )
                 else:
                     raise ValueError(
-                        f'activations_checkpoint_method should be "uniform" or "block" when using granularity full.'
+                        'activations_checkpoint_method should be "uniform" or "block" when using granularity full.'
                     )
             else:
-                raise ValueError(f'activations_checkpoint_granularity should be "selective" or "full".')
+                raise ValueError('activations_checkpoint_granularity should be "selective" or "full".')
 
         self.sequence_parallel = sequence_parallel
         self.transformer_engine = transformer_engine
@@ -760,6 +770,7 @@ class ESMnvParallelTransformer(ParallelTransformer):
         # TODO: Add similar assert for encoder-decoder.
 
         self.num_layers = self.get_num_layers(num_layers)
+
         # Transformer layers.
         def build_layer(layer_number):
             if isinstance(layer_type, list):
@@ -848,7 +859,7 @@ class ESMnvParallelTransformer(ParallelTransformer):
                 'num_layers_per_stage must be divisible by ' 'virtual_pipeline_model_parallel_size'
             )
 
-            assert self.model_type.value != 2, f'virtual pipeline parallel currently only supported for GPT'
+            assert self.model_type.value != 2, 'virtual pipeline parallel currently only supported for GPT'
 
             # Number of layers in each model chunk is the number of layers in the stage,
             # divided by the number of model chunks in a stage.
@@ -885,7 +896,10 @@ class ESMnvParallelTransformer(ParallelTransformer):
             # Final layer norm before output.
             if normalization == 'layernorm':
                 self.final_layernorm = esm_get_layer_norm(
-                    hidden_size, layernorm_epsilon, persist_layer_norm, sequence_parallel=sequence_parallel,
+                    hidden_size,
+                    layernorm_epsilon,
+                    persist_layer_norm,
+                    sequence_parallel=sequence_parallel,
                     use_pt_layernorm=use_pt_layernorm,
                 )
             elif normalization == 'layernorm1p':

@@ -1,16 +1,18 @@
+import math
+import os
 from enum import IntEnum
-from torch.utils.data import Dataset, ConcatDataset
-from typing import List, Dict, Tuple, Any, Callable
+from functools import partial
+from typing import Any, Callable, Dict, List, Tuple
+
+import pandas as pd
+from torch.utils.data import ConcatDataset, Dataset
+
+from bionemo.core import BioNeMoDataModule
 from bionemo.data.dataloader.kmer_collate import KmerBertCollate
 from bionemo.data.fasta_dataset import ConcatFastaDataset
-from bionemo.data.validation_dataset import DataFrameTransformDataset
-from bionemo.core import BioNeMoDataModule
-import pandas as pd
-from functools import partial
-from bionemo.data.utils import expand_dataset_paths
 from bionemo.data.mapped_dataset import NeMoUpsampling
-import os
-import math
+from bionemo.data.utils import expand_dataset_paths
+from bionemo.data.validation_dataset import DataFrameTransformDataset
 
 
 class SpliceSite(IntEnum):
@@ -38,8 +40,7 @@ class InstanceDataset(Dataset):
 
 
 class TranscriptDataset(Dataset):
-    def __init__(self, site_tuple: Tuple[List[int], List[int], List[int]],
-                 transcript: str):
+    def __init__(self, site_tuple: Tuple[List[int], List[int], List[int]], transcript: str):
         """Dataset that represents a single transcript's donor and acceptors,
         and negative examples.
 
@@ -74,9 +75,7 @@ class ChrSpliceSitesDataset(Dataset):
             id_ (str): Chromosome id/name
         """
         self.chr_sites = chr_sites
-        self._dataset = ConcatDataset(
-            TranscriptDataset(sites, name) for name, sites in chr_sites.items()
-        )
+        self._dataset = ConcatDataset(TranscriptDataset(sites, name) for name, sites in chr_sites.items())
         self.id_ = id_
 
     def __getitem__(self, idx):
@@ -86,6 +85,7 @@ class ChrSpliceSitesDataset(Dataset):
 
     def __len__(self):
         return len(self._dataset)
+
 
 def get_start_end(coord, length):
     """Gets start and end coordinates of a subsequence of `length` centered around `coord`
@@ -101,6 +101,7 @@ def get_start_end(coord, length):
     end = int(coord + math.floor(length / 2)) + 1
     return start, end
 
+
 def delistify_single_arg(fn: Callable[[List[Any]], Dict]) -> Callable[[Any], Dict]:
     """Makes a function that runs on a list able to be run on a single entry
     per dict key without being called as a list
@@ -111,11 +112,14 @@ def delistify_single_arg(fn: Callable[[List[Any]], Dict]) -> Callable[[Any], Dic
     Returns:
         Callable[[Any], Dict]: Function that operates on an entry of that list
     """
+
     def wrapper_fn(arg):
         arg = [arg]
         ret_val = fn(arg)
         return {key: value[0] for key, value in ret_val.items()}
+
     return wrapper_fn
+
 
 def fetch_bert_dna(row: pd.Series, dataset, bert_prep, length: int):
     """Fetches and preprocesses data based
@@ -134,6 +138,7 @@ def fetch_bert_dna(row: pd.Series, dataset, bert_prep, length: int):
     text = dataset.fetch(row.id, start, end)
     return bert_prep(text)
 
+
 def get_target(row: pd.Series):
     """sets the target from a dataframe row using the .kind attribute
 
@@ -144,6 +149,7 @@ def get_target(row: pd.Series):
         Dict: Dict containing 'target' as the key and the value gotten as the value
     """
     return {'target': row.kind}
+
 
 def get_autosomes(root_directory, pattern):
     """Generates filenames for autosomes based on a pattern using {}
@@ -156,13 +162,11 @@ def get_autosomes(root_directory, pattern):
     Returns:
         List[str]: List of filepaths to autosomes
     """
-    paths = expand_dataset_paths(
-        '(' + pattern.format('[1..9]') + ',' + pattern.format('[10..22]') + ')', None)
+    paths = expand_dataset_paths('(' + pattern.format('[1..9]') + ',' + pattern.format('[10..22]') + ')', None)
     return [os.path.join(root_directory, path) for path in paths]
 
 
 class SpliceSiteDataModule(BioNeMoDataModule):
-
     def __init__(self, cfg, trainer, model, fasta_backend='memory'):
         """Data Module for Splice Site prediction
 
@@ -184,7 +188,9 @@ class SpliceSiteDataModule(BioNeMoDataModule):
         fasta_files = self.get_fasta_files()
         self.length = cfg.seq_length
         self.fasta_dataset = ConcatFastaDataset(
-            fasta_files, self.length, backend=fasta_backend,
+            fasta_files,
+            self.length,
+            backend=fasta_backend,
         )
         super().__init__(cfg, trainer)
         self.init_num_samples()
@@ -227,16 +233,18 @@ class SpliceSiteDataModule(BioNeMoDataModule):
             Dataset: PyTorch Dataset that retrieves reference strings from
                 genome coordinates.
         """
-        bert_prep = delistify_single_arg(KmerBertCollate(
-            self.model.tokenizer,
-            modify_percent=0,
-            seq_length=self.length,
-            pad_size_divisible_by_8=True,
-        ).collate_fn)
+        bert_prep = delistify_single_arg(
+            KmerBertCollate(
+                self.model.tokenizer,
+                modify_percent=0,
+                seq_length=self.length,
+                pad_size_divisible_by_8=True,
+            ).collate_fn
+        )
 
         gff_dataset = DataFrameTransformDataset(
             filename,
-            functions = [
+            functions=[
                 partial(
                     fetch_bert_dna,
                     dataset=self.fasta_dataset,
@@ -245,24 +253,23 @@ class SpliceSiteDataModule(BioNeMoDataModule):
                 ),
                 get_target,
             ],
-            read_csv_args={'dtype': {'id': str}}
+            read_csv_args={'dtype': {'id': str}},
         )
 
         return gff_dataset
 
     def sample_train_dataset(self, dataset):
-        """Creates an upsampled version of the DNABERT training dataset
-
-        """
+        """Creates an upsampled version of the DNABERT training dataset"""
         num_samples = self.train_num_samples
         dataset_dir = self.cfg.dataset_path
         dataset = NeMoUpsampling(
-            dataset, num_samples=num_samples,
+            dataset,
+            num_samples=num_samples,
             cfg=self.cfg,
             data_prefix=self.cfg.train_file,
             index_mapping_dir=dataset_dir,
             name='train',
-            )
+        )
 
         return dataset
 
@@ -272,10 +279,11 @@ class SpliceSiteDataModule(BioNeMoDataModule):
         num_samples = self.val_num_samples
         dataset_dir = self.cfg.dataset_path
         dataset = NeMoUpsampling(
-            dataset, num_samples=num_samples,
+            dataset,
+            num_samples=num_samples,
             cfg=self.cfg,
             data_prefix=self.cfg.val_file,
             index_mapping_dir=dataset_dir,
             name='val',
-            )
+        )
         return dataset

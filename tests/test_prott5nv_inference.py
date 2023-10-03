@@ -14,14 +14,21 @@
 # limitations under the License.
 
 import logging
-from contextlib import contextmanager
 import os
 import pathlib
+from contextlib import contextmanager
+
 import pytest
 from hydra import compose, initialize
 
 from bionemo.model.protein.prott5nv import ProtT5nvInference
-from bionemo.utils.tests import BioNemoSearchPathConfig, register_searchpath_config_plugin, update_relative_config_dir, check_model_exists
+from bionemo.utils.tests import (
+    BioNemoSearchPathConfig,
+    check_model_exists,
+    register_searchpath_config_plugin,
+    update_relative_config_dir,
+)
+
 
 log = logging.getLogger(__name__)
 
@@ -35,6 +42,7 @@ CHECKPOINT_PATH = "/model/protein/prott5nv/prott5nv.nemo"
 _INFERER = None
 os.environ["PROJECT_MOUNT"] = os.environ.get("PROJECT_MOUNT", '/workspace/bionemo')
 THIS_FILE_DIR = pathlib.Path(os.path.abspath(__file__)).parent
+
 
 def get_cfg(prepend_config_path, config_name, config_path='conf'):
     prepend_config_path = pathlib.Path(prepend_config_path)
@@ -63,14 +71,17 @@ def load_model(inf_cfg):
 def test_model_exists():
     check_model_exists(CHECKPOINT_PATH)
 
+
 @pytest.mark.needs_gpu
 @pytest.mark.needs_checkpoint
 @pytest.mark.skip_if_no_file(CHECKPOINT_PATH)
 def test_seq_to_embedding():
     cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='infer', config_path=CONFIG_PATH)
     with load_model(cfg) as inferer:
-        seqs = ['MSLKRKNIALIPAAGIGVRFGADKPKQYVEIGSKTVLEHVLGIFERHEAVDLTVVVVSPEDTFADKVQTAFPQVRVWKNGGQTRAETVRNGVAKLLETGLAAETDNILVHDAARCCLPSEALARLIEQAGNAAEGGILAVPVADTLKRAESGQISATVDRSGLWQAQTPQLFQAGLLHRALAAENLGGITDEASAVEKLGVRPLLIQGDARNLKLTQPQDAYIVRLLLDAV',
-                'MIQSQINRNIRLDLADAILLSKAKKDLSFAEIADGTGLAEAFVTAALLGQQALPADAARLVGAKLDLDEDSILLLQMIPLRGCIDDRIPTDPTMYRFYEMLQVYGTTLKALVHEKFGDGIISAINFKLDVKKVADPEGGERAVITLDGKYLPTKPF']
+        seqs = [
+            'MSLKRKNIALIPAAGIGVRFGADKPKQYVEIGSKTVLEHVLGIFERHEAVDLTVVVVSPEDTFADKVQTAFPQVRVWKNGGQTRAETVRNGVAKLLETGLAAETDNILVHDAARCCLPSEALARLIEQAGNAAEGGILAVPVADTLKRAESGQISATVDRSGLWQAQTPQLFQAGLLHRALAAENLGGITDEASAVEKLGVRPLLIQGDARNLKLTQPQDAYIVRLLLDAV',
+            'MIQSQINRNIRLDLADAILLSKAKKDLSFAEIADGTGLAEAFVTAALLGQQALPADAARLVGAKLDLDEDSILLLQMIPLRGCIDDRIPTDPTMYRFYEMLQVYGTTLKALVHEKFGDGIISAINFKLDVKKVADPEGGERAVITLDGKYLPTKPF',
+        ]
         embedding = inferer.seq_to_embeddings(seqs)
         assert embedding is not None
 
@@ -87,8 +98,10 @@ def test_long_seq_to_embedding():
 
     cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='infer', config_path=CONFIG_PATH)
     with load_model(cfg) as inferer:
-        seqs = ['MSLKRKNIALIPAAGIGVRFGADKPKQYVEIGSKTVLEHVLGIFERHEAVDLTVVVVSPEDTFADKVQTAFPQVRVWKNGGQTRAETVRNGVAKLLETGLAAETDNILVHDAARCCLPSEALARLIEQAGNAAEGGILAVPVADTLKRAESGQISATVDRSGLWQAQTPQLFQAGLLHRALAAENLGGITDEASAVEKLGVRPLLIQGDARNLKLTQPQDAYIVRLLLDAV',
-                long_seq]
+        seqs = [
+            'MSLKRKNIALIPAAGIGVRFGADKPKQYVEIGSKTVLEHVLGIFERHEAVDLTVVVVSPEDTFADKVQTAFPQVRVWKNGGQTRAETVRNGVAKLLETGLAAETDNILVHDAARCCLPSEALARLIEQAGNAAEGGILAVPVADTLKRAESGQISATVDRSGLWQAQTPQLFQAGLLHRALAAENLGGITDEASAVEKLGVRPLLIQGDARNLKLTQPQDAYIVRLLLDAV',
+            long_seq,
+        ]
         try:
             inferer.seq_to_hiddens(seqs)
             assert False

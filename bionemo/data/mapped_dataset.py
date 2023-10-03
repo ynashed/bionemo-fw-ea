@@ -14,23 +14,18 @@
 # limitations under the License.
 
 from abc import abstractmethod
-from typing import List, Dict, Optional, Any
-from enum import Enum
-import numpy as np
 from typing import Optional
+
+import numpy as np
+from nemo.collections.nlp.data.language_modeling.megatron.dataset_utils import get_samples_mapping
+from nemo.core import Dataset
+from nemo.utils import logging
 
 from bionemo.data.utils import handle_index
 
-from nemo.utils import logging
-from nemo.core import Dataset
-from nemo.collections.nlp.data.language_modeling.megatron.dataset_utils import get_samples_mapping
 
-__all__ = [
-    'MappedDataset',
-    'SliceDataset',
-    'NeMoUpsampling',
-    'FilteredMappedDataset'
-]
+__all__ = ['MappedDataset', 'SliceDataset', 'NeMoUpsampling', 'FilteredMappedDataset']
+
 
 class SliceIndex:
     def __init__(self, dataset, start, end):
@@ -39,9 +34,7 @@ class SliceIndex:
         if end < start:
             raise ValueError(f'end must be >= start: {end} not >= {start}')
         if end > len(dataset):
-            raise ValueError(
-                f'end must be <= dataset length: {end} not <= {len(dataset)}'
-                )
+            raise ValueError(f'end must be <= dataset length: {end} not <= {len(dataset)}')
 
         self.start = start
         self.end = end
@@ -71,10 +64,10 @@ class MappedDataset(Dataset):
         """
         self._dataset = dataset
         self.sample_mapping = self.create_sample_mapping(dataset, num_samples)
-        
+
         # consolidate sample mapping if dataset is MappedDataset
         if isinstance(dataset, MappedDataset):
-            self.sample_mapping = list(map(lambda i: dataset.sample_mapping[i], self.sample_mapping))
+            self.sample_mapping = [dataset.sample_mapping[i] for i in self.sample_mapping]
             self._dataset = dataset._dataset
 
     def __len__(self):
@@ -148,14 +141,19 @@ def _infer_kwarg_values(cfg, data_prefix, max_seq_length, seed):
 
 class NeMoUpsampling(MappedDataset):
     """Upsamples a dataset to a target length by repeating samples."""
-    def __init__(self, dataset, num_samples=None, data_prefix=None,
-                 max_seq_length=None, seed=None, cfg=None,
-                 index_mapping_dir=None,
-                 name=None,
-                 ):
-        self.data_prefix, self.max_seq_length, self.seed = _infer_kwarg_values(
-            cfg, data_prefix, max_seq_length, seed
-        )
+
+    def __init__(
+        self,
+        dataset,
+        num_samples=None,
+        data_prefix=None,
+        max_seq_length=None,
+        seed=None,
+        cfg=None,
+        index_mapping_dir=None,
+        name=None,
+    ):
+        self.data_prefix, self.max_seq_length, self.seed = _infer_kwarg_values(cfg, data_prefix, max_seq_length, seed)
         self.index_mapping_dir = index_mapping_dir
         self.name = name
         super().__init__(dataset, num_samples)
@@ -180,10 +178,11 @@ class NeMoUpsampling(MappedDataset):
             name=self.data_prefix.split('/')[-1] if self.name is None else self.name,
             binary_head=False,
             index_mapping_dir=self.index_mapping_dir,
-         )
+        )
 
         samples_mapping = samples_mapping[:num_samples, 0]
         return samples_mapping
+
 
 class FilteredMappedDataset(MappedDataset):
     """Filters samples from a dataset based on a criterion function by mapping the dataset samples."""
@@ -196,7 +195,6 @@ class FilteredMappedDataset(MappedDataset):
         """
         self.criterion_fn = criterion_fn
         super().__init__(dataset=dataset, num_samples=num_samples)
-        
 
     def create_sample_mapping(self, dataset: Dataset, num_samples: int):
         """Creates a sample mapping for filtering the `dataset` based on the criterion function."""
@@ -209,8 +207,10 @@ class FilteredMappedDataset(MappedDataset):
         samples_mapping = samples_mapping[:num_samples]
         return samples_mapping
 
+
 class IndexMappedDataset(MappedDataset):
     """Maps a dataset to a new dataset based on provides indices."""
+
     def __init__(self, dataset, indices):
         """
         Args:
@@ -219,7 +219,6 @@ class IndexMappedDataset(MappedDataset):
         """
         self.sample_mapping = indices
         super().__init__(dataset=dataset, num_samples=None)
-        
 
     def create_sample_mapping(self, dataset: Dataset, num_samples: int):
         """Creates a sample mapping for filtering the `dataset` based on the criterion function."""

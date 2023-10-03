@@ -16,14 +16,29 @@
 import numpy as np
 import numpy.testing as npt
 import torch
+from nemo.core.optim.lr_scheduler import get_scheduler
 from torch.nn import Parameter
 from torch.optim import Adam
-from nemo.core.optim.lr_scheduler import get_scheduler
+
+
 # needed to register the scheduler
-import bionemo
 
 
-exp_values = [0.02, 0.04, 0.06, 0.08, 0.1, 0.1, 0.1, 0.1, 0.05, 0.025, 0, 0, ]
+exp_values = [
+    0.02,
+    0.04,
+    0.06,
+    0.08,
+    0.1,
+    0.1,
+    0.1,
+    0.1,
+    0.05,
+    0.025,
+    0,
+    0,
+]
+
 
 def test_linear_warmup_hold_decay_scheduler():
     scheduler_cls = get_scheduler('LinearWarmupHoldDecayPolicy')
@@ -33,7 +48,7 @@ def test_linear_warmup_hold_decay_scheduler():
     model = [Parameter(torch.randn(2, 2, requires_grad=True))]
     optimizer = Adam(lr=lr, params=model)
 
-    warmup_steps =  4
+    warmup_steps = 4
 
     scheduler = scheduler_cls(
         optimizer=optimizer,

@@ -35,6 +35,7 @@ class DefaultConfigSearchPathConfig(SearchPathPlugin):
 
 
     """
+
     def manipulate_search_path(self, search_path: ConfigSearchPath) -> None:
         if BIONEMO_PREPEND_SEARCH_PATH is not None:
             new_search_paths: list = BIONEMO_PREPEND_SEARCH_PATH.split(",")

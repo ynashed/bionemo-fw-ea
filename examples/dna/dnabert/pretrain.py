@@ -13,20 +13,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from omegaconf.omegaconf import OmegaConf
-from nemo.core.config import hydra_runner
-from nemo.utils import logging
-from bionemo.model.dna.dnabert import DNABERTModel
-from bionemo.model.utils import setup_trainer
-
 import numpy as np
 import pytorch_lightning as pl
+from nemo.core.config import hydra_runner
+from nemo.utils import logging
+from omegaconf.omegaconf import OmegaConf
+
 from bionemo.data.preprocess.dna.preprocess import DNABERTPreprocess
+from bionemo.model.dna.dnabert import DNABERTModel
+from bionemo.model.utils import setup_trainer
 
 
 @hydra_runner(config_path="conf", config_name="dnabert_config")
 def main(cfg) -> None:
-
     logging.info("\n\n************** Experiment configuration ***********")
     logging.info(f'\n{OmegaConf.to_yaml(cfg)}')
 
@@ -34,8 +33,10 @@ def main(cfg) -> None:
         logging.info("************** Starting Preprocessing ***********")
 
         preprocessor = DNABERTPreprocess(
-            cfg.model.data.dataset_path, cfg.model.tokenizer.model,
-            cfg.model.tokenizer.vocab_file, cfg.model.tokenizer.k,
+            cfg.model.data.dataset_path,
+            cfg.model.tokenizer.model,
+            cfg.model.tokenizer.vocab_file,
+            cfg.model.tokenizer.k,
             cfg.model.data.dataset,
         )
         preprocessor.preprocess()

@@ -14,24 +14,21 @@
 # limitations under the License.
 
 import copy
+from typing import List, Optional
+
 import torch
 from nemo.utils import logging
-from typing import List, Optional
 from nemo.utils.get_rank import is_global_rank_zero
+from nemo.utils.model_utils import import_class_by_path
+from pytorch_lightning.callbacks import Callback
 from torch.utils.data import DataLoader
 
 from bionemo.data.datasets import PerTokenValueDataModule, SingleValueDataModule
-from nemo.utils.model_utils import import_class_by_path
-
-from bionemo.data.metrics import per_token_accuracy, accuracy, mse
-
-from pytorch_lightning.callbacks import Callback
-
-from bionemo.model.core import MLPModel, ConvNet, PerTokenMaskedCrossEntropyLoss
 from bionemo.data.datasets.single_value_dataset import SingleValueDataModule
-from bionemo.model.core import ValidationTrainer
+from bionemo.data.metrics import accuracy, mse, per_token_accuracy
+from bionemo.model.core import ConvNet, MLPModel, PerTokenMaskedCrossEntropyLoss, ValidationTrainer
 
-  
+
 class DownstreamValidationCallback(Callback):
     def __init__(self, dset_dict, parent_cfg, plugins: Optional[List] = None):
         super().__init__()
@@ -44,7 +41,7 @@ class DownstreamValidationCallback(Callback):
         self.metrics = {}
         self.metrics_args = {}
         self.dwnstr_model = None
-    
+
     def _prepare_model(self, main_model):
         main_model.freeze()
         args = {}
@@ -55,7 +52,7 @@ class DownstreamValidationCallback(Callback):
             main_model.model.post_process = False
             args["post_process"] = post_process
         return main_model, args
-    
+
     def _release_model(self, main_model, args):
         main_model.unfreeze()
         if "ESM" in self.valid_cfg.infer_target:
@@ -70,32 +67,21 @@ class DownstreamValidationCallback(Callback):
         inference_wrapper = infer_class(self.cfg, main_model)
         new_cfg = copy.deepcopy(self.cfg.model)
         new_cfg.data = copy.deepcopy(self.valid_cfg)
-        data_module = self.data_class(
-            new_cfg, trainer, model=inference_wrapper
-        )
+        data_module = self.data_class(new_cfg, trainer, model=inference_wrapper)
         results = {}
         # Downstream task validation data and model are handled on rank 0
         train_dataset = data_module.get_sampled_train_dataset()
-        train_dataloader = DataLoader(train_dataset, 
-                                        batch_size=self.valid_cfg.batch_size, 
-                                        shuffle=False,
-                                        pin_memory=False,
-                                        num_workers=1
-                                        )
+        train_dataloader = DataLoader(
+            train_dataset, batch_size=self.valid_cfg.batch_size, shuffle=False, pin_memory=False, num_workers=1
+        )
         test_dataset = data_module.get_sampled_test_dataset()
-        test_dataloader = DataLoader(test_dataset, 
-                                        batch_size=self.valid_cfg.batch_size, 
-                                        shuffle=False,
-                                        pin_memory=False,
-                                        num_workers=1
-                                        )
+        test_dataloader = DataLoader(
+            test_dataset, batch_size=self.valid_cfg.batch_size, shuffle=False, pin_memory=False, num_workers=1
+        )
         if is_global_rank_zero():
-            pt_trainer = ValidationTrainer(self.valid_cfg, 
-                                        self.dwnstr_model, 
-                                        self.loss_fn, 
-                                        self.metrics, 
-                                        self.metrics_args
-                                        )
+            pt_trainer = ValidationTrainer(
+                self.valid_cfg, self.dwnstr_model, self.loss_fn, self.metrics, self.metrics_args
+            )
             pt_trainer.fit(train_dataset, train_dataloader)
             results = pt_trainer.test(test_dataset, test_dataloader)
         train_dataloader.dataset.free_memory()
@@ -105,6 +91,7 @@ class DownstreamValidationCallback(Callback):
         for key, value in results.items():
             logging.info("{}: {}".format(key, value))
         main_model = self._release_model(main_model, args)
+
 
 class PerTokenPredictionCallback(DownstreamValidationCallback):
     def __init__(self, dset_dict, parent_cfg, plugins: Optional[List] = None):
@@ -121,7 +108,11 @@ class PerTokenPredictionCallback(DownstreamValidationCallback):
                 self.metrics[name + "_accuracy"] = per_token_accuracy
                 self.metrics_args[name + "_accuracy"] = {"label_id": idx}
             else:
-                raise ValueError("Invalid task_type was provided {}. Supported task_type: 'token-level-classification'".format(self.valid_cfg.task_type))
+                raise ValueError(
+                    "Invalid task_type was provided {}. Supported task_type: 'token-level-classification'".format(
+                        self.valid_cfg.task_type
+                    )
+                )
         pretrain_model_hidden_size = self.cfg.model.hidden_size
         output_sizes = self.valid_cfg.target_sizes
         self.dwnstr_model = ConvNet(pretrain_model_hidden_size, output_sizes=output_sizes).to("cuda")
@@ -149,4 +140,3 @@ class SingleValuePredictionCallback(DownstreamValidationCallback):
         else:
             raise ValueError("Invalid task_type was provided {}".format(self.valid_cfg.task_type))
         self.dwnstr_model = MLPModel(layer_sizes=[parent_cfg.model.hidden_size, 256, 128, num_heads]).to("cuda")
-                    

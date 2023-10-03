@@ -1,45 +1,38 @@
-from hydra.core.plugins import Plugins
-from hydra.core.config_search_path import ConfigSearchPath
-from hydra.plugins.search_path_plugin import SearchPathPlugin
-from typing import Optional
-import pickle
-import pathlib
-import os
-import shutil
+import hashlib
 import json
+import os
+import pathlib
+import pickle
+import shutil
+from typing import Optional
+
 import numpy as np
+import yaml
+from hydra.core.config_search_path import ConfigSearchPath
+from hydra.core.plugins import Plugins
+from hydra.plugins.search_path_plugin import SearchPathPlugin
+from nemo.utils import logging
 from omegaconf import OmegaConf, open_dict
 from omegaconf.dictconfig import DictConfig
-import yaml
-import hashlib
-import codecs
-from nemo.utils import logging
 
 
 class BioNemoSearchPathConfig(SearchPathPlugin):
-    def __init__(self, prepend_config_dir: Optional[str] = None, 
-                  append_config_dir: Optional[str] = None) -> None:
+    def __init__(self, prepend_config_dir: Optional[str] = None, append_config_dir: Optional[str] = None) -> None:
         # TODO  allow lists for config directories
         self.prepend_config_dir = prepend_config_dir
         self.append_config_dir = append_config_dir
 
     def manipulate_search_path(self, search_path: ConfigSearchPath) -> None:
-        """Manipulate existing search path
-        """
+        """Manipulate existing search path"""
         if self.prepend_config_dir:
-            search_path.prepend( 
-                provider="bionemo-searchpath-plugin", path=f"file://{self.prepend_config_dir}"
-            )
-        
+            search_path.prepend(provider="bionemo-searchpath-plugin", path=f"file://{self.prepend_config_dir}")
+
         if self.append_config_dir:
-            search_path.append( 
-                provider="bionemo-searchpath-plugin", path=f"file://{self.append_config_dir}"
-            )
+            search_path.append(provider="bionemo-searchpath-plugin", path=f"file://{self.append_config_dir}")
 
 
 def register_searchpath_config_plugin(plugin: SearchPathPlugin) -> None:
-    """Call this function before invoking @hydra.main
-    """
+    """Call this function before invoking @hydra.main"""
     Plugins.instance().register(plugin)
 
 
@@ -52,7 +45,7 @@ def update_relative_config_dir(prepend_config_dir: pathlib.Path, test_file_dir: 
     Returns:
         str: directory for additional configs relative to test execution directory
     """
-    execution_dir = pathlib.Path(os.getcwd()).resolve() # directory tests are executed from
+    execution_dir = pathlib.Path(os.getcwd()).resolve()  # directory tests are executed from
 
     # absolute path for the config directory
     prepend_config_dir_absolute_path = os.path.join(test_file_dir, prepend_config_dir)
@@ -143,8 +136,9 @@ def load_expected_training_results(results_comparison_dir: str, correct_results:
     return expected_results
 
 
-def save_expected_training_results(results_comparison_dir: str, correct_results: str, expected_results: dict,
-                                   file_format: str = 'json'):
+def save_expected_training_results(
+    results_comparison_dir: str, correct_results: str, expected_results: dict, file_format: str = 'json'
+):
     """Saves JSON file containing expected training results
 
     Args:
@@ -170,7 +164,9 @@ def save_expected_training_results(results_comparison_dir: str, correct_results:
         raise ValueError(f'Invalid file format {file_format}, supported formats: {supported_formats}')
 
 
-def check_expected_training_results(trainer_results: dict, expected_results: dict, tol: float = 1.0e-4, err_msg: str = ""):
+def check_expected_training_results(
+    trainer_results: dict, expected_results: dict, tol: float = 1.0e-4, err_msg: str = ""
+):
     """Compare expected training results
 
     Args:
@@ -187,12 +183,15 @@ def check_expected_training_results(trainer_results: dict, expected_results: dic
 
     assert len(mismatched_results) == 0, f"Training results mismatched: {mismatched_results}{err_msg}"
 
+
 def check_model_exists(model_fname: str):
     """
     Check if model exists and raise error if not.
     """
-    assert os.path.exists(model_fname), \
-        f"Model file not found model_fname = '{model_fname}', please use 'launch.sh download' to download the model."
+    assert os.path.exists(
+        model_fname
+    ), f"Model file not found model_fname = '{model_fname}', please use 'launch.sh download' to download the model."
+
 
 def get_directory_hash(directory):
     """Calculate hash of all files in a directory"""
@@ -201,6 +200,6 @@ def get_directory_hash(directory):
         for name in sorted(files):
             filepath = os.path.join(root, name)
             with open(filepath, 'rb') as fh:
-                 data = fh.read()
-                 md5_hash.update(data)
+                data = fh.read()
+                md5_hash.update(data)
     return md5_hash.hexdigest()

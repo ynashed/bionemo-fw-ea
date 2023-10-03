@@ -12,9 +12,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import torch
 
 from nemo.collections.common.tokenizers import TokenizerSpec
+
 from bionemo.data.dataloader.collate import (
     BertCollate,
     BertMasking,
@@ -26,11 +26,14 @@ __all__ = ['ProteinBertCollate']
 
 
 class ProteinBertCollate(BertCollate):
-
-    def __init__(self, tokenizer: TokenizerSpec, seq_length: int,
-            pad_size_divisible_by_8: bool,
-            modify_percent: float = 0.1,
-            perturb_percent: float = 0.5):
+    def __init__(
+        self,
+        tokenizer: TokenizerSpec,
+        seq_length: int,
+        pad_size_divisible_by_8: bool,
+        modify_percent: float = 0.1,
+        perturb_percent: float = 0.5,
+    ):
         """
         A collate function for Protein sequences.
 
@@ -56,4 +59,3 @@ class ProteinBertCollate(BertCollate):
             pad_size_divisible_by_8=pad_size_divisible_by_8,
             masking_strategy=masking,
         )
-

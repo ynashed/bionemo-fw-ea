@@ -13,17 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from omegaconf.omegaconf import open_dict
-from omegaconf import OmegaConf
-
-from pytorch_lightning.core import LightningModule
-
 from nemo.collections.nlp.parts.nlp_overrides import NLPSaveRestoreConnector
 from nemo.utils import logging
 from nemo.utils.model_utils import import_class_by_path
+from omegaconf import OmegaConf
+from omegaconf.omegaconf import open_dict
+from pytorch_lightning.core import LightningModule
 
 from bionemo.model.protein.equidock.equidock_model import EquiDock
-from bionemo.model.utils import setup_inference_trainer, parallel_state, _reconfigure_microbatch_calculator
+from bionemo.model.utils import _reconfigure_microbatch_calculator, parallel_state, setup_inference_trainer
 
 
 def restore_model(restore_path, trainer=None, cfg=None, model_cls=None, adjust_config=True):
@@ -83,9 +81,7 @@ class EquiDockInference(LightningModule):
             Loaded model
         """
         # load model class from config which is required to load the .nemo file
-        model = restore_model(
-            restore_path=cfg.model.restore_from_path, cfg=cfg, model_cls=EquiDock
-        )
+        model = restore_model(restore_path=cfg.model.restore_from_path, cfg=cfg, model_cls=EquiDock)
 
         # move self to same device as loaded model
         self.to(model.device)
@@ -98,8 +94,7 @@ class EquiDockInference(LightningModule):
                 return
 
             if model.trainer.strategy.launcher is not None:
-                model.trainer.strategy.launcher.launch(
-                    dummy, trainer=model.trainer)
+                model.trainer.strategy.launcher.launch(dummy, trainer=model.trainer)
             model.trainer.strategy.setup_environment()
 
         # Reconfigure microbatch sizes here because on model restore, this will contain the micro/global batch configuration used while training.

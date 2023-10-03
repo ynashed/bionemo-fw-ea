@@ -19,7 +19,6 @@ from omegaconf.omegaconf import OmegaConf
 from bionemo.data.preprocess.molecule.uspto50k_preprocess import USPTO50KPreprocess
 from bionemo.model.molecule.megamolbart import MegaMolBARTRetroModel
 from bionemo.model.utils import setup_trainer
-
 from bionemo.utils import BioNeMoSaveRestoreConnector
 
 
@@ -35,9 +34,12 @@ def main(cfg):
         # this method restores state dict from the finetuninig's checkpoint if it is available
         # otherwise loads weights from the "restore_path" model. Also, it overwrites the pretrained model
         # config by the finetuninig config
-        model = MegaMolBARTRetroModel.restore_from(restore_path=cfg.restore_from_path, trainer=trainer,
-                                                   save_restore_connector=BioNeMoSaveRestoreConnector(),
-                                                   override_config_path=cfg)
+        model = MegaMolBARTRetroModel.restore_from(
+            restore_path=cfg.restore_from_path,
+            trainer=trainer,
+            save_restore_connector=BioNeMoSaveRestoreConnector(),
+            override_config_path=cfg,
+        )
     else:
         model = MegaMolBARTRetroModel(cfg.model, trainer)
 
@@ -62,12 +64,15 @@ def main(cfg):
     else:
         logging.info("************** Starting Data PreProcessing ***********")
         logging.info("Processing data into CSV files")
-        data_preprocessor = USPTO50KPreprocess(max_smiles_length=cfg.model.data.max_seq_length,
-                                               data_dir=cfg.model.data.dataset_path)
+        data_preprocessor = USPTO50KPreprocess(
+            max_smiles_length=cfg.model.data.max_seq_length, data_dir=cfg.model.data.dataset_path
+        )
 
-        data_preprocessor.prepare_dataset(ngc_registry_target=cfg.model.data.ngc_registry_target,
-                                          ngc_registry_version=cfg.model.data.ngc_registry_version,
-                                          force=True)
+        data_preprocessor.prepare_dataset(
+            ngc_registry_target=cfg.model.data.ngc_registry_target,
+            ngc_registry_version=cfg.model.data.ngc_registry_version,
+            force=True,
+        )
         logging.info("************** Finished Data PreProcessing ***********")
 
     if cfg.do_testing:

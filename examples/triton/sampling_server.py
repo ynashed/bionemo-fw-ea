@@ -12,14 +12,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from omegaconf.omegaconf import OmegaConf
-
+import numpy as np
 from nemo.core.config import hydra_runner
 from nemo.utils import logging
 from nemo.utils.model_utils import import_class_by_path
-
-import numpy as np
-
+from omegaconf.omegaconf import OmegaConf
 from pytriton.decorators import batch
 from pytriton.model_config import ModelConfig, Tensor
 from pytriton.triton import Triton
@@ -34,22 +31,23 @@ def main(cfg) -> None:
 
     infer_class = import_class_by_path(cfg.infer_target)
 
-    initialize_distributed_parallel_state(local_rank=0, tensor_model_parallel_size=1, pipeline_model_parallel_size=1,
-                                            pipeline_model_parallel_split_rank=0)
+    initialize_distributed_parallel_state(
+        local_rank=0,
+        tensor_model_parallel_size=1,
+        pipeline_model_parallel_size=1,
+        pipeline_model_parallel_split_rank=0,
+    )
 
     MODEL = infer_class(cfg)
     MODEL.freeze()
 
     @batch
     def _infer_fn(sequences: np.ndarray):
-
         sequences = np.char.decode(sequences.astype("bytes"), "utf-8")
         sequences = sequences.squeeze(1).tolist()
 
         generated = MODEL.sample(smis=sequences)
-        response = {
-            "generated":  np.char.encode(generated, "utf-8").reshape((len(sequences), -1))
-        }
+        response = {"generated": np.char.encode(generated, "utf-8").reshape((len(sequences), -1))}
 
         return response
 
@@ -59,7 +57,7 @@ def main(cfg) -> None:
             model_name="bionemo_model",
             infer_func=_infer_fn,
             inputs=[
-                    Tensor(name="sequences", dtype=bytes, shape=(1,)),
+                Tensor(name="sequences", dtype=bytes, shape=(1,)),
             ],
             outputs=[
                 Tensor(name="generated", dtype=bytes, shape=(-1,)),
@@ -68,6 +66,7 @@ def main(cfg) -> None:
         )
         logging.info("Serving model")
         triton.serve()
+
 
 if __name__ == "__main__":
     main()

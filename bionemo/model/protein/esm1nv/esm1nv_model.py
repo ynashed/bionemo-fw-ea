@@ -1,4 +1,3 @@
-
 # Copyright (c) 2022, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,25 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import torch
 from typing import Dict, Optional
-from omegaconf.dictconfig import DictConfig
-from pytorch_lightning.trainer.trainer import Trainer
 
-from nemo.core.neural_types import NeuralType
-from bionemo.model.protein.esm1nv.base import ESMnvMegatronBertModel
+import torch
 from nemo.collections.nlp.modules.common.megatron.utils import (
     average_losses_across_data_parallel_group,
 )
-from nemo.utils import logging
-
-from bionemo.data.molecule import megamolbart_build_train_valid_test_datasets
-from bionemo.data.dataloader import ProteinBertCollate
 from nemo.collections.nlp.modules.common.tokenizer_utils import get_nmt_tokenizer
+from nemo.core.neural_types import NeuralType
+from nemo.utils import logging
+from omegaconf.dictconfig import DictConfig
+from pytorch_lightning.trainer.trainer import Trainer
+
+from bionemo.data.dataloader import ProteinBertCollate
+from bionemo.data.molecule import megamolbart_build_train_valid_test_datasets
+from bionemo.model.protein.esm1nv.base import ESMnvMegatronBertModel
+
 
 try:
     from apex.transformer import tensor_parallel
-
 
     HAVE_APEX = True
 except (ImportError, ModuleNotFoundError):
@@ -39,6 +38,7 @@ except (ImportError, ModuleNotFoundError):
 
 
 __all__ = ["ESM1nvModel"]
+
 
 class ESM1nvModel(ESMnvMegatronBertModel):
     """
@@ -65,8 +65,7 @@ class ESM1nvModel(ESMnvMegatronBertModel):
         # patch tokenizer for use with HF esm tokenizer
         # We could alternatively write another  adapter for the `AutoTokenizer` from HF,
         # but the inconsistency is so small we opted to be more concise here
-        if self._cfg.tokenizer.library == 'huggingface' and \
-                str(model_name).startswith('facebook/esm2'):
+        if self._cfg.tokenizer.library == 'huggingface' and str(model_name).startswith('facebook/esm2'):
             self.tokenizer.tokenizer.vocab = self.tokenizer.tokenizer.get_vocab()
 
     def build_pretraining_data_loader(self, dataset, consumed_samples):
@@ -74,20 +73,21 @@ class ESM1nvModel(ESMnvMegatronBertModel):
 
         assert self._cfg.data.dataloader_type == 'single', AssertionError(
             f'Only the Megatron sequential ("single") sampler is currently supported. {self._cfg.data.dataloader_type} was chosen.'
-            )
+        )
 
         dataloader = super().build_pretraining_data_loader(dataset=dataset, consumed_samples=consumed_samples)
 
         # Add collate function and unpin memory to avoid crash with CUDA misaligned address
-        dataloader.pin_memory = False # must be False with CSV dataset TODO check with binary
+        dataloader.pin_memory = False  # must be False with CSV dataset TODO check with binary
         pad_size_divisible_by_8 = True if self._cfg.masked_softmax_fusion else False
 
-        dataloader.collate_fn = ProteinBertCollate(tokenizer=self.tokenizer,
-                                                    seq_length=self._cfg.seq_length,
-                                                    pad_size_divisible_by_8=pad_size_divisible_by_8,
-                                                    modify_percent=self._cfg.data.modify_percent,
-                                                    perturb_percent=self._cfg.data.perturb_percent,
-                                                    ).collate_fn
+        dataloader.collate_fn = ProteinBertCollate(
+            tokenizer=self.tokenizer,
+            seq_length=self._cfg.seq_length,
+            pad_size_divisible_by_8=pad_size_divisible_by_8,
+            modify_percent=self._cfg.data.modify_percent,
+            perturb_percent=self._cfg.data.perturb_percent,
+        ).collate_fn
 
         return dataloader
 
@@ -112,26 +112,24 @@ class ESM1nvModel(ESMnvMegatronBertModel):
             'train': int(max_train_steps * global_batch_size),
             'val': int(eval_iters * global_batch_size),
             'test': int(test_iters * global_batch_size),
-            }
+        }
 
         self._train_ds, self._validation_ds, self._test_ds = megamolbart_build_train_valid_test_datasets(
-            cfg=self._cfg.data,
-            train_valid_test_num_samples=train_valid_test_num_samples
+            cfg=self._cfg.data, train_valid_test_num_samples=train_valid_test_num_samples
         )
 
         logging.info(f'Length of train dataset: {len(self._train_ds)}')
         logging.info(f'Length of val dataset: {len(self._validation_ds)}')
         logging.info(f'Length of test dataset: {len(self._test_ds)}')
-        logging.info(f'Finished building Bert datasets.')
+        logging.info('Finished building Bert datasets.')
         return self._train_ds, self._validation_ds, self._test_ds
-
 
     def validation_epoch_end(self, outputs):
         if not outputs:
             return
         averaged_loss = torch.stack(outputs).mean()
         self.log('val_loss', averaged_loss, prog_bar=True)
-        self.log('val_loss_ECE', pow(2, averaged_loss)) #calculate exponential cross entropy loss for logs
+        self.log('val_loss_ECE', pow(2, averaged_loss))  # calculate exponential cross entropy loss for logs
         self.log('consumed_samples', self.compute_consumed_samples(self.trainer.global_step - self.init_global_step))
 
     def test_epoch_end(self, outputs):
@@ -141,7 +139,10 @@ class ESM1nvModel(ESMnvMegatronBertModel):
 
     @property
     def input_names(self):
-        return ['input_ids', 'attention_mask', ]
+        return [
+            'input_ids',
+            'attention_mask',
+        ]
 
     @property
     def output_names(self):
@@ -149,23 +150,8 @@ class ESM1nvModel(ESMnvMegatronBertModel):
 
     @property
     def input_types(self) -> Optional[Dict[str, NeuralType]]:
-        return {
-            'input_ids': {
-                0: 'batch',
-                1: 'time'
-                },
-            'attention_mask': {
-                0: 'batch',
-                1: 'time'
-                }
-            }
+        return {'input_ids': {0: 'batch', 1: 'time'}, 'attention_mask': {0: 'batch', 1: 'time'}}
 
     @property
     def output_types(self) -> Optional[Dict[str, NeuralType]]:
-        return {
-            'output': {
-                0: 'batch',
-                1: 'time',
-                2: 'size'
-            }
-        }
+        return {'output': {0: 'batch', 1: 'time', 2: 'size'}}

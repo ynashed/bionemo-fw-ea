@@ -16,21 +16,21 @@
 from nemo.core.config import hydra_runner
 from nemo.utils import logging
 from omegaconf.omegaconf import OmegaConf
+
+from bionemo.data import FLIPPreprocess
+from bionemo.data.metrics import accuracy, mse, per_token_accuracy
+from bionemo.model.protein.downstream import FineTuneProteinModel
 from bionemo.model.utils import (
     setup_trainer,
 )
-from bionemo.data import FLIPPreprocess
-from bionemo.model.protein.downstream import FineTuneProteinModel
-from bionemo.data.metrics import per_token_accuracy, accuracy, mse
 
 
-@hydra_runner(config_path="../esm1nv/conf", config_name="downstream_flip_sec_str") # ESM
-#@hydra_runner(config_path="../prott5nv/conf", config_name="downstream_flip_sec_str") # ProtT5
+@hydra_runner(config_path="../esm1nv/conf", config_name="downstream_flip_sec_str")  # ESM
+# @hydra_runner(config_path="../prott5nv/conf", config_name="downstream_flip_sec_str") # ProtT5
 def main(cfg) -> None:
-
     logging.info("\n\n************* Finetune config ****************")
     logging.info(f'\n{OmegaConf.to_yaml(cfg)}')
-    
+
     if cfg.do_training:
         logging.info("************** Starting Training ***********")
         trainer = setup_trainer(cfg, builder=None)
@@ -56,7 +56,9 @@ def main(cfg) -> None:
             if "test" in cfg.model.data.dataset:
                 trainer.test(model)
             else:
-                raise UserWarning("Skipping testing, test dataset file was not provided. Please specify 'dataset.test' in yaml config")
+                raise UserWarning(
+                    "Skipping testing, test dataset file was not provided. Please specify 'dataset.test' in yaml config"
+                )
             logging.info("************** Finished Testing ***********")
     else:
         logging.info("************** Starting Preprocessing ***********")

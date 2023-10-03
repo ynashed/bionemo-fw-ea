@@ -1,14 +1,15 @@
 from functools import lru_cache
-from omegaconf import OmegaConf
-from torch import nn
+
 from nemo.collections.nlp.parts.nlp_overrides import NLPSaveRestoreConnector
-from bionemo.model.dna.dnabert import DNABERTModel
+from torch import nn
+
 from bionemo.data.dna.splice_site_dataset import SpliceSiteDataModule
-from bionemo.model.core.encoder_finetuning import EncoderFineTuning
 from bionemo.model.core import MLPModel
+from bionemo.model.core.encoder_finetuning import EncoderFineTuning
+from bionemo.model.dna.dnabert import DNABERTModel
+
 
 class SpliceSiteBERTPredictionModel(EncoderFineTuning):
-
     def __init__(self, cfg, trainer):
         super().__init__(cfg, trainer=trainer)
 
@@ -20,7 +21,8 @@ class SpliceSiteBERTPredictionModel(EncoderFineTuning):
         return nn.CrossEntropyLoss()
 
     def build_task_head(self):
-        return MLPModel(layer_sizes=[self.cfg.hidden_size, self.cfg.n_outputs],
+        return MLPModel(
+            layer_sizes=[self.cfg.hidden_size, self.cfg.n_outputs],
             dropout=0.1,
         )
 
@@ -54,8 +56,7 @@ class SpliceSiteBERTPredictionModel(EncoderFineTuning):
         return input_tensor[:, idx, :]
 
     def encoder_forward(self, bert_model, batch: dict):
-        tokens, types, _, _, lm_labels, padding_mask = \
-            bert_model.process_batch(batch)
+        tokens, types, _, _, lm_labels, padding_mask = bert_model.process_batch(batch)
         if not bert_model.cfg.bert_binary_head:
             types = None
         output_tensor = bert_model(tokens, padding_mask, token_type_ids=types, lm_labels=lm_labels)
@@ -66,7 +67,9 @@ class SpliceSiteBERTPredictionModel(EncoderFineTuning):
     @lru_cache
     def data_setup(self):
         self.data_module = SpliceSiteDataModule(
-            self.cfg, self.trainer, self.encoder_model,
+            self.cfg,
+            self.trainer,
+            self.encoder_model,
         )
 
     def on_fit_start(self):

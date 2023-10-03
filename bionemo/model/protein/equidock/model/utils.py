@@ -71,9 +71,8 @@ def compute_cross_attention(queries, keys, values, mask, cross_msgs):
       attention_x: Nxd float tensor.
     """
     if not cross_msgs:
-        return queries * 0.
-    a = mask * torch.mm(queries, torch.transpose(keys, 1, 0)
-                        ) - 1000. * (1. - mask)
+        return queries * 0.0
+    a = mask * torch.mm(queries, torch.transpose(keys, 1, 0)) - 1000.0 * (1.0 - mask)
     a_x = torch.softmax(a, dim=1)  # i->j, NxM, a_x.sum(dim=1) = torch.ones(N)
     attention_x = torch.mm(a_x, values)  # (N,d)
     return attention_x
@@ -86,7 +85,7 @@ def get_mask(ligand_batch_num_nodes, receptor_batch_num_nodes, device):
     partial_l = 0
     partial_r = 0
     for l_n, r_n in zip(ligand_batch_num_nodes, receptor_batch_num_nodes):
-        mask[partial_l: partial_l + l_n, partial_r: partial_r + r_n] = 1
+        mask[partial_l : partial_l + l_n, partial_r : partial_r + r_n] = 1
         partial_l = partial_l + l_n
         partial_r = partial_r + r_n
     return mask

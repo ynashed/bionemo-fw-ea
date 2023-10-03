@@ -13,11 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import pytest
-from unittest import TestCase
 import tempfile
+from unittest import TestCase
+
+import pytest
 
 from bionemo.tokenizer import KmerTokenizer
+
 
 example_strings = [
     "ACGTCAGAC",
@@ -27,10 +29,25 @@ example_strings = [
 ]
 
 expected_3mer_tokens = [
-    ["ACG", "CGT", "GTC", "TCA", "CAG", "AGA", "GAC", ],
+    [
+        "ACG",
+        "CGT",
+        "GTC",
+        "TCA",
+        "CAG",
+        "AGA",
+        "GAC",
+    ],
     ["CGN", "GNN", "NNA", "NAC"],
-    ["DOG", ],
-    ["CAT", "ATD", "TDO", "DOG", ],
+    [
+        "DOG",
+    ],
+    [
+        "CAT",
+        "ATD",
+        "TDO",
+        "DOG",
+    ],
 ]
 
 expected_3mer_ids = [
@@ -41,10 +58,22 @@ expected_3mer_ids = [
 ]
 
 expected_5mer_tokens = [
-    ["ACGTC", "CGTCA", "GTCAG", "TCAGA", "CAGAC", ],
-    ["CGNNA", "GNNAC", ],
+    [
+        "ACGTC",
+        "CGTCA",
+        "GTCAG",
+        "TCAGA",
+        "CAGAC",
+    ],
+    [
+        "CGNNA",
+        "GNNAC",
+    ],
     [],
-    ["CATDO", "ATDOG", ],
+    [
+        "CATDO",
+        "ATDOG",
+    ],
 ]
 
 expected_5mer_ids = [
@@ -88,7 +117,7 @@ expected_3mer_decode_vocab = {
     7: 'GTC',
     8: 'TCA',
     9: 'CAG',
-    10: 'AGA', 
+    10: 'AGA',
     11: 'GAC',
     12: 'CGN',
     13: 'GNN',
@@ -124,23 +153,20 @@ single_string_3mer_vocab_saved = [
     'GTA\n',
 ]
 
-@pytest.mark.parametrize(
-        "test_input,expected",
-        zip(example_strings, expected_3mer_tokens)
-    )
+
+@pytest.mark.parametrize("test_input,expected", zip(example_strings, expected_3mer_tokens))
 def test_3mer_text_to_tokens(test_input, expected):
     tokenizer = KmerTokenizer(3)
     tokens = tokenizer.text_to_tokens(test_input)
     assert tokens == expected
 
-@pytest.mark.parametrize(
-        "test_input,expected",
-        zip(example_strings, expected_5mer_tokens)
-    )
+
+@pytest.mark.parametrize("test_input,expected", zip(example_strings, expected_5mer_tokens))
 def test_5mer_text_to_tokens(test_input, expected):
     tokenizer = KmerTokenizer(5)
     tokens = tokenizer.text_to_tokens(test_input)
     assert tokens == expected
+
 
 def test_3mer_build_vocab_list():
     tokenizer = KmerTokenizer(3)
@@ -149,35 +175,46 @@ def test_3mer_build_vocab_list():
     tc.assertDictEqual(tokenizer.vocab, expected_3mer_vocab)
     tc.assertDictEqual(tokenizer.decode_vocab, expected_3mer_decode_vocab)
 
-@pytest.mark.parametrize(
-        "test_input,expected",
-        zip(example_strings, expected_3mer_ids)
-    )
+
+@pytest.mark.parametrize("test_input,expected", zip(example_strings, expected_3mer_ids))
 def test_3mer_text_to_ids(test_input, expected):
     tokenizer = KmerTokenizer(3)
     tokenizer.build_vocab(example_strings)
     tokens = tokenizer.text_to_ids(test_input)
     assert tokens == expected
 
-@pytest.mark.parametrize(
-        "test_input,expected",
-        zip(example_strings, expected_5mer_ids)
-    )
+
+@pytest.mark.parametrize("test_input,expected", zip(example_strings, expected_5mer_ids))
 def test_5mer_text_to_ids(test_input, expected):
     tokenizer = KmerTokenizer(5)
     tokenizer.build_vocab(example_strings)
     tokens = tokenizer.text_to_ids(test_input)
     assert tokens == expected
 
+
 def test_3mer_text_to_ids_with_unk():
     tokenizer = KmerTokenizer(3)
     tokenizer.build_vocab(example_strings)
     text = 'CATDOGANDFISHDOG'
     expected_tokens = [
-        17, 18, 19, 16, 1, 1, 1, 1, 1, 1, 1, 1, 1, 16,
+        17,
+        18,
+        19,
+        16,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        1,
+        16,
     ]
     tokens = tokenizer.text_to_ids(text)
     assert tokens == expected_tokens
+
 
 def test_save_vocab():
     model_file = tempfile.NamedTemporaryFile(suffix='.model')
@@ -191,12 +228,15 @@ def test_save_vocab():
 
     assert observed_vocab == single_string_3mer_vocab_saved
 
-    expected_k = ['3', ]
+    expected_k = [
+        '3',
+    ]
     observed_k = open(model_file.name).readlines()
     assert observed_k == expected_k
 
     model_file.close()
     vocab_file.close()
+
 
 def test_load_vocab():
     model_file = tempfile.NamedTemporaryFile(suffix='.model')
@@ -217,7 +257,4 @@ def test_load_vocab():
     tc = TestCase()
 
     tc.assertDictEqual(tokenizer.vocab, single_string_3mer_vocab)
-    tc.assertDictEqual(
-        tokenizer.decode_vocab,
-        {id: token for token, id in single_string_3mer_vocab.items()}
-    )
+    tc.assertDictEqual(tokenizer.decode_vocab, {id: token for token, id in single_string_3mer_vocab.items()})

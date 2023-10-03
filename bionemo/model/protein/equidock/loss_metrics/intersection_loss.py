@@ -19,7 +19,7 @@ import torch
 
 
 def G_fn(protein_coords, x, sigma):
-    """
+    r"""
     Compute the surface of a protein point
     Ligand residue locations: a_i in R^3. Receptor: b_j in R^3
     Ligand: G_l(x) = -sigma * ln( \sum_i  exp(- ||x - a_i||^2 / sigma)  ), same for G_r(x)
@@ -32,16 +32,17 @@ def G_fn(protein_coords, x, sigma):
         sigma (torch.Tensor or float): Gaussian variance
 
     Returns:
-        (torch.Tensor): 
+        (torch.Tensor):
     """
     # protein_coords: (n,3) ,  x: (m,3), output: (m,)
-    e = torch.exp(- torch.sum((protein_coords.view(1, -1, 3) -
-                  x.view(-1, 1, 3)) ** 2, dim=2) / float(sigma))  # (m, n)
-    return - sigma * torch.log(1e-3 + e.sum(dim=1))
+    e = torch.exp(-torch.sum((protein_coords.view(1, -1, 3) - x.view(-1, 1, 3)) ** 2, dim=2) / float(sigma))  # (m, n)
+    return -sigma * torch.log(1e-3 + e.sum(dim=1))
     # replace with torch.logsumexp
 
 
-def compute_body_intersection_loss(model_ligand_coors_deform, bound_receptor_repres_nodes_loc_array, sigma, surface_ct):
+def compute_body_intersection_loss(
+    model_ligand_coors_deform, bound_receptor_repres_nodes_loc_array, sigma, surface_ct
+):
     """
     Intersection of ligand and receptor: points x such that G_l(x) < surface_ct && G_r(x) < surface_ct
     Intersection loss: IL = \avg_i max(0, surface_ct - G_r(a_i)) + \avg_j max(0, surface_ct - G_l(b_j))
@@ -56,7 +57,9 @@ def compute_body_intersection_loss(model_ligand_coors_deform, bound_receptor_rep
     Returns:
         torch.Tensor: Intersection loss
     """
-    loss = torch.mean(torch.clamp(surface_ct - G_fn(bound_receptor_repres_nodes_loc_array, model_ligand_coors_deform, sigma), min=0)) + \
-        torch.mean(torch.clamp(surface_ct - G_fn(model_ligand_coors_deform,
-                   bound_receptor_repres_nodes_loc_array, sigma), min=0))
+    loss = torch.mean(
+        torch.clamp(surface_ct - G_fn(bound_receptor_repres_nodes_loc_array, model_ligand_coors_deform, sigma), min=0)
+    ) + torch.mean(
+        torch.clamp(surface_ct - G_fn(model_ligand_coors_deform, bound_receptor_repres_nodes_loc_array, sigma), min=0)
+    )
     return loss

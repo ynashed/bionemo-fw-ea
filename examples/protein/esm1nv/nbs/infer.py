@@ -13,17 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
 import grpc
 import torch
-import logging
-from esm1nv_pb2_grpc import GenerativeSamplerStub
 from esm1nv_pb2 import InputSpec
+from esm1nv_pb2_grpc import GenerativeSamplerStub
+
 
 log = logging.getLogger(__name__)
 
 
-class ESMInferenceWrapper():
-
+class ESMInferenceWrapper:
     def __init__(self):
         channel = grpc.insecure_channel('localhost:50051')
         self.stub = GenerativeSamplerStub(channel)
@@ -42,17 +43,17 @@ class ESMInferenceWrapper():
         enc_mask = torch.cat(enc_mask, dim=0).cuda()
 
         return hidden_states, enc_mask
-    
+
     def hiddens_to_embedding(self, hidden_states, enc_mask):
         # compute average on active hiddens
         lengths = enc_mask.sum(dim=1, keepdim=True)
         if (lengths == 0).any():
             raise ValueError("Empty input is not supported (no token was proveded in one or more of the inputs)")
 
-        embeddings = torch.sum(hidden_states*enc_mask.unsqueeze(-1), dim=1) / lengths
-        
+        embeddings = torch.sum(hidden_states * enc_mask.unsqueeze(-1), dim=1) / lengths
+
         return embeddings
-    
+
     def seq_to_embedding(self, seqs):
         hidden_states, enc_mask = self.seq_to_hiddens(seqs)
         embeddings = self.hiddens_to_embedding(hidden_states, enc_mask)

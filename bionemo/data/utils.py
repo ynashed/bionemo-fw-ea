@@ -13,24 +13,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List, Dict, Optional, Any
-from enum import Enum
-import re
-import math
-import braceexpand
-import os
-import torch
 import gzip
-import shutil
 import hashlib
 import json
+import math
+import os
+import re
+import shutil
 import subprocess
+from enum import Enum
+from typing import Any, Dict, List, Optional
+
+import braceexpand
+import torch
+from nemo.utils import logging
 from omegaconf import DictConfig, open_dict
 from pytorch_lightning.trainer.trainer import Trainer
 
-from nemo.utils import logging
 from bionemo.data.molecule import MoleculeCsvDataset
-from typing import Optional
+
 
 __all__ = [
     'DatasetTypes',
@@ -40,18 +41,19 @@ __all__ = [
     'handle_index',
 ]
 
+
 class DatasetTypes(Enum):
-    zinc_csv  = 0
+    zinc_csv = 0
 
 
 def expand_dataset_paths(filepath: str, ext: str) -> List[str]:
     """Expand dataset paths from braces"""
     if ext and not filepath.endswith(ext):
         filepath = filepath + ext
-        
+
     # TODO this should eventually be moved to a Nemo fileutils module or similar
-    filepath = re.sub(r"""\(|\[|\<|_OP_""", '{', filepath) # replaces '(', '[', '<' and '_OP_' with '{'
-    filepath = re.sub(r"""\)|\]|\>|_CL_""", '}', filepath) # replaces ')', ']', '>' and '_CL_' with '}'
+    filepath = re.sub(r"""\(|\[|\<|_OP_""", '{', filepath)  # replaces '(', '[', '<' and '_OP_' with '{'
+    filepath = re.sub(r"""\)|\]|\>|_CL_""", '}', filepath)  # replaces ')', ']', '>' and '_CL_' with '}'
     dataset_paths = list(braceexpand.braceexpand(filepath))
     return dataset_paths
 
@@ -110,6 +112,7 @@ class DatasetBuilderSpec(object):
     here.
 
     """
+
     def __init__(self, options: Dict[str, Any]):
         """
         Initializes a dataset builder
@@ -156,9 +159,7 @@ class DatasetBuilderSpec(object):
             if file_does_not_exist:
                 errors.append(file_does_not_exist)
         if len(errors) != 0:
-            raise ValueError(
-                f"Following files do not exist {' '.join(errors)}"
-            )
+            raise ValueError(f"Following files do not exist {' '.join(errors)}")
 
     def check_path(self, filepath):
         """
@@ -202,8 +203,7 @@ class DatasetBuilderSpec(object):
 
 def get_filepath(options):
     filepath = cfg_get_key(options['cfg'], 'dataset_path', default='')
-    filepath = os.path.join(
-        filepath, options['name'], options['dataset'])
+    filepath = os.path.join(filepath, options['name'], options['dataset'])
 
     return filepath
 
@@ -217,6 +217,7 @@ class CSVDatasetBuilder(DatasetBuilderSpec):
     >>> csv_dataset_instance = dataset_builder.initialize_dataset()
 
     """
+
     def __init__(self, options: Dict[str, Any]):
         """
         Initializes a dataset builder
@@ -244,8 +245,7 @@ class CSVDatasetBuilder(DatasetBuilderSpec):
         filepath = get_filepath(self.options)
         # Get datasets and load data
         logging.info(f'Loading data from {filepath}')
-        self.dataset_paths = expand_dataset_paths(
-            filepath, ".csv")
+        self.dataset_paths = expand_dataset_paths(filepath, ".csv")
 
     def check_path(self, filepath):
         """
@@ -270,13 +270,11 @@ class CSVDatasetBuilder(DatasetBuilderSpec):
             Dataset: Dataset instantiated from paths.
         """
         cfg = self.options['cfg']
-        self.dataset = MoleculeCsvDataset(
-            dataset_paths=self.dataset_paths, cfg=cfg)
+        self.dataset = MoleculeCsvDataset(dataset_paths=self.dataset_paths, cfg=cfg)
         return self.dataset
 
 
 class DatasetFactorySpec(object):
-
     def create_dataset(self, options) -> DatasetBuilderSpec:
         """
         Creates a dataset with the given options.
@@ -293,6 +291,7 @@ class FormattedDatasetFactory(DatasetFactorySpec):
             factory supports, values are the classes of the builders.
 
     """
+
     formats: Dict[str, DatasetBuilderSpec]
 
     def create_dataset(self, options) -> DatasetBuilderSpec:
@@ -320,8 +319,7 @@ class FormattedDatasetFactory(DatasetFactorySpec):
             builder_cls = self.formats[dataset_format]
             builder = builder_cls(options)
         else:
-            raise ValueError(f"Unrecognized data format."
-                             f" Expected one of: {self.keys()}")
+            raise ValueError(f"Unrecognized data format." f" Expected one of: {self.keys()}")
         return builder.initialize_dataset()
 
     @classmethod
@@ -386,26 +384,34 @@ def build_train_valid_test_datasets(
     train_valid_test_num_samples: List[int],
     dataset_factory: Optional[FormattedDatasetFactory] = None,
 ):
-
     ds_train = cfg.dataset.train
     ds_val = cfg.dataset.val
     ds_test = cfg.dataset.test
 
     # Build individual datasets.
-    train_dataset = create_dataset(cfg, train_valid_test_num_samples[0],
-                                   'train', ds_train,
-                                   dataset_factory,
-                                   )
+    train_dataset = create_dataset(
+        cfg,
+        train_valid_test_num_samples[0],
+        'train',
+        ds_train,
+        dataset_factory,
+    )
 
-    validation_dataset = create_dataset(cfg, train_valid_test_num_samples[1],
-                                        'val', ds_val,
-                                        dataset_factory,
-                                        )
+    validation_dataset = create_dataset(
+        cfg,
+        train_valid_test_num_samples[1],
+        'val',
+        ds_val,
+        dataset_factory,
+    )
 
-    test_dataset = create_dataset(cfg, train_valid_test_num_samples[2],
-                                  'test', ds_test,
-                                  dataset_factory,
-                                  )
+    test_dataset = create_dataset(
+        cfg,
+        train_valid_test_num_samples[2],
+        'test',
+        ds_test,
+        dataset_factory,
+    )
 
     return (train_dataset, validation_dataset, test_dataset)
 
@@ -415,18 +421,18 @@ def cfg_get_key(cfg, key, default=None):
         return cfg.get(key, default)
 
 
-def pad_token_ids(token_ids, padding_value=0, padding_len=None, pad_size_divisible_by=1,  **convert_to_kwargs):
+def pad_token_ids(token_ids, padding_value=0, padding_len=None, pad_size_divisible_by=1, **convert_to_kwargs):
     """
-    Pads token ids with padding value, and return the padded tokens and 
+    Pads token ids with padding value, and return the padded tokens and
     the corresponding mask.
-    
+
     Args:
         token_ids (List[int], List[Tensor]): List of token ids or tensors
         padding_value (int, optional): Value to pad with. Defaults to 0.
         padding_len (int, optional): Max length of the padded token ids. Defaults to None.
         pad_size_divisible_by (int, optional): Pad the length of the token ids to be divisible by this number. Defaults to 1.
         **convert_to_kwargs: Passed directly to tensor.to(**kwargs) if provided
-    
+
     Returns:
         Tuple[List[int], List[int]]: Padded token ids and mask
     """
@@ -434,22 +440,19 @@ def pad_token_ids(token_ids, padding_value=0, padding_len=None, pad_size_divisib
     if padding_len is None:
         padding_len = lengths.max()
 
-    # make padding divisible by pad_size_divisible_by   
+    # make padding divisible by pad_size_divisible_by
     if pad_size_divisible_by > 1:
-        padding_len = int(math.ceil(padding_len/pad_size_divisible_by) * pad_size_divisible_by)
+        padding_len = int(math.ceil(padding_len / pad_size_divisible_by) * pad_size_divisible_by)
 
     # build mask
     mask = torch.arange(padding_len)[None, :] < lengths[:, None]
 
     # make sure all sequences are pytorch tensors
-    token_ids = list(map(lambda s: torch.tensor(s) if not torch.is_tensor(s) else s,
-        token_ids))
+    token_ids = [torch.tensor(s) if not torch.is_tensor(s) else s for s in token_ids]
     # pad sequences
-    masked_token_ids = torch.nn.utils.rnn.pad_sequence(token_ids,
-                                                batch_first=True,
-                                                padding_value=padding_value)
+    masked_token_ids = torch.nn.utils.rnn.pad_sequence(token_ids, batch_first=True, padding_value=padding_value)
 
-    # convert to desired device 
+    # convert to desired device
     if len(convert_to_kwargs):
         mask = mask.to(**convert_to_kwargs)
         masked_token_ids = masked_token_ids.to(**convert_to_kwargs)
@@ -499,7 +502,7 @@ def verify_checksum_matches(file_path: str, expected_checksum: str) -> bool:
     Returns:
         bool: True if checksum matches else false
     """
-    
+
     file_hash = hashlib.md5(open(file_path, 'rb').read()).hexdigest()
     if file_hash == expected_checksum:
         matches = True
@@ -509,10 +512,9 @@ def verify_checksum_matches(file_path: str, expected_checksum: str) -> bool:
     return matches
 
 
-def get_ngc_registry_file_list(ngc_registry_target: str,
-                               ngc_registry_version: str,
-                               ngc_org: str, 
-                               ngc_team: Optional[str] = None) -> List[str]:
+def get_ngc_registry_file_list(
+    ngc_registry_target: str, ngc_registry_version: str, ngc_org: str, ngc_team: Optional[str] = None
+) -> List[str]:
     """
     Get listing of NGC registry files:
     https://docs.ngc.nvidia.com/cli/cmd_registry.html
@@ -525,9 +527,9 @@ def get_ngc_registry_file_list(ngc_registry_target: str,
     Returns:
         list of file names
     """
-    filelist_cmd = f'ngc registry resource info --format_type json --files '
+    filelist_cmd = 'ngc registry resource info --format_type json --files '
     filelist_cmd += f'--org {ngc_org} '
-    
+
     target = ngc_org
     if ngc_team:
         filelist_cmd += f'--team {ngc_team} '
@@ -535,34 +537,36 @@ def get_ngc_registry_file_list(ngc_registry_target: str,
 
     target += '/' + ngc_registry_target
     filelist_cmd += f' {target}:{ngc_registry_version}'
-    
+
     try:
         result = subprocess.run(filelist_cmd, capture_output=True, shell=True, check=True)
         if result.stderr:
             logging.warning(result.stderr.decode())
         json_output = result.stdout.strip()
         file_list = json.loads(json_output)['file_list']
-        file_list = list(map(lambda x: x['path'], file_list))
+        file_list = [x['path'] for x in file_list]
     except subprocess.CalledProcessError as e:
         logging.error(f'File list retrival failed: {e}')
         file_list = []
-    except Exception as e:
+    except Exception:
         logging.error(f'File list retrival failed for command \'{filelist_cmd}\' and output \'{json_output}\'')
         file_list = []
 
     return file_list
 
 
-def download_registry_from_ngc(ngc_registry_target: str,
-                               ngc_registry_version: str,
-                               ngc_org: str, 
-                               ngc_team: Optional[str] = None, 
-                               dest: Optional[str] = '.', 
-                               exclude: Optional[str] = None, 
-                               expected_checksum: Optional[str] = None,
-                               file: Optional[str] = None,
-                               format_type: Optional[str] = None, 
-                               debug: bool = False) -> str:
+def download_registry_from_ngc(
+    ngc_registry_target: str,
+    ngc_registry_version: str,
+    ngc_org: str,
+    ngc_team: Optional[str] = None,
+    dest: Optional[str] = '.',
+    exclude: Optional[str] = None,
+    expected_checksum: Optional[str] = None,
+    file: Optional[str] = None,
+    format_type: Optional[str] = None,
+    debug: bool = False,
+) -> str:
     """
     Downloads data from NGC registry. Please refer to the documentation for more details:
     https://docs.ngc.nvidia.com/cli/cmd_registry.html
@@ -582,7 +586,7 @@ def download_registry_from_ngc(ngc_registry_target: str,
         path to the folder where dataset is downloaded
     """
 
-    download_cmd = f'ngc registry resource download-version '
+    download_cmd = 'ngc registry resource download-version '
 
     if dest:
         download_cmd += f'--dest {dest} '
@@ -596,7 +600,7 @@ def download_registry_from_ngc(ngc_registry_target: str,
         download_cmd += '--debug '
 
     download_cmd += f'--org {ngc_org} '
-    
+
     target = ngc_org
     if ngc_team:
         download_cmd += f'--team {ngc_team} '
@@ -611,7 +615,7 @@ def download_registry_from_ngc(ngc_registry_target: str,
     download_file = True
     if expected_checksum and file_list:
         if len(file_list) > 1:
-            logging.info(f'Checksum verification not supported if resource contains more than one file.')
+            logging.info('Checksum verification not supported if resource contains more than one file.')
         else:
             file_name = file_list[0]
             download_dir = os.path.join(dest, f'{ngc_registry_target}_v{ngc_registry_version}')
@@ -627,21 +631,25 @@ def download_registry_from_ngc(ngc_registry_target: str,
     downloaded_file_list = os.listdir(download_dir)
 
     # TODO update logic if there is more than one downloaded file present
-    assert len(downloaded_file_list) == 1, AssertionError(f'Expected only one downloaded file got {len(downloaded_file_list)}.')
+    assert len(downloaded_file_list) == 1, AssertionError(
+        f'Expected only one downloaded file got {len(downloaded_file_list)}.'
+    )
     file_path = os.path.join(download_dir, downloaded_file_list[0])
     return file_path
 
 
-def download_dataset_from_ngc(ngc_dataset_id: int, 
-                              dest: Optional[str] = None, 
-                              dir: Optional[str] = None,
-                              exclude: Optional[str] = None, 
-                              file: Optional[str] = None,
-                              format_type: Optional[str] = None, 
-                              resume: Optional[str] = None,
-                              dry_run: bool = False, 
-                              debug: bool = False, 
-                              compress_file: bool = False) -> str:
+def download_dataset_from_ngc(
+    ngc_dataset_id: int,
+    dest: Optional[str] = None,
+    dir: Optional[str] = None,
+    exclude: Optional[str] = None,
+    file: Optional[str] = None,
+    format_type: Optional[str] = None,
+    resume: Optional[str] = None,
+    dry_run: bool = False,
+    debug: bool = False,
+    compress_file: bool = False,
+) -> str:
     """
     Downloads dataset from NGC. Please refer to the documentation for more details:
     https://docs.ngc.nvidia.com/cli/cmd_dataset.html
@@ -660,7 +668,7 @@ def download_dataset_from_ngc(ngc_dataset_id: int,
     Returns:
         path to the folder where dataset is downloaded
     """
-    cmd = f"ngc dataset download "
+    cmd = "ngc dataset download "
     if dest:
         cmd += f'--dest {dest} '
     if dir:

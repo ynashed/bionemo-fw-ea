@@ -13,11 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from pytorch_lightning import Callback
-
 from typing import List, Optional, Union
 
+from pytorch_lightning import Callback
+
 import bionemo.utils.callbacks
+
 
 __all__ = ["setup_callbacks"]
 
@@ -25,12 +26,12 @@ __all__ = ["setup_callbacks"]
 def _instantiate_callback(callback_cfg, parent_cfg, plugins: Optional[List] = None) -> Callback:
     """
     Instantiates callback
-    
+
     Params
         callback_cfg: Config for callback to be created with 'class' attribute
         parent_cfg: Global cfg dict
         plugins: Optional plugins to be passed to callback
-        
+
     Returns
         Instantiated class given in callback_cfg
     """
@@ -38,13 +39,14 @@ def _instantiate_callback(callback_cfg, parent_cfg, plugins: Optional[List] = No
     cb = lookup_or_use(bionemo.utils.callbacks, callback_class, callback_cfg, parent_cfg, plugins)
     return cb
 
+
 def _select_validation_callbacks(cfg) -> List:
     """
     Selects validation callbacks from config
-    
+
     Params
         cfg: Dict
-    
+
     Returns:
         List of selected validation callback config dicts
     """
@@ -53,14 +55,15 @@ def _select_validation_callbacks(cfg) -> List:
         valid_cbs = [cfg.model.dwnstr_task_validation.dataset]
     return valid_cbs
 
+
 def setup_callbacks(cfg, plugins: Optional[List] = None) -> List:
     """
     Sets up callbacks from cfg
-    
+
     Params
         cfg: Dict
         plugins: Optional plugins to be passed to callbacks
-        
+
     Returns
         List of Callbacks to be passed into Trainer
     """
@@ -69,6 +72,7 @@ def setup_callbacks(cfg, plugins: Optional[List] = None) -> List:
 
     callbacks = [_instantiate_callback(cb, cfg, plugins) for cb in callbacks]
     return callbacks
+
 
 def lookup_or_use(obj: object, attr: Union[str, object], *args, **kwargs):
     """Looks up an object from a module or returns the attribute if it is not a string"""

@@ -26,9 +26,11 @@ __version__ = '.'.join(map(str, VERSION[:3])) + ''.join(VERSION[3:])
 
 __package_name__ = 'bionemo'
 __contact_names__ = 'NVIDIA'
-__homepage__ = 'https://catalog.ngc.nvidia.com/orgs/nvidia/teams/clara/models/megamolbart' # FIXME GA
-__repository_url__ = 'https://github.com/NVIDIA/MegaMolBART' # FIXME GA
-__download_url__ = 'https://catalog.ngc.nvidia.com/orgs/nvidia/teams/clara/models/megamolbart' # FIXME GA
+__homepage__ = 'https://catalog.ngc.nvidia.com/orgs/nvidia/teams/clara/models/megamolbart'  # FIXME GA
+__repository_url__ = 'https://github.com/NVIDIA/MegaMolBART'  # FIXME GA
+__download_url__ = 'https://catalog.ngc.nvidia.com/orgs/nvidia/teams/clara/models/megamolbart'  # FIXME GA
 __description__ = 'BioNeMo, a library for large language models in drug discovery. Trainable with NeMo.'
 __license__ = 'Apache2'
-__keywords__ = 'drug discovery, cheminformatics, proeteomics, deep learning, machine learning, gpu, NeMo, nvidia, pytorch, torch'
+__keywords__ = (
+    'drug discovery, cheminformatics, proeteomics, deep learning, machine learning, gpu, NeMo, nvidia, pytorch, torch'
+)

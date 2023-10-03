@@ -1,5 +1,5 @@
 import time
-from typing import List, Dict, Tuple, Optional
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import torch
@@ -104,7 +104,9 @@ class PerfLoggingCallback(Callback):
         if len(timestamps_ms) > 1:
             for level in [90, 95, 99]:
                 stats.update({f"latency_{level}_{self.mode}": _round3(np.percentile(timestamps_ms, level))})
-                stats.update({f"latency_{level}_{self.mode}_total": _round3(np.percentile(timestamps_ms_total, level))})
+                stats.update(
+                    {f"latency_{level}_{self.mode}_total": _round3(np.percentile(timestamps_ms_total, level))}
+                )
         return stats
 
     @rank_zero_only
@@ -152,7 +154,7 @@ class SaveTrainerFinalMetricCallback(Callback):
 
     def on_train_end(self, trainer, pl_module):
         trainer_results = trainer.logged_metrics
-        logging.info(
-            f'Saving expected training results to {self.log_path}/{self.trainer_log_file}')
-        save_expected_training_results(self.log_path, self.trainer_log_file,
-                                       {k: trainer_results[k].item() for k in trainer_results.keys()})
+        logging.info(f'Saving expected training results to {self.log_path}/{self.trainer_log_file}')
+        save_expected_training_results(
+            self.log_path, self.trainer_log_file, {k: trainer_results[k].item() for k in trainer_results.keys()}
+        )

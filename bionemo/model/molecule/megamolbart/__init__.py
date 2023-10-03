@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .megamolbart_model import *
-from .physchem_finetuning import *
 from .infer import *
 from .megamolbart_downstream_retro import *
+from .megamolbart_model import *
+from .physchem_finetuning import *

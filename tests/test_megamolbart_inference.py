@@ -15,14 +15,21 @@
 
 import logging
 import os
-from contextlib import contextmanager
-from rdkit import Chem
 import pathlib
-from hydra import compose, initialize
+from contextlib import contextmanager
+
 import pytest
+from hydra import compose, initialize
+from rdkit import Chem
 
 from bionemo.model.molecule.megamolbart import MegaMolBARTInference
-from bionemo.utils.tests import BioNemoSearchPathConfig, register_searchpath_config_plugin, update_relative_config_dir, check_model_exists
+from bionemo.utils.tests import (
+    BioNemoSearchPathConfig,
+    check_model_exists,
+    register_searchpath_config_plugin,
+    update_relative_config_dir,
+)
+
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
@@ -38,9 +45,11 @@ _INFERER = None
 os.environ["PROJECT_MOUNT"] = os.environ.get("PROJECT_MOUNT", '/workspace/bionemo')
 THIS_FILE_DIR = pathlib.Path(os.path.abspath(__file__)).parent
 
-_SMIS = ['c1cc2ccccc2cc1',
-         'COc1cc2nc(N3CCN(C(=O)c4ccco4)CC3)nc(N)c2cc1OC',
-         'CC(=O)C(=O)N1CCC([C@H]2CCCCN2C(=O)c2ccc3c(n2)CCN(C(=O)OC(C)(C)C)C3)CC1']
+_SMIS = [
+    'c1cc2ccccc2cc1',
+    'COc1cc2nc(N3CCN(C(=O)c4ccco4)CC3)nc(N)c2cc1OC',
+    'CC(=O)C(=O)N1CCC([C@H]2CCCCN2C(=O)c2ccc3c(n2)CCN(C(=O)OC(C)(C)C)C3)CC1',
+]
 
 
 def get_cfg(prepend_config_path, config_name, config_path='conf'):
@@ -110,7 +119,7 @@ def test_hidden_to_smis():
         infered_smis = inferer.hiddens_to_seq(hidden_state, pad_masks)
         log.info(f'Input SMILES and Infered: {_SMIS}, {infered_smis}')
 
-        assert(len(infered_smis) == len(_SMIS))
+        assert len(infered_smis) == len(_SMIS)
 
         for smi, infered_smi in zip(_SMIS, infered_smis):
             log.info(f'Input and Infered:{smi},  {infered_smi}')
@@ -122,7 +131,7 @@ def test_hidden_to_smis():
             canonical_infered_smi = Chem.MolToSmiles(infer_mol, canonical=True)
             log.info(f'Canonical Input and Infered: {canonical_smi}, {canonical_infered_smi}')
 
-            assert(canonical_smi == canonical_infered_smi)
+            assert canonical_smi == canonical_infered_smi
 
 
 @pytest.mark.needs_gpu
@@ -133,7 +142,7 @@ def test_sample_greedy():
 
     with load_model(cfg) as inferer:
         samples = inferer.sample(
-            num_samples=3, 
+            num_samples=3,
             sampling_method="greedy-perturbate",
             scaled_radius=1,
             smis=_SMIS,
@@ -166,7 +175,7 @@ def test_sample_topk():
 
     with load_model(cfg) as inferer:
         samples = inferer.sample(
-            num_samples=3, 
+            num_samples=3,
             sampling_method="topkp-perturbate",
             scaled_radius=0,
             topk=4,
@@ -203,7 +212,7 @@ def test_sample_topp():
 
     with load_model(cfg) as inferer:
         samples = inferer.sample(
-            num_samples=3, 
+            num_samples=3,
             sampling_method="topkp-perturbate",
             scaled_radius=0,
             topk=0,
@@ -267,8 +276,10 @@ def test_beam_search():
 
         log.info('Valid Molecules' + "\n".join(valid_molecules))
 
-        log.info(f'Total samples = {len(samples_flat)} unique samples {len(set(samples_flat))} '
-                 f'valids {len(valid_molecules)}')
+        log.info(
+            f'Total samples = {len(samples_flat)} unique samples {len(set(samples_flat))} '
+            f'valids {len(valid_molecules)}'
+        )
 
         if len(valid_molecules) < len(samples_flat) * 0.3:
             log.warning("TOO FEW VALID SAMPLES")

@@ -14,10 +14,10 @@
 # limitations under the License.
 
 
-
 from typing import List
 
 from bionemo.model.core.infer import BaseEncoderDecoderInference
+
 
 class ProtT5nvInference(BaseEncoderDecoderInference):
     '''
@@ -25,12 +25,19 @@ class ProtT5nvInference(BaseEncoderDecoderInference):
     '''
 
     def __init__(self, cfg, model=None, freeze=True, restore_path=None, training=False, adjust_config=True):
-        super().__init__(cfg=cfg, model=model, freeze=freeze, restore_path=restore_path, training=training, adjust_config=adjust_config)
+        super().__init__(
+            cfg=cfg,
+            model=model,
+            freeze=freeze,
+            restore_path=restore_path,
+            training=training,
+            adjust_config=adjust_config,
+        )
 
     def _tokenize(self, sequences: List[str]):
         """
         ProtT5 expects input/output format:
-        
+
         encoder input ids - [tokens] (without <BOS> and <EOS>)
         decoder input ids - <BOS> + [tokens]
         decoder output ids - [tokens] + <EOS>
@@ -45,7 +52,7 @@ class ProtT5nvInference(BaseEncoderDecoderInference):
         Transforms Sequences into hidden state.
         Should be implemented in a child class, since it is model specific.
         This method returns hidden states and masks.
-        Hiddens states contain paddings but do not contain special tokens 
+        Hiddens states contain paddings but do not contain special tokens
         such as <BOS> and <EOS> tokens.
 
         Args:

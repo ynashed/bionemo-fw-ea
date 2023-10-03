@@ -13,19 +13,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import pytest
 import os
-from hydra import initialize, compose
-from omegaconf.omegaconf import open_dict
+
+import pytest
+from hydra import compose, initialize
+
 from bionemo.model.dna.dnabert import DNABERTModel
 from bionemo.model.utils import setup_trainer
+
 
 @pytest.mark.slow
 @pytest.mark.needs_gpu
 def test_dnabert_fast_dev_run():
-
-    os.environ["PROJECT_MOUNT"] = os.environ.get(
-        "PROJECT_MOUNT", '/workspace/bionemo')
+    os.environ["PROJECT_MOUNT"] = os.environ.get("PROJECT_MOUNT", '/workspace/bionemo')
 
     with initialize(config_path="./conf"):
         cfg = compose(config_name="dnabert_test")

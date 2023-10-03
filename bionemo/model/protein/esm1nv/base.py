@@ -1,18 +1,16 @@
 # Own imports
-from nemo.collections.nlp.modules.common.megatron.language_model import (
-    Embedding,
-    TransformerLanguageModel,
-)
-from nemo.collections.nlp.models.language_modeling.megatron.bert_model import BertModel
-from nemo.collections.nlp.models.language_modeling.megatron_bert_model import MegatronBertModel
-from bionemo.model.protein.esm1nv.transformer import ESMnvParallelTransformer
 # Imports needed for redefinition of TransformerLanguageModel
 import torch
-
-from nemo.collections.nlp.modules.common.megatron.language_model import Pooler
+from nemo.collections.nlp.models.language_modeling.megatron.bert_model import BertModel
+from nemo.collections.nlp.models.language_modeling.megatron_bert_model import MegatronBertModel
 from nemo.collections.nlp.modules.common.megatron.adapters.parallel_adapters import (
     AdapterName,
     PromptEncoderAdapterConfig,
+)
+from nemo.collections.nlp.modules.common.megatron.language_model import (
+    Embedding,
+    Pooler,
+    TransformerLanguageModel,
 )
 from nemo.collections.nlp.modules.common.megatron.layer_type import LayerType
 from nemo.collections.nlp.modules.common.megatron.position_embedding import (
@@ -30,13 +28,15 @@ from nemo.collections.nlp.modules.common.megatron.utils import (
 )
 from nemo.collections.nlp.parts import utils_funcs
 
+from bionemo.model.protein.esm1nv.transformer import ESMnvParallelTransformer
+
+
 try:
     from apex.transformer.enums import AttnMaskType
 
     HAVE_APEX = True
 
 except (ImportError, ModuleNotFoundError):
-
     HAVE_APEX = False
 
     # fake missing classes with None attributes
@@ -49,7 +49,6 @@ try:
     HAVE_MEGATRON_CORE = True
 
 except (ImportError, ModuleNotFoundError):
-
     ModelParallelConfig = ApexGuardDefaults
 
     HAVE_MEGATRON_CORE = False
@@ -63,13 +62,13 @@ from nemo.collections.nlp.modules.common.megatron.utils import (
 
 class ESMnvEmbedding(Embedding):
     def __init__(
-            self,
-            *args,
-            token_dropout=False,
-            use_attention_mask=False,
-            mask_token_id=None,
-            **kwargs,
-            ):
+        self,
+        *args,
+        token_dropout=False,
+        use_attention_mask=False,
+        mask_token_id=None,
+        **kwargs,
+    ):
         super(ESMnvEmbedding, self).__init__(*args, **kwargs)
         self.token_dropout = token_dropout
         self.use_attention_mask = use_attention_mask
@@ -78,12 +77,12 @@ class ESMnvEmbedding(Embedding):
         self.mask_token_id = mask_token_id
 
     def forward(
-            self,
-            input_ids,
-            position_ids=None,
-            token_type_ids=None,
-            attention_mask=None,
-            ):
+        self,
+        input_ids,
+        position_ids=None,
+        token_type_ids=None,
+        attention_mask=None,
+    ):
         words_embeddings = self.word_embeddings(input_ids)
 
         # BIONEMO: add custom logic for attention masking and token dropout
@@ -97,9 +96,9 @@ class ESMnvEmbedding(Embedding):
             src_lengths = embeddings_mask.sum(-1)
             is_mask_token = input_ids == self.mask_token_id
             mask_ratio_observed = (is_mask_token).sum(-1).float() / src_lengths
-            words_embeddings = (words_embeddings * (1 - mask_ratio_train) / (1 - mask_ratio_observed)[:, None, None]).to(
-                words_embeddings.dtype
-            )
+            words_embeddings = (
+                words_embeddings * (1 - mask_ratio_train) / (1 - mask_ratio_observed)[:, None, None]
+            ).to(words_embeddings.dtype)
         # END BIONEMO
 
         if self.position_embedding_type == 'learned_absolute':
@@ -136,6 +135,7 @@ class ESMnvEmbedding(Embedding):
             embeddings = self.embedding_dropout(embeddings)
 
         return embeddings
+
 
 class ESMnvTransformerLanguageModel(TransformerLanguageModel):
     # BIONEMO: This is copy/paste/edited from NeMo. Parts that are
@@ -233,7 +233,6 @@ class ESMnvTransformerLanguageModel(TransformerLanguageModel):
         self.sequence_parallel = sequence_parallel
         self.dtype = utils_funcs.dtype_from_precision(precision, megatron_amp_O2)
         if kv_channels is None:
-
             assert (
                 hidden_size % num_attention_heads == 0
             ), 'hidden_size must be divisible by num_attention_heads if kv_channels is None'
@@ -292,7 +291,7 @@ class ESMnvTransformerLanguageModel(TransformerLanguageModel):
                 num_attention_heads_kerple=None,
                 max_seq_len=max_position_embeddings,
             )
-            assert use_flash_attention == False  # flash-attention not supported with kerple at this point
+            assert use_flash_attention is False  # flash-attention not supported with kerple at this point
 
         elif position_embedding_type == 'sandwich':
             self.encoder_relative_position_embedding = SandwichRelativePositionEmbedding(
@@ -448,7 +447,9 @@ class ESMnvTransformerLanguageModel(TransformerLanguageModel):
         # Embeddings.
         if self.pre_process and encoder_input is None:
             # BIONEMO: add attn_mask to embeddings call
-            encoder_input = self.embedding(enc_input_ids, enc_position_ids, token_type_ids=token_type_ids, attention_mask=enc_attn_mask)
+            encoder_input = self.embedding(
+                enc_input_ids, enc_position_ids, token_type_ids=token_type_ids, attention_mask=enc_attn_mask
+            )
             if self.is_adapter_available():
                 _sq, _bs, _hs = encoder_input.size()
                 ptuning_adapter = self.get_adapter_module(AdapterName.PTUNING_ADAPTER)
@@ -488,7 +489,8 @@ class ESMnvTransformerLanguageModel(TransformerLanguageModel):
             or self.position_embedding_type == 'kerple'
         ):
             encoder_self_attention_relative_position_bias = self.encoder_relative_position_embedding(
-                query_seq_length=enc_seq_length, key_seq_length=enc_seq_length,
+                query_seq_length=enc_seq_length,
+                key_seq_length=enc_seq_length,
             )
             # causal attention bias: [1, head, 1, k]
             # non-causal attention bias: [1, head, q, k]
@@ -708,6 +710,7 @@ def esm_get_language_model(
     language_model_key = 'language_model'
 
     return language_model, language_model_key
+
 
 class ESMnvBertModel(BertModel):
     def __init__(

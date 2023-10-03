@@ -19,40 +19,53 @@ from typing import List
 
 import numpy as np
 import torch
-
-from bionemo.data.equidock.protein_utils import rigid_transform_Kabsch_3D_torch, rigid_transform_Kabsch_3D
 from torchmetrics import Metric
+
+from bionemo.data.equidock.protein_utils import rigid_transform_Kabsch_3D, rigid_transform_Kabsch_3D_torch
+
 
 __all__ = ['Meter_Unbound_Bound', 'Torchmetrics_Unbound_Bound']
 
 
 def metrics_statistics(metrics_lst: List[Metric], dataset_type: str = 'val'):
     if len(metrics_lst) != 3:
-        raise ValueError(
-            f"len of metrics should be 3, but it is {len(metrics_lst)}!")
+        raise ValueError(f"len of metrics should be 3, but it is {len(metrics_lst)}!")
 
+    complex_rmsd_tensors, ligand_rmsd_tensors, receptor_rmsd_tensors = (metrics_lst[i].compute() for i in range(3))
     complex_rmsd_tensors, ligand_rmsd_tensors, receptor_rmsd_tensors = (
-        metrics_lst[i].compute() for i in range(3))
-    complex_rmsd_tensors, ligand_rmsd_tensors, receptor_rmsd_tensors = complex_rmsd_tensors.view(
-        -1), ligand_rmsd_tensors.view(-1), receptor_rmsd_tensors.view(-1)
+        complex_rmsd_tensors.view(-1),
+        ligand_rmsd_tensors.view(-1),
+        receptor_rmsd_tensors.view(-1),
+    )
 
-    complex_rmsd_mean, ligand_rmsd_mean, receptor_rmsd_mean = complex_rmsd_tensors.mean(
-    ), ligand_rmsd_tensors.mean(), receptor_rmsd_tensors.mean()
-    complex_rmsd_median, ligand_rmsd_median, receptor_rmsd_median = complex_rmsd_tensors.median(
-    ), ligand_rmsd_tensors.median(), receptor_rmsd_tensors.median()
-    complex_rmsd_std, ligand_rmsd_std, receptor_rmsd_std = complex_rmsd_tensors.std(
-    ), ligand_rmsd_tensors.std(), receptor_rmsd_tensors.std()
+    complex_rmsd_mean, ligand_rmsd_mean, receptor_rmsd_mean = (
+        complex_rmsd_tensors.mean(),
+        ligand_rmsd_tensors.mean(),
+        receptor_rmsd_tensors.mean(),
+    )
+    complex_rmsd_median, ligand_rmsd_median, receptor_rmsd_median = (
+        complex_rmsd_tensors.median(),
+        ligand_rmsd_tensors.median(),
+        receptor_rmsd_tensors.median(),
+    )
+    complex_rmsd_std, ligand_rmsd_std, receptor_rmsd_std = (
+        complex_rmsd_tensors.std(),
+        ligand_rmsd_tensors.std(),
+        receptor_rmsd_tensors.std(),
+    )
 
-    rmsd_log = {dataset_type + '_ligand_rmsd_mean': ligand_rmsd_mean.cpu().detach(),
-                dataset_type + '_receptor_rmsd_mean': receptor_rmsd_mean.cpu().detach(),
-                dataset_type + '_complex_rmsd_mean': complex_rmsd_mean.cpu().detach(),
-                dataset_type + '_complex_rmsd_median': complex_rmsd_median.cpu().detach(),
-                dataset_type + '_ligand_rmsd_median': ligand_rmsd_median.cpu().detach(),
-                dataset_type + '_receptor_rmsd_median': receptor_rmsd_median.cpu().detach(),
-                dataset_type + '_complex_rmsd_std': complex_rmsd_std.cpu().detach(),
-                dataset_type + '_ligand_rmsd_std': ligand_rmsd_std.cpu().detach(),
-                dataset_type + '_receptor_rmsd_std': receptor_rmsd_std.cpu().detach(),
-                dataset_type + '_shape': complex_rmsd_tensors.shape[0], }
+    rmsd_log = {
+        dataset_type + '_ligand_rmsd_mean': ligand_rmsd_mean.cpu().detach(),
+        dataset_type + '_receptor_rmsd_mean': receptor_rmsd_mean.cpu().detach(),
+        dataset_type + '_complex_rmsd_mean': complex_rmsd_mean.cpu().detach(),
+        dataset_type + '_complex_rmsd_median': complex_rmsd_median.cpu().detach(),
+        dataset_type + '_ligand_rmsd_median': ligand_rmsd_median.cpu().detach(),
+        dataset_type + '_receptor_rmsd_median': receptor_rmsd_median.cpu().detach(),
+        dataset_type + '_complex_rmsd_std': complex_rmsd_std.cpu().detach(),
+        dataset_type + '_ligand_rmsd_std': ligand_rmsd_std.cpu().detach(),
+        dataset_type + '_receptor_rmsd_std': receptor_rmsd_std.cpu().detach(),
+        dataset_type + '_shape': complex_rmsd_tensors.shape[0],
+    }
 
     for i in range(3):
         metrics_lst[i].reset()
@@ -80,20 +93,16 @@ def rmsd_compute(ligand_coors_pred, receptor_coors_pred, ligand_coors_true, rece
     ligand_coors_true = ligand_coors_true.detach()
     receptor_coors_true = receptor_coors_true.detach()
 
-    ligand_rmsd = torch.sqrt(
-        ((ligand_coors_pred - ligand_coors_true) ** 2).sum(dim=1).mean())
-    receptor_rmsd = torch.sqrt(
-        ((receptor_coors_pred - receptor_coors_true) ** 2).sum(dim=1).mean())
+    ligand_rmsd = torch.sqrt(((ligand_coors_pred - ligand_coors_true) ** 2).sum(dim=1).mean())
+    receptor_rmsd = torch.sqrt(((receptor_coors_pred - receptor_coors_true) ** 2).sum(dim=1).mean())
 
     complex_coors_pred = torch.cat([ligand_coors_pred, receptor_coors_pred], 0)
     complex_coors_true = torch.cat([ligand_coors_true, receptor_coors_true], 0)
 
-    R, b = rigid_transform_Kabsch_3D_torch(
-        complex_coors_pred.T, complex_coors_true.T)
+    R, b = rigid_transform_Kabsch_3D_torch(complex_coors_pred.T, complex_coors_true.T)
     complex_coors_pred_aligned = ((R @ complex_coors_pred.T) + b).T
 
-    complex_rmsd = torch.sqrt(
-        ((complex_coors_pred_aligned - complex_coors_true) ** 2).sum(dim=1).mean())
+    complex_rmsd = torch.sqrt(((complex_coors_pred_aligned - complex_coors_true) ** 2).sum(dim=1).mean())
 
     return complex_rmsd, ligand_rmsd, receptor_rmsd
 
@@ -101,15 +110,12 @@ def rmsd_compute(ligand_coors_pred, receptor_coors_pred, ligand_coors_true, rece
 class Torchmetrics_Unbound_Bound(Metric):
     def __init__(self):
         super().__init__()
-        self.add_state("complex_rmsd_list",
-                       default=torch.tensor(0.), dist_reduce_fx="sum")
-        self.add_state("ligand_rmsd_list", default=torch.tensor(
-            0.), dist_reduce_fx="sum")
-        self.add_state("receptor_rmsd_list",
-                       default=torch.tensor(0.), dist_reduce_fx="sum")
+        self.add_state("complex_rmsd_list", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state("ligand_rmsd_list", default=torch.tensor(0.0), dist_reduce_fx="sum")
+        self.add_state("receptor_rmsd_list", default=torch.tensor(0.0), dist_reduce_fx="sum")
         self.add_state("total", default=torch.tensor(0), dist_reduce_fx="sum")
 
-    def update(self,  complex_rmsd, ligand_rmsd, receptor_rmsd):
+    def update(self, complex_rmsd, ligand_rmsd, receptor_rmsd):
         self.complex_rmsd_list += torch.tensor(complex_rmsd)
         self.ligand_rmsd_list += torch.tensor(ligand_rmsd)
         self.receptor_rmsd_list += torch.tensor(receptor_rmsd)
@@ -127,7 +133,11 @@ class Torchmetrics_Unbound_Bound(Metric):
         sum_ligand_rmsd_list = self.ligand_rmsd_list.float()
         sum_receptor_rmsd_list = self.receptor_rmsd_list.float()
 
-        return sum_complex_rmsd_list / self.total, sum_ligand_rmsd_list / self.total, sum_receptor_rmsd_list / self.total
+        return (
+            sum_complex_rmsd_list / self.total,
+            sum_ligand_rmsd_list / self.total,
+            sum_receptor_rmsd_list / self.total,
+        )
 
 
 class Meter_Unbound_Bound(object):
@@ -142,29 +152,22 @@ class Meter_Unbound_Bound(object):
         self.receptor_rmsd_list = []
 
     def update_rmsd(self, ligand_coors_pred, receptor_coors_pred, ligand_coors_true, receptor_coors_true):
-
         ligand_coors_pred = ligand_coors_pred.detach().cpu().numpy()
         receptor_coors_pred = receptor_coors_pred.detach().cpu().numpy()
 
         ligand_coors_true = ligand_coors_true.detach().cpu().numpy()
         receptor_coors_true = receptor_coors_true.detach().cpu().numpy()
 
-        ligand_rmsd = np.sqrt(
-            np.mean(np.sum((ligand_coors_pred - ligand_coors_true) ** 2, axis=1)))
-        receptor_rmsd = np.sqrt(
-            np.mean(np.sum((receptor_coors_pred - receptor_coors_true) ** 2, axis=1)))
+        ligand_rmsd = np.sqrt(np.mean(np.sum((ligand_coors_pred - ligand_coors_true) ** 2, axis=1)))
+        receptor_rmsd = np.sqrt(np.mean(np.sum((receptor_coors_pred - receptor_coors_true) ** 2, axis=1)))
 
-        complex_coors_pred = np.concatenate(
-            (ligand_coors_pred, receptor_coors_pred), axis=0)
-        complex_coors_true = np.concatenate(
-            (ligand_coors_true, receptor_coors_true), axis=0)
+        complex_coors_pred = np.concatenate((ligand_coors_pred, receptor_coors_pred), axis=0)
+        complex_coors_true = np.concatenate((ligand_coors_true, receptor_coors_true), axis=0)
 
-        R, b = rigid_transform_Kabsch_3D(
-            complex_coors_pred.T, complex_coors_true.T)
+        R, b = rigid_transform_Kabsch_3D(complex_coors_pred.T, complex_coors_true.T)
         complex_coors_pred_aligned = ((R @ complex_coors_pred.T) + b).T
 
-        complex_rmsd = np.sqrt(
-            np.mean(np.sum((complex_coors_pred_aligned - complex_coors_true) ** 2, axis=1)))
+        complex_rmsd = np.sqrt(np.mean(np.sum((complex_coors_pred_aligned - complex_coors_true) ** 2, axis=1)))
 
         self.complex_rmsd_list.append(complex_rmsd)
         self.ligand_rmsd_list.append(ligand_rmsd)
@@ -192,8 +195,7 @@ class Meter_Unbound_Bound(object):
             receptor_rmsd_array = np.array(self.receptor_rmsd_list)
             receptor_rmsd_summarized = np.median(receptor_rmsd_array)
         else:
-            raise ValueError(
-                "Meter_Unbound_Bound: reduction_rmsd mis specified!")
+            raise ValueError("Meter_Unbound_Bound: reduction_rmsd mis specified!")
         return ligand_rmsd_summarized, receptor_rmsd_summarized, complex_rmsd_summarized
 
     def summarize_with_std(self, reduction_rmsd='median'):
@@ -203,6 +205,5 @@ class Meter_Unbound_Bound(object):
         elif reduction_rmsd == 'median':
             complex_rmsd_summarized = np.median(complex_rmsd_array)
         else:
-            raise ValueError(
-                "Meter_Unbound_Bound: reduction_rmsd mis specified!")
+            raise ValueError("Meter_Unbound_Bound: reduction_rmsd mis specified!")
         return complex_rmsd_summarized, np.std(complex_rmsd_array)

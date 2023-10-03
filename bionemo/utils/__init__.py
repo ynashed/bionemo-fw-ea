@@ -13,10 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .connectors import *
 from collections import defaultdict
 from dataclasses import asdict
 from typing import Union
+
+from .connectors import *
 
 
 def update_dataclass_config(cfg, dataset_config_class):
@@ -34,6 +35,7 @@ def flatten_dict(list_of_dicts):
             flattened_dict[metric_name].append(metric_value)
 
     return flattened_dict
+
 
 def lookup_or_use(obj: object, attr: Union[str, object], *args, **kwargs):
     """Looks up an object from a module or returns the attribute if it is not a string"""

@@ -13,21 +13,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from functools import lru_cache
+
 import torch
 import torch.nn as nn
-import bionemo.utils
-from functools import lru_cache
 from nemo.utils.model_utils import import_class_by_path
+
+import bionemo.utils
+from bionemo.data.datasets.single_value_dataset import SingleValueDataModule
 from bionemo.model.core import MLPModel
 from bionemo.model.core.encoder_finetuning import EncoderFineTuning
-from bionemo.data.datasets.single_value_dataset import SingleValueDataModule
+
 
 class FineTuneMegaMolBART(EncoderFineTuning):
-
     def __init__(self, cfg, trainer):
         self.full_cfg = cfg
         self.encoder_frozen = self.full_cfg.model.encoder_frozen
-        super().__init__(cfg.model, trainer=trainer) 
+        super().__init__(cfg.model, trainer=trainer)
         self.batch_target_name = self.cfg.data.target_column
 
     def configure_optimizers(self):
@@ -42,20 +44,26 @@ class FineTuneMegaMolBART(EncoderFineTuning):
         return bionemo.utils.lookup_or_use(torch.nn, self.cfg.downstream_task.loss_func)
 
     def build_task_head(self):
-        regressor = MLPModel(layer_sizes=[self.encoder_model.cfg.model.hidden_size, self.cfg.downstream_task.hidden_layer_size, self.cfg.downstream_task.n_outputs],
+        regressor = MLPModel(
+            layer_sizes=[
+                self.encoder_model.cfg.model.hidden_size,
+                self.cfg.downstream_task.hidden_layer_size,
+                self.cfg.downstream_task.n_outputs,
+            ],
             dropout=0.1,
         )
-        #return regressor
+        # return regressor
         task_head = nn.Sequential(regressor, nn.Flatten(start_dim=0))
         return task_head
 
     def setup_encoder_model(self, cfg, trainer):
         infer_class = import_class_by_path(self.full_cfg.infer_target)
         pretrained_model = infer_class(
-            self.full_cfg, 
-            freeze=self.encoder_frozen, 
+            self.full_cfg,
+            freeze=self.encoder_frozen,
             restore_path=self.full_cfg.restore_from_path,
-            training=not self.cfg.encoder_frozen)
+            training=not self.cfg.encoder_frozen,
+        )
         return pretrained_model
 
     # the lru cache is kind of a hacky way to make sure this isn't set up if
@@ -66,9 +74,7 @@ class FineTuneMegaMolBART(EncoderFineTuning):
             model = self.encoder_model
         else:
             model = None
-        self.data_module = SingleValueDataModule(
-            self.cfg, self.trainer, model=model
-        )
+        self.data_module = SingleValueDataModule(self.cfg, self.trainer, model=model)
 
     def on_fit_start(self):
         self.build_train_valid_test_datasets()
@@ -87,9 +93,9 @@ class FineTuneMegaMolBART(EncoderFineTuning):
         return enc_output
 
     def extract_for_task_head(self, input_tensor):
-        #NOTE investigate using mixed precision to remove need for float casting; maybe use setup_trainer method
+        # NOTE investigate using mixed precision to remove need for float casting; maybe use setup_trainer method
         return input_tensor.float()
-    
+
     def get_target_from_batch(self, batch):
         ret = batch['target']
 

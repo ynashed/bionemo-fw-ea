@@ -14,15 +14,16 @@
 # limitations under the License.
 
 
-from omegaconf.omegaconf import OmegaConf
 from nemo.core.config import hydra_runner
 from nemo.utils import logging
+from omegaconf.omegaconf import OmegaConf
 
-from bionemo.model.molecule.megamolbart import MegaMolBARTModel
 from bionemo.data import Zinc15Preprocess
+from bionemo.model.molecule.megamolbart import MegaMolBARTModel
 from bionemo.model.utils import setup_trainer
-from bionemo.utils.callbacks.callback_utils import setup_callbacks
 from bionemo.utils import BioNeMoSaveRestoreConnector
+from bionemo.utils.callbacks.callback_utils import setup_callbacks
+
 
 @hydra_runner(config_path="conf", config_name="pretrain_xsmall_span_aug")
 def main(cfg) -> None:
@@ -32,7 +33,7 @@ def main(cfg) -> None:
     callbacks = setup_callbacks(cfg)
 
     trainer = setup_trainer(cfg, callbacks=callbacks)
-    
+
     logging.info("************** Model parameters and their sizes ***********")
 
     if cfg.do_training:
@@ -40,8 +41,7 @@ def main(cfg) -> None:
         if cfg.restore_from_path:
             logging.info("\nRestoring model from .nemo file " + cfg.restore_from_path)
             model = MegaMolBARTModel.restore_from(
-                cfg.restore_from_path, cfg.model, trainer=trainer,
-                save_restore_connector=BioNeMoSaveRestoreConnector()
+                cfg.restore_from_path, cfg.model, trainer=trainer, save_restore_connector=BioNeMoSaveRestoreConnector()
             )
         else:
             model = MegaMolBARTModel(cfg.model, trainer)
@@ -55,10 +55,11 @@ def main(cfg) -> None:
     else:
         logging.info("************** Starting Data PreProcessing ***********")
         preproc = Zinc15Preprocess(root_directory=cfg.model.data.dataset_path)
-        preproc.prepare_dataset(links_file=cfg.model.data.links_file,
-                                max_smiles_length=cfg.model.seq_length,
-                                output_dir=cfg.model.data.dataset_path,
-                                )
+        preproc.prepare_dataset(
+            links_file=cfg.model.data.links_file,
+            max_smiles_length=cfg.model.seq_length,
+            output_dir=cfg.model.data.dataset_path,
+        )
 
     if cfg.do_testing:
         logging.info("************** Starting Testing ***********")

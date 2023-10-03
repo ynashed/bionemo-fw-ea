@@ -13,17 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
 import grpc
 import torch
-import logging
-from megamolbart_pb2_grpc import GenerativeSamplerStub
 from megamolbart_pb2 import InputSpec
+from megamolbart_pb2_grpc import GenerativeSamplerStub
+
 
 log = logging.getLogger(__name__)
 
 
-class InferenceWrapper():
-
+class InferenceWrapper:
     def __init__(self):
         channel = grpc.insecure_channel('localhost:50051')
         self.stub = GenerativeSamplerStub(channel)
@@ -50,10 +51,7 @@ class InferenceWrapper():
 
     def hidden_to_smis(self, hidden_states, masks):
         dim = hidden_states.shape
-        spec = InputSpec(hidden_states=hidden_states.flatten().tolist(),
-                         dim=dim,
-                         masks=masks.flatten().tolist())
+        spec = InputSpec(hidden_states=hidden_states.flatten().tolist(), dim=dim, masks=masks.flatten().tolist())
 
         resp = self.stub.HiddenToSmis(spec)
         return resp.smis
-

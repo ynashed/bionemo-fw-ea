@@ -4,19 +4,22 @@ import os
 import pytest
 import pytorch_lightning as pl
 import torch
-from omegaconf.omegaconf import open_dict, OmegaConf
+from omegaconf.omegaconf import OmegaConf, open_dict
 
 from bionemo.data.molecule import MoleculeEnumeration
 from bionemo.model.molecule.megamolbart.megamolbart_model import MegaMolBARTModel
-from bionemo.model.utils import setup_trainer, initialize_model_parallel
-from bionemo.utils.tests import clean_directory, save_expected_training_results, load_expected_training_results
+from bionemo.model.utils import initialize_model_parallel, setup_trainer
+from bionemo.utils.tests import clean_directory, load_expected_training_results, save_expected_training_results
 from tests.test_megamolbart_inference import get_cfg
+
 
 logger = logging.getLogger(__name__)
 
-_SMIS = ['c1cc2ccccc2cc1',
-         'COc1cc2nc(N3CCN(C(=O)c4ccco4)CC3)nc(N)c2cc1OC',
-         'CC(=O)C(=O)N1CCC([C@H]2CCCCN2C(=O)c2ccc3c(n2)CCN(C(=O)OC(C)(C)C)C3)CC1']
+_SMIS = [
+    'c1cc2ccccc2cc1',
+    'COc1cc2nc(N3CCN(C(=O)c4ccco4)CC3)nc(N)c2cc1OC',
+    'CC(=O)C(=O)N1CCC([C@H]2CCCCN2C(=O)c2ccc3c(n2)CCN(C(=O)OC(C)(C)C)C3)CC1',
+]
 _BEAM_SIZE = 5
 _BEAM_ALPHA = 0
 
@@ -76,15 +79,17 @@ def test_megamolbart_greedy_beam_search():
     model = MegaMolBARTModel(cfg.model, trainer)
     initialize_model_parallel(model)
 
-    collate_fn = MoleculeEnumeration(tokenizer=model.tokenizer, seq_length=model._cfg.seq_length,
-                                     pad_size_divisible_by_8=True, **model._cfg.data).collate_fn
+    collate_fn = MoleculeEnumeration(
+        tokenizer=model.tokenizer, seq_length=model._cfg.seq_length, pad_size_divisible_by_8=True, **model._cfg.data
+    ).collate_fn
     batch = collate_fn(_SMIS)
     tokens_enc, _, _, _, enc_mask, _ = model.process_global_batch(batch)
     _NUM_TOKENS_TO_GENERATE = cfg.model.max_position_embeddings
 
     if not UPDATE_EXPECTED_RESULTS and COMPARE_EXPECTED_RESULTS:
-        outputs = load_expected_training_results(results_comparison_dir=CORRECT_RESULTS_DIR,
-                                                 correct_results=CORRECT_RESULTS, format='pickle')
+        outputs = load_expected_training_results(
+            results_comparison_dir=CORRECT_RESULTS_DIR, correct_results=CORRECT_RESULTS, format='pickle'
+        )
         weights = outputs['weights']
         model.load_state_dict(weights)
         for key in weights.keys():
@@ -106,23 +111,34 @@ def test_megamolbart_greedy_beam_search():
     preds, logits = model.decode(tokens_enc, enc_mask, _NUM_TOKENS_TO_GENERATE)
 
     sampling_method = 'beam-search'
-    preds_beam1, logits_beam1 = model.decode(tokens_enc, enc_mask, _NUM_TOKENS_TO_GENERATE,
-                                             sampling_method=sampling_method,
-                                             sampling_kwargs={'beam_size': 1, 'beam_alpha': 0})
+    preds_beam1, logits_beam1 = model.decode(
+        tokens_enc,
+        enc_mask,
+        _NUM_TOKENS_TO_GENERATE,
+        sampling_method=sampling_method,
+        sampling_kwargs={'beam_size': 1, 'beam_alpha': 0},
+    )
 
-    preds_beam, logits_beam, scores_beam = model.decode(tokens_enc, enc_mask, _NUM_TOKENS_TO_GENERATE,
-                                                        sampling_method=sampling_method,
-                                                        sampling_kwargs={'beam_size': _BEAM_SIZE,
-                                                                         'beam_alpha': _BEAM_ALPHA,
-                                                                         'return_scores': True},
-                                                        )
+    preds_beam, logits_beam, scores_beam = model.decode(
+        tokens_enc,
+        enc_mask,
+        _NUM_TOKENS_TO_GENERATE,
+        sampling_method=sampling_method,
+        sampling_kwargs={'beam_size': _BEAM_SIZE, 'beam_alpha': _BEAM_ALPHA, 'return_scores': True},
+    )
 
-    preds_beam_best, logits_beam_best, scores_beam_best = model.decode(tokens_enc, enc_mask, _NUM_TOKENS_TO_GENERATE,
-                                                                       sampling_method=sampling_method,
-                                                                       sampling_kwargs={'beam_size': _BEAM_SIZE,
-                                                                                        'beam_alpha': _BEAM_ALPHA,
-                                                                                        'return_scores': True,
-                                                                                        'keep_only_best_tokens': True})
+    preds_beam_best, logits_beam_best, scores_beam_best = model.decode(
+        tokens_enc,
+        enc_mask,
+        _NUM_TOKENS_TO_GENERATE,
+        sampling_method=sampling_method,
+        sampling_kwargs={
+            'beam_size': _BEAM_SIZE,
+            'beam_alpha': _BEAM_ALPHA,
+            'return_scores': True,
+            'keep_only_best_tokens': True,
+        },
+    )
 
     preds = preds.cpu().detach()
     logits = logits.cpu().detach()
@@ -146,31 +162,45 @@ def test_megamolbart_greedy_beam_search():
 
     assert torch.all((scores_beam[:, :-1] - scores_beam[:, 1:]) >= 0)
     # num_smi_to_generate + 1 accounts for BOS token at the beginning of the decoding if no decoded tokens are provided
-    assert [int(x) for x in preds_beam.shape] == [len(_SMIS), _BEAM_SIZE, _NUM_TOKENS_TO_GENERATE + 1] \
-           and [int(x) for x in logits_beam.shape] == [len(_SMIS), _BEAM_SIZE, _NUM_TOKENS_TO_GENERATE] \
-           and [int(x) for x in scores_beam.shape] == [len(_SMIS), _BEAM_SIZE]
+    assert (
+        [int(x) for x in preds_beam.shape] == [len(_SMIS), _BEAM_SIZE, _NUM_TOKENS_TO_GENERATE + 1]
+        and [int(x) for x in logits_beam.shape] == [len(_SMIS), _BEAM_SIZE, _NUM_TOKENS_TO_GENERATE]
+        and [int(x) for x in scores_beam.shape] == [len(_SMIS), _BEAM_SIZE]
+    )
 
     if UPDATE_EXPECTED_RESULTS:
         weights = model.state_dict()
         logger.warning(f'Updating expected results in {CORRECT_RESULTS_DIR}/{CORRECT_RESULTS}')
-        outputs = {'seed': cfg.seed, 'smiles': _SMIS, 'num_tokens_to_generate': _NUM_TOKENS_TO_GENERATE,
-                   'beam_size': _BEAM_SIZE, 'beam_alpha': _BEAM_ALPHA,
-                   'greedy': {'predictions': preds, 'logits': logits},
-                   'beam': {'predictions': preds_beam, 'logits': logits_beam, 'scores': scores_beam},
-                   'weights': weights,
-                   'batch': batch
-                   }
-        save_expected_training_results(results_comparison_dir=CORRECT_RESULTS_DIR,
-                                       correct_results=CORRECT_RESULTS,
-                                       expected_results=outputs, file_format='pickle')
+        outputs = {
+            'seed': cfg.seed,
+            'smiles': _SMIS,
+            'num_tokens_to_generate': _NUM_TOKENS_TO_GENERATE,
+            'beam_size': _BEAM_SIZE,
+            'beam_alpha': _BEAM_ALPHA,
+            'greedy': {'predictions': preds, 'logits': logits},
+            'beam': {'predictions': preds_beam, 'logits': logits_beam, 'scores': scores_beam},
+            'weights': weights,
+            'batch': batch,
+        }
+        save_expected_training_results(
+            results_comparison_dir=CORRECT_RESULTS_DIR,
+            correct_results=CORRECT_RESULTS,
+            expected_results=outputs,
+            file_format='pickle',
+        )
 
     if not UPDATE_EXPECTED_RESULTS and COMPARE_EXPECTED_RESULTS:
-        assert [k in ['greedy', 'beam', 'seed', 'smiles', 'num_tokens_to_generate', 'beam_size', 'beam_alpha'] for k in
-                outputs.keys()]
-        assert all([outputs[k] == val for k, val in
-                    zip(['seed', 'smiles', 'num_tokens_to_generate', 'beam_size', 'beam_alpha'],
-                        [cfg.seed, _SMIS, _NUM_TOKENS_TO_GENERATE, _BEAM_SIZE, _BEAM_ALPHA])]), \
-            'Setup of the test does not match setup of the expected results'
+        assert [
+            k in ['greedy', 'beam', 'seed', 'smiles', 'num_tokens_to_generate', 'beam_size', 'beam_alpha']
+            for k in outputs.keys()
+        ]
+        assert all(
+            outputs[k] == val
+                for k, val in zip(
+                    ['seed', 'smiles', 'num_tokens_to_generate', 'beam_size', 'beam_alpha'],
+                    [cfg.seed, _SMIS, _NUM_TOKENS_TO_GENERATE, _BEAM_SIZE, _BEAM_ALPHA],
+                )
+        ), 'Setup of the test does not match setup of the expected results'
 
         assert torch.equal(outputs['greedy']['predictions'], preds)
         assert torch.equal(outputs['greedy']['logits'], logits)
