@@ -44,7 +44,7 @@ def main(cfg) -> None:
                 save_restore_connector=BioNeMoSaveRestoreConnector()
             )
         else:
-            model = esm1nv_model.ESM1nvModel(cfg.model, trainer)
+            model = esm1nv_model.ESM2nvModel(cfg.model, trainer)
         trainer.fit(model)
         logging.info("************** Finished Training ***********")
     else:
@@ -56,6 +56,9 @@ def main(cfg) -> None:
             cluster_mapping_tsv=cfg.model.data.cluster_mapping_tsv,
             uf50_output_dir=cfg.model.data.dataset_path,
             uf90_output_dir=cfg.model.data.uf90.uniref90_path,
+            # NOTE use defaults
+            val_size=50,
+            test_size=100,
             force=False
         )
 

@@ -86,6 +86,7 @@ model:
     drop_last: false
     pin_memory: false
     cluster_map_json_path: /data/uniref2022_05/fake-uniref/fake_uniref_cluster-mapping.json
+    force_regen_sample_mapping: true
     data_impl: csv_mmap
     data_impl_kwargs:
       csv_mmap:
@@ -98,6 +99,9 @@ model:
     use_upsampling: true
     seed: ${model.seed}
     max_seq_length: ${model.seq_length}
+    cluster_mapping_tsv: /data/uniref2022_05/fake-uniref/mapping.tsv
+    uf50_datapath: /data/uniref2022_05/fake-uniref/Fake50.fasta 
+    uf90_datapath: /data/uniref2022_05/fake-uniref/Fake90.fasta 
     dataset_path: /data/uniref2022_05/fake_uf_map
     dataset:
       train: x[000..049]
