@@ -1,4 +1,4 @@
-name: esm1nv
+name: esm2nv
 do_training: True # set to false if data preprocessing steps must be completed
 do_testing: False # set to true to run evaluation on test data after training, requires test_dataset section
 restore_from_path: null # used when starting from a .nemo file
@@ -161,13 +161,17 @@ model:
         data_col: 1 # 0-based
         header_lines: 1
         # Rest of these are inherited
-    cluster_map_json_path: /data/uniref2022_05/fake-uniref/fake_uniref_cluster-mapping.json
-    dataset_path: /data/uniref2022_05/fake_uf_map # parent directory for data, contains train / val / test folders. Needs to be writeable for index creation.
 
+    uf50_datapath: '/data/uniref202104_esm2/uniref50_train_filt.fasta'
+    uf90_datapath: '/data/uniref202104_esm2/uniref90_nonUR50seqs_membersandreps.fasta'
+    cluster_mapping_tsv: '/data/uniref202104_esm2/uniref50_mapper_to_uniref90clustermembers.tsv'
+
+    # TODO These need to be updated to values we actually like
+    dataset_path: /data/uniref2022_05/fake_uf_map # parent directory for data, contains train / val / test folders. Needs to be writeable for index creation.
     uf90:
-      uniref90_path: /data/uniref2022_05/fake_uf_map90 # created and populated my preprocessing
+      uniref90_path: /data/uniref2022_05/fake_uf_map90/ # created and populated my preprocessing
       dataset: 
-        uf90_csvs: x[000..049] # created and populated by preprocessing
+        uf90_csvs: x[000..049] # created and populated by preprocessing, this key is a directory inside uniref90_path
       data_impl: 'csv_fields_mmap'
       data_impl_kwargs:
         csv_fields_mmap:
@@ -183,6 +187,8 @@ model:
     use_upsampling: True # if the data should be upsampled to max number of steps in the training
     seed: ${model.seed} # Random seed
     max_seq_length: ${model.seq_length} # Maximum input sequence length. Longer sequences are truncated
+    modify_percent: 0.1 # Percentage of characters in a protein sequence to modify. (Modification means replacing with another amino acid or with a mask token)
+    perturb_percent: 0.5 # Of the modify_percent, what percentage of characters are to be replaced with another amino acid.
 
   
   dwnstr_task_validation:

@@ -18,10 +18,12 @@ import pyfastx
 import pathlib
 from nemo.utils import logging
 import os
+import json
 import requests
 import gzip
 import shutil
 from typing import Optional
+from multiprocessing import Pool
 
 from bionemo.data.utils import download_registry_from_ngc, get_ngc_registry_file_list, verify_checksum_matches
 
@@ -29,6 +31,7 @@ __all__ = ['UniRef50Preprocess']
 
 ROOT_DIR = '/tmp/uniref50'
 MD5_CHECKSUM = 'e619d3689749562d743f8ecf29a7a7c2'
+
 
 class UniRef50Preprocess(object):
     def __init__(self, root_directory: Optional[str] = ROOT_DIR, checksum: Optional[str] = MD5_CHECKSUM) -> None:
@@ -201,7 +204,8 @@ class UniRef50Preprocess(object):
         """CSV file writer for FASTA data
 
         Args:
-            fasta_indexer (pyfastx): Memory mapped index of UniRef50 FASTA file
+            fasta_indexer (Union[pyfastx, str]): Memory mapped index of UniRef50 FASTA file or name of fasta file to open. 
+                if intended to be use with multiprocessing.Pool, pass in a filename.
             record_id_list (Numpy array): array of file indexes for the splits
             file_index (int): Index number of the filename.
             split_name (str): Directory name for the split -- "train", "val", "test"
@@ -213,10 +217,11 @@ class UniRef50Preprocess(object):
         pathlib.Path(split_path).mkdir(parents=True, exist_ok=True)
         file_name = os.path.join(split_path, f'x{str(file_index).zfill(3)}.csv')
 
-        # TODO is this the right way to add this?
         if type(fasta_indexer) == str:
+            # NOTE pass a string if you want to use with Pool.map
             _idx = pyfastx.Fasta(fasta_indexer, build_index=True, uppercase=True, key_func=lambda x: x.split()[0][len("UniRef90_"):])
-        fasta_indexer = _idx
+            fasta_indexer = _idx
+
         with open(file_name, 'w') as fh:
             header_str = delimiter.join(['record_id', 'record_name', 'sequence_length', 'sequence'])
             fh.write(header_str + '\n')
@@ -276,7 +281,6 @@ class UniRef50Preprocess(object):
         if output_dir is None:
             output_dir = self.root_directory.joinpath('processed')
         os.makedirs(output_dir, exist_ok=True)
-
         if source == 'ngc':
             assert ngc_registry_target is not None
             assert ngc_registry_version is not None
@@ -305,3 +309,111 @@ class UniRef50Preprocess(object):
                                   num_csv_files=num_csv_files, 
                                   fasta_indexer=fasta_indexer, 
                                   output_dir=output_dir)
+
+class ESM2Preprocess(UniRef50Preprocess):
+    def prepare_dataset(self,
+                        uf50_datapath,
+                        uf90_datapath,
+                        cluster_mapping_tsv,
+                        uf50_output_dir,
+                        uf90_output_dir,
+                        num_csv_files=50,
+                        val_size=5000,
+                        test_size=1000000,
+                        random_seed=0,
+                        force=False,
+                        ):
+        '''
+        uf50_datapath - fasta file for uniref50
+        uf90_datapath - fasta file for the processed uniref90
+        cluster_mapping_tsv - cluster mapping tsv files that maps uf50 clusters to uf90 members. 
+
+
+        output_dir - destination to store the resulting csv files and cluster mapping json file.
+        '''
+        os.makedirs(uf50_output_dir, exist_ok=True)
+        os.makedirs(uf90_output_dir, exist_ok=True)
+
+        logging.info('Indexing UniRef50 dataset.')
+        # Do this for uf50, uf90
+        uf50_fasta_indexer = pyfastx.Fasta(uf50_datapath, build_index=True, uppercase=True)  
+        uf90_fasta_indexer = pyfastx.Fasta(uf90_datapath, build_index=True, uppercase=True)  
+        train_samples, val_samples, test_samples = self._index_fasta_data(fasta_indexer=uf50_fasta_indexer,
+                                                                          val_size=val_size,
+                                                                          test_size=test_size,
+                                                                          random_seed=random_seed)
+
+
+        logging.info(f'Writing processed uf50 dataset files to {uf50_output_dir}...')
+        # Note that this splits into train/test/val directories
+        # TODO lock here too
+        self.train_val_test_split(train_samples=train_samples, 
+                                  val_samples=val_samples, 
+                                  test_samples=test_samples, 
+                                  num_csv_files=num_csv_files, 
+                                  fasta_indexer=uf50_fasta_indexer, 
+                                  output_dir=uf50_output_dir,
+                                  )
+        
+
+        # How does this get setup in config.
+        record_id_list = np.arange(len(uf90_fasta_indexer))
+        # Magic value
+        split_name = 'uf90_csvs'
+
+        lock = os.path.join(uf90_output_dir, 'preprocessing.lock')
+        if not os.path.exists(lock) and not force:
+            print("doing preprocessing")
+            with Pool(16) as p:
+                p.map( 
+                    UniRef50Preprocess._protein_sequence_filewriter_map,
+                    [
+                        {
+                            'record_id_list': record_id_split, 
+                            'file_index': file_index, 
+                            'split_name': split_name, 
+                            'fasta_indexer': uf90_datapath,
+                            'output_dir': uf90_output_dir, 
+                            'delimiter': ','
+                        }
+                        for file_index, record_id_split in enumerate(np.array_split(record_id_list, num_csv_files))
+                    
+                    ]
+                )
+        with open(lock, 'w') as _:
+            pass
+
+        cluster_map_dest = os.path.join(uf90_output_dir, 'cluster-map.json')
+        self.make_cluster_map(cluster_mapping_tsv=cluster_mapping_tsv, cluster_mapping_dest=cluster_map_dest)
+
+
+    @staticmethod
+    def make_cluster_map(cluster_mapping_tsv, cluster_mapping_dest):
+        filename = cluster_mapping_dest
+        force = False 
+        # Recall that this should all be in preprocesing
+        if os.path.exists(filename) and not force:
+            print(f"found cluster mapping, loading: {filename=}")
+            with open(filename, 'r') as fd:
+                result = json.load(fd)
+        else:
+            print(f"clustering mapping missing, creating: {filename=}")
+            result = dict()
+            with open(cluster_mapping_tsv, 'r') as fd:
+                result = {}
+                for i, line in enumerate(fd):
+                    if i == 0: continue # skip header
+                    cid, cmembers, *_ = line.strip().split("\t")
+                    members = cmembers.split(',')
+                    result[cid] = members
+
+            try:
+                fd = open(filename, 'w')
+                json.dump(result, fd)
+                fd.close()
+            except Exception as e:
+                # If we fail, cleanup so we dont have a broken cached file.
+                fd.close()
+                os.remove(filename)
+
+        return result

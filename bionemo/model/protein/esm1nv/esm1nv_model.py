@@ -22,7 +22,7 @@ from bionemo.data.dataloader.protein_collate import ESM2BertCollate
 from bionemo.data.mapped_dataset import NeMoUpsampling, Uniref90ClusterMappingDataset
 
 from nemo.core.neural_types import NeuralType
-from nemo.collections.nlp.models.language_modeling.megatron_bert_model import MegatronBertModel
+from bionemo.model.protein.esm1nv.base import ESMnvMegatronBertModel
 from nemo.collections.nlp.modules.common.megatron.utils import (
     average_losses_across_data_parallel_group,
 )
@@ -41,10 +41,8 @@ try:
 except (ImportError, ModuleNotFoundError):
     HAVE_APEX = False
 
-
-__all__ = ["ESM1nvModel"]
-
-class ESM1nvModel(MegatronBertModel):
+__all__ = ["ESM1nvModel", "ESM2nvModel"]
+class ESM1nvModel(ESMnvMegatronBertModel):
     """
     ESM1nv pretraining
     """
