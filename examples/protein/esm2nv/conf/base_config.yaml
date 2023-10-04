@@ -167,9 +167,9 @@ model:
     cluster_mapping_tsv: '/data/uniref202104_esm2/uniref50_mapper_to_uniref90clustermembers.tsv'
 
     # TODO These need to be updated to values we actually like
-    dataset_path: /data/uniref2024_esm2/uf50 # parent directory for data, contains train / val / test folders. Needs to be writeable for index creation.
+    dataset_path: /data/uniref202104_esm2/uf50 # parent directory for data, contains train / val / test folders. Needs to be writeable for index creation.
     uf90:
-      uniref90_path: /data/uniref2024_esm2/uf90/ # created and populated my preprocessing
+      uniref90_path: /data/uniref202104_esm2/uf90/ # created and populated my preprocessing
       dataset: 
         uf90_csvs: x[000..049] # created and populated by preprocessing, this key is a directory inside uniref90_path
       data_impl: 'csv_fields_mmap'
