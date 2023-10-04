@@ -127,7 +127,6 @@ class UniRef50Preprocess(object):
 
     @staticmethod
     def process_files_ngc(ngc_registry_target, ngc_registry_version, download_dir, output_dir, checksum):
-        # TODO create base preprocessing class with this method
         assert os.environ.get('NGC_CLI_API_KEY', False), AssertionError("""NGC API key not defined as environment variable "NGC_CLI_API_KEY".
                                                                            Aborting resource download.""")
         ngc_org = os.environ.get('NGC_CLI_ORG', None)
@@ -323,14 +322,36 @@ class ESM2Preprocess(UniRef50Preprocess):
                         random_seed=0,
                         force=False,
                         ):
-        '''
-        uf50_datapath - fasta file for uniref50
-        uf90_datapath - fasta file for the processed uniref90
-        cluster_mapping_tsv - cluster mapping tsv files that maps uf50 clusters to uf90 members. 
+        """
+        Prepares and splits the dataset into train/test/validation subsets, converts the fasta files to CSV format, 
+        and constructs a JSON file for mapping cluster IDs to cluster members.
 
+        Args:
+            uf50_datapath (str): Path to the raw fasta file for UniRef50. The data is divided into train/test/validation 
+                subsets and is utilized to decide which clusters to sample.
+            uf90_datapath (str): Path to the raw fasta file for UniRef90. The data is processed into CSV format similar to 
+                uf50 but isn't split into train/test/validation. The sequences are ultimately used during training.
+            cluster_mapping_tsv (str): Path to the TSV file where the first column represents the cluster ID (fasta header in uf50) 
+                and the second column lists the members separated by commas. The members correspond to entries in the uf90 fasta file.
+            uf50_output_dir (str): Directory where the processed CSVs for uf50 are saved. This directory will have subdirectories 
+                'train', 'test', and 'val'.
+            uf90_output_dir (str): Directory where the processed CSVs for uf90 are saved. A child directory named 'uf90_csvs' is 
+                created inside this directory for storing the CSVs.
+            num_csv_files (int, optional): Number of files to divide each fasta file into after preprocessing. Defaults to 50.
+            val_size (int, optional): Number of samples designated for the validation set.
+            test_size (int, optional): Number of samples designated for the test set. The training size is inferred from 
+                test_size and val_size.
+            random_seed (int, optional): Seed for randomization when splitting samples for train/test/validation. Defaults to 0.
+            force (bool, optional): If set to True, forces the creation of the cluster mapping JSON.
 
-        output_dir - destination to store the resulting csv files and cluster mapping json file.
-        '''
+        Returns:
+            None
+
+        Note:
+            The method constructs 'cluster_map.json' inside the `uf90_output_dir` which is vital for subsequent steps. 
+            The structure of the output directories is essential for the YAML configuration file.
+        """        
+
         os.makedirs(uf50_output_dir, exist_ok=True)
         os.makedirs(uf90_output_dir, exist_ok=True)
 
@@ -346,7 +367,6 @@ class ESM2Preprocess(UniRef50Preprocess):
 
         logging.info(f'Writing processed uf50 dataset files to {uf50_output_dir}...')
         # Note that this splits into train/test/val directories
-        # TODO lock here too
         self.train_val_test_split(train_samples=train_samples, 
                                   val_samples=val_samples, 
                                   test_samples=test_samples, 
@@ -358,9 +378,9 @@ class ESM2Preprocess(UniRef50Preprocess):
 
         # How does this get setup in config.
         record_id_list = np.arange(len(uf90_fasta_indexer))
+
         # Magic value
         split_name = 'uf90_csvs'
-
         lock = os.path.join(uf90_output_dir, 'preprocessing.lock')
         if not os.path.exists(lock) and not force:
             print("doing preprocessing")

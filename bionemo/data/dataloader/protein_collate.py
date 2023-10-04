@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Dict, List
+from typing import List, TypedDict
 from nemo.collections.common.tokenizers import TokenizerSpec
 from bionemo.data.dataloader.collate import (
     BertCollate,
@@ -56,6 +56,11 @@ class ProteinBertCollate(BertCollate):
         )
 
 
+
+class BatchItem(TypedDict):
+    sequence: str
+    sequence_id: str
+
 class ESM2BertCollate(ProteinBertCollate):
     def __init__(self, tokenizer: TokenizerSpec, seq_length: int,
             pad_size_divisible_by_8: bool, modify_percent: float = 0.1, perturb_percent: float = 0.5):
@@ -78,10 +83,6 @@ class ESM2BertCollate(ProteinBertCollate):
             perturb_percent=perturb_percent
         )
 
-    def collate_fn(self, batch: List[Dict[str, str]], label_pad: int = -1):
-        ''' Modifies the underlying collate_fn to handle a dictionary as input instead of a list of sequences.
-
-        batch: dictionary that contains _atleast_ the key 'sequence'
-        '''
-
+    def collate_fn(self, batch: List[BatchItem], label_pad: int = -1):
+        ''' Modifies the underlying collate_fn to handle a dictionary as input instead of a list of sequences. '''
         return super().collate_fn([x['sequence'] for x in batch], label_pad = label_pad)

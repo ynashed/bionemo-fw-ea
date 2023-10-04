@@ -26,25 +26,3 @@ model:
   # Enable/disable downstream task validation in the loop
   dwnstr_task_validation:
     enabled: True
-  data:
-    data_impl_kwargs:
-      csv_mmap:
-        data_col: 1 # 0-based
-        # Rest of these are inherited
-    cluster_map_json_path: /data/uniref2022_05/fake-uniref/fake_uniref_cluster-mapping.json
-    dataset_path: /data/uniref2022_05/fake_uf_map # parent directory for data, contains train / val / test folders. Needs to be writeable for index creation.
-    uf90:
-      uniref90_path: /data/uniref2022_05/fake_uf_map90 # created and populated my preprocessing
-      dataset: 
-        uf90_csvs: x[000..049] # created and populated by preprocessing
-      data_impl: 'csv_fields_mmap'
-      data_impl_kwargs:
-        csv_fields_mmap:
-          header_lines: 1
-          newline_int: 10 # byte-value of newline
-          workers: ${model.data.num_workers} # number of workers when creating missing index files (null defaults to cpu_num // 2)
-          sort_dataset_paths: True # if True datasets will be sorted by name
-          data_sep: ',' # string to split text into columns
-          data_fields:
-            sequence: 3
-            sequence_id: 1

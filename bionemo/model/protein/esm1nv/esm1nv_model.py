@@ -179,42 +179,60 @@ class ESM1nvModel(ESMnvMegatronBertModel):
 
 class ESM2nvModel(ESM1nvModel):
     """
-    ESM2nv pretraining. Same as ESM1nv but with custom dataset construction.
+    Extends the ESM1nv model by customizing dataset construction to mimic ESM2's implementation.
 
-    This model expects the following scheme for model.data in addition to those used by esm1nv
+    This model introduces a dataset structure that not only retains elements from ESM1nv but also 
+    incorporates new fields specifically tailored for ESM2nv. One significant change involves using 
+    NeMoUpsampling to upsample UniRef50 cluster IDs and pre-computing samples from UniRef90 via a mapped dataset.
 
-    (no file suffix, assumes csv, expandable with ..)
-    model:
-        data:
-            # Fields from esm1nv
-            dataset_path: /data/uniref2022_05 # parent directory for data, contains train / val / test folders. Needs to be writeable for index creation.
-            dataset: # inclusive range of data files to load x[000..049] or can a single file, e.g. x000
-                train: x[000..049]
-                test: x[000..049]
-                val: x[000..049]
+    The configuration files are designed to incorporate specific argument structures. A sample configuration 
+    demonstrating the dataset configuration can be viewed in `examples/protein/esm2nv/conf/base_config.yaml`
 
-            # New fields
-            uf90_dataset: x[000..049]
-            uf90_data_impl_kwargs:
-            csv_mmap:
-                data_col: 3 # 0-based
+    Args:
+        cfg (DictConfig): The configuration object, typically constructed from a YAML file.
+        trainer (Trainer): The training instance associated with this model.
+
+    Attributes:
+        dataset_path (str): Parent directory containing train, test, and validation data.
+        dataset (dict): Specifies the data file range for training, testing, and validation.
+        data_impl (str): Implementation choice, like "csv_mmap".
+        data_impl_kwargs (dict): Arguments specific to the data implementation choice.
+        uf50_datapath (str): Path to the raw UniRef50 fasta file.
+        uf90_datapath (str): Path to the raw UniRef90 fasta file.
+        cluster_mapping_tsv (str): TSV file mapping UniRef50 cluster IDs to UniRef90 entries.
     """
+
+
     def __init__(self, cfg: DictConfig, trainer: Trainer):
         super().__init__(cfg, trainer)
     
 
     @staticmethod 
     def _build_train_valid_test_datasets(trainer, model_cfg):
+        """
+        Constructs training, validation, and testing datasets for the ESM2nv model.
+
+        This method encompasses the complex task of first upsampling the UniRef50 cluster IDs using 
+        NeMoUpsampling and then pre-selecting samples from UniRef90 through a mapped dataset.
+
+        Args:
+            trainer: Training instance for this model.
+            model_cfg: Configuration object specific to the model, detailing dataset and other related specifications.
+
+        Returns:
+            Tuple of datasets: (train_dataset, valid_dataset, test_dataset)
+
+        Note:
+            Ensure the model configuration adheres to the expected structure, especially for dataset 
+            paths, data implementation choice, and associated kwargs.
+        """
         _train_ds, _validation_ds, _test_ds = ESM1nvModel._build_train_valid_test_datasets(trainer, model_cfg)
 
-        # TODO: ADDME to config preconditions
         dataset_path = model_cfg.data.uf90.uniref90_path
-        # TODO: ADDME to config preconditions
-        split = 'uf90_csvs' # NOTE do we want this hardcoded? this is where they end up when preprocessed.
+        split = 'uf90_csvs'
         ds_name = model_cfg.data.uf90.dataset.get(split, None)
         filepath: str = os.path.join(dataset_path, split, ds_name)
 
-        # TODO: ADDME to config preconditions
         data_impl = model_cfg.data.uf90.get('data_impl', None)
         assert data_impl is not None, 'Config "cfg" should contain field "cfg.data_impl"'
         # NOTE train/val/test will all each into uniref90, since we are split on clusters, we now they are independent.
@@ -261,12 +279,10 @@ class ESM2nvModel(ESM1nvModel):
         assert self._cfg.data.dataloader_type == 'single', AssertionError(
             f'Only the Megatron sequential ("single") sampler is currently supported. {self._cfg.data.dataloader_type} was chosen.'
             )
-
-        # NOTE: this doesnt actually call the right super. might be okay since we are duplicating the work of the super anyway
         dataloader = super().build_pretraining_data_loader(dataset=dataset, consumed_samples=consumed_samples)
 
         # Add collate function and unpin memory to avoid crash with CUDA misaligned address
-        dataloader.pin_memory = False # must be False with CSV dataset TODO check with binary
+        dataloader.pin_memory = False # must be False with CSV dataset
         pad_size_divisible_by_8 = True if self._cfg.masked_softmax_fusion else False
 
         dataloader.collate_fn = ESM2BertCollate(tokenizer=self.tokenizer,

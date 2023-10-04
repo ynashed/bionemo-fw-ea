@@ -19,6 +19,7 @@ from typing import List, Dict, Optional, Any
 from enum import Enum
 import numpy as np
 from typing import Optional
+import random
 import json
 import os 
 
@@ -231,8 +232,6 @@ class Uniref90ClusterMappingDataset(MappedDataset):
         self.name = name
 
         # Used for creating the cluster_member_id -> index map
-
-        # TODO infer these from arguments. no need to pass them in directly.
         if index_mapping_dir is not None:
             indexmap_filename = os.path.join(index_mapping_dir, os.path.basename(data_prefix))
         else:
@@ -275,23 +274,9 @@ class Uniref90ClusterMappingDataset(MappedDataset):
         return uniref90_samplemap
 
     @staticmethod
-    def create_cluster_map_from_csv(cluster_map_csv, clustermap_dest_path=None) -> Dict[str, str]:
-        ''' Creates a mapping from cluster_id to cluster_members. This is specifically for mapping samples from
-        Uniref50 to Uniref90, although could be generalized to other cluster mappings.
-
-        clustermap_dest_path - Where to save the computed cluster map (as json).
-        TODO: specify inputs, depends on data result
-        '''
-        cluster_map = cluster_map_csv
-
-        with open(clustermap_dest_path, 'r') as fd:
-            json.dump(cluster_map, fd)
-        return cluster_map
-
-    @staticmethod
     def create_cluster_map_from_json(cluster_map_json) -> Dict[str, str]:
         ''' Creates a mapping from cluster_id to cluster_members. This is specifically for mapping samples from
-        Uniref50 to Uniref90, although could be generalized to other cluster mappings.
+        Uniref50 to Uniref90.
 
         Json file is expected to be an exact production (meaning, json.loads is sufficient)
         '''
@@ -320,7 +305,6 @@ class Uniref90ClusterMappingDataset(MappedDataset):
 
         # NOTE: this constructs the index lookup
 
-        import random
         sample_map = list()
 
         logging.info(f"Creating sample mapping for {len(self.uniref50_dataset)} samples.")

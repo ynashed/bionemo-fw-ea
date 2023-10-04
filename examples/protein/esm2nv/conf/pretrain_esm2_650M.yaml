@@ -33,6 +33,5 @@ exp_manager:
   # TODO
   resume_if_exists: False # automatically resume if checkpoint exists
 
-############# OLD
 restore_from_path: null # used when starting from a .nemo file
 name: esm2-650M
