@@ -26,6 +26,7 @@ CONFIG_NAME='pretrain_esm2_??' # name of the yaml config file with parameters [8
 ACCUMULATE_GRAD_BATCHES=1 # gradient accumulation
 VAL_CHECK_INTERVAL=500 # how often validation step is performed, including downstream task validation
 MICRO_BATCH_SIZE=1
+TENSOR_MODEL_PARALLEL_SIZE=1 # if > 1 must turn off pytorch base layers
 PRECISION=32 #fp [16, 32]
 # =========================
 
@@ -48,7 +49,7 @@ VAL_FILES='x_OP_000..049_CL_'   # Range for the val dataset
 DATA_MOUNT=/data # where data will be mounted in the container
 RESULTS_PATH="??/results/${PROJECT_NAME}/${EXP_NAME}" # directory to store logs, checkpoints and results
 RESULTS_MOUNT=/results # directory where results folder will be mounted in the container
-CODE_MOUNT=/code
+CODE_MOUNT=/code # directory where code folder will be mounted in the container
 CODE_PATH="/opt/nvidia/bionemo" #Default code path
 
 mkdir -p ${RESULTS_PATH}
@@ -85,6 +86,7 @@ echo "*******STARTING********" \
     model.data.dataset.val=${VAL_FILES} \
     model.data.dataset.test=${TEST_FILES} \
     model.micro_batch_size=${MICRO_BATCH_SIZE} \
+    model.tensor_model_parallel_size=${TENSOR_MODEL_PARALLEL_SIZE}
 
 
 EOF
