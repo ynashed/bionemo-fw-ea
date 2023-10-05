@@ -266,7 +266,7 @@ class Uniref90ClusterMappingDataset(MappedDataset):
                 uniref90_samplemap = json.load(fd)
             # Now we do it again and check that it still works. (seems like it does), unirefid-ot-int-2.json for context
         else:
-            logging.info("building sample index map")
+            logging.info(f"building sample index map for {len(uniref90_dataset)} samples")
             # this is a map that does sample_id to index
             uniref90_samplemap = {k['sequence_id']: i for i, k in enumerate(uniref90_dataset)}
             with open(filename, 'w') as fd:
@@ -290,8 +290,8 @@ class Uniref90ClusterMappingDataset(MappedDataset):
 
     def create_sample_mapping(self, dataset, num_samples=None) -> np.array:
         ''' 
-        Need to handle smart loading of this sample mapping: e.g. does it already exist?
-
+        Creates a sample mapping from our current (uf50) dataset to an index in our new dataset (uf90) by choosing members
+            from a cluster map. this mimicks the behavior described in the ESM2 publication.
         dataset - dataset that sample_mapping indexes into.
         num_samples - This is an unused parameter.
 
@@ -303,20 +303,16 @@ class Uniref90ClusterMappingDataset(MappedDataset):
         # Cluster map: mapping from cluster_id to cluster member ids
         # sample map: mapping from UF50 index to UF90 IDX
 
-        # NOTE: this constructs the index lookup
-
         sample_map = list()
-
         logging.info(f"Creating sample mapping for {len(self.uniref50_dataset)} samples.")
         for a in self.uniref50_dataset:
             if a in self.cluster_map:
                 # TODO: make this respect the global seed. 
-                #           nemo fetch rng => fork => (now its ready for choice)
                 selected_sample_id = random.choice(self.cluster_map[a])
             else:
                 # These are probably from bad versions
                 logging.warning(f"Missing entry in clustermap {a}, this breaks sampling assumptions")
-                # We actually cant really continue here because it will break things, particularly with our index.
+                # We cant continue here because it will break things, particularly with our index.
                 raise Exception(f"Cannot create a sample mapping for cluster: {a} with no corresponding cluster members. Check cluster mapping.")
 
             # Get the actual index, add to our sample map

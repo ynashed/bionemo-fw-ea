@@ -163,9 +163,9 @@ model:
         # Rest of these are inherited
 
     uf50_datapath: '/data/uniref202104_esm2/uniref50_train_filt.fasta'
-    uf90_datapath: '/data/uniref202104_esm2/uniref90_nonUR50seqs_membersandreps.fasta'
-    cluster_mapping_tsv: '/data/uniref202104_esm2/uniref50_mapper_to_uniref90clustermembers.tsv'
-
+    uf90_datapath: '/data/uniref202104_esm2/uniref90membersandreps_ur50trainfiltreps.fasta'
+    cluster_mapping_tsv: '/data/uniref202104_esm2/uniref50_mapper_to_uniref90clustermembers_andselfuniref50.tsv'
+    cluster_map_json_path: '/data/uniref202104_esm2/uf90/cluster-map.json'
     # TODO These need to be updated to values we actually like
     dataset_path: /data/uniref202104_esm2/uf50 # parent directory for data, contains train / val / test folders. Needs to be writeable for index creation.
     uf90:

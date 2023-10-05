@@ -50,6 +50,7 @@ def main(cfg) -> None:
     else:
         logging.info("************** Starting Preprocessing ***********")
         preprocessor = ESM2Preprocess()
+        # NOTE: Having issues? check that all the lock files are removed in the directories below.
         preprocessor.prepare_dataset(
             uf50_datapath=cfg.model.data.uf50_datapath,
             uf90_datapath=cfg.model.data.uf90_datapath,

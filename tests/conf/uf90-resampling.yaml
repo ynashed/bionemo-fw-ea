@@ -85,7 +85,7 @@ model:
     skip_lines: 0
     drop_last: false
     pin_memory: false
-    cluster_map_json_path: /data/uniref2022_05/fake-uniref/fake_uniref_cluster-mapping.json
+    cluster_map_json_path: /data/uniref2022_05/fake_uf_map90/cluster-map.json
     force_regen_sample_mapping: true
     data_impl: csv_mmap
     data_impl_kwargs:
