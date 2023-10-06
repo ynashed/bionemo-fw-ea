@@ -41,19 +41,22 @@ WANDB_LOGGER_OFFLINE=False # set to True if there are issues uploading to WandB 
 
 # Mounts
 # =========================
+DATA_MOUNT=/data # where data will be mounted in the container
 DATA_PATH="??" # Directory with data for model training and downstream task validation
 DATASET=uniref202104_esm2/uf50 # ESM1 data uniref2022_1024 # folder containing data for model training
 TRAIN_FILES='x_OP_000..049_CL_' # Range for the train dataset
 TEST_FILES='x_OP_000..049_CL_'  # Range for the test dataset
 VAL_FILES='x_OP_000..049_CL_'   # Range for the val dataset
-DATA_MOUNT=/data # where data will be mounted in the container
-RESULTS_PATH="??/results/${PROJECT_NAME}/${EXP_NAME}" # directory to store logs, checkpoints and results
 RESULTS_MOUNT=/results # directory where results folder will be mounted in the container
-CODE_MOUNT=/code # directory where code folder will be mounted in the container
-CODE_PATH="/opt/nvidia/bionemo" #Default code path
-
+RESULTS_PATH="??/results/${PROJECT_NAME}/${EXP_NAME}" # directory to store logs, checkpoints and results
 mkdir -p ${RESULTS_PATH}
-MOUNTS="${CODE_PATH}:${CODE_MOUNT},${RESULTS_PATH}:${RESULTS_MOUNT},${DATA_PATH}:${DATA_MOUNT}"
+CODE_MOUNT=/opt/nvidia/bionemo # directory where code folder will be mounted in the container
+CODE_PATH="" #leave empty if using container bionemo else use path to custom version
+if [ -z "$CODE_PATH" ]; then
+  MOUNTS="${RESULTS_PATH}:${RESULTS_MOUNT},${DATA_PATH}:${DATA_MOUNT}"
+else
+  MOUNTS="${CODE_PATH}:${CODE_MOUNT},${RESULTS_PATH}:${RESULTS_MOUNT},${DATA_PATH}:${DATA_MOUNT}"
+fi
 # =========================
 
 # Necessary Exports
@@ -66,10 +69,10 @@ echo "*******STARTING********" \
 && echo "---------------" \
 && wandb login ${WANDB_API_KEY} \
 && echo "Starting training" \
-&& cd /code \
+&& cd ${CODE_MOUNT} \
 && cd examples/protein/esm2nv \
-&& python /code/examples/protein/esm2nv/pretrain.py \
-    --config-path=/code/examples/protein/esm2nv/conf \
+&& python ${CODE_MOUNT}/examples/protein/esm2nv/pretrain.py \
+    --config-path=${CODE_MOUNT}/examples/protein/esm2nv/conf \
     --config-name=${CONFIG_NAME} \
     exp_manager.exp_dir=${RESULTS_MOUNT} \
     exp_manager.create_wandb_logger=${CREATE_WANDB_LOGGER} \
@@ -81,6 +84,7 @@ echo "*******STARTING********" \
     trainer.accumulate_grad_batches=${ACCUMULATE_GRAD_BATCHES} \
     trainer.val_check_interval=${VAL_CHECK_INTERVAL} \
     trainer.precision=${PRECISION} \
+    model.precision=${PRECISION} \
     model.data.dataset_path=${DATA_MOUNT}/${DATASET} \
     model.data.dataset.train=${TRAIN_FILES} \
     model.data.dataset.val=${VAL_FILES} \
