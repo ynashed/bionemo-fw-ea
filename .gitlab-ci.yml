@@ -44,6 +44,31 @@ variables:
   # FIXME: change to cvai_bnmo_trng when we move data and checkpoints
   NGC_CLI_TEAM: clara-lifesciences
   JET_WORKLOADS_REF_MAIN: "bionemo/training-unit-tests"
+  SKIP_CI_MR: "false"
+  SKIP_CI_MR_JET: "false"
+
+## TODO solution with SKIP_CI flag is error-prone and should be replaced with better logic!!!!
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_LABELS =~ /SKIP_CI/
+      variables:
+        SKIP_CI_MR: "true"
+        SKIP_CI_MR_JET: "true"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_LABELS =~ /JET_NOT_REQUIRED/
+      variables:
+        SKIP_CI_MR_JET: "true"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_LABELS !~ /SKIP_CI/ && $CI_MERGE_REQUEST_LABELS !~ /JET_NOT_REQUIRED/
+    - if: $CI_COMMIT_BRANCH == "dev"
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "bionemo-rc2306-v1"
+
+skip_ci:
+  tags:
+    - generic
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $SKIP_CI_MR == "true"
+  script:
+    - echo "Flag SKIP_CI is set. Skipping MR CI pipeline "
 
 
 .docker-setup:
@@ -62,7 +87,9 @@ build:
     - .docker-setup
   stage: build
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $SKIP_CI_MR == "true"
+      when: never
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $SKIP_CI_MR != "true"
       when: manual
     - if: $CI_COMMIT_BRANCH == "dev"
     - if: $CI_COMMIT_BRANCH == "main"
@@ -93,6 +120,8 @@ get-checkpoints:
   variables:
     MODEL_PATH: models
   rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $SKIP_CI_MR == "true"
+      when: never
     - when: on_success
   script:
     - export NGC_CLI_ORG NGC_CLI_TEAM NGC_CLI_FORMAT_TYPE NGC_CLI_API_KEY MODEL_PATH
@@ -111,6 +140,8 @@ get-checkpoints:
     entrypoint: [""]
   stage: test
   rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $SKIP_CI_MR == "true"
+      when: never
     - when: on_success
   dependencies:
     - get-checkpoints
@@ -149,8 +180,7 @@ unit-test-gpu:
   tags:
     - generic
   stage: jet
-  dependencies:
-    - build
+  needs: [unit-test-cpu, unit-test-gpu]
   variables:
     CMD: 'yq e ".spec.source.image = \"${PIPELINE_TAG}\"" -i builds/bionemo.yaml'
     JET_WORKLOADS_DIR: "/builds/clara-discovery/workloads-registry"
@@ -186,9 +216,9 @@ unit-test-gpu:
 jet-generate:
   extends: .jet-generate-template
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_LABELS =~ /JET_NOT_REQUIRED/
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $SKIP_CI_MR_JET == "true"
       when: never
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_LABELS !~ /JET_NOT_REQUIRED/
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $SKIP_CI_MR_JET != "true"
       when: manual
       variables:
         JET_WORKLOADS_REF_EPHEMERAL: "ephemeral/bionemo/${CI_PIPELINE_ID}"
@@ -211,10 +241,11 @@ jet-trigger:
       variables:
         - CI_PIPELINE_ID
         - CI_COMMIT_BRANCH
+        - SKIP_CI_MR_JET
     rules:
-      - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_LABELS =~ /JET_NOT_REQUIRED/
+      - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $SKIP_CI_MR_JET == "true"
         when: never
-      - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_LABELS !~ /JET_NOT_REQUIRED/
+      - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $SKIP_CI_MR_JET != "true"
         variables:
           JET_WORKLOADS_REF: "ephemeral/bionemo/${CI_PIPELINE_ID}"
       - if: $CI_COMMIT_BRANCH == "dev"
@@ -239,9 +270,9 @@ jet-test:
   stage: jet
   when: on_success
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_LABELS =~ /JET_NOT_REQUIRED/
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $SKIP_CI_MR_JET == "true"
       when: never
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_LABELS !~ /JET_NOT_REQUIRED/
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $SKIP_CI_MR_JET != "true"
     - if: $CI_COMMIT_BRANCH == "dev"
     - if: $CI_COMMIT_BRANCH == "dev-next"
     - if: $CI_COMMIT_BRANCH == "main"

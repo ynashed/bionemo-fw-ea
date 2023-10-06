@@ -70,16 +70,25 @@ JET stage is manually triggered to avoid unnecessary pipelines in JET to be run.
 
 Before MR is ready to be merged, all CI pipelines must be completed and successful. Otherwise, the merge is blocked.
 
-## Type of changes to the codebase that can be merged WITHOUT `jet` stage being triggered
+## Type of changes to the codebase that can be merged WITHOUT BioNeMo CI or `jet` stage being triggered
 One stage of a pipeline is called `jet` and triggers comprehensive performance and convergence tests of BioNeMo models in [JET](https://jet.nvidia.com/docs). The tests are more comprehensive than the tests invoked by `pytest examples/tests/test_model_pretrain_and_downstream.py -k test_model_training`.
-This stage is resources- and time-consuming and can be **OMITTED** for some changes to the codebase by `JET_NOT_REQUIRED` label as one of MR's labels. The changes to the codebase that are eligible for NOT running `jet` stage are:
+This stage is resources- and time-consuming and can be **OMITTED** for some changes to the codebase by `JET_NOT_REQUIRED` label as one of MR's labels. 
+Also, some changes to the codebase do not require to run time-consuming BioNeMo CI and can use `SKIP_CI` label.
+
+The changes to the codebase that are eligible for using `SKIP_CI` label are:
+* changes to the files with extension `.md` or `.ipynb`
+* changes under folders `docs`, `LICENSE`, 
+* changes to the files with extension `.sh` under `examples/**/scripts/*.sh` related to training scripts of models
+* updating files with extensions different than `*.sh`, `*.py`, `*.yaml`, `*.yml`,  `Dockerfile*` or `requirements.txt` that **DO NOT** affect model checkpoints or data download, docker building, unit tests and model performance or convergence
+
+The changes to the codebase that are eligible for using `JET_NOT_REQUIRE` label are:
 * docstrings update in `.py` files
 * code cleanup not related to refactoring of code (ie deleting unused imports or blank lines, improving lines formatting) in `*.py` files
 * improving hydra configs docstrings (comments and descriptions) in  `*.yaml`, `*.yml`
 * changes to `Dockerfile` or `requirements.txt` that **DO NOT** affect model performance or convergence. Changes that **REQUIRE** `jet` stage are, for instance, python package update or a NeMo container version update.
-* updating files with extensions different than `*.py`, `*.yaml`, `*.yml`,  `Dockerfile` or `requirements.txt` that **DO NOT** affect model performance or convergence
+* updating files with extensions different that `*.py`, `*.yaml`, `*.yml`,  `Dockerfile` or `requirements.txt` that **DO NOT** affect model performance or convergence
 
-As a final remark, most of the changes to files with extensions different than `*.py`, `*.yaml`, `*.yml`,  `Dockerfile` or `requirements.txt` DO REQUIRE `jet` stage to be run, should be carefully tested and ARE NOT eligible to use `JET_NOT_REQUIRE` label as they affect model performance or convergence.
+As a final remark, most of the changes to files with extensions `*.py`, `*.yaml`, `*.yml`,  `Dockerfile*` or `requirements.txt` DO REQUIRE both BioNeMo CI and `jet` stage to be run, should be carefully tested and ARE NOT eligible to use `SKIP_CI` or `JET_NOT_REQUIRE` label as they affect model performance or convergence. 
 
 # General principles
 1. **User-oriented**: make it easy for end users, even at the cost of writing more code in the background
