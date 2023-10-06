@@ -57,9 +57,6 @@ def main(cfg) -> None:
             cluster_mapping_tsv=cfg.model.data.cluster_mapping_tsv,
             uf50_output_dir=cfg.model.data.dataset_path,
             uf90_output_dir=cfg.model.data.uf90.uniref90_path,
-            # NOTE use defaults
-            val_size=50,
-            test_size=100,
             force=False
         )
 
