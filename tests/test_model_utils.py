@@ -13,10 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from bionemo.model.utils import TrainerBuilder
-from omegaconf.omegaconf import OmegaConf, open_dict
 from io import StringIO
+
 import pytest
+from omegaconf.omegaconf import OmegaConf
+
+from bionemo.model.utils import TrainerBuilder
+
 
 cfg_template = """
 do_training: {do_training}
@@ -31,35 +34,42 @@ model:
     pipeline_model_parallel_size: {pipeline_model_parallel_size}
 """
 
+
 def load_cfg_str(cfg):
     return OmegaConf.load(StringIO(cfg))
 
+
 def test_adjust_config_no_keys():
-    cfg = load_cfg_str(cfg_template.format(
-        do_training=False,
-        devices=6,
-        num_nodes=8,
-        accumulate_grad_batches=5,
-        global_batch_size=240,
-        micro_batch_size=7,
-        tensor_model_parallel_size=2,
-        pipeline_model_parallel_size=3,
-    ))
+    cfg = load_cfg_str(
+        cfg_template.format(
+            do_training=False,
+            devices=6,
+            num_nodes=8,
+            accumulate_grad_batches=5,
+            global_batch_size=240,
+            micro_batch_size=7,
+            tensor_model_parallel_size=2,
+            pipeline_model_parallel_size=3,
+        )
+    )
 
     TrainerBuilder.adjust_config(cfg)
     assert cfg.model.global_batch_size == 280
 
+
 def test_adjust_config_errors_on_disagreement():
-    cfg = load_cfg_str(cfg_template.format(
-        do_training=True,
-        devices=6,
-        num_nodes=8,
-        accumulate_grad_batches=5,
-        global_batch_size=240,
-        micro_batch_size=7,
-        tensor_model_parallel_size=2,
-        pipeline_model_parallel_size=3,
-    ))
+    cfg = load_cfg_str(
+        cfg_template.format(
+            do_training=True,
+            devices=6,
+            num_nodes=8,
+            accumulate_grad_batches=5,
+            global_batch_size=240,
+            micro_batch_size=7,
+            tensor_model_parallel_size=2,
+            pipeline_model_parallel_size=3,
+        )
+    )
 
     with pytest.raises(ValueError):
         TrainerBuilder.adjust_config(cfg)

@@ -1,7 +1,7 @@
-from bionemo.model.dna.enformer.attention import default
 import torch
 from torch import nn
 
+from bionemo.model.dna.enformer.attention import default
 
 
 class Residual(nn.Module):
@@ -12,9 +12,11 @@ class Residual(nn.Module):
     def forward(self, x, **kwargs):
         return self.fn(x, **kwargs) + x
 
+
 class GELU(nn.Module):
     def forward(self, x):
         return torch.sigmoid(1.702 * x) * x
+
 
 class TargetLengthCrop(nn.Module):
     def __init__(self, target_length):
@@ -37,9 +39,8 @@ class TargetLengthCrop(nn.Module):
 
         return x[:, -trim:trim]
 
-def ConvBlock(dim, dim_out = None, kernel_size = 1):
+
+def ConvBlock(dim, dim_out=None, kernel_size=1):
     return nn.Sequential(
-        nn.BatchNorm1d(dim),
-        GELU(),
-        nn.Conv1d(dim, default(dim_out, dim), kernel_size, padding = kernel_size // 2)
+        nn.BatchNorm1d(dim), GELU(), nn.Conv1d(dim, default(dim_out, dim), kernel_size, padding=kernel_size // 2)
     )

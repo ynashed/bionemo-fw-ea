@@ -14,15 +14,13 @@
 # limitations under the License.
 
 import pytest
-from bionemo.data.mapped_dataset import SliceDataset
-
 import torch
 from torch.utils.data import TensorDataset
 
+from bionemo.data.mapped_dataset import SliceDataset
 
-test_dataset = TensorDataset(
-    torch.arange(24 * 3).reshape(24, 3)
-)
+
+test_dataset = TensorDataset(torch.arange(24 * 3).reshape(24, 3))
 
 
 start_end_length = [
@@ -33,6 +31,7 @@ start_end_length = [
     (3, -1, 20),
     (-5, -2, 3),
 ]
+
 
 @pytest.mark.parametrize('start,end,length', start_end_length)
 def test_slice_dataset(start, end, length):

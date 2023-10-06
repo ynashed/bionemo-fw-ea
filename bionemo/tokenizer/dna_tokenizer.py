@@ -14,22 +14,23 @@
 # limitations under the License.
 
 import os
-from typing import Optional, Union, Iterable, Dict, List
 from itertools import product
+from typing import Iterable, List, Optional, Union
 
 from nemo.collections.common.tokenizers import TokenizerSpec
+
 
 DEFAULT_PAD_TOKEN = "<PAD>"
 DEFAULT_MASK_TOKEN = "<MASK>"
 DEFAULT_UNK_TOKEN = "<UNK>"
 DEFAULT_BEGIN_TOKEN = "<CLS>"
-DEFAULT_END_TOKEN =  "<SEP>"
+DEFAULT_END_TOKEN = "<SEP>"
 
 __all__ = ["KmerTokenizer"]
 
-class KmerTokenizer(TokenizerSpec):
 
-    def  __init__(
+class KmerTokenizer(TokenizerSpec):
+    def __init__(
         self,
         k: int,
         begin_token: Optional[str] = DEFAULT_BEGIN_TOKEN,
@@ -73,7 +74,6 @@ class KmerTokenizer(TokenizerSpec):
         self.unk_token = unk_token
         self.mask_token = mask_token
 
-
     @staticmethod
     def _infer_vocab_file(model_file, vocab_file):
         if vocab_file is None:
@@ -81,7 +81,7 @@ class KmerTokenizer(TokenizerSpec):
         return vocab_file
 
     def save_vocab(self, model_file, vocab_file=None):
-        """ Saves information about the vocab.
+        """Saves information about the vocab.
 
         Args:
             model_file (str): file-containing the tokenizer model/k
@@ -91,9 +91,7 @@ class KmerTokenizer(TokenizerSpec):
 
         """
 
-        vocab_file = KmerTokenizer._infer_vocab_file(
-                model_file, vocab_file
-            )
+        vocab_file = KmerTokenizer._infer_vocab_file(model_file, vocab_file)
 
         with open(model_file, 'w') as f:
             f.write(str(self.k))
@@ -104,7 +102,7 @@ class KmerTokenizer(TokenizerSpec):
 
     @staticmethod
     def from_vocab_file(model_file, vocab_file=None):
-        """ Instantiates a Tokenizer from a vocab
+        """Instantiates a Tokenizer from a vocab
 
         Args:
             model_file (str): file-containing the tokenizer model/k
@@ -116,18 +114,13 @@ class KmerTokenizer(TokenizerSpec):
             KmerTokenizer: Tokenizer with the given vocabulary
         """
 
-        vocab_file = KmerTokenizer._infer_vocab_file(
-                model_file, vocab_file
-            )
+        vocab_file = KmerTokenizer._infer_vocab_file(model_file, vocab_file)
 
         with open(model_file) as f:
             k = int(f.read().strip())
 
         with open(vocab_file) as f:
-            ids_to_text = {
-                id: line.strip()
-                for id, line in enumerate(f.readlines())
-            }
+            ids_to_text = {id: line.strip() for id, line in enumerate(f.readlines())}
 
         tokenizer = KmerTokenizer(
             k=k,
@@ -148,13 +141,11 @@ class KmerTokenizer(TokenizerSpec):
         """
         Updates the id_to_vocab index based on the current vocab
         """
-        self.decode_vocab = {
-            id_: token for token, id_ in self.vocab.items()
-        }
+        self.decode_vocab = {id_: token for token, id_ in self.vocab.items()}
 
     @property
     def vocab_size(self) -> int:
-        """ Return the size of the vocab being used."""
+        """Return the size of the vocab being used."""
         return len(self.vocab)
 
     def text_to_tokens(self, text: str) -> List[str]:
@@ -169,15 +160,12 @@ class KmerTokenizer(TokenizerSpec):
         """
         tokens = []
         for i in range(len(text) - self.k + 1):
-            token = text[i:i + self.k]
+            token = text[i : i + self.k]
             tokens.append(token)
         return tokens
 
     def tokens_to_text(self, tokens):
-        raise NotImplementedError(
-            'Non-ambiguous mapping from tokens to text does not'
-            'exist.'
-        )
+        raise NotImplementedError('Non-ambiguous mapping from tokens to text does not' 'exist.')
 
     def tokens_to_ids(self, tokens: List[str]) -> List[int]:
         """Convert tokens to indexes/ids
@@ -188,8 +176,7 @@ class KmerTokenizer(TokenizerSpec):
             (List[int]): Containing ID's for each token
 
         """
-        return [self.vocab.get(token, self.vocab[self.unk_token])
-                for token in tokens]
+        return [self.vocab.get(token, self.vocab[self.unk_token]) for token in tokens]
 
     def ids_to_tokens(self, ids: List[int]) -> List[str]:
         """Convert Ids to tokens
@@ -209,7 +196,7 @@ class KmerTokenizer(TokenizerSpec):
         return tokens
 
     def text_to_ids(self, text: str) -> List[int]:
-        """ Converts text to ids
+        """Converts text to ids
 
         Args:
             text (str): String containing text to convert
@@ -222,10 +209,7 @@ class KmerTokenizer(TokenizerSpec):
         return self.tokens_to_ids(tokens)
 
     def ids_to_text(self, ids):
-        raise NotImplementedError(
-            'Non-ambiguous mapping from IDs to text does not'
-            'exist.'
-        )
+        raise NotImplementedError('Non-ambiguous mapping from IDs to text does not' 'exist.')
 
     def build_vocab(self, strings: Union[str, Iterable[str]]):
         """Builds the vocabulary of the tokenizer from strings
@@ -251,7 +235,7 @@ class KmerTokenizer(TokenizerSpec):
 
         return self
 
-    def build_vocab_from_k(self, alphabet: List[str]=None):
+    def build_vocab_from_k(self, alphabet: List[str] = None):
         """Builds the complete k-mer vocabulary on an alphabet
 
         E.g.,

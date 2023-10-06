@@ -1,19 +1,15 @@
 import torch
 import torch.nn.functional as F
-
 from nemo.collections.nlp.modules.common.megatron.adapters.parallel_adapters import (
     AdapterName,
     MLPInfusedAdapterConfig,
 )
 from nemo.collections.nlp.modules.common.megatron.fused_bias_geglu import fused_bias_geglu
 from nemo.collections.nlp.modules.common.megatron.fused_bias_gelu import fused_bias_gelu
-from nemo.collections.nlp.modules.common.megatron.fused_layer_norm import get_layer_norm
 from nemo.collections.nlp.modules.common.megatron.layer_norm_1p import LayerNorm1P
-from nemo.collections.nlp.modules.common.megatron.module import MegatronModule
-from nemo.collections.nlp.modules.common.megatron.utils import ApexGuardDefaults, erf_gelu
+from nemo.collections.nlp.modules.common.megatron.utils import ApexGuardDefaults, erf_gelu, squared_relu
 from nemo.collections.nlp.modules.common.megatron.utils import openai_gelu as openai_gelu_func
-from nemo.collections.nlp.modules.common.megatron.utils import squared_relu
-from nemo.core import adapter_mixins
+
 
 try:
     from apex.normalization import MixedFusedRMSNorm
@@ -22,7 +18,6 @@ try:
     HAVE_APEX = True
 
 except (ImportError, ModuleNotFoundError):
-
     HAVE_APEX = False
 
     # fake missing classes with None attributes
@@ -36,25 +31,29 @@ try:
     HAVE_MEGATRON_CORE = True
 
 except (ImportError, ModuleNotFoundError):
-
     HAVE_MEGATRON_CORE = False
 
 # BIONEMO Imports
-from nemo.collections.nlp.modules.common.megatron.mlp import ParallelMLP
-from bionemo.model.protein.esm1nv.layernorm import esm_get_layer_norm
 # END BIONEMO
-
 # BIONEMO: copy gelu function from esm
 import math
+
+from nemo.collections.nlp.modules.common.megatron.mlp import ParallelMLP
+
+from bionemo.model.protein.esm1nv.layernorm import esm_get_layer_norm
+
+
 def esm_gelu_func(x):
     """
     This is the gelu implementation from the original ESM repo. Using F.gelu yields subtly wrong results.
     """
     return x * 0.5 * (1.0 + torch.erf(x / math.sqrt(2.0)))
+
+
 # END BIONEMO
 
-class ESMnvParallelMLP(ParallelMLP):
 
+class ESMnvParallelMLP(ParallelMLP):
     def __init__(
         self,
         init_method,
@@ -170,7 +169,7 @@ class ESMnvParallelMLP(ParallelMLP):
 
         if bias_activation_fusion and not bias:
             raise ValueError(
-                f"Cannot use bias_activation_fusion without bias terms. Please set bias=True or bias_activation_fusion=False."
+                "Cannot use bias_activation_fusion without bias terms. Please set bias=True or bias_activation_fusion=False."
             )
 
         self.bias_activation_fusion = bias_activation_fusion
@@ -214,7 +213,9 @@ class ESMnvParallelMLP(ParallelMLP):
         if transformer_block_type == 'normformer':
             if normalization == 'layernorm':
                 self.normalization = esm_get_layer_norm(
-                    ffn_hidden_size // get_tensor_model_parallel_world_size(), layernorm_epsilon, persist_layer_norm,
+                    ffn_hidden_size // get_tensor_model_parallel_world_size(),
+                    layernorm_epsilon,
+                    persist_layer_norm,
                     use_pt_layernorm=use_pt_layernorm,
                 )
             elif normalization == 'layernorm1p':
@@ -229,7 +230,6 @@ class ESMnvParallelMLP(ParallelMLP):
                 )
 
     def forward(self, hidden_states):
-
         # [s, b, 4hp]
         intermediate_parallel, bias_parallel = self.dense_h_to_4h(hidden_states)
 
@@ -280,4 +280,3 @@ class ESMnvParallelMLP(ParallelMLP):
         else:
             output, output_bias = self.dense_4h_to_h(intermediate_parallel)
         return output, output_bias
-

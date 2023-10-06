@@ -13,20 +13,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import pytest
-import grpc
 from concurrent import futures
-import numpy as np
 
-from bionemo.model.molecule.megamolbart.grpc.service import InferenceService
-from megamolbart_pb2 import InputSpec
+import grpc
 import megamolbart_pb2_grpc
+import numpy as np
+import pytest
+from megamolbart_pb2 import InputSpec
 from megamolbart_pb2_grpc import GenerativeSamplerStub
 from rdkit import Chem
+
+from bionemo.model.molecule.megamolbart.grpc.service import InferenceService
+
 
 SMILES = ['c1ccc2ccccc2c1', 'COc1cc2nc(N3CCN(C(=O)c4ccco4)CC3)nc(N)c2cc1OC']
 
 ##########
+
 
 def canonicalize_smiles(smiles: str) -> str:
     """Canonicalize input SMILES"""
@@ -38,9 +41,7 @@ def canonicalize_smiles(smiles: str) -> str:
 @pytest.fixture(scope='module')
 def grpc_server():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=1))
-    megamolbart_pb2_grpc.add_GenerativeSamplerServicer_to_server(
-        InferenceService(),
-        server)
+    megamolbart_pb2_grpc.add_GenerativeSamplerServicer_to_server(InferenceService(), server)
     server.add_insecure_port(f'[::]:{50051}')
     server.start()
     yield server
@@ -91,12 +92,8 @@ def test_smis_to_hidden(grpc_server, grpc_stub, smis):
 def test_hidden_to_smis(grpc_server, grpc_stub, smis):
     hidden_states, masks = get_hidden_states(smis, grpc_stub)
     dim = hidden_states.shape
-    spec = InputSpec(hidden_states=hidden_states.flatten().tolist(),
-                        dim=dim,
-                        masks=masks.flatten().tolist())
+    spec = InputSpec(hidden_states=hidden_states.flatten().tolist(), dim=dim, masks=masks.flatten().tolist())
     resp = grpc_stub.HiddenToSmis(spec)
 
     resp_canon_smiles = [canonicalize_smiles(x) for x in resp.smis]
     assert resp_canon_smiles == smis
-    
-

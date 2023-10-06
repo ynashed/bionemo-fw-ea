@@ -1,6 +1,7 @@
-from glob import glob
 import os
 import subprocess
+from glob import glob
+
 import pytest
 import torch
 
@@ -21,13 +22,14 @@ def train_args():
         'model.micro_batch_size': 2,
     }
 
+
 # TODO: can we assume that we always run these tests from main bionemo dir?
 DIRS_TO_TEST = [
     'examples/',
     'examples/molecule/megamolbart/',
     'examples/protein/downstream/',
     'examples/protein/esm1nv/',
-    'examples/protein/prott5nv/'
+    'examples/protein/prott5nv/',
 ]
 
 TRAIN_SCRIPTS = []
@@ -53,9 +55,12 @@ def get_data_overrides(script_or_cfg_path: str) -> str:
     DOWNSTREAM = f' ++model.dwnstr_task_validation.dataset.dataset_path={TEST_DATA_DIR}/%s'
 
     root, domain, model, *conf, script = script_or_cfg_path.split('/')
-    assert root == 'examples' and \
-        model in ('megamolbart', 'esm1nv', 'prott5nv', 'downstream'), \
-        f'update this function, patterns might be wrong'
+    assert root == 'examples' and model in (
+        'megamolbart',
+        'esm1nv',
+        'prott5nv',
+        'downstream',
+    ), 'update this function, patterns might be wrong'
 
     task = {
         'molecule': 'phys_chem/SAMPL',
@@ -80,9 +85,8 @@ def get_data_overrides(script_or_cfg_path: str) -> str:
 @pytest.mark.parametrize('script_path', TRAIN_SCRIPTS)
 def test_train_scripts(script_path, train_args, tmp_path):
     data_str = get_data_overrides(script_path)
-    cmd = (
-        f'python {script_path} ++exp_manager.exp_dir={tmp_path} {data_str} ' +
-        ' '.join(f'++{k}={v}' for k, v in train_args.items())
+    cmd = f'python {script_path} ++exp_manager.exp_dir={tmp_path} {data_str} ' + ' '.join(
+        f'++{k}={v}' for k, v in train_args.items()
     )
     process_handle = subprocess.run(cmd, shell=True, capture_output=True)
     assert process_handle.returncode == 0

@@ -12,11 +12,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import pytest
-import pkgutil
 import importlib
+import pkgutil
 
-MODULE='dgl'
+import pytest
+
+
+MODULE = 'dgl'
+
 
 @pytest.mark.needs_gpu
 def test_module_exist():
@@ -25,6 +28,7 @@ def test_module_exist():
     """
     eggs_loader = pkgutil.find_loader(MODULE)
     assert eggs_loader is not None
+
 
 @pytest.mark.needs_gpu
 def test_module_import():

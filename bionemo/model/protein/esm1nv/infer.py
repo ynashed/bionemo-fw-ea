@@ -13,11 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import torch
-from torch.cuda.amp import autocast
 from typing import List
 
+import torch
+from torch.cuda.amp import autocast
+
 from bionemo.model.core.infer import BaseEncoderDecoderInference
+
 
 class ESM1nvInference(BaseEncoderDecoderInference):
     '''
@@ -25,12 +27,19 @@ class ESM1nvInference(BaseEncoderDecoderInference):
     '''
 
     def __init__(self, cfg, model=None, freeze=True, restore_path=None, training=False, adjust_config=True):
-        super().__init__(cfg=cfg, model=model, freeze=freeze, restore_path=restore_path, training=training, adjust_config=adjust_config)
-        
+        super().__init__(
+            cfg=cfg,
+            model=model,
+            freeze=freeze,
+            restore_path=restore_path,
+            training=training,
+            adjust_config=adjust_config,
+        )
+
     def _tokenize(self, sequences: List[str]):
         """
         ESM expects input format:
-        
+
         encoder input ids - <BOS> + [tokens] + <EOS>
         """
         # Tokenize sequences and add <BOS> and <EOS> tokens
@@ -44,7 +53,7 @@ class ESM1nvInference(BaseEncoderDecoderInference):
         Transforms Sequences into hidden state.
         Should be implemented in a child class, since it is model specific.
         This method returns hidden states and masks.
-        Hidden states are returned for all tokens, including <BOS>, <EOS> and padding. 
+        Hidden states are returned for all tokens, including <BOS>, <EOS> and padding.
         <BOS>, <EOS> and padding are masked out.
 
         Args:
@@ -84,7 +93,7 @@ class ESM1nvInference(BaseEncoderDecoderInference):
         else:
             post_process = model.model.post_process
         model = super().load_model(cfg, model=model, restore_path=restore_path)
-        
+
         model.model.post_process = post_process
 
         return model

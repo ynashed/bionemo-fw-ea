@@ -13,10 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-from typing import Optional, Union, Iterable, Dict, List
-
-from nemo.collections.common.tokenizers import TokenizerSpec
+from typing import Optional
 
 from bionemo.data.dataloader.collate import TokenizerAdapterSpec
 
@@ -25,11 +22,11 @@ DEFAULT_PAD_TOKEN = "<PAD>"
 DEFAULT_MASK_TOKEN = "<MASK>"
 DEFAULT_UNK_TOKEN = "<UNK>"
 DEFAULT_BEGIN_TOKEN = "<CLS>"
-DEFAULT_END_TOKEN =  "<SEP>"
+DEFAULT_END_TOKEN = "<SEP>"
 
 
 class NtTokenizer(TokenizerAdapterSpec):
-    def  __init__(
+    def __init__(
         self,
         begin_token: Optional[str] = DEFAULT_BEGIN_TOKEN,
         end_token: Optional[str] = DEFAULT_END_TOKEN,
@@ -51,13 +48,13 @@ class NtTokenizer(TokenizerAdapterSpec):
         """
         # First describe the extra tokens, and the integers that represent them, in a dictionary.
         self.begin_token = begin_token
-        self.end_token = end_token 
+        self.end_token = end_token
         self.pad_token = pad_token
         self.unk_token = unk_token
         self.mask_token = mask_token
 
         # The IDs have to be < len(self.vocab)
-        self.vocab = {        
+        self.vocab = {
             pad_token: 0,  # pad_token
             unk_token: 1,  # unk_token
             begin_token: 2,  # begin_token
@@ -76,13 +73,11 @@ class NtTokenizer(TokenizerAdapterSpec):
         """
         Updates the id_to_vocab index based on the current vocab
         """
-        return {
-            id_: token for token, id_ in self.vocab.items()
-        }
+        return {id_: token for token, id_ in self.vocab.items()}
 
     # TODO these are from TokenizerSpec in NeMo
     def text_to_tokens(self, text):
-        return [c for c in text]
+        return list(text)
 
     def tokens_to_text(self, tokens):
         return ''.join(tokens)
@@ -192,6 +187,7 @@ class NtTokenizer(TokenizerAdapterSpec):
 
         """
         return list(self.vocab.keys())
+
 
 test_sequences = ["ATGAATAGATAGATAGAGATATAGA", 'naTGATGGggaCccCACACGAN']
 tokenizer = NtTokenizer()

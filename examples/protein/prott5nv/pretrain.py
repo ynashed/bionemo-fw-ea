@@ -13,15 +13,16 @@
 # limitations under the License.
 
 
-from omegaconf.omegaconf import OmegaConf
-
-from bionemo.model.protein.prott5nv import ProtT5nvModel
-from bionemo.utils import BioNeMoSaveRestoreConnector
 from nemo.core.config import hydra_runner
 from nemo.utils import logging
-from bionemo.data import UniRef50Preprocess, FLIPPreprocess
+from omegaconf.omegaconf import OmegaConf
+
+from bionemo.data import FLIPPreprocess, UniRef50Preprocess
+from bionemo.model.protein.prott5nv import ProtT5nvModel
 from bionemo.model.utils import setup_trainer
+from bionemo.utils import BioNeMoSaveRestoreConnector
 from bionemo.utils.callbacks.callback_utils import setup_callbacks
+
 
 @hydra_runner(config_path="../../../examples/protein/prott5nv/conf", config_name="pretrain_small")
 def main(cfg) -> None:
@@ -36,7 +37,9 @@ def main(cfg) -> None:
         if cfg.restore_from_path is not None:
             logging.info("\nRestoring model from .nemo file " + cfg.restore_from_path)
             model = ProtT5nvModel.restore_from(
-                cfg.restore_from_path, cfg.model, trainer=trainer,
+                cfg.restore_from_path,
+                cfg.model,
+                trainer=trainer,
                 # 128 -- is the number of padded vocabulary in MegatronT5Model
                 save_restore_connector=BioNeMoSaveRestoreConnector(vocab_size=128),
                 # support loading weights with mismatch in embeddings (e.g., alibi)
@@ -50,9 +53,11 @@ def main(cfg) -> None:
     else:
         logging.info("************** Starting Preprocessing ***********")
         preprocessor = UniRef50Preprocess()
-        preprocessor.prepare_dataset(ngc_registry_target=cfg.model.data.ngc_registry_target,
-                                     ngc_registry_version=cfg.model.data.ngc_registry_version,
-                                     output_dir=cfg.model.data.dataset_path)
+        preprocessor.prepare_dataset(
+            ngc_registry_target=cfg.model.data.ngc_registry_target,
+            ngc_registry_version=cfg.model.data.ngc_registry_version,
+            output_dir=cfg.model.data.dataset_path,
+        )
         # Downloading and preprocessing data for downstream task validation
         if cfg.model.dwnstr_task_validation.enabled:
             flip_preprocessor = FLIPPreprocess()
@@ -60,9 +65,9 @@ def main(cfg) -> None:
                 task_name = cfg.model.dwnstr_task_validation.dataset.dataset_path.split("/")[-1]
             else:
                 task_name = cfg.model.dwnstr_task_validation.dataset.task_name
-            flip_preprocessor.prepare_dataset(output_dir=cfg.model.dwnstr_task_validation.dataset.dataset_path,
-                                              task_name=task_name)
-
+            flip_preprocessor.prepare_dataset(
+                output_dir=cfg.model.dwnstr_task_validation.dataset.dataset_path, task_name=task_name
+            )
 
 
 if __name__ == '__main__':

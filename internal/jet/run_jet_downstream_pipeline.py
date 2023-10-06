@@ -1,24 +1,34 @@
 import logging
 from argparse import ArgumentParser
-from typing import List, Union, Optional
+from typing import List, Optional, Union
 
 from internal.jet.utils.handlers import JetGitRepoHandler, JetPipelineHandler
 from internal.jet.utils.modify_jet_workloads_config import modify_jet_workloads_config
 
 
-def run_jet_downstream_pipeline(jet_workloads_ref_default: str, jet_workloads_repo_path: str,
-                                jet_workloads_ref_ephemeral: Optional[str] = None,
-                                git_repo: Optional[str] = None, git_branch: Optional[str] = None,
-                                dockerfile: Optional[str] = None, docker_image: Optional[str] = None,
-                                config_path: Optional[str] = None, config_name: Optional[str] = None,
-                                script_path: Optional[str] = None, variant: Optional[str] = None,
-                                model: Optional[str] = None, extra_overwrites: Optional[str] = None,
-                                dllogger_warmup: Optional[int] = None,
-                                nodes: Optional[Union[List[int], int]] = None,
-                                gpus: Optional[Union[List[int], int]] = None,
-                                precision: Optional[Union[List[int], int]] = None,
-                                batch_size: Optional[Union[List[int], int]] = None,
-                                jet_filter: Optional[str] = None, setup_jet_api: bool = False, dry_run: bool = False):
+def run_jet_downstream_pipeline(
+    jet_workloads_ref_default: str,
+    jet_workloads_repo_path: str,
+    jet_workloads_ref_ephemeral: Optional[str] = None,
+    git_repo: Optional[str] = None,
+    git_branch: Optional[str] = None,
+    dockerfile: Optional[str] = None,
+    docker_image: Optional[str] = None,
+    config_path: Optional[str] = None,
+    config_name: Optional[str] = None,
+    script_path: Optional[str] = None,
+    variant: Optional[str] = None,
+    model: Optional[str] = None,
+    extra_overwrites: Optional[str] = None,
+    dllogger_warmup: Optional[int] = None,
+    nodes: Optional[Union[List[int], int]] = None,
+    gpus: Optional[Union[List[int], int]] = None,
+    precision: Optional[Union[List[int], int]] = None,
+    batch_size: Optional[Union[List[int], int]] = None,
+    jet_filter: Optional[str] = None,
+    setup_jet_api: bool = False,
+    dry_run: bool = False,
+):
     """
     Runs JET tests for a model or docker specified by the arguments.
 
@@ -103,9 +113,24 @@ def run_jet_downstream_pipeline(jet_workloads_ref_default: str, jet_workloads_re
 
     JET Workloads Registry: https://gitlab-master.nvidia.com/dl/jet/workloads-registry
     """
-    if all([arg is None for arg in [docker_image, git_repo, git_branch, config_path, config_name,
-                                    script_path, model, extra_overwrites, dllogger_warmup, nodes, gpus,
-                                    precision, batch_size]]):
+    if all(
+        arg is None
+            for arg in [
+                docker_image,
+                git_repo,
+                git_branch,
+                config_path,
+                config_name,
+                script_path,
+                model,
+                extra_overwrites,
+                dllogger_warmup,
+                nodes,
+                gpus,
+                precision,
+                batch_size,
+            ]
+    ):
         # if no arguments are passed to modify existing config in JET Workloads Registry, the test related to
         # jet_workloads_ref_default is triggered
         logging.info(f"Running JET tests for jet workloads reference: {jet_workloads_ref_default}")
@@ -116,28 +141,43 @@ def run_jet_downstream_pipeline(jet_workloads_ref_default: str, jet_workloads_re
     if modify_config:
         if docker_image or git_repo or git_branch:
             assert (docker_image is not None) ^ (
-                    git_repo is not None and git_branch is not None and dockerfile is not None), \
-                "Docker container is specified either by docker_image or the build args: git_repo, " \
+                git_repo is not None and git_branch is not None and dockerfile is not None
+            ), (
+                "Docker container is specified either by docker_image or the build args: git_repo, "
                 "git_branch and dockerfile"
+            )
         if variant is not None and variant.endswith(".py"):
             variant = variant[:-3]
 
-        repo_handler = JetGitRepoHandler(jet_workloads_ref_default=jet_workloads_ref_default,
-                                         jet_workloads_repo_path=jet_workloads_repo_path,
-                                         jet_workloads_ref_ephemeral=jet_workloads_ref_ephemeral)
+        repo_handler = JetGitRepoHandler(
+            jet_workloads_ref_default=jet_workloads_ref_default,
+            jet_workloads_repo_path=jet_workloads_repo_path,
+            jet_workloads_ref_ephemeral=jet_workloads_ref_ephemeral,
+        )
         repo_handler.setup_local_jet_workloads_repo()
         repo_handler.setup_local_ephemeral_branch()
 
         jet_workload_ref = repo_handler.jet_workloads_ref_ephemeral
         jet_workloads_repo_path = repo_handler.jet_workloads_repo_path
 
-        modify_jet_workloads_config(jet_workloads_repo_path=jet_workloads_repo_path,
-                                    git_repo=git_repo, git_branch=git_branch, dockerfile=dockerfile,
-                                    docker_image=docker_image, config_path=config_path, config_name=config_name,
-                                    script_path=script_path, variant=variant, model=model,
-                                    extra_overwrites=extra_overwrites,
-                                    dllogger_warmup=dllogger_warmup, nodes=nodes, gpus=gpus, precision=precision,
-                                    batch_size=batch_size)
+        modify_jet_workloads_config(
+            jet_workloads_repo_path=jet_workloads_repo_path,
+            git_repo=git_repo,
+            git_branch=git_branch,
+            dockerfile=dockerfile,
+            docker_image=docker_image,
+            config_path=config_path,
+            config_name=config_name,
+            script_path=script_path,
+            variant=variant,
+            model=model,
+            extra_overwrites=extra_overwrites,
+            dllogger_warmup=dllogger_warmup,
+            nodes=nodes,
+            gpus=gpus,
+            precision=precision,
+            batch_size=batch_size,
+        )
 
         repo_handler.push_changes_to_remote_ephemeral_branch(dry_run=dry_run)
     else:
@@ -161,63 +201,134 @@ def run_jet_downstream_pipeline(jet_workloads_ref_default: str, jet_workloads_re
 if __name__ == '__main__':
     parser = ArgumentParser()
     ### Arguments defining workload in JET Workloads Registry
-    parser.add_argument('--jet_ref', type=str, default='bionemo/new-model-dev',
-                        help='Reference to branch in JET Workloads Registry with default tests')
-    parser.add_argument('--jet_ref_eph', type=str, default=None,
-                        help='Name of ephemeral reference (branch) to run the JET test on')
-    parser.add_argument('--jet_repo_path', type=str, default=None,
-                        help='Path to the JET Workloads Registry to use or downloads the repo to')
+    parser.add_argument(
+        '--jet_ref',
+        type=str,
+        default='bionemo/new-model-dev',
+        help='Reference to branch in JET Workloads Registry with default tests',
+    )
+    parser.add_argument(
+        '--jet_ref_eph', type=str, default=None, help='Name of ephemeral reference (branch) to run the JET test on'
+    )
+    parser.add_argument(
+        '--jet_repo_path',
+        type=str,
+        default=None,
+        help='Path to the JET Workloads Registry to use or downloads the repo to',
+    )
     ### Arguments specifying how to obtain or build docker for a test
-    parser.add_argument('--git_repo', type=str, default=None,
-                        help='Repository name to copy the "bionemo/ci" folder from to the docker image')
-    parser.add_argument('--git_branch', type=str, default=None,
-                        help='Branch name of the repository to copy the "bionemo/ci" folder from to the docker image')
-    parser.add_argument('--dockerfile', type=str, default="internal/Dockerfile-devel",
-                        help='Branch name of the repository to copy the "bionemo/ci" folder from to the docker image')
-    parser.add_argument('--image', type=str, default=None,
-                        help='Docker image to use to run JET tests')
+    parser.add_argument(
+        '--git_repo',
+        type=str,
+        default=None,
+        help='Repository name to copy the "bionemo/ci" folder from to the docker image',
+    )
+    parser.add_argument(
+        '--git_branch',
+        type=str,
+        default=None,
+        help='Branch name of the repository to copy the "bionemo/ci" folder from to the docker image',
+    )
+    parser.add_argument(
+        '--dockerfile',
+        type=str,
+        default="internal/Dockerfile-devel",
+        help='Branch name of the repository to copy the "bionemo/ci" folder from to the docker image',
+    )
+    parser.add_argument('--image', type=str, default=None, help='Docker image to use to run JET tests')
     ### Arguments specifying command of a test
-    parser.add_argument('--config_path', type=str, default=None,
-                        help='Path to the folder with primary configs that is relative to bionemo '
-                             'ie "examples/molecule/megamolbart/conf"')
-    parser.add_argument('--config_name', type=str, default=None,
-                        help='Filename on the config to use under config_path')
-    parser.add_argument('--script_path', type=str, default=None,
-                        help='Path to the folder with the model-specific training scripts that '
-                             'should be relative to bionemo.')
-    parser.add_argument('--variant', type=str, default="pretrain", help='Type of the training case defined as '
-                                                                        'the name of a one training script that can be found '
-                                                                        'in script_path, ie "pretrain".'
-                                                                        'The training command is defined as "{script_path}/{variant}.py"')
+    parser.add_argument(
+        '--config_path',
+        type=str,
+        default=None,
+        help='Path to the folder with primary configs that is relative to bionemo '
+        'ie "examples/molecule/megamolbart/conf"',
+    )
+    parser.add_argument(
+        '--config_name', type=str, default=None, help='Filename on the config to use under config_path'
+    )
+    parser.add_argument(
+        '--script_path',
+        type=str,
+        default=None,
+        help='Path to the folder with the model-specific training scripts that ' 'should be relative to bionemo.',
+    )
+    parser.add_argument(
+        '--variant',
+        type=str,
+        default="pretrain",
+        help='Type of the training case defined as '
+        'the name of a one training script that can be found '
+        'in script_path, ie "pretrain".'
+        'The training command is defined as "{script_path}/{variant}.py"',
+    )
 
-    parser.add_argument('--model', type=str, default=None,
-                        help='Name of the model to test ie "megamolbart"')
-    parser.add_argument('--extra_overwrites', type=str, default=None,
-                        help='Configs that overwrite the training/test configuration.')
+    parser.add_argument('--model', type=str, default=None, help='Name of the model to test ie "megamolbart"')
+    parser.add_argument(
+        '--extra_overwrites', type=str, default=None, help='Configs that overwrite the training/test configuration.'
+    )
     ### Arguments specifying tested cases
-    parser.add_argument('--nodes', nargs='+', type=int, default=None,
-                        help='List of ints that specify different numbers of nodes to test')
-    parser.add_argument('--gpus', nargs='+', type=int, default=None,
-                        help='List of ints that specify different numbers of devices per node  to test')
-    parser.add_argument('--precision', nargs='+', type=int, default=None,
-                        help='List of ints that specify different precisions to test')
-    parser.add_argument('--batch_size', nargs='+', type=int, default=None,
-                        help='List of ints that specify different batch sizes to test')
+    parser.add_argument(
+        '--nodes',
+        nargs='+',
+        type=int,
+        default=None,
+        help='List of ints that specify different numbers of nodes to test',
+    )
+    parser.add_argument(
+        '--gpus',
+        nargs='+',
+        type=int,
+        default=None,
+        help='List of ints that specify different numbers of devices per node  to test',
+    )
+    parser.add_argument(
+        '--precision', nargs='+', type=int, default=None, help='List of ints that specify different precisions to test'
+    )
+    parser.add_argument(
+        '--batch_size',
+        nargs='+',
+        type=int,
+        default=None,
+        help='List of ints that specify different batch sizes to test',
+    )
 
     ### Other
-    parser.add_argument('--filter', type=str, default=None,
-                        help='Query in the pandas format used to filter workloads in the JET config and run only subset of them.')
-    parser.add_argument('--setup_jet_api', action='store_true', default=False,
-                        help='Should JET API to be installed and setup during the execution of the script?')
+    parser.add_argument(
+        '--filter',
+        type=str,
+        default=None,
+        help='Query in the pandas format used to filter workloads in the JET config and run only subset of them.',
+    )
+    parser.add_argument(
+        '--setup_jet_api',
+        action='store_true',
+        default=False,
+        help='Should JET API to be installed and setup during the execution of the script?',
+    )
     parser.add_argument('--dry_run', action='store_true', default=False, help='Should a test run be executed?')
 
     args = parser.parse_args()
 
-    run_jet_downstream_pipeline(jet_workloads_ref_default=args.jet_ref, jet_workloads_repo_path=args.jet_repo_path,
-                                jet_workloads_ref_ephemeral=args.jet_ref_eph,
-                                git_repo=args.git_repo, git_branch=args.git_branch, dockerfile=args.dockerfile,
-                                docker_image=args.image, config_path=args.config_path, config_name=args.config_name,
-                                script_path=args.script_path, variant=args.variant,
-                                model=args.model, extra_overwrites=args.extra_overwrites,
-                                nodes=args.nodes, gpus=args.gpus, precision=args.precision, batch_size=args.batch_size,
-                                jet_filter=args.filter, setup_jet_api=args.setup_jet_api, dry_run=args.dry_run)
+    run_jet_downstream_pipeline(
+        jet_workloads_ref_default=args.jet_ref,
+        jet_workloads_repo_path=args.jet_repo_path,
+        jet_workloads_ref_ephemeral=args.jet_ref_eph,
+        git_repo=args.git_repo,
+        git_branch=args.git_branch,
+        dockerfile=args.dockerfile,
+        docker_image=args.image,
+        config_path=args.config_path,
+        config_name=args.config_name,
+        script_path=args.script_path,
+        variant=args.variant,
+        model=args.model,
+        extra_overwrites=args.extra_overwrites,
+        nodes=args.nodes,
+        gpus=args.gpus,
+        precision=args.precision,
+        batch_size=args.batch_size,
+        jet_filter=args.filter,
+        setup_jet_api=args.setup_jet_api,
+        dry_run=args.dry_run,
+    )

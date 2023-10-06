@@ -1,31 +1,41 @@
+import glob
+import os
+import pathlib
+
+import pandas as pd
 import pytest
 import requests_mock
-import os
-import glob
 from omegaconf import OmegaConf
-import pathlib
-import pandas as pd
 from rdkit import Chem
+
 from bionemo.data import Zinc15Preprocess
 from bionemo.utils.tests import get_directory_hash
+
 
 os.environ['PROJECT_MOUNT'] = os.environ.get('PROJECT_MOUNT', '/workspace/bionemo')
 TEST_DATA_DIR = os.path.join(os.environ['PROJECT_MOUNT'], 'examples/tests/test_data/molecule/zinc15')
 ROOT_DIR = 'zinc15'
-CONFIG = {'max_smiles_length': 512,
-          'train_samples_per_file': 1000,
-          'val_samples_per_file': 100,
-          'test_samples_per_file': 100,
-          'links_file': os.path.join(TEST_DATA_DIR, 'ZINC-downloader-test.txt'),
-          'pool_size': 4,
-          'seed': 0}
+CONFIG = {
+    'max_smiles_length': 512,
+    'train_samples_per_file': 1000,
+    'val_samples_per_file': 100,
+    'test_samples_per_file': 100,
+    'links_file': os.path.join(TEST_DATA_DIR, 'ZINC-downloader-test.txt'),
+    'pool_size': 4,
+    'seed': 0,
+}
 HEADER = 'zinc_id,smiles'
-TRAIN_VAL_TEST_HASHES = {'train': 'fe599545f23995a56dde9e1533b12e35', 
-                         'val': 'f9df93c66c777b9e815614577b58fb1b', 
-                         'test': '73af6d6084a7665de7b706fe26593b5c'}
-MAX_LENGTH_URLS = ["http://files.docking.org/2D/KA/KAED.txt",  # small mols
-                   "http://files.docking.org/2D/AI/AIED.txt"]  # large mols
+TRAIN_VAL_TEST_HASHES = {
+    'train': 'fe599545f23995a56dde9e1533b12e35',
+    'val': 'f9df93c66c777b9e815614577b58fb1b',
+    'test': '73af6d6084a7665de7b706fe26593b5c',
+}
+MAX_LENGTH_URLS = [
+    "http://files.docking.org/2D/KA/KAED.txt",  # small mols
+    "http://files.docking.org/2D/AI/AIED.txt",
+]  # large mols
 ##############
+
 
 @pytest.fixture(scope="session")
 def tmp_directory(tmp_path_factory, root_directory=ROOT_DIR):
@@ -49,10 +59,10 @@ def output_directory(tmp_directory):
     download_dir.mkdir(parents=True, exist_ok=True)
     return download_dir
 
+
 # TODO mocker could probably be made into a fixture
 @requests_mock.Mocker(kw='mocker')
-@pytest.mark.parametrize('config', 
-                         [(CONFIG)])
+@pytest.mark.parametrize('config', [(CONFIG)])
 def test_process_files(tmp_directory, download_directory, config, **kwargs):
     cfg = OmegaConf.create(config)
 
@@ -65,27 +75,26 @@ def test_process_files(tmp_directory, download_directory, config, **kwargs):
                 mocker.get(url, text=fh.read())
 
     preproc = Zinc15Preprocess(root_directory=tmp_directory)
-    preproc.process_files(links_file=cfg.links_file, 
-                          download_dir=download_directory,
-                          pool_size=cfg.pool_size,
-                          max_smiles_length=cfg.max_smiles_length)
-    
+    preproc.process_files(
+        links_file=cfg.links_file,
+        download_dir=download_directory,
+        pool_size=cfg.pool_size,
+        max_smiles_length=cfg.max_smiles_length,
+    )
+
     with open(cfg.links_file, 'r') as fh:
         expected_tranche_files = fh.readlines()
 
     tranche_files = glob.glob(os.path.join(download_directory, '*.txt'))
     assert len(tranche_files) == len(expected_tranche_files)
 
-    expected_tranche_files = sorted([os.path.basename(x.strip()) 
-                                     for x in expected_tranche_files])
-    tranche_files = sorted([os.path.basename(x)
-                            for x in tranche_files])
+    expected_tranche_files = sorted([os.path.basename(x.strip()) for x in expected_tranche_files])
+    tranche_files = sorted([os.path.basename(x) for x in tranche_files])
     assert tranche_files == expected_tranche_files
 
 
 @requests_mock.Mocker(kw='mocker')
-@pytest.mark.parametrize('config, header, hash_dict', 
-                         [(CONFIG, HEADER, TRAIN_VAL_TEST_HASHES)])
+@pytest.mark.parametrize('config, header, hash_dict', [(CONFIG, HEADER, TRAIN_VAL_TEST_HASHES)])
 def test_prepare_dataset(tmp_directory, download_directory, output_directory, config, header, hash_dict, **kwargs):
     cfg = OmegaConf.create(config)
 
@@ -98,19 +107,21 @@ def test_prepare_dataset(tmp_directory, download_directory, output_directory, co
                 mocker.get(url, text=fh.read())
 
     preproc = Zinc15Preprocess(root_directory=tmp_directory)
-    preproc.prepare_dataset(max_smiles_length=cfg.max_smiles_length,
-                            train_samples_per_file=cfg.train_samples_per_file,
-                            val_samples_per_file=cfg.val_samples_per_file,
-                            test_samples_per_file=cfg.test_samples_per_file,
-                            links_file=cfg.links_file,
-                            seed=cfg.seed)
-    
+    preproc.prepare_dataset(
+        max_smiles_length=cfg.max_smiles_length,
+        train_samples_per_file=cfg.train_samples_per_file,
+        val_samples_per_file=cfg.val_samples_per_file,
+        test_samples_per_file=cfg.test_samples_per_file,
+        links_file=cfg.links_file,
+        seed=cfg.seed,
+    )
+
     expected_lines = 0
     tranche_files = glob.glob(os.path.join(download_directory, '*.txt'))
     for file in tranche_files:
         with open(file, 'r') as fh:
             expected_lines += len(fh.readlines()) - 1
-    
+
     total_lines = 0
     for split in ['train', 'val', 'test']:
         split_directory = os.path.join(output_directory, split)

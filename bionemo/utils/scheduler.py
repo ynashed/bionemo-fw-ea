@@ -13,14 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from torch.optim.lr_scheduler import _LRScheduler
-from nemo.utils import logging
 from nemo.core.config.schedulers import (
     WarmupAnnealingHoldSchedulerParams,
 )
+from nemo.utils import logging
+from torch.optim.lr_scheduler import _LRScheduler
+
 
 class LinearWarmupHoldDecayPolicy(_LRScheduler):
-    """
+    r"""
     Has a linear warmup phase from 0 to the optimizer's learning rate, then a
     constant phase, followed by a linear decay to the `min_lr`, after which
     the learning rate is held constant.
@@ -72,8 +73,7 @@ class LinearWarmupHoldDecayPolicy(_LRScheduler):
         assert not (
             constant_steps is not None and constant_ratio is not None
         ), "Either use constant_steps or constant_ratio"
-        assert warmup_ratio is None or max_steps is not None, "If there is a "\
-            "ratio, there should be a total steps"
+        assert warmup_ratio is None or max_steps is not None, "If there is a " "ratio, there should be a total steps"
 
         # It is necessary to assign all attributes *before* __init__,
         # as class is wrapped by an inner class.
@@ -93,8 +93,7 @@ class LinearWarmupHoldDecayPolicy(_LRScheduler):
         else:
             self.constant_steps = 0
 
-        self.decay_steps = max_steps - (
-            self.constant_steps + self.warmup_steps)
+        self.decay_steps = max_steps - (self.constant_steps + self.warmup_steps)
 
         self.min_lr = min_lr
         super().__init__(optimizer, last_epoch)
@@ -102,8 +101,7 @@ class LinearWarmupHoldDecayPolicy(_LRScheduler):
     def get_lr(self):
         if not self._get_lr_called_within_step:
             logging.warning(
-                "To get the last learning rate computed by the scheduler, "
-                "please use `get_last_lr()`.", UserWarning
+                "To get the last learning rate computed by the scheduler, " "please use `get_last_lr()`.", UserWarning
             )
 
         step = self.last_epoch
@@ -113,8 +111,7 @@ class LinearWarmupHoldDecayPolicy(_LRScheduler):
             return self._get_warmup_lr(step)
 
         # Constant steps after warmup
-        if self.warmup_steps > 0 and step > self.warmup_steps and step <=  \
-                (self.warmup_steps + self.constant_steps):
+        if self.warmup_steps > 0 and step > self.warmup_steps and step <= (self.warmup_steps + self.constant_steps):
             return self._get_constant_lr(step)
 
         # Min lr after max steps of updates
@@ -129,11 +126,10 @@ class LinearWarmupHoldDecayPolicy(_LRScheduler):
         return [initial_lr * lr_val for initial_lr in self.base_lrs]
 
     def _get_constant_lr(self, step):
-        return [lr_val for lr_val in self.base_lrs]
+        return list(self.base_lrs)
 
     def _get_decay_lr(self, step):
-        lr_val = (step - (self.warmup_steps + self.constant_steps) + 1) / \
-            (self.decay_steps + 1)
+        lr_val = (step - (self.warmup_steps + self.constant_steps) + 1) / (self.decay_steps + 1)
         return [initial_lr * (1 - lr_val) for initial_lr in self.base_lrs]
 
 

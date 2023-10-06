@@ -28,12 +28,12 @@ Provide a set of solutions for GFF files and leave room for future improvement:
 from collections import defaultdict
 from typing import Dict, List, Literal, Optional, Tuple, TypeVar, Union
 
-
 from pydantic import BaseModel, validator
+
 
 # NOTE: This class may be more well suited for a MixinPattern. Where we are providing mixins that operate on the attribute column. If a need occurs, we will need to redesign this class a little.
 class GFFEntry(BaseModel):
-    """ Class for validating GFF3 entries. https://uswest.ensembl.org/info/website/upload/gff3.html """
+    """Class for validating GFF3 entries. https://uswest.ensembl.org/info/website/upload/gff3.html"""
 
     seqid: str
     source: str
@@ -50,7 +50,7 @@ class GFFEntry(BaseModel):
         return t.lower()
 
     def attributes_as_dict(self) -> Dict[str, str]:
-        """ Conforms to the GFF3 spec. Returns the attributes column as a dictionary. Key value pairs are separated with semicolon (;) and specified with equals (=).
+        """Conforms to the GFF3 spec. Returns the attributes column as a dictionary. Key value pairs are separated with semicolon (;) and specified with equals (=).
             Ex: Key1=Value1;Key2=Value2;
 
         Returns:
@@ -65,10 +65,10 @@ class GFFEntry(BaseModel):
 
 
 class SpliceSiteEntry(GFFEntry):
-    """ Small extension to GFFEntry that adds the ability to parse the Parent field from the attributes column. This is necessary for constructing datasets for the downstream tasks. """
+    """Small extension to GFFEntry that adds the ability to parse the Parent field from the attributes column. This is necessary for constructing datasets for the downstream tasks."""
 
     def get_parent(self) -> Optional[str]:
-        """ Returns the value of the Parent field in the attribute column. That is, the value of Parent={value}.
+        """Returns the value of the Parent field in the attribute column. That is, the value of Parent={value}.
 
         Returns:
             Optional[str]: The value of the Parent field in the attribute column, None if no such field exists.
@@ -78,8 +78,10 @@ class SpliceSiteEntry(GFFEntry):
 
 
 T = TypeVar('T', bound=GFFEntry)
-def parse_gff3(filename: str, cls: T=SpliceSiteEntry) -> List[T]:
-    """ Parses a gff3 file and validates all the lines. Class T is provided so users can
+
+
+def parse_gff3(filename: str, cls: T = SpliceSiteEntry) -> List[T]:
+    """Parses a gff3 file and validates all the lines. Class T is provided so users can
 
     Args:
         filename (str): filename of the gff3 file to parse.
@@ -88,7 +90,7 @@ def parse_gff3(filename: str, cls: T=SpliceSiteEntry) -> List[T]:
     Returns:
         List[T]: List of entries for each row in the passed gff3 file, parsed as the specific GFFEntry (T) object.
     """
-    entries = list()
+    entries = []
     with open(filename, "r") as fd:
         for line in fd:
             if line[0] == "#":
@@ -108,8 +110,9 @@ def parse_gff3(filename: str, cls: T=SpliceSiteEntry) -> List[T]:
             entries.append(entry)
     return entries
 
+
 def _get_exons_by_parent(entries: List[SpliceSiteEntry]) -> Dict[str, List[SpliceSiteEntry]]:
-    """ Internal method for creating a dictionary of seqid:parent_id -> Exon list.
+    """Internal method for creating a dictionary of seqid:parent_id -> Exon list.
 
     Args:
         entries (List[SpliceSiteEntry]): List of parsed entries.
@@ -124,12 +127,16 @@ def _get_exons_by_parent(entries: List[SpliceSiteEntry]) -> Dict[str, List[Splic
             exon_groups[key].append(entry)
     return exon_groups
 
+
 def get_seqid_from_key(key):
-    ''' Given a key in our parent dictionary, returns the parsed sequence id. '''
+    '''Given a key in our parent dictionary, returns the parsed sequence id.'''
     seqid, _ = key.split(":")
     return seqid
 
-def _build_donor_acceptors_midpoints(exon_groups: Dict[str, List[SpliceSiteEntry]]) -> Dict[str, Tuple[List[SpliceSiteEntry], List[SpliceSiteEntry], List[SpliceSiteEntry]]]:
+
+def _build_donor_acceptors_midpoints(
+    exon_groups: Dict[str, List[SpliceSiteEntry]]
+) -> Dict[str, Tuple[List[SpliceSiteEntry], List[SpliceSiteEntry], List[SpliceSiteEntry]]]:
     """Internal method used for going from exon groupings to donor, acceptor, and midpoint lists.
 
     Args:
@@ -150,8 +157,11 @@ def _build_donor_acceptors_midpoints(exon_groups: Dict[str, List[SpliceSiteEntry
         by_parent[parent] = donors, acceptors, midpoints
     return by_parent
 
-def build_donor_acceptors_midpoints(gff_entries: List[SpliceSiteEntry]) -> Dict[str, Tuple[List[SpliceSiteEntry], List[SpliceSiteEntry], List[SpliceSiteEntry]]]:
-    ''' Creates a dictionary mapping locus IDs to donor, acceptor, and midpoint lists from a set of GFF lines.
+
+def build_donor_acceptors_midpoints(
+    gff_entries: List[SpliceSiteEntry],
+) -> Dict[str, Tuple[List[SpliceSiteEntry], List[SpliceSiteEntry], List[SpliceSiteEntry]]]:
+    '''Creates a dictionary mapping locus IDs to donor, acceptor, and midpoint lists from a set of GFF lines.
 
     Args:
         gff_entries: list of parsed and validated SpliceSiteEntries.
@@ -165,7 +175,7 @@ def build_donor_acceptors_midpoints(gff_entries: List[SpliceSiteEntry]) -> Dict[
 
 
 def _get_intron_midpoints(exons: List[SpliceSiteEntry]) -> List[int]:
-    midpoints = list()
+    midpoints = []
     for i, j in zip(range(0, len(exons)), range(1, len(exons))):
         midpoint = exons[i].end + (exons[j].start - exons[i].end) // 2
         midpoints.append(midpoint)
@@ -185,7 +195,7 @@ def _is_exon_start_order_consistent(exons: List[SpliceSiteEntry]) -> bool:
 
 
 def _get_donors_acceptors(exons: List[SpliceSiteEntry]) -> Tuple[List[int], List[int]]:
-    """ Internal method for getting lists of donors and acceptors of this set of exons.
+    """Internal method for getting lists of donors and acceptors of this set of exons.
 
     Args:
         exons (List[SpliceSiteEntry]): exons to fetch donors and acceptors from.
@@ -193,7 +203,7 @@ def _get_donors_acceptors(exons: List[SpliceSiteEntry]) -> Tuple[List[int], List
     Returns:
         Tuple[List[int], List[int]]: Tuple containing two lists, a list of donors and a list of acceptors.
     """
-    donors, acceptors = list(), list()
+    donors, acceptors = [], []
     for i, exon in enumerate(exons):
         # Python 3.10 please, this would be so much cleaner in a `match` statement
 
@@ -213,6 +223,6 @@ def _get_donors_acceptors(exons: List[SpliceSiteEntry]) -> Tuple[List[int], List
             elif exon.strand == "-":
                 acceptors.append(exon.end)
             else:
-                raise ValueError(f"Unexpected strand detected: {exon.strand}")                
+                raise ValueError(f"Unexpected strand detected: {exon.strand}")
 
     return donors, acceptors

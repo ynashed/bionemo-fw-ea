@@ -13,14 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import logging
+import os
 
 from hydra import compose, initialize
+
 from bionemo.model.protein.esm1nv import ESM1nvInference
 
+
 log = logging.getLogger(__name__)
-SAVE_TO='/model'
+SAVE_TO = '/model'
 
 
 with initialize(config_path="../conf"):
@@ -31,8 +33,10 @@ with initialize(config_path="../conf"):
         model = model.half()
 
     # Convert to torchscript
-    seqs = ['MSLKRKNIALIPAAGIGVRFGADKPKQYVEIGSKTVLEHVLGIFERHEAVDLTVVVVSPEDTFADKVQTAFPQVRVWKNGGQTRAETVRNGVAKLLETGLAAETDNILVHDAARCCLPSEALARLIEQAGNAAEGGILAVPVADTLKRAESGQISATVDRSGLWQAQTPQLFQAGLLHRALAAENLGGITDEASAVEKLGVRPLLIQGDARNLKLTQPQDAYIVRLLLDAV',
-            'MIQSQINRNIRLDLADAILLSKAKKDLSFAEIADGTGLAEAFVTAALLGQQALPADAARLVGAKLDLDEDSILLLQMIPLRGCIDDRIPTDPTMYRFYEMLQVYGTTLKALVHEKFGDGIISAINFKLDVKKVADPEGGERAVITLDGKYLPTKPF']
+    seqs = [
+        'MSLKRKNIALIPAAGIGVRFGADKPKQYVEIGSKTVLEHVLGIFERHEAVDLTVVVVSPEDTFADKVQTAFPQVRVWKNGGQTRAETVRNGVAKLLETGLAAETDNILVHDAARCCLPSEALARLIEQAGNAAEGGILAVPVADTLKRAESGQISATVDRSGLWQAQTPQLFQAGLLHRALAAENLGGITDEASAVEKLGVRPLLIQGDARNLKLTQPQDAYIVRLLLDAV',
+        'MIQSQINRNIRLDLADAILLSKAKKDLSFAEIADGTGLAEAFVTAALLGQQALPADAARLVGAKLDLDEDSILLLQMIPLRGCIDDRIPTDPTMYRFYEMLQVYGTTLKALVHEKFGDGIISAINFKLDVKKVADPEGGERAVITLDGKYLPTKPF',
+    ]
 
     tokens_enc, enc_mask = inferer.tokenize(seqs)
 
@@ -42,9 +46,7 @@ with initialize(config_path="../conf"):
     dynamix_axes.update(model.output_types)
 
     model.export(
-        os.path.join(SAVE_TO, 'model.onnx'),
-        input_example=(tokens_enc, enc_mask, None),
-        dynamic_axes=dynamix_axes
+        os.path.join(SAVE_TO, 'model.onnx'), input_example=(tokens_enc, enc_mask, None), dynamic_axes=dynamix_axes
     )
 
     print('Exported to', SAVE_TO)

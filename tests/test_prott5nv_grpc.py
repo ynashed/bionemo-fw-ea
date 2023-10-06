@@ -13,26 +13,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import pytest
-import grpc
 from concurrent import futures
+
+import grpc
 import numpy as np
+import prott5_pb2_grpc
+import pytest
+from prott5_pb2 import InputSpec
+from prott5_pb2_grpc import GenerativeSamplerStub
 
 from bionemo.model.protein.prott5nv.grpc.service import InferenceService
-from prott5_pb2 import InputSpec
-import prott5_pb2_grpc
-from prott5_pb2_grpc import GenerativeSamplerStub
+
 
 SEQS = ['MSLKRKNIALIPAAGIGVRFGADKPKQYVEIGSKTVLEHVL', 'MIQSQINRNIRLDLADAILLSKAKKDLSFAEIADGTGLA']
 
 ##########
 
+
 @pytest.fixture(scope='module')
 def grpc_server():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=1))
-    prott5_pb2_grpc.add_GenerativeSamplerServicer_to_server(
-        InferenceService(),
-        server)
+    prott5_pb2_grpc.add_GenerativeSamplerServicer_to_server(InferenceService(), server)
     server.add_insecure_port(f'[::]:{50051}')
     server.start()
     yield server

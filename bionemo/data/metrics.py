@@ -12,28 +12,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import torch
-import numpy as np
 from typing import List
+
+import numpy as np
+import torch
 from sklearn.metrics import accuracy_score, mean_squared_error
+
 
 def mse(output, target):
     if torch.is_tensor(output):
         output = output.detach().to("cpu").numpy()
-    if torch.is_tensor(target):    
+    if torch.is_tensor(target):
         target = target.detach().to("cpu").numpy()
     return mean_squared_error(output, target)
+
 
 def accuracy(output, target):
     if torch.is_tensor(output):
         output = output.detach().to("cpu").numpy()
-    if torch.is_tensor(target):    
+    if torch.is_tensor(target):
         target = target.detach().to("cpu").numpy()
     return accuracy_score(output.argmax(axis=1), target)
 
 
 def calculate_accuracy(predicted, labels, mask):
-    matches = [int(p==l) if m==1 else 0 for p, l, m in zip(predicted, labels, mask)]
+    matches = [int(p == l) if m == 1 else 0 for p, l, m in zip(predicted, labels, mask)]
     num_correct = sum(matches)
     accuracy = 100 * num_correct / sum(mask)
     return accuracy

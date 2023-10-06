@@ -176,7 +176,7 @@ unit-test-gpu:
     variables: false
   variables:
     JET_WORKLOADS_REF: ""
-    JET_WORKLOADS_QUERY: type == 'recipe'
+    JET_WORKLOADS_FILTER: type == 'recipe'
     JET_BUILDS_PLATFORMS: linux/amd64
   trigger:
     project: dl/jet/ci

@@ -15,13 +15,13 @@
 
 import math
 import random
+from typing import Dict, List, Optional, Tuple, Union
+
 import numpy as np
 import torch
-from rdkit import Chem
-from typing import List, Optional, Tuple, Dict, Union, Any
-
 from nemo.collections.common.tokenizers.char_tokenizer import TokenizerSpec
 from nemo.utils import logging
+from rdkit import Chem
 
 
 __all__ = ['MoleculeEnumeration', 'MoleculeInputTargetEnumeration']
@@ -32,13 +32,21 @@ class MoleculeEnumeration(object):
     """
     Provides collate_fn for pretraining of MegaMolBART based on batches from molecule datasets.
     """
-    def __init__(self, tokenizer: TokenizerSpec, seq_length: int,
-                 encoder_augment: bool, encoder_mask: bool,
-                 decoder_augment: bool, decoder_mask: bool,
-                 canonicalize_input: bool, pad_size_divisible_by_8: bool,
-                 mask_prob: Optional[float] = None,
-                 span_lambda: Optional[float] = None,
-                 **kwargs):
+
+    def __init__(
+        self,
+        tokenizer: TokenizerSpec,
+        seq_length: int,
+        encoder_augment: bool,
+        encoder_mask: bool,
+        decoder_augment: bool,
+        decoder_mask: bool,
+        canonicalize_input: bool,
+        pad_size_divisible_by_8: bool,
+        mask_prob: Optional[float] = None,
+        span_lambda: Optional[float] = None,
+        **kwargs,
+    ):
         """
         Args:
             tokenizer: tokenizer used to tokenize smiles to ids
@@ -66,9 +74,9 @@ class MoleculeEnumeration(object):
         self.mask_prob = mask_prob
         self.span_lambda = span_lambda
 
-        assert ~ ((self.encoder_mask or self.decoder_mask) ^ (self.mask_prob is not None
-                                                              and self.span_lambda is not None)), \
-            "If masking is enabled, parameters mask_prob and span_lambda must be specified!"
+        assert ~(
+            (self.encoder_mask or self.decoder_mask) ^ (self.mask_prob is not None and self.span_lambda is not None)
+        ), "If masking is enabled, parameters mask_prob and span_lambda must be specified!"
 
         if self.encoder_mask or self.decoder_mask:
             assert 0 <= self.mask_prob <= 1, 'Masking probability should belong to [0, 1] '
@@ -110,7 +118,9 @@ class MoleculeEnumeration(object):
         assert len(canon_smiles) > 0, AssertionError('Canonical SMILES string is empty')
         return aug_smiles, canon_smiles
 
-    def _check_seq_len(self, tokens: List[List[str]], mask: List[List[int]]) -> Tuple[List[List[str]], List[List[int]]]:
+    def _check_seq_len(
+        self, tokens: List[List[str]], mask: List[List[int]]
+    ) -> Tuple[List[List[str]], List[List[int]]]:
         """
         Warns user and shortens sequence of tokens if the sequence is too long and exceeds seq_length
         Args:
@@ -121,13 +131,14 @@ class MoleculeEnumeration(object):
         """
         seq_len = max([len(ts) for ts in tokens])
         if seq_len > self.seq_length:
-            tokens_short = [ts[:self.seq_length] for ts in tokens]
-            mask_short = [ms[:self.seq_length] for ms in mask]
+            tokens_short = [ts[: self.seq_length] for ts in tokens]
+            mask_short = [ms[: self.seq_length] for ms in mask]
             return (tokens_short, mask_short)
         return (tokens, mask)
 
-    def _prepare_tokens(self, batch: List[str], mask_data: bool = False) \
-            -> Dict[str, Union[List[List[str]], List[List[int]]]]:
+    def _prepare_tokens(
+        self, batch: List[str], mask_data: bool = False
+    ) -> Dict[str, Union[List[List[str]], List[List[int]]]]:
         """
         Prepares tokens for encoder or decoder from list of SMILES strings. Firstly, tokens are tokenized and,
         if requested, masked. Finally, each sequence length is verified and shortened, if necessary.
@@ -167,8 +178,9 @@ class MoleculeEnumeration(object):
             pad_length = int(math.ceil(pad_length / 8) * 8)
 
         padded = [seq + ([pad_token_id] * (pad_length - len(seq))) for seq in seqs]
-        masks = [([1] * len(seq)) + ([0] * (pad_length - len(seq))) for seq in
-                 seqs]  # 1/True = Active, 0/False = Inactive
+        masks = [
+            ([1] * len(seq)) + ([0] * (pad_length - len(seq))) for seq in seqs
+        ]  # 1/True = Active, 0/False = Inactive
         return padded, masks
 
     def tokenize(self, smi: str, mask_data=False) -> Dict[str, Union[List[List[str]], List[List[int]]]]:
@@ -233,9 +245,14 @@ class MoleculeEnumeration(object):
 
         return masked, token_mask
 
-    def _prepare_input(self, smiles: List[str], mask_data: bool, append_bos_token: bool = False,
-                       get_labels: bool = False, label_pad: Optional[int] = None) -> dict:
-
+    def _prepare_input(
+        self,
+        smiles: List[str],
+        mask_data: bool,
+        append_bos_token: bool = False,
+        get_labels: bool = False,
+        label_pad: Optional[int] = None,
+    ) -> dict:
         """
         Prepare tokens for encoder or decoder input from list with molecules smiles,
 
@@ -247,7 +264,7 @@ class MoleculeEnumeration(object):
         Returns:
             Input to encoder or decoder as a dict
         """
-        input_dict = dict()
+        input_dict = {}
 
         # TODO masks from masked tokens are never used
         tokens_dict = self._prepare_tokens(smiles, mask_data=mask_data)
@@ -270,8 +287,7 @@ class MoleculeEnumeration(object):
         input_dict['mask'] = torch.tensor(mask, dtype=torch.int64)
         return input_dict
 
-    def _get_encoder_decoder_input_smiles(self, batch: List[str]) \
-            -> Tuple[List[str], List[str], List[str]]:
+    def _get_encoder_decoder_input_smiles(self, batch: List[str]) -> Tuple[List[str], List[str], List[str]]:
         """
         Helper method to prepare input smiles to be tokenized for encoder and decoder layers
         Args:
@@ -279,17 +295,23 @@ class MoleculeEnumeration(object):
         Returns:
             lists with SMILES that are used and encoder and decoder inputs and target smiles, respectively
         """
-        encoder_smiles_list = [self._smiles_augmeter_func(smiles, augment_data=self.encoder_augment,
-                                                          canonicalize_input=self.get_canonicalized_encoder_input)
-                               for smiles in batch]
+        encoder_smiles_list = [
+            self._smiles_augmeter_func(
+                smiles, augment_data=self.encoder_augment, canonicalize_input=self.get_canonicalized_encoder_input
+            )
+            for smiles in batch
+        ]
 
         encoder_smiles = [x[0] for x in encoder_smiles_list]
         # target smiles are canonised or not encoder input smiles
         target_smiles = [x[1] for x in encoder_smiles_list]
         if self.decoder_augment:
-            decoder_smiles_list = [self._smiles_augmeter_func(smiles, augment_data=self.decoder_augment,
-                                                              canonicalize_input=self.get_canonicalized_decoder_input)
-                                   for smiles in encoder_smiles]
+            decoder_smiles_list = [
+                self._smiles_augmeter_func(
+                    smiles, augment_data=self.decoder_augment, canonicalize_input=self.get_canonicalized_decoder_input
+                )
+                for smiles in encoder_smiles
+            ]
             decoder_smiles = [x[0] for x in decoder_smiles_list]
         else:
             decoder_smiles = encoder_smiles
@@ -308,16 +330,19 @@ class MoleculeEnumeration(object):
 
         encoder_input = self._prepare_input(encoder_smiles, mask_data=self.encoder_mask)
 
-        decoder_input = self._prepare_input(decoder_smiles, mask_data=self.decoder_mask, append_bos_token=True,
-                                            get_labels=True, label_pad=label_pad)
+        decoder_input = self._prepare_input(
+            decoder_smiles, mask_data=self.decoder_mask, append_bos_token=True, get_labels=True, label_pad=label_pad
+        )
 
-        collate_output = {'text_enc': encoder_input['token_ids'],
-                          'enc_mask': encoder_input['mask'],
-                          'text_dec': decoder_input['token_ids'],
-                          'dec_mask': decoder_input['mask'],
-                          'labels': decoder_input['label_ids'],
-                          'loss_mask': decoder_input['loss_mask'],
-                          'target_smiles': target_smiles}  # target smiles strings
+        collate_output = {
+            'text_enc': encoder_input['token_ids'],
+            'enc_mask': encoder_input['mask'],
+            'text_dec': decoder_input['token_ids'],
+            'dec_mask': decoder_input['mask'],
+            'labels': decoder_input['label_ids'],
+            'loss_mask': decoder_input['loss_mask'],
+            'target_smiles': target_smiles,
+        }  # target smiles strings
 
         return collate_output
 
@@ -331,20 +356,39 @@ class MoleculeInputTargetEnumeration(MoleculeEnumeration):
     target_name - to reactants. For forward synthesis - otherwise.
     """
 
-    def __init__(self, tokenizer: TokenizerSpec, seq_length: int,
-                 encoder_augment: bool, encoder_mask: bool,
-                 decoder_augment: bool, decoder_mask: bool,
-                 canonicalize_input: bool, pad_size_divisible_by_8: bool,
-                 input_name: str, target_name: str,
-                 mask_prob: Optional[float] = None,
-                 span_lambda: Optional[float] = None,
-                 **kwargs):
-        super().__init__(tokenizer, seq_length, encoder_augment, encoder_mask, decoder_augment, decoder_mask,
-                         canonicalize_input, pad_size_divisible_by_8, mask_prob, span_lambda, **kwargs)
+    def __init__(
+        self,
+        tokenizer: TokenizerSpec,
+        seq_length: int,
+        encoder_augment: bool,
+        encoder_mask: bool,
+        decoder_augment: bool,
+        decoder_mask: bool,
+        canonicalize_input: bool,
+        pad_size_divisible_by_8: bool,
+        input_name: str,
+        target_name: str,
+        mask_prob: Optional[float] = None,
+        span_lambda: Optional[float] = None,
+        **kwargs,
+    ):
+        super().__init__(
+            tokenizer,
+            seq_length,
+            encoder_augment,
+            encoder_mask,
+            decoder_augment,
+            decoder_mask,
+            canonicalize_input,
+            pad_size_divisible_by_8,
+            mask_prob,
+            span_lambda,
+            **kwargs,
+        )
         """
         Args:
             input_name: the key name in a batch from a reaction dataset to encoder input
-            target_name: the key name in a batch from a reaction dataset to target and decoder input 
+            target_name: the key name in a batch from a reaction dataset to target and decoder input
                            to calculate the loss
         """
 
@@ -353,8 +397,7 @@ class MoleculeInputTargetEnumeration(MoleculeEnumeration):
         self.get_canonicalized_decoder_input = canonicalize_input
         self.get_canonicalized_encoder_input = False
 
-    def _get_encoder_decoder_input_smiles(self, batch: List[Dict[str, str]]) \
-            -> Tuple[List[str], List[str], List[str]]:
+    def _get_encoder_decoder_input_smiles(self, batch: List[Dict[str, str]]) -> Tuple[List[str], List[str], List[str]]:
         """
         Helper method to prepare input smiles to be tokenized for encoder and decoder layers
         Args:
@@ -362,13 +405,23 @@ class MoleculeInputTargetEnumeration(MoleculeEnumeration):
         Returns:
             lists with SMILES that are used and encoder and decoder inputs and target smiles, respectively
         """
-        encoder_smiles_list = [self._smiles_augmeter_func(react[self.input_name], augment_data=self.encoder_augment,
-                                                          canonicalize_input=self.get_canonicalized_encoder_input)
-                               for react in batch]
+        encoder_smiles_list = [
+            self._smiles_augmeter_func(
+                react[self.input_name],
+                augment_data=self.encoder_augment,
+                canonicalize_input=self.get_canonicalized_encoder_input,
+            )
+            for react in batch
+        ]
 
-        decoder_smiles_list = [self._smiles_augmeter_func(react[self.target_name], augment_data=self.decoder_augment,
-                                                          canonicalize_input=self.get_canonicalized_decoder_input)
-                               for react in batch]
+        decoder_smiles_list = [
+            self._smiles_augmeter_func(
+                react[self.target_name],
+                augment_data=self.decoder_augment,
+                canonicalize_input=self.get_canonicalized_decoder_input,
+            )
+            for react in batch
+        ]
         encoder_smiles = [x[0] for x in encoder_smiles_list]
         decoder_smiles = [x[0] for x in decoder_smiles_list]
         target_smiles = [x[1] for x in decoder_smiles_list]

@@ -14,8 +14,6 @@
 # limitations under the License.
 
 from dataclasses import dataclass
-from bionemo.data.preprocess.dna.preprocess import BasenjiDatasetPreprocessor
-from bionemo.model.utils import setup_trainer
 
 import numpy as np
 import pytorch_lightning as pl
@@ -26,22 +24,24 @@ from nemo.utils import logging
 from omegaconf.omegaconf import OmegaConf
 from torch.optim.lr_scheduler import LinearLR
 
+from bionemo.data.preprocess.dna.preprocess import BasenjiDatasetPreprocessor
 from bionemo.model.dna.enformer import Enformer
+from bionemo.model.utils import setup_trainer
 
 
 @dataclass
 class LinearLRParams(SchedulerParams):
-    # warning: all params must be explicitly overriden in the config 
-    # as registered params are not passed down 
-    start_factor: float=0.000001
-    end_factor:float=1.0
-    total_iters: int=5000
-    last_epoch: int=-1
-    verbose: bool=True
+    # warning: all params must be explicitly overriden in the config
+    # as registered params are not passed down
+    start_factor: float = 0.000001
+    end_factor: float = 1.0
+    total_iters: int = 5000
+    last_epoch: int = -1
+    verbose: bool = True
+
 
 @hydra_runner(config_path="conf", config_name="enformer_pretrain")
 def main(cfg) -> None:
-
     register_scheduler(name='LinearLR', scheduler=LinearLR, scheduler_params=LinearLRParams)
 
     logging.info("\n\n************** Experiment configuration ***********")
@@ -73,6 +73,7 @@ def main(cfg) -> None:
     if cfg.do_testing:
         enformer.setup_test_data(cfg.model.test_ds)
         trainer.test(enformer)
+
 
 if __name__ == '__main__':
     main()

@@ -1,10 +1,9 @@
 from typing import Optional
 
+import dllogger as dll
+from dllogger import DLLLoggerAlreadyInitialized, JSONStreamBackend, StdOutBackend, Verbosity
 from nemo.utils import logging
 from pytorch_lightning.utilities import rank_zero_only
-
-import dllogger as dll
-from dllogger import StdOutBackend, Verbosity, JSONStreamBackend, DLLLoggerAlreadyInitialized
 
 
 class DLLogger:
@@ -13,8 +12,9 @@ class DLLogger:
     See more details under: https://github.com/NVIDIA/dllogger
     """
 
-    def __init__(self, json_file: Optional[str] = None, append_to_json: bool = True,
-                 use_existing_dllogger: bool = False):
+    def __init__(
+        self, json_file: Optional[str] = None, append_to_json: bool = True, use_existing_dllogger: bool = False
+    ):
         """
         Args:
             json_file: path to the json file where logs of dllogger are saved

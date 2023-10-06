@@ -13,11 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from .dataloader import *
+from .metrics import *
 from .molecule import *
-from .utils import *
 from .preprocess.molecule import *
 from .preprocess.protein import *
-from .dataloader import *
 from .prott5_utils import *
+from .utils import *
 from .validation_dataset import *
-from .metrics import *

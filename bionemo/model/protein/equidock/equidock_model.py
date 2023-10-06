@@ -15,30 +15,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List
-from functools import partial
 import random
+from functools import partial
+from typing import List
 
 import torch
-from torch import Tensor
-
-
-from omegaconf import OmegaConf
-
-from torch.utils.data import DataLoader
-from pytorch_lightning import Trainer
-
 from nemo.core import ModelPT
 from nemo.core.classes.common import PretrainedModelInfo
 from nemo.utils import logging, model_utils
-
-from bionemo.model.protein.equidock.model import Rigid_Body_Docking_Net
-from bionemo.data.equidock.data_manager import DataManager
-from bionemo.model.protein.equidock.loss_metrics.intersection_loss import compute_body_intersection_loss
-from bionemo.model.protein.equidock.loss_metrics.ot_utils import compute_sq_dist_mat, compute_ot_emd
-from bionemo.model.protein.equidock.utils.train_utils import batchify_and_create_hetero_graphs
-from bionemo.model.protein.equidock.loss_metrics.eval import rmsd_compute, metrics_statistics
+from omegaconf import OmegaConf
+from pytorch_lightning import Trainer
+from torch import Tensor
+from torch.utils.data import DataLoader
 from torchmetrics.aggregation import CatMetric
+
+from bionemo.data.equidock.data_manager import DataManager
+from bionemo.model.protein.equidock.loss_metrics.eval import metrics_statistics, rmsd_compute
+from bionemo.model.protein.equidock.loss_metrics.intersection_loss import compute_body_intersection_loss
+from bionemo.model.protein.equidock.loss_metrics.ot_utils import compute_ot_emd, compute_sq_dist_mat
+from bionemo.model.protein.equidock.model import Rigid_Body_Docking_Net
+from bionemo.model.protein.equidock.utils.train_utils import batchify_and_create_hetero_graphs
+
 
 torch.use_deterministic_algorithms(False)
 torch.backends.cudnn.deterministic = True
@@ -47,11 +44,7 @@ torch.backends.cudnn.benchmark = False
 
 class NeMoExtension(ModelPT):
     def __init__(
-        self,
-        cfg: OmegaConf,
-        net: torch.nn.Module,
-        trainer: Trainer = None,
-        data_manager: DataManager = None
+        self, cfg: OmegaConf, net: torch.nn.Module, trainer: Trainer = None, data_manager: DataManager = None
     ):
         cfg = model_utils.convert_model_config_to_dict_config(cfg)
         self.cfg = model_utils.maybe_update_config_version(cfg)
@@ -61,9 +54,7 @@ class NeMoExtension(ModelPT):
         else:
             self.world_size = 1
 
-        logging.info(
-            "Fetching train/test/validation splits of protein-protein heterographs"
-        )
+        logging.info("Fetching train/test/validation splits of protein-protein heterographs")
         if data_manager is not None:
             self._train_ds = data_manager.train_ds
             self._validation_ds = data_manager.validation_ds
@@ -83,7 +74,6 @@ class NeMoExtension(ModelPT):
         self.log('lr', lr, batch_size=self.cfg.micro_batch_size)
 
     def equidock_build_dataloader(self, data_config, dataset):
-
         return DataLoader(
             dataset=dataset,
             batch_size=data_config.micro_batch_size,
@@ -97,40 +87,47 @@ class NeMoExtension(ModelPT):
 
     def setup_training_data(self, train_data_config: OmegaConf):
         logging.info(f"Length of train dataset: {len(self._train_ds)}")
-        self._train_dl = self.equidock_build_dataloader(
-            train_data_config, self._train_ds
-        )
+        self._train_dl = self.equidock_build_dataloader(train_data_config, self._train_ds)
 
     def setup_validation_data(self, val_data_config: OmegaConf):
-        logging.info(
-            f"Length of validation dataset: {len(self._validation_ds)}")
-        self._validation_dl = self.equidock_build_dataloader(
-            val_data_config, self._validation_ds
-        )
+        logging.info(f"Length of validation dataset: {len(self._validation_ds)}")
+        self._validation_dl = self.equidock_build_dataloader(val_data_config, self._validation_ds)
 
     def setup_test_data(self, test_data_config: OmegaConf):
         logging.info(f"Length of test dataset: {len(self._test_ds)}")
-        self._test_dl = self.equidock_build_dataloader(
-            test_data_config, self._test_ds)
+        self._test_dl = self.equidock_build_dataloader(test_data_config, self._test_ds)
 
     def training_step(self, train_batch, batch_idx):
+        (
+            batch_hetero_graph,
+            bound_ligand_repres_nodes_loc_array_list,
+            bound_receptor_repres_nodes_loc_array_list,
+            pocket_coors_ligand_list,
+            pocket_coors_receptor_list,
+        ) = train_batch
+        (
+            model_ligand_coors_deform_list,
+            model_keypts_ligand_list,
+            model_keypts_receptor_list,
+            _,
+            _,
+        ) = self.net.forward(batch_hetero_graph)
 
-        batch_hetero_graph, \
-            bound_ligand_repres_nodes_loc_array_list, bound_receptor_repres_nodes_loc_array_list, \
-            pocket_coors_ligand_list, pocket_coors_receptor_list = train_batch
-        model_ligand_coors_deform_list, \
-            model_keypts_ligand_list, model_keypts_receptor_list, \
-            _, _,  = self.net.forward(batch_hetero_graph)
+        loss, batch_ot_loss, batch_intersection_loss = self.loss_function(
+            model_ligand_coors_deform_list,
+            model_keypts_ligand_list,
+            model_keypts_receptor_list,
+            pocket_coors_ligand_list,
+            bound_ligand_repres_nodes_loc_array_list,
+            pocket_coors_receptor_list,
+            bound_receptor_repres_nodes_loc_array_list,
+        )
 
-        loss, batch_ot_loss, batch_intersection_loss = self.loss_function(model_ligand_coors_deform_list,  model_keypts_ligand_list,
-                                                                          model_keypts_receptor_list,
-                                                                          pocket_coors_ligand_list,
-                                                                          bound_ligand_repres_nodes_loc_array_list,
-                                                                          pocket_coors_receptor_list,
-                                                                          bound_receptor_repres_nodes_loc_array_list)
-
-        train_log = {"train_L": loss.cpu().detach(), "train_ot_L": batch_ot_loss.cpu(
-        ).detach(), "train_intersect_L": batch_intersection_loss.cpu().detach()}
+        train_log = {
+            "train_L": loss.cpu().detach(),
+            "train_ot_L": batch_ot_loss.cpu().detach(),
+            "train_intersect_L": batch_intersection_loss.cpu().detach(),
+        }
 
         self.log_dict(
             train_log,
@@ -161,14 +158,16 @@ class NeMoExtension(ModelPT):
         rmsd_log = metrics_statistics(self.metrics_test, 'test')
 
         logging.info("\n")
+        logging.info(f"Testing rmsd computed for  {rmsd_log['test_shape']} / {len(self._test_ds)} points!")
         logging.info(
-            f"Testing rmsd computed for  {rmsd_log['test_shape']} / {len(self._test_ds)} points!")
+            f"Testing dataset rmsd mean (complex/receptor/ligand):   {rmsd_log['test_complex_rmsd_mean']:.3f}/{rmsd_log['test_receptor_rmsd_mean']:.3f}/{rmsd_log['test_ligand_rmsd_mean']:.3f}"
+        )
         logging.info(
-            f"Testing dataset rmsd mean (complex/receptor/ligand):   {rmsd_log['test_complex_rmsd_mean']:.3f}/{rmsd_log['test_receptor_rmsd_mean']:.3f}/{rmsd_log['test_ligand_rmsd_mean']:.3f}")
+            f"Testing dataset rmsd median (complex/receptor/ligand): {rmsd_log['test_complex_rmsd_median']:.3f}/{rmsd_log['test_receptor_rmsd_median']:.3f}/{rmsd_log['test_ligand_rmsd_median']:.3f}"
+        )
         logging.info(
-            f"Testing dataset rmsd median (complex/receptor/ligand): {rmsd_log['test_complex_rmsd_median']:.3f}/{rmsd_log['test_receptor_rmsd_median']:.3f}/{rmsd_log['test_ligand_rmsd_median']:.3f}")
-        logging.info(
-            f"Testing dataset rmsd std (complex/receptor/ligand):    {rmsd_log['test_complex_rmsd_std']:.3f}/{rmsd_log['test_receptor_rmsd_std']:.3f}/{rmsd_log['test_ligand_rmsd_std']:.3f}")
+            f"Testing dataset rmsd std (complex/receptor/ligand):    {rmsd_log['test_complex_rmsd_std']:.3f}/{rmsd_log['test_receptor_rmsd_std']:.3f}/{rmsd_log['test_ligand_rmsd_std']:.3f}"
+        )
 
         self.log_dict(
             rmsd_log,
@@ -183,20 +182,22 @@ class NeMoExtension(ModelPT):
         rmsd_log = metrics_statistics(self.metrics_val, 'val')
 
         logging.info("\n")
+        logging.info(f"Validation rmsd computed for  {rmsd_log['val_shape']} / {len(self._validation_ds)} points!")
         logging.info(
-            f"Validation rmsd computed for  {rmsd_log['val_shape']} / {len(self._validation_ds)} points!")
+            f"Validation dataset rmsd mean (complex/receptor/ligand):   {rmsd_log['val_complex_rmsd_mean']:.3f}/{rmsd_log['val_receptor_rmsd_mean']:.3f}/{rmsd_log['val_ligand_rmsd_mean']:.3f}"
+        )
         logging.info(
-            f"Validation dataset rmsd mean (complex/receptor/ligand):   {rmsd_log['val_complex_rmsd_mean']:.3f}/{rmsd_log['val_receptor_rmsd_mean']:.3f}/{rmsd_log['val_ligand_rmsd_mean']:.3f}")
+            f"Validation dataset rmsd median (complex/receptor/ligand): {rmsd_log['val_complex_rmsd_median']:.3f}/{rmsd_log['val_receptor_rmsd_median']:.3f}/{rmsd_log['val_ligand_rmsd_median']:.3f}"
+        )
         logging.info(
-            f"Validation dataset rmsd median (complex/receptor/ligand): {rmsd_log['val_complex_rmsd_median']:.3f}/{rmsd_log['val_receptor_rmsd_median']:.3f}/{rmsd_log['val_ligand_rmsd_median']:.3f}")
-        logging.info(
-            f"Validation dataset rmsd std (complex/receptor/ligand):    {rmsd_log['val_complex_rmsd_std']:.3f}/{rmsd_log['val_receptor_rmsd_std']:.3f}/{rmsd_log['val_ligand_rmsd_std']:.3f}")
+            f"Validation dataset rmsd std (complex/receptor/ligand):    {rmsd_log['val_complex_rmsd_std']:.3f}/{rmsd_log['val_receptor_rmsd_std']:.3f}/{rmsd_log['val_ligand_rmsd_std']:.3f}"
+        )
 
         if self.trainer.early_stopping_callback is not None and self.current_epoch != 0:
             logging.info(
-                f"Early stopping (wait/patience), (best_score) : {self.trainer.early_stopping_callback.wait_count}/{self.trainer.early_stopping_callback.patience}, {self.trainer.early_stopping_callback.best_score}")
-            early_stopping_stats = {
-                "best_score": self.trainer.early_stopping_callback.best_score}
+                f"Early stopping (wait/patience), (best_score) : {self.trainer.early_stopping_callback.wait_count}/{self.trainer.early_stopping_callback.patience}, {self.trainer.early_stopping_callback.best_score}"
+            )
+            early_stopping_stats = {"best_score": self.trainer.early_stopping_callback.best_score}
             self.log_dict(
                 early_stopping_stats,
                 prog_bar=False,
@@ -216,23 +217,37 @@ class NeMoExtension(ModelPT):
         )
 
     def validation_step(self, val_batch, batch_idx):
-        batch_hetero_graph, \
-            bound_ligand_repres_nodes_loc_array_list, bound_receptor_repres_nodes_loc_array_list, \
-            pocket_coors_ligand_list, pocket_coors_receptor_list = val_batch
-        model_ligand_coors_deform_list, \
-            model_keypts_ligand_list, model_keypts_receptor_list, \
-            _, _,  = self.net(batch_hetero_graph)
+        (
+            batch_hetero_graph,
+            bound_ligand_repres_nodes_loc_array_list,
+            bound_receptor_repres_nodes_loc_array_list,
+            pocket_coors_ligand_list,
+            pocket_coors_receptor_list,
+        ) = val_batch
+        (
+            model_ligand_coors_deform_list,
+            model_keypts_ligand_list,
+            model_keypts_receptor_list,
+            _,
+            _,
+        ) = self.net(batch_hetero_graph)
 
-        loss, batch_ot_loss, batch_intersection_loss = self.loss_function(model_ligand_coors_deform_list,  model_keypts_ligand_list,
-                                                                          model_keypts_receptor_list,
-                                                                          pocket_coors_ligand_list,
-                                                                          bound_ligand_repres_nodes_loc_array_list,
-                                                                          pocket_coors_receptor_list,
-                                                                          bound_receptor_repres_nodes_loc_array_list,
-                                                                          dataset_type='validation')
+        loss, batch_ot_loss, batch_intersection_loss = self.loss_function(
+            model_ligand_coors_deform_list,
+            model_keypts_ligand_list,
+            model_keypts_receptor_list,
+            pocket_coors_ligand_list,
+            bound_ligand_repres_nodes_loc_array_list,
+            pocket_coors_receptor_list,
+            bound_receptor_repres_nodes_loc_array_list,
+            dataset_type='validation',
+        )
 
-        val_log = {"val_L": loss.cpu().detach(), "val_ot_L": batch_ot_loss.cpu(
-        ).detach(), "val_intersect_L": batch_intersection_loss.cpu().detach()}
+        val_log = {
+            "val_L": loss.cpu().detach(),
+            "val_ot_L": batch_ot_loss.cpu().detach(),
+            "val_intersect_L": batch_intersection_loss.cpu().detach(),
+        }
 
         self.log_dict(
             val_log,
@@ -246,23 +261,37 @@ class NeMoExtension(ModelPT):
         return loss
 
     def test_step(self, test_batch, batch_idx):
-        batch_hetero_graph, \
-            bound_ligand_repres_nodes_loc_array_list, bound_receptor_repres_nodes_loc_array_list, \
-            pocket_coors_ligand_list, pocket_coors_receptor_list = test_batch
-        model_ligand_coors_deform_list, \
-            model_keypts_ligand_list, model_keypts_receptor_list, \
-            _, _,  = self.net.forward(batch_hetero_graph)
+        (
+            batch_hetero_graph,
+            bound_ligand_repres_nodes_loc_array_list,
+            bound_receptor_repres_nodes_loc_array_list,
+            pocket_coors_ligand_list,
+            pocket_coors_receptor_list,
+        ) = test_batch
+        (
+            model_ligand_coors_deform_list,
+            model_keypts_ligand_list,
+            model_keypts_receptor_list,
+            _,
+            _,
+        ) = self.net.forward(batch_hetero_graph)
 
-        loss, batch_ot_loss, batch_intersection_loss = self.loss_function(model_ligand_coors_deform_list,  model_keypts_ligand_list,
-                                                                          model_keypts_receptor_list,
-                                                                          pocket_coors_ligand_list,
-                                                                          bound_ligand_repres_nodes_loc_array_list,
-                                                                          pocket_coors_receptor_list,
-                                                                          bound_receptor_repres_nodes_loc_array_list,
-                                                                          dataset_type='testing')
+        loss, batch_ot_loss, batch_intersection_loss = self.loss_function(
+            model_ligand_coors_deform_list,
+            model_keypts_ligand_list,
+            model_keypts_receptor_list,
+            pocket_coors_ligand_list,
+            bound_ligand_repres_nodes_loc_array_list,
+            pocket_coors_receptor_list,
+            bound_receptor_repres_nodes_loc_array_list,
+            dataset_type='testing',
+        )
 
-        test_loss = {"test_L": loss.cpu().detach(), "test_ot_L": batch_ot_loss.cpu(
-        ).detach(), "test_intersect_L": batch_intersection_loss.cpu().detach()}
+        test_loss = {
+            "test_L": loss.cpu().detach(),
+            "test_ot_L": batch_ot_loss.cpu().detach(),
+            "test_intersect_L": batch_intersection_loss.cpu().detach(),
+        }
         self.log_dict(
             test_loss,
             prog_bar=False,
@@ -274,14 +303,17 @@ class NeMoExtension(ModelPT):
 
         return test_loss
 
-    def loss_function(self, model_ligand_coors_deform_list: List[Tensor], model_keypts_ligand_list: List[Tensor],
-                      model_keypts_receptor_list: List[Tensor],
-                      pocket_coors_ligand_list: List[Tensor],
-                      bound_ligand_repres_nodes_loc_array_list: List[Tensor],
-                      pocket_coors_receptor_list: List[Tensor],
-                      bound_receptor_repres_nodes_loc_array_list: List[Tensor],
-                      dataset_type: str = 'train'):
-
+    def loss_function(
+        self,
+        model_ligand_coors_deform_list: List[Tensor],
+        model_keypts_ligand_list: List[Tensor],
+        model_keypts_receptor_list: List[Tensor],
+        pocket_coors_ligand_list: List[Tensor],
+        bound_ligand_repres_nodes_loc_array_list: List[Tensor],
+        pocket_coors_receptor_list: List[Tensor],
+        bound_receptor_repres_nodes_loc_array_list: List[Tensor],
+        dataset_type: str = 'train',
+    ):
         pocket_ot_loss_weight = self.pocket_ot_loss_weight
         intersection_loss_weight = self.intersection_loss_weight
 
@@ -292,8 +324,7 @@ class NeMoExtension(ModelPT):
 
         # Compute MSE loss for each protein individually, then average over the minibatch.
         batch_ligand_coors_loss = torch.zeros([]).to(device)
-        batch_receptor_coors_loss = torch.zeros(
-            []).to(device)  # This is not used!
+        batch_receptor_coors_loss = torch.zeros([]).to(device)  # This is not used!
         batch_ot_loss = torch.zeros([]).to(device)
         batch_intersection_loss = torch.zeros([]).to(device)
 
@@ -301,14 +332,13 @@ class NeMoExtension(ModelPT):
 
         for i in range(len(model_ligand_coors_deform_list)):
             # Compute average MSE loss (which is 3 times smaller than average squared RMSD)
-            batch_ligand_coors_loss = batch_ligand_coors_loss + loss_fn_coors(model_ligand_coors_deform_list[i],
-                                                                              bound_ligand_repres_nodes_loc_array_list[i].to(device))
+            batch_ligand_coors_loss = batch_ligand_coors_loss + loss_fn_coors(
+                model_ligand_coors_deform_list[i], bound_ligand_repres_nodes_loc_array_list[i].to(device)
+            )
 
             # Compute the OT loss for the binding pocket:
-            ligand_pocket_coors = pocket_coors_ligand_list[i].to(
-                device)  # (N, 3), N = num pocket nodes
-            receptor_pocket_coors = pocket_coors_receptor_list[i].to(
-                device)  # (N, 3), N = num pocket nodes
+            ligand_pocket_coors = pocket_coors_ligand_list[i].to(device)  # (N, 3), N = num pocket nodes
+            receptor_pocket_coors = pocket_coors_receptor_list[i].to(device)  # (N, 3), N = num pocket nodes
 
             # (K, 3), K = num keypoints
             ligand_keypts_coors = model_keypts_ligand_list[i]
@@ -316,25 +346,26 @@ class NeMoExtension(ModelPT):
             receptor_keypts_coors = model_keypts_receptor_list[i]
 
             # (N, K) cost matrix
-            cost_mat_ligand = compute_sq_dist_mat(
-                ligand_pocket_coors, ligand_keypts_coors)
-            cost_mat_receptor = compute_sq_dist_mat(
-                receptor_pocket_coors, receptor_keypts_coors)
+            cost_mat_ligand = compute_sq_dist_mat(ligand_pocket_coors, ligand_keypts_coors)
+            cost_mat_receptor = compute_sq_dist_mat(receptor_pocket_coors, receptor_keypts_coors)
 
-            ot_dist, _ = compute_ot_emd(
-                cost_mat_ligand + cost_mat_receptor, device)
+            ot_dist, _ = compute_ot_emd(cost_mat_ligand + cost_mat_receptor, device)
             batch_ot_loss = batch_ot_loss + ot_dist
 
             batch_intersection_loss = batch_intersection_loss + compute_body_intersection_loss(
-                model_ligand_coors_deform_list[i], bound_receptor_repres_nodes_loc_array_list[i].to(
-                    device),
-                intersection_sigma, intersection_surface_ct)
+                model_ligand_coors_deform_list[i],
+                bound_receptor_repres_nodes_loc_array_list[i].to(device),
+                intersection_sigma,
+                intersection_surface_ct,
+            )
 
             if i < 2 or dataset_type.startswith('val') or dataset_type.startswith('test') or (random.random() < 0.1):
-                complex_rmsd, ligand_rmsd, receptor_rmsd = rmsd_compute(model_ligand_coors_deform_list[i],
-                                                                        bound_receptor_repres_nodes_loc_array_list[i],
-                                                                        bound_ligand_repres_nodes_loc_array_list[i],
-                                                                        bound_receptor_repres_nodes_loc_array_list[i])
+                complex_rmsd, ligand_rmsd, receptor_rmsd = rmsd_compute(
+                    model_ligand_coors_deform_list[i],
+                    bound_receptor_repres_nodes_loc_array_list[i],
+                    bound_ligand_repres_nodes_loc_array_list[i],
+                    bound_receptor_repres_nodes_loc_array_list[i],
+                )
 
                 if dataset_type.startswith('val'):
                     for cnt, cur_rmsd in enumerate([complex_rmsd, ligand_rmsd, receptor_rmsd]):
@@ -348,19 +379,14 @@ class NeMoExtension(ModelPT):
                 else:
                     raise ValueError(f"Unknown dataset type {dataset_type}!")
 
-        batch_ligand_coors_loss = batch_ligand_coors_loss / \
-            float(len(model_ligand_coors_deform_list))
-        batch_receptor_coors_loss = batch_receptor_coors_loss / \
-            float(len(model_ligand_coors_deform_list))
-        batch_ot_loss = batch_ot_loss / \
-            float(len(model_ligand_coors_deform_list))
-        batch_intersection_loss = batch_intersection_loss / \
-            float(len(model_ligand_coors_deform_list))
+        batch_ligand_coors_loss = batch_ligand_coors_loss / float(len(model_ligand_coors_deform_list))
+        batch_receptor_coors_loss = batch_receptor_coors_loss / float(len(model_ligand_coors_deform_list))
+        batch_ot_loss = batch_ot_loss / float(len(model_ligand_coors_deform_list))
+        batch_intersection_loss = batch_intersection_loss / float(len(model_ligand_coors_deform_list))
 
         loss_coors = batch_ligand_coors_loss + batch_receptor_coors_loss
 
-        loss = loss_coors + pocket_ot_loss_weight * batch_ot_loss + \
-            intersection_loss_weight * batch_intersection_loss
+        loss = loss_coors + pocket_ot_loss_weight * batch_ot_loss + intersection_loss_weight * batch_intersection_loss
 
         return loss, batch_ot_loss, batch_intersection_loss
 
@@ -374,10 +400,9 @@ class NeMoExtension(ModelPT):
 
 
 class EquiDock(NeMoExtension):
-    def __init__(self, cfg: OmegaConf,
-                 trainer: Trainer = None,
-                 data_manager: DataManager = None,
-                 net: torch.nn.Module = None):
+    def __init__(
+        self, cfg: OmegaConf, trainer: Trainer = None, data_manager: DataManager = None, net: torch.nn.Module = None
+    ):
         if "model" in cfg:
             cfg_ = cfg.model
         else:
@@ -391,10 +416,8 @@ class EquiDock(NeMoExtension):
         )
 
     def reload_nemo_model(self, cfg: OmegaConf, trainer: Trainer, data_manager: DataManager):
-
         if data_manager is None:
-            raise ValueError(
-                f"Error: data_manager {data_manager} and tariner {Trainer} cannot be None")
+            raise ValueError(f"Error: data_manager {data_manager} and tariner {Trainer} cannot be None")
 
         self._train_ds = data_manager.train_ds
         self._test_ds = data_manager.test_ds

@@ -15,8 +15,8 @@
 """Client for seeded molecule generation with MegaMolBART."""
 import argparse
 import pickle
-import numpy as np
 
+import numpy as np
 from pytriton.client import ModelClient
 
 
@@ -51,6 +51,7 @@ def main():
         with open(args.output_path, 'wb') as f:
             pickle.dump(result_dict, f)
         print(f"Results written to {args.output_path}")
+
 
 if __name__ == "__main__":
     main()

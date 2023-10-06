@@ -14,22 +14,18 @@
 # limitations under the License.
 
 import os
-import sys
-import requests
-import multiprocessing as mp
-import pandas as pd
-import tempfile
 import pathlib
-
+import sys
 from datetime import datetime
-from subprocess import run
-from multiprocessing import Pool
 from functools import partial
+from multiprocessing import Pool
+from subprocess import run
 from typing import Optional
 
-from rdkit import Chem
-
+import pandas as pd
+import requests
 from nemo.utils import logging
+from rdkit import Chem
 
 
 __all__ = ['Zinc15Preprocess']
@@ -38,8 +34,8 @@ ROOT_DIR = '/tmp/zinc15'
 os.environ['PROJECT_MOUNT'] = os.environ.get('PROJECT_MOUNT', '/workspace/bionemo')
 ZINC_URL_LIST = os.path.join(os.environ['PROJECT_MOUNT'], 'examples/molecule/megamolbart/dataset/ZINC-downloader.txt')
 
-class Zinc15Preprocess(object):
 
+class Zinc15Preprocess(object):
     def __init__(self, root_directory: Optional[str] = ROOT_DIR) -> None:
         """Preprocessing of ZINC15 data into SMILES
 
@@ -64,7 +60,6 @@ class Zinc15Preprocess(object):
         return process
 
     def _process_file(self, url, download_dir, max_smiles_length=512):
-
         filename = os.path.basename(url)
         if os.path.exists(os.path.join(download_dir, filename)):
             logging.info(f'{url} already downloaded...')
@@ -104,7 +99,9 @@ class Zinc15Preprocess(object):
 
             os.rename(tmp_filename, os.path.join(download_dir, filename))
             if num_molecules_filtered > 0:
-                logging.info(f'Filtered {num_molecules_filtered} molecules from {filename} with length longer than {max_smiles_length}')
+                logging.info(
+                    f'Filtered {num_molecules_filtered} molecules from {filename} with length longer than {max_smiles_length}'
+                )
             if num_molecules_failed > 0:
                 logging.info(f'Could not process {num_molecules_failed} molecules from {filename}')
             return
@@ -113,8 +110,7 @@ class Zinc15Preprocess(object):
                 logging.error(f'{url} Not found')
                 return
             else:
-                logging.error(
-                    f'Could not download file {url}: {e.response.status_code}')
+                logging.error(f'Could not download file {url}: {e.response.status_code}')
                 raise e
 
     def __processing_failure(self, e):
@@ -131,26 +127,22 @@ class Zinc15Preprocess(object):
             download_dir (str): Directory to download the files to.
         """
 
-        logging.info(
-            f'Downloading files from {links_file} with poolsize {pool_size}...')
+        logging.info(f'Downloading files from {links_file} with poolsize {pool_size}...')
 
         os.makedirs(download_dir, exist_ok=True)
         with open(links_file, 'r') as f:
-            links = list(set([x.strip() for x in f]))
+            links = list({x.strip() for x in f})
 
         download_funct = partial(self._process_file, download_dir=download_dir, max_smiles_length=max_smiles_length)
 
         while True:
             pool = Pool(processes=pool_size)
-            pool.map_async(download_funct,
-                           links,
-                           error_callback=self.__processing_failure)
+            pool.map_async(download_funct, links, error_callback=self.__processing_failure)
             pool.close()
             pool.join()
 
             if self.retry:
-                logging.info(
-                    'Retrying to download files that failed with 503...')
+                logging.info('Retrying to download files that failed with 503...')
                 self.retry = False
             else:
                 break
@@ -160,7 +152,7 @@ class Zinc15Preprocess(object):
         logging.info(f'Splitting file {filename} into train, validation, and test data')
 
         df = pd.read_csv(filename, header=None, names=['zinc_id', 'smiles'])
-        
+
         # Calculate sample sizes before size of dataframe changes
         test_samples = max(int(test_frac * df.shape[0]), 1)
         val_samples = max(int(val_frac * df.shape[0]), 1)
@@ -179,15 +171,16 @@ class Zinc15Preprocess(object):
         del test_df
         del val_df
 
-    def train_val_test_split(self, 
-                             download_dir, 
-                             output_dir, 
-                             train_samples_per_file, 
-                             val_samples_per_file, 
-                             test_samples_per_file, 
-                             pool_size=8, 
-                             seed=0):
-
+    def train_val_test_split(
+        self,
+        download_dir,
+        output_dir,
+        train_samples_per_file,
+        val_samples_per_file,
+        test_samples_per_file,
+        pool_size=8,
+        seed=0,
+    ):
         split_data = os.path.join(output_dir, 'split_data')
         os.makedirs(split_data, exist_ok=True)
         os.makedirs(os.path.join(output_dir, 'train'), exist_ok=True)
@@ -195,8 +188,10 @@ class Zinc15Preprocess(object):
         os.makedirs(os.path.join(output_dir, 'val'), exist_ok=True)
 
         total_samples_per_file = sum([train_samples_per_file, val_samples_per_file, test_samples_per_file])
-        self._run_cmd(f"cd {split_data}; tail -q -n +2 {download_dir}/** | split -d -l {total_samples_per_file} -a 3",
-                      failure_error='Error while merging files')
+        self._run_cmd(
+            f"cd {split_data}; tail -q -n +2 {download_dir}/** | split -d -l {total_samples_per_file} -a 3",
+            failure_error='Error while merging files',
+        )
 
         split_files = os.listdir(split_data)
         logging.info(f'The data has been be split into {len(split_files)} files.')
@@ -204,19 +199,22 @@ class Zinc15Preprocess(object):
         val_frac = val_samples_per_file / total_samples_per_file
         test_frac = test_samples_per_file / total_samples_per_file
         with Pool(processes=pool_size) as pool:
-            split_funct = partial(self._process_split, val_frac=val_frac, test_frac=test_frac, output_dir=output_dir, seed=seed)
+            split_funct = partial(
+                self._process_split, val_frac=val_frac, test_frac=test_frac, output_dir=output_dir, seed=seed
+            )
 
-            pool.map(split_funct,
-                     split_files)
+            pool.map(split_funct, split_files)
 
-    def prepare_dataset(self,
-                        max_smiles_length=512,
-                        train_samples_per_file=10050000,
-                        val_samples_per_file=100,
-                        test_samples_per_file=50000,
-                        links_file=ZINC_URL_LIST,
-                        output_dir=None,
-                        seed=0):
+    def prepare_dataset(
+        self,
+        max_smiles_length=512,
+        train_samples_per_file=10050000,
+        val_samples_per_file=100,
+        test_samples_per_file=50000,
+        links_file=ZINC_URL_LIST,
+        output_dir=None,
+        seed=0,
+    ):
         """
         Download ZINC15 tranches and split into train, valid, and test sets.
 
@@ -229,7 +227,9 @@ class Zinc15Preprocess(object):
             seed (int): Random seed for data splitting
         """
 
-        logging.info('Download and preprocess of ZINC15 data does not currently use GPU. Workstation or CPU-only instance recommended.')
+        logging.info(
+            'Download and preprocess of ZINC15 data does not currently use GPU. Workstation or CPU-only instance recommended.'
+        )
 
         download_dir = self.root_directory.joinpath('raw')
         if output_dir is None:
@@ -237,29 +237,29 @@ class Zinc15Preprocess(object):
 
         if os.path.exists(output_dir):
             logging.info(f'{output_dir} already exists...')
-            os.rename(output_dir, str(output_dir) +
-                      datetime.now().strftime('%Y%m%d%H%M%S'))
+            os.rename(output_dir, str(output_dir) + datetime.now().strftime('%Y%m%d%H%M%S'))
 
         if os.path.basename(links_file) == 'ZINC-downloader.txt':
-                logging.info(
-                             f'NOTE: It appears the all ZINC15 tranches have been selected for processing. '\
-                               'Processing all of the ZINC15 tranches can require up to a day, depending on resources. '\
-                               'To test on a subset set model.data.links_file to ZINC-downloader-sample.txt')
+            logging.info(
+                'NOTE: It appears the all ZINC15 tranches have been selected for processing. '
+                'Processing all of the ZINC15 tranches can require up to a day, depending on resources. '
+                'To test on a subset set model.data.links_file to ZINC-downloader-sample.txt'
+            )
 
         # If 503 errors or deadlocks are a problem, reduce pool size to 8.
-        self.process_files(links_file,
-                           download_dir=download_dir,
-                           pool_size=16,
-                           max_smiles_length=max_smiles_length)
+        self.process_files(links_file, download_dir=download_dir, pool_size=16, max_smiles_length=max_smiles_length)
         logging.info('Download complete.')
 
-        samples_per_file = [train_samples_per_file, val_samples_per_file, test_samples_per_file]
-        logging.info(f'Now splitting the data into train, val, and test sets with {train_samples_per_file}, {val_samples_per_file}, {test_samples_per_file} samples per file, respectively.')
+        logging.info(
+            f'Now splitting the data into train, val, and test sets with {train_samples_per_file}, {val_samples_per_file}, {test_samples_per_file} samples per file, respectively.'
+        )
 
-        self.train_val_test_split(download_dir,
-                                  output_dir,
-                                  train_samples_per_file=train_samples_per_file, 
-                                  val_samples_per_file=val_samples_per_file, 
-                                  test_samples_per_file=test_samples_per_file, 
-                                  pool_size=8,
-                                  seed=seed)
+        self.train_val_test_split(
+            download_dir,
+            output_dir,
+            train_samples_per_file=train_samples_per_file,
+            val_samples_per_file=val_samples_per_file,
+            test_samples_per_file=test_samples_per_file,
+            pool_size=8,
+            seed=seed,
+        )

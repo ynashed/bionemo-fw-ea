@@ -1,19 +1,23 @@
 import os
 import shutil
 from typing import Optional
+
 import pandas as pd
 from nemo.utils import logging
 from rdkit import Chem
 
 from bionemo.data.utils import download_registry_from_ngc, get_ngc_registry_file_list, verify_checksum_matches
 
+
 MD5_CHECKSUM = 'd956c753c757f19c8e9d913f51cf0eed'
+
 
 class USPTO50KPreprocess:
     """
     Downloads and prepares the reaction data USPTO50K for model training, ie by cleaning and splitting
     the data into train, validation and tests sets.
     """
+
     def __init__(self, data_dir: str, max_smiles_length: Optional[str] = None, checksum: Optional[str] = MD5_CHECKSUM):
         self.data_dir = data_dir
         self.max_smiles_length = max_smiles_length
@@ -38,13 +42,16 @@ class USPTO50KPreprocess:
             logging.info(f'Path to the processed dataset {self.processed_dir} exists!')
             return
 
-        self.datapath_raw = self.download_raw_data_file(ngc_registry_target=ngc_registry_target, 
-                                                        ngc_registry_version=ngc_registry_version)
+        self.datapath_raw = self.download_raw_data_file(
+            ngc_registry_target=ngc_registry_target, ngc_registry_version=ngc_registry_version
+        )
 
         if self.datapath_raw:
             self.train_val_test_split(datapath_raw=self.datapath_raw)
         else:
-            logging.error(f"Failed to download dataset target {ngc_registry_target} and version {ngc_registry_version}!")
+            logging.error(
+                f"Failed to download dataset target {ngc_registry_target} and version {ngc_registry_version}!"
+            )
 
     def download_raw_data_file(self, ngc_registry_target: str, ngc_registry_version: str) -> Optional[str]:
         """
@@ -56,14 +63,18 @@ class USPTO50KPreprocess:
         Returns:
             output_path (str): path to the location of the downloaded file
         """
-        logging.info(f'Downloading dataset from target {ngc_registry_target} and version '
-                     f'{ngc_registry_version} from NGC ...')
+        logging.info(
+            f'Downloading dataset from target {ngc_registry_target} and version '
+            f'{ngc_registry_version} from NGC ...'
+        )
         if not os.path.exists(self.download_dir):
             os.makedirs(self.download_dir, exist_ok=True)
 
         try:
-            assert os.environ.get('NGC_CLI_API_KEY', False), AssertionError("""NGC API key not defined as environment variable "NGC_CLI_API_KEY".
-                                                                            Aborting resource download.""")
+            assert os.environ.get('NGC_CLI_API_KEY', False), AssertionError(
+                """NGC API key not defined as environment variable "NGC_CLI_API_KEY".
+                                                                            Aborting resource download."""
+            )
             ngc_org = os.environ.get('NGC_CLI_ORG', None)
             assert ngc_org, AssertionError('NGC org must be defined by the environment variable NGC_CLI_ORG')
             ngc_team = os.environ.get('NGC_CLI_TEAM', None)
@@ -72,7 +83,7 @@ class USPTO50KPreprocess:
             file_list = get_ngc_registry_file_list(ngc_registry_target, ngc_registry_version, ngc_org, ngc_team)
             file_exists = False
             if len(file_list) > 1:
-                logging.info(f'Checksum verification not supported if resource contains more than one file.')
+                logging.info('Checksum verification not supported if resource contains more than one file.')
             else:
                 file_name = file_list[0]
                 output_path = os.path.join(self.download_dir, file_name)
@@ -81,16 +92,20 @@ class USPTO50KPreprocess:
 
             # Download resource and copy if needed
             if not file_exists:
-                tmp_download_path = download_registry_from_ngc(ngc_registry_target=ngc_registry_target, 
-                                                               ngc_registry_version=ngc_registry_version,
-                                                               ngc_org=ngc_org,
-                                                               ngc_team=ngc_team,
-                                                               dest=self.data_dir,
-                                                               expected_checksum=MD5_CHECKSUM)
-                
+                tmp_download_path = download_registry_from_ngc(
+                    ngc_registry_target=ngc_registry_target,
+                    ngc_registry_version=ngc_registry_version,
+                    ngc_org=ngc_org,
+                    ngc_team=ngc_team,
+                    dest=self.data_dir,
+                    expected_checksum=MD5_CHECKSUM,
+                )
+
                 # Move to destination directory and clean up
                 file_name = os.path.basename(tmp_download_path)
-                output_path = os.path.join(self.download_dir, file_name) # Ensures output_path is defined when file is downloaded
+                output_path = os.path.join(
+                    self.download_dir, file_name
+                )  # Ensures output_path is defined when file is downloaded
                 shutil.copyfile(tmp_download_path, output_path)
                 logging.info(f'Download complete at {output_path}.')
             else:
@@ -100,7 +115,8 @@ class USPTO50KPreprocess:
 
         except Exception as e:
             logging.error(
-                f'Could not download from NGC dataset from target {ngc_registry_target} and version {ngc_registry_version}: {e}')
+                f'Could not download from NGC dataset from target {ngc_registry_target} and version {ngc_registry_version}: {e}'
+            )
             raise e
 
     def train_val_test_split(self, datapath_raw: str):
@@ -109,16 +125,18 @@ class USPTO50KPreprocess:
         Args:
             datapath_raw (str): local path to the file with the raw data
         """
-        logging.info(f'Splitting file {datapath_raw} into {", ".join(self.splits)} data and '
-                     f'saving in {self.processed_dir}')
+        logging.info(
+            f'Splitting file {datapath_raw} into {", ".join(self.splits)} data and ' f'saving in {self.processed_dir}'
+        )
 
         df = pd.read_pickle(datapath_raw)
-        assert all([col in df for col in ['reactants_mol', 'products_mol', 'reaction_type', 'set']])
+        assert all(col in df for col in ['reactants_mol', 'products_mol', 'reaction_type', 'set'])
 
         # TODO parallelize in the future!
         for name in ['reactants', 'products']:
             df[f'{name}_correct'] = df[f'{name}_mol'].apply(
-                lambda mol: True if Chem.MolToSmiles(mol, canonical=True) else False)
+                lambda mol: True if Chem.MolToSmiles(mol, canonical=True) else False
+            )
 
         df = df[df['reactants_correct'] & df['products_correct']]
         for name in ['reactants', 'products']:

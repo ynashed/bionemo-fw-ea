@@ -1,18 +1,18 @@
-from typing import Union, Callable, List, Optional, Dict
 import os
+from typing import Callable, Dict, List, Optional, Union
 
-import torch
-from torch.utils.data import Dataset, DataLoader, random_split
-from pytorch_lightning import LightningDataModule
 import pandas as pd
+import torch
+from torch.utils.data import Dataset
 
 
 class DataFrameTransformDataset(Dataset):
-    def __init__(self,
-                 data_file: Union[str, bytes, os.PathLike],
-                 functions: List[Callable[[pd.Series], Dict[str, torch.TensorType]]],
-                 read_csv_args: Optional[dict] = None,
-                ):
+    def __init__(
+        self,
+        data_file: Union[str, bytes, os.PathLike],
+        functions: List[Callable[[pd.Series], Dict[str, torch.TensorType]]],
+        read_csv_args: Optional[dict] = None,
+    ):
         """Dataset that is fundamentally a dataset but allows transforms on rows
 
         Args:
@@ -24,7 +24,7 @@ class DataFrameTransformDataset(Dataset):
         """
 
         if read_csv_args is None:
-            read_csv_args = dict()
+            read_csv_args = {}
         self.df = pd.read_csv(data_file, **read_csv_args)
         self.length = self.df.shape[0]
         self.functions = functions

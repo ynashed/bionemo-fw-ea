@@ -1,7 +1,7 @@
-import pytest
-import subprocess
-import inspect
 import os
+
+import pytest
+
 
 """
 
@@ -96,12 +96,15 @@ tests/regression_tests/test_regression.py::test_e SKIPPED (test requires regress
 
 """
 
+
 ############################## HELPERS ##############################
 def _level_to_str(level: int) -> str:
     return f'L{level}'
 
+
 def _str_to_level(level_str: str) -> int:
     return int(level_str[1:])
+
 
 def _regression_test_filter(item):
     item_regression_levels = [mark.args[0] for mark in item.iter_markers(name="regression")]
@@ -109,8 +112,10 @@ def _regression_test_filter(item):
         item_regression_levels = ['L0']
     runner_regression_levels = [_level_to_str(l) for l in item.config.getoption("--regression-level")]
     if not any(item_level in runner_regression_levels for item_level in item_regression_levels):
-        pytest.skip("test requires regression level in {!r}".format(
-            [_str_to_level(item) for item in item_regression_levels]))
+        pytest.skip(
+            "test requires regression level in {!r}".format([_str_to_level(item) for item in item_regression_levels])
+        )
+
 
 ################ NEEDED FOR PYTEST OPTIONS/FILTERING ################
 def pytest_addoption(parser):
@@ -119,16 +124,20 @@ def pytest_addoption(parser):
         "-L",
         action="store",
         nargs="+",
-        default=[0, ],
+        default=[
+            0,
+        ],
         metavar="NAME",
         help="Run tests with the specified regression levels. Tests without a regression mark are considered level 0",
     )
+
 
 def pytest_configure(config):
     # register an additional marker
     config.addinivalue_line(
         "markers", "regression(level): mark test to be run with regression tests at a certain level"
     )
+
 
 def pytest_runtest_setup(item):
     _regression_test_filter(item)

@@ -13,12 +13,12 @@
 # limitations under the License.
 
 import os
-from omegaconf.dictconfig import DictConfig
-from omegaconf import open_dict
-from pytorch_lightning.trainer.trainer import Trainer
 
 from nemo.collections.nlp.models.language_modeling.megatron_t5_model import MegatronT5Model
 from nemo.utils import logging
+from omegaconf import open_dict
+from omegaconf.dictconfig import DictConfig
+from pytorch_lightning.trainer.trainer import Trainer
 
 from bionemo.data.prott5_utils import prott5_build_dataset
 
@@ -72,7 +72,7 @@ class ProtT5nvModel(MegatronT5Model):
             "permutation": self._cfg.data.get('permutation', False),
             "whole_word_masking": self._cfg.data.get('whole_word_masking', False),
             "favor_long_ngrams": self._cfg.data.get('favor_long_ngrams', False),
-            "data_impl_kwargs": self._cfg.data.data_impl_kwargs.get(self._cfg.data.data_impl, {})
+            "data_impl_kwargs": self._cfg.data.data_impl_kwargs.get(self._cfg.data.data_impl, {}),
         }
         # we add here index_mapping_dir to data_impl_kwargs (which are data_impl specific)
         with open_dict(kwargs["data_impl_kwargs"]):
@@ -86,21 +86,21 @@ class ProtT5nvModel(MegatronT5Model):
             data_prefix=os.path.join(dataset_path, 'train', ds_train),
             num_samples=train_valid_test_num_samples[0],
             name="train",
-            **kwargs
-            )
+            **kwargs,
+        )
         self._validation_ds = prott5_build_dataset(
             data_prefix=os.path.join(dataset_path, 'val', ds_val),
             num_samples=train_valid_test_num_samples[1],
             name="valid",
-            **kwargs
-            )
+            **kwargs,
+        )
 
         self._test_ds = prott5_build_dataset(
             data_prefix=os.path.join(dataset_path, 'test', ds_test),
             num_samples=train_valid_test_num_samples[2],
             name="test",
-            **kwargs
-            )
+            **kwargs,
+        )
 
         logging.info(f'Length of train dataset: {len(self._train_ds)}')
         logging.info(f'Length of val dataset: {len(self._validation_ds)}')

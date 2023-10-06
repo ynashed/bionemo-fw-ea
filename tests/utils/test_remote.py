@@ -1,11 +1,12 @@
 import os
+
 from bionemo.utils.remote import RemoteResource
-from hashlib import md5
+
 
 """
 RemoteResource tests and justification
 
-We are not testing downloading behavior, because that is difficult and requires resources to achieve. 
+We are not testing downloading behavior, because that is difficult and requires resources to achieve.
 We are assuming the code 'works', and validating the rest of the methods.
 
 We test the branchpoints on check_exists because we cannot guarantee correctness without types
@@ -21,9 +22,10 @@ Last set of tests, which should be marked to NOT run in automated tests, and onl
 These download and test the behavior of each method, explicitly.
 """
 
+
 # Test remote resources
 def test_RemoteResource_check_exists():
-    """ Core functionality """
+    """Core functionality"""
 
     checksum = "a95c530a7af5f492a74499e70578d150"
     data = "asdfasdfasdf"
@@ -59,7 +61,7 @@ def test_RemoteResource_check_exists():
 
 
 def test_RemoteResource_nochecksum():
-    """ Has to not fail, when no checksum is provided """
+    """Has to not fail, when no checksum is provided"""
     checksum = None
     data = "asdfasdfasdf"
     with open("test-file", "w") as fd:

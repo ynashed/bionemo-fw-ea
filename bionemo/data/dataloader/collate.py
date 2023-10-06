@@ -30,15 +30,15 @@ has the methods required by the BERT collate function.
 A generic interface for random samples used by the collate function is also
 introduced.
 """
-import torch
-import math
-from typing import List, Optional, Callable
+import copy
 import math
 import random
 from dataclasses import dataclass
-import copy
+from typing import Callable, List, Optional
 
+import torch
 from nemo.collections.common.tokenizers import TokenizerSpec
+
 
 __all__ = [
     'TokenSampler',
@@ -51,6 +51,7 @@ __all__ = [
 
 class TokenSampler(object):
     """Group of sampling methods for sampling from a list of tokens"""
+
     def sample_token_id(self, tokenizer: TokenizerSpec):
         """Samples a token id from the tokens vocabulary
 
@@ -61,7 +62,7 @@ class TokenSampler(object):
             int: ID sampled from the tokenizers vocab
 
         """
-        return random.randint(0,len(tokenizer.vocab)-1)
+        return random.randint(0, len(tokenizer.vocab) - 1)
 
     def sample_indices(self, num_tokens: int, num_samples: int):
         """Samples a specifieid number of indices from a vocabulary size
@@ -73,10 +74,7 @@ class TokenSampler(object):
         Returns:
             List[int]: Sampled indices of length `num_samples`
         """
-        return random.sample(
-                    range(num_tokens),
-                    num_samples
-                )
+        return random.sample(range(num_tokens), num_samples)
 
 
 class TokenizerAdapterSpec(object):
@@ -323,6 +321,7 @@ class BertMasking(object):
             and tokens to use for modifying the token strings.
 
     """
+
     tokenizer: TokenizerAdapterSpec
     modify_percent: float = 0.1
     perturb_percent: float = 0.5
@@ -346,11 +345,10 @@ class BertMasking(object):
                 # Also make sure the token isn't one of the special tokens.
                 # Special tokens are <unk>, <s>, <\s>, <pad>, <mask>
                 sampled_token = self.tokenizer.vocab_list()[randid]
-                while (t == sampled_token or \
-                        self.tokenizer.is_special_token(sampled_token)):
+                while t == sampled_token or self.tokenizer.is_special_token(sampled_token):
                     randid = self.sampler.sample_token_id(self.tokenizer)
                     sampled_token = self.tokenizer.vocab_list()[randid]
-                #replace token with a random token from vocab
+                # replace token with a random token from vocab
                 new_tokens[idx] = sampled_token
 
         return new_tokens
@@ -374,7 +372,7 @@ class BertMasking(object):
     def __call__(
         self,
         tokens,
-        ):
+    ):
         """Modify tokens to add masking and perturbations
 
         Args:
@@ -396,38 +394,33 @@ class BertMasking(object):
         token_masks = []
         for token in tokens:
             token_len = len(token)
-            num_modifications = int (token_len * self.modify_percent)
-            num_perturbs = int (num_modifications * self.perturb_percent)
+            num_modifications = int(token_len * self.modify_percent)
+            num_perturbs = int(num_modifications * self.perturb_percent)
             # TODO: changed the assertion here, check that Neha merges
             # change in own PR, as discussed on 8/3/22
             assert num_perturbs <= num_modifications
 
-            indices_to_modify = self.sampler.sample_indices(
-                token_len, num_modifications
-            )
+            indices_to_modify = self.sampler.sample_indices(token_len, num_modifications)
 
-            pert_token = self._perturb_token(
-                token, indices_to_modify[0:num_perturbs]
-            )
-            mask_token = self._mask_token(
-                pert_token, indices_to_modify[num_perturbs:]
-            )
+            pert_token = self._perturb_token(token, indices_to_modify[0:num_perturbs])
+            mask_token = self._mask_token(pert_token, indices_to_modify[num_perturbs:])
 
             modified_tokens.append(mask_token)
 
-            mask = [1 if idx in indices_to_modify else 0
-                    for idx in range(token_len)]
+            mask = [1 if idx in indices_to_modify else 0 for idx in range(token_len)]
             token_masks.append(mask)
 
         return modified_tokens, token_masks
 
 
 class BertCollate(object):
-    def __init__(self, tokenizer: TokenizerAdapterSpec,
-            seq_length: int,
-            pad_size_divisible_by_8: bool,
-            masking_strategy: Optional[Callable] = None,
-            ):
+    def __init__(
+        self,
+        tokenizer: TokenizerAdapterSpec,
+        seq_length: int,
+        pad_size_divisible_by_8: bool,
+        masking_strategy: Optional[Callable] = None,
+    ):
         """
 
         Arguments:
@@ -462,7 +455,7 @@ class BertCollate(object):
         self._tokenizer = self.adapter_cls(other)
 
     def _check_seq_len(self, tokens: List[List[str]], mask: List[List[int]]):
-        """ Warn user and shorten sequence if the tokens are too long,
+        """Warn user and shorten sequence if the tokens are too long,
         otherwise return original
 
         Args:
@@ -478,8 +471,8 @@ class BertCollate(object):
 
         seq_len = max([len(ts) for ts in tokens])
         if seq_len > self.seq_length:
-            tokens_short = [ts[:self.seq_length] for ts in tokens]
-            mask_short = [ms[:self.seq_length] for ms in mask]
+            tokens_short = [ts[: self.seq_length] for ts in tokens]
+            mask_short = [ms[: self.seq_length] for ms in mask]
             return (tokens_short, mask_short)
         return (tokens, mask)
 
@@ -494,10 +487,7 @@ class BertCollate(object):
 
         """
         tokens = self.tokenize(batch)
-        tokens = [[self.tokenizer.get_bos_token()] +
-                  ts +
-                  [self.tokenizer.get_eos_token()]
-                  for ts in tokens]
+        tokens = [[self.tokenizer.get_bos_token()] + ts + [self.tokenizer.get_eos_token()] for ts in tokens]
         return tokens
 
     def _prepare_tokens_and_masks(self, tokens: List[List[str]], mask_data: bool = True):
@@ -519,10 +509,7 @@ class BertCollate(object):
         # Verify sequence length
         tokens, mask = self._check_seq_len(tokens, mask)
 
-        token_output = {
-            "tokens": tokens,
-            "mask": mask
-        }
+        token_output = {"tokens": tokens, "mask": mask}
 
         return token_output
 
@@ -530,12 +517,10 @@ class BertCollate(object):
         # TODO: switch to torch.nn.utils.rnn.pad_sequence
         pad_length = max([len(seq) for seq in seqs])
         if self.pad_size_divisible_by_8:
-            pad_length = int(math.ceil(pad_length/8) * 8)
+            pad_length = int(math.ceil(pad_length / 8) * 8)
 
-        padding_mask = [[1] * len(seq) + [0] * (pad_length - len(seq))
-                        for seq in seqs]
-        padded = [seq + ([pad_token] * (pad_length - len(seq)))
-                  for seq in seqs]
+        padding_mask = [[1] * len(seq) + [0] * (pad_length - len(seq)) for seq in seqs]
+        padded = [seq + ([pad_token] * (pad_length - len(seq))) for seq in seqs]
         # 1/True = Active, 0/False = Inactive
         masks = [mask + ([0] * (pad_length - len(mask))) for mask in masks]
         return padded, masks, padding_mask
@@ -568,32 +553,31 @@ class BertCollate(object):
         encoder_dict = self._prepare_tokens_and_masks(tokens, mask_data=True)
         encoder_tokens = encoder_dict['tokens']
         loss_mask = encoder_dict['mask']
-        enc_token_ids = [self.tokenizer.tokens_to_ids(t)
-                         for t in encoder_tokens]
-        enc_token_ids, loss_mask, padding_mask = self._pad_seqs(
-            enc_token_ids, loss_mask, self.tokenizer.get_pad_id())
+        enc_token_ids = [self.tokenizer.tokens_to_ids(t) for t in encoder_tokens]
+        enc_token_ids, loss_mask, padding_mask = self._pad_seqs(enc_token_ids, loss_mask, self.tokenizer.get_pad_id())
 
         label_dict = self._prepare_tokens_and_masks(tokens, mask_data=False)
         label_tokens = label_dict['tokens']
         label_mask = label_dict['mask']
         label_ids = [self.tokenizer.tokens_to_ids(t) for t in label_tokens]
-        label_ids, _, _ = self._pad_seqs(label_ids, label_mask,
-                                         self.tokenizer.get_pad_id())
+        label_ids, _, _ = self._pad_seqs(label_ids, label_mask, self.tokenizer.get_pad_id())
 
         loss_mask = torch.tensor(loss_mask, dtype=torch.int64)
         enc_token_ids = torch.tensor(enc_token_ids, dtype=torch.int64)
         padding_mask = torch.tensor(padding_mask, dtype=torch.int64)
         label_ids = torch.tensor(label_ids, dtype=torch.int64)
-        types = torch.zeros_like(enc_token_ids).long() #expected by training & validation methods
-        sentence_order = torch.arange(len(enc_token_ids)).long() #expected by training & validation methods
+        types = torch.zeros_like(enc_token_ids).long()  # expected by training & validation methods
+        sentence_order = torch.arange(len(enc_token_ids)).long()  # expected by training & validation methods
 
-        collate_output = {'text': enc_token_ids,
-                          'types': types,
-                          'is_random': sentence_order,
-                          'loss_mask': loss_mask,
-                          'labels': label_ids,
-                          'padding_mask': padding_mask,
-                          'batch': batch}
+        collate_output = {
+            'text': enc_token_ids,
+            'types': types,
+            'is_random': sentence_order,
+            'loss_mask': loss_mask,
+            'labels': label_ids,
+            'padding_mask': padding_mask,
+            'batch': batch,
+        }
 
         return collate_output
 

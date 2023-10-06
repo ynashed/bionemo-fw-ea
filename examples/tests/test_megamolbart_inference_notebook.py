@@ -13,26 +13,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+from concurrent import futures
+
+import grpc
+import megamolbart_pb2_grpc
 import pytest
 from testbook import testbook
-import grpc
-from concurrent import futures
-import os
 
 from bionemo.model.molecule.megamolbart.grpc.service import InferenceService
-import megamolbart_pb2_grpc
+
 
 os.environ['PROJECT_MOUNT'] = os.environ.get('PROJECT_MOUNT', '/workspace/bionemo')
 NOTEBOOK_PATH = os.path.join(os.environ['PROJECT_MOUNT'], 'examples/molecule/megamolbart/nbs/Inference.ipynb')
 
 ##########
 
+
 @pytest.fixture(scope='module')
 def grpc_server():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=1))
-    megamolbart_pb2_grpc.add_GenerativeSamplerServicer_to_server(
-        InferenceService(),
-        server)
+    megamolbart_pb2_grpc.add_GenerativeSamplerServicer_to_server(InferenceService(), server)
     server.add_insecure_port(f'[::]:{50051}')
     server.start()
     yield server

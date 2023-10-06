@@ -15,9 +15,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import numpy as np
 import ot
 import torch
-import numpy as np
 
 
 def compute_sq_dist_mat(X_1, X_2):
@@ -44,7 +44,6 @@ def compute_ot_emd(cost_mat, device):
     a = a / a.sum()
     b = b / b.sum()
     ot_mat = ot.emd(a=a, b=b, M=cost_mat_detach, numItermax=10000)
-    ot_mat_attached = torch.tensor(
-        ot_mat, device=device, requires_grad=False).float()
+    ot_mat_attached = torch.tensor(ot_mat, device=device, requires_grad=False).float()
     ot_dist = torch.sum(ot_mat_attached * cost_mat)
     return ot_dist, ot_mat_attached

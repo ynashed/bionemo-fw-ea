@@ -13,14 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Union, Iterable, List
+from typing import Iterable, List, Union
+
 from nemo.collections.common.tokenizers import TokenizerSpec
+
 
 __all__ = ["Label2IDTokenizer"]
 
+
 class Label2IDTokenizer(TokenizerSpec):
-    """Initializes simple Char Tokenizer. 
-    Intended to be used for extracting class labels 
+    """Initializes simple Char Tokenizer.
+    Intended to be used for extracting class labels
     for classification models such as secondary
     structure prediction model, where each class is
     encoded with a character (ex. "C", "H", "E")
@@ -30,8 +33,9 @@ class Label2IDTokenizer(TokenizerSpec):
             >>> seqs = ['CHE', 'CCC', 'EHH']
             >>> tokenizer = tokenizer.build_vocab(s)
 
-        """
-    def  __init__(
+    """
+
+    def __init__(
         self,
     ):
         self.vocab = {}
@@ -41,17 +45,15 @@ class Label2IDTokenizer(TokenizerSpec):
         """
         Updates the id_to_vocab index based on the current vocab
         """
-        self.decode_vocab = {
-            id_: token for token, id_ in self.vocab.items()
-        }
+        self.decode_vocab = {id_: token for token, id_ in self.vocab.items()}
 
     @property
     def vocab_size(self) -> int:
-        """ Return the size of the vocab being used."""
+        """Return the size of the vocab being used."""
         return len(self.vocab)
 
     def text_to_tokens(self, text: str) -> List[str]:
-        return [t for t in text]
+        return list(text)
 
     def tokens_to_text(self, tokens):
         return "".join(tokens)
@@ -88,7 +90,7 @@ class Label2IDTokenizer(TokenizerSpec):
         return tokens
 
     def text_to_ids(self, text: str) -> List[int]:
-        """ Converts text to ids
+        """Converts text to ids
         Args:
             text (str): String containing text to convert
         Returns:

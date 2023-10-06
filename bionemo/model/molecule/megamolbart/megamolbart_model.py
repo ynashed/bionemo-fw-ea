@@ -20,6 +20,7 @@ from rdkit import RDLogger
 from bionemo.data.molecule import MoleculeEnumeration, megamolbart_build_train_valid_test_datasets
 from bionemo.model.molecule.megamolbart.megamolbart_model_base import MegaMolBARTModelBase
 
+
 lg = RDLogger.logger()
 lg.setLevel(RDLogger.CRITICAL)
 
@@ -39,9 +40,12 @@ class MegaMolBARTModel(MegaMolBARTModelBase):
         Returns:
             callable collate fn
         """
-        return MoleculeEnumeration(tokenizer=self.tokenizer, seq_length=self._cfg.seq_length,
-                                   pad_size_divisible_by_8=pad_size_divisible_by_8,
-                                   **self._cfg.data).collate_fn
+        return MoleculeEnumeration(
+            tokenizer=self.tokenizer,
+            seq_length=self._cfg.seq_length,
+            pad_size_divisible_by_8=pad_size_divisible_by_8,
+            **self._cfg.data,
+        ).collate_fn
 
     def _load_train_valid_test_datasets(self, train_valid_test_num_samples: Dict[str, int]):
         """
@@ -50,4 +54,5 @@ class MegaMolBARTModel(MegaMolBARTModelBase):
             train_valid_test_num_samples: dicts with number of samples needed for train, val and test steps
         """
         self._train_ds, self._validation_ds, self._test_ds = megamolbart_build_train_valid_test_datasets(
-            self._cfg.data, train_valid_test_num_samples)
+            self._cfg.data, train_valid_test_num_samples
+        )

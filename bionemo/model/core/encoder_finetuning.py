@@ -13,42 +13,45 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from abc import abstractmethod, ABC
+from abc import ABC, abstractmethod
+
 import torch
-from nemo.collections.nlp.parts.nlp_overrides import NLPSaveRestoreConnector
-from nemo.utils import logging
-from nemo.core.classes import ModelPT
-from nemo.core.classes.exportable import Exportable
-from nemo.collections.nlp.modules.common.megatron.utils import (
-    average_losses_across_data_parallel_group,
-)
 from nemo.collections.nlp.data.language_modeling.megatron.data_samplers import (
     MegatronPretrainingRandomSampler,
     MegatronPretrainingSampler,
 )
-from bionemo.model.utils import (
-    extract_consumed_samples_from_ckpt,
-    compute_consumed_samples,
+from nemo.collections.nlp.modules.common.megatron.utils import (
+    average_losses_across_data_parallel_group,
 )
-try:
-    from megatron.core import parallel_state
+from nemo.collections.nlp.parts.nlp_overrides import NLPSaveRestoreConnector
+from nemo.core.classes import ModelPT
+from nemo.core.classes.exportable import Exportable
+from nemo.utils import logging
 
+from bionemo.model.utils import (
+    compute_consumed_samples,
+    extract_consumed_samples_from_ckpt,
+)
+
+
+try:
     from apex.transformer.pipeline_parallel.utils import (
         _reconfigure_microbatch_calculator,
     )
+    from megatron.core import parallel_state
 
     HAVE_APEX = True
 except (ImportError, ModuleNotFoundError):
     HAVE_APEX = False
 
-class EncoderFineTuning(ModelPT, Exportable, ABC):
 
+class EncoderFineTuning(ModelPT, Exportable, ABC):
     def __init__(self, cfg, trainer):
         super().__init__(cfg, trainer)
         if trainer.accumulate_grad_batches != 1:
             raise ValueError(
-                "Trainer.accumulate_grad_batches currently only supported"
-                " for Trainer.accumulate_grad_batches = 1")
+                "Trainer.accumulate_grad_batches currently only supported" " for Trainer.accumulate_grad_batches = 1"
+            )
         self._save_restore_connector = NLPSaveRestoreConnector()
         self.cfg = cfg
 
@@ -82,6 +85,7 @@ class EncoderFineTuning(ModelPT, Exportable, ABC):
 
         if parallel_state.is_unitialized():
             logging.info("DDP is not initialized. Initializing...")
+
             def dummy():
                 return
 
@@ -94,9 +98,9 @@ class EncoderFineTuning(ModelPT, Exportable, ABC):
         _reconfigure_microbatch_calculator(
             rank=0,  # This doesn't matter since it is only used for logging
             rampup_batch_size=None,
-            #NOTE depends on global_batch_size being set in config, see MR !95
+            # NOTE depends on global_batch_size being set in config, see MR !95
             global_batch_size=cfg.global_batch_size,
-            micro_batch_size=cfg.micro_batch_size, 
+            micro_batch_size=cfg.micro_batch_size,
             data_parallel_size=cur_data_parallel_world_size,
         )
 
@@ -149,12 +153,12 @@ class EncoderFineTuning(ModelPT, Exportable, ABC):
         pass
 
     def predict_dataloader(self):
-        self.predict_dataset = self.data_module.create_dataset(
-            self.cfg.data.predict_file
-        )
+        self.predict_dataset = self.data_module.create_dataset(self.cfg.data.predict_file)
         return torch.utils.data.DataLoader(
-            self.predict_dataset, num_workers=self.cfg.data.num_workers,
-            pin_memory=True, shuffle=False,
+            self.predict_dataset,
+            num_workers=self.cfg.data.num_workers,
+            pin_memory=True,
+            shuffle=False,
             batch_size=self.cfg.micro_batch_size,
         )
 
@@ -171,7 +175,7 @@ class EncoderFineTuning(ModelPT, Exportable, ABC):
         loss = self.loss_fn(output_tensor, target)
 
         return loss, output_tensor, target
-    
+
     def add_metrics(self, metrics, metrics_args=None):
         self.metrics = metrics
         self.metrics_args = metrics_args
@@ -226,9 +230,12 @@ class EncoderFineTuning(ModelPT, Exportable, ABC):
             raise ValueError('cfg.data.dataloader_type not found. Must be "single" or "cyclic"')
 
         return torch.utils.data.DataLoader(
-            dataset, batch_sampler=batch_sampler, num_workers=self.cfg.data.num_workers, pin_memory=True,
+            dataset,
+            batch_sampler=batch_sampler,
+            num_workers=self.cfg.data.num_workers,
+            pin_memory=True,
         )
-    
+
     def _step(self, batch, batch_idx, subset):
         loss, output, target = self._calc_step(batch, batch_idx)
         reduced_loss = average_losses_across_data_parallel_group([loss])
@@ -248,7 +255,7 @@ class EncoderFineTuning(ModelPT, Exportable, ABC):
         return self._step(batch, batch_idx, subset="test")
 
     def _epoch_end(self, outputs, subset):
-         if len(outputs) > 0:
+        if len(outputs) > 0:
             for name, value in outputs[0].items():
                 batch_value = [x[name] for x in outputs]
                 averaged_value = torch.stack(batch_value).mean()

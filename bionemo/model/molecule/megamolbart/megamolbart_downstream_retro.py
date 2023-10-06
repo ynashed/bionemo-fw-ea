@@ -1,10 +1,10 @@
-from typing import Dict, Callable, List, Optional
+from typing import Callable, Dict, List, Optional
 
 import torch
 from omegaconf import DictConfig
 
-from bionemo.data.molecule.augment import MoleculeInputTargetEnumeration
 from bionemo.data import megamolbart_retro_build_train_valid_test_datasets
+from bionemo.data.molecule.augment import MoleculeInputTargetEnumeration
 from bionemo.model.molecule.megamolbart.megamolbart_model_base import MegaMolBARTModelBase
 
 
@@ -24,10 +24,12 @@ class MegaMolBARTRetroModel(MegaMolBARTModelBase):
         Returns:
             callable collate fn
         """
-        return MoleculeInputTargetEnumeration(tokenizer=self.tokenizer,
-                                              seq_length=self._cfg.seq_length,
-                                              pad_size_divisible_by_8=pad_size_divisible_by_8,
-                                              **self._cfg.data).collate_fn
+        return MoleculeInputTargetEnumeration(
+            tokenizer=self.tokenizer,
+            seq_length=self._cfg.seq_length,
+            pad_size_divisible_by_8=pad_size_divisible_by_8,
+            **self._cfg.data,
+        ).collate_fn
 
     def _load_train_valid_test_datasets(self, train_valid_test_num_samples: Dict[str, int]):
         """
@@ -36,7 +38,8 @@ class MegaMolBARTRetroModel(MegaMolBARTModelBase):
             train_valid_test_num_samples: dicts with number of samples needed for train, val and test steps
         """
         self._train_ds, self._validation_ds, self._test_ds = megamolbart_retro_build_train_valid_test_datasets(
-            self._cfg.data, train_valid_test_num_samples)
+            self._cfg.data, train_valid_test_num_samples
+        )
 
     def build_data_loader(self, dataset, consumed_samples, num_workers):
         return super().build_pretraining_data_loader(dataset, consumed_samples, num_workers)
@@ -47,8 +50,9 @@ class MegaMolBARTRetroModel(MegaMolBARTModelBase):
     def setup_training_data(self, cfg: DictConfig):
         if hasattr(self, '_train_ds'):
             consumed_samples = self.compute_consumed_samples(0)
-            self._train_dl = self.build_data_loader(self._train_ds, consumed_samples,
-                                                    num_workers=self._cfg.data.num_workers)
+            self._train_dl = self.build_data_loader(
+                self._train_ds, consumed_samples, num_workers=self._cfg.data.num_workers
+            )
 
     def setup_validation_data(self, cfg: DictConfig):
         if hasattr(self, '_validation_ds'):

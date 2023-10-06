@@ -15,15 +15,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import torch
 import dgl
+import torch
 from nemo.core import NeuralModule
 from nemo.utils import logging
+
 from bionemo.model.protein.equidock.model.block import IEGMN
 
 
 class Rigid_Body_Docking_Net(NeuralModule):
-
     def __init__(self, args):
         """
         Implementation of Independent SE(3)-Equivariant Models for
@@ -34,22 +34,19 @@ class Rigid_Body_Docking_Net(NeuralModule):
 
         self.debug = args['debug']
 
-        self.iegmn_original = IEGMN(
-            args, n_lays=args['iegmn_n_lays'], fine_tune=False)
+        self.iegmn_original = IEGMN(args, n_lays=args['iegmn_n_lays'], fine_tune=False)
         if args['fine_tune']:
-            self.iegmn_fine_tune = IEGMN(
-                args, n_lays=2, fine_tune=True)
-            self.list_iegmns = [
-                ('original', self.iegmn_original), ('finetune', self.iegmn_fine_tune)]
+            self.iegmn_fine_tune = IEGMN(args, n_lays=2, fine_tune=True)
+            self.list_iegmns = [('original', self.iegmn_original), ('finetune', self.iegmn_fine_tune)]
         else:
-            self.list_iegmns = [
-                ('finetune', self.iegmn_original)]  # just original
+            self.list_iegmns = [('finetune', self.iegmn_original)]  # just original
+
     # self.reset_parameters()
 
     def reset_parameters(self):
         for p in self.parameters():
             if p.dim() > 1:
-                torch.nn.init.xavier_normal_(p, gain=1.)
+                torch.nn.init.xavier_normal_(p, gain=1.0)
             else:
                 torch.nn.init.zeros_(p)
 
@@ -79,8 +76,7 @@ class Rigid_Body_Docking_Net(NeuralModule):
                 b_align = outputs[1][the_idx]
                 assert b_align.shape[0] == 1 and b_align.shape[1] == 3
 
-                inner_coors_ligand = (
-                    T_align @ orig_coors_ligand.t()).t() + b_align  # (n,3)
+                inner_coors_ligand = (T_align @ orig_coors_ligand.t()).t() + b_align  # (n,3)
 
                 if stage == 'original':
                     hetero_graph.nodes['ligand'].data['new_x'] = inner_coors_ligand
@@ -89,11 +85,13 @@ class Rigid_Body_Docking_Net(NeuralModule):
                 if self.debug:
                     logging.info("\n\n* DEBUG MODE *")
                     logging.info('T_align', T_align)
-                    logging.info('T_align @ T_align.t() - eye(3)', T_align @
-                                 T_align.t() - torch.eye(3).to(device))
+                    logging.info('T_align @ T_align.t() - eye(3)', T_align @ T_align.t() - torch.eye(3).to(device))
                     logging.info('b_align', b_align)
-                    logging.info('\n ---> inner_coors_ligand mean - true ligand mean ',
-                                 inner_coors_ligand.mean(dim=0) - hetero_graph.nodes['ligand'].data['x'].mean(dim=0), '\n')
+                    logging.info(
+                        '\n ---> inner_coors_ligand mean - true ligand mean ',
+                        inner_coors_ligand.mean(dim=0) - hetero_graph.nodes['ligand'].data['x'].mean(dim=0),
+                        '\n',
+                    )
 
                 if stage == 'finetune':
                     all_ligand_coors_deform_list.append(inner_coors_ligand)
@@ -107,6 +105,10 @@ class Rigid_Body_Docking_Net(NeuralModule):
         all_translation_list = last_outputs[1]
         # TODO: write a test to make sure invariances are perserved
 
-        return all_ligand_coors_deform_list, \
-            all_keypts_ligand_list, all_keypts_receptor_list, \
-            all_rotation_list, all_translation_list
+        return (
+            all_ligand_coors_deform_list,
+            all_keypts_ligand_list,
+            all_keypts_receptor_list,
+            all_rotation_list,
+            all_translation_list,
+        )

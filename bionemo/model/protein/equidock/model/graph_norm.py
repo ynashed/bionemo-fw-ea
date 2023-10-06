@@ -15,8 +15,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import torch.nn as nn
 import torch
+import torch.nn as nn
 
 
 class GraphNorm(nn.Module):
@@ -45,8 +45,7 @@ class GraphNorm(nn.Module):
         return (x - mean) / (var + self.eps)
 
     def forward(self, g, h, node_type):
-        graph_size = g.batch_num_nodes(
-            node_type) if self.is_node else g.batch_num_edges(node_type)
+        graph_size = g.batch_num_nodes(node_type) if self.is_node else g.batch_num_edges(node_type)
         x_list = torch.split(h, graph_size.tolist())
         norm_list = []
         for x in x_list:

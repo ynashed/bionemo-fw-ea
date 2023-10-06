@@ -16,16 +16,19 @@ from copy import deepcopy
 from typing import Dict, List, Tuple
 
 import torch
-from nemo.collections.nlp.models.language_modeling.megatron_lm_encoder_decoder_model import \
-    MegatronLMEncoderDecoderModel
+from nemo.collections.nlp.models.language_modeling.megatron_lm_encoder_decoder_model import (
+    MegatronLMEncoderDecoderModel,
+)
 from nemo.collections.nlp.modules.common.megatron.utils import average_losses_across_data_parallel_group
 from nemo.utils import logging
 from omegaconf.dictconfig import DictConfig
 from pytorch_lightning.trainer.trainer import Trainer
 from rdkit import Chem, RDLogger
 
+
 try:
     from apex.transformer.pipeline_parallel.utils import get_num_microbatches
+
     HAVE_APEX = True
 
 except (ImportError, ModuleNotFoundError):
@@ -33,6 +36,7 @@ except (ImportError, ModuleNotFoundError):
 
 try:
     from megatron.core.pipeline_parallel.schedules import get_forward_backward_func
+
     HAVE_MEGATRON_CORE = True
 
 except (ImportError, ModuleNotFoundError):
@@ -40,6 +44,7 @@ except (ImportError, ModuleNotFoundError):
 
 from bionemo.data import DatasetTypes
 from bionemo.utils import flatten_dict
+
 
 # Disable logging of invalid SMILES moloecules
 lg = RDLogger.logger()
@@ -93,7 +98,8 @@ class MegaMolBARTModelBase(MegatronLMEncoderDecoderModel):
             min_lr = cfg.optim.sched.min_lr
             if max_lr <= min_lr:
                 logging.warning(
-                    f'Warning: maximum learning rate for Noam Scheduler ({max_lr}) is less than minimum ({min_lr}).')
+                    f'Warning: maximum learning rate for Noam Scheduler ({max_lr}) is less than minimum ({min_lr}).'
+                )
         return
 
     def _get_dataset_num_samples(self) -> Dict[str, int]:
@@ -104,13 +110,16 @@ class MegaMolBARTModelBase(MegatronLMEncoderDecoderModel):
             dicts with number of samples needed for train, val and test steps
         """
         tensor_model_parallel_size = self._cfg.get('tensor_model_parallel_size', 1)
-        global_batch_size = (self.trainer.world_size * self._cfg.micro_batch_size / tensor_model_parallel_size) \
-                            * self.trainer.limit_train_batches
+        global_batch_size = (
+            self.trainer.world_size * self._cfg.micro_batch_size / tensor_model_parallel_size
+        ) * self.trainer.limit_train_batches
         eval_iters = (self.trainer.max_steps // self.trainer.val_check_interval + 1) * self.trainer.limit_val_batches
         test_iters = self.trainer.limit_test_batches
-        train_valid_test_num_samples = {'train': int(self.trainer.max_steps * global_batch_size),
-                                        'val': int(eval_iters * global_batch_size),
-                                        'test': int(test_iters * global_batch_size)}
+        train_valid_test_num_samples = {
+            'train': int(self.trainer.max_steps * global_batch_size),
+            'val': int(eval_iters * global_batch_size),
+            'test': int(test_iters * global_batch_size),
+        }
         return train_valid_test_num_samples
 
     def build_train_valid_test_datasets(self):
@@ -119,7 +128,9 @@ class MegaMolBARTModelBase(MegatronLMEncoderDecoderModel):
         if self._cfg.data.get('dataset_type', None) is not None:
             dataset_types = DatasetTypes.__members__
             if self._cfg.data.get('dataset_type') not in dataset_types:
-                raise ValueError(f"dataset_type must be in {dataset_types}. Found {self._cfg.data.get('dataset_type')}")
+                raise ValueError(
+                    f"dataset_type must be in {dataset_types}. Found {self._cfg.data.get('dataset_type')}"
+                )
 
         train_valid_test_num_samples = self._get_dataset_num_samples()
         self._load_train_valid_test_datasets(train_valid_test_num_samples=train_valid_test_num_samples)
@@ -127,16 +138,16 @@ class MegaMolBARTModelBase(MegatronLMEncoderDecoderModel):
         if self._train_ds is not None:
             logging.info(f'Length of train dataset: {len(self._train_ds)}')
         else:
-            logging.info(f'No train dataset is used')
+            logging.info('No train dataset is used')
         if self._validation_ds is not None:
             logging.info(f'Length of val dataset: {len(self._validation_ds)}')
         else:
-            logging.info(f'No validation dataset is used')
+            logging.info('No validation dataset is used')
         if self._test_ds is not None:
             logging.info(f'Length of test dataset: {len(self._test_ds)}')
         else:
-            logging.info(f'No test dataset is used')
-        logging.info(f'Finished building MegaMolBART datasets.')
+            logging.info('No test dataset is used')
+        logging.info('Finished building MegaMolBART datasets.')
         return self._train_ds, self._validation_ds, self._test_ds
 
     def build_pretraining_data_loader(self, dataset, consumed_samples, num_workers):
@@ -148,8 +159,9 @@ class MegaMolBARTModelBase(MegatronLMEncoderDecoderModel):
             f'Only the Megatron sequential ("single") sampler is currently supported. {self._cfg.data.dataloader_type} was chosen.'
         )
 
-        dataloader = super().build_pretraining_data_loader(dataset=dataset, consumed_samples=consumed_samples,
-                                                           num_workers=num_workers)
+        dataloader = super().build_pretraining_data_loader(
+            dataset=dataset, consumed_samples=consumed_samples, num_workers=num_workers
+        )
 
         # Add collate function and unpin memory to avoid crash with CUDA misaligned address
         dataloader.pin_memory = False  # must be False with CSV dataset
@@ -176,8 +188,9 @@ class MegaMolBARTModelBase(MegatronLMEncoderDecoderModel):
         )
 
         device = next(self.parameters()).device
-        tokens_enc, tokens_dec, loss_mask, labels, enc_mask, dec_mask = [t.to(device) for t in (
-            tokens_enc, tokens_dec, loss_mask, labels, enc_mask, dec_mask)]
+        tokens_enc, tokens_dec, loss_mask, labels, enc_mask, dec_mask = [
+            t.to(device) for t in (tokens_enc, tokens_dec, loss_mask, labels, enc_mask, dec_mask)
+        ]
 
         return (tokens_enc, tokens_dec, loss_mask, labels, enc_mask, dec_mask)
 
@@ -207,7 +220,6 @@ class MegaMolBARTModelBase(MegatronLMEncoderDecoderModel):
 
         self.log_dict(logged_results, prog_bar=True)
 
-
     def validation_step_logits(self, batch, batch_idx):
         tensor_shape = [self.max_encoder_seq_length, self.cfg.micro_batch_size, self.cfg.encoder.hidden_size]
         arg_names = ['enc_input_ids', 'enc_attn_mask', 'dec_input_ids', 'dec_attn_mask']
@@ -225,7 +237,11 @@ class MegaMolBARTModelBase(MegatronLMEncoderDecoderModel):
 
         output_tensor = fwd_bwd_function(
             forward_step_func=forward_step_func,
-            data_iterator=iter([batch_for_pipeline,]),
+            data_iterator=iter(
+                [
+                    batch_for_pipeline,
+                ]
+            ),
             model=[self.enc_dec_model],
             num_microbatches=get_num_microbatches(),
             forward_only=True,
@@ -246,27 +262,34 @@ class MegaMolBARTModelBase(MegatronLMEncoderDecoderModel):
 
         return logits_tensor
 
-
     def validation_step(self, batch, batch_idx):
-        loss_mean = super().validation_step(iter([batch,]), batch_idx)
+        loss_mean = super().validation_step(
+            iter(
+                [
+                    batch,
+                ]
+            ),
+            batch_idx,
+        )
         token_logits = self.validation_step_logits(batch, batch_idx)
-        tokens_enc, tokens_dec, loss_mask, labels, enc_mask, dec_mask = \
-            self.process_global_batch(batch)
+        tokens_enc, tokens_dec, loss_mask, labels, enc_mask, dec_mask = self.process_global_batch(batch)
 
         target_smiles = batch['target_smiles']
-        token_logits[:, :, self.tokenizer.vocab_size:] = -float('Inf')  # never pick padded tokens
+        token_logits[:, :, self.tokenizer.vocab_size :] = -float('Inf')  # never pick padded tokens
 
         log_n_batches = 10
         log_mol = True if batch_idx < log_n_batches else False  # TODO enable logging in yaml config
-        metrics = self.calculate_metrics(token_logits=token_logits,
-                                         loss_mask=loss_mask,
-                                         labels=labels,
-                                         tokens_enc=tokens_enc,
-                                         enc_mask=enc_mask,
-                                         target_smiles=target_smiles,
-                                         batch_idx=batch_idx,
-                                         log_char=False,
-                                         log_mol=log_mol)
+        metrics = self.calculate_metrics(
+            token_logits=token_logits,
+            loss_mask=loss_mask,
+            labels=labels,
+            tokens_enc=tokens_enc,
+            enc_mask=enc_mask,
+            target_smiles=target_smiles,
+            batch_idx=batch_idx,
+            log_char=False,
+            log_mol=log_mol,
+        )
 
         logs = {'loss': loss_mean}
         for metric_name, metric_value in metrics.items():
@@ -292,9 +315,14 @@ class MegaMolBARTModelBase(MegatronLMEncoderDecoderModel):
         super().test_epoch_end(outputs)
         self._inference_epoch_end(outputs, mode='test')
 
-    def sample_molecules(self, tokens_enc, enc_mask, hidden_states=None,
-                         sampling_method: str = "greedy-search",
-                         sampling_kwargs: dict = {}):
+    def sample_molecules(
+        self,
+        tokens_enc,
+        enc_mask,
+        hidden_states=None,
+        sampling_method: str = "greedy-search",
+        sampling_kwargs: dict = {},
+    ):
         """Autoregressively sample SMILES molecules from encoder hidden state
 
         Args:
@@ -312,12 +340,14 @@ class MegaMolBARTModelBase(MegatronLMEncoderDecoderModel):
         self.freeze()
 
         # Decode encoder hidden state to tokens
-        predicted_tokens_ids, log_probs = self.decode(tokens_enc,
-                                                      enc_mask,
-                                                      self._cfg.max_position_embeddings,
-                                                      enc_output=hidden_states,
-                                                      sampling_method=sampling_method,
-                                                      sampling_kwargs=sampling_kwargs)
+        predicted_tokens_ids, log_probs = self.decode(
+            tokens_enc,
+            enc_mask,
+            self._cfg.max_position_embeddings,
+            enc_output=hidden_states,
+            sampling_method=sampling_method,
+            sampling_kwargs=sampling_kwargs,
+        )
         supported_dims = [2, 3]
         tensor_dim = len(predicted_tokens_ids.size())
         predicted_tokens_ids = predicted_tokens_ids.cpu().detach().numpy().tolist()
@@ -329,12 +359,16 @@ class MegaMolBARTModelBase(MegatronLMEncoderDecoderModel):
                 sampled_smiles_i, predicted_tokens_ids_i = self._process_predicted_tokens_ids(predicted_tokens_ids_i)
                 sampled_smiles.append(sampled_smiles_i)
         else:
-            raise ValueError(f'The shape of the tensor with token_ids is not supported. '
-                             f'Supported numbers of dims: {supported_dims}')
+            raise ValueError(
+                f'The shape of the tensor with token_ids is not supported. '
+                f'Supported numbers of dims: {supported_dims}'
+            )
         self.unfreeze()
         return sampled_smiles
 
-    def _process_predicted_tokens_ids(self, predicted_tokens_ids: List[List[int]]) -> Tuple[List[str], List[List[int]]]:
+    def _process_predicted_tokens_ids(
+        self, predicted_tokens_ids: List[List[int]]
+    ) -> Tuple[List[str], List[List[int]]]:
         """
         Prunes tokens ids by eos / padding and convert them to SMILES
         Args:
@@ -402,7 +436,9 @@ class MegaMolBARTModelBase(MegatronLMEncoderDecoderModel):
         sampled_mols = [Chem.MolFromSmiles(smi) for smi in sampled_smiles]
 
         invalid = [mol is None for mol in sampled_mols]
-        canonical_smiles = ["Unknown" if mol is None else Chem.MolToSmiles(mol, canonical=True) for mol in sampled_mols]
+        canonical_smiles = [
+            "Unknown" if mol is None else Chem.MolToSmiles(mol, canonical=True) for mol in sampled_mols
+        ]
         correct_smiles = [target_smiles[idx] == smi for idx, smi in enumerate(canonical_smiles)]
 
         num_correct = sum(correct_smiles)
@@ -421,12 +457,23 @@ class MegaMolBARTModelBase(MegatronLMEncoderDecoderModel):
                 else:
                     result = 'incorrect'
                 logging.info(
-                    f'     Sample {idx} is {result}, target: {target_smiles[idx]}, sample: {sampled_smiles[idx]}')
+                    f'     Sample {idx} is {result}, target: {target_smiles[idx]}, sample: {sampled_smiles[idx]}'
+                )
 
         return molecular_accuracy, percent_invalid
 
-    def calculate_metrics(self, token_logits, loss_mask, labels, tokens_enc, enc_mask, target_smiles, batch_idx=None,
-                          log_char=False, log_mol=False):
+    def calculate_metrics(
+        self,
+        token_logits,
+        loss_mask,
+        labels,
+        tokens_enc,
+        enc_mask,
+        target_smiles,
+        batch_idx=None,
+        log_char=False,
+        log_mol=False,
+    ):
         """Calculate metrics for character accuracy, molecular accuracy, and invalid molecules
 
         Args:
@@ -440,12 +487,17 @@ class MegaMolBARTModelBase(MegatronLMEncoderDecoderModel):
         Returns:
             dict: dictionary of metric values
         """
-        character_accuracy = self.calculate_character_accuracy(token_logits, loss_mask, labels, batch_idx, log=log_char)
-        molecular_accuracy, percent_invalid = self.calculate_molecular_accuracy(tokens_enc, enc_mask, target_smiles,
-                                                                                batch_idx, log=log_mol)
-        metrics = {'character_accuracy': character_accuracy,
-                   'molecular_accuracy': molecular_accuracy,
-                   'percent_invalid': percent_invalid}
+        character_accuracy = self.calculate_character_accuracy(
+            token_logits, loss_mask, labels, batch_idx, log=log_char
+        )
+        molecular_accuracy, percent_invalid = self.calculate_molecular_accuracy(
+            tokens_enc, enc_mask, target_smiles, batch_idx, log=log_mol
+        )
+        metrics = {
+            'character_accuracy': character_accuracy,
+            'molecular_accuracy': molecular_accuracy,
+            'percent_invalid': percent_invalid,
+        }
         return metrics
 
     def list_available_models(self):

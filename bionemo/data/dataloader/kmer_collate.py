@@ -13,15 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from dataclasses import dataclass
+from typing import Callable, Optional
+
+import numpy as np
+from nemo.collections.common.tokenizers import TokenizerSpec
+
 from bionemo.data.dataloader.collate import (
     BertCollate,
-    TokenizerAdapterSpec,
     BertMasking,
+    TokenizerAdapterSpec,
 )
-from nemo.collections.common.tokenizers import TokenizerSpec
-from typing import Optional, Callable
-import numpy as np
-from dataclasses import dataclass
+
 
 __all__ = [
     'KmerTokenizerAdapter',
@@ -52,9 +55,7 @@ class KmerTokenizerAdapter(TokenizerAdapterSpec):
             tk.end_token,
             tk.mask_token,
         }
-        self._vocab_list = [
-            self.decode_vocab[i] for i in range(len(self.vocab))
-        ]
+        self._vocab_list = [self.decode_vocab[i] for i in range(len(self.vocab))]
 
     def get_bos_id(self):
         """Gets ID for beginning of sentence token
@@ -142,6 +143,7 @@ class KmerTokenizerAdapter(TokenizerAdapterSpec):
         """
         return self._vocab_list
 
+
 @dataclass
 class SpanMasking(object):
     """A strategy for masking sequences that masks a minimal neighborhood
@@ -178,6 +180,7 @@ class SpanMasking(object):
             of spans that are masked around masking seeds.
 
     """
+
     tokenizer: TokenizerAdapterSpec
     seed_probability: float
     span_length: int
@@ -198,8 +201,8 @@ class SpanMasking(object):
         for idx in mask_indices:
             start = max(0, idx - (self.span_length - 1) // 2)
             end = min(idx + self.span_length // 2, len(seq) - 1)
-            new_seq[start:end + 1] = self.tokenizer.get_mask_token()
-            loss_mask[start:end + 1] = 1
+            new_seq[start : end + 1] = self.tokenizer.get_mask_token()
+            loss_mask[start : end + 1] = 1
         return new_seq.tolist(), loss_mask.tolist()
 
     def pick_mask_indices(self, seq):
@@ -211,10 +214,7 @@ class SpanMasking(object):
             List[int] indices to mask in the sequence.
 
         """
-        return np.random.choice(
-            len(seq),
-            size=int(self.seed_probability * len(seq))
-        )
+        return np.random.choice(len(seq), size=int(self.seed_probability * len(seq)))
 
     def __call__(self, seqs):
         """Masks spans in each sequence in `seqs`.
@@ -227,13 +227,11 @@ class SpanMasking(object):
 
         """
         masked_tokens = [self.extending_seed_masking(seq) for seq in seqs]
-        return [tokens[0] for tokens in masked_tokens], \
-            [tokens[1] for tokens in masked_tokens]
+        return [tokens[0] for tokens in masked_tokens], [tokens[1] for tokens in masked_tokens]
 
 
 @dataclass
 class LengthTruncatorABC(object):
-
     subsequence_probability: float = 0.5
     """
     Randomly subsamples the length of each sentence.
@@ -299,13 +297,12 @@ class LengthTruncatorABC(object):
             str: subsampled version of the sentence.
         """
         sentence = self.get_sentence(entry)
-        if  self.sample_probability(sentence) < self.subsequence_probability:
-            sentence = sentence[:self.sample_length(sentence)]
+        if self.sample_probability(sentence) < self.subsequence_probability:
+            sentence = sentence[: self.sample_length(sentence)]
         return sentence
 
 
 class LengthTruncator(LengthTruncatorABC):
-
     @staticmethod
     def sample_length(sentence):
         """Determines the length of the subsequence to slice.
@@ -331,8 +328,7 @@ class LengthTruncator(LengthTruncatorABC):
 
 
 class DeterministicLengthTruncator(LengthTruncatorABC):
-
-    probability_scale: int = 10 ** 8
+    probability_scale: int = 10**8
 
     @staticmethod
     def _hash(sentence):
@@ -369,14 +365,16 @@ class DeterministicLengthTruncator(LengthTruncatorABC):
 
 
 class KmerBertCollate(BertCollate):
-
-    def __init__(self, tokenizer: TokenizerSpec, seq_length: int,
-            pad_size_divisible_by_8: bool,
-            modify_percent: float = 0.1,
-            perturb_percent: float = 0.5,
-            masking_strategy: Optional[Callable] = None,
-            transform_sentences: Optional[Callable] = None,
-            ):
+    def __init__(
+        self,
+        tokenizer: TokenizerSpec,
+        seq_length: int,
+        pad_size_divisible_by_8: bool,
+        modify_percent: float = 0.1,
+        perturb_percent: float = 0.5,
+        masking_strategy: Optional[Callable] = None,
+        transform_sentences: Optional[Callable] = None,
+    ):
         """
         A BertCollate function for k-mer based tokenization. This collate function
         specifically prepares input strings for consumption by a BERT model with
@@ -430,7 +428,8 @@ class KmerBertCollate(BertCollate):
                 perturb_percent=perturb_percent,
             )
         if transform_sentences is None:
-            transform_sentences = lambda x: x
+            def transform_sentences(x):
+                return x
         self.transform_sentences = transform_sentences
         super().__init__(
             tokenizer=tokenizer,

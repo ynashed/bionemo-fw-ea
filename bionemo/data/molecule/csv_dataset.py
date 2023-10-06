@@ -15,41 +15,42 @@
 
 import os
 
-from typing import Optional
-from dataclasses import dataclass
-
 import numpy as np
-
-from nemo.core import Dataset
-from nemo.collections.nlp.data.language_modeling.text_memmap_dataset import CSVMemMapDataset
 from nemo.collections.nlp.data.language_modeling.megatron.dataset_utils import (
     get_samples_mapping,
 )
+from nemo.collections.nlp.data.language_modeling.text_memmap_dataset import CSVMemMapDataset
+from nemo.core import Dataset
+
 
 try:
     from apex.transformer.parallel_state import get_rank_info
+
     HAVE_APEX = True
 except (ImportError, ModuleNotFoundError):
     HAVE_APEX = False
 
 __all__ = ['MoleculeCsvDataset']
 
+
 # TODO: use NeMoUpsampling instead of directly calling get_samples_mapping
 class MoleculeCsvDataset(Dataset):
     """
     Allow per-line lazy access to multiple text files using numpy memmap.
     """
-    def __init__(self,
-                 dataset_paths,
-                 cfg,
-                 workers=None,
-                 num_samples=None,
-                 index_mapping_dir=None,
-                 ):
+
+    def __init__(
+        self,
+        dataset_paths,
+        cfg,
+        workers=None,
+        num_samples=None,
+        index_mapping_dir=None,
+    ):
         super().__init__()
 
         self.num_samples = num_samples
-        self.seed  = cfg.get('seed')
+        self.seed = cfg.get('seed')
         # prefix for sample mapping cached indeices
         self.data_prefix = cfg.get('data_prefix')
         if not self.data_prefix:
@@ -59,7 +60,7 @@ class MoleculeCsvDataset(Dataset):
         self.ds = CSVMemMapDataset(
             dataset_paths=dataset_paths,
             newline_int=cfg.get('newline_int'),
-            header_lines=cfg.get('header_lines'), # skip first N lines
+            header_lines=cfg.get('header_lines'),  # skip first N lines
             workers=workers,
             tokenizer=None,
             sort_dataset_paths=cfg.get('sort_dataset_paths'),
@@ -89,11 +90,11 @@ class MoleculeCsvDataset(Dataset):
             binary_head=False,
         )
 
-        self.samples_mapping = self.samples_mapping[:self.num_samples]
+        self.samples_mapping = self.samples_mapping[: self.num_samples]
 
     def __len__(self):
         return len(self.samples_mapping)
-            
+
     def __getitem__(self, idx):
         if isinstance(idx, np.int64):
             idx = idx.item()

@@ -1,6 +1,7 @@
 import os
-from bionemo.utils.fasta import FastaUtil
 from tempfile import NamedTemporaryFile
+
+from bionemo.utils.fasta import FastaUtil
 
 
 def test_constructor_right_length_entries():
@@ -69,11 +70,7 @@ def test_split_ns():
 
         # Three entries
         assert type(splitted[0]) == str
-        assert (
-            len(splitted[0]) == 100
-            and len(splitted[1]) == 1
-            and len(splitted[2]) == 100
-        )
+        assert len(splitted[0]) == 100 and len(splitted[1]) == 1 and len(splitted[2]) == 100
         assert all(x == "A" for x in splitted[0])
         assert all(x == "C" for x in splitted[1])
         assert all(x == "C" for x in splitted[2])
@@ -119,7 +116,7 @@ def test_split_on_ns():
     fasta = FastaUtil.from_filename(result)
     assert len(fasta.seq_lookup.keys()) == 7
 
-    lens = list()
+    lens = []
     for seqs in fasta.seq_lookup.values():
         lens.extend([len(seq) for seq in seqs])
 
@@ -168,7 +165,7 @@ def test_split_on_ns_nogap():
     result = fasta.split_on_ns().write("test.fa")
     fasta = FastaUtil.from_filename(result)
 
-    lens = list()
+    lens = []
     for seqs in fasta.seq_lookup.values():
         lens.extend([len(seq) for seq in seqs])
 

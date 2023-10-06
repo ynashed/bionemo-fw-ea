@@ -14,14 +14,15 @@
 # limitations under the License.
 
 from nemo.core.optim.lr_scheduler import register_scheduler
+
 from bionemo.utils.scheduler import (
-    LinearWarmupHoldDecayPolicy,
     LinearWarmupHoldDecayParams,
+    LinearWarmupHoldDecayPolicy,
 )
+
 
 register_scheduler(
     'LinearWarmupHoldDecayPolicy',
     LinearWarmupHoldDecayPolicy,
     LinearWarmupHoldDecayParams,
 )
-

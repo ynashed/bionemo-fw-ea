@@ -13,18 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from tqdm import tqdm
-
 import torch
-
-from nemo.utils import logging
-
-import torch
-from nemo.core.optim.optimizers import get_optimizer
 from nemo.core.optim.lr_scheduler import get_scheduler
+from nemo.core.optim.optimizers import get_optimizer
+from nemo.utils import logging
 from omegaconf import OmegaConf
-from nemo.utils import logging
-from nemo.utils import logging
+from tqdm import tqdm
 
 
 class ValidationTrainer:
@@ -57,14 +51,16 @@ class ValidationTrainer:
         sched_cls = get_scheduler(sched_name)
         scheduler = sched_cls(optimizer, **sched_params)
         return optimizer, scheduler
-        
-    def fit(self, train_dataset, train_dataloader):        
+
+    def fit(self, train_dataset, train_dataloader):
         for epoch in range(self.cfg.num_epochs):
             self.model.train(True)
-            logging.info('EPOCH {}'.format(epoch+1))
-            avg_loss = self.train_one_epoch(self.model, train_dataset, train_dataloader, self.loss_fn, self.optimizer, self.scheduler)
-            logging.info('Training Avg Loss: {}'.format(avg_loss)) 
-    
+            logging.info('EPOCH {}'.format(epoch + 1))
+            avg_loss = self.train_one_epoch(
+                self.model, train_dataset, train_dataloader, self.loss_fn, self.optimizer, self.scheduler
+            )
+            logging.info('Training Avg Loss: {}'.format(avg_loss))
+
     def test(self, test_dataset, test_dataloader):
         running_vloss = 0.0
         avg_vloss = 0.0
@@ -76,7 +72,7 @@ class ValidationTrainer:
             vloss = self.loss_fn(voutputs, vlabels)
             running_vloss += vloss
             avg_metrics = self.update_metrics(avg_metrics, "test", voutputs, vlabels)
-            
+
         avg_vloss = running_vloss / (n + 1)
         for key in avg_metrics.keys():
             avg_metrics[key] = avg_metrics[key] / (n + 1)
@@ -84,7 +80,7 @@ class ValidationTrainer:
         return avg_metrics
 
     def train_one_epoch(self, model, train_dataset, train_dataloader, loss_fn, optimizer, scheduler):
-        running_loss = 0.
+        running_loss = 0.0
         for i, data in enumerate(tqdm(train_dataloader)):
             inputs, labels = train_dataset.prepare_batch(data, train_dataset, task=self.cfg.task_type)
             torch.set_grad_enabled(True)
