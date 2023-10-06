@@ -9,7 +9,12 @@ from omegaconf.omegaconf import OmegaConf, open_dict
 from bionemo.data.molecule import MoleculeEnumeration
 from bionemo.model.molecule.megamolbart.megamolbart_model import MegaMolBARTModel
 from bionemo.model.utils import initialize_model_parallel, setup_trainer
-from bionemo.utils.tests import clean_directory, load_expected_training_results, save_expected_training_results
+from bionemo.utils.tests import (
+    clean_directory,
+    list_to_tensor,
+    load_expected_training_results,
+    save_expected_training_results,
+)
 from tests.test_megamolbart_inference import get_cfg
 
 
@@ -29,7 +34,7 @@ CONFIG_PATH = os.path.join(PREPEND_DIR, 'conf')
 PREPEND_CONFIG_DIR = '../examples/molecule/megamolbart/conf'
 
 CORRECT_RESULTS_DIR = 'examples/tests/expected_results'
-CORRECT_RESULTS = 'megamolbart_inference_greedy_beam_search_preds.pkl'
+CORRECT_RESULTS = 'megamolbart_inference_greedy_beam_search_preds.json'
 
 UPDATE_EXPECTED_RESULTS = os.environ.get('UPDATE_EXPECTED_RESULTS', False)
 COMPARE_EXPECTED_RESULTS = os.environ.get('COMPARE_EXPECTED_RESULTS', False)
@@ -88,18 +93,33 @@ def test_megamolbart_greedy_beam_search():
 
     if not UPDATE_EXPECTED_RESULTS and COMPARE_EXPECTED_RESULTS:
         outputs = load_expected_training_results(
-            results_comparison_dir=CORRECT_RESULTS_DIR, correct_results=CORRECT_RESULTS, format='pickle'
+            results_comparison_dir=CORRECT_RESULTS_DIR, correct_results=CORRECT_RESULTS
         )
         weights = outputs['weights']
+
+        # Convert weights from list to tensor.
+        for key, lst in weights.items():
+            if isinstance(lst, list):
+                weights[key] = list_to_tensor(lst).cuda()
+
         model.load_state_dict(weights)
         for key in weights.keys():
             assert torch.equal(model.state_dict()[key], weights[key])
 
+        # Convert output batch from list to tensor.
+        expected_batch = outputs['batch']
+        for key, lst in expected_batch.items():
+            if isinstance(lst, list):
+                if isinstance(lst[0], str):
+                    expected_batch[key] = lst
+                else:
+                    expected_batch[key] = list_to_tensor(lst)
+
         for key in batch.keys():
             if key == 'target_smiles':
-                assert batch[key] == outputs['batch'][key]
+                assert batch[key] == expected_batch[key]
             else:
-                assert torch.equal(batch[key], outputs['batch'][key])
+                assert torch.equal(batch[key], expected_batch[key])
 
     # this test requires warmup - otherwise there are some logits discrepancies later on
     model.freeze()
@@ -171,14 +191,28 @@ def test_megamolbart_greedy_beam_search():
     if UPDATE_EXPECTED_RESULTS:
         weights = model.state_dict()
         logger.warning(f'Updating expected results in {CORRECT_RESULTS_DIR}/{CORRECT_RESULTS}')
+
+        # Convert weights from tensors to list so we can save them in JSON.
+        for key, tensor in weights.items():
+            if isinstance(tensor, torch.Tensor):
+                weights[key] = tensor.tolist()
+
+        for key, tensor in batch.items():
+            if isinstance(tensor, torch.Tensor):
+                batch[key] = tensor.tolist()
+
         outputs = {
             'seed': cfg.seed,
             'smiles': _SMIS,
             'num_tokens_to_generate': _NUM_TOKENS_TO_GENERATE,
             'beam_size': _BEAM_SIZE,
             'beam_alpha': _BEAM_ALPHA,
-            'greedy': {'predictions': preds, 'logits': logits},
-            'beam': {'predictions': preds_beam, 'logits': logits_beam, 'scores': scores_beam},
+            'greedy': {'predictions': preds.tolist(), 'logits': logits.tolist()},
+            'beam': {
+                'predictions': preds_beam.tolist(),
+                'logits': logits_beam.tolist(),
+                'scores': scores_beam.tolist(),
+            },
             'weights': weights,
             'batch': batch,
         }
@@ -186,7 +220,6 @@ def test_megamolbart_greedy_beam_search():
             results_comparison_dir=CORRECT_RESULTS_DIR,
             correct_results=CORRECT_RESULTS,
             expected_results=outputs,
-            file_format='pickle',
         )
 
     if not UPDATE_EXPECTED_RESULTS and COMPARE_EXPECTED_RESULTS:
@@ -196,16 +229,16 @@ def test_megamolbart_greedy_beam_search():
         ]
         assert all(
             outputs[k] == val
-                for k, val in zip(
-                    ['seed', 'smiles', 'num_tokens_to_generate', 'beam_size', 'beam_alpha'],
-                    [cfg.seed, _SMIS, _NUM_TOKENS_TO_GENERATE, _BEAM_SIZE, _BEAM_ALPHA],
-                )
+            for k, val in zip(
+                ['seed', 'smiles', 'num_tokens_to_generate', 'beam_size', 'beam_alpha'],
+                [cfg.seed, _SMIS, _NUM_TOKENS_TO_GENERATE, _BEAM_SIZE, _BEAM_ALPHA],
+            )
         ), 'Setup of the test does not match setup of the expected results'
-
-        assert torch.equal(outputs['greedy']['predictions'], preds)
-        assert torch.equal(outputs['greedy']['logits'], logits)
-        assert torch.equal(outputs['beam']['predictions'], preds_beam)
-        assert torch.equal(outputs['beam']['logits'], logits_beam)
+        # Convert from list to tensor in order to compare.
+        assert torch.equal(list_to_tensor(outputs['greedy']['predictions']), preds)
+        assert torch.equal(list_to_tensor(outputs['greedy']['logits']), logits)
+        assert torch.equal(list_to_tensor(outputs['beam']['predictions']), preds_beam)
+        assert torch.equal(list_to_tensor(outputs['beam']['logits']), logits_beam)
 
     model.unfreeze()
 

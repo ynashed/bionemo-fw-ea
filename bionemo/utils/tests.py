@@ -2,11 +2,12 @@ import hashlib
 import json
 import os
 import pathlib
-import pickle
 import shutil
-from typing import Optional
+from collections import OrderedDict
+from typing import List, Optional, Union
 
 import numpy as np
+import torch
 import yaml
 from hydra.core.config_search_path import ConfigSearchPath
 from hydra.core.plugins import Plugins
@@ -69,33 +70,33 @@ def resolve_cfg(cfg: DictConfig):
     return cfg_str
 
 
-def pickle_cfg(cfg: dict, results_comparison_dir: str, correct_config: str):
-    """Dump hydra configuration to pickle file
+def save_cfg_to_json(cfg: dict, results_comparison_dir: str, correct_config: str):
+    """Dump hydra configuration to JSON file
 
     Args:
         cfg (dict): configuration parameters
-        results_comparison_dir (str): Directory to store the pickle file with config
-        correct_config (str): Name of the pickle file holding the configuration
+        results_comparison_dir (str): Directory to store the JSON file with config
+        correct_config (str): Name of the JSON file holding the configuration
     """
     cfg_str = resolve_cfg(cfg)
     output_file = os.path.join(results_comparison_dir, correct_config)
-    with open(output_file, 'wb') as fh:
-        pickle.dump(cfg_str, fh)
+    with open(output_file, 'w') as fh:
+        fh.write(json.dumps(cfg_str))
 
 
-def load_cfg_pickle(results_comparison_dir: str, correct_config: str):
-    """Load hydra configuration from a pickle file for comparison
+def load_cfg_json(results_comparison_dir: str, correct_config: str):
+    """Load hydra configuration from a json file for comparison
 
     Args:
-        results_comparison_dir (str): Directory where the pickle file with config is located
-        correct_config (str): Name of the pickle file holding the configuration
+        results_comparison_dir (str): Directory where the json file with config is located
+        correct_config (str): Name of the json file holding the configuration
 
     Returns:
         dict: expected comparison configuration
     """
     config_file = os.path.join(results_comparison_dir, correct_config)
-    with open(config_file, 'rb') as fh:
-        cfg_dict = pickle.load(fh)
+    with open(config_file, 'r') as fh:
+        cfg_dict = json.load(fh)
     return cfg_dict
 
 
@@ -111,57 +112,38 @@ def clean_directory(directory):
     directory.mkdir(parents=True, exist_ok=True)
 
 
-def load_expected_training_results(results_comparison_dir: str, correct_results: str, format: str = 'json'):
-    """Load JSON file containing expected training results
+def load_expected_training_results(results_comparison_dir: str, correct_results: str):
+    """Loads a JSON file containing expected training results.
 
     Args:
-        results_comparison_dir (str): Directory where the pickle file with config is located
-        correct_config (str): Name of the pickle file holding the configuration
-        format (str): Format of the serialized file to load, can be json or pickle
+        results_comparison_dir (str): Directory where the json file with config is located.
+        correct_config (str): Name of the json file holding the configuration.
 
     Returns:
-        dict: expected training results
+        dict: expected training results.
     """
-    supported_formats = ['json', 'pickle']
     results_path = os.path.join(results_comparison_dir, correct_results)
-    if format == 'json':
-        with open(results_path, 'r') as fh:
-            expected_results = json.load(fh)
-    elif format == 'pickle':
-        with open(results_path, 'rb') as fh:
-            expected_results = pickle.load(fh)
-    else:
-        raise ValueError(f'Invalid file format {format}, supported format {supported_formats}')
+
+    with open(results_path, 'r') as fh:
+        expected_results = json.load(fh, object_pairs_hook=OrderedDict)
 
     return expected_results
 
 
-def save_expected_training_results(
-    results_comparison_dir: str, correct_results: str, expected_results: dict, file_format: str = 'json'
-):
-    """Saves JSON file containing expected training results
-
+def save_expected_training_results(results_comparison_dir: str, correct_results: str, expected_results: dict) -> None:
+    """
     Args:
-        results_comparison_dir (str): Directory where the pickle file with config is located
-        correct_config (str): Name of the pickle file holding the configuration
+        results_comparison_dir (str): Directory where the json file with config is located
+        correct_config (str): Name of the json file holding the configuration
         expected_results (dict): expected training results
-        file_format (str): Format of the serialized file to save, can be json or pickle
 
     Returns:
         None
     """
-    supported_formats = ['json', 'pickle']
     results_path = os.path.join(results_comparison_dir, correct_results)
     logging.info(f'Saving expected training results to {results_path}')
-    if file_format == 'json':
-        with open(results_path, 'w') as fh:
-            json.dump(expected_results, fh, indent=4, sort_keys=True)
-
-    elif file_format == 'pickle':
-        with open(results_path, 'wb') as fh:
-            pickle.dump(expected_results, fh)
-    else:
-        raise ValueError(f'Invalid file format {file_format}, supported formats: {supported_formats}')
+    with open(results_path, 'w') as fh:
+        json.dump(expected_results, fh, indent=4, sort_keys=True)
 
 
 def check_expected_training_results(
@@ -203,3 +185,21 @@ def get_directory_hash(directory):
                 data = fh.read()
                 md5_hash.update(data)
     return md5_hash.hexdigest()
+
+
+# TODO(@jomitchell) Write a unit test somewhere for this helper function.
+def list_to_tensor(data_list: List[Union[float, int]]) -> torch.Tensor:
+    """Recursively convert a multi-dimensional list to a torch tensor."""
+
+    # If the current item is not a list, return it wrapped in a tensor
+    if not isinstance(data_list, list):
+        return torch.tensor(data_list)
+
+    # Convert the first level of the list to tensors or lists
+    converted = [list_to_tensor(item) for item in data_list]
+
+    # If all converted items are tensors and have the same shape, stack them
+    if all(isinstance(item, torch.Tensor) for item in converted) and len({item.shape for item in converted}) == 1:
+        return torch.stack(converted)
+
+    return converted

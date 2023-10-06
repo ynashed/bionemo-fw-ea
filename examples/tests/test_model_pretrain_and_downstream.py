@@ -39,11 +39,11 @@ from bionemo.utils.tests import (
     check_expected_training_results,
     check_model_exists,
     clean_directory,
-    load_cfg_pickle,
+    load_cfg_json,
     load_expected_training_results,
-    pickle_cfg,
     register_searchpath_config_plugin,
     resolve_cfg,
+    save_cfg_to_json,
     save_expected_training_results,
     update_relative_config_dir,
 )
@@ -76,14 +76,14 @@ CONFIG_NAME = [
     'megamolbart_physchem_test',
 ]
 CORRECT_CONFIG = [
-    'megamolbart_retro_config.pkl',
-    'megamolbart_config.pkl',
-    'esm1nv_config.pkl',
-    'prott5nv_config.pkl',
-    'prott5nv_encoder_finetune_config.pkl',
-    'esm1nv_encoder_finetune_config.pkl',
-    'prott5nv_sec_str_val_config.pkl',
-    'megamolbart_physchem_config.pkl',
+    'megamolbart_retro_config.json',
+    'megamolbart_config.json',
+    'esm1nv_config.json',
+    'prott5nv_config.json',
+    'prott5nv_encoder_finetune_config.json',
+    'esm1nv_encoder_finetune_config.json',
+    'prott5nv_sec_str_val_config.json',
+    'megamolbart_physchem_config.json',
 ]
 CORRECT_RESULTS = [
     'megamolbart_retro_log.json',
@@ -162,10 +162,10 @@ def test_config_parameters(prepend_config_path, config_name, correct_config):
         msg = f'Updating expected config in {results_comparison_dir}/{correct_config}'
         logger.warning(msg)
         # will create a new comparison config
-        pickle_cfg(cfg, results_comparison_dir, correct_config)
+        save_cfg_to_json(cfg, results_comparison_dir, correct_config)
         assert False, msg
 
-    original_cfg_dict = load_cfg_pickle(results_comparison_dir, correct_config)
+    original_cfg_dict = load_cfg_json(results_comparison_dir, correct_config)
     new_cfg_dict = resolve_cfg(cfg)
     assert (
         original_cfg_dict == new_cfg_dict
