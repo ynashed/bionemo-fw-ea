@@ -242,6 +242,11 @@ class ESM2nvModel(ESM1nvModel):
                                                 cfg=model_cfg.data.uf90, 
                                                 use_upsampling=False, 
                                                 num_samples=None)
+        
+        # now we can create the sample caceh
+        # how to choose filename?
+        sample_mapping_json_filename = dataset_path + "/uf90_seqid_to_idx.json"
+        uf90_seqid_to_idx = Uniref90ClusterMappingDataset._create_sample_mapping_cache(sample_mapping_json_filename, uniref90_dataset)
 
         results = []
         for ds in [_train_ds, _validation_ds, _test_ds]:
@@ -260,7 +265,8 @@ class ESM2nvModel(ESM1nvModel):
                 index_mapping_dir=index_mapping_dir, # stores index
                 cluster_map_json_path=model_cfg.data.cluster_map_json_path,
                 name=ds.name,
-                force_regen_sample_mapping=model_cfg.data.force_regen_sample_mapping
+                force_regen_sample_mapping=model_cfg.data.force_regen_sample_mapping,
+                uniref90_samplemap=uf90_seqid_to_idx
             )
 
             results.append(ds)

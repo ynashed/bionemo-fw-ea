@@ -208,6 +208,7 @@ class Uniref90ClusterMappingDataset(MappedDataset):
             index_mapping_dir=None,
             name=None,
             force_regen_sample_mapping=False,
+            uniref90_samplemap=None,
         ):
         '''
         Creates a mapped dataset mapping samples from uniref50_dataset to cluster members inside uniref90_dataset. 
@@ -238,20 +239,29 @@ class Uniref90ClusterMappingDataset(MappedDataset):
             indexmap_filename = data_prefix
 
         # At this point we have the directory
-        self.cluster_member_map = indexmap_filename
-        self.cluster_member_map += f'seed{seed}_sample_mapping_cache.json'
         # this gets invoked to create the cluster map, which is used in create_sample_map
 
         # Cluster map should be passed in some unknown format. Using pre-created JSON for now.
         self.cluster_map_json_path = cluster_map_json_path
-
-        # What do we want to do with this?
-        # We must do this in order to create our sample mapping
-        self.uniref90_samplemap = self._create_sample_mapping_cache(self.cluster_member_map, uniref90_dataset, force=force_regen_sample_mapping)
         # Pass in the dataset that sample_mapping indicies correspond to
-        self.uniref50_dataset = uniref50_dataset
+        # NOTE: Do we needthis as an attribute? 
+        # self.uniref50_dataset = uniref50_dataset
+
+        if uniref90_samplemap is None:
+            # Convenience method incase the caller doesnt know what is going on, but still wants to run.
+            self.sample_map_json_fn= indexmap_filename
+            self.sample_map_json_fn += f'seed{seed}_sample_mapping_cache.json'
+            # Basically we do not want this as an attribute, ever. how do we avoid that?
+            uniref90_samplemap = self._create_sample_mapping_cache(self.sample_map_json_fn, uniref90_dataset, force=force_regen_sample_mapping)
+
         num_samples=0 # This has no effect on behavior
+        logging.info(f"Loading cluster map {self.cluster_map_json_path=}")
+        cluster_map = self.create_cluster_map_from_json(self.cluster_map_json_path)
+        self.sample_map = self._create_sample_mapping(uniref50_dataset, cluster_map, uniref90_samplemap)
         super().__init__(uniref90_dataset, num_samples)
+        # Now we can free the dictonaries used for creating the cluster mapping
+        del(uniref90_samplemap)
+        del(cluster_map)
 
     @staticmethod
     def _create_sample_mapping_cache(filename, uniref90_dataset, force=False) -> Dict[str, int]:
@@ -264,10 +274,13 @@ class Uniref90ClusterMappingDataset(MappedDataset):
             logging.info(f'restoring found sample index map {filename}')
             with open(filename, 'r') as fd:
                 uniref90_samplemap = json.load(fd)
+            logging.info(f'Done')
             # Now we do it again and check that it still works. (seems like it does), unirefid-ot-int-2.json for context
         else:
             logging.info(f"building sample index map for {len(uniref90_dataset)} samples")
             # this is a map that does sample_id to index
+
+            # TODO: DataLoader here to go fast?
             uniref90_samplemap = {k['sequence_id']: i for i, k in enumerate(uniref90_dataset)}
             with open(filename, 'w') as fd:
                 json.dump(uniref90_samplemap, fd)
@@ -284,9 +297,36 @@ class Uniref90ClusterMappingDataset(MappedDataset):
             cluster_map = json.load(fd)
         return cluster_map
 
-    @cached_property
-    def cluster_map(self) -> Dict[str, str]:
-        return self.create_cluster_map_from_json(self.cluster_map_json_path)
+    @staticmethod
+    def _create_sample_mapping(uniref50_dataset, cluster_map, uniref90_samplemap):
+        sample_map = list()
+        logging.info(f"Creating uf50->uf90 sample mapping for {len(uniref50_dataset)} samples.")
+        for a in uniref50_dataset:
+            if a in cluster_map:
+                items = cluster_map[a]
+                match items:
+                    case [item]:
+                        selected_sample_id = item
+                    case _:
+                        selected_sample_id = random.choice(items)
+                # selected_sample_id = random.choice(self.cluster_map[a])
+            else:
+                # These are probably from bad versions
+                logging.warning(f"Missing entry in clustermap {a}, this breaks sampling assumptions")
+                # We cant continue here because it will break things, particularly with our index.
+                raise Exception(f"Cannot create a sample mapping for cluster: {a} with no corresponding cluster members. Check cluster mapping.")
+
+            # Get the actual index, add to our sample map
+            if (selected_sample_idx := uniref90_samplemap.get(selected_sample_id)) is not None:
+                # sample_map.append(selected_sample_idx)
+                sample_map.append(selected_sample_idx)
+            else:
+                # Occurs when the dictionary going from member => idx has no entry for some cluster member.
+                #   Causes: 
+                #       - cluster map contains members that are not present in the underlying dataset
+                #       - cluster map contains non-existant members
+                raise Exception("Cluster member id to index map is corrupted.")
+        return np.array(sample_map)
 
     def create_sample_mapping(self, dataset, num_samples=None) -> np.array:
         ''' 
@@ -297,34 +337,7 @@ class Uniref90ClusterMappingDataset(MappedDataset):
 
         Returns - numpy array that maps indicies from the first dataset (Uniref50) to an entry in the second dataset (Uniref90)
         '''
-        if num_samples is not None:
-            logging.warning(f"{type(self)}.create_sample_mapping recieved `num_samples`, but this parameter has no effect.")
-
-        # Cluster map: mapping from cluster_id to cluster member ids
-        # sample map: mapping from UF50 index to UF90 IDX
-
-        sample_map = list()
-        logging.info(f"Creating sample mapping for {len(self.uniref50_dataset)} samples.")
-        for a in self.uniref50_dataset:
-            if a in self.cluster_map:
-                # TODO: make this respect the global seed. 
-                selected_sample_id = random.choice(self.cluster_map[a])
-            else:
-                # These are probably from bad versions
-                logging.warning(f"Missing entry in clustermap {a}, this breaks sampling assumptions")
-                # We cant continue here because it will break things, particularly with our index.
-                raise Exception(f"Cannot create a sample mapping for cluster: {a} with no corresponding cluster members. Check cluster mapping.")
-
-            # Get the actual index, add to our sample map
-            if (selected_sample_idx := self.uniref90_samplemap.get(selected_sample_id)) is not None:
-                sample_map.append(selected_sample_idx)
-            else:
-                # Occurs when the dictionary going from member => idx has no entry for some cluster member.
-                #   Causes: 
-                #       - cluster map contains members that are not present in the underlying dataset
-                #       - cluster map contains non-existant members
-                raise Exception("Cluster member id to index map is corrupted.")
-        return np.array(sample_map)
+        return self.sample_map
 
 class NeMoUpsampling(MappedDataset):
     """Upsamples a dataset to a target length by repeating samples."""
