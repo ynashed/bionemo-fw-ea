@@ -13,23 +13,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from abc import abstractmethod
-from functools import cached_property
-from typing import List, Dict, Optional, Any
-from enum import Enum
-import numpy as np
-from typing import Optional
-import random
 import json
 import os
+import random
+import time
+from abc import abstractmethod
+from typing import Dict, Optional
+
+import numpy as np
+from nemo.collections.nlp.data.language_modeling.megatron.dataset_utils import get_samples_mapping
+from nemo.core import Dataset
+from nemo.utils import logging
 from tqdm import tqdm
 
 from bionemo.data.utils import handle_index
 
-from nemo.utils import logging
-from nemo.core import Dataset
-from nemo.collections.nlp.data.language_modeling.megatron.dataset_utils import get_samples_mapping
-import time
 
 __all__ = [
     'MappedDataset',
@@ -81,7 +79,7 @@ class MappedDataset(Dataset):
 
         # consolidate sample mapping if dataset is MappedDataset
         if consolidate_sample_mapping and isinstance(dataset, MappedDataset):
-            self.sample_mapping = list(map(lambda i: dataset.sample_mapping[i], self.sample_mapping))
+            self.sample_mapping = [dataset.sample_mapping[i] for i in self.sample_mapping]
             self._dataset = dataset._dataset
 
     def __len__(self):
@@ -238,9 +236,9 @@ class AltUniref90ClusterMappingDataset(MappedDataset):
 
         # Used for creating the cluster_member_id -> index map
         if index_mapping_dir is not None:
-            indexmap_filename = os.path.join(index_mapping_dir, os.path.basename(data_prefix))
+            os.path.join(index_mapping_dir, os.path.basename(data_prefix))
         else:
-            indexmap_filename = data_prefix
+            pass
 
         # At this point we have the directory
         # this gets invoked to create the cluster map, which is used in create_sample_map
@@ -273,7 +271,7 @@ class AltUniref90ClusterMappingDataset(MappedDataset):
             cluster_map = json.load(fd)
 
         for k, v in cluster_map.items():
-            cluster_map[k] = np.memmap(v)
+            cluster_map[k] = np.memmap(v, dtype=int)
 
         return cluster_map
 
@@ -434,7 +432,7 @@ class Uniref90ClusterMappingDataset(MappedDataset):
             logging.debug(f'restoring found sample index map {filename}')
             with open(filename, 'r') as fd:
                 uniref90_samplemap = json.load(fd)
-            logging.debug(f'Done')
+            logging.debug('Done')
             # Now we do it again and check that it still works. (seems like it does), unirefid-ot-int-2.json for context
         else:
             logging.debug(f"building sample index map for {len(uniref90_dataset)} samples")
@@ -459,7 +457,7 @@ class Uniref90ClusterMappingDataset(MappedDataset):
 
     @staticmethod
     def _create_sample_mapping(uniref50_dataset, cluster_map, uniref90_samplemap):
-        sample_map = list()
+        sample_map = []
         logging.debug(f"Creating uf50->uf90 sample mapping for {len(uniref50_dataset)} samples.")
         for a in tqdm(uniref50_dataset):
             if a in cluster_map:
