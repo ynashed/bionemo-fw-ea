@@ -121,5 +121,4 @@ download_bionemo_models() {
         "${MODEL_PATH}" \
         "protein/esm2nv/esm2nv_3B_converted.nemo"
     fi
-
 }
