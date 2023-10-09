@@ -95,10 +95,6 @@ def test_number_of_tokenization_calls(test_input, n_calls, model_path):
     assert obs == n_calls
 
 
-def test_dataloader_collate():
-    get_tokenizer()
-
-
 @pytest.mark.parametrize(
     "model_path",
     get_tokenizer_model_paths(),

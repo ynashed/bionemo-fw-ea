@@ -29,7 +29,7 @@ except (ImportError, ModuleNotFoundError):
     HAVE_APEX = False
 
     # fake missing classes with None attributes
-    ModelType = AttnMaskType = AttnType = LayerType = ApexGuardDefaults()
+    ModelType = AttnMaskType = AttnType = LayerType = ApexGuardDefaults()  # noqa: F811
 
 try:
     from megatron.core import parallel_state, tensor_parallel
@@ -45,7 +45,7 @@ try:
 
     HAVE_TE = True
 
-except:
+except (ImportError, ModuleNotFoundError):
     HAVE_TE = False
 
     # fake missing class

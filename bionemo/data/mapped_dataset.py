@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
 import os
 import time
 from abc import abstractmethod
@@ -279,7 +278,7 @@ class Uniref90ClusterMappingDataset(MappedDataset):
         Utilizes the `uniref50_dataset` to generate a sample map and writes/reads this map to/from a memory-mapped file.
 
         Args:
-            uniref50_dataset (list of str): A dataset where each item is a string in the format of 
+            uniref50_dataset (list of str): A dataset where each item is a string in the format of
                 ["u50_id0","u50_id1", "u50_id2", ...].
             sample_mapping_file (str): Path to the file where the sample mapping will be stored as a memory-mapped array.
             cluster_map (dict): A dictionary containing mapping information between clusters. Expected to have keys 'counts' and 'starts'.

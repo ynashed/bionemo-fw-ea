@@ -14,12 +14,7 @@
 # limitations under the License.
 
 
-
-
 from nemo.collections.nlp.data.language_modeling.text_memmap_dataset import TextMemMapDataset
-
-
-__all__ = ["ProteinFASTAMemmapDataset"]
 
 
 class FASTAFieldsMemmapDataset(TextMemMapDataset):

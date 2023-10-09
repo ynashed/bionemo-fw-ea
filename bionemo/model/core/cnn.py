@@ -17,8 +17,6 @@ from typing import List
 import torch
 from torch.nn.modules.loss import _WeightedLoss
 
-from bionemo.data.datasets.per_token_value_dataset import *
-
 
 class PerTokenMaskedCrossEntropyLoss(_WeightedLoss):
     def __init__(self, **kwargs):

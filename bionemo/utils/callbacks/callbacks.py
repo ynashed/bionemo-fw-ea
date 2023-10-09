@@ -24,7 +24,6 @@ from pytorch_lightning.callbacks import Callback
 from torch.utils.data import DataLoader
 
 from bionemo.data.datasets import PerTokenValueDataModule, SingleValueDataModule
-from bionemo.data.datasets.single_value_dataset import SingleValueDataModule
 from bionemo.data.metrics import accuracy, mse, per_token_accuracy
 from bionemo.model.core import ConvNet, MLPModel, PerTokenMaskedCrossEntropyLoss, ValidationTrainer
 

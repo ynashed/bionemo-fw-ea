@@ -50,6 +50,9 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
 
 COPY setup/requirements.txt /tmp/requirements.txt
 RUN pip3 install -r /tmp/requirements.txt
+COPY setup/requirements-linter.txt /tmp/requirements-linter.txt
+RUN pip3 install -r /tmp/requirements-linter.txt
+
 
 ## Install NGC cli in container for artifact download
 ENV NGC_CLI_INSTALL_PREFIX=/usr/local/bin

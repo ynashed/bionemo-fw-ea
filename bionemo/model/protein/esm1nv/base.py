@@ -41,7 +41,7 @@ except (ImportError, ModuleNotFoundError):
 
     # fake missing classes with None attributes
     AttnMaskType = ApexGuardDefaults()
-    LayerType = ApexGuardDefaults()
+    LayerType = ApexGuardDefaults()  # noqa: F811
 
 try:
     from megatron.core import parallel_state, tensor_parallel
@@ -55,9 +55,6 @@ except (ImportError, ModuleNotFoundError):
 
 # Additional imports needed for BertModel
 from nemo.collections.nlp.models.language_modeling.megatron.bert_model import BertLMHead
-from nemo.collections.nlp.modules.common.megatron.utils import (
-    get_linear_layer,
-)
 
 
 class ESMnvEmbedding(Embedding):

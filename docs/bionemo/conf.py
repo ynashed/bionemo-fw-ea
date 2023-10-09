@@ -10,10 +10,10 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
-import os
 
 from docutils import nodes
 from sphinx import search
+
 
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
@@ -47,8 +47,8 @@ extensions = [
     "sphinxcontrib.bibtex",
     "sphinx_tabs.tabs",
     "sphinx_sitemap",
-    #"sphinxcontrib.openapi",
-    #"sphinxcontrib.redoc"
+    # "sphinxcontrib.openapi",
+    # "sphinxcontrib.redoc"
 ]
 
 suppress_warnings = ["myst.domains", "ref.ref"]
@@ -56,21 +56,21 @@ suppress_warnings = ["myst.domains", "ref.ref"]
 numfig = True
 
 # final location of docs for seo/sitemap
-html_baseurl = 'https://docs.nvidia.com/bionemo-framework/0.4.0/' # FIXME # FIXED for now; needs to be updated at the time of product launch
+html_baseurl = 'https://docs.nvidia.com/bionemo-framework/0.4.0/'  # FIXME # FIXED for now; needs to be updated at the time of product launch
 
 # final location of the framework code repo
-fw_code_baseurl = 'https://registry.ngc.nvidia.com/orgs/cobwt4rder8b/containers' # FIXME # FIXED for now; needs to be updated at the time of product launch
+fw_code_baseurl = 'https://registry.ngc.nvidia.com/orgs/cobwt4rder8b/containers'  # FIXME # FIXED for now; needs to be updated at the time of product launch
 
 # final location of the framework signup/info website
-bionemo_info_url = 'https://www.nvidia.com/en-us/gpu-cloud/bionemo' # FIXME
+bionemo_info_url = 'https://www.nvidia.com/en-us/gpu-cloud/bionemo'  # FIXME
 
 # NGC deploy info
-deploy_ngc_registry = 'nvcr.io' # FIXME # FIXED for now; needs to be updated at the time of product launch
-deploy_ngc_org = "cobwt4rder8b" # FIXME
-deploy_ngc_org_id = 'cobwt4rder8b' # FIXME
-deploy_ngc_team = "" # FIXME
-deploy_container_name = 'bionemo-framework' # FIXME
-deploy_container_tag = 'latest' # FIXME
+deploy_ngc_registry = 'nvcr.io'  # FIXME # FIXED for now; needs to be updated at the time of product launch
+deploy_ngc_org = "cobwt4rder8b"  # FIXME
+deploy_ngc_org_id = 'cobwt4rder8b'  # FIXME
+deploy_ngc_team = ""  # FIXME
+deploy_container_name = 'bionemo-framework'  # FIXME
+deploy_container_tag = 'latest'  # FIXME
 
 myst_enable_extensions = [
     "dollarmath",
@@ -155,7 +155,7 @@ version_short = release
 myst_substitutions = {
     "version_num": version_short,
     "bionemo_info_url": f"[information website]({bionemo_info_url})",
-    "model_license_slug": f"Apache License",
+    "model_license_slug": "Apache License",
     "deploy_ngc_registry": f"{deploy_ngc_registry}",
     "deploy_ngc_org_team": f"{deploy_ngc_org}/{deploy_ngc_team}" if deploy_ngc_team else deploy_ngc_org,
     "deploy_ngc_org": f"{deploy_ngc_org}",
@@ -191,6 +191,7 @@ bibtex_default_style = "unsrt"
 ### We currrently use Myst: https://myst-nb.readthedocs.io/en/latest/use/execute.html
 nb_execution_mode = "off"  # Global execution disable
 # execution_excludepatterns = ['tutorials/tts-python-basics.ipynb']  # Individual notebook disable
+
 
 def setup(app):
     app.add_config_value('ultimate_replacements', {}, True)

@@ -13,7 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from typing import List, TypedDict
+
 from nemo.collections.common.tokenizers import TokenizerSpec
+
 from bionemo.data.dataloader.collate import (
     BertCollate,
     BertMasking,
@@ -25,10 +27,14 @@ __all__ = ['ProteinBertCollate']
 
 
 class ProteinBertCollate(BertCollate):
-    def __init__(self, tokenizer: TokenizerSpec, seq_length: int,
-            pad_size_divisible_by_8: bool,
-            modify_percent: float = 0.1,
-            perturb_percent: float = 0.5):
+    def __init__(
+        self,
+        tokenizer: TokenizerSpec,
+        seq_length: int,
+        pad_size_divisible_by_8: bool,
+        modify_percent: float = 0.1,
+        perturb_percent: float = 0.5,
+    ):
         """
         A collate function for Protein sequences.
 
@@ -56,15 +62,21 @@ class ProteinBertCollate(BertCollate):
         )
 
 
-
 class BatchItem(TypedDict):
     sequence: str
     sequence_id: str
 
+
 class ESM2BertCollate(ProteinBertCollate):
-    def __init__(self, tokenizer: TokenizerSpec, seq_length: int,
-            pad_size_divisible_by_8: bool, modify_percent: float = 0.1, perturb_percent: float = 0.5):
-        """ Extends the parent class by allowing collate_fns that operate on dictionaries rather
+    def __init__(
+        self,
+        tokenizer: TokenizerSpec,
+        seq_length: int,
+        pad_size_divisible_by_8: bool,
+        modify_percent: float = 0.1,
+        perturb_percent: float = 0.5,
+    ):
+        """Extends the parent class by allowing collate_fns that operate on dictionaries rather
         that lists of strings.
 
         Arguments:
@@ -77,12 +89,14 @@ class ESM2BertCollate(ProteinBertCollate):
                 percentage of tokens to perturb. Perturbation changes the
                 tokens randomly to some other non-special token.
         """
-        super().__init__(tokenizer=tokenizer, seq_length=seq_length,
+        super().__init__(
+            tokenizer=tokenizer,
+            seq_length=seq_length,
             pad_size_divisible_by_8=pad_size_divisible_by_8,
             modify_percent=modify_percent,
-            perturb_percent=perturb_percent
+            perturb_percent=perturb_percent,
         )
 
     def collate_fn(self, batch: List[BatchItem], label_pad: int = -1):
-        ''' Modifies the underlying collate_fn to handle a dictionary as input instead of a list of sequences. '''
-        return super().collate_fn([x['sequence'] for x in batch], label_pad = label_pad)
+        '''Modifies the underlying collate_fn to handle a dictionary as input instead of a list of sequences.'''
+        return super().collate_fn([x['sequence'] for x in batch], label_pad=label_pad)

@@ -12,18 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from omegaconf.omegaconf import OmegaConf
-
 from nemo.core.config import hydra_runner
 from nemo.utils import logging
+from omegaconf.omegaconf import OmegaConf
 
-from bionemo.data import UniRef50Preprocess, FLIPPreprocess
-from bionemo.data.mapped_dataset import Uniref90ClusterMappingDataset
+from bionemo.data import FLIPPreprocess
 from bionemo.data.preprocess.protein.preprocess import ESM2Preprocess
-from bionemo.model.protein.esm1nv import ESM1nvModel, esm1nv_model
+from bionemo.model.protein.esm1nv import esm1nv_model
 from bionemo.model.utils import setup_trainer
 from bionemo.utils import BioNeMoSaveRestoreConnector
-
 from bionemo.utils.callbacks.callback_utils import setup_callbacks
 
 
@@ -40,8 +37,7 @@ def main(cfg) -> None:
         if cfg.restore_from_path:
             logging.info("\nRestoring model from .nemo file " + cfg.restore_from_path)
             model = esm1nv_model.ESM2nvModel.restore_from(
-                cfg.restore_from_path, cfg.model, trainer=trainer,
-                save_restore_connector=BioNeMoSaveRestoreConnector()
+                cfg.restore_from_path, cfg.model, trainer=trainer, save_restore_connector=BioNeMoSaveRestoreConnector()
             )
         else:
             model = esm1nv_model.ESM2nvModel(cfg.model, trainer)
@@ -59,7 +55,7 @@ def main(cfg) -> None:
             uf90_output_dir=cfg.model.data.uf90.uniref90_path,
             val_size=cfg.model.data.val_size,
             test_size=cfg.model.data.test_size,
-            sort_fastas=cfg.model.data.sort_fastas
+            sort_fastas=cfg.model.data.sort_fastas,
         )
 
         if cfg.model.dwnstr_task_validation.enabled:
@@ -68,8 +64,9 @@ def main(cfg) -> None:
                 task_name = cfg.model.dwnstr_task_validation.dataset.dataset_path.split("/")[-1]
             else:
                 task_name = cfg.model.dwnstr_task_validation.dataset.task_name
-            flip_preprocessor.prepare_dataset(output_dir=cfg.model.dwnstr_task_validation.dataset.dataset_path,
-                                              task_name=task_name)
+            flip_preprocessor.prepare_dataset(
+                output_dir=cfg.model.dwnstr_task_validation.dataset.dataset_path, task_name=task_name
+            )
 
 
 if __name__ == '__main__':

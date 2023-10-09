@@ -1,4 +1,3 @@
-
 # Copyright (c) 2022, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,34 +13,37 @@
 # limitations under the License.
 
 import os
-import torch
 from typing import Dict, Optional
-from omegaconf.dictconfig import DictConfig
-from pytorch_lightning.trainer.trainer import Trainer
-from bionemo.data.dataloader.protein_collate import ESM2BertCollate
-from bionemo.data.mapped_dataset import NeMoUpsampling, Uniref90ClusterMappingDataset
 
-from nemo.core.neural_types import NeuralType
-from bionemo.model.protein.esm1nv.base import ESMnvMegatronBertModel
+import torch
 from nemo.collections.nlp.modules.common.megatron.utils import (
     average_losses_across_data_parallel_group,
 )
-from nemo.utils import logging
-from bionemo.data.dataset_builder_utils import build_typed_dataset
-
-from bionemo.data.molecule import megamolbart_build_train_valid_test_datasets
-from bionemo.data.dataloader import ProteinBertCollate
 from nemo.collections.nlp.modules.common.tokenizer_utils import get_nmt_tokenizer
+from nemo.core.neural_types import NeuralType
+from nemo.utils import logging
+from omegaconf.dictconfig import DictConfig
+from pytorch_lightning.trainer.trainer import Trainer
 
+from bionemo.data.dataloader import ProteinBertCollate
+from bionemo.data.dataloader.protein_collate import ESM2BertCollate
+from bionemo.data.dataset_builder_utils import build_typed_dataset
+from bionemo.data.mapped_dataset import NeMoUpsampling, Uniref90ClusterMappingDataset
+from bionemo.data.molecule import megamolbart_build_train_valid_test_datasets
+from bionemo.model.protein.esm1nv.base import ESMnvMegatronBertModel
+
+
+# TODO(trvachov): Clean up deps
 try:
-    from apex.transformer import tensor_parallel
-
+    from apex.transformer import tensor_parallel  # noqa: F401
 
     HAVE_APEX = True
 except (ImportError, ModuleNotFoundError):
     HAVE_APEX = False
 
 __all__ = ["ESM1nvModel", "ESM2nvModel"]
+
+
 class ESM1nvModel(ESMnvMegatronBertModel):
     """
     ESM1nv pretraining
@@ -65,8 +67,7 @@ class ESM1nvModel(ESMnvMegatronBertModel):
             legacy=False,
         )
         # patch tokenizer for use with HF esm tokenizer
-        if self._cfg.tokenizer.library == 'huggingface' and \
-                str(model_name).startswith('facebook/esm2'):
+        if self._cfg.tokenizer.library == 'huggingface' and str(model_name).startswith('facebook/esm2'):
             self.tokenizer.tokenizer.vocab = self.tokenizer.tokenizer.get_vocab()
 
     def build_pretraining_data_loader(self, dataset, consumed_samples):
@@ -74,20 +75,21 @@ class ESM1nvModel(ESMnvMegatronBertModel):
 
         assert self._cfg.data.dataloader_type == 'single', AssertionError(
             f'Only the Megatron sequential ("single") sampler is currently supported. {self._cfg.data.dataloader_type} was chosen.'
-            )
+        )
 
         dataloader = super().build_pretraining_data_loader(dataset=dataset, consumed_samples=consumed_samples)
 
         # Add collate function and unpin memory to avoid crash with CUDA misaligned address
-        dataloader.pin_memory = False # must be False with CSV dataset TODO check with binary
+        dataloader.pin_memory = False  # must be False with CSV dataset TODO check with binary
         pad_size_divisible_by_8 = True if self._cfg.masked_softmax_fusion else False
 
-        dataloader.collate_fn = ProteinBertCollate(tokenizer=self.tokenizer,
-                                                seq_length=self._cfg.seq_length,
-                                                pad_size_divisible_by_8=pad_size_divisible_by_8,
-                                                modify_percent=self._cfg.data.modify_percent,
-                                                perturb_percent=self._cfg.data.perturb_percent,
-                                                ).collate_fn
+        dataloader.collate_fn = ProteinBertCollate(
+            tokenizer=self.tokenizer,
+            seq_length=self._cfg.seq_length,
+            pad_size_divisible_by_8=pad_size_divisible_by_8,
+            modify_percent=self._cfg.data.modify_percent,
+            perturb_percent=self._cfg.data.perturb_percent,
+        ).collate_fn
         return dataloader
 
     def setup_training_data(self, cfg):
@@ -112,19 +114,17 @@ class ESM1nvModel(ESMnvMegatronBertModel):
             'train': int(max_train_steps * global_batch_size),
             'val': int(eval_iters * global_batch_size),
             'test': int(test_iters * global_batch_size),
-            }
+        }
 
         _train_ds, _validation_ds, _test_ds = megamolbart_build_train_valid_test_datasets(
-            cfg=model_cfg.data,
-            train_valid_test_num_samples=train_valid_test_num_samples
+            cfg=model_cfg.data, train_valid_test_num_samples=train_valid_test_num_samples
         )
 
         logging.info(f'Length of train dataset: {len(_train_ds)}')
         logging.info(f'Length of val dataset: {len(_validation_ds)}')
         logging.info(f'Length of test dataset: {len(_test_ds)}')
-        logging.info(f'Finished building Bert datasets.')
+        logging.info('Finished building Bert datasets.')
         return _train_ds, _validation_ds, _test_ds
-
 
     def build_train_valid_test_datasets(self):
         train, val, test = self._build_train_valid_test_datasets(self.trainer, self._cfg)
@@ -138,7 +138,7 @@ class ESM1nvModel(ESMnvMegatronBertModel):
             return
         averaged_loss = torch.stack(outputs).mean()
         self.log('val_loss', averaged_loss, prog_bar=True)
-        self.log('val_loss_ECE', pow(2, averaged_loss)) #calculate exponential cross entropy loss for logs
+        self.log('val_loss_ECE', pow(2, averaged_loss))  # calculate exponential cross entropy loss for logs
         self.log('consumed_samples', self.compute_consumed_samples(self.trainer.global_step - self.init_global_step))
 
     def test_epoch_end(self, outputs):
@@ -148,7 +148,10 @@ class ESM1nvModel(ESMnvMegatronBertModel):
 
     @property
     def input_names(self):
-        return ['input_ids', 'attention_mask', ]
+        return [
+            'input_ids',
+            'attention_mask',
+        ]
 
     @property
     def output_names(self):
@@ -156,26 +159,12 @@ class ESM1nvModel(ESMnvMegatronBertModel):
 
     @property
     def input_types(self) -> Optional[Dict[str, NeuralType]]:
-        return {
-            'input_ids': {
-                0: 'batch',
-                1: 'time'
-                },
-            'attention_mask': {
-                0: 'batch',
-                1: 'time'
-                }
-            }
+        return {'input_ids': {0: 'batch', 1: 'time'}, 'attention_mask': {0: 'batch', 1: 'time'}}
 
     @property
     def output_types(self) -> Optional[Dict[str, NeuralType]]:
-        return {
-            'output': {
-                0: 'batch',
-                1: 'time',
-                2: 'size'
-            }
-        }
+        return {'output': {0: 'batch', 1: 'time', 2: 'size'}}
+
 
 class ESM2nvModel(ESM1nvModel):
     """
@@ -202,7 +191,6 @@ class ESM2nvModel(ESM1nvModel):
         cluster_mapping_tsv (str): TSV file mapping UniRef50 cluster IDs to UniRef90 entries.
     """
 
-
     def __init__(self, cfg: DictConfig, trainer: Trainer):
         super().__init__(cfg, trainer)
 
@@ -222,11 +210,13 @@ class ESM2nvModel(ESM1nvModel):
         assert data_impl is not None, 'Config "cfg" should contain field "cfg.data_impl"'
         # NOTE train/val/test will all each into uniref90, since we are split on clusters, we now they are independent.
         #   hence, we only need one dataset object for uf90
-        uniref90_dataset = build_typed_dataset(dataset_paths=filepath,
-                                                data_impl=data_impl,
-                                                cfg=model_cfg.data.uf90,
-                                                use_upsampling=False,
-                                                num_samples=None)
+        uniref90_dataset = build_typed_dataset(
+            dataset_paths=filepath,
+            data_impl=data_impl,
+            cfg=model_cfg.data.uf90,
+            use_upsampling=False,
+            num_samples=None,
+        )
 
         results = []
         for ds, split in zip([_train_ds, _validation_ds, _test_ds], ['train', 'val', 'test']):
@@ -241,11 +231,11 @@ class ESM2nvModel(ESM1nvModel):
                 uniref50_dataset=_ds,
                 uniref90_dataset=uniref90_dataset,
                 data_prefix=split,  # used for index creation
-                seed=model_cfg.seed, # used for rng, although awkward because global statehood
-                index_mapping_dir=index_mapping_dir, # stores index
+                seed=model_cfg.seed,  # used for rng, although awkward because global statehood
+                index_mapping_dir=index_mapping_dir,  # stores index
                 cluster_map_starts_fn=f'{path_root}/starts.mmap',
                 cluster_map_counts_fn=f'{path_root}/counts.mmap',
-                name=ds.name
+                name=ds.name,
             )
 
             if keep_uf50:
@@ -257,28 +247,27 @@ class ESM2nvModel(ESM1nvModel):
         logging.info(f'Length of train dataset: {len(_train_ds)}')
         logging.info(f'Length of val dataset: {len(_validation_ds)}')
         logging.info(f'Length of test dataset: {len(_test_ds)}')
-        logging.info(f'Finished building Bert datasets.')
+        logging.info('Finished building Bert datasets.')
         return _train_ds, _validation_ds, _test_ds
-
-
 
     def build_pretraining_data_loader(self, dataset, consumed_samples):
         """Buld dataloader given an input dataset."""
 
         assert self._cfg.data.dataloader_type == 'single', AssertionError(
             f'Only the Megatron sequential ("single") sampler is currently supported. {self._cfg.data.dataloader_type} was chosen.'
-            )
+        )
         dataloader = super().build_pretraining_data_loader(dataset=dataset, consumed_samples=consumed_samples)
 
         # Add collate function and unpin memory to avoid crash with CUDA misaligned address
-        dataloader.pin_memory = False 
+        dataloader.pin_memory = False
 
         pad_size_divisible_by_8 = True if self._cfg.masked_softmax_fusion else False
 
-        dataloader.collate_fn = ESM2BertCollate(tokenizer=self.tokenizer,
-                                                seq_length=self._cfg.seq_length,
-                                                pad_size_divisible_by_8=pad_size_divisible_by_8,
-                                                modify_percent=self._cfg.data.modify_percent,
-                                                perturb_percent=self._cfg.data.perturb_percent,
-                                                ).collate_fn
+        dataloader.collate_fn = ESM2BertCollate(
+            tokenizer=self.tokenizer,
+            seq_length=self._cfg.seq_length,
+            pad_size_divisible_by_8=pad_size_divisible_by_8,
+            modify_percent=self._cfg.data.modify_percent,
+            perturb_percent=self._cfg.data.perturb_percent,
+        ).collate_fn
         return dataloader

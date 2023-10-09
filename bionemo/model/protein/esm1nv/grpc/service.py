@@ -29,10 +29,11 @@ from bionemo.model.protein.esm1nv import ESM1nvInference
 logger = logging.getLogger(__name__)
 
 MODEL_MAPPING = {
-    "esm1nv":("../../../../../examples/protein/esm1nv/conf", "/model/protein/esm1nv/esm1nv.nemo"),
+    "esm1nv": ("../../../../../examples/protein/esm1nv/conf", "/model/protein/esm1nv/esm1nv.nemo"),
     "esm2nv_650M": ("../../../../../examples/protein/esm2nv/conf", "/model/protein/esm2nv/esm2nv_650M_converted.nemo"),
-    "esm2nv_3B": ("../../../../../examples/protein/esm2nv/conf", "/model/protein/esm2nv/esm2nv_3B_converted.nemo")
+    "esm2nv_3B": ("../../../../../examples/protein/esm2nv/conf", "/model/protein/esm2nv/esm2nv_3B_converted.nemo"),
 }
+
 
 class InferenceService(esm1nv_pb2_grpc.GenerativeSampler):
     def __init__(self, config_path=None, config_name=None, model=None):
@@ -54,7 +55,7 @@ class InferenceService(esm1nv_pb2_grpc.GenerativeSampler):
             be set when using config_path and config_name.
             By default None.
         """
-        if model: 
+        if model:
             if (config_path is not None) or (config_name is not None):
                 raise ValueError("If 'model' is specified, 'config_path' and 'config_name' must be None.")
             config_path = MODEL_MAPPING[model][0]
@@ -66,7 +67,7 @@ class InferenceService(esm1nv_pb2_grpc.GenerativeSampler):
             with initialize(config_path=config_path):
                 inf_cfg = compose(config_name=config_name)
                 if model:
-                    inf_cfg.model.downstream_task.restore_from_path =  MODEL_MAPPING[model][1]
+                    inf_cfg.model.downstream_task.restore_from_path = MODEL_MAPPING[model][1]
                 self._inferer = ESM1nvInference(cfg=inf_cfg)
 
     def SeqToEmbedding(self, spec, context):
@@ -92,8 +93,8 @@ def main():
     parser.add_argument(
         '--model',
         help='Name of the ESM model to load',
-        choices=[None, "esm1nv","esm2nv_650M", "esm2nv_3B"],
-        default=None
+        choices=[None, "esm1nv", "esm2nv_650M", "esm2nv_3B"],
+        default=None,
     )
 
     args = parser.parse_args()

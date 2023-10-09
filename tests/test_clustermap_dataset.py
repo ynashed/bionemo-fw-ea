@@ -1,8 +1,8 @@
-import json
 import tempfile
 from collections import defaultdict
-import pytest
+
 import numpy as np
+import pytest
 from torch.utils.data import Dataset
 
 from bionemo.data.mapped_dataset import (
@@ -56,6 +56,7 @@ def make_fake_dataset(num_50_clusters, num_50_samples, num_maps):
     counts_memmap.flush()
     starts_memmap.flush()
     return uniref50_dataset, uniref90_dataset, tf2_memmap_counts.name, tf2_memmap_starts.name
+
 
 @pytest.mark.needs_gpu
 @pytest.mark.skip

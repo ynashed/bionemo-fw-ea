@@ -4,6 +4,7 @@ default:
 
 
 stages:
+  - code_format
   - build
   - download
   - test
@@ -80,6 +81,14 @@ skip_ci:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     - docker login -u '$oauthtoken' -p $NGC_CLI_API_KEY nvcr.io
 
+
+code_format:
+  stage: code_format
+  script:
+    - pre-commit run --all-files --show-diff-on-failure
+  image: nvcr.io/nvidian/cvai_bnmo_trng/bionemo-linter:latest
+  tags:
+   - generic
 
 # TODO(@dorotat): consider splitting this into build-base and build-devel
 build:

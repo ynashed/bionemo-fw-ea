@@ -24,7 +24,7 @@ from nemo.core import Dataset
 
 
 try:
-    from apex.transformer.parallel_state import get_rank_info
+    from apex.transformer.parallel_state import get_rank_info  # noqa: F401
 
     HAVE_APEX = True
 except (ImportError, ModuleNotFoundError):

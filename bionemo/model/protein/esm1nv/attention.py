@@ -1,4 +1,3 @@
-
 import torch
 from einops import rearrange
 from nemo.collections.nlp.modules.common.megatron.adapters.parallel_adapters import (
@@ -81,7 +80,7 @@ class ESMnvCoreAttention(CoreAttention):
         relative_position_bias=None,
         headscale_tensor=None,
     ):
-        b, np, sq, sk, hn = (
+        b, np, sq, sk, hn = (  # noqa: F841
             query_layer.size(1),
             query_layer.size(2),
             query_layer.size(0),

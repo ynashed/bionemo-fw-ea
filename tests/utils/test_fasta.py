@@ -55,21 +55,21 @@ def test_split_ns():
         splitted = fasta._split_ns(fasta.seq_lookup[">seq1"])
         # Both should be length 100
 
-        assert type(splitted[0]) == str
+        assert isinstance(splitted[0], str)
         assert len(splitted[0]) == 100 and len(splitted[1]) == 100
         assert all(x == "A" for x in splitted[0])
         assert all(x == "C" for x in splitted[1])
 
         splitted = fasta._split_ns(fasta.seq_lookup[">seq2"])
         # Both should be length 100
-        assert type(splitted[0]) == str
+        assert isinstance(splitted[0], str)
         assert len(splitted[0]) == 100 and len(splitted[1]) == 100
         assert all(x == "A" for x in splitted[0])
         assert all(x == "C" for x in splitted[1])
         splitted = fasta._split_ns(fasta.seq_lookup[">seq3"])
 
         # Three entries
-        assert type(splitted[0]) == str
+        assert isinstance(splitted[0], str)
         assert len(splitted[0]) == 100 and len(splitted[1]) == 1 and len(splitted[2]) == 100
         assert all(x == "A" for x in splitted[0])
         assert all(x == "C" for x in splitted[1])
@@ -120,7 +120,7 @@ def test_split_on_ns():
     for seqs in fasta.seq_lookup.values():
         lens.extend([len(seq) for seq in seqs])
 
-    assert all(lambda x: type(x) == str for x in seqs)
+    assert all(lambda x: isinstance(x, str) for x in seqs)
     assert sum(lens) == 601  # 100 + 100, 100 + 100, 100 + 1 + 100 = 601
 
     os.remove("test.fa")

@@ -472,9 +472,7 @@ def pyfastx_constructor(builder, discretize, max_length):
 
 def fasta_memmap_constructor(builder, discretize, max_length):
     if discretize:
-        dataset = DiscretizeFastaDataset(
-            InternallyIndexedFastaMemMapDataset(list(builder.dataset_paths), max_length)
-        )
+        dataset = DiscretizeFastaDataset(InternallyIndexedFastaMemMapDataset(list(builder.dataset_paths), max_length))
     else:
         dataset = InternallyIndexedFastaMemMapDataset(
             builder.dataset_paths,
@@ -550,16 +548,6 @@ class FastaDatasetBuilder(DatasetBuilderSpec):
             else []
         )
         return transforms
-
-
-class DNABERTDatasetFactory(FormattedDatasetFactory):
-    def __init__(self):
-        """
-        Initializes a dataset factory for handling fasta formats.
-        """
-        self.formats = {
-            'fasta': FastaDatasetBuilder,
-        }
 
 
 class DNABERTDatasetFactory(FormattedDatasetFactory):

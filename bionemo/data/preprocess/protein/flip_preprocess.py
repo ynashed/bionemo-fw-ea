@@ -17,7 +17,7 @@ import os
 import pathlib
 import re
 import urllib.request
-from typing import Optional
+from typing import Dict, List, Optional
 
 import numpy as np
 import pyfastx
@@ -27,10 +27,6 @@ from nemo.utils import logging
 __all__ = ['FLIPPreprocess']
 
 ROOT_DIR = '/tmp/FLIP'
-
-import re
-from typing import Dict, List
-
 
 SEQUENCE_FNAME = {
     "aav": "seven_vs_many.fasta",

@@ -76,4 +76,4 @@ def setup_callbacks(cfg, plugins: Optional[List] = None) -> List:
 
 def lookup_or_use(obj: object, attr: Union[str, object], *args, **kwargs):
     """Looks up an object from a module or returns the attribute if it is not a string"""
-    return getattr(obj, attr)(*args, **kwargs) if type(attr) is str else attr
+    return getattr(obj, attr)(*args, **kwargs) if isinstance(attr, str) else attr

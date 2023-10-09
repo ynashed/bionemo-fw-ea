@@ -428,8 +428,10 @@ class KmerBertCollate(BertCollate):
                 perturb_percent=perturb_percent,
             )
         if transform_sentences is None:
+
             def transform_sentences(x):
                 return x
+
         self.transform_sentences = transform_sentences
         super().__init__(
             tokenizer=tokenizer,

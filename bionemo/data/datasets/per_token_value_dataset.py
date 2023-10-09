@@ -267,7 +267,8 @@ class get_data(object):
             for i in range(len(strings)):
                 try:
                     ids = tokenizers[i].text_to_ids(strings[i])
-                except:
+                # TODO(trvachov): Understand except type
+                except:  # noqa: E722
                     pass
                 cur_one_hot = []
                 for id_ in ids:
