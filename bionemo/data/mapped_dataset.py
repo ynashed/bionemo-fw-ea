@@ -234,16 +234,9 @@ class Uniref90ClusterMappingDataset(MappedDataset):
         self.name = name
         self.buffer_size = buffer_size
 
-        # Used for creating the cluster_member_id -> index map
-        if index_mapping_dir is not None:
-            os.path.join(index_mapping_dir, os.path.basename(data_prefix))
-        else:
-            pass
-
         # At this point we have the directory
         # this gets invoked to create the cluster map, which is used in create_sample_map
 
-        # Cluster map should be passed in some unknown format. Using pre-created JSON for now.
         self.cluster_map_json_path = cluster_map_json_path
         # Pass in the dataset that sample_mapping indicies correspond to
         num_samples = 0  # This has no effect on behavior
