@@ -15,34 +15,37 @@ set -x
 # downstream task with BioNeMo on SLURM-based clusters
 # Replace all ?? with appropriate values prior to launching a job
 # Any parameters not specified in this script can be changed in the yaml config file
-# located in examples/protein/prott5nv/conf/finetune_config.yaml for ProtT5nv model
-# or in examples/protein/esm1nv/conf/finetune_config.yaml for ESM-1nv model
+# located in examples/protein/prott5nv/conf/downstream_flip_sec_str.yaml for ProtT5nv model
+# or in examples/protein/esm1nv/conf/downstream_flip_sec_str.yaml for ESM-1nv model
+# - place holder for ESM2 instructions -
+# Other downstream yaml files can be found in those locations as well
 
-BIONEMO_IMAGE="??" # BioNeMo container image
-WANDB_API_KEY=??# Add your WANDB API KEY
+BIONEMO_IMAGE=?? # BioNeMo container image
+WANDB_API_KEY=?? # Add your WANDB API KEY
 
-CONFIG_NAME='finetune_config' # name of the yaml config file with parameters 
+CONFIG_NAME='downstream_flip_sec_str' # name of the yaml config file with parameters, should be aligned with TASK_NAME parameter
+PROTEIN_MODEL=esm2nv # protein LM name, can be esm2nv, esm1nv or prott5nv 
 
 # Training parameters
 # =========================
-PROTEIN_MODEL=prott5nv # protein LM name, can be esm1nv or prott5nv 
 ACCUMULATE_GRAD_BATCHES=1 # gradient accumulation
 ENCODER_FROZEN=True # encoder can be frozen or trainable 
-# NOTE: this script assumes that checkpoints exist
-RESTORE_FROM_PATH=/model/protein/${PROTEIN_MODEL}/${PROTEIN_MODEL}.nemo # Path to the pretrained model checkpoint in the container
+RESTORE_FROM_PATH=/model/protein/${PROTEIN_MODEL}/esm2nv_650M_converted.nemo # Path to the pretrained model checkpoint in the container
 TENSOR_MODEL_PARALLEL_SIZE=1 # tensor model parallel size,  model checkpoint must be compatible with tensor model parallel size
-MICRO_BATCH_SIZE=32 # micro batch size per GPU
-MAX_STEPS=1000 # duration of training as the number of training steps
-VAL_CHECK_INTERVAL=10 # how often validation step is performed
+MICRO_BATCH_SIZE=64 # micro batch size per GPU, for best efficiency should be set to occupy ~85% of GPU memory. Suggested value for A100 80GB is 256 
+MAX_STEPS=2000 # duration of training as the number of training steps
+VAL_CHECK_INTERVAL=20 # how often validation step is performed, including downstream task validation
 # =========================
 
 # Logging
 # =========================
-PROJECT_NAME="${PROTEIN_MODEL}_downstream_sec_str"  # project name, will be used for logging
+TASK_NAME=secondary_structure # FLIP task name: secondary_structure, scl, meltome, etc.
 EXP_TAG="" # any additional experiment info, can be empty
 EXP_NAME="${PROTEIN_MODEL}_batch${MICRO_BATCH_SIZE}_gradacc${ACCUMULATE_GRAD_BATCHES}_nodes${SLURM_JOB_NUM_NODES}_encoder-frozen-${ENCODER_FROZEN}${EXP_TAG}"
 CREATE_WANDB_LOGGER=True # set to False if you don't want to log results with WandB 
 WANDB_LOGGER_OFFLINE=False # set to True if there are issues uploading to WandB during training
+
+PROJECT_NAME="${PROTEIN_MODEL}_${CONFIG_NAME}"  # project name, will be used for logging
 # =========================
 
 # Mounts
@@ -86,6 +89,8 @@ echo "*******STARTING********" \
     model.tensor_model_parallel_size=${TENSOR_MODEL_PARALLEL_SIZE} \
     model.dwnstr_task_validation.enabled=False \
     model.encoder_frozen=${ENCODER_FROZEN} \
+    model.data.task_name=${TASK_NAME} \
+    model.data.dataset_path=${DATA_MOUNT}/${TASK_NAME} \
     restore_from_path=${RESTORE_FROM_PATH} 
 
 EOF

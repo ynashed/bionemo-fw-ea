@@ -1,10 +1,10 @@
-name: esm1nv_flip
+name: esm2nv_flip
 defaults:
-  - pretrain_small
+  - pretrain_esm2_650M
 do_training: True # set to false if data preprocessing steps must be completed
 do_testing: True # set to true to run evaluation on test data after training
-restore_from_path: /model/protein/esm1nv/esm1nv.nemo # path to nemo checkpoint of the protein model
-target: bionemo.model.protein.esm1nv.ESM1nvModel # target class for protein model
+restore_from_path: /model/protein/esm2nv/esm2nv_650M_converted.nemo # path to nemo checkpoint of the protein model. Other options: esm2nv_3B_converted.nemo
+target: bionemo.model.protein.esm1nv.ESM2nvModel # target class for protein model
 infer_target: bionemo.model.protein.esm1nv.infer.ESM1nvInference # target inference class for protein model
 
 trainer:
@@ -26,10 +26,12 @@ model:
   micro_batch_size: 64 # NOTE: adjust to occupy ~ 90% of GPU memory
   global_batch_size: null # if null will be computed automatically
   tensor_model_parallel_size: 1  # model parallelism
+  loss_func: CrossEntropyLoss
+  hidden_layer_size: 256
   
   data:
-    task_name: secondary_structure # options: aav, bind, conservation, gb1, meltome, sav, scl, secondary_structure
-    task_type: 'token-level-classification'  # alternative: classification, regression
+    task_name: scl # options: aav, bind, conservation, gb1, meltome, sav, scl, secondary_structure
+    task_type: classification #'token-level-classification'  # alternative: classification, regression
     preprocessed_data_path: /data/FLIP # path where all preprocessed FLIP datasets are saved
     dataset_path: ${model.data.preprocessed_data_path}/${model.data.task_name} # path to a training data
     dataset:
@@ -37,16 +39,17 @@ model:
       val: x000
       test: x000
     sequence_column: "sequence" # name of column with protein sequence in csv file
-    target_column: ["3state", "resolved"] # names of label columns in csv file
-    target_sizes: [3, 2] # number of classes in each label
-    mask_column: ["resolved", null] # names of mask columns in csv file, masks must be 0 or 1
+    target_column: ["scl_label"] #["3state", "resolved"] # names of label columns in csv file
+    target_sizes: [10] # number of classes in each label for classifications or 1 for regression
+    num_classes: 10
     num_workers: 8
+    shuffle: True # shuffle training dataset
     max_seq_length: ${model.seq_length}
     emb_batch_size: ${model.micro_batch_size}
   
   finetuning_optim: # optimizer parameters for downstream task model
     name: adam
-    lr: 0.0001
+    lr: 0.0005
     betas:
       - 0.9
       - 0.999
@@ -56,4 +59,4 @@ model:
       name: WarmupAnnealing
       min_lr: 0.00001
       last_epoch: -1
-      warmup_ratio: 10
+      warmup_steps: 10
