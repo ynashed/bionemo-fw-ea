@@ -48,17 +48,13 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
         wget git unzip tmux vim tree xterm && \
     rm -rf /var/lib/apt/lists/*
 
-# install Google Cloud SDK so that users can authethicate while pulling data from GCP buckets
-RUN mkdir /google-sdk && cd /google-sdk && curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-427.0.0-linux-x86_64.tar.gz && \
-    tar -xvf google-cloud-cli-427.0.0-linux-x86_64.tar.gz && ./google-cloud-sdk/install.sh -q --rc-path /etc/bash.bashrc
-
 COPY setup/requirements.txt /tmp/requirements.txt
 RUN pip3 install -r /tmp/requirements.txt
 
 ## Install NGC cli in container for artifact download
 ENV NGC_CLI_INSTALL_PREFIX=/usr/local/bin
 RUN wget -O /tmp/ngccli_linux.zip --content-disposition \
-    "https://api.ngc.nvidia.com/v2/resources/nvidia/ngc-apps/ngc_cli/versions/3.23.0/files/ngccli_linux.zip" && \
+    "https://api.ngc.nvidia.com/v2/resources/nvidia/ngc-apps/ngc_cli/versions/3.30.1/files/ngccli_linux.zip" && \
     unzip /tmp/ngccli_linux.zip -d ${NGC_CLI_INSTALL_PREFIX} && \
     chmod u+x ${NGC_CLI_INSTALL_PREFIX}/ngc-cli/ngc && \
     ln -fns  ${NGC_CLI_INSTALL_PREFIX}/ngc-cli/ngc ${NGC_CLI_INSTALL_PREFIX}/ngc && \
