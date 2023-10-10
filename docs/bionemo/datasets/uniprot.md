@@ -1,0 +1,3 @@
+# UniProt Dataset
+
+The UniRef50 database was used for training. UniProt Reference Cluster (UniRef) databases provide clustered sets of sequences from UniProtKB. UniRef50 is built by clustering UniRef90 seed sequences that have at least 50% sequence identity to, and 80% overlap with, the longest sequence in the cluster. The release from 05/2022 was used for training. The reference sequence for each cluster was selected, with sequences longer than the maximum sequence length of 512 removed, resulting in approximately 46M protein sequences. The sequences were randomly split with 4.35K sequences in validation, 875K sequences in test, and the remaining in train. 
