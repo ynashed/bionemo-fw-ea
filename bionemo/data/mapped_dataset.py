@@ -333,7 +333,7 @@ class Uniref90ClusterMappingDataset(MappedDataset):
                 cluster_slice = uniref50_dataset.sample_mapping[buffer_start:buffer_end]
                 sample_slice = np.random.rand(len(cluster_slice))
                 cluster_count_slice = cluster_counts[cluster_slice]
-                sampled_relative_indices = np.rint(sample_slice * cluster_count_slice)
+                sampled_relative_indices = np.floor(sample_slice * cluster_count_slice)
                 sample_map[buffer_start:buffer_end] = cluster_map['starts'][cluster_slice] + sampled_relative_indices
                 buffer_start = buffer_end
             sample_map.flush()
