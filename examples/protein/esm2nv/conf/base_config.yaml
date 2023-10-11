@@ -168,6 +168,8 @@ model:
     cluster_map_json_path: '/data/uniref202104_esm2/uf90/cluster-map.json'
     # TODO These need to be updated to values we actually like
     dataset_path: /data/uniref202104_esm2/uf50 # parent directory for data, contains train / val / test folders. Needs to be writeable for index creation.
+    val_size: 5000
+    test_size: 1000000
     uf90:
       uniref90_path: /data/uniref202104_esm2/uf90/ # created and populated my preprocessing
       dataset: 
