@@ -210,36 +210,17 @@ class Uniref90ClusterMappingDataset(MappedDataset):
         name=None,
         buffer_size=int(1e6),
     ):
-        '''
-        Creates a mapped dataset mapping samples from uniref50_dataset to cluster members inside uniref90_dataset.
-        This happens by first loading the uniref50 dataset, uniref90 dataset, and some cluster mapping taking cluster ids (from uniref50)
-        to members. Next we construct a sample mapping by iterating over the entirety of the uniref50_dataset and assigning a random cluster id
-        to each member (element in the uniref50_dataset). This is set as the sample mapping used by the underlying MappedDataset.
-
-        cluster_map_json_path - path to a json file encoding the cluster mappings. the keys should correspond _exactly_ to the values
-            returned by the first column (data_col=1) of the clustered (uf50) fasta -> processed csv, and the values should similarly correspond _exactly_
-            to the values returned by the first column of the member (uf90) fasta -> processed csv
-
-        uniref50_dataset - MUST be an already upsampled dataset on uniref50 that returns cluster_ids (NOT sequences)
-            Typically this is done by setting the data_col parameter in the model.data section of the yaml config file.
-
-        uniref90_dataset - just a regular dataset constructed on uniref90, this should return sequences.
-        '''
-
         self.data_prefix = data_prefix
         self.seed = seed
-        # Really obnoxious to get these.
+
         self.index_mapping_dir = index_mapping_dir
         self.name = name
         self.buffer_size = buffer_size
 
-        # At this point we have the directory
-        # this gets invoked to create the cluster map, which is used in create_sample_map
-
-        # Pass in the dataset that sample_mapping indicies correspond to
         num_samples = 0  # This has no effect on behavior
         logging.info(f"Loading cluster map {cluster_map_counts_fn=}, {cluster_map_starts_fn=}")
         time_start = time.time()
+        # Loads the memory maps into a dictionary of 'counts', 'starts'
         cluster_map = self.create_cluster_map_from_files(cluster_map_counts_fn, cluster_map_starts_fn)
         time_end = time.time()
         logging.info(f"Cluster map from json: {time_end - time_start}")
@@ -251,6 +232,7 @@ class Uniref90ClusterMappingDataset(MappedDataset):
             num_samples=len(uniref50_dataset),
             seed=seed,
         )
+        # Creates a memory map for the sample mapping
         self.sample_map = self._create_sample_mapping(
             uniref50_dataset, sample_map_file, cluster_map, buffer_size=self.buffer_size
         )
@@ -293,23 +275,23 @@ class Uniref90ClusterMappingDataset(MappedDataset):
 
     def _create_sample_mapping(self, uniref50_dataset, sample_mapping_file, cluster_map, buffer_size=int(1e6)):
         """
+        Create a sample mapping from `uniref50_dataset` using memory-mapped file techniques.
+        Utilizes the `uniref50_dataset` to generate a sample map and writes/reads this map to/from a memory-mapped file.
 
         Args:
-            uniref50_dataset (_type_): _description_
-                items are effectively string:
-                    ["u50_id0","u50_id1", "u50_id2", ...]
-            cluster_map (_type_): _description_
-                Starts
-            uniref90_samplemap (_type_): _description_
-                List[Dict["sequence_id", "..."]]
-
-        Raises:
-            Exception: _description_
-            Exception: _description_
+            uniref50_dataset (list of str): A dataset where each item is a string in the format of 
+                ["u50_id0","u50_id1", "u50_id2", ...].
+            sample_mapping_file (str): Path to the file where the sample mapping will be stored as a memory-mapped array.
+            cluster_map (dict): A dictionary containing mapping information between clusters. Expected to have keys 'counts' and 'starts'.
+            buffer_size (int, optional): The size of the buffer used during the mapping creation. Default is 1e6.
 
         Returns:
-            _type_: _description_
+            numpy.memmap: A memory-mapped array containing the generated sample mapping.
+
+        Raises:
+            RuntimeError: If the torch.distributed process group is not initialized.
         """
+        # TODO: promote this to its own ABC (MemMappedDataset)
         n_samples = len(uniref50_dataset)
         try:
             rank = torch.distributed.get_rank()
@@ -342,14 +324,6 @@ class Uniref90ClusterMappingDataset(MappedDataset):
         return sample_map
 
     def create_sample_mapping(self, dataset, num_samples=None) -> np.array:
-        '''
-        Creates a sample mapping from our current (uf50) dataset to an index in our new dataset (uf90) by choosing members
-            from a cluster map. this mimicks the behavior described in the ESM2 publication.
-        dataset - dataset that sample_mapping indexes into.
-        num_samples - This is an unused parameter.
-
-        Returns - numpy array that maps indicies from the first dataset (Uniref50) to an entry in the second dataset (Uniref90)
-        '''
         return self.sample_map
 
 

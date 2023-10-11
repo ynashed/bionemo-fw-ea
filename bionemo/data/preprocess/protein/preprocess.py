@@ -318,11 +318,11 @@ class ESM2Preprocess(UniRef50Preprocess):
                         val_size=5000,
                         test_size=1000000,
                         random_seed=0,
-                        force=False,
                         ):
         """
         Prepares and splits the dataset into train/test/validation subsets, converts the fasta files to CSV format, 
-        and constructs a JSON file for mapping cluster IDs to cluster members.
+        and constructs both counts and start memmaps for each dataset. These are used for the underlying cluster mapping 
+        and are *required.*
 
         Args:
             uf50_datapath (str): Path to the raw fasta file for UniRef50. The data is divided into train/test/validation 
@@ -340,7 +340,6 @@ class ESM2Preprocess(UniRef50Preprocess):
             test_size (int, optional): Number of samples designated for the test set. The training size is inferred from 
                 test_size and val_size.
             random_seed (int, optional): Seed for randomization when splitting samples for train/test/validation. Defaults to 0.
-            force (bool, optional): If set to True, forces the creation of the cluster mapping JSON.
 
         Returns:
             None
@@ -400,10 +399,10 @@ class ESM2Preprocess(UniRef50Preprocess):
                                   )
         
 
-        # NOTE: ensure we are using the new sort order for uf90
+        # force the new cluster order for uf90
         new_uf90_fasta_indexer = pyfastx.Fasta(new_uf90_fn, build_index=True, uppercase=True)  # Duplicate for testing
         record_id_list = np.arange(len(new_uf90_fasta_indexer))
-        # Magic value
+        # split name hardcoded :)
         split_name = 'uf90_csvs'
         with Pool(16) as p:
             p.map( 
@@ -424,23 +423,14 @@ class ESM2Preprocess(UniRef50Preprocess):
 
     @staticmethod
     def _make_local_memmaps(samples_arr, starts_global, counts_global, counts_mmap_fn, starts_mmap_fn, memmap_dtype=np.uint64):
-        # These cant be tempfiles
+        ''' Constructs memmaps using only the locally available samples. starts and counts remain the same, but we use the 
+        sample_arr to find them in the global counts and global starts maps.
+
+        Returns - counts memmap and starts memmap
+        '''
         counts_local_mm = np.memmap(counts_mmap_fn, dtype=memmap_dtype, mode='w+', shape=(len(samples_arr),))
         starts_local_mm = np.memmap(starts_mmap_fn, dtype=memmap_dtype, mode='w+', shape=(len(samples_arr),))
         for i, global_sample_idx in enumerate(samples_arr):
-            '''
-            starts is where a cluster starts (within uf90)
-            counts is how far a cluster goes 
-
-            uf90
-            1a, a2, 2b, 3a, 3b, 3c, 4a, 5a, 6a, 6b, 7a
-
-            train:
-                2, 4, 6
-                => 1, 2
-                => 6, 1
-                    => 8, 2
-            '''
             start = starts_global[global_sample_idx] 
             counts = counts_global[global_sample_idx]
             starts_local_mm[i] = start
@@ -455,10 +445,6 @@ class ESM2Preprocess(UniRef50Preprocess):
         ''' Loads the cluster map into two arrays, counts and sizes. As a side effect, creates new 
         temp fasta files that are in the same sort order as cluster_mapping_tsv. This is required for
         csv creation to match the indexing structure in the cluster map.
-
-        This could all be refactored into a ClusterMap type, but takes significantly more work to get these
-        abstractions to be useful rather than a singleton.
-
         '''
         import tempfile
         new_uf50_fn = tempfile.NamedTemporaryFile().name
@@ -496,35 +482,3 @@ class ESM2Preprocess(UniRef50Preprocess):
                 pos += len(members)
 
         return dict(starts=starts_global, counts=counts_global, uf50_fn=new_uf50_fn, uf90_fn=new_uf90_fn)
-
-
-    @staticmethod
-    def make_cluster_map(cluster_mapping_tsv, cluster_mapping_dest):
-        filename = cluster_mapping_dest
-        force = False 
-        # Recall that this should all be in preprocesing
-        if os.path.exists(filename) and not force:
-            print(f"found cluster mapping, loading: {filename=}")
-            with open(filename, 'r') as fd:
-                result = json.load(fd)
-        else:
-            print(f"clustering mapping missing, creating: {filename=}")
-            result = dict()
-            with open(cluster_mapping_tsv, 'r') as fd:
-                result = {}
-                for i, line in enumerate(fd):
-                    if i == 0: continue # skip header
-                    cid, cmembers, *_ = line.strip().split("\t")
-                    members = cmembers.split(',')
-                    result[cid] = members
-
-            try:
-                fd = open(filename, 'w')
-                json.dump(result, fd)
-                fd.close()
-            except Exception as e:
-                # If we fail, cleanup so we dont have a broken cached file.
-                fd.close()
-                os.remove(filename)
-
-        return result
