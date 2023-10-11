@@ -16,7 +16,7 @@ model:
 
   tokenizer:
     # NOTE: this tokenizer doesnt exist?
-    model_name: "facebook/esm2_t36_15B_UR50D"
+    model_name: "facebook/esm2_t48_15B_UR50D"
 
   # model/data parallelism
   tensor_model_parallel_size: 1 # model parallelism
