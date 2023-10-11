@@ -4,10 +4,18 @@ from bionemo.model.utils import setup_trainer
 
 
 def test_uf90_resampling_dataset_integration():
-    # TODO(testing): this is functional/integration test between NeMo megatron and our Dataset class.
-    # TODO: bring synthetic data generation script into tests somewhere.
-    # TODO: locate the datasets required for this somewhere in the tests directory
-    # TODO: update the config file to use the above paths.
+    '''
+    This test requires:
+
+    cluster_mapping_tsv: /data/uniref2022_05/fake-uniref/mapping.tsv
+    uf50_datapath: /data/uniref2022_05/fake-uniref/Fake50.fasta 
+    uf90_datapath: /data/uniref2022_05/fake-uniref/Fake90.fasta 
+    dataset_path: /data/uniref2022_05/fake_uf_map
+
+    you can generate Fake50.fasta, Fake90.fasta, and mapping.tsv by running
+    '''
+    
+    
     from omegaconf import OmegaConf
     cfg = OmegaConf.load('conf/uf90-resampling.yaml')
     trainer = setup_trainer(cfg, callbacks=[])
