@@ -471,6 +471,7 @@ class ESM2Preprocess(UniRef50Preprocess):
             pos = 0
             all_cids, all_cmembers = list(), list()
             # Parse fasta
+            # TODO: this is slow, but only happens once.
             for i, line in enumerate(fd):
                 if i == 0: continue # skip header
                 cid, cmembers, *_ = line.strip().split("\t")
@@ -478,14 +479,7 @@ class ESM2Preprocess(UniRef50Preprocess):
                 all_cids.append(cid)
                 all_cmembers.append(members)
 
-                # TODO understand whats missing, i think the answer is to 'continue' in these cases.
-                #       we still need to keep them in the all_cid all_cmembers list to get the correct mapping.
-
-                uf50_not_found = 0
-                try:
-                    uf50_entry = uf50_fasta_indexer[cid]
-                except Exception as e:
-                    continue
+                uf50_entry = uf50_fasta_indexer[cid]
                 uf50_fa_out.write(f">{uf50_entry.name}\n")
                 uf50_fa_out.write(f"{uf50_entry.seq}\n")
                 # Update new ordered fastas
@@ -494,7 +488,6 @@ class ESM2Preprocess(UniRef50Preprocess):
                     uf90_entry = uf90_fasta_indexer[member]
                     uf90_fa_out.write(f">{uf90_entry.name}\n")
                     uf90_fa_out.write(f"{uf90_entry.seq}\n")
-            print('total, not found', i, uf50_not_found)
 
             starts_global = np.zeros(shape=(len(all_cmembers)), dtype=np.int64)
             counts_global = np.zeros(shape=(len(all_cmembers)), dtype=np.int64)
