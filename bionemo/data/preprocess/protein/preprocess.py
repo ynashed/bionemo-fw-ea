@@ -186,7 +186,6 @@ class UniRef50Preprocess(object):
         val_samples = sample_list[:val_size]
         test_samples = sample_list[val_size:val_size + test_size]
         train_samples = sample_list[val_size + test_size:]
-
         assert len(val_samples) == val_size, AssertionError('Validation dataset is not the correct size.')
         assert len(test_samples) == test_size, AssertionError('Test dataset is not the correct size.')
         assert len(fasta_indexer) - len(val_samples) - len(test_samples) == len(train_samples), AssertionError('Train dataset is not the correct size.')
@@ -461,8 +460,9 @@ class ESM2Preprocess(UniRef50Preprocess):
         abstractions to be useful rather than a singleton.
 
         '''
-        new_uf50_fn = 'temp1'
-        new_uf90_fn = 'temp2'
+        import tempfile
+        new_uf50_fn = tempfile.NamedTemporaryFile().name
+        new_uf90_fn = tempfile.NamedTemporaryFile().name
         with (
             open(cluster_mapping_tsv, 'r') as fd,
             open(new_uf50_fn, 'w') as uf50_fa_out,
@@ -484,7 +484,6 @@ class ESM2Preprocess(UniRef50Preprocess):
                 uf50_fa_out.write(f"{uf50_entry.seq}\n")
                 # Update new ordered fastas
                 for member in members:
-                    # This one is more concerning..
                     uf90_entry = uf90_fasta_indexer[member]
                     uf90_fa_out.write(f">{uf90_entry.name}\n")
                     uf90_fa_out.write(f"{uf90_entry.seq}\n")
