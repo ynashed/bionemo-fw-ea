@@ -354,18 +354,20 @@ class ESM2Preprocess(UniRef50Preprocess):
         os.makedirs(uf50_output_dir, exist_ok=True)
         os.makedirs(uf90_output_dir, exist_ok=True)
 
-        logging.info('Indexing UniRef50 dataset.')
         # Do this for uf50, uf90
+        logging.info('Indexing UniRef50 dataset.')
         uf50_fasta_indexer = pyfastx.Fasta(uf50_datapath, build_index=True, uppercase=True)  
+        logging.info('Indexing UniRef90 dataset.')
+        # TODO: this is the thing thats causing us issues with some IDs (why didnt this cause problems before?)
         uf90_fasta_indexer = pyfastx.Fasta(uf90_datapath, build_index=True, uppercase=True)  
 
+        logging.info('Creating cluster mapping')
         cluster_map_resources = self._sort_fastas_load_cluster_mapping(uf50_fasta_indexer, uf90_fasta_indexer, cluster_mapping_tsv)
         new_uf50_fn, new_uf90_fn, global_starts, global_counts = cluster_map_resources['uf50_fn'], cluster_map_resources['uf90_fn'], cluster_map_resources['starts'], cluster_map_resources['counts']
 
-        new_uf50_fasta_indexer = pyfastx.Fasta(new_uf50_fn)
-        new_uf90_fasta_indexer = pyfastx.Fasta(new_uf90_fn)
-
-        logging.info(f'Writing processed uf50 dataset files to {uf50_output_dir}...')
+        logging.info('Loading sorted fasta files')
+        new_uf50_fasta_indexer = pyfastx.Fasta(new_uf50_fn, build_index=True)
+        new_uf90_fasta_indexer = pyfastx.Fasta(new_uf90_fn, build_index=True)
 
         # Undo the shuffling that occurs when splitting with sort.
         train_samples, val_samples, test_samples = map(
@@ -378,6 +380,7 @@ class ESM2Preprocess(UniRef50Preprocess):
 
 
         for split_name, record_id_list in zip(['train', 'val', 'test'], [train_samples, val_samples, test_samples]):
+            logging.info(f"Making cluster memmap for {split_name}")
             split_path = os.path.join(uf50_output_dir, split_name)
             pathlib.Path(split_path).mkdir(parents=True, exist_ok=True)
 
@@ -388,6 +391,7 @@ class ESM2Preprocess(UniRef50Preprocess):
             _counts, _starts = self._make_local_memmaps(record_id_list, global_starts, global_counts, counts_mmap_fn=counts_fn, starts_mmap_fn=starts_fn)
 
 
+        logging.info(f'Writing processed uf50 dataset files to {uf50_output_dir}...')
         self.train_val_test_split(train_samples=train_samples, 
                                   val_samples=val_samples, 
                                   test_samples=test_samples, 
@@ -474,15 +478,23 @@ class ESM2Preprocess(UniRef50Preprocess):
                 all_cids.append(cid)
                 all_cmembers.append(members)
 
+                # TODO understand whats missing, i think the answer is to 'continue' in these cases.
+                #       we still need to keep them in the all_cid all_cmembers list to get the correct mapping.
+
+                uf50_not_found = 0
+                try:
+                    uf50_entry = uf50_fasta_indexer[cid]
+                except Exception as e:
+                    continue
+                uf50_fa_out.write(f">{uf50_entry.name}\n")
+                uf50_fa_out.write(f"{uf50_entry.seq}\n")
                 # Update new ordered fastas
                 for member in members:
+                    # This one is more concerning..
                     uf90_entry = uf90_fasta_indexer[member]
                     uf90_fa_out.write(f">{uf90_entry.name}\n")
                     uf90_fa_out.write(f"{uf90_entry.seq}\n")
-
-                uf50_entry = uf50_fasta_indexer[cid]
-                uf50_fa_out.write(f">{uf50_entry.name}\n")
-                uf50_fa_out.write(f"{uf50_entry.seq}\n")
+            print('total, not found', i, uf50_not_found)
 
             starts_global = np.zeros(shape=(len(all_cmembers)), dtype=np.int64)
             counts_global = np.zeros(shape=(len(all_cmembers)), dtype=np.int64)
