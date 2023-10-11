@@ -19,7 +19,7 @@ from typing import Dict, Optional
 from omegaconf.dictconfig import DictConfig
 from pytorch_lightning.trainer.trainer import Trainer
 from bionemo.data.dataloader.protein_collate import ESM2BertCollate
-from bionemo.data.mapped_dataset import NeMoUpsampling, Uniref90ClusterMappingDataset
+from bionemo.data.mapped_dataset import AltUniref90ClusterMappingDataset, NeMoUpsampling, Uniref90ClusterMappingDataset
 
 from nemo.core.neural_types import NeuralType
 from bionemo.model.protein.esm1nv.base import ESMnvMegatronBertModel
@@ -206,9 +206,61 @@ class ESM2nvModel(ESM1nvModel):
     def __init__(self, cfg: DictConfig, trainer: Trainer):
         super().__init__(cfg, trainer)
     
+    @staticmethod 
+    def _build_train_valid_test_datasets(trainer, model_cfg, keep_uf50=False):
+        _train_ds, _validation_ds, _test_ds = ESM1nvModel._build_train_valid_test_datasets(trainer, model_cfg)
+
+        dataset_path = model_cfg.data.uf90.uniref90_path
+        split = 'uf90_csvs'
+        ds_name = model_cfg.data.uf90.dataset.get(split, None)
+        filepath: str = os.path.join(dataset_path, split, ds_name)
+
+        data_impl = model_cfg.data.uf90.get('data_impl', None)
+        assert data_impl is not None, 'Config "cfg" should contain field "cfg.data_impl"'
+        # NOTE train/val/test will all each into uniref90, since we are split on clusters, we now they are independent.
+        #   hence, we only need one dataset object for uf90
+        uniref90_dataset = build_typed_dataset(dataset_paths=filepath,
+                                                data_impl=data_impl,
+                                                cfg=model_cfg.data.uf90, 
+                                                use_upsampling=False, 
+                                                num_samples=None)
+        
+        # now we can create the sample caceh
+        # how to choose filename?
+        results = []
+        for ds, split in zip([_train_ds, _validation_ds, _test_ds], ['train', 'val', 'test']):
+            # TypeHint for intellisense
+            ds: NeMoUpsampling = ds
+
+            data_prefix = ds.data_prefix
+            index_mapping_dir = ds.index_mapping_dir
+
+            path_root: str = os.path.join(model_cfg.data.dataset_path, split)
+            # Setup the resampling
+            ds = AltUniref90ClusterMappingDataset(
+                uniref50_dataset=ds, 
+                uniref90_dataset=uniref90_dataset, 
+                data_prefix=data_prefix,  # used for index creation
+                seed=model_cfg.seed, # used for rng, although awkward because global statehood
+                index_mapping_dir=index_mapping_dir, # stores index
+                cluster_map_starts_fn=f'{path_root}/starts.mmap',
+                cluster_map_counts_fn=f'{path_root}/counts.mmap',
+                name=ds.name,
+                keep_uf50=keep_uf50
+            )
+
+            results.append(ds)
+
+        [_train_ds, _validation_ds, _test_ds] = results
+        logging.info(f'Length of train dataset: {len(_train_ds)}')
+        logging.info(f'Length of val dataset: {len(_validation_ds)}')
+        logging.info(f'Length of test dataset: {len(_test_ds)}')
+        logging.info(f'Finished building Bert datasets.')
+        return _train_ds, _validation_ds, _test_ds
+
 
     @staticmethod 
-    def _build_train_valid_test_datasets(trainer, model_cfg):
+    def _build_train_valid_test_datasets_old(trainer, model_cfg):
         """
         Constructs training, validation, and testing datasets for the ESM2nv model.
 
@@ -246,6 +298,7 @@ class ESM2nvModel(ESM1nvModel):
         # now we can create the sample caceh
         # how to choose filename?
         sample_mapping_json_filename = dataset_path + "/uf90_seqid_to_idx.json"
+
         uf90_seqid_to_idx = Uniref90ClusterMappingDataset._create_sample_mapping_cache(sample_mapping_json_filename, uniref90_dataset)
 
         results = []
@@ -278,6 +331,54 @@ class ESM2nvModel(ESM1nvModel):
         logging.info(f'Finished building Bert datasets.')
         return _train_ds, _validation_ds, _test_ds
 
+    @staticmethod 
+    def _build_pretraining_data_loader_override(model_cfg, dataset, consumed_samples):
+        """Buld dataloader given an input dataset."""
+
+        from megatron.core import parallel_state
+        from nemo.collections.nlp.data.language_modeling.megatron.data_samplers import (
+            MegatronPretrainingRandomSampler,
+            MegatronPretrainingSampler,
+        )
+
+        if dataset is None:
+            return None
+        # Megatron sampler
+        if hasattr(model_cfg.data, 'dataloader_type') and model_cfg.data.dataloader_type is not None:
+            if model_cfg.data.dataloader_type == 'single':
+                batch_sampler = MegatronPretrainingSampler(
+                    total_samples=len(dataset),
+                    consumed_samples=consumed_samples,
+                    micro_batch_size=model_cfg.micro_batch_size,
+                    global_batch_size=model_cfg.global_batch_size,
+                    data_parallel_rank=parallel_state.get_data_parallel_rank(),
+                    data_parallel_size=parallel_state.get_data_parallel_world_size(),
+                    drop_last=model_cfg.get('drop_last', True),
+                )
+            elif model_cfg.data.dataloader_type == 'cyclic':
+                batch_sampler = MegatronPretrainingRandomSampler(
+                    total_samples=len(dataset),
+                    consumed_samples=consumed_samples,
+                    micro_batch_size=model_cfg.micro_batch_size,
+                    data_parallel_rank=parallel_state.get_data_parallel_rank(),
+                    data_parallel_size=parallel_state.get_data_parallel_world_size(),
+                    drop_last=model_cfg.get('drop_last', True),
+                )
+            else:
+                raise ValueError('cfg.data.dataloader_type must be "single" or "cyclic"')
+        else:
+            raise ValueError('cfg.data.dataloader_type not found. Must be "single" or "cyclic"')
+
+        # TODO
+        # Run this one more time with pin_memory=True
+        return torch.utils.data.DataLoader(
+            dataset,
+            batch_sampler=batch_sampler,
+            num_workers=model_cfg.data.num_workers,
+            pin_memory=False, # ahah
+            persistent_workers=True if model_cfg.data.num_workers > 0 else False,
+        )
+
 
     def build_pretraining_data_loader(self, dataset, consumed_samples):
         """Buld dataloader given an input dataset."""
@@ -285,10 +386,12 @@ class ESM2nvModel(ESM1nvModel):
         assert self._cfg.data.dataloader_type == 'single', AssertionError(
             f'Only the Megatron sequential ("single") sampler is currently supported. {self._cfg.data.dataloader_type} was chosen.'
             )
-        dataloader = super().build_pretraining_data_loader(dataset=dataset, consumed_samples=consumed_samples)
+        # dataloader = super().build_pretraining_data_loader(dataset=dataset, consumed_samples=consumed_samples)
+        dataloader = self._build_pretraining_data_loader_override(self._cfg, dataset=dataset, consumed_samples=consumed_samples)
 
         # Add collate function and unpin memory to avoid crash with CUDA misaligned address
-        dataloader.pin_memory = False # must be False with CSV dataset
+        dataloader.pin_memory = False # Does this actually do anything?
+
         pad_size_divisible_by_8 = True if self._cfg.masked_softmax_fusion else False
 
         dataloader.collate_fn = ESM2BertCollate(tokenizer=self.tokenizer,
