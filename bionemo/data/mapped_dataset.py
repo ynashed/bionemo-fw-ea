@@ -202,8 +202,9 @@ class Uniref90ClusterMappingDataset(MappedDataset):
         self,
         uniref50_dataset: 'NeMoUpsampling',
         uniref90_dataset: Dataset,
-        cluster_map_json_path: str,
-        data_prefix,
+        cluster_map_starts_fn: str,
+        cluster_map_counts_fn: str,
+        data_prefix: str,
         seed=None,
         index_mapping_dir=None,
         name=None,
@@ -237,12 +238,11 @@ class Uniref90ClusterMappingDataset(MappedDataset):
         # At this point we have the directory
         # this gets invoked to create the cluster map, which is used in create_sample_map
 
-        self.cluster_map_json_path = cluster_map_json_path
         # Pass in the dataset that sample_mapping indicies correspond to
         num_samples = 0  # This has no effect on behavior
-        logging.info(f"Loading cluster map {self.cluster_map_json_path=}")
+        logging.info(f"Loading cluster map {cluster_map_counts_fn=}, {cluster_map_starts_fn=}")
         time_start = time.time()
-        cluster_map = self.create_cluster_map_from_json(self.cluster_map_json_path)
+        cluster_map = self.create_cluster_map_from_files(cluster_map_counts_fn, cluster_map_starts_fn)
         time_end = time.time()
         logging.info(f"Cluster map from json: {time_end - time_start}")
         time_start = time.time()
@@ -263,19 +263,16 @@ class Uniref90ClusterMappingDataset(MappedDataset):
         del cluster_map
 
     @staticmethod
-    def create_cluster_map_from_json(cluster_map_json) -> Dict[str, str]:
+    def create_cluster_map_from_files(cluster_map_counts_fn, cluster_map_starts_fn) -> Dict[str, str]:
         '''Creates a mapping from cluster_id to cluster_members. This is specifically for mapping samples from
         Uniref50 to Uniref90.
 
         Json file is expected to be an exact production (meaning, json.loads is sufficient)
         '''
-        with open(cluster_map_json, 'r') as fd:
-            cluster_map = json.load(fd)
-
-        for k, v in cluster_map.items():
-            cluster_map[k] = np.memmap(v, dtype=int)
-
-        return cluster_map
+        return {
+            'counts': np.memmap(cluster_map_counts_fn, dtype=int, mode='r'),
+            'starts': np.memmap(cluster_map_starts_fn, dtype=int, mode='r'),
+        }
 
     def _sample_mapping_filename(
         self,

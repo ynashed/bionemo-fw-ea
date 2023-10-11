@@ -40,16 +40,12 @@ def make_fake_dataset(num_50_clusters, num_50_samples, num_maps):
 
     uniref90_dataset = [{"sequence_id": i} for i in range(cum_num_maps)]
 
-    tf = tempfile.NamedTemporaryFile(suffix='.json')
     tf2 = tempfile.NamedTemporaryFile(suffix='json')
     tf2_memmap_counts = tempfile.NamedTemporaryFile(suffix='json')
     tf2_memmap_starts = tempfile.NamedTemporaryFile(suffix='json')
-    state_['cluster_map'] = tf
     state_['alt_cluster_map'] = tf2
     state_['alt_cluster_map_counts'] = tf2_memmap_counts
     state_['alt_cluster_map_starts'] = tf2_memmap_starts
-    with open(tf.name, 'w') as fh:
-        json.dump(cluster_map, fh)
 
     counts = np.array(alt_cluster_map.pop('counts'))
     starts = np.array(alt_cluster_map.pop('starts'))
@@ -59,18 +55,14 @@ def make_fake_dataset(num_50_clusters, num_50_samples, num_maps):
     starts_memmap[:] = starts
     counts_memmap.flush()
     starts_memmap.flush()
-    alt_cluster_map['counts'] = tf2_memmap_counts.name
-    alt_cluster_map['starts'] = tf2_memmap_starts.name
-    with open(tf2.name, 'w') as fh:
-        json.dump(alt_cluster_map, fh)
-    return uniref50_dataset, uniref90_dataset, tf.name, tf2.name
+    return uniref50_dataset, uniref90_dataset, tf2_memmap_counts.name, tf2_memmap_starts.name
 
 
 def test_dataset_construction():
     num_50_clusters = 20
     num_maps = 20
     num_50_samples = 200
-    uniref50_dataset, uniref90_dataset, cluster_map_json, alt_cluster_map_json = make_fake_dataset(
+    uniref50_dataset, uniref90_dataset, counts_fn, starts_fn = make_fake_dataset(
         num_50_clusters, num_50_samples, num_maps
     )
     index_mapping_dir = tempfile.TemporaryDirectory()
@@ -79,8 +71,9 @@ def test_dataset_construction():
     dataset = Uniref90ClusterMappingDataset(
         uniref50_dataset,
         uniref90_dataset,
-        alt_cluster_map_json,
-        data_prefix='test_data_',
+        cluster_map_counts_fn=counts_fn,
+        cluster_map_starts_fn=starts_fn,
+        data_prefix='test_',
         index_mapping_dir=alt_index_mapping_dir.name,
         buffer_size=int(1e6),
     )
