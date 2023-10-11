@@ -72,6 +72,8 @@ model:
   activations_checkpoint_method: null
   activations_checkpoint_num_layers: 1
   data:
+    val_size: 50
+    test_size: 10
     ngc_registry_target: uniref50_2022_05
     ngc_registry_version: v23.06
     data_prefix: ''

@@ -208,8 +208,6 @@ class Uniref90ClusterMappingDataset(MappedDataset):
         seed=None,
         index_mapping_dir=None,
         name=None,
-        force_regen_sample_mapping=False,
-        uniref90_samplemap=None,
         buffer_size=int(1e6),
     ):
         '''
@@ -263,15 +261,15 @@ class Uniref90ClusterMappingDataset(MappedDataset):
         del cluster_map
 
     @staticmethod
-    def create_cluster_map_from_files(cluster_map_counts_fn, cluster_map_starts_fn) -> Dict[str, str]:
+    def create_cluster_map_from_files(cluster_map_counts_fn, cluster_map_starts_fn, dtype=np.uint64) -> Dict[str, str]:
         '''Creates a mapping from cluster_id to cluster_members. This is specifically for mapping samples from
         Uniref50 to Uniref90.
 
         Json file is expected to be an exact production (meaning, json.loads is sufficient)
         '''
         return {
-            'counts': np.memmap(cluster_map_counts_fn, dtype=int, mode='r'),
-            'starts': np.memmap(cluster_map_starts_fn, dtype=int, mode='r'),
+            'counts': np.memmap(cluster_map_counts_fn, dtype=dtype, mode='r'),
+            'starts': np.memmap(cluster_map_starts_fn, dtype=dtype, mode='r'),
         }
 
     def _sample_mapping_filename(

@@ -244,8 +244,7 @@ class ESM2nvModel(ESM1nvModel):
                 index_mapping_dir=index_mapping_dir, # stores index
                 cluster_map_starts_fn=f'{path_root}/starts.mmap',
                 cluster_map_counts_fn=f'{path_root}/counts.mmap',
-                name=ds.name,
-                keep_uf50=keep_uf50
+                name=ds.name
             )
 
             results.append(ds)
