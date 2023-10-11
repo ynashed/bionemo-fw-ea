@@ -18,6 +18,8 @@ def test_uf90_resampling_dataset_integration():
 
     files are deposited into the current working directory, move them to /data/uniref2022_05 before preprocessing.
     '''
+
+    # TODO (SKH): automate data generation
     from omegaconf import OmegaConf
     cfg = OmegaConf.load('conf/uf90-resampling.yaml')
     trainer = setup_trainer(cfg, callbacks=[])
