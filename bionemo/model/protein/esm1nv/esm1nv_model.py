@@ -208,6 +208,9 @@ class ESM2nvModel(ESM1nvModel):
 
     @staticmethod
     def _build_train_valid_test_datasets(trainer, model_cfg, keep_uf50=False):
+        '''
+        keep_uf50 - use this flag for testing, manually assigns the uniref50_dataset object to the resulting Uniref90ClusterMappingDataset object.
+        '''
         _train_ds, _validation_ds, _test_ds = ESM1nvModel._build_train_valid_test_datasets(trainer, model_cfg)
 
         dataset_path = model_cfg.data.uf90.uniref90_path
@@ -230,14 +233,14 @@ class ESM2nvModel(ESM1nvModel):
         results = []
         for ds, split in zip([_train_ds, _validation_ds, _test_ds], ['train', 'val', 'test']):
             # TypeHint for intellisense
-            ds: NeMoUpsampling = ds
+            _ds: NeMoUpsampling = ds
 
             index_mapping_dir = ds.index_mapping_dir
 
             path_root: str = os.path.join(model_cfg.data.dataset_path, split)
             # Setup the resampling
             ds = Uniref90ClusterMappingDataset(
-                uniref50_dataset=ds,
+                uniref50_dataset=_ds,
                 uniref90_dataset=uniref90_dataset,
                 data_prefix=split,  # used for index creation
                 seed=model_cfg.seed, # used for rng, although awkward because global statehood
@@ -246,6 +249,9 @@ class ESM2nvModel(ESM1nvModel):
                 cluster_map_counts_fn=f'{path_root}/counts.mmap',
                 name=ds.name
             )
+
+            if keep_uf50:
+                ds.uniref50_dataset = _ds
 
             results.append(ds)
 
