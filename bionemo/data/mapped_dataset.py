@@ -304,8 +304,7 @@ class Uniref90ClusterMappingDataset(MappedDataset):
                 items are effectively string:
                     ["u50_id0","u50_id1", "u50_id2", ...]
             cluster_map (_type_): _description_
-                maps u50 clster to List[u90 cluster]
-                 {"u50_id{i}': ["u90_id{j" for j in range(num_maps)]}
+                Starts
             uniref90_samplemap (_type_): _description_
                 List[Dict["sequence_id", "..."]]
 
@@ -319,8 +318,10 @@ class Uniref90ClusterMappingDataset(MappedDataset):
         n_samples = len(uniref50_dataset)
         try:
             rank = torch.distributed.get_rank()
+            is_distributed = True
         except RuntimeError:  # Except a process group not initialized error so this can be debugged
             rank = 0
+            is_distributed = False
         if rank == 0:
             sample_map = np.memmap(sample_mapping_file, dtype=int, mode='w+', shape=(n_samples,))
 
@@ -338,6 +339,8 @@ class Uniref90ClusterMappingDataset(MappedDataset):
                 buffer_start = buffer_end
             sample_map.flush()
 
+        if is_distributed:
+            torch.distributed.barrier()
         logging.info(f"Loading uf50-uf90 sample mapping on rank {rank}.")
         sample_map = np.memmap(sample_mapping_file, dtype=int, mode='r')
 
