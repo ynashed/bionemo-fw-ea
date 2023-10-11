@@ -19,7 +19,7 @@ from typing import Dict, Optional
 from omegaconf.dictconfig import DictConfig
 from pytorch_lightning.trainer.trainer import Trainer
 from bionemo.data.dataloader.protein_collate import ESM2BertCollate
-from bionemo.data.mapped_dataset import AltUniref90ClusterMappingDataset, NeMoUpsampling, Uniref90ClusterMappingDataset
+from bionemo.data.mapped_dataset import NeMoUpsampling, Uniref90ClusterMappingDataset
 
 from nemo.core.neural_types import NeuralType
 from bionemo.model.protein.esm1nv.base import ESMnvMegatronBertModel
@@ -132,7 +132,7 @@ class ESM1nvModel(ESMnvMegatronBertModel):
         self._validation_ds = val
         self._test_ds = test
         return self._train_ds, self._validation_ds, self._test_ds
-        
+
     def validation_epoch_end(self, outputs):
         if not outputs:
             return
@@ -181,11 +181,11 @@ class ESM2nvModel(ESM1nvModel):
     """
     Extends the ESM1nv model by customizing dataset construction to mimic ESM2's implementation.
 
-    This model introduces a dataset structure that not only retains elements from ESM1nv but also 
-    incorporates new fields specifically tailored for ESM2nv. One significant change involves using 
+    This model introduces a dataset structure that not only retains elements from ESM1nv but also
+    incorporates new fields specifically tailored for ESM2nv. One significant change involves using
     NeMoUpsampling to upsample UniRef50 cluster IDs and pre-computing samples from UniRef90 via a mapped dataset.
 
-    The configuration files are designed to incorporate specific argument structures. A sample configuration 
+    The configuration files are designed to incorporate specific argument structures. A sample configuration
     demonstrating the dataset configuration can be viewed in `examples/protein/esm2nv/conf/base_config.yaml`
 
     Args:
@@ -205,8 +205,8 @@ class ESM2nvModel(ESM1nvModel):
 
     def __init__(self, cfg: DictConfig, trainer: Trainer):
         super().__init__(cfg, trainer)
-    
-    @staticmethod 
+
+    @staticmethod
     def _build_train_valid_test_datasets(trainer, model_cfg, keep_uf50=False):
         _train_ds, _validation_ds, _test_ds = ESM1nvModel._build_train_valid_test_datasets(trainer, model_cfg)
 
@@ -221,10 +221,10 @@ class ESM2nvModel(ESM1nvModel):
         #   hence, we only need one dataset object for uf90
         uniref90_dataset = build_typed_dataset(dataset_paths=filepath,
                                                 data_impl=data_impl,
-                                                cfg=model_cfg.data.uf90, 
-                                                use_upsampling=False, 
+                                                cfg=model_cfg.data.uf90,
+                                                use_upsampling=False,
                                                 num_samples=None)
-        
+
         # now we can create the sample caceh
         # how to choose filename?
         results = []
@@ -232,15 +232,14 @@ class ESM2nvModel(ESM1nvModel):
             # TypeHint for intellisense
             ds: NeMoUpsampling = ds
 
-            data_prefix = ds.data_prefix
             index_mapping_dir = ds.index_mapping_dir
 
             path_root: str = os.path.join(model_cfg.data.dataset_path, split)
             # Setup the resampling
-            ds = AltUniref90ClusterMappingDataset(
-                uniref50_dataset=ds, 
-                uniref90_dataset=uniref90_dataset, 
-                data_prefix=data_prefix,  # used for index creation
+            ds = Uniref90ClusterMappingDataset(
+                uniref50_dataset=ds,
+                uniref90_dataset=uniref90_dataset,
+                data_prefix=split,  # used for index creation
                 seed=model_cfg.seed, # used for rng, although awkward because global statehood
                 index_mapping_dir=index_mapping_dir, # stores index
                 cluster_map_starts_fn=f'{path_root}/starts.mmap',
@@ -259,12 +258,12 @@ class ESM2nvModel(ESM1nvModel):
         return _train_ds, _validation_ds, _test_ds
 
 
-    @staticmethod 
+    @staticmethod
     def _build_train_valid_test_datasets_old(trainer, model_cfg):
         """
         Constructs training, validation, and testing datasets for the ESM2nv model.
 
-        This method encompasses the complex task of first upsampling the UniRef50 cluster IDs using 
+        This method encompasses the complex task of first upsampling the UniRef50 cluster IDs using
         NeMoUpsampling and then pre-selecting samples from UniRef90 through a mapped dataset.
 
         Args:
@@ -275,7 +274,7 @@ class ESM2nvModel(ESM1nvModel):
             Tuple of datasets: (train_dataset, valid_dataset, test_dataset)
 
         Note:
-            Ensure the model configuration adheres to the expected structure, especially for dataset 
+            Ensure the model configuration adheres to the expected structure, especially for dataset
             paths, data implementation choice, and associated kwargs.
         """
         _train_ds, _validation_ds, _test_ds = ESM1nvModel._build_train_valid_test_datasets(trainer, model_cfg)
@@ -291,10 +290,10 @@ class ESM2nvModel(ESM1nvModel):
         #   hence, we only need one dataset object for uf90
         uniref90_dataset = build_typed_dataset(dataset_paths=filepath,
                                                 data_impl=data_impl,
-                                                cfg=model_cfg.data.uf90, 
-                                                use_upsampling=False, 
+                                                cfg=model_cfg.data.uf90,
+                                                use_upsampling=False,
                                                 num_samples=None)
-        
+
         # now we can create the sample caceh
         # how to choose filename?
         sample_mapping_json_filename = dataset_path + "/uf90_seqid_to_idx.json"
@@ -311,8 +310,8 @@ class ESM2nvModel(ESM1nvModel):
 
             # Setup the resampling
             ds = Uniref90ClusterMappingDataset(
-                uniref50_dataset=ds, 
-                uniref90_dataset=uniref90_dataset, 
+                uniref50_dataset=ds,
+                uniref90_dataset=uniref90_dataset,
                 data_prefix=data_prefix,  # used for index creation
                 seed=model_cfg.seed, # used for rng, although awkward because global statehood
                 index_mapping_dir=index_mapping_dir, # stores index
@@ -331,7 +330,7 @@ class ESM2nvModel(ESM1nvModel):
         logging.info(f'Finished building Bert datasets.')
         return _train_ds, _validation_ds, _test_ds
 
-    @staticmethod 
+    @staticmethod
     def _build_pretraining_data_loader_override(model_cfg, dataset, consumed_samples):
         """Buld dataloader given an input dataset."""
 
