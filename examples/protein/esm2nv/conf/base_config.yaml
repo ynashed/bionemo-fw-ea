@@ -71,8 +71,8 @@ model:
   # NOTE: these are compatability features
   use_esm_attention: True # Use specific attention modifications for ESM2
   esm_gelu: True # ESM2 uses custom gelu in the ML layer
-  use_pt_layernorm: True # Use pytorch implementation of layernorm instead of fused nemo layernorm. Important for equivalency of results with ESM2.
-  use_pt_mlp_out: True # Use pytorch implementation of attention output mlp instead of the nemo version. Important for equivalency of results with ESM2.
+  use_pt_layernorm: False # Use pytorch implementation of layernorm instead of fused nemo layernorm. Important for equivalency of results with ESM2.
+  use_pt_mlp_out: False # Use pytorch implementation of attention output mlp instead of the nemo version. Important for equivalency of results with ESM2.
 
   # Not specified in ESM2 models:
   # model architecture
