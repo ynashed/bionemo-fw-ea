@@ -446,9 +446,10 @@ class ESM2Preprocess(UniRef50Preprocess):
         temp fasta files that are in the same sort order as cluster_mapping_tsv. This is required for
         csv creation to match the indexing structure in the cluster map.
         '''
-        import tempfile
+        import tempfile, tqdm
         new_uf50_fn = tempfile.NamedTemporaryFile().name
         new_uf90_fn = tempfile.NamedTemporaryFile().name
+        logging.info(f"Sorting fasta files in temporary file: {new_uf50_fn=} {new_uf90_fn=}")
         with (
             open(cluster_mapping_tsv, 'r') as fd,
             open(new_uf50_fn, 'w') as uf50_fa_out,
@@ -458,13 +459,14 @@ class ESM2Preprocess(UniRef50Preprocess):
             all_cids, all_cmembers = list(), list()
             # Parse fasta
             # TODO: this is slow, but only happens once.
-            for i, line in enumerate(fd):
+            import time
+            start = time.time()
+            for i, line in enumerate(tqdm.tqdm(fd, total=len(uf50_fasta_indexer))):
                 if i == 0: continue # skip header
                 cid, cmembers, *_ = line.strip().split("\t")
                 members = cmembers.split(',')
                 all_cids.append(cid)
                 all_cmembers.append(members)
-
                 uf50_entry = uf50_fasta_indexer[cid]
                 uf50_fa_out.write(f">{uf50_entry.name}\n")
                 uf50_fa_out.write(f"{uf50_entry.seq}\n")
@@ -473,7 +475,8 @@ class ESM2Preprocess(UniRef50Preprocess):
                     uf90_entry = uf90_fasta_indexer[member]
                     uf90_fa_out.write(f">{uf90_entry.name}\n")
                     uf90_fa_out.write(f"{uf90_entry.seq}\n")
-
+            end = time.time()
+            logging.info('finished sorting in ', end - start)
             starts_global = np.zeros(shape=(len(all_cmembers)), dtype=np.int64)
             counts_global = np.zeros(shape=(len(all_cmembers)), dtype=np.int64)
             for i, (cid, members) in enumerate(zip(all_cids, all_cmembers)):
