@@ -57,7 +57,7 @@ model:
   hidden_size: 320
   ffn_hidden_size: 1280 # Transformer FFN hidden size. Usually 4 * hidden_size.
   num_attention_heads: 20
-  megatron_legacy: True
+  megatron_legacy: false 
   position_embedding_type: rope # ESM2 uses relative positional encoding 'ROPE' to extrapolate to longer sequences unseen during training
   hidden_dropout: 0 # ESM2 removes dropout from hidden layers and attention
   embedding_use_attention_mask: True # ESM2 uses attention masking on the embeddings
@@ -194,7 +194,7 @@ model:
 
   
   dwnstr_task_validation:
-    enabled: False
+    enabled: True 
     dataset:
       class: PerTokenPredictionCallback
       task_type: token-level-classification
