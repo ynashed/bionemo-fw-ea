@@ -33,9 +33,9 @@ def main(cfg) -> None:
     logging.info(f'\n{OmegaConf.to_yaml(cfg)}')
 
     callbacks = setup_callbacks(cfg)
-    trainer = setup_trainer(cfg, callbacks=callbacks)
 
     if cfg.do_training:
+        trainer = setup_trainer(cfg, callbacks=callbacks)
         logging.info("************** Starting Training ***********")
         if cfg.restore_from_path:
             logging.info("\nRestoring model from .nemo file " + cfg.restore_from_path)
