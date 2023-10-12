@@ -58,7 +58,8 @@ def main(cfg) -> None:
             uf50_output_dir=cfg.model.data.dataset_path,
             uf90_output_dir=cfg.model.data.uf90.uniref90_path,
             val_size=cfg.model.data.val_size,
-            test_size=cfg.model.data.test_size
+            test_size=cfg.model.data.test_size,
+            sort_fastas=cfg.data.sort_fastas
         )
 
         if cfg.model.dwnstr_task_validation.enabled:

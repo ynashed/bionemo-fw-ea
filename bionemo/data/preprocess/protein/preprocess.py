@@ -318,6 +318,7 @@ class ESM2Preprocess(UniRef50Preprocess):
                         val_size=5000,
                         test_size=1000000,
                         random_seed=0,
+                        sort_fastas=True
                         ):
         """
         Prepares and splits the dataset into train/test/validation subsets, converts the fasta files to CSV format, 
@@ -360,7 +361,7 @@ class ESM2Preprocess(UniRef50Preprocess):
         uf90_fasta_indexer = pyfastx.Fasta(uf90_datapath, build_index=True, uppercase=True)  
 
         logging.info('Creating cluster mapping')
-        cluster_map_resources = self._sort_fastas_load_cluster_mapping(uf50_fasta_indexer, uf90_fasta_indexer, cluster_mapping_tsv)
+        cluster_map_resources = self._sort_fastas_load_cluster_mapping(uf50_fasta_indexer, uf90_fasta_indexer, cluster_mapping_tsv, sort_fastas)
         new_uf50_fn, new_uf90_fn, global_starts, global_counts = cluster_map_resources['uf50_fn'], cluster_map_resources['uf90_fn'], cluster_map_resources['starts'], cluster_map_resources['counts']
 
         logging.info('Loading sorted fasta files')
@@ -441,7 +442,7 @@ class ESM2Preprocess(UniRef50Preprocess):
         return counts_local_mm, starts_local_mm
 
     @staticmethod
-    def _sort_fastas_load_cluster_mapping(uf50_fasta_indexer, uf90_fasta_indexer, cluster_mapping_tsv):
+    def _sort_fastas_load_cluster_mapping(uf50_fasta_indexer, uf90_fasta_indexer, cluster_mapping_tsv, sort_fastas=True):
         ''' Loads the cluster map into two arrays, counts and sizes. As a side effect, creates new 
         temp fasta files that are in the same sort order as cluster_mapping_tsv. This is required for
         csv creation to match the indexing structure in the cluster map.
@@ -467,14 +468,16 @@ class ESM2Preprocess(UniRef50Preprocess):
                 members = cmembers.split(',')
                 all_cids.append(cid)
                 all_cmembers.append(members)
-                uf50_entry = uf50_fasta_indexer[cid]
-                uf50_fa_out.write(f">{uf50_entry.name}\n")
-                uf50_fa_out.write(f"{uf50_entry.seq}\n")
-                # Update new ordered fastas
-                for member in members:
-                    uf90_entry = uf90_fasta_indexer[member]
-                    uf90_fa_out.write(f">{uf90_entry.name}\n")
-                    uf90_fa_out.write(f"{uf90_entry.seq}\n")
+
+                if sort_fastas:
+                    uf50_entry = uf50_fasta_indexer[cid]
+                    uf50_fa_out.write(f">{uf50_entry.name}\n")
+                    uf50_fa_out.write(f"{uf50_entry.seq}\n")
+                    # Update new ordered fastas
+                    for member in members:
+                        uf90_entry = uf90_fasta_indexer[member]
+                        uf90_fa_out.write(f">{uf90_entry.name}\n")
+                        uf90_fa_out.write(f"{uf90_entry.seq}\n")
             end = time.time()
             logging.info('finished sorting in ', end - start)
             starts_global = np.zeros(shape=(len(all_cmembers)), dtype=np.int64)
