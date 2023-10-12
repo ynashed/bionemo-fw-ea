@@ -293,12 +293,8 @@ class Uniref90ClusterMappingDataset(MappedDataset):
         """
         # TODO: promote this to its own ABC (MemMappedDataset)
         n_samples = len(uniref50_dataset)
-        try:
-            rank = torch.distributed.get_rank()
-            is_distributed = True
-        except RuntimeError:  # Except a process group not initialized error so this can be debugged
-            rank = 0
-            is_distributed = False
+        rank = torch.distributed.get_rank()
+        is_distributed = True
         if rank == 0:
             sample_map = np.memmap(sample_mapping_file, dtype=int, mode='w+', shape=(n_samples,))
 
