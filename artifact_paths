@@ -16,6 +16,7 @@
 # limitations under the License.
 
 # BioNeMo Models
+
 ESM1NV_MODEL="nvidian/clara-lifesciences/esm1nv:23.06"
 PROTT5NV_MODEL="nvidian/clara-lifesciences/prott5nv:23.06"
 MEGAMOLBART_MODEL="nvidian/clara-lifesciences/megamolbart:23.06"
