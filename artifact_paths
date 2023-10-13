@@ -21,3 +21,5 @@ PROTT5NV_MODEL="nvidian/clara-lifesciences/prott5nv:23.06"
 MEGAMOLBART_MODEL="nvidian/clara-lifesciences/megamolbart:23.06"
 EQUIDOCK_DIPS_MODEL="nvidian/clara-lifesciences/equidock:dips.23.08"
 EQUIDOCK_DB5_MODEL="nvidian/clara-lifesciences/equidock:db5.23.08"
+ESM2NV_650M_MODEL="nvidian/cvai_bnmo_trng/esm2nv650m:1.0-rc1" #TODO: update path when model is released
+ESM2NV_3B_MODEL="nvidian/cvai_bnmo_trng/esm2nv3b:1.0-rc1" #TODO: update path when model is released
