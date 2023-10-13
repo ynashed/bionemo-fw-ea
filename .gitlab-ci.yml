@@ -41,13 +41,13 @@ variables:
     description: "Wether to use nightly NeMo docker image as base. Set to 'false' by default."
   NGC_CLI_FORMAT_TYPE: ascii
   NGC_CLI_ORG: nvidian
-  # FIXME: change to cvai_bnmo_trng when we move data and checkpoints
+  # TODO(@dorotat): change to cvai_bnmo_trng when we move data and checkpoints
   NGC_CLI_TEAM: clara-lifesciences
   JET_WORKLOADS_REF_MAIN: "bionemo/training-unit-tests"
   SKIP_CI_MR: "false"
   SKIP_CI_MR_JET: "false"
 
-## TODO solution with SKIP_CI flag is error-prone and should be replaced with better logic!!!!
+# TODO(@dorotat) solution with SKIP_CI flag is error-prone and should be replaced with better logic!!!!
 workflow:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_LABELS =~ /SKIP_CI/
@@ -81,7 +81,7 @@ skip_ci:
     - docker login -u '$oauthtoken' -p $NGC_CLI_API_KEY nvcr.io
 
 
-# TODO: consider splitting this into build-base and build-devel
+# TODO(@dorotat): consider splitting this into build-base and build-devel
 build:
   extends:
     - .docker-setup
@@ -97,9 +97,9 @@ build:
     - when: manual
   script:
     - if [[ $NIGHTLY = true ]]; then
-        base="--build-arg BASE_IMAGE=$NEMO_NIGHTLY_TAG";
+      base="--build-arg BASE_IMAGE=$NEMO_NIGHTLY_TAG";
       else
-        base="";
+      base="";
       fi
     - docker build --network host --no-cache ${base} --label com.nvidia.bionemo.git_hash=${CI_COMMIT_SHORT_SHA}
       -t $PIPELINE_TAG -f setup/Dockerfile .
@@ -113,7 +113,7 @@ build:
 get-checkpoints:
   image:
     name: "$PIPELINE_TAG"
-    entrypoint: [""]
+    entrypoint: [ "" ]
   tags:
     - generic
   stage: download
@@ -125,9 +125,7 @@ get-checkpoints:
     - when: on_success
   script:
     - export NGC_CLI_ORG NGC_CLI_TEAM NGC_CLI_FORMAT_TYPE NGC_CLI_API_KEY MODEL_PATH
-    - source download_models.sh && download_bionemo_models
-    - setup_model "nvidian/clara-lifesciences/megamolbart_retro:0.1.0"
-        "${MODEL_PATH}" "molecule/megamolbart/megamolbart_retro.nemo"
+    - sh internal/scripts/download_models_unit_tests.sh 3 30
   artifacts:
     paths:
       - models
@@ -137,7 +135,7 @@ get-checkpoints:
 .unit-tests-common:
   image:
     name: "$PIPELINE_TAG"
-    entrypoint: [""]
+    entrypoint: [ "" ]
   stage: test
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $SKIP_CI_MR == "true"
@@ -159,20 +157,20 @@ unit-test-cpu:
   tags:
     - cpu
   script:
-    - !reference [.unit-tests-common, script]
+    - !reference [ .unit-tests-common, script ]
     - pytest -v -m "not needs_gpu"
 
 
 unit-test-gpu:
   extends:
-  - .unit-tests-common
+    - .unit-tests-common
   tags:
     - gpu
   before_script:
-    - !reference [.unit-tests-common, before_script]
+    - !reference [ .unit-tests-common, before_script ]
     - nvidia-smi
   script:
-    - !reference [.unit-tests-common, script]
+    - !reference [ .unit-tests-common, script ]
     - pytest -v -m "needs_gpu" -k "not test_model_training"
 
 
@@ -180,7 +178,7 @@ unit-test-gpu:
   tags:
     - generic
   stage: jet
-  needs: [unit-test-cpu, unit-test-gpu]
+  needs: [ unit-test-cpu, unit-test-gpu ]
   variables:
     CMD: 'yq e ".spec.source.image = \"${PIPELINE_TAG}\"" -i builds/bionemo.yaml'
     JET_WORKLOADS_DIR: "/builds/clara-discovery/workloads-registry"
@@ -234,37 +232,37 @@ jet-generate:
 
 
 jet-trigger:
-    needs: [jet-generate]
-    extends:
-      - .jet-trigger-template
-    inherit:
+  needs: [ jet-generate ]
+  extends:
+    - .jet-trigger-template
+  inherit:
+    variables:
+      - CI_PIPELINE_ID
+      - CI_COMMIT_BRANCH
+      - SKIP_CI_MR_JET
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $SKIP_CI_MR_JET == "true"
+      when: never
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $SKIP_CI_MR_JET != "true"
       variables:
-        - CI_PIPELINE_ID
-        - CI_COMMIT_BRANCH
-        - SKIP_CI_MR_JET
-    rules:
-      - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $SKIP_CI_MR_JET == "true"
-        when: never
-      - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $SKIP_CI_MR_JET != "true"
-        variables:
-          JET_WORKLOADS_REF: "ephemeral/bionemo/${CI_PIPELINE_ID}"
-      - if: $CI_COMMIT_BRANCH == "dev"
-        variables:
-          JET_WORKLOADS_REF: "ephemeral/bionemo/${CI_COMMIT_BRANCH}/${CI_PIPELINE_ID}"
-      - if: $CI_COMMIT_BRANCH == "dev-next"
-        variables:
-          JET_WORKLOADS_REF: "ephemeral/bionemo/${CI_COMMIT_BRANCH}/${CI_PIPELINE_ID}"
-      - if: $CI_COMMIT_BRANCH == "main"
-        variables:
-          JET_WORKLOADS_REF: "ephemeral/bionemo/${CI_COMMIT_BRANCH}/${CI_PIPELINE_ID}"
+        JET_WORKLOADS_REF: "ephemeral/bionemo/${CI_PIPELINE_ID}"
+    - if: $CI_COMMIT_BRANCH == "dev"
+      variables:
+        JET_WORKLOADS_REF: "ephemeral/bionemo/${CI_COMMIT_BRANCH}/${CI_PIPELINE_ID}"
+    - if: $CI_COMMIT_BRANCH == "dev-next"
+      variables:
+        JET_WORKLOADS_REF: "ephemeral/bionemo/${CI_COMMIT_BRANCH}/${CI_PIPELINE_ID}"
+    - if: $CI_COMMIT_BRANCH == "main"
+      variables:
+        JET_WORKLOADS_REF: "ephemeral/bionemo/${CI_COMMIT_BRANCH}/${CI_PIPELINE_ID}"
 
 
-# TODO use image: gitlab-master.nvidia.com:5005/dl/jet/api:latest
+# TODO(@dorotat): use image gitlab-master.nvidia.com:5005/dl/jet/api:latest
 jet-test:
-  needs: [jet-trigger]
+  needs: [ jet-trigger ]
   image:
     name: "${PIPELINE_TAG}-devel"
-    entrypoint: [""]
+    entrypoint: [ "" ]
   tags:
     - generic
   stage: jet
@@ -288,13 +286,13 @@ dev-deploy:
   extends:
     - .docker-setup
   stage: deploy
-  dependencies: []
+  dependencies: [ ]
   rules:
     - if: $CI_COMMIT_BRANCH == "dev" && $NIGHTLY != "true"
     - if: $CI_COMMIT_BRANCH == "main" && $NIGHTLY != "true"
     - if: $CI_COMMIT_BRANCH == "bionemo-rc2306-v1" && $NIGHTLY != "true"
   before_script:
-    - !reference [.docker-setup, before_script]
+    - !reference [ .docker-setup, before_script ]
     - apk update && apk add curl
   script:
     - docker pull $PIPELINE_TAG
