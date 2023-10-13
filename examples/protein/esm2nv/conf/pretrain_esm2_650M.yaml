@@ -18,7 +18,7 @@ model:
 
   dwnstr_task_validation:
     # TODO there are some failures with this enabled.
-    enabled: False
+    enabled: True 
 
 exp_manager:
   wandb_logger_kwargs:

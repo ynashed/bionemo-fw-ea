@@ -19,6 +19,9 @@ model:
   tokenizer:
     model_name: "facebook/esm2_t6_8M_UR50D"
 
+  dwnstr_task_validation:
+    enabled: True
+
 exp_manager:
   wandb_logger_kwargs:
     offline: True # set to True if there are issues uploading to WandB during training
