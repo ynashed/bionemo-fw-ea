@@ -1,7 +1,7 @@
 import json
 import tempfile
 from collections import defaultdict
-
+import pytest
 import numpy as np
 from torch.utils.data import Dataset
 
@@ -57,7 +57,7 @@ def make_fake_dataset(num_50_clusters, num_50_samples, num_maps):
     starts_memmap.flush()
     return uniref50_dataset, uniref90_dataset, tf2_memmap_counts.name, tf2_memmap_starts.name
 
-
+@pytest.mark.needs_gpu
 def test_dataset_construction():
     num_50_clusters = 20
     num_maps = 20

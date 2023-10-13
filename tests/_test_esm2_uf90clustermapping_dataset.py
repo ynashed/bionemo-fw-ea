@@ -1,8 +1,9 @@
 from bionemo.data.preprocess.protein.preprocess import ESM2Preprocess
 from bionemo.model.protein.esm1nv import esm1nv_model
 from bionemo.model.utils import setup_trainer
-
-
+import pytest
+# TODO setup test data
+@pytest.mark.skip
 def test_uf90_resampling_dataset_integration():
     '''
     This test requires:
