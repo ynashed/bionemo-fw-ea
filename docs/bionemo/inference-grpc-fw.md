@@ -21,12 +21,14 @@ Run the following command to connect for MegaMolBART:
 python3 -m bionemo.model.molecule.megamolbart.grpc.service
 ``` 
 
-Similarly, for ESM1 or ProtT5: 
+Similarly, for ESM or ProtT5: 
 
 ```bash
-python3 -m bionemo.model.protein.esm1nv.grpc.service  
+python3 -m bionemo.model.protein.esm1nv.grpc.service --model esm2_650M
 python3 -m bionemo.model.protein.prott5nv.grpc.service
 ``` 
+
+Note that for ESM models, the command accepts an additional argument `--model` to specify the model variant to load. Currently, we support three models: `esm1`, `esm2nv_650M`, and `esm2nv_3B`. If not specified, the default `esm1` model is loaded.
 
 ## Detailed Example with MegaMolBART
 
@@ -150,9 +152,9 @@ In this example SMILES molecules are encoded and then decoded to produce the ori
 
 ## Supplementary Examples with ESM1 and ProtT5
 
-The inference wrappers for ESM1 and ProtT5 function in a similar manner to MegaMolBART, with the obvious exception of architecture and model function. Full notebooks with examples can be found at `bionemo/examples/protein/[esm1nv|prott5]/nbs/Inference.ipynb`
+The inference wrappers for ESM and ProtT5 function in a similar manner to MegaMolBART, with the obvious exception of architecture and model function. Full notebooks with examples can be found at `bionemo/examples/protein/[esm1nv|esm2nv|prott5]/nbs/Inference.ipynb`
 
-The ESM1 and ProtT5 inference wrappers implements `seq_to_embedding`, which is used to obtain encoder embeddings for the input protein sequence in text format.  The batch size, which is the number of sequences submitted at once, may be limited by the compute capacity of the node hosting the model. 
+The ESM and ProtT5 inference wrappers implements `seq_to_embedding`, which is used to obtain encoder embeddings for the input protein sequence in text format.  The batch size, which is the number of sequences submitted at once, may be limited by the compute capacity of the node hosting the model. 
 
 From `bionemo.examples.protein.[esm1nv|prott5].nbs.infer.py` import  the inference wrapper. If both wrappers have been imported, it is possible to swap between models. 
 
