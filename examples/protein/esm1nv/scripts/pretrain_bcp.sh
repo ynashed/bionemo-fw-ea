@@ -61,7 +61,7 @@ WANDB_LOGGER_OFFLINE=False # set to True if there are issues uploading to WandB 
 # Mounts
 # =========================
 DATASET_ID=110553 # ID of the dataset with Uniref50 data
-DWNSTR_TASK_DATASET_ID=1612245 # ID of the dataset with FLIP secondary structure data for downstream task validation
+DWNSTR_TASK_DATASET_ID=1612756 # ID of the dataset with FLIP secondary structure data for downstream task validation
 DATA_MOUNT=/data # path to training data in the container
 DWNSTR_TASK_DATA_MOUNT=/FLIP # path to downstream task validation data in the container
 DATASET=uniref202205_0256 # folder containing data for model training

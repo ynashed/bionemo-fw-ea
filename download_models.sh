@@ -76,24 +76,49 @@ download_bionemo_models() {
     fi
 
     mkdir -p ${MODEL_PATH}
-    setup_model \
-        "${MEGAMOLBART_MODEL}" \
-        "${MODEL_PATH}" \
-        "molecule/megamolbart/megamolbart.nemo"
-    setup_model \
-        "${ESM1NV_MODEL}" \
-        "${MODEL_PATH}" \
-        "protein/esm1nv/esm1nv.nemo"
-    setup_model \
-        "${PROTT5NV_MODEL}" \
-        "${MODEL_PATH}" \
-        "protein/prott5nv/prott5nv.nemo"
-    setup_model \
-        "${EQUIDOCK_DIPS_MODEL}" \
-        "${MODEL_PATH}" \
-        "protein/equidock/equidock_dips.nemo"
-    setup_model \
+    if [ -z "$1" ]  || [ "$1" = "megamolbart" ]; then
+      setup_model \
+          "${MEGAMOLBART_MODEL}" \
+          "${MODEL_PATH}" \
+          "molecule/megamolbart/megamolbart.nemo"
+    fi
+
+    if [ -z "$1" ]  || [ "$1" = "esm1nv" ]; then
+      setup_model \
+          "${ESM1NV_MODEL}" \
+          "${MODEL_PATH}" \
+          "protein/esm1nv/esm1nv.nemo"
+    fi
+
+    if [ -z "$1" ]  || [ "$1" = "prott5nv" ]; then
+      setup_model \
+          "${PROTT5NV_MODEL}" \
+          "${MODEL_PATH}" \
+          "protein/prott5nv/prott5nv.nemo"
+    fi
+
+    if [ -z "$1" ]  || [ "$1" = "equidock" ]; then
+      setup_model \
+          "${EQUIDOCK_DIPS_MODEL}" \
+          "${MODEL_PATH}" \
+          "protein/equidock/equidock_dips.nemo"
+      setup_model \
         "${EQUIDOCK_DB5_MODEL}" \
         "${MODEL_PATH}" \
         "protein/equidock/equidock_db5.nemo"
+    fi
+
+    if [ -z "$1" ]  || [ "$1" = "esm2nv_650M" ]; then
+      setup_model \
+        "${ESM2NV_650M_MODEL}" \
+        "${MODEL_PATH}" \
+        "protein/esm2nv/esm2nv_650M_converted.nemo"
+    fi
+
+    if [ -z "$1" ]  || [ "$1" = "esm2nv_3B" ]; then
+      setup_model \
+        "${ESM2NV_3B_MODEL}" \
+        "${MODEL_PATH}" \
+        "protein/esm2nv/esm2nv_3B_converted.nemo"
+    fi
 }
