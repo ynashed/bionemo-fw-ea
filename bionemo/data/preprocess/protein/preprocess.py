@@ -15,14 +15,15 @@
 
 import numpy as np
 import pyfastx
+import tempfile
+import tqdm
 import pathlib
 from nemo.utils import logging
 import os
-import json
 import requests
 import gzip
 import shutil
-from typing import Optional
+from typing import Optional, Tuple
 from multiprocessing import Pool
 
 from bionemo.data.utils import download_registry_from_ngc, get_ngc_registry_file_list, verify_checksum_matches
@@ -361,8 +362,15 @@ class ESM2Preprocess(UniRef50Preprocess):
         uf90_fasta_indexer = pyfastx.Fasta(uf90_datapath, build_index=True, uppercase=True)  
 
         logging.info('Creating cluster mapping')
-        cluster_map_resources = self._sort_fastas_load_cluster_mapping(uf50_fasta_indexer, uf90_fasta_indexer, cluster_mapping_tsv, sort_fastas)
-        new_uf50_fn, new_uf90_fn, global_starts, global_counts = cluster_map_resources['uf50_fn'], cluster_map_resources['uf90_fn'], cluster_map_resources['starts'], cluster_map_resources['counts']
+        # cluster_map_resources = self._sort_fastas_load_cluster_mapping(uf50_fasta_indexer, uf90_fasta_indexer, cluster_mapping_tsv, sort_fastas)
+        global_starts, global_counts, all_cids, all_cmembers = self._load_cluster_mapping(cluster_mapping_tsv)
+
+        if sort_fastas:
+            new_uf50_fn, new_uf90_fn = self._sort_fastas(uf50_fasta_indexer=uf50_fasta_indexer, uf90_fasta_indexer=uf90_fasta_indexer, all_cids=all_cids, all_cmembers=all_cmembers)
+        else:
+            new_uf50_fn, new_uf90_fn = uf50_datapath, uf90_datapath
+
+        # new_uf50_fn, new_uf90_fn, global_starts, global_counts = cluster_map_resources['uf50_fn'], cluster_map_resources['uf90_fn'], cluster_map_resources['starts'], cluster_map_resources['counts']
 
         logging.info('Loading sorted fasta files')
         new_uf50_fasta_indexer = pyfastx.Fasta(new_uf50_fn, build_index=True)
@@ -403,7 +411,6 @@ class ESM2Preprocess(UniRef50Preprocess):
         # force the new cluster order for uf90
         new_uf90_fasta_indexer = pyfastx.Fasta(new_uf90_fn, build_index=True, uppercase=True)  # Duplicate for testing
         record_id_list = np.arange(len(new_uf90_fasta_indexer))
-        # split name hardcoded :)
         split_name = 'uf90_csvs'
         with Pool(16) as p:
             p.map( 
@@ -440,46 +447,52 @@ class ESM2Preprocess(UniRef50Preprocess):
         starts_local_mm.flush()
         
         return counts_local_mm, starts_local_mm
+    
 
     @staticmethod
-    def _sort_fastas_load_cluster_mapping(uf50_fasta_indexer, uf90_fasta_indexer, cluster_mapping_tsv, sort_fastas=True):
-        ''' Loads the cluster map into two arrays, counts and sizes. As a side effect, creates new 
-        temp fasta files that are in the same sort order as cluster_mapping_tsv. This is required for
-        csv creation to match the indexing structure in the cluster map.
-        '''
-        import tempfile, tqdm
+    def _sort_fastas(uf50_fasta_indexer, uf90_fasta_indexer, all_cids, all_cmembers) -> Tuple[str, str]:
         new_uf50_fn = tempfile.NamedTemporaryFile().name
         new_uf90_fn = tempfile.NamedTemporaryFile().name
         logging.info(f"Sorting fasta files in temporary file: {new_uf50_fn=} {new_uf90_fn=}")
         with (
-            open(cluster_mapping_tsv, 'r') as fd,
             open(new_uf50_fn, 'w') as uf50_fa_out,
             open(new_uf90_fn, 'w') as uf90_fa_out
+        ):
+            
+            for cid, members in tqdm.tqdm(zip(all_cids, all_cmembers)):
+                uf50_entry = uf50_fasta_indexer[cid]
+                uf50_fa_out.write(f">{uf50_entry.name}\n")
+                uf50_fa_out.write(f"{uf50_entry.seq}\n")
+                # Update new ordered fastas
+                for member in members:
+                    uf90_entry = uf90_fasta_indexer[member]
+                    uf90_fa_out.write(f">{uf90_entry.name}\n")
+                    uf90_fa_out.write(f"{uf90_entry.seq}\n")
+        return new_uf50_fn, new_uf90_fn
+
+    @staticmethod
+    def _load_cluster_mapping(cluster_mapping_tsv):
+        ''' Loads the cluster map into two arrays, counts and sizes. As a side effect, creates new 
+        temp fasta files that are in the same sort order as cluster_mapping_tsv. This is required for
+        csv creation to match the indexing structure in the cluster map.
+        '''
+        with (
+            open(cluster_mapping_tsv, 'r') as fd,
         ):
             pos = 0
             all_cids, all_cmembers = list(), list()
             # Parse fasta
-            # TODO: this is slow, but only happens once.
             import time
             start = time.time()
-            for i, line in enumerate(tqdm.tqdm(fd, total=len(uf50_fasta_indexer))):
+            for i, line in enumerate(tqdm.tqdm(fd)):
                 if i == 0: continue # skip header
                 cid, cmembers, *_ = line.strip().split("\t")
                 members = cmembers.split(',')
                 all_cids.append(cid)
                 all_cmembers.append(members)
-
-                if sort_fastas:
-                    uf50_entry = uf50_fasta_indexer[cid]
-                    uf50_fa_out.write(f">{uf50_entry.name}\n")
-                    uf50_fa_out.write(f"{uf50_entry.seq}\n")
-                    # Update new ordered fastas
-                    for member in members:
-                        uf90_entry = uf90_fasta_indexer[member]
-                        uf90_fa_out.write(f">{uf90_entry.name}\n")
-                        uf90_fa_out.write(f"{uf90_entry.seq}\n")
             end = time.time()
             logging.info('finished sorting in ', end - start)
+
             starts_global = np.zeros(shape=(len(all_cmembers)), dtype=np.int64)
             counts_global = np.zeros(shape=(len(all_cmembers)), dtype=np.int64)
             for i, (cid, members) in enumerate(zip(all_cids, all_cmembers)):
@@ -487,4 +500,6 @@ class ESM2Preprocess(UniRef50Preprocess):
                 counts_global[i] = len(members)
                 pos += len(members)
 
-        return dict(starts=starts_global, counts=counts_global, uf50_fn=new_uf50_fn, uf90_fn=new_uf90_fn)
+
+                # This has to return the right fasta filenames for this all to work out.
+        return starts_global, counts_global, all_cids, all_cmembers
