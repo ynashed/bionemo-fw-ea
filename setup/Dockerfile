@@ -93,6 +93,11 @@ ENV NEMO_HOME=${NEMO_HOME}
 
 ENV PYTHONPATH=${BIONEMO_HOME}:${BIONEMO_HOME}/generated:${NEMO_HOME}:$PYTHONPATH
 
+# TODO(trvachov): Remove after NeMo is upgraded to 1.21
+COPY ./setup/nemo-v-1.20-fix-for-esm2.patch /nemo-v-1.20-fix-for-esm2.patch
+RUN patch -p1 /usr/local/lib/python3.10/dist-packages/nemo/collections/nlp/data/language_modeling/megatron/dataset_utils.py /nemo-v-1.20-fix-for-esm2.patch \
+    && rm /nemo-v-1.20-fix-for-esm2.patch
+
 COPY ./setup/startup.sh /opt/nvidia
 COPY ./tokenizers /tokenizers
 
