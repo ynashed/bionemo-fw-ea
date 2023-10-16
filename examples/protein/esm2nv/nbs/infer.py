@@ -23,10 +23,13 @@ from esm1nv_pb2_grpc import GenerativeSamplerStub
 
 log = logging.getLogger(__name__)
 
-
+MAX_MESSAGE_LENGTH=100 * 1024 * 1024
 class ESMInferenceWrapper:
     def __init__(self):
-        channel = grpc.insecure_channel('localhost:50051')
+        channel = grpc.insecure_channel('localhost:50051',  options=[
+            ('grpc.max_send_message_length', MAX_MESSAGE_LENGTH),
+            ('grpc.max_receive_message_length', MAX_MESSAGE_LENGTH),
+            ])
         self.stub = GenerativeSamplerStub(channel)
 
     def seq_to_hiddens(self, seqs):
