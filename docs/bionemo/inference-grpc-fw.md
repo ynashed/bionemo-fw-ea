@@ -24,11 +24,11 @@ python3 -m bionemo.model.molecule.megamolbart.grpc.service
 Similarly, for ESM or ProtT5: 
 
 ```bash
-python3 -m bionemo.model.protein.esm1nv.grpc.service --model esm2_650M
+python3 -m bionemo.model.protein.esm1nv.grpc.service --model esm2nv_650M
 python3 -m bionemo.model.protein.prott5nv.grpc.service
 ``` 
 
-Note that for ESM models, the command accepts an additional argument `--model` to specify the model variant to load. Currently, we support three models: `esm1`, `esm2nv_650M`, and `esm2nv_3B`. If not specified, the default `esm1` model is loaded.
+Note that for ESM models, the command accepts an additional argument `--model` to specify the model variant to load. Currently, we support three models: `esm1nv`, `esm2nv_650M`, and `esm2nv_3B`. If not specified, the default `esm1nv` model is loaded.
 
 ## Detailed Example with MegaMolBART
 
