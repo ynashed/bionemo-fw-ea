@@ -10,9 +10,11 @@ Compute embeddings from input protein sequences. Embeddings are created for each
 
 ## Model Architecture   
 
-ESM-2nv was developed using the BioNeMo framework. The model uses an architecture called Bidirectional Encoder Representations from Transformers (BERT) and is based on the ESM-1b model {cite:p}`lin2023evolutionary,rives2021esm`. Pre-norm layer normalization and GELU activation are used throughout. The 650M model has 33 layers, 20 attention heads, a hidden space dimension of 1280, and contains 650M parameters. The 3B model has 36 layers, 40 attention heads, a hidden space dimension of 2560, and contains 3B parameters.  
+ESM-2nv was developed using the BioNeMo framework by converting the ESM-2 model checkpoints from HuggingFace into the NeMo framework {cite:p}`lin2023evolutionary`. The underlying ESM-2 model uses an architecture called Bidirectional Encoder Representations from Transformers (BERT) and improves upon the ESM-1b model {cite:p}`lin2023evolutionary,rives2021esm` with various features including architectural changes, differences in embeddings, and custom transformations describe below. 
 
-Main Contributions of ESM-2 over the BERT model:
+ESM-2nv models are in principle compatible with ESM-2 checkpoints, meaning that ESM-2 public checkpoints from HuggingFace can be loaded into ESM-2nv architectures of similar size. We are making the 650M and 3B converted models available out-of-the-box in the current release. The 650M model has 33 layers, 20 attention heads, a hidden space dimension of 1280, and contains 650M parameters. The 3B model has 36 layers, 40 attention heads, a hidden space dimension of 2560, and contains 3B parameters.  
+
+Main improvements of ESM-2 over ESM-1b:
 - **Positional Embeddings:** ESM-2 replaces the learnable absolute positional embeddings with rotary positional encoding (ROPE). This change enables support for sequences longer than the maximum length used during pre-training.
 
 - **Masked Token Dropout:** Similar to how dropout layers scale the output during training, ESM-2 introduces the token-dropout scaling option. The motivation is to account for a model correction during evaluation when tokens are not masked. Technically, the model replaces the embeddings of [MASK] tokens with a vector of `0s`, and scales the non-masked embeddings using the following formula:
@@ -29,11 +31,18 @@ Main Contributions of ESM-2 over the BERT model:
 - **Custom GELU Function for the MLP Layer:** ESM-2 implements a slightly different function compared to F.gelu. It is defined as:
   $$x \rightarrow x \cdot 0.5 \cdot \text{torch.erf}\left(\frac{x}{\sqrt{2}}\right).$$
 
-## Limitations  
+## Improvements in ESM-2nv over ESM-2  
+
+ESM-2nv models are HuggingFace ESM-2 model checkpoints that have been converted into NeMo-optimized BioNeMo model checkpoints.  
+ESM-2nv achieves the same performance benchmarks as ESM-2 but is optimized to provide faster training and inference on NVIDIA GPUs.   
+ESM-2nv enables customization for pre-training and inference parameters through YAML configuration files at time of model instantiation.   
+A complete, curated pre-training dataset is provided with the BioNeMo framework release of ESM-2nv to facilitate pre-training from scratch.  
+
+## Limitations of ESM-2nv compared to ESM-2
 
 Input sequence length is limited to 1023 amino acids.  
 Pre-training truncates protein sequence length to 1023 instead of random crops of maximum length 1024 used in the ESM-2 model {cite:p}`lin2023evolutionary`.   
-Unlike ESM-2, the ESM-2nv training dataset contains hits for *de novo* proteins, since sequences in UniRef100, UniRef90, and UniRef50 with high sequence similarity to a non-public 81 *de novo* proteins {cite:p}`lin2023evolutionary` are not filtered.   
+Unlike ESM-2, the ESM-2nv training dataset contains hits for *de novo* proteins, since sequences in UniRef100, UniRef90, and UniRef50 with high sequence similarity to a non-public 81 *de novo* proteins {cite:p}`lin2023evolutionary` are not filtered.  
 
 ## Training
 
