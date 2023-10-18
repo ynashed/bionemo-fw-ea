@@ -24,6 +24,7 @@ biopandas==0.2.8
 pipdeptree==2.13.0
 gevent==23.9.1
 joblib==1.2.0
+pytest-cov
 # Linters
 ruff==0.0.292
 black==23.1.0

@@ -166,9 +166,15 @@ unit-test-cpu:
   tags:
     - cpu
   script:
-    - !reference [ .unit-tests-common, script ]
-    - pytest -v -m "not needs_gpu"
-
+    - !reference [.unit-tests-common, script]
+    - pytest -v -m "not needs_gpu" --cov=bionemo --cov-report term --cov-report xml:coverage_cpu.xml
+    - cp -r coverage_cpu.xml /builds/clara-discovery/bionemo/
+  coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage_cpu.xml
 
 unit-test-gpu:
   extends:
@@ -180,7 +186,14 @@ unit-test-gpu:
     - nvidia-smi
   script:
     - !reference [ .unit-tests-common, script ]
-    - pytest -v -m "needs_gpu" -k "not test_model_training"
+    - pytest -v -m "needs_gpu" --cov=bionemo --cov-report term --cov-report xml:coverage_gpu.xml -k "not test_model_training"
+    - cp -r coverage_gpu.xml /builds/clara-discovery/bionemo/
+  coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage_gpu.xml
 
 
 .jet-generate-template:
