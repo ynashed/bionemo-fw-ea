@@ -44,6 +44,8 @@ WANDB_LOGGER_OFFLINE=False # set to True if there are issues uploading to WandB 
 DATA_MOUNT=/data # where data will be mounted in the container
 DATA_PATH="??" # Directory with data for model training and downstream task validation
 DATASET=uniref202104_esm2/uf50 # ESM1 data uniref2022_1024 # folder containing data for model training
+DATASET_90=uniref202104_esm2/uf90
+MAPPING_FILE=uniref202104_esm2/uniref50_mapper_to_uniref90clustermembers_andselfuniref50.tsv
 TRAIN_FILES='x_OP_000..049_CL_' # Range for the train dataset
 TEST_FILES='x_OP_000..049_CL_'  # Range for the test dataset
 VAL_FILES='x_OP_000..049_CL_'   # Range for the val dataset
@@ -86,6 +88,8 @@ echo "*******STARTING********" \
     trainer.precision=${PRECISION} \
     model.precision=${PRECISION} \
     model.data.dataset_path=${DATA_MOUNT}/${DATASET} \
+    model.data.uf90.uniref90_path=${DATA_MOUNT}/${DATASET_90} \
+    model.data.cluster_mapping_tsv=${DATA_MOUNT}/${MAPPING_FILE} \
     model.data.dataset.train=${TRAIN_FILES} \
     model.data.dataset.val=${VAL_FILES} \
     model.data.dataset.test=${TEST_FILES} \
