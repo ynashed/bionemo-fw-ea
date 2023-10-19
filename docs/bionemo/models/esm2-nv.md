@@ -38,11 +38,9 @@ ESM-2nv achieves the same performance benchmarks as ESM-2 but is optimized to pr
 ESM-2nv enables customization for pre-training and inference parameters through YAML configuration files at time of model instantiation.   
 A complete, curated pre-training dataset is provided with the BioNeMo framework release of ESM-2nv to facilitate pre-training from scratch.  
 
-## Limitations of ESM-2nv compared to ESM-2
+## Differences in ESM-2nv compared to ESM-2
 
-Input sequence length is limited to 1023 amino acids.  
-Pre-training truncates protein sequence length to 1023 instead of random crops of maximum length 1024 used in the ESM-2 model {cite:p}`lin2023evolutionary`.   
-Unlike ESM-2, the ESM-2nv training dataset contains hits for *de novo* proteins, since sequences in UniRef100, UniRef90, and UniRef50 with high sequence similarity to a non-public 81 *de novo* proteins {cite:p}`lin2023evolutionary` are not filtered.  
+Unlike ESM-2 pre-training data, the curated pre-training dataset provided with ESM-2nv release contains hits for *de novo* proteins, since sequences in UniRef100, UniRef90, and UniRef50 with high sequence similarity to a non-public 81 *de novo* proteins {cite:p}`lin2023evolutionary` are not filtered.  
 
 ## Training
 
