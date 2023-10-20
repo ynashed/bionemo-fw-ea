@@ -22,7 +22,7 @@ model:
     data_fields_map: # name which data_fields shoud be used for sequence/id (dataset dependant)
       sequence: "smiles"
       id: "iupac"
-    dataset_path: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/molecule/phys_chem/SAMPL/test/x000 # full path to dataset (can include range or a list)
+    dataset_path: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/molecule/physchem/SAMPL/test/x000 # full path to dataset (can include range or a list)
 
 target: bionemo.model.molecule.megamolbart.megamolbart_model.MegaMolBARTModel # path to model class to load
 infer_target: bionemo.model.molecule.megamolbart.infer.MegaMolBARTInference # path to inferende class to load
