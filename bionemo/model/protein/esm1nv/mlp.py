@@ -39,6 +39,7 @@ except (ImportError, ModuleNotFoundError):
 import math
 
 from nemo.collections.nlp.modules.common.megatron.mlp import ParallelMLP
+from nemo.utils import logging
 
 from bionemo.model.protein.esm1nv.layernorm import esm_get_layer_norm
 
@@ -80,6 +81,7 @@ class ESMnvParallelMLP(ParallelMLP):
         use_pt_mlp_out=False,
         # END BIONEMO
     ):
+        # TODO(srabhi, georgea): refactor the custom ESMnvParallelMLP module using Megatron Core when NeMo 1.21 is available
         super(ParallelMLP, self).__init__()
         self.activation = activation
         self.bias = bias
@@ -179,6 +181,7 @@ class ESMnvParallelMLP(ParallelMLP):
             self.activation_func = openai_gelu_func
         # BIONEMO allow esm gelu
         elif esm_gelu:
+            logging.warning("Using custom ESM2 GELU function instead of the default NeMo version")
             self.activation_func = esm_gelu_func
         elif activation in ["gelu", "geglu", "fast-geglu"]:
             self.activation_func = F.gelu
@@ -194,6 +197,9 @@ class ESMnvParallelMLP(ParallelMLP):
 
         # Project back to h.
         if use_pt_mlp_out:
+            logging.warning(
+                "Using PyTorch Linear instead of the default NeMo RowParallelLinear for `dense_4h_to_h` module"
+            )
             self.dense_4h_to_h = torch.nn.Linear(ffn_hidden_size, hidden_size, bias=bias, dtype=dtype)
         else:
             self.dense_4h_to_h = tensor_parallel.RowParallelLinear(

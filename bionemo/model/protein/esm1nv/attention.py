@@ -51,6 +51,7 @@ except (ImportError, ModuleNotFoundError):
 
 # BIONEMO imports
 from nemo.collections.nlp.modules.common.megatron.attention import CoreAttention, ParallelAttention
+from nemo.utils import logging
 
 
 # END BIONEMO
@@ -67,6 +68,8 @@ class ESMnvCoreAttention(CoreAttention):
         super().__init__(*args, **kwargs)
         self.return_intermediate = False
         self.use_esm_attention = use_esm_attention
+        if self.use_esm_attention:
+            logging.warning("Using custom ESM2 attention instead of the default NeMo version")
 
     def forward(
         self,
@@ -114,6 +117,7 @@ class ESMnvCoreAttention(CoreAttention):
         # Update query_layer, key_layer, value_layer
         # ==================================================
         # BIONEMO custom attention normalization
+        # TODO(srabhi, georgea): refactor the custom ESMnvCoreAttention module using Megatron Core when NeMo 1.21 is available
         if self.use_esm_attention:
             query_layer = query_layer * self.hidden_size_per_attention_head**-0.5
         # END BIONEMO
@@ -197,6 +201,7 @@ class ESMnvCoreAttention(CoreAttention):
         # change view to [b, np, sq, sk]
         attention_scores = matmul_result.view(b, np, sq, sk)
         # BIONEMO CUSTOM ATTENTION MASKING
+        # TODO(srabhi, georgea): refactor the custom torch_attention module using Megatron Core when NeMo 1.21 is available
         if self.use_esm_attention:
             # NOTE: the slicing here is to make the attention_mask the same shape as the extended
             #  attention mask in ESM2. The multiplication by -3.4028e+38 is similarly motivated
