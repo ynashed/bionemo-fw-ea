@@ -88,13 +88,13 @@ variables:
     DEV_CONT_NAME
         Docker name for development container
     NGC_CLI_API_KEY
-        NGC API key -- this is required for downloading models and other assets. Run `ngc config --help` for details.
+        NGC API key -- this is required for downloading models and other assets. Run \`ngc config --help\` for details.
     NGC_CLI_ORG
-        NGC organization name. Default is nvidian. Run `ngc config --help` for details.
+        NGC organization name. Default is nvidian. Run \`ngc config --help\` for details.
     NGC_CLI_TEAM
-        NGC team name.  Run `ngc config --help` for details.
+        NGC team name.  Run \`ngc config --help\` for details.
     NGC_CLI_FORMAT_TYPE
-        NGC cli format. Default is ascii.  Run `ngc config --help` for details.
+        NGC cli format. Default is ascii.  Run \`ngc config --help\` for details.
 
 EOF
     exit
@@ -332,7 +332,7 @@ setup() {
     fi
 
     DOCKER_CMD="${DOCKER_CMD} -v ${MODEL_PATH}:/model "
-    
+
     # For dev use the tokenizers in /tokenizers dir
     if [ ! -z "${TOKENIZERS_PATH}" ];
     then
