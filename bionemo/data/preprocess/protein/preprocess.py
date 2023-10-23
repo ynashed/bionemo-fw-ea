@@ -502,7 +502,7 @@ class ESM2Preprocess(UniRef50Preprocess):
         temp fasta files that are in the same sort order as cluster_mapping_tsv. This is required for
         csv creation to match the indexing structure in the cluster map.
         '''
-        with (open(cluster_mapping_tsv, 'r') as fd):
+        with open(cluster_mapping_tsv, 'r') as fd:
             pos = 0
             all_cids, all_cmembers = [], []
             # Parse fasta
