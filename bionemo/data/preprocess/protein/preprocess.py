@@ -376,13 +376,16 @@ class ESM2Preprocess(UniRef50Preprocess):
             The structure of the output directories is essential for the YAML configuration file.
         """
         if val_size == 0 or test_size == 0:
-            raise ValueError(f"Cannot set validation or test size to zero during pre-training {val_size=} {test_size=}")
+            raise ValueError(
+                f"Cannot set validation or test size to zero during pre-training {val_size=} {test_size=}"
+            )
 
         logging.info('Indexing UniRef50 dataset.')
         uf50_fasta_indexer = pyfastx.Fasta(uf50_datapath, build_index=True, uppercase=True)
         if (val_size + test_size) >= len(uf50_fasta_indexer):
-            raise ValueError(f"{val_size=}+{test_size=} is larger than the total cluster size {len(uf50_fasta_indexer)=}, choose smaller values so your model can actually be trained.")
-
+            raise ValueError(
+                f"{val_size=}+{test_size=} is larger than the total cluster size {len(uf50_fasta_indexer)=}, choose smaller values so your model can actually be trained."
+            )
 
         os.makedirs(uf50_output_dir, exist_ok=True)
         os.makedirs(uf90_output_dir, exist_ok=True)
