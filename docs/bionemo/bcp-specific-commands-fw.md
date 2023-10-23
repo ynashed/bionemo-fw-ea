@@ -103,7 +103,7 @@ This command will effectively terminate any Python processes and clear any linge
 :::
 
 
-To use interactive shell, instead of launching the bcprun command shown in the example script above, the following command can be used to secure compute resources in interactive mode. 
+To use interactive shell interface, instead of launching the bcprun command shown in the example script above, the following command can be used to secure compute resources in interactive mode. 
 
 
 ```bash
