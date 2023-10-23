@@ -363,8 +363,8 @@ class ESM2Preprocess(UniRef50Preprocess):
             uf90_output_dir (str): Directory where the processed CSVs for uf90 are saved. A child directory named 'uf90_csvs' is
                 created inside this directory for storing the CSVs.
             num_csv_files (int, optional): Number of files to divide each fasta file into after preprocessing. Defaults to 50.
-            val_size (int, optional): Number of samples designated for the validation set.
-            test_size (int, optional): Number of samples designated for the test set. The training size is inferred from
+            val_size (int): Number of samples designated for the validation set.
+            test_size (int): Number of samples designated for the test set. The training size is inferred from
                 test_size and val_size.
             random_seed (int, optional): Seed for randomization when splitting samples for train/test/validation. Defaults to 0.
 
@@ -375,6 +375,9 @@ class ESM2Preprocess(UniRef50Preprocess):
             The method constructs 'cluster_map.json' inside the `uf90_output_dir` which is vital for subsequent steps.
             The structure of the output directories is essential for the YAML configuration file.
         """
+        if (val_size + test_size) >= len(uf50_fasta_indexer):
+            raise ValueError(f"{val_size=}+{test_size=} is larger than the total cluster size {len(uf50_fasta_indexer)=}, choose smaller values so your model can actually be trained.")
+        logging.info('Indexing UniRef90 dataset.')
 
         os.makedirs(uf50_output_dir, exist_ok=True)
         os.makedirs(uf90_output_dir, exist_ok=True)
@@ -382,7 +385,7 @@ class ESM2Preprocess(UniRef50Preprocess):
         # Do this for uf50, uf90
         logging.info('Indexing UniRef50 dataset.')
         uf50_fasta_indexer = pyfastx.Fasta(uf50_datapath, build_index=True, uppercase=True)
-        logging.info('Indexing UniRef90 dataset.')
+
         # TODO: this is the thing thats causing us issues with some IDs (why didnt this cause problems before?)
         uf90_fasta_indexer = pyfastx.Fasta(uf90_datapath, build_index=True, uppercase=True)
 
