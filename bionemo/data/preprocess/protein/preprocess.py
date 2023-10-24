@@ -375,22 +375,25 @@ class ESM2Preprocess(UniRef50Preprocess):
             The method constructs 'cluster_map.json' inside the `uf90_output_dir` which is vital for subsequent steps.
             The structure of the output directories is essential for the YAML configuration file.
         """
+        if val_size == 0 or test_size == 0:
+            raise ValueError(
+                f"Cannot set validation or test size to zero during pre-training {val_size=} {test_size=}"
+            )
+
+        logging.info('Indexing UniRef50 dataset.')
+        uf50_fasta_indexer = pyfastx.Fasta(uf50_datapath, build_index=True, uppercase=True)
         if (val_size + test_size) >= len(uf50_fasta_indexer):
-            raise ValueError(f"{val_size=}+{test_size=} is larger than the total cluster size {len(uf50_fasta_indexer)=}, choose smaller values so your model can actually be trained.")
-        logging.info('Indexing UniRef90 dataset.')
+            raise ValueError(
+                f"{val_size=}+{test_size=} is larger than the total cluster size {len(uf50_fasta_indexer)=}, choose smaller values so your model can actually be trained."
+            )
 
         os.makedirs(uf50_output_dir, exist_ok=True)
         os.makedirs(uf90_output_dir, exist_ok=True)
 
-        # Do this for uf50, uf90
-        logging.info('Indexing UniRef50 dataset.')
-        uf50_fasta_indexer = pyfastx.Fasta(uf50_datapath, build_index=True, uppercase=True)
-
-        # TODO: this is the thing thats causing us issues with some IDs (why didnt this cause problems before?)
+        logging.info('Indexing UniRef90 dataset.')
         uf90_fasta_indexer = pyfastx.Fasta(uf90_datapath, build_index=True, uppercase=True)
 
         logging.info('Creating cluster mapping')
-        # cluster_map_resources = self._sort_fastas_load_cluster_mapping(uf50_fasta_indexer, uf90_fasta_indexer, cluster_mapping_tsv, sort_fastas)
         global_starts, global_counts, all_cids, all_cmembers = self._load_cluster_mapping(cluster_mapping_tsv)
 
         if sort_fastas:
@@ -402,8 +405,6 @@ class ESM2Preprocess(UniRef50Preprocess):
             )
         else:
             new_uf50_fn, new_uf90_fn = uf50_datapath, uf90_datapath
-
-        # new_uf50_fn, new_uf90_fn, global_starts, global_counts = cluster_map_resources['uf50_fn'], cluster_map_resources['uf90_fn'], cluster_map_resources['starts'], cluster_map_resources['counts']
 
         logging.info('Loading sorted fasta files')
         new_uf50_fasta_indexer = pyfastx.Fasta(new_uf50_fn, build_index=True)
@@ -504,13 +505,11 @@ class ESM2Preprocess(UniRef50Preprocess):
         temp fasta files that are in the same sort order as cluster_mapping_tsv. This is required for
         csv creation to match the indexing structure in the cluster map.
         '''
-        with (open(cluster_mapping_tsv, 'r') as fd,):
+        with open(cluster_mapping_tsv, 'r') as fd:
             pos = 0
             all_cids, all_cmembers = [], []
             # Parse fasta
-            import time
 
-            start = time.time()
             for i, line in enumerate(tqdm.tqdm(fd)):
                 if i == 0:
                     continue  # skip header
@@ -518,8 +517,6 @@ class ESM2Preprocess(UniRef50Preprocess):
                 members = cmembers.split(',')
                 all_cids.append(cid)
                 all_cmembers.append(members)
-            end = time.time()
-            logging.info('finished sorting in ', end - start)
 
             starts_global = np.zeros(shape=(len(all_cmembers)), dtype=np.int64)
             counts_global = np.zeros(shape=(len(all_cmembers)), dtype=np.int64)

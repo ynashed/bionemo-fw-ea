@@ -167,6 +167,7 @@ model:
     cluster_mapping_tsv: '/data/uniref202104_esm2/uniref50_mapper_to_uniref90clustermembers_andselfuniref50.tsv'
     # TODO These need to be updated to values we actually like
     dataset_path: /data/uniref202104_esm2/uf50 # parent directory for data, contains train / val / test folders. Needs to be writeable for index creation.
+    # NOTE test_size and val_size must be smaller than the total dataset size.
     val_size: 5000
     test_size: 1000000
     sort_fastas: false # If true, assumes the input files are not sorted, and sorts them before creating the cluster mapping. Unsorted fastas will break the cluster map.
