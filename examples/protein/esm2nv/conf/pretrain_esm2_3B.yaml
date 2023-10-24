@@ -18,10 +18,6 @@ model:
     model_name: "facebook/esm2_t36_3B_UR50D"
 
   # model/data parallelism
-  tensor_model_parallel_size: 1 # model parallelism
+  tensor_model_parallel_size: 2 # model parallelism
   pipeline_model_parallel_size: 1 # model parallelism
   micro_batch_size: 1
-
-  # Enable/disable downstream task validation in the loop
-  dwnstr_task_validation:
-    enabled: True

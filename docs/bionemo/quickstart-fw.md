@@ -126,7 +126,7 @@ In order to prevent downloading and processing of data each time a new container
 ## Training Configuration
 
 :::{note}
-The following describes how to configure a **single node** training on a workstation to test and configure a sample pre-training job. Training at scale should be performed on BCP, as described in the [Tutorials section](./tutorials-fw.md).
+The following describes how to configure a **single node** training on a workstation to test and configure a sample pre-training job. Training at scale should be performed on BCP, as described in the [Tutorials section](./tutorials-fw.md). It is recommended to only train large models such as ESM-2nv 3B model on BCP to accommodate necessary compute and memory requirements.
 :::
 
 ### Python Job Script

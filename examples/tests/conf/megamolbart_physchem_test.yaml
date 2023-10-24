@@ -1,5 +1,5 @@
 name: mmb_physchem
-defaults: 
+defaults:
   - pretrain_small_span_aug
 do_training: True # set to false if data preprocessing steps must be completed
 do_testing: True # set to true to run evaluation on test data after training, requires test_dataset section
@@ -34,7 +34,7 @@ model:
   micro_batch_size: 32 # NOTE: adjust to occupy ~ 90% of GPU memory
   global_batch_size: null
   tensor_model_parallel_size: 1  # model parallelism
-  
+
   downstream_task:
     n_outputs: 1
     hidden_layer_size: 128
@@ -43,7 +43,7 @@ model:
   data:
     # Preprocessing data params
     links_file: ${oc.env:PROJECT_MOUNT}/examples/molecule/megamolbart/dataset/PhysChem-downloader.txt
-    dataset_path: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/molecule/phys_chem/${model.data.task_name}
+    dataset_path: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/molecule/physchem/${model.data.task_name}
     split_data: True
     val_frac: 0.15 # proportion of samples used for validation set
     test_frac: 0.15 # proportion of samples used for test set
@@ -59,7 +59,7 @@ model:
       val: x000
       test: x000
     num_workers: 0
-  
+
   finetuning_optim:
     name: adam
     lr: 0.001

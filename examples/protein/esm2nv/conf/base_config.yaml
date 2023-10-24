@@ -194,7 +194,7 @@ model:
 
   
   dwnstr_task_validation:
-    enabled: True 
+    enabled: False 
     dataset:
       class: PerTokenPredictionCallback
       task_type: token-level-classification

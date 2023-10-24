@@ -92,20 +92,18 @@ echo $ngc_command
 #eval "echo $ngc_command"
 ```
 
-Alternatively, the cluster resource allocation can be acquired and then the model training can be launched interactively by accessing the allocated nodes. In this case, the training can be launched via Jupyter Lab or NGC CLI. 
+Alternatively, the cluster resource allocation can be acquired and then the model training can be launched interactively by accessing the allocated nodes. In this case, the training can be launched via NGC CLI. 
 
 
 :::{note}
-The example demonstrating launching interactive jobs through the Jupyter Lab interface is primarily designed for users who are new to the system or wish to conduct trial runs. However, for more robust and efficient model training, we recommend utilizing the launch script within the ``ngc batch run`` command, as explained earlier in this documentation.
-
-When employing the JuupyterLab interface for interactive job launch example, it's possible that cached memory allocations may persist on the GPUs even after job termination. To resolve this issue, you can forcibly clear these allocations by executing the following command: 
+When employing the command line interface for interactive job launch example, it's possible that cached memory allocations may persist on the GPUs even after job termination. To resolve this issue, you can forcibly clear these allocations by executing the following command: 
 ``bcprun --cmd "pkill -9 python``
 
 This command will effectively terminate any Python processes and clear any lingering GPU memory allocations.
 :::
 
 
-To use Jupyter Lab interface, instead of launching the bcprun command shown in the example script above, the following command can be used to secure compute resources in interactive mode. 
+To use interactive shell interface, instead of launching the bcprun command shown in the example script above, the following command can be used to secure compute resources in interactive mode. 
 
 
 ```bash
@@ -133,18 +131,6 @@ Next, log into job using the NGC CLI for interactive development
 ```bash
 ngc batch exec --ace ACE_NAME --org {deploy_ngc_org} --team {deploy_ngc_team} <JOB_ID> 
 ```
-
-If launching Jupyter Lab is preferred, replace the final line with the following:
-
-```bash
---commandline "jupyter lab --allow-root --ip=* --port=8888 --no-browser --NotebookApp.token='' --NotebookApp.allow_origin='*' --ContentsManager.allow_hidden=True --notebook-dir=/ & sleep infinity"
-```
-
-To connect via the Jupyter Lab interface by going to the address displayed on the NGC web UI Jobs Dashboard. 
-
-![](./images/bcp_snapshot_2.png)
-
-![](./images/bcp_snapshot_3.png)
 
 Once connected, you can execute the training run with `bcprun` command followed by the job launch arguments. 
 
