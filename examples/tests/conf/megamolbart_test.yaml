@@ -9,7 +9,7 @@ trainer:
   val_check_interval: 50
   limit_val_batches: 1
   accumulate_grad_batches: 1
-    
+
 model:
   micro_batch_size: 4
   global_batch_size: null
@@ -24,14 +24,14 @@ model:
     data_sep: ','
     header_lines: 1
     num_workers: 10
-  
+
   dwnstr_task_validation:
     enabled: False
     dataset:
       emb_batch_size: 32
       batch_size: ${.emb_batch_size}
       num_epochs: 1
-      dataset_path: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/molecule/phys_chem/SAMPL
+      dataset_path: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/molecule/physchem/SAMPL
       task_name: SAMPL
       dataset:
         train: x000

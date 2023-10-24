@@ -13,5 +13,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .phys_chem_downloader import *
+from .physchem_downloader import *
 from .preprocess import *
