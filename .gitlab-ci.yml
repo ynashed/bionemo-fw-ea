@@ -134,7 +134,9 @@ get-checkpoints:
     - when: on_success
   script:
     - export NGC_CLI_ORG NGC_CLI_TEAM NGC_CLI_FORMAT_TYPE NGC_CLI_API_KEY MODEL_PATH
-    - sh internal/scripts/download_models_unit_tests.sh 3 30
+    - source download_models.sh && download_bionemo_models
+    - setup_model "nvidian/clara-lifesciences/megamolbart_retro:0.1.0" 
+        "${MODEL_PATH}" "molecule/megamolbart/megamolbart_retro.nemo"
   artifacts:
     paths:
       - models
