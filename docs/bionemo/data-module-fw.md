@@ -4,12 +4,13 @@ This section provides an overview BioNeMo DataModule and how to use and connect 
 
 ## Overview
 
-The BioNeMo data module serves to centralize several of BioNeMo’s core operations, thus simplifying workflows for future model extensions. This is an interface that encapsulates steps for data processing of BioNeMo Models, allowing higher adaptability of models to several use cases.
+The BioNeMo data module (`bionemo/core.py:BioNeMoDataModule`) serves to centralize several of BioNeMo’s core operations, thus simplifying workflows for future model extensions. This is an interface that encapsulates steps for data processing of BioNeMo Models, allowing higher adaptability of models to several use cases.
 
 Applications of the data module:
-* Fine tuning datasets as in `bionemo/data/finetune_dataset.py`
-* Processing FASTA format as in `bionemo/data/fasta_dataset.py`
-* Transforms (for example, Tokenization) as in `bionemo/model/protein/downstream/sec_str_pred_data.py`
+* Fine tuning datasets as used by the finetuning ABC in `bionemo/model/core/encoder_finetuning.py`
+* BioNeMoDataModule implemention for per-token downstream task `bionemo/data/datasets/per_token_value_dataset.py`
+* BioNeMoDataModule implemention for single value downstream tasks `bionemo/data/datasets/singel_value_dataset.py`
+* Transforms (for example, Tokenization) as in `bionemo/model/protein/downstream/protein_model_finetuning.py`
 
 The data modules coordinate functions related to data processing in BioNeMo, including the instantiation of train, validation and test datasets as well as tokenizers, addition of collate functions, and inferring the number of global samples (up and downsampling included).
 
@@ -17,7 +18,7 @@ Since data modules are abstractors, these duties will depend on child classes be
 * `train_dataset` 
 * `val_dataset`
 * `test_dataset`
-* Variations for additional level of control such as `sample_train_dataset` and `adjust_train_dataloader`
+* Variations for additional level of control such as `sample_train_dataset` and `adjust_train_dataloader`. View the full class for additional convenience methods.
 
 ## Reasons for using BioNeMo’s Data Module
 The Data Module gives developers 4 core benefits:
@@ -27,22 +28,19 @@ The Data Module gives developers 4 core benefits:
 * **Flexibility**: dataset-agnostic model development and allows for easy swapping of datasets​​.
 
 Example:
-extracted from `bionemo/model/protein/downstream/sec_str_pred_data.py`
+extracted from `bionemo/model/protein/downstream/protein_model_finetuning.py`
 
 ```python
-class SSDataModule(BioNeMoDataModule):
+class PerTokenValueDataModule(BioNeMoDataModule):
     def __init__(self, cfg, trainer, model):
         super().__init__(cfg, trainer)
-        self.model=model
-        self.tokenizers = [
-            Label2IDTokenizer()
-            for _ in range(len(self.cfg.labels_size))
-            ]
+        self.model = model
+        self.tokenizers = [Label2IDTokenizer() for _ in range(len(self.cfg.target_sizes))]
 ```
 
 The code snippet above defines the tokenization process. It takes as arguments:
-* A configuration object of the model as in `examples/protein/esm1nv/conf/finetune_config.yaml`
-* A trainer object containing functions that define callbacks, checkpoints as in `bionemo/molecule/megamolbart.pretrain_mlp_validation.py : setup_trainer(cgf)`
+* A configuration object of the model as in `examples/protein/esm1nv/conf/downstream_flip_sec_str.yaml`
+* A trainer object containing functions that define callbacks, checkpoints as in `bionemo/model/utils.py: setup_trainer(cfg)`
 * A model object like _ESM1nvModel_ as in `examples/protein/esm1nv/pretrain.py`
 
 ## How to use BioNeMo DataModule
@@ -53,13 +51,12 @@ To begin, have a look into the `bionemo/core.py` classes and functions, particul
 ```python
 @abstractmethod
 def train_dataset(self):
-    """Creates a training dataset
+    """Creates a training dataset and returns.
 
     Returns:
         Dataset: dataset to use for training
 
     """
-    raise NotImplementedError()
 ```
 
 Next, let's implement a simple case to leverage the BioNeMo data module. A further example can be found in the [BioNeMo DataModule Example](./notebooks/protein-esm1nv-clustering.ipynb) notebook.
@@ -73,6 +70,7 @@ from bionemo.core import BioNeMoDataModule
 Let's define a new class which will inherit `BioNeMoDataModule` and name it `FineTune`. Let's begin by creating the skeleton for the functions responsible for dealing with the _train_, _test_, and _validation_ sets.
 
 ```python
+from bionemo.core import BioNeMoDataModule
 class FineTune(BioNeMoDataModule):
     def __init__(self, cfg, trainer):
         super().__init__(cfg, trainer) 
