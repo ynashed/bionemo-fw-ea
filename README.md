@@ -8,7 +8,6 @@ BioNeMo relies on [NeMo](https://github.com/NVIDIA/NeMo). NeMo provides a robust
 
 ## Repo Organization
 
-
 The BioNeMo repo is organized by biological entity (molecule, protein) and by deep learning model, e.g. `molecule/megamolbart` or `protein/esm1nv`. Shared code can be found within `utils` files or directories. These are the most important directories and their purpose:
 
 - `bionemo`: The library location, including functionality for data processing, data loading, models, and associated functions.
