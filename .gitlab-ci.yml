@@ -133,10 +133,9 @@ get-checkpoints:
       when: never
     - when: on_success
   script:
-    - export NGC_CLI_ORG NGC_CLI_TEAM NGC_CLI_FORMAT_TYPE NGC_CLI_API_KEY MODEL_PATH
-    - source download_models.sh && download_bionemo_models
-    - setup_model "nvidian/clara-lifesciences/megamolbart_retro:0.1.0" 
-        "${MODEL_PATH}" "molecule/megamolbart/megamolbart_retro.nemo"
+    - export AWS_ENDPOINT_URL=https://pbss.s8k.io
+    - export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
+    - ./launch.sh download -pbss
   artifacts:
     paths:
       - models

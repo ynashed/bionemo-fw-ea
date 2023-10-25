@@ -196,10 +196,12 @@ DOCKER_BUILD_CMD="docker build --network host \
     -f setup/Dockerfile"
 
 
+
 download() {
     mkdir -p ${MODEL_PATH}
-    download_bionemo_models ${MODEL_PATH}
+    download_bionemo_models "${@}"
 }
+
 
 
 docker_login() {
@@ -455,7 +457,11 @@ protoc() {
 
 
 case $1 in
-    protoc | download | build | run | push | pull | dev | attach)
+    download)
+        shift
+        download "$@"
+        ;;
+    protoc | build | run | push | pull | dev | attach)
         $@
         ;;
     *)

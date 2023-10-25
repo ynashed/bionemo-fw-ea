@@ -32,21 +32,30 @@ function setup_model() {
     local model_target=${base_directory}/$3
 
     set -e
-
+    
     echo "Downloading model ${model_source} to ${model_target}..."
+
     local tmp_root=`mktemp -d`
     local tmp_download_loc="${tmp_root}/bionemo_downloads"
     rm -rf ${tmp_download_loc}
     mkdir -p ${tmp_download_loc}
 
     if [[ ${model_source} = http* ]]; then
+        echo ${model_source} "is http"
         wget -q --show-progress ${model_source} -O ${tmp_download_loc}/model.zip
         download_path=$(unzip -o ${tmp_download_loc}/model.zip -d ${base_directory} | grep "inflating:")
         download_path=$(echo ${download_path} | cut -d ":" -f 2)
         model_basename=$(basename ${download_path})
         downloaded_model_file="${base_directory}/${model_basename}"
         rm -rf ${tmp_download_loc}/model.zip
+    elif $use_s3; then
+        echo "Downloading model ${model_source} from s3/swiftstack..."
+        aws s3 cp $model_source $MODEL_PATH
+        echo "Saved model to $MODEL_PATH"
+        model_basename=$(basename ${model_source})
+        downloaded_model_file="${base_directory}/${model_basename}"
     else
+        echo "Downloading model ${model_source} from NGC..."
         ngc registry model download-version \
             --dest ${tmp_download_loc} \
             "${model_source}"
@@ -57,8 +66,8 @@ function setup_model() {
         downloaded_model_file="${base_directory}/${model_basename}.nemo"
         rm -rf ${tmp_download_loc}/*
     fi
-
-    echo "Linking ${downloaded_model_file} to ${model_target}..."
+    
+    echo "Linking  ${model_target} to ${downloaded_model_file}..."
     mkdir -p $(dirname ${model_target})
     ln -frs ${downloaded_model_file} ${model_target}
     
@@ -70,43 +79,72 @@ function setup_model() {
 
 
 download_bionemo_models() {
-    local ngc_api_key_is_set_=$(ngc_api_key_is_set)
-    if [ $ngc_api_key_is_set_ != true ]; then
-        echo 'The NGC cli key ($NGC_CLI_API_KEY) is not set correctly. Model download may fail.'
+    use_s3=false
+    # Check if the -pbss argument is passed. This is more robust than just checking the first arg.
+    while [[ $# -gt 0 ]]; do
+        key="$1"
+        case $key in
+            -pbss)
+            use_s3=true
+            shift
+            ;;
+            *)
+            shift
+            ;;
+        esac
+    done
+    
+    if $use_s3; then
+        if [[ -z "${AWS_ENDPOINT_URL}" || -z "${AWS_ACCESS_KEY_ID}" || -z "${AWS_SECRET_ACCESS_KEY}" ]]; then
+            echo "One or more of the required AWS environment variables (AWS_ENDPOINT_URL, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY) are not set!"
+            exit 1
+        fi
+        setup_model \
+            "${MEGAMOLBART_MODEL_PBSS}" \
+            "${MODEL_PATH}" \
+            "molecule/megamolbart/megamolbart.nemo"
+        setup_model \
+            "${ESM1NV_MODEL_PBSS}" \
+            "${MODEL_PATH}" \
+            "protein/esm1nv/esm1nv.nemo"
+        setup_model \
+            "${PROTT5NV_MODEL_PBSS}" \
+            "${MODEL_PATH}" \
+            "protein/prott5nv/prott5nv.nemo"
+        setup_model \
+            "${EQUIDOCK_DIPS_MODEL_PBSS}" \
+            "${MODEL_PATH}" \
+            "protein/equidock/equidock_dips.nemo"
+        setup_model \
+            "${EQUIDOCK_DB5_MODEL_PBSS}" \
+            "${MODEL_PATH}" \
+            "protein/equidock/equidock_db5.nemo"
+    else
+        local ngc_api_key_is_set_=$(ngc_api_key_is_set)
+        if [ $ngc_api_key_is_set_ != true ]; then
+            echo 'The NGC cli key ($NGC_CLI_API_KEY) is not set correctly. Model download may fail.'
+        fi
+
+        mkdir -p ${MODEL_PATH}
+        setup_model \
+            "${MEGAMOLBART_MODEL}" \
+            "${MODEL_PATH}" \
+            "molecule/megamolbart/megamolbart.nemo" \
+        setup_model \
+            "${ESM1NV_MODEL}" \
+            "${MODEL_PATH}" \
+            "protein/esm1nv/esm1nv.nemo"
+        setup_model \
+            "${PROTT5NV_MODEL}" \
+            "${MODEL_PATH}" \
+            "protein/prott5nv/prott5nv.nemo"
+        setup_model \
+            "${EQUIDOCK_DIPS_MODEL}" \
+            "${MODEL_PATH}" \
+            "protein/equidock/equidock_dips.nemo"
+        setup_model \
+            "${EQUIDOCK_DB5_MODEL}" \
+            "${MODEL_PATH}" \
+            "protein/equidock/equidock_db5.nemo"
     fi
-
-    mkdir -p ${MODEL_PATH}
-    setup_model \
-        "${MEGAMOLBART_MODEL}" \
-        "${MODEL_PATH}" \
-        "molecule/megamolbart/megamolbart.nemo"
-
-    setup_model \
-        "${ESM1NV_MODEL}" \
-        "${MODEL_PATH}" \
-        "protein/esm1nv/esm1nv.nemo"
-
-    setup_model \
-        "${PROTT5NV_MODEL}" \
-        "${MODEL_PATH}" \
-        "protein/prott5nv/prott5nv.nemo"
-
-    setup_model \
-        "${EQUIDOCK_DIPS_MODEL}" \
-        "${MODEL_PATH}" \
-        "protein/equidock/equidock_dips.nemo"
-    setup_model \
-      "${EQUIDOCK_DB5_MODEL}" \
-      "${MODEL_PATH}" \
-      "protein/equidock/equidock_db5.nemo"
-
-    setup_model \
-      "${ESM2NV_650M_MODEL}" \
-      "${MODEL_PATH}" \
-      "protein/esm2nv/esm2nv_650M_converted.nemo"
-
-    setup_model \
-      "${ESM2NV_3B_MODEL}" \
-      "${MODEL_PATH}" \
-      "protein/esm2nv/esm2nv_3B_converted.nemo"
 }
