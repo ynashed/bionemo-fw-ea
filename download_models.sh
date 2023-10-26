@@ -129,7 +129,7 @@ download_bionemo_models() {
         setup_model \
             "${MEGAMOLBART_MODEL}" \
             "${MODEL_PATH}" \
-            "molecule/megamolbart/megamolbart.nemo" \
+            "molecule/megamolbart/megamolbart.nemo"
         setup_model \
             "${ESM1NV_MODEL}" \
             "${MODEL_PATH}" \
