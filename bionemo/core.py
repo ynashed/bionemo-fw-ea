@@ -16,9 +16,10 @@
 from abc import abstractmethod
 from functools import lru_cache
 
+import torch
 from nemo.collections.nlp.models.language_modeling.megatron_bert_model import MegatronBertModel
 from nemo.utils import logging
-import torch
+
 
 class BioNeMoDataModule(object):
     """Base Class for BioNeMo Data Modules.
@@ -236,7 +237,6 @@ class BioNeMoBertModel(MegatronBertModel):
             consumed_samples = 0
             self._test_dl = self.build_pretraining_data_loader(self._test_ds, consumed_samples, num_workers=0)
 
-
     @classmethod
     def list_available_models(cls):
         """
@@ -298,6 +298,5 @@ class BioNeMoBertModel(MegatronBertModel):
 
         # Add collate function and unpin memory to avoid crash with CUDA misaligned address
         dataloader.pin_memory = False  # must be False with CSV dataset TODO check with binary
-        pad_size_divisible_by_8 = True if self._cfg.masked_softmax_fusion else False
 
         return dataloader

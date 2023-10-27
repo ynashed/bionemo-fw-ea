@@ -83,4 +83,3 @@ class DNABERTModel(BioNeMoBertModel):
         if hasattr(self, '_test_ds'):
             consumed_samples = 0
             self._test_dl = self.build_pretraining_data_loader(self._test_ds, consumed_samples, num_workers=0)
-
