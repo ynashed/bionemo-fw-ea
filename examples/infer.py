@@ -36,8 +36,7 @@ from bionemo.data.memmap_fasta_fields_dataset import FASTAFieldsMemmapDataset
 from bionemo.data.utils import expand_dataset_paths
 
 
-@hydra_runner(config_path="conf", config_name="infer")
-def main(cfg) -> None:
+def setup_inference(cfg):
     logging.info("\n\n************** Experiment configuration ***********")
     logging.info(f'\n{OmegaConf.to_yaml(cfg)}')
 
@@ -89,6 +88,12 @@ def main(cfg) -> None:
         num_workers=cfg.model.data.num_workers,
         drop_last=False,
     )
+    return infer_model, trainer, dataloader
+
+
+@hydra_runner(config_path="conf", config_name="infer")
+def main(cfg) -> None:
+    infer_model, trainer, dataloader = setup_inference(cfg)
 
     # predict outputs for all sequences in batch mode
     all_batch_predictions = trainer.predict(

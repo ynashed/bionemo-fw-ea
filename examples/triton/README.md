@@ -1,6 +1,38 @@
 This example shows how you can easily deploy a BioNeMo model for inference.
 For this purpose you will use [PyTriton](https://github.com/triton-inference-server/pytriton) -- a Flask/FastAPI-like interface that simplifies Triton's deployment in Python environments. The library allows serving Machine Learning models directly from Python through NVIDIA's [Triton Inference Server](https://github.com/triton-inference-server).
 
+# Exporting models to optimized runtimies
+The embeddings server uses optimized runtimes for inference.
+You need to prepare the model bofore starting the embeddings server. You need to perform this step only once.
+
+Run the conversion with:
+```
+python examples/triton/embeddings_export.py --config-path </path/to/dir/with/inference/conf> 
+```
+
+You can run the conversion for MegaMolBART:
+```
+python examples/triton/embeddings_export.py --config-path /workspace/bionemo/examples/molecule/megamolbart/conf
+```
+...ESM1nv:
+
+```
+python examples/triton/embeddings_export.py --config-path /workspace/bionemo/examples/protein/esm1nv/conf
+```
+
+...and ProtT5nv:
+
+```
+python examples/triton/embeddings_export.py --config-path /workspace/bionemo/examples/protein/prott5nv/conf
+```
+
+Under the hood, the scripts use `hydra` and load model configuration for `infer.yaml`,
+so you can provide custom configuration by specifying a different yaml or overriding particular arguments, eg:
+
+```
+python examples/triton/embeddings_export.py --config-path /workspace/bionemo/examples/protein/esm1nv/conf model.data.batch_size=4
+```
+
 
 # Starting the Server
 To start the Triton Server (and send it to the background) run:

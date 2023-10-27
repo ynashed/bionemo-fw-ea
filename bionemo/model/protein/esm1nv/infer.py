@@ -12,11 +12,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 from typing import List
 
 import torch
-from torch.cuda.amp import autocast
 
 from bionemo.model.core.infer import BaseEncoderDecoderInference
 
@@ -64,17 +62,11 @@ class ESM1nvInference(BaseEncoderDecoderInference):
             enc_mask (torch.Tensor, long): boolean mask for special tokens (<BOS> and <EOS>) and padded sections
         '''
         token_ids, enc_mask = self.tokenize(sequences)
-        # FIXME this autocast shouldn't be needed
-        with autocast(enabled=self.model.enable_autocast):
-            hidden_states = self.model(token_ids, enc_mask, None)
+        hidden_states = self.model.encode(token_ids, enc_mask)
 
         # ignore <BOS> and <EOS> tokens
         enc_mask[:, 0:2] = 0
         enc_mask = torch.roll(enc_mask, shifts=-1, dims=1)
-
-        # Want to check actual value in the model and not in the config
-        if self.model.model.post_process:
-            hidden_states = hidden_states[0]
 
         return hidden_states, enc_mask
 

@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import os
 from typing import Dict, Optional
 
@@ -24,6 +23,7 @@ from nemo.core.neural_types import NeuralType
 from nemo.utils import logging
 from omegaconf.dictconfig import DictConfig
 from pytorch_lightning.trainer.trainer import Trainer
+from torch.cuda.amp import autocast
 
 from bionemo.data.dataloader import ProteinBertCollate
 from bionemo.data.dataloader.protein_collate import ESM2BertCollate
@@ -145,6 +145,14 @@ class ESM1nvModel(ESMnvMegatronBertModel):
         averaged_loss = average_losses_across_data_parallel_group(outputs)
         logging.info(f'test_loss: {averaged_loss[0]}')
         logging.info(f'test_loss_ECE: {pow(2, averaged_loss[0])}')
+
+    def encode(self, tokens_enc, enc_mask):
+        # FIXME this autocast shouldn't be needed
+        with autocast(enabled=self.enable_autocast):
+            hidden_states = self(tokens_enc, enc_mask, None)
+            if self.model.post_process:
+                hidden_states = hidden_states[0]
+        return hidden_states
 
     @property
     def input_names(self):

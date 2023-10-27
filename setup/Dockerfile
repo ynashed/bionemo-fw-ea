@@ -73,6 +73,9 @@ RUN NEMO_PATH=$(python -c 'import nemo; print(nemo.__path__[0])') && \
    cd ${NEMO_PATH}/collections/nlp/data/language_modeling/megatron && \
    make
 
+RUN pip install -U --extra-index-url https://pypi.ngc.nvidia.com triton-model-navigator==0.7.3
+RUN pip install nvidia-pytriton==0.2.4
+
 #########################################################################################
 # BioNeMo Build
 #########################################################################################
