@@ -150,7 +150,7 @@ class MegaMolBARTModelBase(MegatronLMEncoderDecoderModel):
         logging.info('Finished building MegaMolBART datasets.')
         return self._train_ds, self._validation_ds, self._test_ds
 
-    def build_pretraining_data_loader(self, dataset, consumed_samples, num_workers):
+    def build_pretraining_data_loader(self, dataset, consumed_samples, num_workers=None):
         """Build dataloader given an input dataset."""
         if dataset is None:
             return None
@@ -159,21 +159,55 @@ class MegaMolBARTModelBase(MegatronLMEncoderDecoderModel):
             f'Only the Megatron sequential ("single") sampler is currently supported. {self._cfg.data.dataloader_type} was chosen.'
         )
 
-        dataloader = super().build_pretraining_data_loader(
-            dataset=dataset, consumed_samples=consumed_samples, num_workers=num_workers
+        if dataset is None:
+            return None
+
+        # NOTE (SKH) this was taken directly from megatron, this is the 'single' dataloader type.
+        from megatron.core import parallel_state
+        from nemo.collections.nlp.data.language_modeling.megatron.data_samplers import (
+            MegatronPretrainingSampler,
         )
 
-        # Add collate function and unpin memory to avoid crash with CUDA misaligned address
-        dataloader.pin_memory = False  # must be False with CSV dataset
-        dataloader.collate_fn = self._collate_fn
+        batch_sampler = MegatronPretrainingSampler(
+            total_samples=len(dataset),
+            consumed_samples=consumed_samples,
+            micro_batch_size=self.cfg.micro_batch_size,
+            global_batch_size=self.cfg.global_batch_size,
+            data_parallel_rank=parallel_state.get_data_parallel_rank(),
+            data_parallel_size=parallel_state.get_data_parallel_world_size(),
+            drop_last=self.cfg.get('drop_last', True),
+        )
 
+        if num_workers is None:
+            num_workers = self.cfg.data.num_workers
+        # Torch dataloader.
+        dataloader = torch.utils.data.DataLoader(
+            dataset,
+            batch_sampler=batch_sampler,
+            num_workers=num_workers,  # Needs to be set to zero.
+            pin_memory=True,
+            persistent_workers=True if num_workers > 0 else False,
+        )
+        dataloader.collate_fn = self._collate_fn
         return dataloader
 
     def setup_validation_data(self, cfg):
-        super().setup_validation_data(cfg)
+        if hasattr(self, '_validation_ds'):
+            consumed_samples = 0
+            logging.info(
+                f'Setting up validation dataloader with len(len(self._validation_ds)): {len(self._validation_ds)} and consumed samples: {consumed_samples}'
+            )
+            self._validation_dl = self.build_pretraining_data_loader(
+                self._validation_ds, consumed_samples, num_workers=0
+            )
 
     def setup_test_data(self, cfg):
-        super().setup_test_data(cfg)
+        if hasattr(self, '_test_ds'):
+            consumed_samples = 0
+            logging.info(
+                f'Setting up test dataloader with len(len(self._test_ds)): {len(self._test_ds)} and consumed samples: {consumed_samples}'
+            )
+            self._test_dl = self.build_pretraining_data_loader(self._test_ds, consumed_samples, num_workers=0)
 
     def process_global_batch(self, global_batch):
         # FIXME: move to device correctly
