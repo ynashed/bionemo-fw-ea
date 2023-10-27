@@ -25,6 +25,8 @@ pipdeptree==2.13.0
 gevent==23.9.1
 joblib==1.2.0
 pytest-cov
+# For SwiftStack access
+awscli==1.29.67
 # Linters
 ruff==0.0.292
 black==23.1.0

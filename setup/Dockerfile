@@ -24,7 +24,8 @@ ARG BASE_IMAGE=nvcr.io/nvidia/nemo:23.06
 FROM ${BASE_IMAGE}
 
 WORKDIR /workspace/
-
+# TODO: Long term, docker should not be running as root.
+ENV HOME=/root
 # copy built DGL and install it
 # dgl_builder is created with setup/Dockerfile.dgl_builder
 COPY --from=gitlab-master.nvidia.com:5005/clara-discovery/bionemo:dgl_builder /dgl ./dgl
@@ -53,6 +54,10 @@ RUN pip3 install -r /tmp/requirements.txt
 COPY setup/requirements-linter.txt /tmp/requirements-linter.txt
 RUN pip3 install -r /tmp/requirements-linter.txt
 
+# AWS CLI is inside requirements.txt. Add config file.
+# This config file does not contain access keys.
+RUN mkdir $HOME/.aws
+COPY setup/aws-config-swiftstack $HOME/.aws/config
 
 ## Install NGC cli in container for artifact download
 ENV NGC_CLI_INSTALL_PREFIX=/usr/local/bin
@@ -67,6 +72,9 @@ RUN wget -O /tmp/ngccli_linux.zip --content-disposition \
 RUN NEMO_PATH=$(python -c 'import nemo; print(nemo.__path__[0])') && \
    cd ${NEMO_PATH}/collections/nlp/data/language_modeling/megatron && \
    make
+
+RUN pip install -U --extra-index-url https://pypi.ngc.nvidia.com triton-model-navigator==0.7.3
+RUN pip install nvidia-pytriton==0.2.4
 
 #########################################################################################
 # BioNeMo Build
