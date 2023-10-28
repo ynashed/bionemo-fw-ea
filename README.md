@@ -40,3 +40,6 @@ Once a container has been built, it can be started in interactive mode with `bas
 ### Quick Links
 For more details on setting up the repo and launching example jobs, ,checkout the [Quickstart Guide](./docs/bionemo/quickstart-fw.md)
 For example data-processing, pretraining and inference setup, checkout the [Tutorials](./docs/bionemo/tutorials-fw.md)
+
+## Notice of Third Party Software
+This project will download and install additional third-party open source software projects. Review the license terms of these open source projects before use.
