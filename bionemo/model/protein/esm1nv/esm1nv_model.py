@@ -124,9 +124,6 @@ class ESM1nvModel(ESMnvMegatronBertModel):
     def setup_validation_data(self, cfg):
         if hasattr(self, '_validation_ds'):
             consumed_samples = 0
-            logging.info(
-                f'Setting up validation dataloader with len(len(self._validation_ds)): {len(self._validation_ds)} and consumed samples: {consumed_samples}'
-            )
             self._validation_dl = self.build_pretraining_data_loader(
                 self._validation_ds, consumed_samples, num_workers=0
             )
@@ -134,9 +131,6 @@ class ESM1nvModel(ESMnvMegatronBertModel):
     def setup_test_data(self, cfg):
         if hasattr(self, '_test_ds'):
             consumed_samples = 0
-            logging.info(
-                f'Setting up test dataloader with len(len(self._test_ds)): {len(self._test_ds)} and consumed samples: {consumed_samples}'
-            )
             self._test_dl = self.build_pretraining_data_loader(self._test_ds, consumed_samples, num_workers=0)
 
     @staticmethod

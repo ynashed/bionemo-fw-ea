@@ -159,9 +159,6 @@ class MegaMolBARTModelBase(MegatronLMEncoderDecoderModel):
             f'Only the Megatron sequential ("single") sampler is currently supported. {self._cfg.data.dataloader_type} was chosen.'
         )
 
-        if dataset is None:
-            return None
-
         # NOTE (SKH) this was taken directly from megatron, this is the 'single' dataloader type.
         from megatron.core import parallel_state
         from nemo.collections.nlp.data.language_modeling.megatron.data_samplers import (
@@ -194,9 +191,6 @@ class MegaMolBARTModelBase(MegatronLMEncoderDecoderModel):
     def setup_validation_data(self, cfg):
         if hasattr(self, '_validation_ds'):
             consumed_samples = 0
-            logging.info(
-                f'Setting up validation dataloader with len(len(self._validation_ds)): {len(self._validation_ds)} and consumed samples: {consumed_samples}'
-            )
             self._validation_dl = self.build_pretraining_data_loader(
                 self._validation_ds, consumed_samples, num_workers=0
             )
@@ -204,9 +198,6 @@ class MegaMolBARTModelBase(MegatronLMEncoderDecoderModel):
     def setup_test_data(self, cfg):
         if hasattr(self, '_test_ds'):
             consumed_samples = 0
-            logging.info(
-                f'Setting up test dataloader with len(len(self._test_ds)): {len(self._test_ds)} and consumed samples: {consumed_samples}'
-            )
             self._test_dl = self.build_pretraining_data_loader(self._test_ds, consumed_samples, num_workers=0)
 
     def process_global_batch(self, global_batch):
