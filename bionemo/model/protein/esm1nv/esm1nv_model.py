@@ -24,6 +24,7 @@ from nemo.core.neural_types import NeuralType
 from nemo.utils import logging
 from omegaconf.dictconfig import DictConfig
 from pytorch_lightning.trainer.trainer import Trainer
+from torch.cuda.amp import autocast
 
 from bionemo.data.dataloader import ProteinBertCollate
 from bionemo.data.dataloader.protein_collate import ESM2BertCollate
@@ -31,8 +32,6 @@ from bionemo.data.dataset_builder_utils import build_typed_dataset
 from bionemo.data.mapped_dataset import NeMoUpsampling, Uniref90ClusterMappingDataset
 from bionemo.data.molecule import megamolbart_build_train_valid_test_datasets
 from bionemo.model.protein.esm1nv.base import ESMnvMegatronBertModel
-from torch.cuda.amp import autocast
-
 
 
 # TODO(trvachov): Clean up deps
@@ -175,7 +174,6 @@ class ESM1nvModel(ESMnvMegatronBertModel):
         self.log('val_loss_ECE', pow(2, averaged_loss))  # calculate exponential cross entropy loss for logs
         self.log('consumed_samples', self.compute_consumed_samples(self.trainer.global_step - self.init_global_step))
 
-    
     def encode(self, tokens_enc, enc_mask):
         # FIXME this autocast shouldn't be needed
         with autocast(enabled=self.enable_autocast):
