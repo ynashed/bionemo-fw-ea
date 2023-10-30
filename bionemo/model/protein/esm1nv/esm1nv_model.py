@@ -31,6 +31,8 @@ from bionemo.data.dataset_builder_utils import build_typed_dataset
 from bionemo.data.mapped_dataset import NeMoUpsampling, Uniref90ClusterMappingDataset
 from bionemo.data.molecule import megamolbart_build_train_valid_test_datasets
 from bionemo.model.protein.esm1nv.base import ESMnvMegatronBertModel
+from torch.cuda.amp import autocast
+
 
 
 # TODO(trvachov): Clean up deps
@@ -172,6 +174,15 @@ class ESM1nvModel(ESMnvMegatronBertModel):
         self.log('val_loss', averaged_loss, prog_bar=True)
         self.log('val_loss_ECE', pow(2, averaged_loss))  # calculate exponential cross entropy loss for logs
         self.log('consumed_samples', self.compute_consumed_samples(self.trainer.global_step - self.init_global_step))
+
+    
+    def encode(self, tokens_enc, enc_mask):
+        # FIXME this autocast shouldn't be needed
+        with autocast(enabled=self.enable_autocast):
+            hidden_states = self(tokens_enc, enc_mask, None)
+            if self.model.post_process:
+                hidden_states = hidden_states[0]
+        return hidden_states
 
     def test_epoch_end(self, outputs):
         averaged_loss = average_losses_across_data_parallel_group(outputs)
