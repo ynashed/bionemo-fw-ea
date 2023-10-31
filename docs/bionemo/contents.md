@@ -6,6 +6,7 @@
 
 index
 quickstart-fw
+quickstart-bcp
 tutorials-fw
 known-issues-fw
 ```
