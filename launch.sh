@@ -17,6 +17,16 @@
 
 source download_models.sh
 
+current_script="$0"
+
+# Check if the script is executable
+if [ ! -x "$current_script" ]; then
+    # If not, make it executable
+    echo "This script is not executable. Making it executable..."
+    chmod +x "$current_script"
+    echo "Done."
+fi
+
 ###############################################################################
 #
 # This is my $LOCAL_ENV file
@@ -189,12 +199,16 @@ DOCKER_CMD="docker run \
 
 
 # add current git hash as docker image metadata
-BIONEMO_GIT_HASH=`git rev-parse --short HEAD`
+if git rev-parse --git-dir > /dev/null 2>&1; then
+    BIONEMO_GIT_HASH=$(git rev-parse --short HEAD)
+else
+    BIONEMO_GIT_HASH="not in git repository"
+fi
+
 DOCKER_BUILD_CMD="docker build --network host \
     -t ${BIONEMO_IMAGE} \
-    --label com.nvidia.bionemo.git_hash=${BIONEMO_GIT_HASH} \
+    --label com.nvidia.bionemo.git_hash='${BIONEMO_GIT_HASH}' \
     -f setup/Dockerfile"
-
 
 
 download() {
