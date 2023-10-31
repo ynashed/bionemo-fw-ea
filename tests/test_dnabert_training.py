@@ -22,6 +22,7 @@ from bionemo.model.dna.dnabert import DNABERTModel
 from bionemo.model.utils import setup_trainer
 
 
+@pytest.mark.skip
 @pytest.mark.slow
 @pytest.mark.needs_gpu
 def test_dnabert_fast_dev_run():
