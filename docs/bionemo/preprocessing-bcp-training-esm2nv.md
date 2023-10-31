@@ -30,11 +30,11 @@ This command downloads the pre-training dataset named `uniref50_90_202104_esm2nv
 ```bash
 ngc registry resource download-version nvidian/cvai_bnmo_trng/uniref50_90_202104_esm2nv:v1.0-rc2 --dest ~/
 ```
-Note that the data size is ~48GB. So, the download would take time (~ 7 hours)
+Note that the data size is ~18GB. So, the download would take time (~ 3 hours)
 
 After downloading, copy the data to the mounted directory in your NGC workspace.
 ```bash
-cp -r ~/uniref50_90_202104_esm2nv/ ~/pretrain_esm2nv_data/
+cp -r ~/uniref50_90_202104_esm2nv_vv1.0-rc2/ ~/pretrain_esm2nv_data/
 ```
 
 ### Step 5: Run Pre-processing of Pre-train Data
