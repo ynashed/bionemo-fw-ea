@@ -31,17 +31,19 @@ PROTEIN_MODEL=esm2nv # protein LM name, can be esm2nv, esm1nv or prott5nv
 # NGC specific parameters
 # =========================
 TIME_LIMIT="2h"
-NGC_ARRAY_SIZE=1  #number of nodes for the job
-NGC_GPUS_PER_NODE=2 #number of gpus per node
-REPLICAS=1 #equal to the number of nodes
+NGC_ARRAY_SIZE=1  # number of nodes for the job
+NGC_GPUS_PER_NODE=2  # number of gpus per node
+REPLICAS=1  # equal to the number of nodes
 ACE=nv-us-west-2
 INSTANCE="dgx1v.32g.2.norm"
-ORG=nvidian
-TEAM=cvai_bnmo_trng
+NGC_CLI_API_KEY=??
+NGC_CLI_ORG=nvidian
+NGC_CLI_TEAM=cvai_bnmo_trng
+
 LABEL=ml__bionemo
 WL_LABEL=wl___other___bionemo 
 JOB_NAME=ml-model.bionemo-fw-${PROTEIN_MODEL}-finetune
-WORKSPACE=?? # Your NGC workspace ID goes here
+WORKSPACE=??  # Your NGC workspace ID goes here
 # =========================
 
 # Training parameters
@@ -50,16 +52,14 @@ ACCUMULATE_GRAD_BATCHES=1 # gradient accumulation
 ENCODER_FROZEN=True # encoder can be frozen or trainable 
 RESTORE_FROM_PATH=/model/protein/${PROTEIN_MODEL}/esm2nv_650M_converted.nemo # Path to the pretrained model checkpoint in the container
 TENSOR_MODEL_PARALLEL_SIZE=1 # tensor model parallel size,  model checkpoint must be compatible with tensor model parallel size
-MICRO_BATCH_SIZE=64 # micro batch size per GPU, for best efficiency should be set to occupy ~85% of GPU memory. Suggested value for A100 80GB is 256 
+MICRO_BATCH_SIZE=32 # micro batch size per GPU, for best efficiency should be set to occupy ~85% of GPU memory. Suggested value for A100 80GB is 256 
 MAX_STEPS=2000 # duration of training as the number of training steps
 VAL_CHECK_INTERVAL=20 # how often validation step is performed, including downstream task validation
 # =========================
 
-# Dataset and logging parameters
+# Logging parameters
 # =========================
-DATASET_ID=1612756 # ID of the dataset with FLIP data
-DATA_MOUNT=/data/FLIP # Where FLIP data is mounted in the container
-
+DATA_PATH=/data/FLIP
 TASK_NAME=secondary_structure # FLIP task name: secondary_structure, scl, meltome, etc.
 EXP_DIR=/workspace/nemo_experiments/${PROTEIN_MODEL}/downstream_sec_str_encoder_frozen-${ENCODER_FROZEN}_tp${TENSOR_MODEL_PARALLEL_SIZE}_grad_acc${ACCUMULATE_GRAD_BATCHES}
 WANDB_LOGGER_NAME=${PROTEIN_MODEL}_sec_str_finetune_encoder_frozen-${ENCODER_FROZEN}_tp${TENSOR_MODEL_PARALLEL_SIZE}_grad_acc${ACCUMULATE_GRAD_BATCHES}
@@ -68,42 +68,25 @@ WANDB_LOGGER_OFFLINE=False # set to True if uploading results to WandB online is
 CONFIG_PATH=../${PROTEIN_MODEL}/conf
 # =========================
 
-# if $LOCAL_ENV file exists, source it to specify my environment
-if [ -e ./$LOCAL_ENV ]
-then
-    echo sourcing environment from ./$LOCAL_ENV
-    . ./$LOCAL_ENV
-fi
-
-read -r -d '' COMMAND <<EOF
- python downstream_sec_str.py --config-path=${CONFIG_PATH} \
- --config-name=${CONFIG_NAME} exp_manager.exp_dir=${EXP_DIR} \
- exp_manager.wandb_logger_kwargs.offline=${WANDB_LOGGER_OFFLINE} \
- trainer.devices=${NGC_GPUS_PER_NODE} \
- trainer.num_nodes=${NGC_ARRAY_SIZE} \
- ++model.dwnstr_task_validation.enabled=False \
- model.micro_batch_size=${MICRO_BATCH_SIZE} \
- model.data.task_name=${TASK_NAME} \
- model.data.dataset_path=${DATA_MOUNT}/${TASK_NAME} \
- exp_manager.wandb_logger_kwargs.name=${WANDB_LOGGER_NAME} \
- trainer.val_check_interval=${VAL_CHECK_INTERVAL} model.global_batch_size=null \
- trainer.max_steps=${MAX_STEPS} \
- model.encoder_frozen=${ENCODER_FROZEN} \
- model.tensor_model_parallel_size=${TENSOR_MODEL_PARALLEL_SIZE} \
- restore_from_path=${RESTORE_FROM_PATH} \
- trainer.accumulate_grad_batches=${ACCUMULATE_GRAD_BATCHES}
+# Instructions for downloading checkpoint, preprocessing the data and running finetuning
+# =========================
+read -r -d '' BCP_COMMAND <<EOF
+bcprun --debug --nnodes=${NGC_ARRAY_SIZE} --npernode=${NGC_GPUS_PER_NODE} -w /opt/nvidia/bionemo -e WANDB_API_KEY=${WANDB_API_KEY} --cmd 'export NGC_CLI_ORG=$NGC_CLI_ORG NGC_CLI_API_KEY=$NGC_CLI_API_KEY MODEL_PATH=/model; ./launch.sh download';
+bcprun --debug --nnodes=${NGC_ARRAY_SIZE} --npernode=${NGC_GPUS_PER_NODE} -w /workspace/bionemo/examples/protein/downstream -e WANDB_API_KEY=${WANDB_API_KEY} --cmd 'python downstream_sec_str.py do_training=False';
+bcprun --debug --nnodes=${NGC_ARRAY_SIZE} --npernode=${NGC_GPUS_PER_NODE} -w /workspace/bionemo/examples/protein/downstream -e WANDB_API_KEY=${WANDB_API_KEY} --cmd 'python downstream_sec_str.py --config-path=${CONFIG_PATH} \
+    --config-name=${CONFIG_NAME} exp_manager.exp_dir=${EXP_DIR} exp_manager.wandb_logger_kwargs.offline=${WANDB_LOGGER_OFFLINE} \
+    trainer.devices=${NGC_GPUS_PER_NODE} trainer.num_nodes=${NGC_ARRAY_SIZE} ++model.dwnstr_task_validation.enabled=False \
+    model.micro_batch_size=${MICRO_BATCH_SIZE} model.data.task_name=${TASK_NAME} model.data.dataset_path=${DATA_PATH}/${TASK_NAME} \
+    exp_manager.wandb_logger_kwargs.name=${WANDB_LOGGER_NAME} trainer.val_check_interval=${VAL_CHECK_INTERVAL} model.global_batch_size=null \
+    trainer.max_steps=${MAX_STEPS} model.encoder_frozen=${ENCODER_FROZEN} model.tensor_model_parallel_size=${TENSOR_MODEL_PARALLEL_SIZE} \
+    restore_from_path=${RESTORE_FROM_PATH} trainer.accumulate_grad_batches=${ACCUMULATE_GRAD_BATCHES}'
 EOF
-
-BCP_COMMAND="bcprun --debug --nnodes=${NGC_ARRAY_SIZE} \
-             --npernode=${NGC_GPUS_PER_NODE} -w /workspace/bionemo/examples/protein/downstream \
-             -e WANDB_API_KEY=${WANDB_API_KEY} --cmd '"${COMMAND}"'"
+# =========================
 
 #Add --array-type "PYTORCH" to command below for multinode jobs
 echo "ngc batch run --name "${JOB_NAME}" --priority NORMAL \
       --preempt RUNONCE --total-runtime ${TIME_LIMIT} --ace "${ACE}" \
       --instance "${INSTANCE}" --commandline "\"${BCP_COMMAND}"\" \
       --result /result/ngc_log --replicas "${REPLICAS}" \
-      --image "${BIONEMO_IMAGE}" --org ${ORG} --team ${TEAM} \
-      --workspace ${WORKSPACE}:/result --datasetid ${DATASET_ID}:${DATA_MOUNT} \
-      --label ${LABEL} --label ${WL_LABEL}" | bash
-
+      --image "${BIONEMO_IMAGE}" --org ${NGC_CLI_ORG} --team ${NGC_CLI_TEAM} \
+      --workspace ${WORKSPACE}:/result --label ${LABEL} --label ${WL_LABEL}" | bash
