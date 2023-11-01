@@ -103,8 +103,10 @@ class FineTuneProteinModel(EncoderFineTuning):
     def encoder_forward(self, protein_model, batch: dict):
         if self.encoder_frozen:
             enc_output = batch["embeddings"]
+        elif self.task_type in ['regression', 'classification']:
+            enc_output = protein_model.seq_to_embeddings(batch["embeddings"])  # (B, D)
         else:
-            enc_output, _ = protein_model.seq_to_hiddens(batch["embeddings"])
+            enc_output, _ = protein_model.seq_to_hiddens(batch["embeddings"])  # (B, S, D)
             batch_size, seq_len, emb_dim = enc_output.size()
             enc_output = torch.cat(
                 [
