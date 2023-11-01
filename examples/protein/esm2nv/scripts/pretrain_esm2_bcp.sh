@@ -34,11 +34,12 @@ REPLICAS=1 #equal to the number of nodes
 ACE=nv-us-west-2
 INSTANCE="dgx1v.32g.2.norm"
 ORG=nvidian
-TEAM=clara-lifesciences
+TEAM=?? # name of the NGC team e.g: cvai_bnmo_trng or clara-lifesciences
 LABEL=ml__bionemo
 WL_LABEL=wl___other___bionemo 
 JOB_NAME=ml-model.bionemo-fw-esm2-pretrain
-WORKSPACE=?? # NGC workspace ID goes here
+DATA_WORKSPACE=?? # NGC workspace ID for pretraining data, more detail on how to set it at `docs/bionemo/preprocessing-bcp-training-esm2nv.md`.
+RESULT_WORKSPACE=?? # NGC workspace ID for storing results
 
 # Training parameters
 # =========================
@@ -58,12 +59,9 @@ WANDB_LOGGER_OFFLINE=False # set to True if there are issues uploading to WandB 
 
 # Mounts
 # =========================
-DATASET_ID=110553 # ID of the dataset with Uniref50 data
-DWNSTR_TASK_DATASET_ID=1612756 # ID of the dataset with FLIP secondary structure data for downstream task validation
 DATA_MOUNT=/data # path to training data in the container
-DWNSTR_TASK_DATA_MOUNT=/FLIP # path to downstream task validation data in the container
-DATASET=uniref202205_0256 # folder containing data for model training
-DWNSTR_TASK_DATASET=secondary_structure # folder containing data for downstream task validation
+DATASET=uniref50_90_202104_esm2nv # folder containing preprocessed data for model training
+DWNSTR_TASK_DATASET=/FLIP/secondary_structure # folder containing preprocessed data for downstream task validation
 TRAIN_FILES='x_OP_000..049_CL_' # Range for the train dataset
 TEST_FILES='x_OP_000..049_CL_'  # Range for the test dataset
 VAL_FILES='x_OP_000..049_CL_'   # Range for the val dataset
@@ -95,9 +93,10 @@ echo "*******STARTING********" \
     trainer.accumulate_grad_batches=${ACCUMULATE_GRAD_BATCHES} \
     trainer.val_check_interval=${VAL_CHECK_INTERVAL} \
     ++model.data.index_mapping_dir=${INDEX_MAPPING_DIR} \
-    model.dwnstr_task_validation.dataset.dataset_path=${DWNSTR_TASK_DATA_MOUNT}/${DWNSTR_TASK_DATASET} \
+    model.dwnstr_task_validation.dataset.dataset_path=${DATA_MOUNT}/${DWNSTR_TASK_DATASET} \
     model.micro_batch_size=${MICRO_BATCH_SIZE} \
-    model.data.dataset_path=${DATA_MOUNT}/${DATASET} \
+    ++model.data.dataset_path=${DATA_MOUNT}/${DATASET}/uf50 \
+    ++model.data.uf90.uniref90_path=${DATA_MOUNT}/${DATASET}/uf90 \
     model.data.dataset.train=${TRAIN_FILES} \
     model.data.dataset.val=${VAL_FILES} \
     model.data.dataset.test=${TEST_FILES} 
@@ -106,7 +105,7 @@ EOF
 
 BCP_COMMAND="bcprun --debug --nnodes=${NGC_ARRAY_SIZE} \
              --npernode=${NGC_GPUS_PER_NODE} \
-             -w /opt/nvidia/bionemo/examples/protein/esm1nv \
+             -w /opt/nvidia/bionemo/examples/protein/esm2nv \
              -e WANDB_API_KEY=${WANDB_API_KEY} --cmd '"${COMMAND}"'"
 
 #Add --array-type "PYTORCH" to command below for multinode jobs
@@ -116,6 +115,5 @@ echo "ngc batch run --name "${JOB_NAME}" \
       --instance "${INSTANCE}" --commandline "\"${BCP_COMMAND}"\" \
       --result /result/ngc_log --replicas "${REPLICAS}" \
       --image "${BIONEMO_IMAGE}" --org ${ORG} --team ${TEAM} \
-      --workspace ${WORKSPACE}:/result --datasetid ${DATASET_ID}:${DATA_MOUNT} \
-      --datasetid ${DWNSTR_TASK_DATASET_ID}:${DWNSTR_TASK_DATA_MOUNT} \
+      --workspace ${RESULT_WORKSPACE}:/result --workspace ${DATA_WORKSPACE}:${DATA_MOUNT} \
       --label ${LABEL} --label ${WL_LABEL}" | bash
