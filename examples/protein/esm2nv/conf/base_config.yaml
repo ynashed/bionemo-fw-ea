@@ -168,6 +168,7 @@ model:
     # TODO These need to be updated to values we actually like
     dataset_path: /data/uniref202104_esm2/uf50 # parent directory for data, contains train / val / test folders. Needs to be writeable for index creation.
     # NOTE test_size and val_size must be smaller than the total dataset size.
+    # you can check this with grep -c '>' <uf50_datapath.fasta>
     val_size: 5000
     test_size: 1000000
     sort_fastas: false # If true, assumes the input files are not sorted, and sorts them before creating the cluster mapping. Unsorted fastas will break the cluster map.
@@ -186,12 +187,14 @@ model:
           data_fields:
             sequence: 3
             sequence_id: 1
+      index_mapping_dir: ${model.data.index_mapping_dir}
 
     use_upsampling: True # if the data should be upsampled to max number of steps in the training
     seed: ${model.seed} # Random seed
     max_seq_length: ${model.seq_length} # Maximum input sequence length. Longer sequences are truncated
     modify_percent: 0.1 # Percentage of characters in a protein sequence to modify. (Modification means replacing with another amino acid or with a mask token)
     perturb_percent: 0.5 # Of the modify_percent, what percentage of characters are to be replaced with another amino acid.
+    index_mapping_dir: /data/uniref202104_esm2/
 
   
   dwnstr_task_validation:
