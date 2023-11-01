@@ -15,6 +15,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# If there are C-like issues when running on cluster environments, it may be
+# necessary to recompile the Megatron helpers, which can be done by running
+# this script. This recompilation should also be done immediately before
+# training starts on clusters as a best practice.
+
 # Find NeMo installation location and re-combile Megatron helpers
 NEMO_PATH=$(python -c 'import nemo; print(nemo.__path__[0])')
 cd ${NEMO_PATH}/collections/nlp/data/language_modeling/megatron
