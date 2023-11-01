@@ -31,6 +31,7 @@ from biopandas.pdb import PandasPdb
 from nemo.core.config import hydra_runner
 from nemo.utils import logging
 from omegaconf import OmegaConf
+from pytorch_lightning import seed_everything
 
 import bionemo
 from bionemo.data.equidock.protein_utils import (
@@ -54,6 +55,8 @@ def main(cfg) -> None:
     logging.info("\n\n************** Experiment configuration ***********")
     logging.info(f"\n{OmegaConf.to_yaml(cfg)}")
     logging.info(f"\nTrain dataset name {cfg.data.data_name}")
+
+    seed_everything(cfg.seed)
 
     #######################################
     # set data IO dirs

@@ -27,8 +27,10 @@ import torch
 from hydra import compose, initialize
 from hydra.core.global_hydra import GlobalHydra
 
+from bionemo.data.equidock import DataManager
 from bionemo.model.molecule.megamolbart import FineTuneMegaMolBART, MegaMolBARTModel, MegaMolBARTRetroModel
 from bionemo.model.protein.downstream import FineTuneProteinModel
+from bionemo.model.protein.equidock.equidock_model import EquiDock
 from bionemo.model.protein.esm1nv import ESM1nvModel
 from bionemo.model.protein.prott5nv import ProtT5nvModel
 from bionemo.model.utils import setup_trainer
@@ -64,6 +66,8 @@ PREPEND_CONFIG_DIR = [
     '../protein/esm1nv/conf',
     '../protein/prott5nv/conf',
     '../molecule/megamolbart/conf',
+    '../protein/equidock/conf',
+    '../protein/equidock/conf',
 ]
 CONFIG_NAME = [
     'megamolbart_downstream_retro_test',
@@ -74,6 +78,8 @@ CONFIG_NAME = [
     'esm1nv_encoder_finetune_test',
     'prott5nv_sec_str_val_test',
     'megamolbart_physchem_test',
+    'equidock_pretrain_test',
+    'equidock_finetune_test',
 ]
 CORRECT_CONFIG = [
     'megamolbart_retro_config.json',
@@ -84,6 +90,8 @@ CORRECT_CONFIG = [
     'esm1nv_encoder_finetune_config.json',
     'prott5nv_sec_str_val_config.json',
     'megamolbart_physchem_config.json',
+    'equidock_pretrain_config.json',
+    'equidock_finetune_config.json',
 ]
 CORRECT_RESULTS = [
     'megamolbart_retro_log.json',
@@ -94,6 +102,8 @@ CORRECT_RESULTS = [
     'esm1nv_encoder_finetune_log.json',
     'prott5nv_sec_str_val_log.json',
     'megamolbart_physchem_log.json',
+    'equidock_pretrain_log.json',
+    'equidock_finetune_log.json',
 ]
 MODEL_CLASS = [
     MegaMolBARTRetroModel,
@@ -104,6 +114,8 @@ MODEL_CLASS = [
     FineTuneProteinModel,
     ProtT5nvModel,
     FineTuneMegaMolBART,
+    EquiDock,
+    EquiDock,
 ]
 MODEL_PARAMETERS = [
     45058048,
@@ -114,6 +126,8 @@ MODEL_PARAMETERS = [
     43787533,
     198970496,
     66817,
+    525671,
+    684074,
 ]
 
 
@@ -187,6 +201,13 @@ def test_model_size(prepend_config_path, config_name, model_class, model_paramet
     trainer = setup_trainer(cfg, callbacks=callbacks)
     if model_class == FineTuneProteinModel or model_class == FineTuneMegaMolBART:
         model = model_class(cfg, trainer)
+
+    elif model_class == EquiDock:
+        data_manager = DataManager(cfg)
+        cfg.model.input_edge_feats_dim = data_manager.train_ds[0][0].edata['he'].shape[1]
+        trainer = setup_trainer(cfg, callbacks=callbacks)
+        model = EquiDock(cfg=cfg, trainer=trainer, data_manager=data_manager)
+
     else:
         model = model_class(cfg.model, trainer)
     assert model.num_weights == model_parameters
@@ -203,7 +224,6 @@ def test_model_training(prepend_config_path, config_name, model_class, correct_r
     torch.manual_seed(0)
     cfg = get_cfg(prepend_config_path, config_name)
     clean_directory(cfg.exp_manager.exp_dir)
-
     callbacks = setup_callbacks(cfg)
     trainer = setup_trainer(cfg, callbacks=callbacks)
 
@@ -216,6 +236,11 @@ def test_model_training(prepend_config_path, config_name, model_class, correct_r
             save_restore_connector=BioNeMoSaveRestoreConnector(),
             override_config_path=cfg,
         )
+    elif model_class == EquiDock:
+        data_manager = DataManager(cfg)
+        cfg.model.input_edge_feats_dim = data_manager.train_ds[0][0].edata['he'].shape[1]
+        trainer = setup_trainer(cfg, callbacks=callbacks)
+        model = EquiDock(cfg=cfg, trainer=trainer, data_manager=data_manager)
     else:
         if model_class == FineTuneProteinModel or model_class == FineTuneMegaMolBART:
             model = model_class(cfg, trainer)

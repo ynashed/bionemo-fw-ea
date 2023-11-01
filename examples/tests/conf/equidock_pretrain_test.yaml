@@ -1,0 +1,23 @@
+defaults:
+  - pretrain
+
+data:
+  data_name: dips # Train first over this dataset, [db5, dips] for now only train on db5
+  cache_path: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/protein/equidock # Folder from where to load/restore cached dataset
+  raw_data_path: null
+  split_files_path: null
+
+model:
+  train_ds:
+    data_fraction: 1.0
+
+trainer:
+  devices: 1
+  max_epochs: 1 # PTL default. In practice we don't usually train for more than 1 epoch.
+  max_steps: 500 # consumed_samples = global_step * micro_batch_size * data_parallel_size * accumulate_grad_batches
+
+exp_manager:    
+  # logging
+  exp_dir: /tmp/nemo_experiments/equidock_pretrain_dips
+  create_tensorboard_logger: False
+  create_wandb_logger: false

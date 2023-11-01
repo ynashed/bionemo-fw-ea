@@ -21,7 +21,6 @@ import random
 import warnings
 
 import pandas as pd
-import psutil
 from biopandas.pdb import PandasPdb
 from dgl import save_graphs
 from joblib import Parallel, cpu_count, delayed
@@ -211,15 +210,6 @@ def preprocess(cfg: OmegaConf):
         print('Done preprocess_unbound_bound\n\n')
 
     elif cfg.data_name == 'dips':
-        ram_info = psutil.virtual_memory()
-        swap_info = psutil.swap_memory()
-        total_available_memory = (ram_info.available + swap_info.free) / 1024**3  # GB
-        if reload_mode == 'train' and total_available_memory <= 200:
-            raise MemoryError(
-                f"Dips dataset requires available RAM + SWAP memory larger than 200 GB, but it is {total_available_memory}! \n \
-                Add swap memory (https://askubuntu.com/questions/755521/allocating-disk-space-as-memory-temporarily/755575#755575) or use larger RAM memory! "
-            )
-
         if reload_mode != 'train':
             data_fraction = 1.0
         else:

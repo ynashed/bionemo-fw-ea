@@ -20,6 +20,7 @@ nvidia-pytriton==0.1.5
 git+https://github.com/NVIDIA/dllogger@v1.0.0#egg=dllogger
 POT==0.7.0
 dgllife==0.2.8
+dill
 biopandas==0.2.8
 pipdeptree==2.13.0
 gevent==23.9.1
