@@ -12,6 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# This is a copy from nemo/examples/nlp/language_modeling/megatron_change_num_partitions.py
+# This copy exposes the argument `tokenizer_model_name` to load the ESM2 tokenizer from HuggingFace
+# TODO(srabhi) Open an MR in NeMo to update the script with `tokenizer_model_name`
+
 import os
 import tempfile
 from argparse import ArgumentParser
@@ -113,10 +117,6 @@ Passing --tensor_model_parallel_size=-1 or --pipeline_model_parallel_size=-1 wil
 model config.
 
 """
-
-# This is a copy from nemo/examples/nlp/language_modeling/megatron_change_num_partitions.py
-# This copy exposes the argument `tokenizer_model_name` to load the ESM2 tokenizer from HuggingFace
-# TODO(srabhi) Open an MR in NeMo to update the script with `tokenizer_model_name`
 
 
 def set_virtual_parallel_rank_safely(rank: int):
