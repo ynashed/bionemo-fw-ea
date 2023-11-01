@@ -17,9 +17,13 @@ The BioNeMo repo is organized by biological entity (molecule, protein) and by de
 
 ## Code Development
 
-`BIONEMO_PATH` is an environment variable used to select the path to the BioNeMo library in use. By default, this is the library installation path (`/opt/nvidia/bionemo`). For development, code should be mounted inside the container at `/workspace/bionemo`.
+**NOTE**: BioNeMo is only supported on x86 Linux systems. If you are not on such a system, you **must** use the project's Docker images to develop and execute BioNeMo code.
 
-The easiest way to develop or test the training of in-development code is to mount a local copy of the code inside the docker container. The `launch.sh` script mounts the current working directory inside the container by default. This behavior can be customized by editing `PROJECT_PATH`, which is the local copy of the code, and `BIONEMO_PATH` in the `.env` file.
+Regardless of your system, the easiest way to develop and test code is to mount a local copy of the code inside the BioNeMo Docker container. While you may [build the image from the Dockerfile](./setup/Dockerfile), we encourage folks to use the [launcher script, `launch.sh`](./launch.sh).
+
+The `launch.sh` script mounts the current working directory inside the container by default. This behavior can be customized by editing `PROJECT_PATH`, which is the local copy of the code, and `BIONEMO_PATH` in the `.env` file.
+
+`BIONEMO_PATH` is an environment variable used to select the path to the BioNeMo library in use. By default, this is the library installation path (`/opt/nvidia/bionemo`). For development, code should be mounted inside the container at `/workspace/bionemo`.
 
 It may also be necessary to recompile the Megatron helpers, which can be done by running the script `setup/recompile_megatron_helper.sh`. This recompilation should also be done immediately before training starts on clusters as a best practice.
 
