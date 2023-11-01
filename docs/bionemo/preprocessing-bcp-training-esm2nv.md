@@ -3,14 +3,14 @@
 
 This section outlines the steps to prepare your workspace with pre-processed files for pre-training ESM2nv using the NVIDIA NGC platform. 
 
-This workspace can then be used to launch ESM2nv training job using the template script `<BioNeMO_Workspace>/example/protein/esm2nv/scripts/pretrain_esm2_bcp.sh`. 
+This workspace can then be used to launch ESM2nv training job using the template script `<BioNeMO_Workspace>/examples/protein/esm2nv/scripts/pretrain_esm2_bcp.sh`. 
 
- For more information about how to launch ESM2nv training using BCP script, you can check [Running BioNeMo on DGX-Cloud using BCP](../../bcp-specific-commands-fw.md) tutorial.
+For more information about how to launch ESM2nv training using BCP script, you can check [Running BioNeMo on DGX-Cloud using BCP](./bcp-specific-commands-fw.md) tutorial.
 
 ### Step 1: Create a Workspace
 Create a new NGC workspace by running the following command. Make sure to replace `esm2_bcp_pretrain` with your desired workspace name and `nv-us-east-2` with your preferred ACE
 ```bash
-ngc workspace create --name besm2_bcp_pretrain --ace nv-us-east-2
+ngc workspace create --name esm2_bcp_pretrain --ace nv-us-east-2
 ```
 Store the workspace ID provided after creating the workspace. You will need this ID for mounting data and running jobs.
 
@@ -22,6 +22,7 @@ mkdir ~/pretrain_esm2nv_data
 ### Step 3: Mount the Local Directory to the NGC Workspace
 Mount your local data directory to the NGC workspace using the following command.
 ```bash
+export WKSP_ID=??
 ngc workspace mount $WKSP_ID ~/pretrain_esm2nv_data --mode RW
 ```
 
