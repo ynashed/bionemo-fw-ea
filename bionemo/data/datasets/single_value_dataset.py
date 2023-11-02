@@ -81,6 +81,8 @@ class SingleValueDataset(Dataset):
                 _reconfigure_inference_batch(
                     self.encoder_model_batch_size, global_batch_size=self.model.cfg.model.global_batch_size
                 )
+        else:
+            self.embeddings = self.input_seq
         self.idxs = list(range(len(self.embeddings)))
         if shuffle:
             np.random.shuffle(self.idxs)
@@ -122,7 +124,11 @@ class SingleValueDataset(Dataset):
             target = batch['target'].float().to("cuda").reshape(-1, 1)
         elif task == "classification":
             target = batch['target'].long().to("cuda").reshape(-1)
-        return batch['embeddings'].float().to("cuda"), target
+        if type(batch['embeddings'][0]) is np.str_:
+            embeddings = batch['embeddings']
+        else:
+            embeddings = batch['embeddings'].float().to("cuda")
+        return embeddings, target
 
 
 class SingleValueDataModule(BioNeMoDataModule):

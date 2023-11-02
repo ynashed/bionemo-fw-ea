@@ -119,6 +119,15 @@ download_bionemo_models() {
             "${EQUIDOCK_DB5_MODEL_PBSS}" \
             "${MODEL_PATH}" \
             "protein/equidock/equidock_db5.nemo"
+        setup_model \
+            "${ESM2NV_650M_MODEL_PBSS}" \
+            "${MODEL_PATH}" \
+            "protein/esm2nv/esm2nv_650M_converted.nemo"
+        setup_model \
+            "${ESM2NV_3B_MODEL_PBSS}" \
+            "${MODEL_PATH}" \
+            "protein/esm2nv/esm2nv_3B_converted.nemo"
+
     else
         local ngc_api_key_is_set_=$(ngc_api_key_is_set)
         if [ $ngc_api_key_is_set_ != true ]; then
@@ -146,5 +155,14 @@ download_bionemo_models() {
             "${EQUIDOCK_DB5_MODEL}" \
             "${MODEL_PATH}" \
             "protein/equidock/equidock_db5.nemo"
+        setup_model \
+            "${ESM2NV_650M_MODEL}" \
+            "${MODEL_PATH}" \
+            "protein/esm2nv/esm2nv_650M_converted.nemo"
+        setup_model \
+            "${ESM2NV_3B_MODEL}" \
+            "${MODEL_PATH}" \
+            "protein/esm2nv/esm2nv_3B_converted.nemo"
+
     fi
 }
