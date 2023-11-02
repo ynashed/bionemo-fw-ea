@@ -109,7 +109,7 @@ def get_num_devices(n_devices):
     return n_devices
 
 
-class TrainerBuilder(object):
+class TrainerBuilder:
     @staticmethod
     def adjust_config(cfg):
         micro_batch_size = cfg.model.micro_batch_size

@@ -24,7 +24,7 @@ from nemo.utils import logging
 
 
 @dataclass
-class RemoteResource(object):
+class RemoteResource:
     """Responsible for downloading remote files, along with optional processing of downloaded files for downstream usecases.
 
     Each object is invoked through either its constructor (setting up the destination and checksum), or through a pre-configured class method.

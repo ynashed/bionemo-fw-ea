@@ -21,7 +21,7 @@ from nemo.collections.nlp.models.language_modeling.megatron_bert_model import Me
 from nemo.utils import logging
 
 
-class BioNeMoDataModule(object):
+class BioNeMoDataModule:
     """Base Class for BioNeMo Data Modules.
 
     Data Modules coordinate the data-driven functions for BioNeMo Modules:

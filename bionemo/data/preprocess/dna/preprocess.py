@@ -359,7 +359,7 @@ class GRCh38Ensembl99GFF3ResourcePreprocessor(ResourcePreprocessor):
 # dataclass to define the constructor for DNABERTPreprocess but also want to
 # extend the constructor.
 @dataclass
-class DNABERTPreprocessorDataClass(object):
+class DNABERTPreprocessorDataClass:
     genome_dir: str
     tokenizer_model_path: str
     tokenizer_vocab_path: str

@@ -24,7 +24,7 @@ from nemo.utils import logging
 __all__ = ['PhysChemPreprocess']
 
 
-class PhysChemPreprocess(object):
+class PhysChemPreprocess:
     '''
     Handles download of PhysChem datasets
     '''

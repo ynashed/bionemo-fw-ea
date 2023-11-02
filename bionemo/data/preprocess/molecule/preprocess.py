@@ -35,7 +35,7 @@ os.environ['PROJECT_MOUNT'] = os.environ.get('PROJECT_MOUNT', '/workspace/bionem
 ZINC_URL_LIST = os.path.join(os.environ['PROJECT_MOUNT'], 'examples/molecule/megamolbart/dataset/ZINC-downloader.txt')
 
 
-class Zinc15Preprocess(object):
+class Zinc15Preprocess:
     def __init__(self, root_directory: Optional[str] = ROOT_DIR) -> None:
         """Preprocessing of ZINC15 data into SMILES
 

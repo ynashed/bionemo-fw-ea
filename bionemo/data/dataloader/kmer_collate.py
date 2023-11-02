@@ -145,7 +145,7 @@ class KmerTokenizerAdapter(TokenizerAdapterSpec):
 
 
 @dataclass
-class SpanMasking(object):
+class SpanMasking:
     """A strategy for masking sequences that masks a minimal neighborhood
     of length `span_length` around each item it masks.
     This strategy originates from DNABERT.
@@ -231,7 +231,7 @@ class SpanMasking(object):
 
 
 @dataclass
-class LengthTruncatorABC(object):
+class LengthTruncatorABC:
     subsequence_probability: float = 0.5
     """
     Randomly subsamples the length of each sentence.

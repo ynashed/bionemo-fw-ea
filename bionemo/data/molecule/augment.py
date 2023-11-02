@@ -28,7 +28,7 @@ __all__ = ['MoleculeEnumeration', 'MoleculeInputTargetEnumeration']
 
 
 # FIXME: apply masking on ids instead of tokens
-class MoleculeEnumeration(object):
+class MoleculeEnumeration:
     """
     Provides collate_fn for pretraining of MegaMolBART based on batches from molecule datasets.
     """

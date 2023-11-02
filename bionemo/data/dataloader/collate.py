@@ -49,7 +49,7 @@ __all__ = [
 ]
 
 
-class TokenSampler(object):
+class TokenSampler:
     """Group of sampling methods for sampling from a list of tokens"""
 
     def sample_token_id(self, tokenizer: TokenizerSpec):
@@ -77,7 +77,7 @@ class TokenSampler(object):
         return random.sample(range(num_tokens), num_samples)
 
 
-class TokenizerAdapterSpec(object):
+class TokenizerAdapterSpec:
     """Interface for adapting tokenizers for DataLoaders.
 
     Tokenizers can be fairly homogenous, so an Adapter is used
@@ -305,7 +305,7 @@ class SentencePieceTokenizerAdapter(TokenizerAdapterSpec):
 
 
 @dataclass
-class BertMasking(object):
+class BertMasking:
 
     """
     Produces a callable that can be used to mask/perturb sequences of tokens.
@@ -413,7 +413,7 @@ class BertMasking(object):
         return modified_tokens, token_masks
 
 
-class BertCollate(object):
+class BertCollate:
     def __init__(
         self,
         tokenizer: TokenizerAdapterSpec,

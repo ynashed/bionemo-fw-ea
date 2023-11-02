@@ -72,7 +72,7 @@ interface.
 An example stub for the proposed base model could look like:
 ```python
 # bionemo/core/datamodule.py
-class BioNeMoDataModule(object):
+class BioNeMoDataModule:
     def __init__(self, cfg, trainer):
         pass
 

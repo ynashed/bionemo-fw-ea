@@ -72,7 +72,7 @@ BACKENDS = {
 }
 
 
-class SafePyfastxFasta(object):
+class SafePyfastxFasta:
     '''SafePyfastxFasta provides safety pytorch distributed by ensuring the pyfastx indexes are created only once.
     Previously, when more than one device was configured, a race condition would occur where all workers would try to build an index.
     If an index file already existed, the worker would attempt to use it, leading to a crash. This extension guards against this scenario.

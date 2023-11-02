@@ -5,7 +5,7 @@ import grpc
 import prott5_pb2 as prott5__pb2
 
 
-class GenerativeSamplerStub(object):
+class GenerativeSamplerStub:
     """Missing associated documentation comment in .proto file."""
 
     def __init__(self, channel):
@@ -21,7 +21,7 @@ class GenerativeSamplerStub(object):
                 )
 
 
-class GenerativeSamplerServicer(object):
+class GenerativeSamplerServicer:
     """Missing associated documentation comment in .proto file."""
 
     def SeqToEmbedding(self, request, context):
@@ -45,7 +45,7 @@ def add_GenerativeSamplerServicer_to_server(servicer, server):
 
 
  # This class is part of an EXPERIMENTAL API.
-class GenerativeSampler(object):
+class GenerativeSampler:
     """Missing associated documentation comment in .proto file."""
 
     @staticmethod

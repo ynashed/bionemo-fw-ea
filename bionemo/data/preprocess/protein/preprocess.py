@@ -36,7 +36,7 @@ ROOT_DIR = '/tmp/uniref50'
 MD5_CHECKSUM = 'e619d3689749562d743f8ecf29a7a7c2'
 
 
-class UniRef50Preprocess(object):
+class UniRef50Preprocess:
     def __init__(self, root_directory: Optional[str] = ROOT_DIR, checksum: Optional[str] = MD5_CHECKSUM) -> None:
         """Prepocess UniRef50 data for pre-training.
 

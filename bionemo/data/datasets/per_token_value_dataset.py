@@ -148,7 +148,7 @@ class PerTokenValueDataset(Dataset):
         return embeddings, (labels, masks)
 
 
-class get_data(object):
+class get_data:
     def __init__(
         self,
         datafiles: List,

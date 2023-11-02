@@ -87,7 +87,7 @@ def get_attributes_from_seq(sequences: List) -> Dict[str, Dict[str, str]]:
     return result
 
 
-class FLIPPreprocess(object):
+class FLIPPreprocess:
     def __init__(
         self,
         root_directory: Optional[str] = ROOT_DIR,

@@ -140,7 +140,7 @@ class Torchmetrics_Unbound_Bound(Metric):
         )
 
 
-class Meter_Unbound_Bound(object):
+class Meter_Unbound_Bound:
     def __init__(self):
         self.complex_rmsd_list = []
         self.ligand_rmsd_list = []

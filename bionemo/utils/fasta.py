@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from typing import List, TypeVar
 
 
-class FastaUtil(object):
+class FastaUtil:
     """Packaged this into a class so we can control how the things we do are generated.
 
     1) Meaning, read from a filename, yield back a dictionary of seq_ids + sequences.

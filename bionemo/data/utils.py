@@ -91,7 +91,7 @@ def gunzip(i: str, o: str, exist_ok: bool = False):
         raise FileNotFoundError(i)
 
 
-class DatasetBuilderSpec(object):
+class DatasetBuilderSpec:
     """
     Abstract class for building datasets.
 
@@ -274,7 +274,7 @@ class CSVDatasetBuilder(DatasetBuilderSpec):
         return self.dataset
 
 
-class DatasetFactorySpec(object):
+class DatasetFactorySpec:
     def create_dataset(self, options) -> DatasetBuilderSpec:
         """
         Creates a dataset with the given options.
