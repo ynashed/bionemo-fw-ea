@@ -72,7 +72,7 @@ CONFIG_PATH=../${PROTEIN_MODEL}/conf
 # =========================
 read -r -d '' BCP_COMMAND <<EOF
 bcprun --debug --nnodes=${NGC_ARRAY_SIZE} --npernode=${NGC_GPUS_PER_NODE} -w /opt/nvidia/bionemo -e WANDB_API_KEY=${WANDB_API_KEY} --cmd 'export NGC_CLI_ORG=$NGC_CLI_ORG NGC_CLI_API_KEY=$NGC_CLI_API_KEY MODEL_PATH=/model; ./launch.sh download';
-bcprun --debug --nnodes=${NGC_ARRAY_SIZE} --npernode=${NGC_GPUS_PER_NODE} -w /workspace/bionemo/examples/protein/downstream -e WANDB_API_KEY=${WANDB_API_KEY} --cmd 'python downstream_sec_str.py do_training=False';
+bcprun --debug --nnodes=${NGC_ARRAY_SIZE} --npernode=1 -w /workspace/bionemo/examples/protein/downstream -e WANDB_API_KEY=${WANDB_API_KEY} --cmd 'python downstream_sec_str.py do_training=False';
 bcprun --debug --nnodes=${NGC_ARRAY_SIZE} --npernode=${NGC_GPUS_PER_NODE} -w /workspace/bionemo/examples/protein/downstream -e WANDB_API_KEY=${WANDB_API_KEY} --cmd 'python downstream_sec_str.py --config-path=${CONFIG_PATH} \
     --config-name=${CONFIG_NAME} exp_manager.exp_dir=${EXP_DIR} exp_manager.wandb_logger_kwargs.offline=${WANDB_LOGGER_OFFLINE} \
     trainer.devices=${NGC_GPUS_PER_NODE} trainer.num_nodes=${NGC_ARRAY_SIZE} ++model.dwnstr_task_validation.enabled=False \
