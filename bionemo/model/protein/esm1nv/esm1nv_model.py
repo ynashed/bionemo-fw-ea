@@ -124,15 +124,17 @@ class ESM1nvModel(ESMnvMegatronBertModel):
 
     def setup_validation_data(self, cfg):
         if hasattr(self, '_validation_ds'):
-            consumed_samples = 0
-            self._validation_dl = self.build_pretraining_data_loader(
-                self._validation_ds, consumed_samples, num_workers=0
-            )
+            if self._validation_ds is not None:
+                consumed_samples = 0
+                self._validation_dl = self.build_pretraining_data_loader(
+                    self._validation_ds, consumed_samples, num_workers=0
+                )
 
     def setup_test_data(self, cfg):
         if hasattr(self, '_test_ds'):
-            consumed_samples = 0
-            self._test_dl = self.build_pretraining_data_loader(self._test_ds, consumed_samples, num_workers=0)
+            if self._test_ds is not None:
+                consumed_samples = 0
+                self._test_dl = self.build_pretraining_data_loader(self._test_ds, consumed_samples, num_workers=0)
 
     @staticmethod
     def _build_train_valid_test_datasets(trainer, model_cfg):
@@ -155,7 +157,7 @@ class ESM1nvModel(ESMnvMegatronBertModel):
 
         logging.info(f'Length of train dataset: {len(_train_ds)}')
         logging.info(f'Length of val dataset: {len(_validation_ds)}')
-        logging.info(f'Length of test dataset: {len(_test_ds)}')
+        logging.info(f'Length of test dataset: {len(_test_ds) if _test_ds is not None else None}')
         logging.info('Finished building Bert datasets.')
         return _train_ds, _validation_ds, _test_ds
 

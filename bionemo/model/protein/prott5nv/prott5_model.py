@@ -39,15 +39,17 @@ class ProtT5nvModel(MegatronT5Model):
 
     def setup_validation_data(self, cfg):
         if hasattr(self, '_validation_ds'):
-            consumed_samples = 0
-            self._validation_dl = self.build_pretraining_data_loader(
-                self._validation_ds, consumed_samples, num_workers=0
-            )
+            if self._validation_ds is not None:
+                consumed_samples = 0
+                self._validation_dl = self.build_pretraining_data_loader(
+                    self._validation_ds, consumed_samples, num_workers=0
+                )
 
     def setup_test_data(self, cfg):
         if hasattr(self, '_test_ds'):
-            consumed_samples = 0
-            self._test_dl = self.build_pretraining_data_loader(self._test_ds, consumed_samples, num_workers=0)
+            if self._test_ds is not None:
+                consumed_samples = 0
+                self._test_dl = self.build_pretraining_data_loader(self._test_ds, consumed_samples, num_workers=0)
 
     def build_train_valid_test_datasets(self):
         logging.info(f'Building {self.model_name} datasets.')
@@ -110,6 +112,6 @@ class ProtT5nvModel(MegatronT5Model):
 
         logging.info(f'Length of train dataset: {len(self._train_ds)}')
         logging.info(f'Length of val dataset: {len(self._validation_ds)}')
-        logging.info(f'Length of test dataset: {len(self._test_ds)}')
+        logging.info(f'Length of test dataset: {len(self._test_ds) if self._test_ds is not None else None}')
         logging.info(f'Finished building {self.model_name} datasets.')
         return self._train_ds, self._validation_ds, self._test_ds
