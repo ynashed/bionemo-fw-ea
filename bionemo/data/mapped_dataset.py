@@ -15,7 +15,7 @@
 
 import os
 import time
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from typing import Dict, Optional
 
 import numpy as np
@@ -51,7 +51,7 @@ class SliceIndex:
         return self.length
 
 
-class MappedDataset(Dataset):
+class MappedDataset(Dataset, ABC):
     def __init__(self, dataset: Dataset, num_samples: Optional[int] = None, consolidate_sample_mapping=True):
         """
         Produces a remapped version of a `Dataset`.

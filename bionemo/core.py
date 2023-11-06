@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from functools import lru_cache
 
 import torch
@@ -21,7 +21,7 @@ from nemo.collections.nlp.models.language_modeling.megatron_bert_model import Me
 from nemo.utils import logging
 
 
-class BioNeMoDataModule:
+class BioNeMoDataModule(ABC):
     """Base Class for BioNeMo Data Modules.
 
     Data Modules coordinate the data-driven functions for BioNeMo Modules:

@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from copy import deepcopy
 from typing import Dict, List, Tuple
 
@@ -53,7 +53,7 @@ lg.setLevel(RDLogger.CRITICAL)
 __all__ = ["MegaMolBARTModelBase"]
 
 
-class MegaMolBARTModelBase(MegatronLMEncoderDecoderModel):
+class MegaMolBARTModelBase(MegatronLMEncoderDecoderModel, ABC):
     """
     MegaMolBART base models with abstract methods to be implemented:
     - _setup_collate
