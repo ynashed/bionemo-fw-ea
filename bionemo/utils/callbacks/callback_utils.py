@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List, Optional, Union
+from typing import List, Optional
 
 from pytorch_lightning import Callback
 
@@ -21,6 +21,8 @@ import bionemo.utils.callbacks
 
 
 __all__ = ["setup_callbacks"]
+
+from bionemo.utils import lookup_or_use
 
 
 def _instantiate_callback(callback_cfg, parent_cfg, plugins: Optional[List] = None) -> Callback:
@@ -72,8 +74,3 @@ def setup_callbacks(cfg, plugins: Optional[List] = None) -> List:
 
     callbacks = [_instantiate_callback(cb, cfg, plugins) for cb in callbacks]
     return callbacks
-
-
-def lookup_or_use(obj: object, attr: Union[str, object], *args, **kwargs):
-    """Looks up an object from a module or returns the attribute if it is not a string"""
-    return getattr(obj, attr)(*args, **kwargs) if isinstance(attr, str) else attr

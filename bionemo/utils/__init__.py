@@ -15,9 +15,14 @@
 
 from collections import defaultdict
 from dataclasses import asdict
-from typing import Union
+from typing import Any, Union
 
-from .connectors import *
+from bionemo.utils.connectors import *
+
+
+# TODO [MG] Remove this -- confusing API to have this module re-export `connector`'s things.
+#           Vastly clearer to have callers simply import the actual module instead.
+#           https://gitlab-master.nvidia.com/clara-discovery/bionemo/-/merge_requests/474
 
 
 def update_dataclass_config(cfg, dataset_config_class):
@@ -37,6 +42,7 @@ def flatten_dict(list_of_dicts):
     return flattened_dict
 
 
-def lookup_or_use(obj: object, attr: Union[str, object], *args, **kwargs):
+def lookup_or_use(obj: Any, attr: Union[str, Any], *args, **kwargs):
     """Looks up an object from a module or returns the attribute if it is not a string"""
+    # TODO [MG]: Why is this runtime reflection necessary? Can we avoid this indirection? Or is it absolutely vital?
     return getattr(obj, attr)(*args, **kwargs) if isinstance(attr, str) else attr
