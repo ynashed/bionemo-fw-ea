@@ -34,8 +34,8 @@ from bionemo.model.protein.equidock.equidock_model import EquiDock
 from bionemo.model.protein.esm1nv import ESM1nvModel
 from bionemo.model.protein.prott5nv import ProtT5nvModel
 from bionemo.model.utils import setup_trainer
-from bionemo.utils import BioNeMoSaveRestoreConnector
 from bionemo.utils.callbacks.callback_utils import setup_callbacks
+from bionemo.utils.connectors import BioNeMoSaveRestoreConnector
 from bionemo.utils.tests import (
     BioNemoSearchPathConfig,
     check_expected_training_results,

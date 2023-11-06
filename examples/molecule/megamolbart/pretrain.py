@@ -21,8 +21,8 @@ from omegaconf.omegaconf import OmegaConf
 from bionemo.data import Zinc15Preprocess
 from bionemo.model.molecule.megamolbart import MegaMolBARTModel
 from bionemo.model.utils import setup_trainer
-from bionemo.utils import BioNeMoSaveRestoreConnector
 from bionemo.utils.callbacks.callback_utils import setup_callbacks
+from bionemo.utils.connectors import BioNeMoSaveRestoreConnector
 
 
 @hydra_runner(config_path="conf", config_name="pretrain_xsmall_span_aug")

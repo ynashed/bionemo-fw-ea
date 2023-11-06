@@ -15,14 +15,14 @@
 
 from collections import defaultdict
 from dataclasses import asdict
-from typing import Any, Union
-
-from bionemo.utils.connectors import *
+from typing import Any, Sequence, Union
 
 
-# TODO [MG] Remove this -- confusing API to have this module re-export `connector`'s things.
-#           Vastly clearer to have callers simply import the actual module instead.
-#           https://gitlab-master.nvidia.com/clara-discovery/bionemo/-/merge_requests/474
+__all__: Sequence[str] = (
+    "update_dataclass_config",
+    "flatten_dict",
+    "lookup_or_use",
+)
 
 
 def update_dataclass_config(cfg, dataset_config_class):

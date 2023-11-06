@@ -20,8 +20,8 @@ from bionemo.data import FLIPPreprocess
 from bionemo.data.preprocess.protein.preprocess import ESM2Preprocess
 from bionemo.model.protein.esm1nv import esm1nv_model
 from bionemo.model.utils import setup_trainer
-from bionemo.utils import BioNeMoSaveRestoreConnector
 from bionemo.utils.callbacks.callback_utils import setup_callbacks
+from bionemo.utils.connectors import BioNeMoSaveRestoreConnector
 
 
 @hydra_runner(config_path="../../../examples/protein/esm2nv/conf", config_name="pretrain_esm2_8M")

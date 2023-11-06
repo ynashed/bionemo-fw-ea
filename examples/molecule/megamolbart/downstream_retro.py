@@ -19,7 +19,7 @@ from omegaconf.omegaconf import OmegaConf
 from bionemo.data.preprocess.molecule.uspto50k_preprocess import USPTO50KPreprocess
 from bionemo.model.molecule.megamolbart import MegaMolBARTRetroModel
 from bionemo.model.utils import setup_trainer
-from bionemo.utils import BioNeMoSaveRestoreConnector
+from bionemo.utils.connectors import BioNeMoSaveRestoreConnector
 
 
 @hydra_runner(config_path="conf", config_name="downstream_retro_uspto50k")

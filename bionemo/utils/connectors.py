@@ -14,7 +14,7 @@
 
 import math
 import tarfile
-from typing import Optional, Union
+from typing import Optional, Sequence, Union
 
 import torch
 import yaml
@@ -26,7 +26,7 @@ from omegaconf import OmegaConf
 from pytorch_lightning.trainer.trainer import Trainer
 
 
-__all__ = ['BioNeMoSaveRestoreConnector']
+__all__: Sequence[str] = ('BioNeMoSaveRestoreConnector',)
 
 
 class BioNeMoSaveRestoreConnector(NLPSaveRestoreConnector):

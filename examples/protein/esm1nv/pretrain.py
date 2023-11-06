@@ -19,8 +19,8 @@ from omegaconf.omegaconf import OmegaConf
 from bionemo.data import FLIPPreprocess, UniRef50Preprocess
 from bionemo.model.protein.esm1nv import ESM1nvModel
 from bionemo.model.utils import setup_trainer
-from bionemo.utils import BioNeMoSaveRestoreConnector
 from bionemo.utils.callbacks.callback_utils import setup_callbacks
+from bionemo.utils.connectors import BioNeMoSaveRestoreConnector
 
 
 @hydra_runner(config_path="../../../examples/protein/esm1nv/conf", config_name="pretrain_small")
