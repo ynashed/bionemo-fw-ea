@@ -24,6 +24,7 @@ EQUIDOCK_DIPS_MODEL="nvidian/clara-lifesciences/equidock:dips.23.10"
 EQUIDOCK_DB5_MODEL="nvidian/clara-lifesciences/equidock:db5.23.10"
 ESM2NV_650M_MODEL="nvidian/cvai_bnmo_trng/esm2nv650m:1.0-rc1" #TODO: update path when model is released
 ESM2NV_3B_MODEL="nvidian/cvai_bnmo_trng/esm2nv3b:1.0-rc1" #TODO: update path when model is released
+OPENFOLD_INH_FINETUNED_MODEL="nvidian/cvai_bnmo_trng/openfold:finetuning_pub_0.1.0" # TODO: update path and tag once released
 
 # PBSS Paths:
 ESM1NV_MODEL_PBSS="s3://bionemo-ci/models/esm1nv.nemo"
@@ -33,3 +34,4 @@ EQUIDOCK_DIPS_MODEL_PBSS="s3://bionemo-ci/models/equidock_dips.nemo"
 EQUIDOCK_DB5_MODEL_PBSS="s3://bionemo-ci/models/equidock_db5.nemo"
 ESM2NV_650M_MODEL_PBSS="s3://bionemo-ci/models/esm2nv_650M_converted.nemo"
 ESM2NV_3B_MODEL_PBSS="s3://bionemo-ci/models/esm2nv_3B_converted.nemo"
+OPENFOLD_INH_FINETUNED_MODEL_PBSS="s3://bionemo-ci/models/openfold.nemo"

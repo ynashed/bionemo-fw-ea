@@ -1,6 +1,5 @@
-# Copyright (c) 2022, NVIDIA CORPORATION.
-# SPDX-License-Identifier: Apache-2.0
-
+# Copyright 2023 NVIDIA CORPORATION
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -13,7 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .flip_preprocess import *
-from .open_protein_set import *
-from .pdb_mmcif import *
-from .preprocess import *
+from typing import Callable
+
+import numpy as np
+
+from bionemo.data.protein.openfold.helpers import map_tree_leaves
+
+
+NUMPY_SEED_MODULUS = 0xFFFF_FFFF + 1
+
+
+def map_array_tree(fn: Callable, tree: dict) -> dict:
+    """Maps array tree using given function."""
+    return map_tree_leaves(fn=fn, tree=tree, leaf_type=np.ndarray)

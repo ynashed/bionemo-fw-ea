@@ -6,6 +6,9 @@ import pytest
 import torch
 
 
+os.environ['PROJECT_MOUNT'] = os.environ.get('PROJECT_MOUNT', '/workspace/bionemo')
+
+
 @pytest.fixture
 def train_args():
     return {
@@ -30,11 +33,12 @@ DIRS_TO_TEST = [
     'examples/protein/downstream/',
     'examples/protein/esm1nv/',
     'examples/protein/prott5nv/',
+    'examples/protein/openfold/',
 ]
 
 TRAIN_SCRIPTS = []
 for subdir in DIRS_TO_TEST:
-    TRAIN_SCRIPTS += list(glob(os.path.join(subdir, 'pretrain*.py')))
+    TRAIN_SCRIPTS += list(glob(os.path.join(subdir, '*train*.py')))
     TRAIN_SCRIPTS += [f for f in glob(os.path.join(subdir, 'downstream*.py')) if not f.endswith('test.py')]
 
 
@@ -60,6 +64,7 @@ def get_data_overrides(script_or_cfg_path: str) -> str:
         'esm1nv',
         'prott5nv',
         'downstream',
+        'openfold',
     ), 'update this function, patterns might be wrong'
 
     task = {
@@ -68,23 +73,39 @@ def get_data_overrides(script_or_cfg_path: str) -> str:
     }
 
     if conf == ['conf']:
-        if model == 'megamolbart':
+        if model in ('megamolbart', 'openfold'):
             return ''
         else:
             return MAIN % f'{domain}/{task[domain]}/test/x000'
 
     if 'retro' in script:
         return MAIN % 'reaction'
+    elif model == 'openfold':
+        return MAIN % 'openfold_data'
     elif 'downstream' in script:
         return MAIN % f'{domain}/{task[domain]}'
     else:
         return (MAIN + DOWNSTREAM) % (domain, f'{domain}/{task[domain]}')
 
 
+def get_train_args_overrides(script_or_cfg_path, train_args):
+    root, domain, model, *conf, script = script_or_cfg_path.split('/')
+    if model == "openfold":
+        # FIXME: provide even smaller data sample or do not generate MSA features
+        pytest.skip(reason="CI infrastructure is too limiting")
+        train_args['model.micro_batch_size'] = 1
+        train_args['model.train_ds.num_workers'] = 1
+        train_args['model.train_sequence_crop_size'] = 32
+        # do not use kalign as it requires third-party-download and it not essential for testing
+        train_args['model.data.realign_when_required'] = False
+    return train_args
+
+
 @pytest.mark.needs_gpu
 @pytest.mark.parametrize('script_path', TRAIN_SCRIPTS)
 def test_train_scripts(script_path, train_args, tmp_path):
     data_str = get_data_overrides(script_path)
+    train_args = get_train_args_overrides(script_path, train_args)
     cmd = f'python {script_path} ++exp_manager.exp_dir={tmp_path} {data_str} ' + ' '.join(
         f'++{k}={v}' for k, v in train_args.items()
     )
@@ -92,13 +113,32 @@ def test_train_scripts(script_path, train_args, tmp_path):
     assert process_handle.returncode == 0
 
 
+def get_infer_args_overrides(config_path):
+    if 'openfold' in config_path:
+        return {
+            # cropped 7YVT_B  # cropped 7ZHL
+            # predicting on longer sequences will result in CUDA OOM.
+            # TODO: if preparing MSA is to be tested, the model has to be further scaled down
+            'sequences': r"\['GASTATVGRWMGPAEYQQMLDTGTVVQSSTGTTHVAYPAD','MTDSIKTLSAHRSFGGVQHFHEHASREIGLPMRFAAYLPP'\]"
+        }
+    return {}
+
+
 @pytest.mark.needs_checkpoint
 @pytest.mark.needs_gpu
 @pytest.mark.parametrize('config_path', INFERENCE_CONFIGS)
 def test_infer_script(config_path, tmp_path):
     config_dir, config_name = os.path.split(config_path)
-    cmd = f'python examples/infer.py --config-dir {config_dir} --config-name {config_name} ++exp_manager.exp_dir={tmp_path}'
-    # FIXME: WAR for retro checkpoint not being released
+    script_path = os.path.join(os.path.dirname(config_dir), 'infer.py')
+    infer_args = get_infer_args_overrides(config_path)
+    if not os.path.exists(script_path):
+        script_path = 'examples/infer.py'
+    cmd = (
+        f'python {script_path} --config-dir {config_dir} --config-name {config_name} ++exp_manager.exp_dir={tmp_path} '
+        + ' '.join(f'++{k}={v}' for k, v in infer_args.items())
+    )
+
+    # FIXME: WARs for unavailable checkpoints
     if 'retro' in config_path:
         cmd += ' model.downstream_task.restore_from_path=/model/molecule/megamolbart/megamolbart.nemo'
     cmd += get_data_overrides(config_path)

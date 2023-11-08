@@ -160,6 +160,7 @@ cifar-10-batches-py
 # Test data.
 tests/.data
 tests/data
+**/openfold_data
 
 # outputs folder
 examples/*/outputs

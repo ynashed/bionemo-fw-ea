@@ -18,6 +18,7 @@ In order to update test results or configs please use the following command:
 UPDATE_EXPECTED_RESULTS=1 pytest examples/tests/test_model_pretrain_and_downstream.py
 UPDATE_EXPECTED_CFG=1 pytest examples/tests/test_model_pretrain_and_downstream.py
 """
+
 import logging
 import os
 import pathlib
@@ -32,6 +33,7 @@ from bionemo.model.molecule.megamolbart import FineTuneMegaMolBART, MegaMolBARTM
 from bionemo.model.protein.downstream import FineTuneProteinModel
 from bionemo.model.protein.equidock.equidock_model import EquiDock
 from bionemo.model.protein.esm1nv import ESM1nvModel
+from bionemo.model.protein.openfold.openfold_model import AlphaFold
 from bionemo.model.protein.prott5nv import ProtT5nvModel
 from bionemo.model.utils import setup_trainer
 from bionemo.utils.callbacks.callback_utils import setup_callbacks
@@ -68,6 +70,7 @@ PREPEND_CONFIG_DIR = [
     '../molecule/megamolbart/conf',
     '../protein/equidock/conf',
     '../protein/equidock/conf',
+    '../protein/openfold/conf',
 ]
 CONFIG_NAME = [
     'megamolbart_downstream_retro_test',
@@ -80,6 +83,7 @@ CONFIG_NAME = [
     'megamolbart_physchem_test',
     'equidock_pretrain_test',
     'equidock_finetune_test',
+    'openfold_initial_training_test',
 ]
 CORRECT_CONFIG = [
     'megamolbart_retro_config.json',
@@ -92,6 +96,7 @@ CORRECT_CONFIG = [
     'megamolbart_physchem_config.json',
     'equidock_pretrain_config.json',
     'equidock_finetune_config.json',
+    'openfold_initial_training_config.json',
 ]
 CORRECT_RESULTS = [
     'megamolbart_retro_log.json',
@@ -104,6 +109,7 @@ CORRECT_RESULTS = [
     'megamolbart_physchem_log.json',
     'equidock_pretrain_log.json',
     'equidock_finetune_log.json',
+    'openfold_initial_training_log.json',
 ]
 MODEL_CLASS = [
     MegaMolBARTRetroModel,
@@ -116,6 +122,7 @@ MODEL_CLASS = [
     FineTuneMegaMolBART,
     EquiDock,
     EquiDock,
+    AlphaFold,
 ]
 MODEL_PARAMETERS = [
     45058048,
@@ -128,6 +135,7 @@ MODEL_PARAMETERS = [
     66817,
     525671,
     684074,
+    93229082,
 ]
 
 

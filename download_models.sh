@@ -32,7 +32,7 @@ function setup_model() {
     local model_target=${base_directory}/$3
 
     set -e
-    
+
     echo "Downloading model ${model_source} to ${model_target}..."
 
     local tmp_root=`mktemp -d`
@@ -66,11 +66,11 @@ function setup_model() {
         downloaded_model_file="${base_directory}/${model_basename}.nemo"
         rm -rf ${tmp_download_loc}/*
     fi
-    
+
     echo "Linking  ${model_target} to ${downloaded_model_file}..."
     mkdir -p $(dirname ${model_target})
     ln -frs ${downloaded_model_file} ${model_target}
-    
+
     # This file is created to record the version of model
     mkdir -p ${base_directory}/version
     touch ${base_directory}/version/${model_source//[\/]/_}.version
@@ -93,7 +93,7 @@ download_bionemo_models() {
             ;;
         esac
     done
-    
+
     if $use_s3; then
         if [[ -z "${AWS_ENDPOINT_URL}" || -z "${AWS_ACCESS_KEY_ID}" || -z "${AWS_SECRET_ACCESS_KEY}" ]]; then
             echo "One or more of the required AWS environment variables (AWS_ENDPOINT_URL, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY) are not set!"
@@ -127,7 +127,10 @@ download_bionemo_models() {
             "${ESM2NV_3B_MODEL_PBSS}" \
             "${MODEL_PATH}" \
             "protein/esm2nv/esm2nv_3B_converted.nemo"
-
+        setup_model \
+            "${OPENFOLD_INH_FINETUNED_MODEL_PBSS}" \
+            "${MODEL_PATH}" \
+            "protein/openfold/openfold.nemo"
     else
         local ngc_api_key_is_set_=$(ngc_api_key_is_set)
         if [ $ngc_api_key_is_set_ != true ]; then
@@ -163,6 +166,9 @@ download_bionemo_models() {
             "${ESM2NV_3B_MODEL}" \
             "${MODEL_PATH}" \
             "protein/esm2nv/esm2nv_3B_converted.nemo"
-
+        setup_model \
+            "${OPENFOLD_INH_FINETUNED_MODEL}" \
+            "${MODEL_PATH}" \
+            "protein/openfold/openfold.nemo"
     fi
 }

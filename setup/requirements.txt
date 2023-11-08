@@ -25,6 +25,11 @@ biopandas==0.2.8
 pipdeptree==2.13.0
 gevent==23.9.1
 joblib==1.2.0
+dill
+biopython==1.79
+Pympler==1.0.1
+dacite==1.7.0
+ipdb==0.13.11
 pytest-cov
 # For SwiftStack access
 awscli==1.29.67

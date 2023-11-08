@@ -171,6 +171,7 @@ unit-test-pytest:
     - nvidia-smi
   script:
     - !reference [ .unit-tests-common, script ]
+    - bash /workspace/bionemo/examples/protein/openfold/scripts/download_data_sample.sh /workspace/bionemo/examples/tests/test_data/
     - pytest -v --cov=bionemo --cov-report term --cov-report xml:coverage.xml -k "not test_model_training"
     - cp -r coverage.xml /builds/clara-discovery/bionemo/
   coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
