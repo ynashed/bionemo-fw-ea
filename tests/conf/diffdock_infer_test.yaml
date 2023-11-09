@@ -1,0 +1,20 @@
+defaults:
+  - infer
+
+hydra:
+  searchpath:
+     - ${oc.env:PROJECT_MOUNT}/examples/molecule/diffdock/conf
+
+tmp_directory: ???
+
+seed: 42
+out_dir: ${tmp_directory}
+samples_per_complex: 4
+
+confidence_infer:
+  trainer:
+    deterministic: warn
+
+score_infer:
+  trainer:
+    deterministic: warn

@@ -1,0 +1,36 @@
+defaults:
+  - train_confidence
+
+hydra:
+  searchpath:
+     - ${oc.env:PROJECT_MOUNT}/examples/molecule/diffdock/conf
+
+tmp_directory: ???
+
+seed: 42
+
+training_data:
+  protein_data_dir:  ${tmp_directory}/PDBBind_processed_test
+  output_fasta_file: ${tmp_directory}/ref/pdbbind_sequences.fasta
+  esm_embeddings_path: ${tmp_directory}/ref/esm2_embeddings.sqlite3
+
+model:
+  train_ds:
+    num_workers: 2
+    chunk_size: 1
+    split_train: ${tmp_directory}/timesplit_train
+    cache_path: ${tmp_directory}/data_cache
+
+
+
+score_infer:
+  model:
+    train_ds:
+      split_train: ${tmp_directory}/timesplit_train
+      cache_path: ${tmp_directory}/ref/data_cache
+
+train_graph_folder_name: allatoms_limit0_INDEXtimesplit_train_maxLigSizeNone_H0_recRad15_recMax24_atomRad5.0_atomMax8_esmEmbeddings
+ref_train_graph_file: ${tmp_directory}/ref/data_cache/${train_graph_folder_name}/heterographs.sqlite3
+
+ligand_pose_folder_name: model_paper_large_score_split_train_limit_0
+ref_ligand_pose_file: ${tmp_directory}/ref/data_cache/${ligand_pose_folder_name}/confidence_cache_id_base.sqlite3

@@ -128,6 +128,14 @@ download_bionemo_models() {
             "${MODEL_PATH}" \
             "protein/esm2nv/esm2nv_3B_converted.nemo"
         setup_model \
+            "${DIFFDOCK_SCORE_MODEL_PBSS}" \
+            "${MODEL_PATH}" \
+            "molecule/diffdock/diffdock_score.nemo"
+        setup_model \
+            "${DIFFDOCK_CONFIDENCE_MODEL_PBSS}" \
+            "${MODEL_PATH}" \
+            "molecule/diffdock/diffdock_confidence.nemo"
+        setup_model \
             "${OPENFOLD_INH_FINETUNED_MODEL_PBSS}" \
             "${MODEL_PATH}" \
             "protein/openfold/openfold.nemo"
@@ -166,6 +174,14 @@ download_bionemo_models() {
             "${ESM2NV_3B_MODEL}" \
             "${MODEL_PATH}" \
             "protein/esm2nv/esm2nv_3B_converted.nemo"
+        setup_model \
+            "${DIFFDOCK_SCORE_MODEL}" \
+            "${MODEL_PATH}" \
+            "molecule/diffdock/diffdock_score.nemo"
+        setup_model \
+            "${DIFFDOCK_CONFIDENCE_MODEL}" \
+            "${MODEL_PATH}" \
+            "molecule/diffdock/diffdock_confidence.nemo"
         setup_model \
             "${OPENFOLD_INH_FINETUNED_MODEL}" \
             "${MODEL_PATH}" \

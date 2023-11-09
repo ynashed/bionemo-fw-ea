@@ -193,6 +193,13 @@ nemo_error_log*.txt
 *.nemo
 *.version
 *.npy
+
+.python_history
+.config
+.ipython
+
+.dotnet
+tmp
 *.swp
 *.idx.info
 .dgl/

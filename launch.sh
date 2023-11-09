@@ -105,6 +105,8 @@ variables:
         NGC team name.  Run \`ngc config --help\` for details.
     NGC_CLI_FORMAT_TYPE
         NGC cli format. Default is ascii.  Run \`ngc config --help\` for details.
+    GITLAB_TOKEN
+        gitlab access token, used when build container with wheels stored in gitlab registery
 
 EOF
     exit
@@ -207,6 +209,7 @@ fi
 
 DOCKER_BUILD_CMD="docker build --network host \
     -t ${BIONEMO_IMAGE} \
+    --build-arg GITLAB_TOKEN=${GITLAB_TOKEN} \
     --label com.nvidia.bionemo.git_hash='${BIONEMO_GIT_HASH}' \
     -f setup/Dockerfile"
 

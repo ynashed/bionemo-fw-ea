@@ -23,6 +23,9 @@
 ARG BASE_IMAGE=nvcr.io/nvidia/nemo:23.06
 FROM ${BASE_IMAGE}
 
+ENV TERM=xterm
+ENV FORCE_CUDA=1
+
 WORKDIR /workspace/
 # TODO: Long term, docker should not be running as root.
 ENV HOME=/root
@@ -58,6 +61,14 @@ RUN pip3 install -r /tmp/requirements-linter.txt
 # This config file does not contain access keys.
 RUN mkdir $HOME/.aws
 COPY setup/aws-config-swiftstack $HOME/.aws/config
+
+## Install PyG packages with pre-built wheel from gitlab registry
+ARG GITLAB_TOKEN
+ARG PIP_URL=https://__token__:${GITLAB_TOKEN}@gitlab-master.nvidia.com/api/v4/projects/65301/packages/pypi/simple
+RUN pip install torch_cluster==1.6.1 --index-url ${PIP_URL}
+RUN pip install torch_sparse==0.6.17 --index-url ${PIP_URL}
+RUN pip install torch-geometric==2.3.0 --index-url ${PIP_URL}
+RUN pip install torch-scatter==2.0.9 --index-url ${PIP_URL}
 
 ## Install NGC cli in container for artifact download
 ENV NGC_CLI_INSTALL_PREFIX=/usr/local/bin

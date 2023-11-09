@@ -1,0 +1,17 @@
+defaults:
+  - embedding_preprocess
+
+hydra:
+  searchpath:
+     - ${oc.env:PROJECT_MOUNT}/examples/molecule/diffdock/conf
+
+tmp_directory: ???
+
+ref_fasta_file: ${tmp_directory}/ref/pdbbind_sequences.fasta
+ref_esm_embeddings_path: ${tmp_directory}/ref/esm2_embeddings.sqlite3
+
+training_data:
+  protein_data_dir:  ${tmp_directory}/PDBBind_processed_test
+  output_fasta_file: ${tmp_directory}/pdbbind_sequences.fasta
+  output_esm_dir: ${tmp_directory}/embeddings_output
+  esm_embeddings_path: ${tmp_directory}/esm2_embeddings.sqlite3

@@ -1,0 +1,7 @@
+training_data:
+  protein_path: null
+  protein_ligand_csv: null
+  protein_data_dir: /data/PDBBind_processed # /data/structures <- for Marta
+  output_fasta_file: /data/pdbbind_sequences.fasta
+  esm_embeddings_path: /data/esm2_3billion_embeddings.sqlite3
+  chain_cutoff: 10

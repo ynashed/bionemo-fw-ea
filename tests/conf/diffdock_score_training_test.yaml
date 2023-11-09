@@ -1,0 +1,32 @@
+defaults:
+  - train_score
+
+hydra:
+  searchpath:
+     - ${oc.env:PROJECT_MOUNT}/examples/molecule/diffdock/conf
+
+tmp_directory: ???
+
+
+name: diffdock_score_training_test
+
+data:
+  split_train: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/molecule/diffdock/splits/timesplit_no_lig_overlap_train # Path of file defining the split.
+  split_val: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/molecule/diffdock/splits/timesplit_no_lig_overlap_val # Path of file defining the split
+  split_test: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/molecule/diffdock/splits/timesplit_test # Path of file defining the split
+  cache_path: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/molecule/diffdock/data_cache # Folder from where to load/restore cached dataset
+
+trainer:
+  precision: 32
+  max_epochs: 1
+
+model:
+  micro_batch_size: 2
+  max_total_size: null
+  estimate_memory_usage:
+    maximal: null
+  val_denoising_inference_freq: 1
+
+exp_manager:
+  create_wandb_logger: False
+  exp_dir: ${tmp_directory}/result/${name}

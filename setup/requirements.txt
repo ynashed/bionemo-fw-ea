@@ -21,7 +21,6 @@ git+https://github.com/NVIDIA/dllogger@v1.0.0#egg=dllogger
 POT==0.7.0
 dgllife==0.2.8
 dill
-biopandas==0.2.8
 pipdeptree==2.13.0
 gevent==23.9.1
 joblib==1.2.0
@@ -37,3 +36,11 @@ awscli==1.29.67
 ruff==0.0.292
 black==23.1.0
 pre-commit==3.4.0
+# diffdock
+biopandas==0.4.1
+biopython==1.79
+git+https://github.com/e3nn/e3nn.git@0.5.1
+rdkit-pypi==2022.9.5
+spyrmsd==0.5.2
+git+https://github.com/facebookresearch/esm.git@v2.0.0
+pytest-timeout

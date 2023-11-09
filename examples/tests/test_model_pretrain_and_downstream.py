@@ -27,8 +27,17 @@ import pytest
 import torch
 from hydra import compose, initialize
 from hydra.core.global_hydra import GlobalHydra
+from pytorch_lightning import seed_everything
 
+from bionemo.data.diffdock.data_manager import DataManager as DiffdockDataManagers
 from bionemo.data.equidock import DataManager
+from bionemo.model.molecule.diffdock.models.nemo_model import (
+    DiffdockTensorProductScoreModel as DiffdockScoreModel,
+)
+from bionemo.model.molecule.diffdock.models.nemo_model import (
+    DiffdockTensorProductScoreModelAllAtom as DiffdockConfidenceModel,
+)
+from bionemo.model.molecule.diffdock.setup_trainer import DiffdockTrainerBuilder
 from bionemo.model.molecule.megamolbart import FineTuneMegaMolBART, MegaMolBARTModel, MegaMolBARTRetroModel
 from bionemo.model.protein.downstream import FineTuneProteinModel
 from bionemo.model.protein.equidock.equidock_model import EquiDock
@@ -68,6 +77,8 @@ PREPEND_CONFIG_DIR = [
     '../protein/esm1nv/conf',
     '../protein/prott5nv/conf',
     '../molecule/megamolbart/conf',
+    '../molecule/diffdock/conf',
+    '../molecule/diffdock/conf',
     '../protein/equidock/conf',
     '../protein/equidock/conf',
     '../protein/openfold/conf',
@@ -81,6 +92,8 @@ CONFIG_NAME = [
     'esm1nv_encoder_finetune_test',
     'prott5nv_sec_str_val_test',
     'megamolbart_physchem_test',
+    'diffdock_score_test',
+    'diffdock_confidence_test',
     'equidock_pretrain_test',
     'equidock_finetune_test',
     'openfold_initial_training_test',
@@ -94,6 +107,8 @@ CORRECT_CONFIG = [
     'esm1nv_encoder_finetune_config.json',
     'prott5nv_sec_str_val_config.json',
     'megamolbart_physchem_config.json',
+    'diffdock_score_config.json',
+    'diffdock_confidence_config.json',
     'equidock_pretrain_config.json',
     'equidock_finetune_config.json',
     'openfold_initial_training_config.json',
@@ -107,6 +122,8 @@ CORRECT_RESULTS = [
     'esm1nv_encoder_finetune_log.json',
     'prott5nv_sec_str_val_log.json',
     'megamolbart_physchem_log.json',
+    'diffdock_score_log.json',
+    'diffdock_confidence_log.json',
     'equidock_pretrain_log.json',
     'equidock_finetune_log.json',
     'openfold_initial_training_log.json',
@@ -120,6 +137,8 @@ MODEL_CLASS = [
     FineTuneProteinModel,
     ProtT5nvModel,
     FineTuneMegaMolBART,
+    DiffdockScoreModel,
+    DiffdockConfidenceModel,
     EquiDock,
     EquiDock,
     AlphaFold,
@@ -133,6 +152,8 @@ MODEL_PARAMETERS = [
     43787533,
     198970496,
     66817,
+    20248214,
+    4769636,
     525671,
     684074,
     93229082,
@@ -209,6 +230,10 @@ def test_model_size(prepend_config_path, config_name, model_class, model_paramet
     trainer = setup_trainer(cfg, callbacks=callbacks)
     if model_class == FineTuneProteinModel or model_class == FineTuneMegaMolBART:
         model = model_class(cfg, trainer)
+    elif model_class == DiffdockScoreModel or model_class == DiffdockConfidenceModel:
+        data_manager = DiffdockDataManagers(cfg)
+        trainer = setup_trainer(cfg, builder=DiffdockTrainerBuilder)
+        model = model_class(cfg=cfg, trainer=trainer, data_manager=data_manager)
 
     elif model_class == EquiDock:
         data_manager = DataManager(cfg)
@@ -229,7 +254,7 @@ def test_model_size(prepend_config_path, config_name, model_class, model_paramet
 )
 def test_model_training(prepend_config_path, config_name, model_class, correct_results):
     '''Run short model training and ensure key metrics are identical'''
-    torch.manual_seed(0)
+    seed_everything(0, workers=True)
     cfg = get_cfg(prepend_config_path, config_name)
     clean_directory(cfg.exp_manager.exp_dir)
     callbacks = setup_callbacks(cfg)
@@ -244,6 +269,12 @@ def test_model_training(prepend_config_path, config_name, model_class, correct_r
             save_restore_connector=BioNeMoSaveRestoreConnector(),
             override_config_path=cfg,
         )
+    elif model_class == DiffdockScoreModel or model_class == DiffdockConfidenceModel:
+        torch.use_deterministic_algorithms(True, warn_only=True)
+        torch.backends.cudnn.benchmark = False
+        data_manager = DiffdockDataManagers(cfg)
+        trainer = setup_trainer(cfg, builder=DiffdockTrainerBuilder)
+        model = model_class(cfg=cfg, trainer=trainer, data_manager=data_manager)
     elif model_class == EquiDock:
         data_manager = DataManager(cfg)
         cfg.model.input_edge_feats_dim = data_manager.train_ds[0][0].edata['he'].shape[1]
@@ -278,6 +309,7 @@ def test_model_training(prepend_config_path, config_name, model_class, correct_r
         assert False, msg
 
     expected_results = load_expected_training_results(results_comparison_dir, correct_results)
+
     check_expected_training_results(
         trainer_results,
         expected_results,

@@ -111,6 +111,7 @@ build:
       base="";
       fi
     - docker build --network host --no-cache ${base} --label com.nvidia.bionemo.git_hash=${CI_COMMIT_SHORT_SHA}
+      --build-arg GITLAB_TOKEN=${RO_API_TOKEN}
       -t $PIPELINE_TAG -f setup/Dockerfile .
     - docker push $PIPELINE_TAG
     - docker build --network host --no-cache --build-arg BIONEMO_IMAGE="$PIPELINE_TAG"
@@ -171,6 +172,7 @@ unit-test-pytest:
     - nvidia-smi
   script:
     - !reference [ .unit-tests-common, script ]
+    - bash /workspace/bionemo/examples/molecule/diffdock/scripts/download_data_sample.sh
     - bash /workspace/bionemo/examples/protein/openfold/scripts/download_data_sample.sh /workspace/bionemo/examples/tests/test_data/
     - pytest -v --cov=bionemo --cov-report term --cov-report xml:coverage.xml -k "not test_model_training"
     - cp -r coverage.xml /builds/clara-discovery/bionemo/
