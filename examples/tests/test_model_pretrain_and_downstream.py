@@ -41,7 +41,7 @@ from bionemo.model.molecule.diffdock.setup_trainer import DiffdockTrainerBuilder
 from bionemo.model.molecule.megamolbart import FineTuneMegaMolBART, MegaMolBARTModel, MegaMolBARTRetroModel
 from bionemo.model.protein.downstream import FineTuneProteinModel
 from bionemo.model.protein.equidock.equidock_model import EquiDock
-from bionemo.model.protein.esm1nv import ESM1nvModel
+from bionemo.model.protein.esm1nv import ESM1nvModel, ESM2nvModel
 from bionemo.model.protein.openfold.openfold_model import AlphaFold
 from bionemo.model.protein.prott5nv import ProtT5nvModel
 from bionemo.model.utils import setup_trainer
@@ -82,6 +82,7 @@ PREPEND_CONFIG_DIR = [
     '../protein/equidock/conf',
     '../protein/equidock/conf',
     '../protein/openfold/conf',
+    '../protein/esm2nv/conf',
 ]
 CONFIG_NAME = [
     'megamolbart_downstream_retro_test',
@@ -97,6 +98,7 @@ CONFIG_NAME = [
     'equidock_pretrain_test',
     'equidock_finetune_test',
     'openfold_initial_training_test',
+    'esm2nv_8M_test',
 ]
 CORRECT_CONFIG = [
     'megamolbart_retro_config.json',
@@ -112,6 +114,7 @@ CORRECT_CONFIG = [
     'equidock_pretrain_config.json',
     'equidock_finetune_config.json',
     'openfold_initial_training_config.json',
+    'esm2nv_8M_config.json',
 ]
 CORRECT_RESULTS = [
     'megamolbart_retro_log.json',
@@ -127,6 +130,7 @@ CORRECT_RESULTS = [
     'equidock_pretrain_log.json',
     'equidock_finetune_log.json',
     'openfold_initial_training_log.json',
+    'esm2nv_8M_log.json',
 ]
 MODEL_CLASS = [
     MegaMolBARTRetroModel,
@@ -142,6 +146,7 @@ MODEL_CLASS = [
     EquiDock,
     EquiDock,
     AlphaFold,
+    ESM2nvModel,
 ]
 MODEL_PARAMETERS = [
     45058048,
@@ -157,6 +162,7 @@ MODEL_PARAMETERS = [
     525671,
     684074,
     93229082,
+    7542848,
 ]
 
 

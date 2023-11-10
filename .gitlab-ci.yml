@@ -42,13 +42,13 @@ variables:
     description: "Wether to use nightly NeMo docker image as base. Set to 'false' by default."
   NGC_CLI_FORMAT_TYPE: ascii
   NGC_CLI_ORG: nvidian
-  # TODO(@dorotat): change to cvai_bnmo_trng when we move data and checkpoints
+  # TODO(dorotat): change to cvai_bnmo_trng when we move data and checkpoints
   NGC_CLI_TEAM: clara-lifesciences
   JET_WORKLOADS_REF_MAIN: "bionemo/training-unit-tests"
   SKIP_CI_MR: "false"
   SKIP_CI_MR_JET: "false"
 
-# TODO(@dorotat) solution with SKIP_CI flag is error-prone and should be replaced with better logic!!!!
+# TODO(dorotat) solution with SKIP_CI flag is error-prone and should be replaced with better logic!!!!
 workflow:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_LABELS =~ /SKIP_CI/
@@ -172,6 +172,7 @@ unit-test-pytest:
     - nvidia-smi
   script:
     - !reference [ .unit-tests-common, script ]
+    - unzip examples/tests/test_data/uniref202104_esm2_qc_test200_val200.zip -d examples/tests/test_data/
     - bash /workspace/bionemo/examples/molecule/diffdock/scripts/download_data_sample.sh
     - bash /workspace/bionemo/examples/protein/openfold/scripts/download_data_sample.sh /workspace/bionemo/examples/tests/test_data/
     - pytest -v --cov=bionemo --cov-report term --cov-report xml:coverage.xml -k "not test_model_training"

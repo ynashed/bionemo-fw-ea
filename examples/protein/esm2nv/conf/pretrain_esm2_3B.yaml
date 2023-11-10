@@ -1,17 +1,14 @@
-##
-## The minimal set of changes to scale the ESM2nv-8M to 3B
-##
+# The minimal set of changes to scale the ESM2nv model to 3B
 
 defaults:
   - base_config
-restore_from_path: null # used when starting from a .nemo file
 
 name: esm2-3B
 
 model:
+  micro_batch_size: 1
   num_layers: 36
   hidden_size: 2560
-  ffn_hidden_size: 10240 # Transformer FFN hidden size. Usually 4 * hidden_size.
   num_attention_heads: 40
 
   tokenizer:
@@ -19,5 +16,4 @@ model:
 
   # model/data parallelism
   tensor_model_parallel_size: 2 # model parallelism
-  pipeline_model_parallel_size: 1 # model parallelism
-  micro_batch_size: 1
+

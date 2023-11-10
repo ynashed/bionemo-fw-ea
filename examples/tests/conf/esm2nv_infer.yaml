@@ -1,0 +1,37 @@
+defaults:
+  - base_infer_config
+  # allow this config to override defaults
+  - _self_
+
+hydra:
+  searchpath:
+     - /workspace/bionemo/examples/conf/
+
+name: ESM2nv_Inference
+desc: Minimum configuration for initializing a ESM2nv model for inference in unit tests.
+
+model:
+  post_process: False
+  tokenizer:
+    library: 'huggingface'
+    type: 'BertWordPieceLowerCase'
+    model_name: "facebook/esm2_t33_650M_UR50D"  # Other supported models: esm2_t6_8M_UR50D esm2_t36_3B_UR50D
+    vocab_path: null
+    model_path: null
+  downstream_task:
+    restore_from_path: "/model/protein/esm2nv/esm2nv_650M_converted.nemo" # Path to pretrained checkpoint. Other options: esm2nv_3B_converted.nemo
+    outputs: [embeddings, hiddens] # Which outputs to extract per sample (a value or list). Possible values: hiddens, embeddings.
+  data:
+    dataset_path: examples/tests/test_data/protein/downstream/test/x000.csv # full path to dataset (can include range or a list)
+    output_fname: /tmp/nemo_experiments/esm2nv_infer/x000.pkl
+    batch_size: 32
+
+target: bionemo.model.protein.esm1nv.esm1nv_model.ESM2nvModel  # path to model class to load
+infer_target: bionemo.model.protein.esm1nv.infer.ESM1nvInference # path to inferende class to load
+
+exp_manager:
+  exp_dir: /tmp/nemo_experiments/esm2nv_infer
+  create_wandb_logger: False
+  create_tensorboard_logger: False
+  wandb_logger_kwargs:
+    offline: True

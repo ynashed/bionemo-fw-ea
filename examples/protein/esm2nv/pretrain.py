@@ -24,7 +24,7 @@ from bionemo.utils.callbacks.callback_utils import setup_callbacks
 from bionemo.utils.connectors import BioNeMoSaveRestoreConnector
 
 
-@hydra_runner(config_path="../../../examples/protein/esm2nv/conf", config_name="pretrain_esm2_8M")
+@hydra_runner(config_path="conf", config_name="pretrain_esm2_8M")
 def main(cfg) -> None:
     logging.info("\n\n************** Experiment configuration ***********")
     logging.info(f'\n{OmegaConf.to_yaml(cfg)}')

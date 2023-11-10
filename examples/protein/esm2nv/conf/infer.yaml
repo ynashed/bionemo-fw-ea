@@ -19,7 +19,7 @@ model:
     vocab_path: null
     model_path: null
   downstream_task:
-    restore_from_path: "/model/protein/esm2nv/protein/esm2nv/esm2nv_650M_converted.nemo" # Path to pretrained checkpoint. Other options: esm2nv_3B_converted.nemo
+    restore_from_path: "/model/protein/esm2nv/esm2nv_650M_converted.nemo" # Path to pretrained checkpoint. Other options: esm2nv_3B_converted.nemo
     outputs: [embeddings, hiddens] # Which outputs to extract per sample (a value or list). Possible values: hiddens, embeddings.
   data:
     dataset_path: /data/FLIP/secondary_structure/test/x000 # full path to dataset (can include range or a list)

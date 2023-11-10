@@ -1,0 +1,13 @@
+{
+    "consumed_samples": 1000.0,
+    "global_step": 499.0,
+    "grad_norm": 2.8949713706970215,
+    "loss_scale": 65536.0,
+    "lr": 9.639999916544184e-05,
+    "reduced_train_loss": 2.851994276046753,
+    "train_backward_timing": 3.3855438232421875e-05,
+    "train_step_timing": 0.03252100944519043,
+    "val_loss": 2.988468647003174,
+    "val_loss_ECE": 7.9363112449646,
+    "validation_step_timing": 0.016628026962280273
+}

@@ -17,12 +17,19 @@ def train_args():
         'trainer.max_steps': 20,
         'trainer.val_check_interval': 10,
         'trainer.limit_val_batches': 2,
+        'trainer.limit_test_batches': 1,
         'exp_manager.create_wandb_logger': False,
         'exp_manager.create_tensorboard_logger': False,
+        'model.micro_batch_size': 2,
+    }
+
+
+@pytest.fixture
+def data_args():
+    return {
         'model.data.dataset.train': 'x000',
         'model.data.dataset.val': 'x000',
         'model.data.dataset.test': 'x000',
-        'model.micro_batch_size': 2,
     }
 
 
@@ -32,6 +39,7 @@ DIRS_TO_TEST = [
     'examples/molecule/megamolbart/',
     'examples/protein/downstream/',
     'examples/protein/esm1nv/',
+    'examples/protein/esm2nv/',
     'examples/protein/prott5nv/',
     'examples/protein/openfold/',
 ]
@@ -55,13 +63,15 @@ def get_data_overrides(script_or_cfg_path: str) -> str:
     Returns string that can be appended to the python command for launching the script
     """
     TEST_DATA_DIR = '/workspace/bionemo/examples/tests/test_data'
-    MAIN = f' ++model.data.dataset_path={TEST_DATA_DIR}/%s'
+    DATA = " ++model.data"
+    MAIN = f'{DATA}.dataset_path={TEST_DATA_DIR}/%s'
     DOWNSTREAM = f' ++model.dwnstr_task_validation.dataset.dataset_path={TEST_DATA_DIR}/%s'
 
     root, domain, model, *conf, script = script_or_cfg_path.split('/')
     assert root == 'examples' and model in (
         'megamolbart',
         'esm1nv',
+        'esm2nv',
         'prott5nv',
         'downstream',
         'openfold',
@@ -84,6 +94,16 @@ def get_data_overrides(script_or_cfg_path: str) -> str:
         return MAIN % 'openfold_data'
     elif 'downstream' in script:
         return MAIN % f'{domain}/{task[domain]}'
+    elif model == 'esm2nv' and "infer" not in script:
+        # TODO(dorotat) Simplify this case when data-related utils for ESM2 are refactored
+        UNIREF_FOLDER = "uniref202104_esm2_qc_test200_val200"
+        esm2_overwrites = (
+            MAIN % f'{UNIREF_FOLDER}/uf50' + f"{DATA}.cluster_mapping_tsv={TEST_DATA_DIR}/{UNIREF_FOLDER}/mapping.tsv"
+            f"{DATA}.index_mapping_dir={TEST_DATA_DIR}/{UNIREF_FOLDER}"
+            f"{DATA}.uf90.uniref90_path={TEST_DATA_DIR}/{UNIREF_FOLDER}/uf90/"
+            + DOWNSTREAM % f'{domain}/{task[domain]}'
+        )
+        return esm2_overwrites
     else:
         return (MAIN + DOWNSTREAM) % (domain, f'{domain}/{task[domain]}')
 
@@ -103,12 +123,16 @@ def get_train_args_overrides(script_or_cfg_path, train_args):
 
 @pytest.mark.needs_gpu
 @pytest.mark.parametrize('script_path', TRAIN_SCRIPTS)
-def test_train_scripts(script_path, train_args, tmp_path):
+def test_train_scripts(script_path, train_args, data_args, tmp_path):
     data_str = get_data_overrides(script_path)
     train_args = get_train_args_overrides(script_path, train_args)
     cmd = f'python {script_path} ++exp_manager.exp_dir={tmp_path} {data_str} ' + ' '.join(
         f'++{k}={v}' for k, v in train_args.items()
     )
+    # TODO(dorotat) Trye to simplify  when data-related utils for ESM2 are refactored
+    if "esm2" not in script_path:
+        cmd += ' ' + ' '.join(f'++{k}={v}' for k, v in data_args.items())
+    print(cmd)
     process_handle = subprocess.run(cmd, shell=True, capture_output=True)
     assert process_handle.returncode == 0
 
