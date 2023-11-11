@@ -81,7 +81,7 @@ def save_cfg_to_json(cfg: dict, results_comparison_dir: str, correct_config: str
     cfg_str = resolve_cfg(cfg)
     output_file = os.path.join(results_comparison_dir, correct_config)
     with open(output_file, 'w') as fh:
-        fh.write(json.dumps(cfg_str))
+        fh.write(json.dumps(cfg_str, indent=4))
 
 
 def load_cfg_json(results_comparison_dir: str, correct_config: str):
