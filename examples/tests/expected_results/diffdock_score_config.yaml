@@ -1,0 +1,242 @@
+training_data:
+  protein_path: "null"
+  protein_ligand_csv: "null"
+  protein_data_dir: /data/PDBBind_processed
+  output_fasta_file: /data/pdbbind_sequences.fasta
+  esm_embeddings_path: /data/esm2_3billion_embeddings.sqlite3
+  chain_cutoff: "10"
+name: diffdock_score_training_test
+do_embedding_preprocessing: "false"
+do_training: "true"
+do_testing: "false"
+seed: "0"
+cluster_type: None
+restore_from_path: "null"
+target: bionemo.model.molecule.diffdock.models.nemo_model.DiffdockTensorProductScoreModel
+infer_target: bionemo.model.molecule.diffdock.infer.ScoreModelInference
+data:
+  num_workers: "1"
+  pin_memory: "false"
+  limit_complexes: "0"
+  all_atoms: "false"
+  receptor_radius: "15"
+  c_alpha_max_neighbors: "24"
+  atom_radius: "5.0"
+  atom_max_neighbors: "8"
+  matching_popsize: "20"
+  matching_maxiter: "20"
+  max_lig_size: "null"
+  remove_hs: "true"
+  num_conformers: "1"
+  world_size: "1"
+  esm_embeddings_path: /data/esm2_3billion_embeddings.sqlite3
+  data_dir: /data/PDBBind_processed
+  split_train: /workspace/bionemo/examples/tests/test_data/molecule/diffdock/splits/timesplit_no_lig_overlap_train
+  split_val: /workspace/bionemo/examples/tests/test_data/molecule/diffdock/splits/timesplit_no_lig_overlap_val
+  split_test: /workspace/bionemo/examples/tests/test_data/molecule/diffdock/splits/timesplit_test
+  cache_path: /workspace/bionemo/examples/tests/test_data/molecule/diffdock/data_cache
+  chunk_size: "5"
+trainer:
+  devices: "1"
+  num_nodes: "1"
+  precision: "32"
+  accelerator: gpu
+  max_epochs: "1"
+  max_steps: "-1"
+  log_every_n_steps: "50"
+  val_check_interval: "null"
+  check_val_every_n_epoch: "1"
+  num_sanity_val_steps: "2"
+  limit_val_batches: "200"
+  limit_test_batches: "0"
+  gradient_clip_val: "1.0"
+  logger: "false"
+  enable_checkpointing: "false"
+  replace_sampler_ddp: "false"
+  reload_dataloaders_every_n_epochs: "100000"
+  accumulate_grad_batches: "1"
+  deterministic: warn
+model:
+  name: diffdock_score_training_test
+  esm_embeddings_path: /data/esm2_3billion_embeddings.sqlite3
+  seed: "0"
+  micro_batch_size: "5"
+  global_batch_size: "null"
+  batch_sampler: "null"
+  max_total_size: "null"
+  estimate_memory_usage:
+    coeff_ligand_num_nodes: "2.9"
+    coeff_ligand_num_edges: "0.0"
+    coeff_receptor_num_nodes: "0.0"
+    coeff_receptor_num_edges: "0.11"
+    coeff_num_cross_edges: "0.25"
+    bias: "435.0"
+    maximal: "null"
+    estimate_num_cross_edges:
+      scale: "1.03"
+      terms:
+        - - "4.92"
+          - ligand_ligand
+        - - "0.0118"
+          - receptor_receptor
+        - - "0.0401"
+          - ligand
+          - receptor_receptor
+  resume_from_checkpoint: "null"
+  tensor_model_parallel_size: "1"
+  pipeline_model_parallel_size: "1"
+  confidence_mode: "false"
+  num_conv_layers: "6"
+  max_radius: "5.0"
+  scale_by_sigma: "true"
+  ns: "48"
+  nv: "10"
+  distance_embed_dim: "64"
+  cross_distance_embed_dim: "64"
+  no_batch_norm: "false"
+  batch_norm_with_shift: "true"
+  tensor_product:
+    use_second_order_repr: "false"
+    type: e3nn
+  cross_max_distance: "80.0"
+  dynamic_max_cross: "true"
+  dropout: "0.1"
+  embedding_type: sinusoidal
+  sigma_embed_dim: "64"
+  embedding_scale: "10000"
+  all_atoms: "false"
+  diffusion:
+    tr_weight: "0.33"
+    rot_weight: "0.33"
+    tor_weight: "0.33"
+    tr_sigma_min: "0.1"
+    tr_sigma_max: "19"
+    rot_sigma_min: "0.03"
+    rot_sigma_max: "1.55"
+    tor_sigma_min: "0.0314"
+    tor_sigma_max: "3.14"
+    no_torsion: "false"
+  test_sigma_intervals: "false"
+  val_denoising_inference_freq: "5"
+  denoising_inference_steps: "20"
+  num_denoising_inference_complexes: "500"
+  inference_earlystop_metric: valinf_rmsds_lt2
+  inference_earlystop_goal: max
+  optim:
+    name: fused_adam
+    lr: "0.001"
+    betas:
+      - "0.9"
+      - "0.999"
+    eps: "1.0e-08"
+    weight_decay: "0.01"
+    sched:
+      name: ReduceLROnPlateau
+      patience: "30"
+      monitor: valinf_rmsds_lt2
+      mode: max
+  train_ds:
+    num_batches: "null"
+    pin_memory: "false"
+    seed: "0"
+    no_torsion: "false"
+    all_atoms: "false"
+    data_dir: /data/PDBBind_processed
+    limit_complexes: "0"
+    receptor_radius: "15"
+    c_alpha_max_neighbors: "24"
+    remove_hs: "true"
+    max_lig_size: "null"
+    matching_popsize: "20"
+    matching_maxiter: "20"
+    num_workers: "1"
+    atom_radius: "5.0"
+    atom_max_neighbors: "8"
+    esm_embeddings_path: /data/esm2_3billion_embeddings.sqlite3
+    cache_path: /workspace/bionemo/examples/tests/test_data/molecule/diffdock/data_cache
+    num_conformers: "1"
+    split_train: /workspace/bionemo/examples/tests/test_data/molecule/diffdock/splits/timesplit_no_lig_overlap_train
+    chunk_size: "5"
+  validation_ds:
+    num_batches: "null"
+    pin_memory: "false"
+    seed: "0"
+    no_torsion: "false"
+    all_atoms: "false"
+    data_dir: /data/PDBBind_processed
+    limit_complexes: "0"
+    receptor_radius: "15"
+    c_alpha_max_neighbors: "24"
+    remove_hs: "true"
+    max_lig_size: "null"
+    matching_popsize: "20"
+    matching_maxiter: "20"
+    num_workers: "1"
+    atom_radius: "5.0"
+    atom_max_neighbors: "8"
+    esm_embeddings_path: /data/esm2_3billion_embeddings.sqlite3
+    cache_path: /workspace/bionemo/examples/tests/test_data/molecule/diffdock/data_cache
+    num_conformers: "1"
+    split_val: /workspace/bionemo/examples/tests/test_data/molecule/diffdock/splits/timesplit_no_lig_overlap_val
+    chunk_size: "5"
+  test_ds:
+    num_batches: "null"
+    pin_memory: "false"
+    seed: "0"
+    no_torsion: "false"
+    all_atoms: "false"
+    data_dir: /data/PDBBind_processed
+    limit_complexes: "0"
+    receptor_radius: "15"
+    c_alpha_max_neighbors: "24"
+    remove_hs: "true"
+    max_lig_size: "null"
+    matching_popsize: "20"
+    matching_maxiter: "20"
+    num_workers: "1"
+    atom_radius: "5.0"
+    atom_max_neighbors: "8"
+    esm_embeddings_path: /data/esm2_3billion_embeddings.sqlite3
+    cache_path: /workspace/bionemo/examples/tests/test_data/molecule/diffdock/data_cache
+    num_conformers: "1"
+    split_test: /workspace/bionemo/examples/tests/test_data/molecule/diffdock/splits/timesplit_test
+    chunk_size: "5"
+  optimize_einsums: "false"
+exp_manager:
+  name: diffdock_score_training_test
+  resume_if_exists: "true"
+  resume_ignore_no_checkpoint: "true"
+  create_checkpoint_callback: "true"
+  checkpoint_callback_params:
+    save_top_k: "1"
+    monitor: valinf_rmsds_lt2
+    mode: max
+    save_last: "true"
+    always_save_nemo: "true"
+    filename: diffdock_score_training_test-{valinf_rmsds_lt2:.4f}-{val_loss:.4f}-{train_loss:.4f}-{step}
+  ema:
+    enable: "true"
+    decay: "0.999"
+    cpu_offload: "false"
+    every_n_steps: "1"
+    validate_original_weights: "false"
+  exp_dir: /tmp/diffdock_score_training_test
+  explicit_log_dir: /tmp/diffdock_score_training_test
+  create_wandb_logger: "false"
+  create_tensorboard_logger: "false"
+  wandb_logger_kwargs:
+    project: diffdock_large_score_model
+    name: diffdock_score_training_test_training
+    group: diffdock_score_training_test
+    job_type: Localhost_nodes_1_gpus_1
+    tags:
+      - diffdock_score_training_test
+      - diffdock_score_training_test
+    offline: "false"
+nsys_profile:
+  enabled: "false"
+  start_step: "0"
+  end_step: "0"
+  ranks:
+    - "0"
+  gen_shape: "false"

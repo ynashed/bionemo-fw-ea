@@ -70,36 +70,6 @@ def resolve_cfg(cfg: DictConfig):
     return cfg_str
 
 
-def save_cfg_to_json(cfg: dict, results_comparison_dir: str, correct_config: str):
-    """Dump hydra configuration to JSON file
-
-    Args:
-        cfg (dict): configuration parameters
-        results_comparison_dir (str): Directory to store the JSON file with config
-        correct_config (str): Name of the JSON file holding the configuration
-    """
-    cfg_str = resolve_cfg(cfg)
-    output_file = os.path.join(results_comparison_dir, correct_config)
-    with open(output_file, 'w') as fh:
-        fh.write(json.dumps(cfg_str, indent=4))
-
-
-def load_cfg_json(results_comparison_dir: str, correct_config: str):
-    """Load hydra configuration from a json file for comparison
-
-    Args:
-        results_comparison_dir (str): Directory where the json file with config is located
-        correct_config (str): Name of the json file holding the configuration
-
-    Returns:
-        dict: expected comparison configuration
-    """
-    config_file = os.path.join(results_comparison_dir, correct_config)
-    with open(config_file, 'r') as fh:
-        cfg_dict = json.load(fh)
-    return cfg_dict
-
-
 def clean_directory(directory):
     """Remove existing files in a directory
 

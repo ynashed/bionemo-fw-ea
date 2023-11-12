@@ -1,0 +1,181 @@
+do_training: "true"
+do_testing: "true"
+seed: "1204518"
+data:
+  data_name: dips
+  num_workers: "0"
+  pin_memory: "true"
+  micro_batch_size: "32"
+  world_size: "1"
+  cache_path: /workspace/bionemo/examples/tests/test_data/protein/equidock
+  graph_cutoff: "30.0"
+  graph_max_neighbor: "10"
+  split: "0"
+  pocket_cutoff: "8.0"
+  translation_interval: "5"
+  n_jobs: "null"
+  graph_residue_loc_is_alphaC: "true"
+  raw_data_path: "null"
+  split_files_path: "null"
+  reload_mode: "null"
+model:
+  name: EquiDock_dips
+  seed: "8"
+  restore_from_path: "null"
+  micro_batch_size: "32"
+  resume_from_checkpoint: "null"
+  debug: "false"
+  iegmn_n_lays: "8"
+  graph_nodes: residues
+  rot_model: kb_att
+  noise_decay_rate: "0.0"
+  noise_initial: "0.0"
+  use_edge_features_in_gmn: "true"
+  use_mean_node_features: "true"
+  residue_emb_dim: "64"
+  iegmn_lay_hid_dim: "64"
+  input_edge_feats_dim: "null"
+  dropout: "0.0"
+  nonlin: lkyrelu
+  cross_msgs: "true"
+  layer_norm: LN
+  layer_norm_coors: "0"
+  final_h_layer_norm: "0"
+  use_dist_in_layers: "true"
+  skip_weight_h: "0.75"
+  x_connection_init: "0.0"
+  leakyrelu_neg_slope: "0.01"
+  shared_layers: "true"
+  num_att_heads: "50"
+  fine_tune: "false"
+  pocket_ot_loss_weight: "1.0"
+  intersection_loss_weight: "10.0"
+  intersection_sigma: "25.0"
+  intersection_surface_ct: "10.0"
+  divide_coors_dist: "false"
+  tensor_model_parallel_size: "1"
+  pipeline_model_parallel_size: "1"
+  optim:
+    name: adam
+    lr: "0.0002"
+    betas:
+      - "0.9"
+      - "0.999"
+    eps: "1.0e-08"
+    weight_decay: "0.0001"
+  train_ds:
+    micro_batch_size: "32"
+    pin_memory: "true"
+    seed: "1204518"
+    cache_path: /workspace/bionemo/examples/tests/test_data/protein/equidock
+    num_workers: "0"
+    shuffle: "true"
+    data_fraction: "1.0"
+    drop_last: "false"
+    data_name: dips
+    graph_cutoff: "30.0"
+    graph_max_neighbor: "10"
+    split: "0"
+    pocket_cutoff: "8.0"
+    translation_interval: "5"
+    graph_nodes: residues
+    n_jobs: "null"
+    graph_residue_loc_is_alphaC: "true"
+    raw_data_path: "null"
+    split_files_path: "null"
+    reload_mode: train
+  validation_ds:
+    micro_batch_size: "32"
+    pin_memory: "true"
+    seed: "1204518"
+    cache_path: /workspace/bionemo/examples/tests/test_data/protein/equidock
+    num_workers: "0"
+    shuffle: "false"
+    data_fraction: "null"
+    drop_last: "false"
+    data_name: dips
+    graph_cutoff: "30.0"
+    graph_max_neighbor: "10"
+    split: "0"
+    pocket_cutoff: "8.0"
+    translation_interval: "5"
+    graph_nodes: residues
+    n_jobs: "null"
+    graph_residue_loc_is_alphaC: "true"
+    raw_data_path: "null"
+    split_files_path: "null"
+    reload_mode: val
+  test_ds:
+    micro_batch_size: "32"
+    pin_memory: "true"
+    seed: "1204518"
+    cache_path: /workspace/bionemo/examples/tests/test_data/protein/equidock
+    num_workers: "0"
+    shuffle: "false"
+    data_fraction: "null"
+    drop_last: "false"
+    data_name: dips
+    graph_cutoff: "30.0"
+    graph_max_neighbor: "10"
+    split: "0"
+    pocket_cutoff: "8.0"
+    translation_interval: "5"
+    graph_nodes: residues
+    n_jobs: "null"
+    graph_residue_loc_is_alphaC: "true"
+    raw_data_path: "null"
+    split_files_path: "null"
+    reload_mode: test
+trainer:
+  devices: "1"
+  num_nodes: "1"
+  precision: "32"
+  accelerator: gpu
+  max_epochs: "1"
+  max_steps: "500"
+  log_every_n_steps: "1"
+  val_check_interval: "1.0"
+  num_sanity_val_steps: "1.0"
+  limit_val_batches: "1.0"
+  limit_test_batches: "1.0"
+  limit_train_batches: "1.0"
+  gradient_clip_val: "100.0"
+  logger: "false"
+  enable_checkpointing: "false"
+  reload_dataloaders_every_n_epochs: "0"
+  accumulate_grad_batches: "1"
+exp_manager:
+  name: EquiDock_dips_nnodes_1_ndevices_1_bs_32
+  resume_if_exists: "true"
+  resume_ignore_no_checkpoint: "true"
+  create_checkpoint_callback: "true"
+  checkpoint_callback_params:
+    save_top_k: "1"
+    monitor: val_complex_rmsd_median
+    mode: min
+    save_last: "true"
+    always_save_nemo: "true"
+    filename: EquiDock_dips--{val_complex_rmsd_median:.4f}-{step}
+    save_best_model: "true"
+    save_nemo_on_train_end: "true"
+  create_early_stopping_callback: "true"
+  early_stopping_callback_params:
+    monitor: val_complex_rmsd_median
+    mode: min
+    patience: "500"
+    verbose: "true"
+    check_on_train_epoch_end: "false"
+  ema:
+    enable: "false"
+    decay: "0.999"
+  exp_dir: /tmp/nemo_experiments/equidock_pretrain_dips
+  explicit_log_dir: /tmp/nemo_experiments/equidock_pretrain_dips
+  create_tensorboard_logger: "false"
+  create_wandb_logger: "false"
+  wandb_logger_kwargs:
+    project: EquiDock_dips_training
+    name: lr_0.0002_iegmn_n_lays_8_iegmn_hdim_64
+    group: EquiDock_dips
+    job_type: Localhost_nodes_1_gpus_1
+    tags: -EquiDock_dips -dips
+    offline: "true"

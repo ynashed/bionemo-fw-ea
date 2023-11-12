@@ -27,6 +27,7 @@ import pytest
 import torch
 from hydra import compose, initialize
 from hydra.core.global_hydra import GlobalHydra
+from omegaconf import OmegaConf
 from pytorch_lightning import seed_everything
 
 from bionemo.data.diffdock.data_manager import DataManager as DiffdockDataManagers
@@ -52,11 +53,9 @@ from bionemo.utils.tests import (
     check_expected_training_results,
     check_model_exists,
     clean_directory,
-    load_cfg_json,
     load_expected_training_results,
     register_searchpath_config_plugin,
     resolve_cfg,
-    save_cfg_to_json,
     save_expected_training_results,
     update_relative_config_dir,
 )
@@ -101,20 +100,20 @@ CONFIG_NAME = [
     'esm2nv_8M_test',
 ]
 CORRECT_CONFIG = [
-    'megamolbart_retro_config.json',
-    'megamolbart_config.json',
-    'esm1nv_config.json',
-    'prott5nv_config.json',
-    'prott5nv_encoder_finetune_config.json',
-    'esm1nv_encoder_finetune_config.json',
-    'prott5nv_sec_str_val_config.json',
-    'megamolbart_physchem_config.json',
-    'diffdock_score_config.json',
-    'diffdock_confidence_config.json',
-    'equidock_pretrain_config.json',
-    'equidock_finetune_config.json',
-    'openfold_initial_training_config.json',
-    'esm2nv_8M_config.json',
+    'megamolbart_retro_config',
+    'megamolbart_config',
+    'esm1nv_config',
+    'prott5nv_config',
+    'prott5nv_encoder_finetune_config',
+    'esm1nv_encoder_finetune_config',
+    'prott5nv_sec_str_val_config',
+    'megamolbart_physchem_config',
+    'diffdock_score_config',
+    'diffdock_confidence_config',
+    'equidock_pretrain_config',
+    'equidock_finetune_config',
+    'openfold_initial_training_config',
+    'esm2nv_8M_config',
 ]
 CORRECT_RESULTS = [
     'megamolbart_retro_log.json',
@@ -205,16 +204,16 @@ def test_config_parameters(prepend_config_path, config_name, correct_config):
     '''Load the config parameters and ensure they're identical to previous'''
 
     cfg = get_cfg(prepend_config_path, config_name)
-
     results_comparison_dir = os.path.abspath(os.path.join(THIS_FILE_DIR, 'expected_results'))
+
     if os.environ.get('UPDATE_EXPECTED_CFG', False):
         msg = f'Updating expected config in {results_comparison_dir}/{correct_config}'
         logger.warning(msg)
         # will create a new comparison config
-        save_cfg_to_json(cfg, results_comparison_dir, correct_config)
+        OmegaConf.save(cfg, os.path.join(results_comparison_dir, correct_config + ".yaml"))
         assert False, msg
 
-    original_cfg_dict = load_cfg_json(results_comparison_dir, correct_config)
+    original_cfg_dict = resolve_cfg(get_cfg(results_comparison_dir, correct_config))
     new_cfg_dict = resolve_cfg(cfg)
     assert (
         original_cfg_dict == new_cfg_dict
