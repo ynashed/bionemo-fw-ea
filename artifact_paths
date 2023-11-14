@@ -1,0 +1,31 @@
+#!/bin/bash
+#
+# Copyright (c) 2023, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# BioNeMo Models
+# NGC Paths:
+ESM1NV_MODEL="nvidia/clara/esm1nv:1.0"
+PROTT5NV_MODEL="nvidia/clara/prott5nv:1.0"
+MEGAMOLBART_MODEL="nvidia/clara/megamolbart:1.0"
+ESM2NV_650M_MODEL="nvidia/clara/esm2nv650m:1.0"
+ESM2NV_3B_MODEL="nvidia/clara/esm2nv3b:1.0"
+
+# PBSS Paths:
+ESM1NV_MODEL_PBSS="s3://bionemo-ci/models/esm1nv.nemo"
+PROTT5NV_MODEL_PBSS="s3://bionemo-ci/models/prott5nv.nemo"
+MEGAMOLBART_MODEL_PBSS="s3://bionemo-ci/models/megamolbart.nemo"
+ESM2NV_650M_MODEL_PBSS="s3://bionemo-ci/models/esm2nv_650M_converted.nemo"
+ESM2NV_3B_MODEL_PBSS="s3://bionemo-ci/models/esm2nv_3B_converted.nemo"

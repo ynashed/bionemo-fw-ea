@@ -1,0 +1,12 @@
+[default]
+aws_access_key_id = REDACTED
+aws_secret_access_key = REDACTED
+region = us-east-1
+
+s3 =
+ endpoint_url = https://pbss.s8k.io
+ signature_version = s3v4
+ payload_signing_enabled = true
+s3api =
+ endpoint_url = https://pbss.s8k.io
+ payload_signing_enabled = true

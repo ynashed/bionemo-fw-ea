@@ -1,0 +1,28 @@
+From 0e69d30363bbf9c86659c61f571b64f6c56cffa7 Mon Sep 17 00:00:00 2001
+From: Timur Rvachov <trvachov@nvidia.com>
+Date: Mon, 16 Oct 2023 19:03:07 -0400
+Subject: [PATCH] Bugfix
+
+---
+ .../nlp/data/language_modeling/megatron/dataset_utils.py    | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/nemo/collections/nlp/data/language_modeling/megatron/dataset_utils.py b/nemo/collections/nlp/data/language_modeling/megatron/dataset_utils.py
+index 775ac271d..f286bb9a8 100644
+--- a/nemo/collections/nlp/data/language_modeling/megatron/dataset_utils.py
++++ b/nemo/collections/nlp/data/language_modeling/megatron/dataset_utils.py
+@@ -1344,8 +1344,8 @@ def get_samples_mapping(
+         logging.info('    loaded indexed file in {:3.3f} seconds'.format(time.time() - start_time))
+         logging.info('    total number of samples: {}'.format(samples_mapping.shape[0]))
+
+-        # Deallocate temporary numpy arrays that were created for `get_samples_mapping()` when needed
+-        if hasattr(indexed_dataset, 'doc_idx') and hasattr(indexed_dataset, 'sizes'):
+-            deallocate_indexed_dataset_memory(indexed_dataset)
++    # Deallocate temporary numpy arrays that were created for `get_samples_mapping()` when needed
++    if hasattr(indexed_dataset, 'doc_idx') and hasattr(indexed_dataset, 'sizes'):
++        deallocate_indexed_dataset_memory(indexed_dataset)
+
+     return samples_mapping
+--
+2.39.1
+
