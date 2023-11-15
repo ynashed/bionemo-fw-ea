@@ -15,23 +15,58 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#!/bin/bash
+REPO_DIR=examples/tests/test_data/molecule/diffdock
+# Function to display help
+display_help() {
+    echo "Usage: $0 [-data_path <path>] [-pbss <value>] [-help]"
+    echo "  -data_path <path>   Specify the data path, \$PROJECT_MOUNT/$REPO_DIR by default"
+    echo "  -pbss <value>       If set, data will be download from PBSS. If unset, NGC by default."
+    echo "  -help               Display this help message"
+    exit 1
+}
 
-if [ -n "${PROJECT_MOUNT}" ]
-then 
-  DATA_PATH=$PROJECT_MOUNT/examples/tests/test_data/molecule/diffdock
+# Parse command line options
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        -data_path)
+            DATA_PATH="$2"
+            shift 2
+            ;;
+        -pbss)
+            PBSS=true
+            shift
+            ;;
+        -help)
+            display_help
+            ;;
+        *)
+            echo "Unknown parameter: $1"
+            display_help
+            ;;
+    esac
+done
+
+if [ -n "$DATA_PATH" ]; then
+    echo "Data path specified: $DATA_PATH"
+elif [ -n "$PROJECT_MOUNT" ]; then
+    echo "Data path defaulting to \$PROJECT_MOUNT repo base: $PROJECT_MOUNT/$REPO_DIR"
+    DATA_PATH=$PROJECT_MOUNT/$REPO_DIR
 else
-  DATA_PATH=/workspace/bionemo/examples/tests/test_data/molecule/diffdock
+    echo "\$PROJECT_MOUNT is unset and -data_path was not provided. Exiting."
+    exit 1
 fi
 
-if ! [ -z "$1" ]
-  then
-    DATA_PATH=$1
-  else
-    echo Data will be extracted to $DATA_PATH. You can change location by providing argument to \
-    this script:  download_data_sample.sh \<data_path\>
+if [ -n "$PBSS" ]; then
+    echo "Downloading from PBSS to $DATA_PATH"
+    aws s3 cp s3://bionemo-ci/test-data/diffdock/diffdock_vprocessed_sample $DATA_PATH --endpoint-url https://pbss.s8k.io --recursive
+    # Add actions for pbss
+else
+    echo "Downloading from NGC to $DATA_PATH"
+    ngc registry resource download-version nvidian/clara-lifesciences/diffdock:processed_sample
+    tar -xvf diffdock_vprocessed_sample/diffdock_processsed_sample.tar.gz -C $DATA_PATH
+    rm -r diffdock_vprocessed_sample/
 fi
 
-ngc registry resource download-version nvidian/clara-lifesciences/diffdock:processed_sample
-tar -xvf diffdock_vprocessed_sample/diffdock_processsed_sample.tar.gz -C $DATA_PATH
-rm -r diffdock_vprocessed_sample/
+
+
+
