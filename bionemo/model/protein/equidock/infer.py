@@ -13,6 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Tuple
+
+import dgl
+import numpy as np
 from nemo.collections.nlp.parts.nlp_overrides import NLPSaveRestoreConnector
 from nemo.utils import logging
 from nemo.utils.model_utils import import_class_by_path
@@ -20,6 +24,11 @@ from omegaconf import OmegaConf
 from omegaconf.omegaconf import open_dict
 from pytorch_lightning.core import LightningModule
 
+from bionemo.data.equidock.protein_utils import (
+    get_residues,
+    preprocess_unbound_bound,
+    protein_to_graph_unbound_bound,
+)
 from bionemo.model.protein.equidock.equidock_model import EquiDock
 from bionemo.model.utils import _reconfigure_microbatch_calculator, parallel_state, setup_inference_trainer
 
@@ -110,6 +119,55 @@ class EquiDockInference(LightningModule):
         model.freeze()
         self.model = model
         return model
+
+    def create_ligand_receptor_graphs_arrays(
+        self, ligand_filename: str, receptor_filename: str
+    ) -> Tuple[dgl.graph, dgl.graph, np.ndarray, np.ndarray]:
+        """Creates ligand and receptor graphs and arrays (coordinates) from ligand and receptor files"""
+
+        # Preprocess ligand and receptor
+        (
+            unbound_predic_ligand,
+            unbound_predic_receptor,
+            bound_ligand_repres_nodes_loc_clean_array,
+            bound_receptor_repres_nodes_loc_clean_array,
+        ) = preprocess_unbound_bound(
+            get_residues(ligand_filename),
+            get_residues(receptor_filename),
+            graph_nodes=self.cfg.model.graph_nodes,
+            pos_cutoff=self.cfg.data.pocket_cutoff,
+            inference=True,
+        )
+
+        # Make graphs
+        ligand_graph, receptor_graph = protein_to_graph_unbound_bound(
+            unbound_predic_ligand,
+            unbound_predic_receptor,
+            bound_ligand_repres_nodes_loc_clean_array,
+            bound_receptor_repres_nodes_loc_clean_array,
+            graph_nodes=self.cfg.model.graph_nodes,
+            cutoff=self.cfg.data.graph_cutoff,
+            max_neighbor=self.cfg.data.graph_max_neighbor,
+            one_hot=False,
+            residue_loc_is_alphaC=self.cfg.model.graph_residue_loc_is_alphaC,
+        )
+
+        if self.cfg.model.input_edge_feats_dim < 0:
+            self.cfg.model.input_edge_feats_dim = ligand_graph.edata['he'].shape[1]
+
+        ligand_graph.ndata['new_x'] = ligand_graph.ndata['x']
+
+        assert (
+            np.linalg.norm(bound_ligand_repres_nodes_loc_clean_array - ligand_graph.ndata['x'].detach().cpu().numpy())
+            < 1e-1
+        )
+
+        return (
+            ligand_graph,
+            receptor_graph,
+            bound_ligand_repres_nodes_loc_clean_array,
+            bound_receptor_repres_nodes_loc_clean_array,
+        )
 
     def forward(self, batch):
         """Forward pass of the model"""

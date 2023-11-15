@@ -17,8 +17,10 @@
 
 import random
 from functools import partial
-from typing import List
+from typing import List, Tuple
 
+import dgl
+import numpy as np
 import torch
 from nemo.core import ModelPT
 from nemo.core.classes.common import PretrainedModelInfo
@@ -30,6 +32,11 @@ from torch.utils.data import DataLoader
 from torchmetrics.aggregation import CatMetric
 
 from bionemo.data.equidock.data_manager import DataManager
+from bionemo.data.equidock.protein_utils import (
+    get_residues,
+    preprocess_unbound_bound,
+    protein_to_graph_unbound_bound,
+)
 from bionemo.model.protein.equidock.loss_metrics.eval import metrics_statistics, rmsd_compute
 from bionemo.model.protein.equidock.loss_metrics.intersection_loss import compute_body_intersection_loss
 from bionemo.model.protein.equidock.loss_metrics.ot_utils import compute_ot_emd, compute_sq_dist_mat
@@ -389,6 +396,58 @@ class NeMoExtension(ModelPT):
         loss = loss_coors + pocket_ot_loss_weight * batch_ot_loss + intersection_loss_weight * batch_intersection_loss
 
         return loss, batch_ot_loss, batch_intersection_loss
+
+    def create_ligand_receptor_graphs_arrays(
+        self,
+        ligand_filename: str,
+        receptor_filename: str,
+        data_cfg: OmegaConf,
+    ) -> Tuple[dgl.graph, dgl.graph, np.ndarray, np.ndarray]:
+        """Creates ligand and receptor graphs and arrays (coordinates) from ligand and receptor files"""
+
+        # Preprocess ligand and receptor
+        (
+            unbound_predic_ligand,
+            unbound_predic_receptor,
+            bound_ligand_repres_nodes_loc_clean_array,
+            bound_receptor_repres_nodes_loc_clean_array,
+        ) = preprocess_unbound_bound(
+            get_residues(ligand_filename),
+            get_residues(receptor_filename),
+            graph_nodes=self.cfg.graph_nodes,
+            pos_cutoff=data_cfg.pocket_cutoff,
+            inference=True,
+        )
+
+        # Make graphs
+        ligand_graph, receptor_graph = protein_to_graph_unbound_bound(
+            unbound_predic_ligand,
+            unbound_predic_receptor,
+            bound_ligand_repres_nodes_loc_clean_array,
+            bound_receptor_repres_nodes_loc_clean_array,
+            graph_nodes=self.cfg.graph_nodes,
+            cutoff=data_cfg.graph_cutoff,
+            max_neighbor=data_cfg.graph_max_neighbor,
+            one_hot=False,
+            residue_loc_is_alphaC=self.cfg.graph_residue_loc_is_alphaC,
+        )
+
+        if self.cfg.input_edge_feats_dim < 0:
+            self.cfg.input_edge_feats_dim = ligand_graph.edata['he'].shape[1]
+
+        ligand_graph.ndata['new_x'] = ligand_graph.ndata['x']
+
+        assert (
+            np.linalg.norm(bound_ligand_repres_nodes_loc_clean_array - ligand_graph.ndata['x'].detach().cpu().numpy())
+            < 1e-1
+        )
+
+        return (
+            ligand_graph,
+            receptor_graph,
+            bound_ligand_repres_nodes_loc_clean_array,
+            bound_receptor_repres_nodes_loc_clean_array,
+        )
 
     @staticmethod
     def empty_safe_mean(tensor: torch.Tensor, **kwargs) -> torch.Tensor:
