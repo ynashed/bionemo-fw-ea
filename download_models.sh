@@ -50,7 +50,7 @@ function setup_model() {
         rm -rf ${tmp_download_loc}/model.zip
     elif $use_s3; then
         echo "Downloading model ${model_source} from s3/swiftstack..."
-        aws s3 cp $model_source $MODEL_PATH
+        aws s3 cp $model_source $MODEL_PATH --no-progress
         echo "Saved model to $MODEL_PATH"
         model_basename=$(basename ${model_source})
         downloaded_model_file="${base_directory}/${model_basename}"
