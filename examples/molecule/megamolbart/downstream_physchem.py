@@ -29,11 +29,10 @@ def main(cfg) -> None:
     logging.info("\n\n************* Fintune config ****************")
     logging.info(f'\n{OmegaConf.to_yaml(cfg)}')
 
-    if cfg.do_training or cfg.do_testing:
+    if cfg.do_training:
         trainer = setup_trainer(cfg, builder=None)
         model = FineTuneMegaMolBART(cfg, trainer)
 
-    if cfg.do_training:
         logging.info("************** Starting Training ***********")
         trainer.fit(model)
         logging.info("************** Finished Training ***********")
