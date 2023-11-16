@@ -139,3 +139,4 @@ class FineTune(BioNeMoDataModule):
 The same principle applies to the other functions. One can make customizations, add rules, exceptions and treatments to each one of them. 
 
 For a full example, refer to the  [Generating embeddings for Protein Clustering](./notebooks/protein-esm1nv-clustering.ipynb) example notebook.
+

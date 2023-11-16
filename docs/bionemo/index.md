@@ -42,16 +42,17 @@ Before you begin using BioNeMo, ensure the following prerequisites are met:
 
 ## BioNeMo Models: Overview
 
-BioNeMo Framework provides three pre-trained models developed by NVIDIA: __**ESM1-nv**__, __**ProtT5-nv**__, and __**MegaMolBART**__. These models can perform representation learning and sequence translation tasks on amino acid sequences and small molecule (SMILES) representations. Molecule generation can also be performed using MegaMolBART.
+BioNeMo Framework provides three pre-trained models developed by NVIDIA: __**ESM1-nv**__, __**ProtT5-nv**__, and __**MegaMolBART**__. It additionally provides NeMo optimized checkpoints for ESM2 models, as __**ESM2-nv**__. These models can perform representation learning and sequence translation tasks on amino acid sequences and small molecule (SMILES) representations. Molecule generation can also be performed using MegaMolBART.
 
 | **Model**   | **Modality**             | **Uses**                                      |
 |-------------|--------------------------|-----------------------------------------------|
+| ESM-2nv     | Protein                  | Representation Learning                       |
 | ESM-1nv     | Protein                  | Representation Learning                       |
 | ProtT5nv    | Protein                  | Representation Learning                       |
 | MegaMolBART | Small Molecule           | Representation Learning + Molecule Generation |
 
 
-**ESM-1nv** is based on the BERT architecture and trained on millions of protein sequences from the UniProt database. ESM-1nv learns the patterns and dependencies between amino acids that ultimately give rise to a protein’s 2D structure. These can include properties such as secondary structure, subcellular localization, thermostability, solubility, and other protein properties.
+**ESM-2nv** and **ESM-1nv** are based on the BERT architecture and trained on millions of protein sequences from the UniProt database. They learn a numerical representation based on the amino acids. These representations can be used to predict properties, such as subcellular localization, thermostability, and solubility, as well as higher order structure, including secondary and tertiary structure.
 
 **ProtT5nv** is based on the T5 architecture and trained on millions of protein sequences from the UniProt database. Like ESM-1nv, Prot5nv learns a representation for amino acids, allowing it to represent a variety of protein properties, similar to ESM-1nv.
 

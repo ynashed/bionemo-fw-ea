@@ -6,7 +6,7 @@ ESM-2nv is a model that has been trained on protein sequences. The embeddings fr
 
 ## Intended Use
 
-Compute embeddings from input protein sequences. Embeddings are created for each amino acid in the protein sequence. Embeddings can then be used for downstream tasks such as prediction of secondary structure, subcellular localization, or others, as detailed by the FLIP benchmark tasks {cite:p}`dallago2021flip`.
+Compute embeddings from input protein sequences. Embeddings are created for each amino acid in the protein sequence. Embeddings can then be used for downstream tasks such as prediction of secondary structure, subcellular localization, or others, as detailed by the FLIP benchmark tasks {cite:p}`dallago2021flip`.  
 
 ## Model Architecture   
 
@@ -40,7 +40,7 @@ A complete, curated pre-training dataset is provided with the BioNeMo framework 
 
 ## Differences in ESM-2nv compared to ESM-2
 
-Unlike ESM-2 pre-training data, the curated pre-training dataset provided with ESM-2nv release contains hits for *de novo* proteins, since sequences in UniRef100, UniRef90, and UniRef50 with high sequence similarity to a non-public 81 *de novo* proteins {cite:p}`lin2023evolutionary` are not filtered.  
+Unlike ESM-2 pre-training data, the curated pre-training dataset provided with ESM-2nv release contains hits for *de novo* proteins, since sequences in UniRef100, UniRef90, and UniRef50 with high sequence similarity to a non-public 81 *de novo* proteins {cite:p}`lin2023evolutionary` are not filtered.   
 
 ## Training
 

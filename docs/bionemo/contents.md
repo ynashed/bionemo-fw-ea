@@ -43,6 +43,7 @@ parallelism-fw
 :caption: MODELS
 
 models/esm1-nv
+models/esm2-nv
 models/prott5nv
 models/megamolbart
 models/model-benchmarks

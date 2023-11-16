@@ -8,7 +8,7 @@ AI innovation with no-surprise predictable pricing. For more details, visit [NVI
 
 BioNeMo is developed and optimized to run on DGX Cloud to achieve the best throughput performance. Customers can: 
 
-- Use the pre-trained models ESM-1nv, ProtT5nv and MegaMolBART for inferencing and generative tasks
+- Use the pre-trained models ESM-2nv, ESM-1nv, ProtT5nv and MegaMolBART for inferencing and generative tasks
 - Retrain the models on custom datasets
 - Adapt and modify the models for specific fine-tuning tasks
 
