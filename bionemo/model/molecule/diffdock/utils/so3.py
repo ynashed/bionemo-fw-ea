@@ -113,11 +113,12 @@ def _score_small_eps(omega, eps):
     )
 
 
-if os.path.exists(os.path.join(package_path, ".so3_omegas_array2.npy")):
-    _omegas_array = np.load(os.path.join(package_path, ".so3_omegas_array2.npy"))
-    _cdf_vals = np.load(os.path.join(package_path, ".so3_cdf_vals2.npy"))
-    _score_norms = np.load(os.path.join(package_path, ".so3_score_norms2.npy"))
-    _exp_score_norms = np.load(os.path.join(package_path, ".so3_exp_score_norms2.npy"))
+if os.path.exists(os.path.join(package_path, ".so3.npz")):
+    so3 = np.load(os.path.join(package_path, ".so3.npz"))
+    _omegas_array = so3['_omegas_array']
+    _cdf_vals = so3['_cdf_vals']
+    _score_norms = so3['_score_norms']
+    _exp_score_norms = so3['_exp_score_norms']
 else:
     _eps_array = 10 ** np.linspace(np.log10(MIN_EPS), np.log10(MAX_EPS), N_EPS)
     _omegas_array = np.linspace(0, np.pi, X_N + 1)[1:]
@@ -134,10 +135,13 @@ else:
 
     _exp_score_norms = np.sqrt(np.sum(_score_norms**2 * _pdf_vals, axis=1) / np.sum(_pdf_vals, axis=1) / np.pi)
 
-    np.save(os.path.join(package_path, ".so3_omegas_array2.npy"), _omegas_array)
-    np.save(os.path.join(package_path, ".so3_cdf_vals2.npy"), _cdf_vals)
-    np.save(os.path.join(package_path, ".so3_score_norms2.npy"), _score_norms)
-    np.save(os.path.join(package_path, ".so3_exp_score_norms2.npy"), _exp_score_norms)
+    np.savez(
+        os.path.join(package_path, ".so3.npz"),
+        _omegas_array=_omegas_array,
+        _cdf_vals=_cdf_vals,
+        _score_norms=_score_norms,
+        _exp_score_norms=_exp_score_norms,
+    )
 
 
 def sample(eps):

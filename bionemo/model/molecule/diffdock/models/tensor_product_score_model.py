@@ -321,14 +321,11 @@ class TensorProductScoreModel(torch.nn.Module):
             cross_cutoff = self.cross_max_distance
         cross_edge_index, cross_edge_attr, cross_edge_sh = self.build_cross_conv_graph(data, cross_cutoff)
         if cross_edge_index.numel() == 0 and not self.confidence_mode:
-            if self.training:
-                return None, None, None
-            else:
-                return (
-                    0.0 * lig_node_attr[: len(data.name), :3],
-                    0.0 * lig_node_attr[: len(data.name), :3],
-                    0.0 * lig_edge_attr.reshape(-1)[: data['ligand'].edge_mask.sum().item()],
-                )
+            return (
+                0.0 * lig_node_attr[: len(data.name), :3],
+                0.0 * lig_node_attr[: len(data.name), :3],
+                0.0 * lig_edge_attr.reshape(-1)[: data['ligand'].edge_mask.sum().item()],
+            )
         cross_lig, cross_rec = cross_edge_index
         cross_edge_attr = self.cross_edge_embedding(cross_edge_attr)
 
@@ -340,7 +337,11 @@ class TensorProductScoreModel(torch.nn.Module):
                     f'Estimated memory {total_memory} exceeds maximal = {self.estimate_memory_usage.maximal} '
                     f' for batch: {data.name} with {cross_edge_attr.shape[0]} cross edges, skipping'
                 )
-                return None, None, None
+                return (
+                    0.0 * lig_node_attr[: len(data.name), :3],
+                    0.0 * lig_node_attr[: len(data.name), :3],
+                    0.0 * lig_edge_attr.reshape(-1)[: data['ligand'].edge_mask.sum().item()],
+                )
 
         for l in range(len(self.lig_conv_layers)):
             # intra graph message passing
