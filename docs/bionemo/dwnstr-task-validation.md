@@ -92,7 +92,7 @@ If downstream task validation is enabled, a set of parameters must be specified 
 
 ### Universal Parameters
 
-* `class` defines a type of callback. Available options are: `SingleValuePredictionCallback` for sequence-level classification or regression and `bionemo.model.core.dwnstr_task_callbacks.PerTokenPredictionCallback` for token-level classification.
+* `class` defines a type of callback. Available options are: `bionemo.model.core.dwnstr_task_callbacks.SingleValuePredictionCallback` for sequence-level classification or regression and `bionemo.model.core.dwnstr_task_callbacks.PerTokenPredictionCallback` for token-level classification.
 
 * `task_type` defines a type of downstream task. Available options are `classification` or `regression`. `PerTokenPredictionCallback` supports only `classification`.
 
@@ -125,7 +125,7 @@ If downstream task validation is enabled, a set of parameters must be specified 
 
 * `num_classes` defines the number of class labels in the target and must be provided only in case of `task_type: classification` in the `SingleValuePredictionCallback`.
 
-An example of `SingleValuePredictionCallback` can be found in `/workspace/bionemo/examples/molecule/megamolbart/conf/pretrain_xsmall_span_aug.yaml`.
+An example of `SingleValuePredictionCallback` can be found in `/workspace/bionemo/examples/molecule/megamolbart/conf/pretrain_base.yaml`.
 
 ### `PerTokenPredictionCallback` Parameters
 
