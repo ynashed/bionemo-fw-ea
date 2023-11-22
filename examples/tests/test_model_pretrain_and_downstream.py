@@ -46,7 +46,7 @@ from bionemo.model.protein.esm1nv import ESM1nvModel, ESM2nvModel
 from bionemo.model.protein.openfold.openfold_model import AlphaFold
 from bionemo.model.protein.prott5nv import ProtT5nvModel
 from bionemo.model.utils import setup_trainer
-from bionemo.utils.callbacks.callback_utils import setup_callbacks
+from bionemo.utils.callbacks.callback_utils import setup_dwnstr_task_validation_callbacks
 from bionemo.utils.connectors import BioNeMoSaveRestoreConnector
 from bionemo.utils.tests import (
     BioNemoSearchPathConfig,
@@ -230,7 +230,7 @@ def test_model_size(prepend_config_path, config_name, model_class, model_paramet
     '''Check that number of model weights are correct'''
 
     cfg = get_cfg(prepend_config_path, config_name)
-    callbacks = setup_callbacks(cfg)
+    callbacks = setup_dwnstr_task_validation_callbacks(cfg)
 
     trainer = setup_trainer(cfg, callbacks=callbacks)
     if model_class == FineTuneProteinModel or model_class == FineTuneMegaMolBART:
@@ -262,7 +262,7 @@ def test_model_training(prepend_config_path, config_name, model_class, correct_r
     seed_everything(0, workers=True)
     cfg = get_cfg(prepend_config_path, config_name)
     clean_directory(cfg.exp_manager.exp_dir)
-    callbacks = setup_callbacks(cfg)
+    callbacks = setup_dwnstr_task_validation_callbacks(cfg)
     trainer = setup_trainer(cfg, callbacks=callbacks)
 
     if model_class == MegaMolBARTRetroModel:

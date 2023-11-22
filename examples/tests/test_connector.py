@@ -24,7 +24,7 @@ from bionemo.model.protein.downstream import FineTuneProteinModel
 from bionemo.model.protein.esm1nv import ESM1nvModel
 from bionemo.model.protein.prott5nv import ProtT5nvModel
 from bionemo.model.utils import setup_trainer
-from bionemo.utils.callbacks.callback_utils import setup_callbacks
+from bionemo.utils.callbacks.callback_utils import setup_dwnstr_task_validation_callbacks
 from bionemo.utils.tests import BioNemoSearchPathConfig, register_searchpath_config_plugin, update_relative_config_dir
 
 
@@ -82,7 +82,7 @@ def test_model_size(prepend_config_path, config_name, model_class, model_paramet
     '''Check that number of model weights are correct'''
 
     cfg = get_cfg(prepend_config_path, config_name)
-    callbacks = setup_callbacks(cfg)
+    callbacks = setup_dwnstr_task_validation_callbacks(cfg)
 
     trainer = setup_trainer(cfg, callbacks=callbacks)
     if model_class == FineTuneProteinModel:

@@ -13,13 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from nemo.utils.model_utils import import_class_by_path
 from omegaconf import DictConfig
+from pytorch_lightning import Callback
 
 
-__all__ = ["setup_callbacks"]
+__all__ = ["setup_dwnstr_task_validation_callbacks"]
 
 
 def _select_dwnstr_task_validation_callbacks(cfg: DictConfig) -> List:
@@ -39,7 +40,7 @@ def _select_dwnstr_task_validation_callbacks(cfg: DictConfig) -> List:
     return valid_cbs
 
 
-def setup_callbacks(cfg, plugins: Optional[List] = None) -> List:
+def setup_dwnstr_task_validation_callbacks(cfg: DictConfig, plugins: Optional[List[Any]] = None) -> List[Callback]:
     """
     Sets up callbacks for short downstream tasks fine-tunings at the end of the main training validation loop.
     The configuration of callbacks is taken from the main training config.

@@ -21,7 +21,7 @@ from omegaconf.omegaconf import OmegaConf
 from bionemo.data import Zinc15Preprocess
 from bionemo.model.molecule.megamolbart import MegaMolBARTModel
 from bionemo.model.utils import setup_trainer
-from bionemo.utils.callbacks.callback_utils import setup_callbacks
+from bionemo.utils.callbacks.callback_utils import setup_dwnstr_task_validation_callbacks
 from bionemo.utils.connectors import BioNeMoSaveRestoreConnector
 
 
@@ -30,7 +30,7 @@ def main(cfg) -> None:
     logging.info("\n\n************** Experiment configuration ***********")
     logging.info(f'\n{OmegaConf.to_yaml(cfg)}')
 
-    callbacks = setup_callbacks(cfg)
+    callbacks = setup_dwnstr_task_validation_callbacks(cfg)
 
     trainer = setup_trainer(cfg, callbacks=callbacks)
 
