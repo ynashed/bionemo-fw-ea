@@ -15,62 +15,48 @@
 
 from typing import List, Optional
 
-from pytorch_lightning import Callback
-
-import bionemo.utils.callbacks
+from nemo.utils.model_utils import import_class_by_path
+from omegaconf import DictConfig
 
 
 __all__ = ["setup_callbacks"]
 
-from bionemo.utils import lookup_or_use
 
-
-def _instantiate_callback(callback_cfg, parent_cfg, plugins: Optional[List] = None) -> Callback:
+def _select_dwnstr_task_validation_callbacks(cfg: DictConfig) -> List:
     """
-    Instantiates callback
+    Selects configuration of validation callbacks from a main training config
 
     Params
-        callback_cfg: Config for callback to be created with 'class' attribute
-        parent_cfg: Global cfg dict
-        plugins: Optional plugins to be passed to callback
+        cfg: a main configuration of training used in training scripts
 
-    Returns
-        Instantiated class given in callback_cfg
+    Returns: List of selected validation callback config dicts
     """
-    callback_class = callback_cfg['class']
-    cb = lookup_or_use(bionemo.utils.callbacks, callback_class, callback_cfg, parent_cfg, plugins)
-    return cb
-
-
-def _select_validation_callbacks(cfg) -> List:
-    """
-    Selects validation callbacks from config
-
-    Params
-        cfg: Dict
-
-    Returns:
-        List of selected validation callback config dicts
-    """
+    assert "model" in cfg, " The 'model' key is not present in the supplied cfg"
     valid_cbs = []
     if 'dwnstr_task_validation' in cfg.model and cfg.model.dwnstr_task_validation['enabled']:
         valid_cbs = [cfg.model.dwnstr_task_validation.dataset]
+
     return valid_cbs
 
 
 def setup_callbacks(cfg, plugins: Optional[List] = None) -> List:
     """
-    Sets up callbacks from cfg
+    Sets up callbacks for short downstream tasks fine-tunings at the end of the main training validation loop.
+    The configuration of callbacks is taken from the main training config.
 
     Params
         cfg: Dict
         plugins: Optional plugins to be passed to callbacks
 
     Returns
-        List of Callbacks to be passed into Trainer
-    """
-    callbacks = []
-    callbacks.extend(_select_validation_callbacks(cfg))
+        List of callbacks to be passed into plt.Trainer
+    TODO(dorotat): This method can be generalized to instantiate any method from config, ie using hydra instantiate or defined specific layout of input config
 
-    callbacks = [_instantiate_callback(cb, cfg, plugins) for cb in callbacks]
+    """
+    callbacks_cfg = []
+    callbacks_cfg.extend(_select_dwnstr_task_validation_callbacks(cfg))
+
+    callbacks = [
+        import_class_by_path(callback_cfg['class'])(callback_cfg, cfg, plugins) for callback_cfg in callbacks_cfg
+    ]
     return callbacks
