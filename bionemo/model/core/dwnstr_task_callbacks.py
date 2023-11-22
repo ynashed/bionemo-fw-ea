@@ -44,7 +44,7 @@ class DownstreamValidationCallback(Callback):
         self.dwnstr_model = None
 
     # TODO(dorotat): this class can be improved in terms of docs and simplified in terms of what args are needed.
-    #  self.plugins are not used
+    # TODO(dorotat): self.plugins are not used
 
     def _prepare_model(self, main_model):
         main_model.freeze()
