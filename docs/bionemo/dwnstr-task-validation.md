@@ -72,7 +72,8 @@ The ConvNet model architecture consists of 2D convolutional layer with `in_chann
 Validation with a downstream task is implemented in the form of a callback that is called at the end of every validation epoch. Parameters for the callback must be provided in the YAML configuration file. The callback is set up and added to the trainer with the following commands at the beginning of the training script:
 
 ```python
-from bionemo.utils.callbacks.callback_utils import setup_dwnstr_task_validation_callbacks
+
+from bionemo.callbacks import setup_dwnstr_task_validation_callbacks
 
 
 def main(cfg) -> None:

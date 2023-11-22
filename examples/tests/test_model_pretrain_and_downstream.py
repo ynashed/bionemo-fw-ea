@@ -30,6 +30,7 @@ from hydra.core.global_hydra import GlobalHydra
 from omegaconf import OmegaConf
 from pytorch_lightning import seed_everything
 
+from bionemo.callbacks import setup_dwnstr_task_validation_callbacks
 from bionemo.data.diffdock.data_manager import DataManager as DiffdockDataManagers
 from bionemo.data.equidock import DataManager
 from bionemo.model.molecule.diffdock.models.nemo_model import (
@@ -46,7 +47,6 @@ from bionemo.model.protein.esm1nv import ESM1nvModel, ESM2nvModel
 from bionemo.model.protein.openfold.openfold_model import AlphaFold
 from bionemo.model.protein.prott5nv import ProtT5nvModel
 from bionemo.model.utils import setup_trainer
-from bionemo.utils.callbacks.callback_utils import setup_dwnstr_task_validation_callbacks
 from bionemo.utils.connectors import BioNeMoSaveRestoreConnector
 from bionemo.utils.tests import (
     BioNemoSearchPathConfig,

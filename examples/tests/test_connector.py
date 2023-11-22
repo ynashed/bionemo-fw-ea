@@ -19,12 +19,12 @@ import pathlib
 import pytest
 from hydra import compose, initialize
 
+from bionemo.callbacks import setup_dwnstr_task_validation_callbacks
 from bionemo.model.molecule.megamolbart import MegaMolBARTModel
 from bionemo.model.protein.downstream import FineTuneProteinModel
 from bionemo.model.protein.esm1nv import ESM1nvModel
 from bionemo.model.protein.prott5nv import ProtT5nvModel
 from bionemo.model.utils import setup_trainer
-from bionemo.utils.callbacks.callback_utils import setup_dwnstr_task_validation_callbacks
 from bionemo.utils.tests import BioNemoSearchPathConfig, register_searchpath_config_plugin, update_relative_config_dir
 
 

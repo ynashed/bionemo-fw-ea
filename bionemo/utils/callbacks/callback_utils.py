@@ -13,51 +13,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, List, Optional
 
-from nemo.utils.model_utils import import_class_by_path
-from omegaconf import DictConfig
-from pytorch_lightning import Callback
-
-
-__all__ = ["setup_dwnstr_task_validation_callbacks"]
-
-
-def _select_dwnstr_task_validation_callbacks(cfg: DictConfig) -> List:
-    """
-    Selects configuration of validation callbacks from a main training config
-
-    Params
-        cfg: a main configuration of training used in training scripts
-
-    Returns: List of selected validation callback config dicts
-    """
-    assert "model" in cfg, " The 'model' key is not present in the supplied cfg"
-    valid_cbs = []
-    if 'dwnstr_task_validation' in cfg.model and cfg.model.dwnstr_task_validation['enabled']:
-        valid_cbs = [cfg.model.dwnstr_task_validation.dataset]
-
-    return valid_cbs
-
-
-def setup_dwnstr_task_validation_callbacks(cfg: DictConfig, plugins: Optional[List[Any]] = None) -> List[Callback]:
-    """
-    Sets up callbacks for short downstream tasks fine-tunings at the end of the main training validation loop.
-    The configuration of callbacks is taken from the main training config.
-
-    Params
-        cfg: Dict
-        plugins: Optional plugins to be passed to callbacks
-
-    Returns
-        List of callbacks to be passed into plt.Trainer
-    TODO(dorotat): This method can be generalized to instantiate any method from config, ie using hydra instantiate or defined specific layout of input config
-
-    """
-    callbacks_cfg = []
-    callbacks_cfg.extend(_select_dwnstr_task_validation_callbacks(cfg))
-
-    callbacks = [
-        import_class_by_path(callback_cfg['class'])(callback_cfg, cfg, plugins) for callback_cfg in callbacks_cfg
-    ]
-    return callbacks
+__all__ = []

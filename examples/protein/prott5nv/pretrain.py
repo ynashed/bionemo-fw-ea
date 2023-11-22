@@ -17,10 +17,10 @@ from nemo.core.config import hydra_runner
 from nemo.utils import logging
 from omegaconf.omegaconf import OmegaConf
 
+from bionemo.callbacks import setup_dwnstr_task_validation_callbacks
 from bionemo.data import FLIPPreprocess, UniRef50Preprocess
 from bionemo.model.protein.prott5nv import ProtT5nvModel
 from bionemo.model.utils import setup_trainer
-from bionemo.utils.callbacks.callback_utils import setup_dwnstr_task_validation_callbacks
 from bionemo.utils.connectors import BioNeMoSaveRestoreConnector
 
 
