@@ -84,8 +84,6 @@ def setup_dwnstr_task_validation_callbacks(cfg: DictConfig, plugins: Optional[Li
 
     Returns
         List of callbacks to be passed into plt.Trainer
-    TODO(dorotat): This method can be generalized to instantiate any method from config, ie using hydra instantiate or defined specific layout of input config
-
     """
     callbacks_cfg = []
     callbacks_cfg.extend(_select_dwnstr_task_validation_callbacks(cfg))
