@@ -92,7 +92,7 @@ If downstream task validation is enabled, a set of parameters must be specified 
 
 ### Universal Parameters
 
-* `class` defines a type of callback. Available options are: `SingleValuePredictionCallback` for sequence-level classification or regression and `PerTokenPredictionCallback` for token-level classification.
+* `class` defines a type of callback. Available options are: `SingleValuePredictionCallback` for sequence-level classification or regression and `bionemo.model.core.dwnstr_task_callbacks.PerTokenPredictionCallback` for token-level classification.
 
 * `task_type` defines a type of downstream task. Available options are `classification` or `regression`. `PerTokenPredictionCallback` supports only `classification`.
 

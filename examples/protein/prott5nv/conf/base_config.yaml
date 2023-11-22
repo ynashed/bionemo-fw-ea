@@ -180,7 +180,7 @@ model:
   dwnstr_task_validation:
     enabled: False
     dataset:
-      class: PerTokenPredictionCallback
+      class: bionemo.model.core.dwnstr_task_callbacks.PerTokenPredictionCallback
       task_type: token-level-classification
       infer_target: bionemo.model.protein.prott5nv.infer.ProtT5nvInference
       max_seq_length: ${model.seq_length}
