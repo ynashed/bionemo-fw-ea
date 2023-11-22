@@ -3,7 +3,7 @@ from typing import List
 from omegaconf import OmegaConf
 from pytorch_lightning import Callback
 
-from bionemo.tests.callbacks.callbacks import PerfLoggingCallback, SaveTrainerFinalMetricCallback
+from bionemo.callbacks.logging_callbacks import PerfLoggingCallback, SaveTrainerFinalMetricCallback
 from bionemo.utils.dllogger import DLLogger
 
 
