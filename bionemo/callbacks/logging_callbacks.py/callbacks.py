@@ -7,7 +7,7 @@ from nemo.utils import logging
 from pytorch_lightning import Callback
 from pytorch_lightning.utilities import rank_zero_only
 
-from bionemo.tests.callbacks.dllogger import DLLogger
+from bionemo.utils.dllogger import DLLogger
 from bionemo.utils.tests import save_expected_training_results
 
 

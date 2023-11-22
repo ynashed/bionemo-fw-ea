@@ -38,7 +38,7 @@ from pytorch_lightning.trainer.connectors.checkpoint_connector import (
     CheckpointConnector,
 )
 
-from bionemo.tests.utils import add_test_callbacks
+from bionemo.callbacks.utils import add_test_callbacks
 
 
 try:

@@ -4,7 +4,7 @@ from omegaconf import OmegaConf
 from pytorch_lightning import Callback
 
 from bionemo.tests.callbacks.callbacks import PerfLoggingCallback, SaveTrainerFinalMetricCallback
-from bionemo.tests.callbacks.dllogger import DLLogger
+from bionemo.utils.dllogger import DLLogger
 
 
 def add_test_callbacks(cfg: OmegaConf, callbacks: List[Callback], mode: str = "train"):
