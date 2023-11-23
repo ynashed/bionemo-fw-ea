@@ -52,6 +52,14 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
         wget git unzip tmux vim tree xterm && \
     rm -rf /var/lib/apt/lists/*
 
+# Install code-server to enable easy remote development on a container
+# More info about code-server be found here: https://coder.com/docs/code-server/v4.4.0
+ADD https://github.com/coder/code-server/releases/download/v4.4.0/code-server_4.4.0_amd64.deb code-server_4.4.0_amd64.deb
+RUN dpkg -i ./code-server_4.4.0_amd64.deb && rm -f code-server_4.4.0_amd64.deb
+
+# Install extensions from the marketplace
+RUN code-server --install-extension ms-python.python
+
 COPY setup/requirements.txt /tmp/requirements.txt
 RUN pip3 install -r /tmp/requirements.txt
 COPY setup/requirements-linter.txt /tmp/requirements-linter.txt

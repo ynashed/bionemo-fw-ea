@@ -190,6 +190,43 @@ Before commiting code, make sure to setup the auto-formatter and linter via prec
 pip install pre-commit
 pre-commit install
 ```
+### VSCode into DGX Cloud
+[Visual Studio Code](https://code.visualstudio.com/) is an extremely useful IDE for development and debugging. If you want to run a workload on NGC and develop with VSCode you can now do that seemlessly on our platform.
+
+To startup a VSCode server, you must replace the `--command` portion of your `ngc base-command` command with
+```bash
+--commandline "\
+PASSWORD=mypass code-server --auth password --bind-addr 0.0.0.0:8899 /workspace & \
+sleep infinity"
+```
+This will tell DGX Cloud to sleep and wait for you to attach via the VSCode environment. Then you can run all your jobs through VSCode.
+
+
+#### Sample command:
+```bash
+ngc base-command job run \
+--name "myjobnamedummy" \
+--priority HIGH \
+--order 1 \
+--preempt RUNONCE \
+--min-timeslice 0s \
+--ace nv-us-east-2 \
+--org nvidian \
+--team cvai_bnmo_trng \
+--instance  dgxa100.80g.8.norm \
+--image "nvidian/cvai_bnmo_trng/bionemo:latest" \
+--port 8888 \
+--port 8899 \
+--total-runtime 8h  \
+--result \results \
+--commandline "\
+PASSWORD=mypass code-server --auth password --bind-addr 0.0.0.0:8899 /workspace & \
+sleep infinity"
+```
+
+Once that is done, take a look at the ngc [jobs](https://bc.ngc.nvidia.com/jobs) page and find your job. Under the `Service Mapped Ports` section, click
+on the top port `8899` and you should be taken to a VSCode server.
+
 
 ### Build and Start Container from Source
 
