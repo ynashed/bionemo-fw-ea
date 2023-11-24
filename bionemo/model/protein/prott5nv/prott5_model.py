@@ -54,7 +54,19 @@ class ProtT5nvModel(MegatronT5Model):
     def build_train_valid_test_datasets(self):
         logging.info(f'Building {self.model_name} datasets.')
         global_batch_size = self._cfg.global_batch_size
-        eval_iters = (self.trainer.max_steps // self.trainer.val_check_interval + 1) * self.trainer.limit_val_batches
+
+        # Calculating number of times when validation stage is performed during a model's training assuming
+        # trainer.max_steps is set, not trainer.max_epochs
+        if self.trainer.max_steps is None:
+            raise ValueError("ProtT5nvModel requires setting self.trainer.max_steps")
+
+        if isinstance(self.trainer.val_check_interval, float):
+            # if trainer.val_check_interval is a float, it represents a fraction of the training epoch
+            # to check validation, hence we need to check how many times the validation stage will be executed
+            val_steps = int(1 // self.trainer.val_check_interval)
+        else:
+            val_steps = self.trainer.max_steps // self.trainer.val_check_interval
+        eval_iters = (val_steps + 1) * self.trainer.limit_val_batches
         test_iters = self.trainer.limit_test_batches
         train_valid_test_num_samples = [
             self.trainer.max_steps * global_batch_size,
