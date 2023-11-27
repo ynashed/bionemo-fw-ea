@@ -1,0 +1,11 @@
+type: build
+format_version: 1
+maintainers: [dorotat]
+labels:
+  origin: bionemo
+  workload_ref: ""
+spec:
+  name: bionemo
+  platforms: [linux/amd64]
+  source:
+    image: gitlab-master.nvidia.com/clara-discovery/bionemo:dev-latest-devel

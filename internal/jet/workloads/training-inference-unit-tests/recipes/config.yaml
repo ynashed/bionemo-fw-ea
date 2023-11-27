@@ -1,0 +1,78 @@
+type: recipe
+format_version: 1
+maintainers: [dorotat]
+logger: dllogger
+labels:
+  origin: bionemo
+  workload_ref: ""
+key_segments:
+  domain: domain
+  dwnstr_task: dwnstrtask
+  config_name: config
+  warmup: warmup
+  config_path: False
+  default_overwrites: False
+  extra_overwrites: False
+launchers:
+  type:slurm:
+    ntasks_per_node: '{gpus}'
+spec:
+  build: bionemo
+  scope: perf-train
+  platforms: [linux/amd64]
+  BIONEMO_HOME: "/opt/nvidia/bionemo"
+  MODEL_PATH: "/model"
+  NGC_CLI_FORMAT_TYPE: ascii
+  NGC_CLI_ORG: nvidian
+  NGC_CLI_TEAM: clara-lifesciences
+  config_path: "examples/tests/conf/"
+  warmup: 0
+  default_overwrites: "++exp_manager.create_wandb_logger=False ++exp_manager.create_tensorboard_logger=False ++exp_manager.exp_dir=/tmp/nemo_experiments/ ++exp_manager.create_checkpoint_callback=False ++exp_manager.resume_if_exists=False"
+  extra_overwrites: ""
+  script: "cd {BIONEMO_HOME}\nexport NGC_CLI_ORG={NGC_CLI_ORG} \nexport NGC_CLI_TEAM={NGC_CLI_TEAM} \nexport NGC_CLI_FORMAT_TYPE={NGC_CLI_FORMAT_TYPE} \nexport MODEL_PATH={MODEL_PATH}\nexport PROJECT_MOUNT={BIONEMO_HOME}\nif [ \"$SLURM_LOCALID\" = \"0\" ]; then\n  source download_models.sh && download_bionemo_models;\n  unzip examples/tests/test_data/uniref202104_esm2_qc_test200_val200.zip -d examples/tests/test_data/;\n  touch .download-finished;\nelse\n  until [ -f .download-finished ]; do\n    sleep 5;\n  done\nfi   \npython examples/{domain}/{model}/{variant}.py --config-path {BIONEMO_HOME}/{config_path} --config-name {config_name} \\\ntrainer.num_nodes={nodes} trainer.devices={gpus} trainer.precision={precision} model.micro_batch_size={batch_size} \\\n++model.dwnstr_task_validation.enabled={dwnstr_task} \\\n{default_overwrites} {extra_overwrites} hydra.searchpath=[file://{BIONEMO_HOME}/examples/{domain}/{model}/conf] \\\n++create_dllogger_callbacks=True ++create_trainer_metric_callback=True \\\n++dllogger_callbacks_kwargs.use_existing_dllogger=True ++dllogger_callbacks_kwargs.warmup={warmup} \\\n++dllogger_callbacks_kwargs.json_file={dllogger_file} ++trainer_metric_callback_kwargs.log_path={assets_dir} ++logs_dir={logs_dir}"
+  time_limit: 1800
+  artifacts: {}
+  metrics:
+    throughput_train:
+      goal: maximize
+      tags: [primary]
+    latency_train_mean:
+      goal: minimize
+      tags: [secondary]
+    train_loss:
+      goal: minimize
+      tags: [secondary]
+products:
+  - nodes: [1]
+    gpus: [1, 8]
+    precision: [16, 32, bf16]
+    products:
+      - domain: [molecule]
+        model: [megamolbart]
+        batch_size: [32]
+        products:
+          - variant: [pretrain]
+            dwnstr_task: [False, True]
+            config_name: [megamolbart_test]
+          - variant: [downstream_retro]
+            config_name: [megamolbart_downstream_retro_test]
+            dwnstr_task: [False]
+          - variant: [downstream_physchem]
+            config_name: [megamolbart_physchem_test]
+            dwnstr_task: [False]
+            extra_overwrites: ["++trainer.check_val_every_n_epoch=null"]
+      - domain: [protein]
+        dwnstr_task: [False, True]
+        products:
+          - model: [esm1nv]
+            batch_size: [32]
+            variant: [pretrain]
+            config_name: [esm1nv_test]
+          - model: [esm2nv]
+            batch_size: [2]
+            variant: [pretrain]
+            config_name: [esm2nv_8M_test]
+          - model: [prott5nv]
+            batch_size: [12]
+            variant: [pretrain]
+            config_name: [prott5nv_test]

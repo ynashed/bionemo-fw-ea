@@ -44,6 +44,8 @@ variables:
   # TODO(dorotat): change to cvai_bnmo_trng when we move data and checkpoints
   NGC_CLI_TEAM: clara-lifesciences
   JET_WORKLOADS_REF_MAIN: "bionemo/training-unit-tests"
+  JET_WORKLOADS_DIR: "internal/jet/workloads/training-inference-unit-tests"
+  JET_WORKLOADS_: "internal/jet/workloads/training-inference-unit-tests"
   SKIP_CI_MR: "false"
   SKIP_CI_MR_JET: "false"
 
@@ -154,36 +156,52 @@ unit-test-pytest:
         coverage_format: cobertura
         path: coverage.xml
 
-
-.jet-generate-template:
+.jet-configure:
+  stage: jet
   tags:
     - generic
-  stage: jet
-  needs: [unit-test-pytest]
-  variables:
-    CMD: 'yq e ".spec.source.image = \"${PIPELINE_TAG}\"" -i builds/bionemo.yaml'
-    JET_WORKLOADS_DIR: "/builds/clara-discovery/workloads-registry"
-    JET_WORKLOADS_REPO_URL: "gitlab-master.nvidia.com/dl/jet/workloads-registry"
+  after_script:
+    - echo "JET_WORKLOADS_PROJECT=$CI_PROJECT_ID" >> jet.env
+    - echo "JET_WORKLOADS_JOB=$CI_JOB_ID" >> jet.env
+  artifacts:
+    reports:
+      dotenv: jet.env
+
+
+jet-configure:
+  extends: [.jet-configure]
+  artifacts:
+    paths:
+      - $JET_WORKLOADS_DIR
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $SKIP_CI_MR_JET == "true"
+      when: never
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $SKIP_CI_MR_JET != "true"
+      when: manual
+      variables:
+        JET_WORKLOADS_REF: "bionemo/merge_request_event"
+    - if: $CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "dev-next" || $CI_COMMIT_BRANCH == "main"
+      variables:
+        JET_WORKLOADS_REF: "bionemo/${CI_COMMIT_BRANCH}"
   before_script:
     - apk update && apk add git yq
-    - if [ -d "$JET_WORKLOADS_DIR" ]; then rm -rf $JET_WORKLOADS_DIR; fi
-    - git clone https://gitlab-ci-token:${JET_WORKLOADS_TOKEN}@$JET_WORKLOADS_REPO_URL $JET_WORKLOADS_DIR
-    - cd $JET_WORKLOADS_DIR
-    - git checkout -f $JET_WORKLOADS_REF_MAIN
-    - git checkout -b $JET_WORKLOADS_REF_EPHEMERAL
-    - git config --global user.email "bionemo@ci.nvidia.com"
-    - git config --global user.name "BioNeMo CI"
   script:
-    - eval "$CMD"
-    - git add .; git commit -m'Dynamic configuration - ${CI_PIPELINE_ID} - replaced docker image in build config'
-    - git push origin $JET_WORKLOADS_REF_EPHEMERAL
+    - yq e ".spec.source.image = \"${PIPELINE_TAG}\"" -i ${JET_WORKLOADS_DIR}/builds/bionemo.yaml
+    - 'find "$JET_WORKLOADS_DIR" -type f -name "*.yaml" -print0 | while IFS= read -r -d "" file; do
+          echo "File: $file";
+          yq e ".labels.workload_ref = \"${JET_WORKLOADS_REF}\"" -i ${file};
+          yq e ".labels.bionemo_ci_pipeline_id = \"${CI_PIPELINE_ID}\"" -i ${file};
+       done'
 
 
 .jet-trigger-template:
   stage: jet
+  needs: [jet-configure]
   inherit:
     variables: false
   variables:
+    JET_WORKLOADS_PROJECT: $JET_WORKLOADS_PROJECT
+    JET_WORKLOADS_JOB: $JET_WORKLOADS_JOB
     JET_WORKLOADS_REF: ""
     JET_WORKLOADS_FILTER: type == 'recipe'
     JET_BUILDS_PLATFORMS: linux/amd64
@@ -192,30 +210,8 @@ unit-test-pytest:
     strategy: depend
 
 
-jet-generate:
-  extends: .jet-generate-template
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $SKIP_CI_MR_JET == "true"
-      when: never
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $SKIP_CI_MR_JET != "true"
-      when: manual
-      variables:
-        JET_WORKLOADS_REF_EPHEMERAL: "ephemeral/bionemo/${CI_PIPELINE_ID}"
-    - if: $CI_COMMIT_BRANCH == "dev"
-      variables:
-        JET_WORKLOADS_REF_EPHEMERAL: "ephemeral/bionemo/${CI_COMMIT_BRANCH}/${CI_PIPELINE_ID}"
-    - if: $CI_COMMIT_BRANCH == "dev-next"
-      variables:
-        JET_WORKLOADS_REF_EPHEMERAL: "ephemeral/bionemo/${CI_COMMIT_BRANCH}/${CI_PIPELINE_ID}"
-    - if: $CI_COMMIT_BRANCH == "main"
-      variables:
-        JET_WORKLOADS_REF_EPHEMERAL: "ephemeral/bionemo/${CI_COMMIT_BRANCH}/${CI_PIPELINE_ID}"
-
-
 jet-trigger:
-  needs: [ jet-generate ]
-  extends:
-    - .jet-trigger-template
+  extends: [.jet-trigger-template]
   inherit:
     variables:
       - CI_PIPELINE_ID
@@ -227,20 +223,14 @@ jet-trigger:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $SKIP_CI_MR_JET != "true"
       variables:
         JET_WORKLOADS_REF: "ephemeral/bionemo/${CI_PIPELINE_ID}"
-    - if: $CI_COMMIT_BRANCH == "dev"
-      variables:
-        JET_WORKLOADS_REF: "ephemeral/bionemo/${CI_COMMIT_BRANCH}/${CI_PIPELINE_ID}"
-    - if: $CI_COMMIT_BRANCH == "dev-next"
-      variables:
-        JET_WORKLOADS_REF: "ephemeral/bionemo/${CI_COMMIT_BRANCH}/${CI_PIPELINE_ID}"
-    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "dev-next" || $CI_COMMIT_BRANCH == "main"
       variables:
         JET_WORKLOADS_REF: "ephemeral/bionemo/${CI_COMMIT_BRANCH}/${CI_PIPELINE_ID}"
 
 
 # TODO(@dorotat): use image gitlab-master.nvidia.com:5005/dl/jet/api:latest
 jet-test:
-  needs: [ jet-trigger ]
+  needs: [jet-trigger]
   image:
     name: "${PIPELINE_TAG}-devel"
     entrypoint: [ "" ]

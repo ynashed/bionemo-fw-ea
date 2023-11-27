@@ -1,0 +1,65 @@
+type: recipe
+format_version: 1
+maintainers: [dorotat]
+logger: dllogger
+labels:
+  origin: bionemo
+  workload_ref: ""
+key_segments:
+  domain: domain
+  config_name: config
+  warmup: warmup
+  config_path: False
+  default_overwrites: False
+  extra_overwrites: False
+launchers:
+  type:slurm:
+    ntasks_per_node: '{gpus}'
+spec:
+  build: bionemo
+  scope: perf-infer
+  platforms: [linux/amd64]
+  BIONEMO_HOME: "/opt/nvidia/bionemo"
+  MODEL_PATH: "/model"
+  NGC_CLI_FORMAT_TYPE: ascii
+  NGC_CLI_ORG: nvidian
+  NGC_CLI_TEAM: clara-lifesciences
+  config_path: "examples/tests/conf/"
+  default_overwrites: "++exp_manager.exp_dir=/tmp/nemo_experiments/"
+  extra_overwrites: ""
+  warmup: 0
+  script: "cd {BIONEMO_HOME}\nexport NGC_CLI_ORG={NGC_CLI_ORG} \nexport NGC_CLI_TEAM={NGC_CLI_TEAM} \nexport NGC_CLI_FORMAT_TYPE={NGC_CLI_FORMAT_TYPE} \nexport MODEL_PATH={MODEL_PATH}\nexport PROJECT_MOUNT={BIONEMO_HOME}\nif [ \"$SLURM_LOCALID\" = \"0\" ]; then\n  source download_models.sh && download_bionemo_models;\n  touch .download-finished;\nelse\n  until [ -f .download-finished ]; do\n    sleep 5;\n  done\nfi  \npython examples/{variant}.py --config-path {BIONEMO_HOME}/{config_path} --config-name {config_name} \\\ntrainer.num_nodes={nodes} trainer.devices={gpus} trainer.precision={precision} ++model.data.batch_size={batch_size} \\\n{default_overwrites} {extra_overwrites}  \\\n++create_dllogger_callbacks=True ++dllogger_callbacks_kwargs.use_existing_dllogger=True \\\n++dllogger_callbacks_kwargs.warmup={warmup} \\\n++dllogger_callbacks_kwargs.json_file={dllogger_file} ++assets_dir={assets_dir} ++logs_dir={logs_dir}"
+  time_limit: 1800
+  artifacts: {}
+  metrics:
+    throughput_train:
+      goal: maximize
+      tags: [primary]
+    latency_train_mean:
+      goal: minimize
+      tags: [secondary]
+    train_loss:
+      goal: minimize
+      tags: [secondary]
+products:
+  - nodes: [1]
+    gpus: [1, 8]
+    precision: [16, 32, bf16]
+    variant: [infer]
+    products:
+      - domain: [molecule]
+        model: [megamolbart]
+        config_name: [megamolbart_infer]
+        batch_size: [4]
+        checkpoint_name: [megamolbart]
+      - domain: [protein]
+        products:
+          - model: [esm1nv]
+            config_name: [esm1nv_infer]
+            batch_size: [4]
+          - model: [esm2nv]
+            config_name: [esm2nv_infer]
+            batch_size: [4]
+          - model: [prott5nv]
+            config_name: [prott5nv_infer]
+            batch_size: [4]
