@@ -8,7 +8,7 @@ data:
   pin_memory: True
   micro_batch_size: ${model.micro_batch_size}
   world_size: ${multiply:${trainer.devices}, ${trainer.num_nodes}}
-  cache_path: /data/ # Folder from where to load/restore cached dataset
+  cache_path: ${oc.env:BIONEMO_HOME}/data/ # Folder from where to load/restore cached dataset
   graph_cutoff: 30.0
   graph_max_neighbor: 10
   split: 0
@@ -16,14 +16,14 @@ data:
   translation_interval: 5
   n_jobs: null
   graph_residue_loc_is_alphaC: True # needed for preprocessing
-  raw_data_path: /data/benchmark5.5/structures/ ## See utils/partition_dips.py on how to get this data preprocessed.
-  split_files_path: /data/benchmark5.5/cv/cv_0
+  raw_data_path: ${oc.env:BIONEMO_HOME}/data/benchmark5.5/structures/ ## See utils/partition_dips.py on how to get this data preprocessed.
+  split_files_path: ${oc.env:BIONEMO_HOME}/data/benchmark5.5/cv/cv_0
   reload_mode: null
 
 model:
   name: EquiDock_${data.data_name}_finetune
   seed: 42
-  restore_from_path: /model/protein/equidock/equidock_${data.data_name}.nemo # Used when starting from a .nemo file. Replace with your own pretrainined
+  restore_from_path: ${oc.env:BIONEMO_HOME}/models/protein/equidock/equidock_${data.data_name}.nemo # Used when starting from a .nemo file. Replace with your own pretrainined
   micro_batch_size: 32
   resume_from_checkpoint: null
   debug: False
@@ -185,7 +185,7 @@ exp_manager:
     decay: 0.999 # (ema_rate) The exponential decay used when calculating the moving average. Has to be between 0-1.
 
   # logging
-  exp_dir: /result/nemo_experiments/${.name}/${.wandb_logger_kwargs.name}
+  exp_dir: ${oc.env:BIONEMO_HOME}/results/nemo_experiments/${.name}/${.wandb_logger_kwargs.name}
   explicit_log_dir: ${.exp_dir}
   create_tensorboard_logger: True
   create_wandb_logger: True

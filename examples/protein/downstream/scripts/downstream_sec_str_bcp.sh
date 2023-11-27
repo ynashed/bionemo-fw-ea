@@ -15,7 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Below is a sample set of parameters for launching ESM-1nv or ProtT5nv finetuning for a secondary structure predition 
+# Below is a sample set of parameters for launching ESM-1nv or ProtT5nv finetuning for a secondary structure predition
 # downstream task with BioNeMo on BCP clusters
 # Replace all ?? with appropriate values prior to launching a job
 # Any parameters not specified in this script can be changed in the yaml config file
@@ -26,7 +26,7 @@ BIONEMO_IMAGE=?? # BioNeMo container image
 WANDB_API_KEY=?? # Add your WANDB API KEY
 
 CONFIG_NAME='downstream_flip_sec_str' # name of the yaml config file with parameters, should be aligned with TASK_NAME parameter
-PROTEIN_MODEL=esm2nv # protein LM name, can be esm2nv, esm1nv or prott5nv 
+PROTEIN_MODEL=esm2nv # protein LM name, can be esm2nv, esm1nv or prott5nv
 
 # NGC specific parameters
 # =========================
@@ -41,7 +41,7 @@ NGC_CLI_ORG=nvidian
 NGC_CLI_TEAM=cvai_bnmo_trng
 
 LABEL=ml__bionemo
-WL_LABEL=wl___other___bionemo 
+WL_LABEL=wl___other___bionemo
 JOB_NAME=ml-model.bionemo-fw-${PROTEIN_MODEL}-finetune
 WORKSPACE=??  # Your NGC workspace ID goes here
 # =========================
@@ -49,10 +49,10 @@ WORKSPACE=??  # Your NGC workspace ID goes here
 # Training parameters
 # =========================
 ACCUMULATE_GRAD_BATCHES=1 # gradient accumulation
-ENCODER_FROZEN=True # encoder can be frozen or trainable 
+ENCODER_FROZEN=True # encoder can be frozen or trainable
 RESTORE_FROM_PATH=/model/protein/${PROTEIN_MODEL}/esm2nv_650M_converted.nemo # Path to the pretrained model checkpoint in the container
 TENSOR_MODEL_PARALLEL_SIZE=1 # tensor model parallel size,  model checkpoint must be compatible with tensor model parallel size
-MICRO_BATCH_SIZE=32 # micro batch size per GPU, for best efficiency should be set to occupy ~85% of GPU memory. Suggested value for A100 80GB is 256 
+MICRO_BATCH_SIZE=32 # micro batch size per GPU, for best efficiency should be set to occupy ~85% of GPU memory. Suggested value for A100 80GB is 256
 MAX_STEPS=2000 # duration of training as the number of training steps
 VAL_CHECK_INTERVAL=20 # how often validation step is performed, including downstream task validation
 # =========================
@@ -71,7 +71,7 @@ CONFIG_PATH=../${PROTEIN_MODEL}/conf
 # Instructions for downloading checkpoint, preprocessing the data and running finetuning
 # =========================
 read -r -d '' BCP_COMMAND <<EOF
-bcprun --debug --nnodes=${NGC_ARRAY_SIZE} --npernode=${NGC_GPUS_PER_NODE} -w /opt/nvidia/bionemo -e WANDB_API_KEY=${WANDB_API_KEY} --cmd 'export NGC_CLI_ORG=$NGC_CLI_ORG NGC_CLI_API_KEY=$NGC_CLI_API_KEY MODEL_PATH=/model; ./launch.sh download';
+bcprun --debug --nnodes=${NGC_ARRAY_SIZE} --npernode=${NGC_GPUS_PER_NODE} -w /workspace/bionemo -e WANDB_API_KEY=${WANDB_API_KEY} --cmd 'export NGC_CLI_ORG=$NGC_CLI_ORG NGC_CLI_API_KEY=$NGC_CLI_API_KEY MODEL_PATH=/model; ./launch.sh download';
 bcprun --debug --nnodes=${NGC_ARRAY_SIZE} --npernode=1 -w /workspace/bionemo/examples/protein/downstream -e WANDB_API_KEY=${WANDB_API_KEY} --cmd 'python downstream_sec_str.py do_training=False';
 bcprun --debug --nnodes=${NGC_ARRAY_SIZE} --npernode=${NGC_GPUS_PER_NODE} -w /workspace/bionemo/examples/protein/downstream -e WANDB_API_KEY=${WANDB_API_KEY} --cmd 'python downstream_sec_str.py --config-path=${CONFIG_PATH} \
     --config-name=${CONFIG_NAME} exp_manager.exp_dir=${EXP_DIR} exp_manager.wandb_logger_kwargs.offline=${WANDB_LOGGER_OFFLINE} \

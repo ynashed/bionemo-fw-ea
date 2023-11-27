@@ -1,13 +1,13 @@
 
-protein_data_dir: /data/PDBBind_processed
+protein_data_dir: ${oc.env:BIONEMO_HOME}/data/PDBBind_processed
 
 data:
-  split_test: ${oc.env:PROJECT_MOUNT}/examples/molecule/diffdock/data/splits/timesplit_test # Path of file defining the split
+  split_test: ${oc.env:BIONEMO_HOME}/examples/molecule/diffdock/data/splits/timesplit_test # Path of file defining the split
   data_dir: ${protein_data_dir}
 
-names_no_rec_overlap: ${oc.env:PROJECT_MOUNT}/examples/molecule/diffdock/data/splits/timesplit_test_no_rec_overlap
+names_no_rec_overlap: ${oc.env:BIONEMO_HOME}/examples/molecule/diffdock/data/splits/timesplit_test_no_rec_overlap
 
-results_path: /results/user_predictions_testset
+results_path: ${oc.env:BIONEMO_HOME}/results/user_predictions_testset
 all_dirs_in_results: True
 num_predictions: 40
 file_to_exclude: rank1.sdf

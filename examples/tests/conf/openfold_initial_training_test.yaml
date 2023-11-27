@@ -5,7 +5,7 @@ defaults:
 model:
   num_train_iters: 100
   data:
-    dataset_path: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/openfold_data # only if downloaded
+    dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/openfold_data # only if downloaded
     filter_by_alignments: true
   train_ds:
     defer_setup: true
@@ -19,6 +19,6 @@ trainer:
   val_check_interval: 20
 
 exp_manager:
-  exp_dir: /tmp/nemo_experiments/openfold/
+  exp_dir: ${oc.env:BIONEMO_HOME}/test_results/nemo_experiments/openfold/
   wandb_logger_kwargs:
     offline: True

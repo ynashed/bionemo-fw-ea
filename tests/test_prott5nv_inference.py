@@ -32,15 +32,15 @@ from bionemo.utils.tests import (
 
 log = logging.getLogger(__name__)
 
-CONFIG_PATH = "../examples/protein/prott5nv/conf"
-PREPEND_CONFIG_DIR = os.path.abspath("../examples/conf")
+BIONEMO_HOME = os.getenv("BIONEMO_HOME")
+CONFIG_PATH = "../examples/protein/prott5nv/conf"  # Hydra config paths must be relative
+PREPEND_CONFIG_DIR = os.path.join(BIONEMO_HOME, "examples/conf")
 MODEL_CLASS = ProtT5nvInference
-CHECKPOINT_PATH = "/model/protein/prott5nv/prott5nv.nemo"
+CHECKPOINT_PATH = os.path.join(BIONEMO_HOME, "models/protein/prott5nv/prott5nv.nemo")
 
 ####
 
 _INFERER = None
-os.environ["PROJECT_MOUNT"] = os.environ.get("PROJECT_MOUNT", '/workspace/bionemo')
 THIS_FILE_DIR = pathlib.Path(os.path.abspath(__file__)).parent
 
 

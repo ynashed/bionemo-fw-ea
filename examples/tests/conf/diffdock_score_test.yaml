@@ -3,7 +3,7 @@ defaults:
 
 hydra:
   searchpath:
-     - ${oc.env:PROJECT_MOUNT}/examples/molecule/diffdock/conf
+     - ${oc.env:BIONEMO_HOME}/examples/molecule/diffdock/conf
 
 name: diffdock_score_training_test
 
@@ -11,10 +11,10 @@ seed: 0
 
 data:
   num_workers: 1
-  split_train: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/molecule/diffdock/splits/timesplit_no_lig_overlap_train # Path of file defining the split.
-  split_val: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/molecule/diffdock/splits/timesplit_no_lig_overlap_val # Path of file defining the split
-  split_test: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/molecule/diffdock/splits/timesplit_test # Path of file defining the split
-  cache_path: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/molecule/diffdock/data_cache # Folder from where to load/restore cached dataset
+  split_train: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/splits/timesplit_no_lig_overlap_train # Path of file defining the split.
+  split_val: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/splits/timesplit_no_lig_overlap_val # Path of file defining the split
+  split_test: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/splits/timesplit_test # Path of file defining the split
+  cache_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/data_cache # Folder from where to load/restore cached dataset
 
 trainer:
   precision: 32
@@ -31,4 +31,4 @@ model:
 
 exp_manager:
   create_wandb_logger: False
-  exp_dir: /tmp/${name}
+  exp_dir: ${oc.env:BIONEMO_HOME}/test_results/${name}

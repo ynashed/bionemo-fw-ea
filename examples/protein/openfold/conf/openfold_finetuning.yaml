@@ -49,7 +49,7 @@ model:
       decay_factor: 0.95
 
   data:
-    dataset_path: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/openfold_data
+    dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/openfold_data
     dataset_variant: processed
     realign_when_required: True
     use_only_pdb_chain_ids: null # Optional list of pdb chain ids for intersection with train and val datasets.
@@ -84,7 +84,7 @@ trainer:
 
 exp_manager:
   name: fine-tuning
-  exp_dir: /result/nemo_experiments/${.name}/${.wandb_logger_kwargs.name}
+  exp_dir: ${oc.env:BIONEMO_HOME}/results/nemo_experiments/${.name}/${.wandb_logger_kwargs.name}
   explicit_log_dir: ${.exp_dir}
   version: base
   resume_if_exists: True

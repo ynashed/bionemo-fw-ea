@@ -13,10 +13,10 @@ model:
   tokenizer:
     type: 'kmer'
     k: 3
-    model: /tokenizers/dna/dnabert/vocab/dnabert${.k}.model
-    vocab_file: /tokenizers/dna/dnabert/vocab/dnabert${.k}.vocab
+    model: ${oc.env:BIONEMO_HOME}/tokenizers/dna/dnabert/vocab/dnabert${.k}.model
+    vocab_file: ${oc.env:BIONEMO_HOME}/tokenizers/dna/dnabert/vocab/dnabert${.k}.vocab
   data:
-    dataset_path: /data/GRCh38.p13 # contains train / val / test folders
+    dataset_path: ${oc.env:BIONEMO_HOME}/data/GRCh38.p13 # contains train / val / test folders
     dataset: # inclusive range of data files to load or can load a single file, e.g. x000.csv
       train: chr[1..19].fna.gz.chunked.fa
       test: chr21.fna.gz.chunked.fa

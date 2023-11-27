@@ -54,7 +54,7 @@ MOUNTS="${RESULTS_PATH}:${RESULTS_MOUNT},${DATA_PATH}:${DATA_MOUNT}"
 export HYDRA_FULL_ERROR=1
 # =========================
 
-
+# Note: BIONEMO_HOME is set inside the container to the correct repo path (typically /workspace/bionemo)
 # Command
 # =========================
 read -r -d '' COMMAND <<EOF
@@ -62,10 +62,10 @@ echo "*******STARTING********" \
 && echo "---------------" \
 && wandb login ${WANDB_API_KEY} \
 && echo "Starting training" \
-&& cd /opt/nvidia/bionemo \
+&& cd \$BIONEMO_HOME \
 && cd examples/protein/openfold \
-&& python /opt/nvidia/bionemo/examples/protein/openfold/train.py \
-    --config-path=/opt/nvidia/bionemo/examples/protein/openfold/conf \
+&& python \$BIONEMO_HOME/examples/protein/openfold/train.py \
+    --config-path=\$BIONEMO_HOME/examples/protein/openfold/conf \
     --config-name=${CONFIG_NAME} \
     exp_manager.exp_dir=${RESULTS_MOUNT} \
     exp_manager.create_wandb_logger=${CREATE_WANDB_LOGGER} \

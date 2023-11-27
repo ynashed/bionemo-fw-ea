@@ -11,7 +11,7 @@
 #SBATCH --exclusive                   # exclusive node access
 set -x
 
-# Below is a sample set of parameters for launching ESM-1nv or ProtT5nv finetuning for a secondary structure predition 
+# Below is a sample set of parameters for launching ESM-1nv or ProtT5nv finetuning for a secondary structure predition
 # downstream task with BioNeMo on SLURM-based clusters
 # Replace all ?? with appropriate values prior to launching a job
 # Any parameters not specified in this script can be changed in the yaml config file
@@ -24,15 +24,15 @@ BIONEMO_IMAGE=?? # BioNeMo container image
 WANDB_API_KEY=?? # Add your WANDB API KEY
 
 CONFIG_NAME='downstream_flip_sec_str' # name of the yaml config file with parameters, should be aligned with TASK_NAME parameter
-PROTEIN_MODEL=esm2nv # protein LM name, can be esm2nv, esm1nv or prott5nv 
+PROTEIN_MODEL=esm2nv # protein LM name, can be esm2nv, esm1nv or prott5nv
 
 # Training parameters
 # =========================
 ACCUMULATE_GRAD_BATCHES=1 # gradient accumulation
-ENCODER_FROZEN=True # encoder can be frozen or trainable 
+ENCODER_FROZEN=True # encoder can be frozen or trainable
 RESTORE_FROM_PATH=/model/protein/${PROTEIN_MODEL}/esm2nv_650M_converted.nemo # Path to the pretrained model checkpoint in the container
 TENSOR_MODEL_PARALLEL_SIZE=1 # tensor model parallel size,  model checkpoint must be compatible with tensor model parallel size
-MICRO_BATCH_SIZE=64 # micro batch size per GPU, for best efficiency should be set to occupy ~85% of GPU memory. Suggested value for A100 80GB is 256 
+MICRO_BATCH_SIZE=64 # micro batch size per GPU, for best efficiency should be set to occupy ~85% of GPU memory. Suggested value for A100 80GB is 256
 MAX_STEPS=2000 # duration of training as the number of training steps
 VAL_CHECK_INTERVAL=20 # how often validation step is performed, including downstream task validation
 # =========================
@@ -42,7 +42,7 @@ VAL_CHECK_INTERVAL=20 # how often validation step is performed, including downst
 TASK_NAME=secondary_structure # FLIP task name: secondary_structure, scl, meltome, etc.
 EXP_TAG="" # any additional experiment info, can be empty
 EXP_NAME="${PROTEIN_MODEL}_batch${MICRO_BATCH_SIZE}_gradacc${ACCUMULATE_GRAD_BATCHES}_nodes${SLURM_JOB_NUM_NODES}_encoder-frozen-${ENCODER_FROZEN}${EXP_TAG}"
-CREATE_WANDB_LOGGER=True # set to False if you don't want to log results with WandB 
+CREATE_WANDB_LOGGER=True # set to False if you don't want to log results with WandB
 WANDB_LOGGER_OFFLINE=False # set to True if there are issues uploading to WandB during training
 
 PROJECT_NAME="${PROTEIN_MODEL}_${CONFIG_NAME}"  # project name, will be used for logging
@@ -65,15 +65,16 @@ MOUNTS="${RESULTS_PATH}:${RESULTS_MOUNT},${DATA_PATH}:${DATA_MOUNT}"
 export HYDRA_FULL_ERROR=1
 # =========================
 
+# Note: BIONEMO_HOME is set inside the container to the correct repo path (typically /workspace/bionemo)
 read -r -d '' COMMAND <<EOF
 echo "*******STARTING********" \
 && echo "---------------" \
 && wandb login ${WANDB_API_KEY} \
 && echo "Starting training" \
-&& cd /opt/nvidia/bionemo \
+&& cd \$BIONEMO_HOME \
 && cd examples/protein/downstream \
-&& python /opt/nvidia/bionemo/examples/protein/downstream/downstream_sec_str.py \
-    --config-path=/opt/nvidia/bionemo/examples/protein/${PROTEIN_MODEL}/conf \
+&& python \$BIONEMO_HOME/examples/protein/downstream/downstream_sec_str.py \
+    --config-path=\$BIONEMO_HOME/examples/protein/${PROTEIN_MODEL}/conf \
     --config-name=${CONFIG_NAME} \
     exp_manager.exp_dir=${RESULTS_MOUNT} \
     exp_manager.create_wandb_logger=${CREATE_WANDB_LOGGER} \
@@ -91,7 +92,7 @@ echo "*******STARTING********" \
     model.encoder_frozen=${ENCODER_FROZEN} \
     model.data.task_name=${TASK_NAME} \
     model.data.dataset_path=${DATA_MOUNT}/${TASK_NAME} \
-    restore_from_path=${RESTORE_FROM_PATH} 
+    restore_from_path=${RESTORE_FROM_PATH}
 
 EOF
 

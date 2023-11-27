@@ -6,7 +6,8 @@ import pytest
 import torch
 
 
-os.environ['PROJECT_MOUNT'] = os.environ.get('PROJECT_MOUNT', '/workspace/bionemo')
+BIONEMO_HOME = os.getenv('BIONEMO_HOME')
+TEST_DATA_DIR = os.path.join(BIONEMO_HOME, "examples/tests/test_data")
 
 
 @pytest.fixture
@@ -62,7 +63,6 @@ def get_data_overrides(script_or_cfg_path: str) -> str:
     the script performs and selects compatible data sample from test data.
     Returns string that can be appended to the python command for launching the script
     """
-    TEST_DATA_DIR = '/workspace/bionemo/examples/tests/test_data'
     DATA = " ++model.data"
     MAIN = f'{DATA}.dataset_path={TEST_DATA_DIR}/%s'
     DOWNSTREAM = f' ++model.dwnstr_task_validation.dataset.dataset_path={TEST_DATA_DIR}/%s'
@@ -134,7 +134,8 @@ def test_train_scripts(script_path, train_args, data_args, tmp_path):
         cmd += ' ' + ' '.join(f'++{k}={v}' for k, v in data_args.items())
     print(cmd)
     process_handle = subprocess.run(cmd, shell=True, capture_output=True)
-    assert process_handle.returncode == 0
+    error_out = process_handle.stderr.decode('utf-8')
+    assert process_handle.returncode == 0, f"Command failed:\n{cmd}\n Error log:\n{error_out}"
 
 
 def get_infer_args_overrides(config_path):
@@ -164,7 +165,9 @@ def test_infer_script(config_path, tmp_path):
 
     # FIXME: WARs for unavailable checkpoints
     if 'retro' in config_path:
-        cmd += ' model.downstream_task.restore_from_path=/model/molecule/megamolbart/megamolbart.nemo'
+        model_checkpoint_path = os.path.join(BIONEMO_HOME, "models/molecule/megamolbart/megamolbart.nemo")
+        cmd += f" model.downstream_task.restore_from_path={model_checkpoint_path}"
     cmd += get_data_overrides(config_path)
     process_handle = subprocess.run(cmd, shell=True, capture_output=True)
-    assert process_handle.returncode == 0
+    error_out = process_handle.stderr.decode('utf-8')
+    assert process_handle.returncode == 0, f"Command failed:\n{cmd}\n Error log:\n{error_out}"

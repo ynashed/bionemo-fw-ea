@@ -47,13 +47,15 @@ launch.sh [command]
 
     valid commands:
 
-    pull      - pull an existing container
-    download  - download pre-trained models
-    build     - build a container, only recommended if customization is needed
-    run       - launch the docker container in non-dev mode. Code is cloned from git and installed.
-    push      - push a container to a registry
-    dev       - launch a new container in development mode. Local copy of the code is mounted and installed.
-    attach    - attach to a running container
+    pull               - pull an existing container
+    download           - download pre-trained models
+    download_test_data - download data necessary for openfold, diffdock tests.
+    download_all       - download_test_data and download pretrained models.
+    build              - build a container, only recommended if customization is needed
+    run                - launch the docker container in non-dev mode. Code is cloned from git and installed.
+    push               - push a container to a registry
+    dev                - launch a new container in development mode. Local copy of the code is mounted and installed.
+    attach             - attach to a running container
 
 
 Getting Started tl;dr
@@ -73,19 +75,12 @@ variables:
     BIONEMO_IMAGE
         Container image for BioNeMo training, prepended with registry. e.g.,
         Note that this is a separate (precursor) container from any service associated containers
-    PROJECT_MOUNT
+    DOCKER_MOUNT_PATH
         Set this to change the location of the library in the container, e.g. for development work.
         It is set to /workspace/bionemo by default and a lot of the examples expect this path to be valid.
-        Use of /workspace/bionemo is strongly recommended as the alternative for development work.
-        Only change this if you know what you're doing.
-    PROJECT_PATH
-        Path on workstation or cluster to code, e.g., /home/user/code/bionemo
-    DATA_PATH
-        Path on workstation or cluster to data, e.g., /data
-    MODEL_PATH
-        Location of the models when downloaded. Defaults to '$PROJECT_PATH/models' on workstation or /model in container.
-    RESULT_PATH
-        Path on workstation or cluster to directory for results, e.g. /home/user/results/nemo_experiments
+    BIONEMO_HOME
+        Path on workstation or cluster to code, e.g., /home/user/code/bionemo. Inside the bionemo container,
+        this is set to /workspace/bionemo by default.
     WANDB_API_KEY
         Weights and Balances API key to upload runs to WandB. Can also be uploaded afterwards., e.g. Dkjdf...
         This value is optional -- Weights and Biases will log data and not upload if missing.
@@ -112,19 +107,17 @@ EOF
     exit
 }
 
-
-# Don't change these
-BIONEMO_HOME=/opt/nvidia/bionemo # Where BioNeMo is installed in container, set the same as Docker container
-BIONEMO_WORKSPACE=/workspace/bionemo # Location of examples / config files and where BioNeMo code can be mounted for development
-
+# Check if BIONEMO_HOME is already set externally (which would be the case inside
+# the docker image)
+if [ -v BIONEMO_HOME ]; then
+    PREVIOUSLY_SET_BIONEMO_HOME=${BIONEMO_HOME}
+    echo Found \$BIONEMO_HOME = ${BIONEMO_HOME}
+fi
 
 # Defaults for `.env` file
 BIONEMO_IMAGE=${BIONEMO_IMAGE:=nvcr.io/nvidian/cvai_bnmo_trng/bionemo:dev}
-PROJECT_MOUNT=${PROJECT_MOUNT:=/workspace/bionemo}
-PROJECT_PATH=${PROJECT_PATH:=$(pwd)}
-DATA_PATH=${DATA_PATH:=/tmp}
-MODEL_PATH=${MODEL_PATH:=${PROJECT_PATH}/models}
-RESULT_PATH=${RESULT_PATH:=${HOME}/results/nemo_experiments}
+DOCKER_MOUNT_PATH=${DOCKER_MOUNT_PATH:=/workspace/bionemo}
+BIONEMO_HOME=${BIONEMO_HOME:=$(pwd)}
 WANDB_API_KEY=${WANDB_API_KEY:=NotSpecified}
 JUPYTER_PORT=${JUPYTER_PORT:=8888}
 REGISTRY=${REGISTRY:=NotSpecified}
@@ -134,6 +127,7 @@ NGC_CLI_API_KEY=${NGC_CLI_API_KEY:=NotSpecified}
 NGC_CLI_ORG=${NGC_CLI_ORG:=nvidian}
 NGC_CLI_TEAM=${NGC_CLI_TEAM:=NotSpecified}
 NGC_CLI_FORMAT_TYPE=${NGC_CLI_FORMAT_TYPE:=ascii}
+
 
 # if $LOCAL_ENV file exists, source it to specify my environment
 if [ -e ./$LOCAL_ENV ]
@@ -149,11 +143,8 @@ fi
 # If $LOCAL_ENV was not found, write out a template for user to edit
 if [ $write_env -eq 1 ]; then
     echo BIONEMO_IMAGE=${BIONEMO_IMAGE} >> $LOCAL_ENV
-    echo PROJECT_MOUNT=${PROJECT_MOUNT} >> $LOCAL_ENV
-    echo PROJECT_PATH=${PROJECT_PATH} >> $LOCAL_ENV
-    echo DATA_PATH=${DATA_PATH} >> $LOCAL_ENV
-    echo MODEL_PATH=${MODEL_PATH} >> $LOCAL_ENV
-    echo RESULT_PATH=${RESULT_PATH} >> $LOCAL_ENV
+    echo DOCKER_MOUNT_PATH=${DOCKER_MOUNT_PATH} \# This wil be BIONEMO_HOME in container >> $LOCAL_ENV
+    echo BIONEMO_HOME=${BIONEMO_HOME} >> $LOCAL_ENV
     echo WANDB_API_KEY=${WANDB_API_KEY} >> $LOCAL_ENV
     echo JUPYTER_PORT=${JUPYTER_PORT} >> $LOCAL_ENV
     echo REGISTRY=${REGISTRY} >> $LOCAL_ENV
@@ -164,10 +155,20 @@ if [ $write_env -eq 1 ]; then
     echo NGC_CLI_TEAM=${NGC_CLI_TEAM} >> $LOCAL_ENV
     echo NGC_CLI_FORMAT_TYPE=${NGC_CLI_FORMAT_TYPE} >> $LOCAL_ENV
 fi
+echo $PREVIOUSLY_SET_BIONEMO_HOME
+echo $BIONEMO_HOME
 
-# Mount paths
-DATA_MOUNT_PATH="/data"
-RESULT_MOUNT_PATH="/result/nemo_experiments"
+if [[ -n $PREVIOUSLY_SET_BIONEMO_HOME && "${PREVIOUSLY_SET_BIONEMO_HOME}" != "${BIONEMO_HOME}" ]]; then
+    echo "WARNING! \$BIONEMO_HOME was set externally to be: ${PREVIOUSLY_SET_BIONEMO_HOME}"
+    echo "which does not match the \$BIONEMO_HOME set inside of the .env configuration file: ${BIONEMO_HOME}"
+    echo "Using the externally set \$BIONEMO_HOME value of: ${PREVIOUSLY_SET_BIONEMO_HOME}"
+    BIONEMO_HOME=${PREVIOUSLY_SET_BIONEMO_HOME}
+fi
+
+# Default paths for framework
+DATA_PATH=${BIONEMO_HOME}/data
+MODEL_PATH=${BIONEMO_HOME}/models
+RESULT_PATH=${BIONEMO_HOME}/results/nemo_experiments
 
 # Additional variables that will be used in the script when sent in the .env file:
 # BASE_IMAGE        Custom Base image for building.
@@ -191,8 +192,6 @@ DOCKER_CMD="docker run \
     --network host \
     ${PARAM_RUNTIME} \
     -p ${JUPYTER_PORT}:8888 \
-    -v ${DATA_PATH}:${DATA_MOUNT_PATH} \
-    -v ${RESULT_PATH}:${RESULT_MOUNT_PATH} \
     --shm-size=4g \
     --ulimit memlock=-1 \
     --ulimit stack=67108864 \
@@ -217,6 +216,18 @@ DOCKER_BUILD_CMD="docker build --network host \
 download() {
     mkdir -p ${MODEL_PATH}
     download_bionemo_models "${@}"
+}
+
+download_test_data() {
+    echo 'Downloading test data for openfold...'
+    source $BIONEMO_HOME/examples/protein/openfold/scripts/download_data_sample.sh
+    echo 'Openfold data download complete.'
+    echo 'Downloading test data for diffdock...'
+    source $BIONEMO_HOME/examples/molecule/diffdock/scripts/download_data_sample.sh
+    echo 'Diffdock data download complete.'
+    echo 'Unzipping ESM2 test data...'
+    unzip $BIONEMO_HOME/examples/tests/test_data/uniref202104_esm2_qc_test200_val200.zip -d $BIONEMO_HOME/examples/tests/test_data/
+    echo 'ESM2 test data unzipped.'
 }
 
 
@@ -350,17 +361,6 @@ setup() {
         DEV_PYTHONPATH="${DEV_PYTHONPATH}:/workspace/nemo"
     fi
 
-    DOCKER_CMD="${DOCKER_CMD} -v ${MODEL_PATH}:/model "
-
-    # For dev use the tokenizers in /tokenizers dir
-    if [ ! -z "${TOKENIZERS_PATH}" ];
-    then
-        DOCKER_CMD="${DOCKER_CMD} -v ${TOKENIZERS_PATH}:/tokenizers "
-    else
-        DOCKER_CMD="${DOCKER_CMD} -v ${PROJECT_PATH}/tokenizers:/tokenizers "
-    fi
-
-    DOCKER_CMD="${DOCKER_CMD} --env MODEL_PATH=/model"
     DOCKER_CMD="${DOCKER_CMD} --env WANDB_API_KEY=$WANDB_API_KEY"
     DOCKER_CMD="${DOCKER_CMD} --env NGC_CLI_API_KEY=$NGC_CLI_API_KEY"
     DOCKER_CMD="${DOCKER_CMD} --env NGC_CLI_ORG=$NGC_CLI_ORG"
@@ -368,8 +368,8 @@ setup() {
     DOCKER_CMD="${DOCKER_CMD} --env NGC_CLI_FORMAT_TYPE=$NGC_CLI_FORMAT_TYPE"
 
     # For development work
-    echo "Mounting ${PROJECT_PATH} at ${PROJECT_MOUNT} for development"
-    DOCKER_CMD="${DOCKER_CMD} -v ${PROJECT_PATH}:${PROJECT_MOUNT} -e HOME=${PROJECT_MOUNT} -w ${PROJECT_MOUNT} "
+    echo "Mounting ${BIONEMO_HOME} at ${DOCKER_MOUNT_PATH} for development"
+    DOCKER_CMD="${DOCKER_CMD} -v ${BIONEMO_HOME}:${DOCKER_MOUNT_PATH} -e HOME=${DOCKER_MOUNT_PATH} -w ${DOCKER_MOUNT_PATH} "
     DOCKER_CMD="${DOCKER_CMD} -v /etc/passwd:/etc/passwd:ro "
     DOCKER_CMD="${DOCKER_CMD} -v /etc/group:/etc/group:ro "
     DOCKER_CMD="${DOCKER_CMD} -v /etc/shadow:/etc/shadow:ro "
@@ -381,8 +381,8 @@ setup() {
         echo "Mounting ~/.ssh up for development"
         DOCKER_CMD="$DOCKER_CMD -v ${HOME}/.ssh:${HOME}/.ssh:ro"
 
-        echo "Prepending ${PROJECT_MOUNT} to PYTHONPATH for development"
-        DEV_PYTHONPATH="${PROJECT_MOUNT}:${PROJECT_MOUNT}/generated:${DEV_PYTHONPATH}"
+        echo "Prepending ${DOCKER_MOUNT_PATH} to PYTHONPATH for development"
+        DEV_PYTHONPATH="${DOCKER_MOUNT_PATH}:${DOCKER_MOUNT_PATH}/generated:${DEV_PYTHONPATH}"
         DOCKER_CMD="${DOCKER_CMD} --env PYTHONPATH=${DEV_PYTHONPATH}"
     fi
 }
@@ -445,7 +445,7 @@ run() {
     done
 
     set -x
-    ${DOCKER_CMD} --rm -it --gpus all -e HOME=${BIONEMO_WORKSPACE} -w ${BIONEMO_WORKSPACE} --name ${DEV_CONT_NAME} ${BIONEMO_IMAGE} ${CMD}
+    ${DOCKER_CMD} --rm -it --gpus all -e HOME=${BIONEMO_HOME} -w ${BIONEMO_HOME} --name ${DEV_CONT_NAME} ${BIONEMO_IMAGE} ${CMD}
     set +x
     exit
 }
@@ -478,7 +478,12 @@ case $1 in
         shift
         download "$@"
         ;;
-    protoc | build | run | push | pull | dev | attach)
+    download_all)
+        shift
+        download "$@"
+        download_test_data
+        ;;
+    protoc | build | run | push | pull | dev | attach | download_test_data)
         $@
         ;;
     *)

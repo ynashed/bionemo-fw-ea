@@ -35,7 +35,12 @@ That command is executed and the container exits.
 EOF
 }
 
-EXAMPLE_BASE="/workspace/bionemo/examples"
+if [ -z "$BIONEMO_HOME" ]; then
+    echo "\$BIONEMO_HOME is unset. Please set the variable and run the script again. This variable should be set to the base of the repo path."
+    exit 1
+fi
+
+EXAMPLE_BASE=${BIONEMO_HOME}/examples
 
 # Kill all grpc service that may be lingering
 # TODO: This is a WAR

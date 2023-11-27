@@ -39,10 +39,10 @@ data:
   world_size: ${multiply:${trainer.devices}, ${trainer.num_nodes}}
   esm_embeddings_path: ${training_data.esm_embeddings_path} # If this is set then the LM embeddings at that path will be used for the receptor features
   data_dir: ${training_data.protein_data_dir} # Folder containing original structures
-  split_train: ${oc.env:PROJECT_MOUNT}/examples/molecule/diffdock/data/splits/timesplit_no_lig_overlap_train # Path of file defining the split
-  split_val: ${oc.env:PROJECT_MOUNT}/examples/molecule/diffdock/data/splits/timesplit_no_lig_overlap_val # Path of file defining the split
-  split_test: ${oc.env:PROJECT_MOUNT}/examples/molecule/diffdock/data/splits/timesplit_test # Path of file defining the split
-  cache_path: /data/data_cache # Folder from where to load/restore cached dataset
+  split_train: ${oc.env:BIONEMO_HOME}/examples/molecule/diffdock/data/splits/timesplit_no_lig_overlap_train # Path of file defining the split
+  split_val: ${oc.env:BIONEMO_HOME}/examples/molecule/diffdock/data/splits/timesplit_no_lig_overlap_val # Path of file defining the split
+  split_test: ${oc.env:BIONEMO_HOME}/examples/molecule/diffdock/data/splits/timesplit_test # Path of file defining the split
+  cache_path: ${oc.env:BIONEMO_HOME}/data/data_cache # Folder from where to load/restore cached dataset
   chunk_size: 5 # Number of samples as a chunk given to each process to process each time when preparing the dataset in class PDBBind, default is 5
   use_original_model_cache: false # If this is true, the same dataset as in the original model will be used. Otherwise, the dataset parameters are used
   cache_ids_to_combine: null # RMSD value below which a prediction is considered a positive. This can also be multiple cutoffs
@@ -258,7 +258,7 @@ exp_manager:
     every_n_steps: 1 # Apply EMA every n global steps
     validate_original_weights: False # Validate the EMA weights instead of the original weights. Note this means that when saving the model, the validation metrics are calculated with the EMA weights.
   # logging
-  exp_dir: /result/nemo_experiments/${.name}/${.wandb_logger_kwargs.name}
+  exp_dir: ${oc.env:BIONEMO_HOME}/results/nemo_experiments/${.name}/${.wandb_logger_kwargs.name}
   explicit_log_dir: ${.exp_dir}
   create_wandb_logger: False
   create_tensorboard_logger: False

@@ -16,10 +16,12 @@
 # limitations under the License.
 
 REPO_DIR=examples/tests/test_data/molecule/diffdock
+# This unset is necessary because this script may be called by other scripts.
+unset DATA_PATH
 # Function to display help
 display_help() {
     echo "Usage: $0 [-data_path <path>] [-pbss <value>] [-help]"
-    echo "  -data_path <path>   Specify the data path, \$PROJECT_MOUNT/$REPO_DIR by default"
+    echo "  -data_path <path>   Specify the data path, \$BIONEMO_HOME/$REPO_DIR by default"
     echo "  -pbss <value>       If set, data will be download from PBSS. If unset, NGC by default."
     echo "  -help               Display this help message"
     exit 1
@@ -48,11 +50,11 @@ done
 
 if [ -n "$DATA_PATH" ]; then
     echo "Data path specified: $DATA_PATH"
-elif [ -n "$PROJECT_MOUNT" ]; then
-    echo "Data path defaulting to \$PROJECT_MOUNT repo base: $PROJECT_MOUNT/$REPO_DIR"
-    DATA_PATH=$PROJECT_MOUNT/$REPO_DIR
+elif [ -n "$BIONEMO_HOME" ]; then
+    echo "Data path defaulting to \$BIONEMO_HOME repo base: $BIONEMO_HOME/$REPO_DIR"
+    DATA_PATH=$BIONEMO_HOME/$REPO_DIR
 else
-    echo "\$PROJECT_MOUNT is unset and -data_path was not provided. Exiting."
+    echo "\$BIONEMO_HOME is unset and -data_path was not provided. Exiting."
     exit 1
 fi
 

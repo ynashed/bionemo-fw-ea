@@ -46,7 +46,7 @@ def main(cfg) -> None:
     if do_preprocess:
         logging.info("************** Starting Preprocessing ***********")
         preprocessor = GRCh38Ensembl99GFF3ResourcePreprocessor(
-            dest_directory=cfg.task.model.data.dataset_path,  # Set to /data
+            dest_directory=cfg.task.model.data.dataset_path,  # Set to $BIONEMO_HOME/data
             root_directory=cfg.task.model.data.root_directory,
             train_perc=cfg.task.model.data.train_perc,
             val_perc=cfg.task.model.data.val_perc,
@@ -57,7 +57,7 @@ def main(cfg) -> None:
 
         # Needed for our actual data loaders. Used inside SpliceSiteDataModule.get_fasta_files()
         fasta_preprocessor = GRCh38Ensembl99FastaResourcePreprocessor(
-            root_directory=cfg.task.model.data.root_directory,  # Set to /data
+            root_directory=cfg.task.model.data.root_directory,  # Set to $BIONEMO_HOME/data
             dest_directory=cfg.task.model.data.dataset_path,
         )
         fasta_preprocessor.prepare()

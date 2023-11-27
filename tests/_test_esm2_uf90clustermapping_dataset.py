@@ -11,16 +11,16 @@ def test_uf90_resampling_dataset_integration():
     '''
     This test requires:
 
-    cluster_mapping_tsv: /data/uniref2022_05/fake-uniref/mapping.tsv
-    uf50_datapath: /data/uniref2022_05/fake-uniref/Fake50.fasta
-    uf90_datapath: /data/uniref2022_05/fake-uniref/Fake90.fasta
-    dataset_path: /data/uniref2022_05/fake_uf_map
+    cluster_mapping_tsv: $BIONEMO_HOME/data/uniref2022_05/fake-uniref/mapping.tsv
+    uf50_datapath: $BIONEMO_HOME/data/uniref2022_05/fake-uniref/Fake50.fasta
+    uf90_datapath: $BIONEMO_HOME/data/uniref2022_05/fake-uniref/Fake90.fasta
+    dataset_path: $BIONEMO_HOME/data/uniref2022_05/fake_uf_map
 
     you can generate Fake50.fasta, Fake90.fasta, and mapping.tsv by running this script with a python interpreter instead of pytest:
         python tests/_test_esm2_uf90clustermapping_dataset.py
 
 
-    files are deposited into the current working directory, move them to /data/uniref2022_05 before preprocessing.
+    files are deposited into the current working directory, move them to $BIONEMO_HOME/data/uniref2022_05 before preprocessing.
     '''
 
     # TODO (SKH): automate data generation

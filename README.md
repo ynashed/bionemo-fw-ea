@@ -47,16 +47,16 @@ The following is an example use of `infer.sh` to run inference on ESM2-nv using 
 The set of commands below generates a pickle file with the embeddings of all sequences, at `/data/bionemo_esm2_example.pkl` file specified by `model.data.output_fname`.
 
 ```bash
-# Set the path to your local BioNeMo Framework codebase. In the default Docker container, this is /workspace/bionemo
-BIONEMO='/workspace/bionemo'
-cd $BIONEMO
+# Set the path to your local BioNeMo Framework codebase using the BIONEMO_HOME variable. In the docker container, this is set to /workspace/bionemo by default.
+BIONEMO_HOME='/workspace/bionemo' # This is the default value
+cd $BIONEMO_HOME
 # Ensure you have downloaded the model checkpoints already - if not, run this command.
-# It will use your NGC credentials stored in $BIONEMO/.env (Company specific).
-# And download all model checkpoints to the 'MODEL_PATH' variable in $BIONEMO/.env (default: /model)
+# It will use your NGC credentials stored in $BIONEMO_HOME/.env (Company specific).
+# And download all model checkpoints to the 'MODEL_PATH' variable in $BIONEMO_HOME/.env (default: /model)
 ./launch.sh download
 # Next we navigate to the location of infer.sh and set up the required variables.
-cd $BIONEMO/examples/protein/esm2nv/
-example_file=$BIONEMO/examples/tests/test_data/protein/test/x000.csv
+cd $BIONEMO_HOME/examples/protein/esm2nv/
+example_file=$BIONEMO_HOME/examples/tests/test_data/protein/test/x000.csv
 config_name='infer.yaml'
 restore_from_path='/model/protein/esm2nv/esm2nv_650M_converted.nemo'
 outfile='/data/bionemo_ems2_example.pkl'
@@ -181,9 +181,7 @@ The BioNeMo repo is organized by biological entity (molecule, protein) and by de
 
 Regardless of your system, the easiest way to develop and test code is to mount a local copy of the code inside the BioNeMo Docker container. While you may [build the image from the Dockerfile](./setup/Dockerfile), we encourage folks to use the [launcher script, `launch.sh`](./launch.sh).
 
-The `launch.sh` script mounts the current working directory inside the container by default. This behavior can be customized by editing `PROJECT_PATH`, which is the local copy of the code, and `BIONEMO_PATH` in the `.env` file.
-
-`BIONEMO_PATH` is an environment variable used to select the path to the BioNeMo library in use. By default, this is the library installation path (`/opt/nvidia/bionemo`). For development, code should be mounted inside the container at `/workspace/bionemo`.
+The `launch.sh` script mounts the current working directory inside the container by default. This behavior can be customized by editing `BIONEMO_HOME` and `DOCKER_MOUTH_PATH`.
 
 Before commiting code, make sure to setup the auto-formatter and linter via precommit hooks:
 ```bash

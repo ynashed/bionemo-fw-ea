@@ -1,128 +1,129 @@
 name: esm2-8M
-do_training: "true"
-do_testing: "false"
-restore_from_path: "null"
+do_training: true
+do_testing: false
+restore_from_path: null
 trainer:
-  devices: "1"
-  num_nodes: "1"
+  devices: 1
+  num_nodes: 1
   accelerator: gpu
-  precision: "16"
-  logger: "false"
-  enable_checkpointing: "false"
-  replace_sampler_ddp: "false"
-  max_epochs: "1"
-  log_every_n_steps: "10"
-  val_check_interval: "1.0"
-  limit_val_batches: "10"
-  limit_test_batches: "1"
-  accumulate_grad_batches: "1"
-  gradient_clip_val: "1.0"
-  benchmark: "false"
-  max_steps: "500"
-  check_val_every_n_epoch: "1"
+  precision: 16
+  logger: false
+  enable_checkpointing: false
+  replace_sampler_ddp: false
+  max_epochs: 1
+  log_every_n_steps: 10
+  val_check_interval: 1.0
+  limit_val_batches: 10
+  limit_test_batches: 1
+  accumulate_grad_batches: 1
+  gradient_clip_val: 1.0
+  benchmark: false
+  max_steps: 500
+  check_val_every_n_epoch: 1
 exp_manager:
-  name: esm2-8M
-  exp_dir: /tmp/nemo_experiments/esm2nv_pretrain
-  explicit_log_dir: /tmp/nemo_experiments/esm2nv_pretrain
-  create_wandb_logger: "false"
-  create_tensorboard_logger: "false"
+  name: ${name}
+  exp_dir: ${oc.env:BIONEMO_HOME}/test_results/nemo_experiments/esm2nv_pretrain
+  explicit_log_dir: ${.exp_dir}
+  create_wandb_logger: false
+  create_tensorboard_logger: false
   wandb_logger_kwargs:
-    project: esm2-8M_pretraining
-    name: esm2-8M_pretraining
-    group: esm2-8M
-    job_type: Localhost_nodes_1_gpus_1
+    project: ${name}_pretraining
+    name: ${name}_pretraining
+    group: ${name}
+    job_type: Localhost_nodes_${trainer.num_nodes}_gpus_${trainer.devices}
+    notes: 'date: ${now:%y%m%d-%H%M%S}'
     tags:
-      - esm2-8M
-    offline: "true"
-  resume_if_exists: "false"
-  resume_ignore_no_checkpoint: "true"
-  create_checkpoint_callback: "false"
+    - ${name}
+    offline: true
+  resume_if_exists: false
+  resume_ignore_no_checkpoint: true
+  create_checkpoint_callback: false
   checkpoint_callback_params:
     monitor: val_loss
-    save_top_k: "10"
+    save_top_k: 10
     mode: min
-    always_save_nemo: "false"
+    always_save_nemo: false
     filename: megatron_bert--{val_loss:.2f}-{step}-{consumed_samples}
-    model_parallel_size: "1"
+    model_parallel_size: ${multiply:${model.tensor_model_parallel_size}, ${model.pipeline_model_parallel_size}}
 model:
-  precision: "16"
-  micro_batch_size: "2"
-  seq_length: "1024"
-  num_layers: "6"
-  hidden_size: "320"
-  ffn_hidden_size: "1280"
-  num_attention_heads: "20"
-  megatron_legacy: "false"
+  precision: 16
+  micro_batch_size: 2
+  seq_length: 1024
+  num_layers: 6
+  hidden_size: 320
+  ffn_hidden_size: ${multiply:${model.hidden_size}, 4}
+  num_attention_heads: 20
+  megatron_legacy: false
   position_embedding_type: rope
-  hidden_dropout: "0"
-  embedding_use_attention_mask: "true"
-  embedding_token_dropout: "true"
-  mask_token_id: "32"
-  attention_dropout: "0.0"
-  normalize_attention_scores: "false"
-  tensor_model_parallel_size: "1"
-  pipeline_model_parallel_size: "1"
-  bias_gelu_fusion: "false"
-  use_esm_attention: "true"
-  esm_gelu: "true"
-  use_pt_layernorm: "false"
-  use_pt_mlp_out: "false"
-  max_position_embeddings: "1024"
-  encoder_seq_length: "1024"
+  hidden_dropout: 0
+  embedding_use_attention_mask: true
+  embedding_token_dropout: true
+  mask_token_id: ${.tokenizer.mask_id}
+  attention_dropout: 0.0
+  normalize_attention_scores: false
+  tensor_model_parallel_size: 1
+  pipeline_model_parallel_size: 1
+  bias_gelu_fusion: false
+  use_esm_attention: true
+  esm_gelu: true
+  use_pt_layernorm: false
+  use_pt_mlp_out: false
+  max_position_embeddings: ${.seq_length}
+  encoder_seq_length: ${.seq_length}
   optim:
     name: fused_adam
-    lr: "0.0004"
-    weight_decay: "0.01"
+    lr: 0.0004
+    weight_decay: 0.01
     betas:
-      - "0.9"
-      - "0.98"
+    - 0.9
+    - 0.98
     sched:
       name: CosineAnnealing
-      warmup_steps: "2000"
-      constant_steps: "50000"
-      min_lr: "4.0e-05"
-  init_method_std: "0.02"
-  kv_channels: "null"
-  apply_query_key_layer_scaling: "true"
-  layernorm_epsilon: "1.0e-05"
-  make_vocab_size_divisible_by: "128"
-  pre_process: "true"
-  post_process: "true"
-  bert_binary_head: "false"
-  resume_from_checkpoint: "null"
-  masked_softmax_fusion: "true"
+      warmup_steps: 2000
+      constant_steps: 50000
+      min_lr: 4.0e-05
+  init_method_std: 0.02
+  kv_channels: null
+  apply_query_key_layer_scaling: true
+  layernorm_epsilon: 1.0e-05
+  make_vocab_size_divisible_by: 128
+  pre_process: true
+  post_process: true
+  bert_binary_head: false
+  resume_from_checkpoint: null
+  masked_softmax_fusion: true
   tokenizer:
     library: huggingface
     type: BertWordPieceLowerCase
     model_name: facebook/esm2_t6_8M_UR50D
-    mask_id: "32"
-    model: "null"
-    vocab_file: "null"
-    merge_file: "null"
-  native_amp_init_scale: "4294967296"
-  native_amp_growth_interval: "1000"
-  fp32_residual_connection: "false"
-  fp16_lm_cross_entropy: "false"
-  seed: "1234"
-  use_cpu_initialization: "false"
-  onnx_safe: "false"
-  activations_checkpoint_method: "null"
-  activations_checkpoint_num_layers: "1"
+    mask_id: 32
+    model: null
+    vocab_file: null
+    merge_file: null
+  native_amp_init_scale: 4294967296
+  native_amp_growth_interval: 1000
+  fp32_residual_connection: false
+  fp16_lm_cross_entropy: false
+  seed: 1234
+  use_cpu_initialization: false
+  onnx_safe: false
+  activations_checkpoint_method: null
+  activations_checkpoint_num_layers: 1
   data:
     ngc_registry_target: uniref50_2022_05
     ngc_registry_version: v23.06
-    data_prefix: ""
-    num_workers: "8"
+    data_prefix: ''
+    num_workers: 8
     dataloader_type: single
-    reset_position_ids: "false"
-    reset_attention_mask: "false"
-    eod_mask_loss: "false"
-    masked_lm_prob: "0.15"
-    short_seq_prob: "0.1"
-    skip_lines: "0"
-    drop_last: "false"
-    pin_memory: "false"
-    force_regen_sample_mapping: "false"
+    reset_position_ids: false
+    reset_attention_mask: false
+    eod_mask_loss: false
+    masked_lm_prob: 0.15
+    short_seq_prob: 0.1
+    skip_lines: 0
+    drop_last: false
+    pin_memory: false
+    force_regen_sample_mapping: false
     data_impl: csv_mmap
     dataset:
       train: x[000..049]
@@ -130,76 +131,76 @@ model:
       val: x[000..049]
     data_impl_kwargs:
       csv_mmap:
-        data_col: "1"
-        header_lines: "1"
-    uf50_datapath: /workspace/bionemo/examples/tests/test_data/uniref202104_esm2_qc_test200_val200/uniref50_train_filt.fasta
-    uf90_datapath: /workspace/bionemo/examples/tests/test_data/uniref202104_esm2_qc_test200_val200/ur90_ur50_sampler.fasta
-    cluster_mapping_tsv: /workspace/bionemo/examples/tests/test_data/uniref202104_esm2_qc_test200_val200/mapping.tsv
-    dataset_path: /workspace/bionemo/examples/tests/test_data/uniref202104_esm2_qc_test200_val200/uf50
-    val_size: "200"
-    test_size: "200"
-    sort_fastas: "false"
+        data_col: 1
+        header_lines: 1
+    uf50_datapath: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/uniref202104_esm2_qc_test200_val200/uniref50_train_filt.fasta
+    uf90_datapath: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/uniref202104_esm2_qc_test200_val200/ur90_ur50_sampler.fasta
+    cluster_mapping_tsv: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/uniref202104_esm2_qc_test200_val200/mapping.tsv
+    dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/uniref202104_esm2_qc_test200_val200/uf50
+    val_size: 200
+    test_size: 200
+    sort_fastas: false
     uf90:
-      uniref90_path: /workspace/bionemo/examples/tests/test_data/uniref202104_esm2_qc_test200_val200/uf90/
+      uniref90_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/uniref202104_esm2_qc_test200_val200/uf90/
       dataset:
         uf90_csvs: x[000..049]
       data_impl: csv_fields_mmap
       data_impl_kwargs:
         csv_fields_mmap:
-          header_lines: "1"
-          newline_int: "10"
-          workers: "8"
-          sort_dataset_paths: "true"
+          header_lines: 1
+          newline_int: 10
+          workers: ${model.data.num_workers}
+          sort_dataset_paths: true
           data_sep: ','
           data_fields:
-            sequence: "3"
-            sequence_id: "1"
-      index_mapping_dir: /workspace/bionemo/examples/tests/test_data/uniref202104_esm2_qc_test200_val200
-    use_upsampling: "true"
-    seed: "1234"
-    max_seq_length: "1024"
-    modify_percent: "0.1"
-    perturb_percent: "0.5"
-    index_mapping_dir: /workspace/bionemo/examples/tests/test_data/uniref202104_esm2_qc_test200_val200
+            sequence: 3
+            sequence_id: 1
+      index_mapping_dir: ${model.data.index_mapping_dir}
+    use_upsampling: true
+    seed: ${model.seed}
+    max_seq_length: ${model.seq_length}
+    modify_percent: 0.1
+    perturb_percent: 0.5
+    index_mapping_dir: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/uniref202104_esm2_qc_test200_val200
   dwnstr_task_validation:
-    enabled: "false"
+    enabled: false
     dataset:
       class: bionemo.model.core.dwnstr_task_callbacks.PerTokenPredictionCallback
       task_type: token-level-classification
       infer_target: bionemo.model.protein.esm1nv.infer.ESM1nvInference
-      max_seq_length: "1024"
-      emb_batch_size: "24"
-      batch_size: "24"
-      num_epochs: "1"
-      shuffle: "true"
-      num_workers: "8"
+      max_seq_length: ${model.seq_length}
+      emb_batch_size: 24
+      batch_size: ${.emb_batch_size}
+      num_epochs: 1
+      shuffle: true
+      num_workers: 8
       task_name: downstream
-      dataset_path: /workspace/bionemo/examples/tests/test_data/protein/downstream
+      dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/protein/downstream
       dataset:
         train: x000
         test: x000
       sequence_column: sequence
       target_column:
-        - 3state
-        - resolved
+      - 3state
+      - resolved
       target_sizes:
-        - "3"
-        - "2"
+      - 3
+      - 2
       mask_column:
-        - resolved
-        - "null"
-      random_seed: "1234"
+      - resolved
+      - null
+      random_seed: 1234
       optim:
         name: adam
-        lr: "0.0001"
+        lr: 0.0001
         betas:
-          - "0.9"
-          - "0.999"
-        eps: "1.0e-08"
-        weight_decay: "0.01"
+        - 0.9
+        - 0.999
+        eps: 1.0e-08
+        weight_decay: 0.01
         sched:
           name: WarmupAnnealing
-          min_lr: "1.0e-05"
-          last_epoch: "-1"
-          warmup_ratio: "0.01"
-          max_steps: "1000"
+          min_lr: 1.0e-05
+          last_epoch: -1
+          warmup_ratio: 0.01
+          max_steps: 1000

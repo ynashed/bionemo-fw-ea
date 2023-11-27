@@ -7,30 +7,30 @@ You need to prepare the model bofore starting the embeddings server. You need to
 
 Run the conversion with:
 ```
-python examples/triton/embeddings_export.py --config-path </path/to/dir/with/inference/conf> 
+python examples/triton/embeddings_export.py --config-path </path/to/dir/with/inference/conf>
 ```
 
 You can run the conversion for MegaMolBART:
 ```
-python examples/triton/embeddings_export.py --config-path /workspace/bionemo/examples/molecule/megamolbart/conf
+python examples/triton/embeddings_export.py --config-path $BIONEMO_HOME/examples/molecule/megamolbart/conf
 ```
 ...ESM1nv:
 
 ```
-python examples/triton/embeddings_export.py --config-path /workspace/bionemo/examples/protein/esm1nv/conf
+python examples/triton/embeddings_export.py --config-path $BIONEMO_HOME/examples/protein/esm1nv/conf
 ```
 
 ...and ProtT5nv:
 
 ```
-python examples/triton/embeddings_export.py --config-path /workspace/bionemo/examples/protein/prott5nv/conf
+python examples/triton/embeddings_export.py --config-path $BIONEMO_HOME/examples/protein/prott5nv/conf
 ```
 
 Under the hood, the scripts use `hydra` and load model configuration for `infer.yaml`,
 so you can provide custom configuration by specifying a different yaml or overriding particular arguments, eg:
 
 ```
-python examples/triton/embeddings_export.py --config-path /workspace/bionemo/examples/protein/esm1nv/conf model.data.batch_size=4
+python examples/triton/embeddings_export.py --config-path $BIONEMO_HOME/examples/protein/esm1nv/conf model.data.batch_size=4
 ```
 
 
@@ -43,23 +43,23 @@ python examples/triton/<embeddings,sampling>_server.py --config-path </path/to/d
 You can start server for generating embeddings with MegaMolBART:
 
 ```
-python examples/triton/embeddings_server.py --config-path /workspace/bionemo/examples/molecule/megamolbart/conf &
+python examples/triton/embeddings_server.py --config-path $BIONEMO_HOME/examples/molecule/megamolbart/conf &
 ```
 
 ...ESM1nv:
 
 ```
-python examples/triton/embeddings_server.py --config-path /workspace/bionemo/examples/protein/esm1nv/conf/ &
+python examples/triton/embeddings_server.py --config-path $BIONEMO_HOME/examples/protein/esm1nv/conf/ &
 ```
 
 ...or ProtT5nv:
 ```
-python examples/triton/embeddings_server.py --config-path /workspace/bionemo/examples/protein/prott5nv/conf/ &
+python examples/triton/embeddings_server.py --config-path $BIONEMO_HOME/examples/protein/prott5nv/conf/ &
 ```
 
 Alternatively you can start server for sampling new sequences with MegaMolBART:
 ```
-python examples/triton/sampling_server.py --config-path /workspace/bionemo/examples/molecule/megamolbart/conf &
+python examples/triton/sampling_server.py --config-path $BIONEMO_HOME/examples/molecule/megamolbart/conf &
 ```
 
 Under the hood, the scripts use `hydra` and load model configuration from `infer.yaml` present in the specified config directory,

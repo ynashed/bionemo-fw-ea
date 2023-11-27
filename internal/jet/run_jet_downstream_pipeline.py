@@ -56,7 +56,7 @@ def run_jet_downstream_pipeline(
     ie
     python internal/jet/run_jet_downstream_pipeline.py --model megamolbart --config_path examples/molecule/megamolbart/conf
     --config_name pretrain_xsmall_span_aug --script_path examples/molecule/megamolbart --variant pretrain
-    --nodes 1 --gpus 8 --batch_size 8 --precision 16 32   --extra_overwrites "trainer.max_steps=200 ++trainer.check_val_every_n_epoch=None ++model.data.dataset_path=/opt/nvidia/bionemo/examples/tests/test_data/molecule
+    --nodes 1 --gpus 8 --batch_size 8 --precision 16 32   --extra_overwrites "trainer.max_steps=200 ++trainer.check_val_every_n_epoch=None ++model.data.dataset_path=$BIONEMO_HOME/examples/tests/test_data/molecule
     ++model.data.dataset.train=x000 ++model.data.dataset.val=x000 ++model.data.dataset.test=x000 ++model.dwnstr_task_validation.enabled=False"
 
 
@@ -70,7 +70,7 @@ def run_jet_downstream_pipeline(
     python internal/jet/run_jet_downstream_pipeline.py --image "gitlab-master.nvidia.com/clara-discovery/bionemo:dev-latest-devel"
     --model megamolbart --config_path examples/molecule/megamolbart/conf --config_name pretrain_xsmall_span_aug
     --script_path examples/molecule/megamolbart --variant pretrain --nodes 1 --gpus 8 --batch_size 8 --precision 16 32
-    --extra_overwrites "trainer.max_steps=200 ++trainer.check_val_every_n_epoch=None ++model.data.dataset_path=/opt/nvidia/bionemo/examples/tests/test_data/molecule
+    --extra_overwrites "trainer.max_steps=200 ++trainer.check_val_every_n_epoch=None ++model.data.dataset_path=$BIONEMO_HOME/examples/tests/test_data/molecule
     ++model.data.dataset.train=x000 ++model.data.dataset.val=x000 ++model.data.dataset.test=x000 ++model.dwnstr_task_validation.enabled=False"
 
     ie
@@ -84,7 +84,7 @@ def run_jet_downstream_pipeline(
     python internal/jet/run_jet_downstream_pipeline.py --git_repo "https://gitlab-master.nvidia.com/clara-discovery/bionemo.git"
     --git_branch dev  --dockerfile setup/Dockerfile  --model megamolbart --config_path examples/molecule/megamolbart/conf
     --config_name pretrain_xsmall_span_aug --script_path examples/molecule/megamolbart --variant pretrain
-    --nodes 1 --gpus 8 --batch_size 8 --precision 16 32  --extra_overwrites "trainer.max_steps=200 ++trainer.check_val_every_n_epoch=None ++model.data.dataset_path=/opt/nvidia/bionemo/examples/tests/test_data/molecule
+    --nodes 1 --gpus 8 --batch_size 8 --precision 16 32  --extra_overwrites "trainer.max_steps=200 ++trainer.check_val_every_n_epoch=None ++model.data.dataset_path=$BIONEMO_HOME/examples/tests/test_data/molecule
     ++model.data.dataset.train=x000 ++model.data.dataset.val=x000 ++model.data.dataset.test=x000 ++model.dwnstr_task_validation.enabled=False"
 
 
@@ -97,9 +97,9 @@ def run_jet_downstream_pipeline(
         git_repo: git repository url to build docker image
         git_branch: git branch to use to build docker image
         dockerfile: path in the repository to the Dockerfile to build the container
-        config_path: path to the folder with primary training/testing configs, relative to /opt/nvidia/bionemo
+        config_path: path to the folder with primary training/testing configs, relative to $BIONEMO_HOME
         config_name: hydra config name to use that can be found under config_path
-        script_path: path to a folder with training/testing scripts to use, relative to /opt/nvidia/bionemo
+        script_path: path to a folder with training/testing scripts to use, relative to $BIONEMO_HOME
         variant: name of a training/testing script to use (without .py extension), relative to the script_path
         model: name of the model to be tested
         extra_overwrites: additional training configs to be passed

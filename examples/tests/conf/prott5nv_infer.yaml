@@ -5,27 +5,27 @@ defaults:
 
 hydra:
   searchpath:
-     - file:///workspace/bionemo/examples/conf/
+     - file://${oc.env:BIONEMO_HOME}/examples/conf/
 
 name: ProtT5_Inference
 desc: Minimum configuration for initializing a ProtT5 model for inference.
 
 model:
   tokenizer:
-    vocab_path: /tokenizers/protein/prott5nv/vocab/protein_sequence_sentencepiece.vocab
-    model_path: /tokenizers/protein/prott5nv/vocab/protein_sequence_sentencepiece.model
+    vocab_path: ${oc.env:BIONEMO_HOME}/tokenizers/protein/prott5nv/vocab/protein_sequence_sentencepiece.vocab
+    model_path: ${oc.env:BIONEMO_HOME}/tokenizers/protein/prott5nv/vocab/protein_sequence_sentencepiece.model
   downstream_task:
-    restore_from_path: "/model/protein/prott5nv/prott5nv.nemo"
+    restore_from_path: "${oc.env:BIONEMO_HOME}/models/protein/prott5nv/prott5nv.nemo"
     outputs: [embeddings, hiddens] # Which outputs to extract per sample (a value or list). Possible values: hiddens, embeddings.
   data:
-    dataset_path: examples/tests/test_data/protein/downstream/test/x000.csv # full path to dataset (can include range or a list)
-    output_fname: /tmp/nemo_experiments/prott5nv_infer/x000.pkl
+    dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/protein/downstream/test/x000.csv # full path to dataset (can include range or a list)
+    output_fname: ${oc.env:BIONEMO_HOME}/test_results/nemo_experiments/prott5nv_infer/x000.pkl
 
 target: bionemo.model.protein.prott5nv.prott5_model.ProtT5nvModel # path to model class to load
 infer_target: bionemo.model.protein.prott5nv.infer.ProtT5nvInference # path to inferende class to load
 
 exp_manager:
-  exp_dir: /tmp/nemo_experiments/prott5nv_infer
+  exp_dir: ${oc.env:BIONEMO_HOME}/test_results/nemo_experiments/prott5nv_infer
   create_wandb_logger: False
   create_tensorboard_logger: False
   wandb_logger_kwargs:

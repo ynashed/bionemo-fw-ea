@@ -3,7 +3,7 @@ defaults:
 
 hydra:
   searchpath:
-     - ${oc.env:PROJECT_MOUNT}/examples/molecule/diffdock/conf
+     - ${oc.env:BIONEMO_HOME}/examples/molecule/diffdock/conf
 
 tmp_directory: ???
 

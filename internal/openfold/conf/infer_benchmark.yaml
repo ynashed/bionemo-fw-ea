@@ -12,7 +12,7 @@ defaults:
 
 benchmark_dir_path: ???
 allow_missing_msa: False
-results_path: /tmp/openfold_benchmark # a directory where all predictions all stored
+results_path: ${oc.env:BIONEMO_HOME}/test_results/openfold_benchmark # a directory where all predictions all stored
 
 model:
   stage: finetuning
@@ -33,7 +33,7 @@ model:
     chunk_size_opm: 128
 
   data:
-    dataset_path: /data
+    dataset_path: ${oc.env:BIONEMO_HOME}/data
     dataset_variant: processed
     msa_a3m_filepaths: null # Optional list of MSAs files in A3M format for each sequence. Path should be null for sequences without MSAs
     template_hhr_filepaths: null # Optional list of structural templates for each sequence. Path should be null for sequences without strucutural homologues.

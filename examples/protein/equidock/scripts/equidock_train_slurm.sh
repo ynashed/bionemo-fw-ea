@@ -74,7 +74,7 @@ fi
 
 if [ ! -z "${BIONEMO_CODE}" ];
 then
-    MOUNTS="${MOUNTS},${BIONEMO_CODE}:/opt/nvidia/bionemo"
+    MOUNTS="${MOUNTS},${BIONEMO_CODE}:$BIONEMO_HOME"
 fi
 
 echo "INFO: bionemo code: ${BIONEMO_CODE}"
@@ -85,8 +85,8 @@ srun \
     --error error-%j-%n.out \
     --container-image ${BIONEMO_IMAGE} \
     --container-mounts ${MOUNTS} \
-    --container-workdir /opt/nvidia/bionemo/examples/protein/equidock \
+    --container-workdir /workspace/bionemo/examples/protein/equidock \
     --export WANDB_API_KEY="${WANDB_API_KEY}" \
-    bash -c "cd   /opt/nvidia/bionemo/examples/protein/equidock ;
+    bash -c "cd   \$BIONEMO_HOME/examples/protein/equidock ;
     python pretrain.py  --config-path=conf    --config-name=pretrain    exp_manager.wandb_logger_kwargs.job_type="${JOB_TYPE}"    exp_manager.wandb_logger_kwargs.name=${EXP_NAME}    trainer.num_nodes=${SLURM_JOB_NUM_NODES}    trainer.devices=${SLURM_NTASKS_PER_NODE}    model.micro_batch_size=${MICRO_BATCH_SIZE}"
 set +x

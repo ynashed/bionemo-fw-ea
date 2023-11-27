@@ -58,10 +58,9 @@ then
     . ./$LOCAL_ENV
 fi
 
-
+# Note: BIONEMO_HOME is set inside the container to the correct repo path (typically /workspace/bionemo)
 read -r -d '' COMMAND <<EOF
-  export PROJECT_MOUNT=/opt/nvidia/bionemo && \
-  cd /opt/nvidia/bionemo/examples/protein/equidock && \
+  cd \$BIONEMO_HOME/examples/protein/equidock && \
   python pretrain.py  --config-path=conf \
                    --config-name=pretrain   data.data_name=${DATASET_NAME}    trainer.devices=${NGC_GPUS_PER_NODE}    trainer.num_nodes=${NGC_ARRAY_SIZE}    exp_manager.name=${EXP_NAME}    exp_manager.exp_dir=${EXP_DIR}    exp_manager.wandb_logger_kwargs.offline=False    trainer.devices=${NGC_GPUS_PER_NODE}    trainer.num_nodes=${NGC_ARRAY_SIZE}    model.micro_batch_size=${MICRO_BATCH_SIZE}    model.optim.lr=${LR}
 EOF

@@ -40,11 +40,14 @@ e3nn.set_optimization_defaults(optimize_einsums=False)
 torch.use_deterministic_algorithms(True, warn_only=True)
 torch.backends.cudnn.benchmark = False
 
+BIONEMO_HOME = os.getenv("BIONEMO_HOME")
 THIS_FILE_DIR = os.path.dirname(os.path.realpath(__file__))
 PREPEND_CONFIG_DIR = os.path.join(THIS_FILE_DIR, './conf')
-os.environ["PROJECT_MOUNT"] = os.environ.get("PROJECT_MOUNT", '/workspace/bionemo')
 ROOT_DIR = 'diffdock'
-CHECKPOINT_PATH = ["/model/molecule/diffdock/diffdock_score.nemo", "/model/molecule/diffdock/diffdock_confidence.nemo"]
+CHECKPOINT_PATH = [
+    os.path.join(BIONEMO_HOME, "models/molecule/diffdock/diffdock_score.nemo"),
+    os.path.join(BIONEMO_HOME, "models/molecule/diffdock/diffdock_confidence.nemo"),
+]
 
 
 @pytest.mark.needs_checkpoint

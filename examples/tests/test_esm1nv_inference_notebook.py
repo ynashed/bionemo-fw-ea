@@ -24,8 +24,7 @@ from testbook import testbook
 from bionemo.model.protein.esm1nv.grpc.service import InferenceService
 
 
-os.environ['PROJECT_MOUNT'] = os.environ.get('PROJECT_MOUNT', '/workspace/bionemo')
-NOTEBOOK_PATH = os.path.join(os.environ['PROJECT_MOUNT'], 'examples/protein/esm1nv/nbs/Inference.ipynb')
+NOTEBOOK_PATH = os.path.join(os.environ['BIONEMO_HOME'], 'examples/protein/esm1nv/nbs/Inference.ipynb')
 
 ##########
 

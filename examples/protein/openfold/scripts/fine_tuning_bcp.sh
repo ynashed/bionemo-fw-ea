@@ -85,10 +85,10 @@ echo "*******STARTING********" \
 && echo "---------------" \
 && wandb login ${WANDB_API_KEY} \
 && echo "Starting training" \
-&& cd /opt/nvidia/bionemo \
+&& cd \$BIONEMO_HOME \
 && cd examples/protein/openfold \
-&& python /opt/nvidia/bionemo/examples/protein/openfold/train.py \
-    --config-path=/opt/nvidia/bionemo/examples/protein/openfold/conf \
+&& python \$BIONEMO_HOME/examples/protein/openfold/train.py \
+    --config-path=\$BIONEMO_HOME/examples/protein/openfold/conf \
     --config-name=${CONFIG_NAME} \
     exp_manager.exp_dir=${RESULTS_PATH} \
     exp_manager.create_wandb_logger=${CREATE_WANDB_LOGGER} \
@@ -108,7 +108,6 @@ EOF
 
 BCP_COMMAND="bcprun --debug --nnodes=${REPLICAS} \
              --npernode=${NGC_GPUS_PER_NODE} \
-             -w /opt/nvidia/bionemo/examples/protein/openfold \
              -e WANDB_API_KEY=${WANDB_API_KEY} --cmd '"${COMMAND}"'"
 
 echo "ngc batch run --name "${JOB_NAME}" \

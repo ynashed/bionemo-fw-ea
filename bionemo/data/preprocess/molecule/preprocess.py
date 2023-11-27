@@ -31,8 +31,7 @@ from rdkit import Chem
 __all__ = ['Zinc15Preprocess']
 
 ROOT_DIR = '/tmp/zinc15'
-os.environ['PROJECT_MOUNT'] = os.environ.get('PROJECT_MOUNT', '/workspace/bionemo')
-ZINC_URL_LIST = os.path.join(os.environ['PROJECT_MOUNT'], 'examples/molecule/megamolbart/dataset/ZINC-downloader.txt')
+ZINC_URL_LIST = os.path.join(os.environ['BIONEMO_HOME'], 'examples/molecule/megamolbart/dataset/ZINC-downloader.txt')
 
 
 class Zinc15Preprocess:

@@ -29,9 +29,12 @@ from bionemo.model.protein.esm1nv import ESM1nvInference
 logger = logging.getLogger(__name__)
 
 MODEL_MAPPING = {
-    "esm1nv": ("../../../../../examples/protein/esm1nv/conf", "/model/protein/esm1nv/esm1nv.nemo"),
-    "esm2nv_650M": ("../../../../../examples/protein/esm2nv/conf", "/model/protein/esm2nv/esm2nv_650M_converted.nemo"),
-    "esm2nv_3B": ("../../../../../examples/protein/esm2nv/conf", "/model/protein/esm2nv/esm2nv_3B_converted.nemo"),
+    "esm1nv": ("../../../../../examples/protein/esm1nv/conf", "../models/protein/esm1nv/esm1nv.nemo"),
+    "esm2nv_650M": (
+        "../../../../../examples/protein/esm2nv/conf",
+        "../models/protein/esm2nv/esm2nv_650M_converted.nemo",
+    ),
+    "esm2nv_3B": ("../../../../../examples/protein/esm2nv/conf", "../models/protein/esm2nv/esm2nv_3B_converted.nemo"),
 }
 
 

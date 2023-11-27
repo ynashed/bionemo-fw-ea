@@ -75,14 +75,13 @@ model:
   tokenizer:
     library: 'regex'
     type: null
-    model: /tokenizers/molecule/megamolbart/vocab/megamolbart.model
-    vocab_file: /tokenizers/molecule/megamolbart/vocab/megamolbart.vocab
+    model: ${oc.env:BIONEMO_HOME}/tokenizers/molecule/megamolbart/vocab/megamolbart.model
+    vocab_file: ${oc.env:BIONEMO_HOME}/tokenizers/molecule/megamolbart/vocab/megamolbart.vocab
     merge_file: null
 
   data:
-    # PROJECT_MOUNT is env variable with root location of code e.g. /opt/nividia/bionemo or /workspace/bionemo
-    links_file: ${oc.env:PROJECT_MOUNT}/examples/molecule/megamolbart/dataset/ZINC-downloader.txt # Set to ZINC-downloader-sample.txt for demo
-    dataset_path: /data/zinc_csv # parent directory for data, contains train / val / test folders. Needs to be writeable for index creation.
+    links_file: ${oc.env:BIONEMO_HOME}/examples/molecule/megamolbart/dataset/ZINC-downloader.txt # Set to ZINC-downloader-sample.txt for demo
+    dataset_path: ${oc.env:BIONEMO_HOME}/data/zinc_csv # parent directory for data, contains train / val / test folders. Needs to be writeable for index creation.
     dataset: # inclusive range of data files to load or can load a single file, e.g. x000 or x[000..186]
       train: x[000..186] # Range is for full dataset
       test: x[000..186]
@@ -92,7 +91,7 @@ model:
     decoder_augment: True # task = mask(span)_aug
     decoder_mask: False # always False
     mask_prob: 0.1 # mask probability
-    span_lambda: 3.0 # max size of poisson distribution for 
+    span_lambda: 3.0 # max size of poisson distribution for
     micro_batch_size: ${model.micro_batch_size}
     num_workers: 10
     dataloader_type: single
@@ -104,7 +103,7 @@ model:
     pin_memory: False
     index_mapping_dir: null # path to store cached indexing files (if empty, will be stored in the same directory as dataset_path)
     data_impl: "csv_mmap"
-    # Supported kwargs (with default values): 
+    # Supported kwargs (with default values):
     #     text_mmap (newline_int=10, header_lines=0, workers=None, sort_dataset_paths=True)
     #     csv_mmap (newline_int=10, header_lines=0,workers=None, sort_dataset_paths=True, data_col=1, data_sep=",")
     data_impl_kwargs:
@@ -146,7 +145,7 @@ model:
       num_epochs: 10
       shuffle: True
       num_workers: 8
-      dataset_path: /data/physchem/${model.dwnstr_task_validation.dataset.task_name}
+      dataset_path: ${oc.env:BIONEMO_HOME}/data/physchem/${model.dwnstr_task_validation.dataset.task_name}
       task_name: SAMPL
       dataset:
         train: x000
@@ -186,7 +185,7 @@ exp_manager:
     model_parallel_size: ${multiply:${model.tensor_model_parallel_size}, ${model.pipeline_model_parallel_size}}
 
   # logging
-  exp_dir: /result/nemo_experiments/${.name}/${.wandb_logger_kwargs.name}
+  exp_dir: ${oc.env:BIONEMO_HOME}/results/nemo_experiments/${.name}/${.wandb_logger_kwargs.name}
   explicit_log_dir: ${.exp_dir}
   create_wandb_logger: True
   create_tensorboard_logger: True

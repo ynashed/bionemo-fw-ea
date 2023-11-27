@@ -54,7 +54,6 @@ MODEL_PARAMETERS = [
     44926976,
 ]
 
-os.environ['PROJECT_MOUNT'] = os.environ.get('PROJECT_MOUNT', '/workspace/bionemo')
 THIS_FILE_DIR = pathlib.Path(os.path.abspath(__file__)).parent
 
 

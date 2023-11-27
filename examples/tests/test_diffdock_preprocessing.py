@@ -44,7 +44,6 @@ from bionemo.utils.tests import (
 THIS_FILE_DIR = os.path.dirname(os.path.realpath(__file__))
 PREPEND_CONFIG_DIR = os.path.join(THIS_FILE_DIR, './conf')
 TEST_DATA_FILE = os.path.join(THIS_FILE_DIR, './test_data/molecule/diffdock/diffdock_preprocessing_test.zip')
-os.environ["PROJECT_MOUNT"] = os.environ.get("PROJECT_MOUNT", '/workspace/bionemo')
 ROOT_DIR = 'diffdock'
 
 

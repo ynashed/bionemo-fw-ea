@@ -6,13 +6,13 @@ model:
   tokenizer:
     library: 'sentencepiece'
     type: null
-    model: /tokenizers/protein/prott5nv/vocab/protein_sequence_sentencepiece.model
-    vocab_file: /tokenizers/vocab/protein_sequence_sentencepiece.vocab
+    model: ${oc.env:BIONEMO_HOME}/tokenizers/protein/prott5nv/vocab/protein_sequence_sentencepiece.model
+    vocab_file: ${oc.env:BIONEMO_HOME}/tokenizers/vocab/protein_sequence_sentencepiece.vocab
   data:
     # Path to data must be specified by the user.
     ngc_registry_target: uniref50_2022_05
     ngc_registry_version: v23.06
-    dataset_path: /data/uniref2022_05 # parent directory for data, contains train / val / test folders. Needs to be writeable for index creation.
+    dataset_path: ${oc.env:BIONEMO_HOME}/data/uniref2022_05 # parent directory for data, contains train / val / test folders. Needs to be writeable for index creation.
     dataset: # inclusive range of data files to load or can load a single file (e.g. x000.csv). See data_impl for default file extentions
       train: x[000..049]
       test: x[000..049]

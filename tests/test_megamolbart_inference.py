@@ -34,15 +34,15 @@ from bionemo.utils.tests import (
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
 
-CONFIG_PATH = "../examples/molecule/megamolbart/conf"
-PREPEND_CONFIG_DIR = os.path.abspath("../examples/conf")
+BIONEMO_HOME = os.getenv("BIONEMO_HOME")
+CONFIG_PATH = "../examples/molecule/megamolbart/conf"  # Hydra config paths must be relative
+PREPEND_CONFIG_DIR = os.path.join(BIONEMO_HOME, "examples/conf")
 MODEL_CLASS = MegaMolBARTInference
-CHECKPOINT_PATH = "/model/molecule/megamolbart/megamolbart.nemo"
+CHECKPOINT_PATH = os.path.join(BIONEMO_HOME, "models/molecule/megamolbart/megamolbart.nemo")
 
 ####
 
 _INFERER = None
-os.environ["PROJECT_MOUNT"] = os.environ.get("PROJECT_MOUNT", '/workspace/bionemo')
 THIS_FILE_DIR = pathlib.Path(os.path.abspath(__file__)).parent
 
 _SMIS = [

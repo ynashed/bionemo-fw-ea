@@ -52,9 +52,9 @@ def modify_jet_workloads_config(
         git_repo: git repository url to build docker image from
         git_branch: git branch to use to build docker image
         dockerfile: path in the repository to the Dockerfile to build the container
-        config_path: path to the folder with primary training/testing configs, relative to /opt/nvidia/bionemo
+        config_path: path to the folder with primary training/testing configs, relative to $BIONEMO_HOME
         config_name: hydra config name to use that can be found under config_path
-        script_path: path to a folder with training/testing scripts to use, relative to /opt/nvidia/bionemo
+        script_path: path to a folder with training/testing scripts to use, relative to $BIONEMO_HOME
         variant: name of a training/testing script to use (without .py extension), relative to the script_path
         model: name of the model to be tested
         extra_overwrites: additional training configs to be passed
@@ -154,9 +154,9 @@ def _modify_jet_workloads_recipe_config(
     https://gitlab-master.nvidia.com/dl/jet/workloads-registry/-/tree/bionemo/training-unit-tests/recipes
     Args:
         workloads_config_path: path to the workloads config with the recipe/test definition
-        config_path: path to the folder with primary training/testing configs, relative to /opt/nvidia/bionemo
+        config_path: path to the folder with primary training/testing configs, relative to $BIONEMO_HOME
         config_name: hydra config name to use that can be found under config_path
-        script_path: path to a folder with training/testing scripts to use, relative to /opt/nvidia/bionemo
+        script_path: path to a folder with training/testing scripts to use, relative to $BIONEMO_HOME
         variant: name of a training/testing script to use (without .py extension), relative to the script_path
         model: name of the model to be tested
         extra_overwrites: additional training configs to be passed

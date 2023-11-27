@@ -19,11 +19,11 @@ set -x
 BIONEMO_IMAGE="??" # BioNeMo container image
 WANDB_API_KEY=?? # Add your WANDB API KEY
 
-CONFIG_NAME='pretrain_small' # name of the yaml config file with parameters 
+CONFIG_NAME='pretrain_small' # name of the yaml config file with parameters
 
 # Training parameters
 # =========================
-MICRO_BATCH_SIZE=256 # micro batch size per GPU, for best efficiency should be set to occupy ~85% of GPU memory. Suggested value for A100 80GB is 256 
+MICRO_BATCH_SIZE=256 # micro batch size per GPU, for best efficiency should be set to occupy ~85% of GPU memory. Suggested value for A100 80GB is 256
 ACCUMULATE_GRAD_BATCHES=1 # gradient accumulation
 TENSOR_MODEL_PARALLEL_SIZE=1 # tensor model parallel size
 VAL_CHECK_INTERVAL=500 # how often validation step is performed, including downstream task validation
@@ -35,7 +35,7 @@ MAX_STEPS=1000000 # duration of training as the number of training steps
 PROJECT_NAME="esm1nv_pretraining" # project name, will be used for logging
 EXP_TAG="-small" # any additional experiment info, can be empty
 EXP_NAME="esm1nv_batch${MICRO_BATCH_SIZE}_gradacc${ACCUMULATE_GRAD_BATCHES}_nodes${SLURM_JOB_NUM_NODES}${EXP_TAG}"
-CREATE_WANDB_LOGGER=True # set to False if you don't want to log results with WandB 
+CREATE_WANDB_LOGGER=True # set to False if you don't want to log results with WandB
 WANDB_LOGGER_OFFLINE=False # set to True if there are issues uploading to WandB during training
 # =========================
 
@@ -60,15 +60,16 @@ MOUNTS="${RESULTS_PATH}:${RESULTS_MOUNT},${DATA_PATH}:${DATA_MOUNT}"
 export HYDRA_FULL_ERROR=1
 # =========================
 
+# Note: BIONEMO_HOME is set inside the container to the correct repo path (typically /workspace/bionemo)
 read -r -d '' COMMAND <<EOF
 echo "*******STARTING********" \
 && echo "---------------" \
 && wandb login ${WANDB_API_KEY} \
 && echo "Starting training" \
-&& cd /opt/nvidia/bionemo \
+&& cd \$BIONEMO_HOME \
 && cd examples/protein/esm1nv \
-&& python /opt/nvidia/bionemo/examples/protein/esm1nv/pretrain.py \
-    --config-path=/opt/nvidia/bionemo/examples/protein/esm1nv/conf \
+&& python \$BIONEMO_HOME/examples/protein/esm1nv/pretrain.py \
+    --config-path=\$BIONEMO_HOME/examples/protein/esm1nv/conf \
     --config-name=${CONFIG_NAME} \
     exp_manager.exp_dir=${RESULTS_MOUNT} \
     exp_manager.create_wandb_logger=${CREATE_WANDB_LOGGER} \
@@ -85,7 +86,7 @@ echo "*******STARTING********" \
     model.data.dataset_path=${DATA_MOUNT}/${DATASET} \
     model.data.dataset.train=${TRAIN_FILES} \
     model.data.dataset.val=${VAL_FILES} \
-    model.data.dataset.test=${TEST_FILES} 
+    model.data.dataset.test=${TEST_FILES}
 
 EOF
 

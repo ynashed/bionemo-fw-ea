@@ -42,9 +42,8 @@ e3nn.set_optimization_defaults(optimize_einsums=True)
 
 THIS_FILE_DIR = os.path.dirname(os.path.realpath(__file__))
 PREPEND_CONFIG_DIR = os.path.join(THIS_FILE_DIR, './conf')
-os.environ["PROJECT_MOUNT"] = os.environ.get("PROJECT_MOUNT", '/workspace/bionemo')
 TEST_DATA_DOWNLOAD_SCRIPT = os.path.join(
-    os.environ["PROJECT_MOUNT"], 'examples/molecule/diffdock/scripts/download_data_sample.sh'
+    os.environ["BIONEMO_HOME"], 'examples/molecule/diffdock/scripts/download_data_sample.sh'
 )
 ROOT_DIR = 'diffdock'
 if 'USE_FAST_TP' in os.environ:

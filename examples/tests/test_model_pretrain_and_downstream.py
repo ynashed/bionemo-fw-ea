@@ -165,7 +165,6 @@ MODEL_PARAMETERS = [
 ]
 
 
-os.environ['PROJECT_MOUNT'] = os.environ.get('PROJECT_MOUNT', '/workspace/bionemo')
 THIS_FILE_DIR = pathlib.Path(os.path.abspath(__file__)).parent
 
 
@@ -210,7 +209,7 @@ def test_config_parameters(prepend_config_path, config_name, correct_config):
         msg = f'Updating expected config in {results_comparison_dir}/{correct_config}'
         logger.warning(msg)
         # will create a new comparison config
-        OmegaConf.save(cfg, os.path.join(results_comparison_dir, correct_config + ".yaml"))
+        OmegaConf.save(cfg, os.path.join(results_comparison_dir, f"{correct_config}.yaml"))
         assert False, msg
 
     original_cfg_dict = resolve_cfg(get_cfg(results_comparison_dir, correct_config))

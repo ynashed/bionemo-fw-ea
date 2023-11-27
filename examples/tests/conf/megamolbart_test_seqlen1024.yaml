@@ -1,7 +1,7 @@
 defaults:
   - pretrain_small_span_aug
 
-restore_from_path: /model/molecule/megamolbart/megamolbart.nemo # used when starting from a .nemo file
+restore_from_path: ${oc.env:BIONEMO_HOME}/models/molecule/megamolbart/megamolbart.nemo # used when starting from a .nemo file
 trainer:
   devices: 1
   num_nodes: 1
@@ -10,12 +10,12 @@ trainer:
   val_check_interval: 50
   limit_val_batches: 1
   accumulate_grad_batches: 1
-    
+
 model:
   micro_batch_size: 4
   global_batch_size: 4
   data:
-    dataset_path: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/molecule/ # parent directory for data, contains train / val / test folders
+    dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/ # parent directory for data, contains train / val / test folders
     dataset: # inclusive range of data files to load or can load a single file, e.g. x000.csv
       train: x[000..001]
       test: x[000..001]
@@ -28,16 +28,15 @@ model:
   seq_length: 1024 # maximum sequence length allowed
 
 exp_manager:
-  exp_dir: /tmp/nemo_experiments/megamolbart_pretrain
+  exp_dir: ${oc.env:BIONEMO_HOME}/test_results/nemo_experiments/megamolbart_pretrain
   create_wandb_logger: False
   create_tensorboard_logger: False
   wandb_logger_kwargs:
     offline: True
 
   # data:
-  #   # PROJECT_MOUNT is env variable with root location of code e.g. /opt/nividia/bionemo or /workspace/bionemo
-  #   links_file: ${oc.env:PROJECT_MOUNT}/examples/molecule/megamolbart/dataset/ZINC-downloader-sample.txt # Set to ZINC-downloader-sample.txt for demo
-  #   dataset_path: /workspace/bionemo/data/zinc_csv/processed # parent directory for data, contains train / val / test folders. Needs to be writeable for index creation.
+  #   links_file: ${oc.env:BIONEMO_HOME}/examples/molecule/megamolbart/dataset/ZINC-downloader-sample.txt # Set to ZINC-downloader-sample.txt for demo
+  #   dataset_path: ${oc.env:BIONEMO_HOME}/data/zinc_csv/processed # parent directory for data, contains train / val / test folders. Needs to be writeable for index creation.
   #   dataset: # inclusive range of data files to load or can load a single file, e.g. x000 or x[000..186]
   #     train: x000 # Range is for full dataset
   #     test: x000

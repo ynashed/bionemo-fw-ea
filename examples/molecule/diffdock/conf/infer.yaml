@@ -3,10 +3,10 @@ defaults:
 
 protein_ligand_csv: null # Path to a .csv file specifying the input as described in the README. If this is not None, it will be used instead of the --protein_path and --ligand parameters
 complex_name: 1a0q # Name that the complex will be saved with
-protein_path: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/molecule/diffdock/1a0q/1a0q_protein_processed.pdb # Path to the protein .pdb file
+protein_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/1a0q/1a0q_protein_processed.pdb # Path to the protein .pdb file
 protein_sequence: null # Sequence of the protein for ESMFold, this is ignored if --protein_path is not None
 ligand_description: COc(cc1)ccc1C#N # Either a SMILES string or the path to a molecule file that rdkit can read
-out_dir: /result/nemo_experiments/user_inference # Directory where the outputs will be written to
+out_dir: ${oc.env:BIONEMO_HOME}/results/nemo_experiments/user_inference # Directory where the outputs will be written to
 
 seed: null
 samples_per_complex: 40
@@ -26,10 +26,10 @@ ode: false
 ###############################################################################################################
 confidence_infer:
   use_original_model_cache: false # If this is true, the same dataset as in the original model will be used. Otherwise, the dataset parameters are used
-  transfer_weights: false 
+  transfer_weights: false
   rmsd_classification_cutoff:
     - 2.0
-  restore_from_path: /model/molecule/diffdock/diffdock_confidence.nemo # used when starting from a .nemo file
+  restore_from_path: ${oc.env:BIONEMO_HOME}/models/molecule/diffdock/diffdock_confidence.nemo # used when starting from a .nemo file
   target: bionemo.model.molecule.diffdock.models.nemo_model.DiffdockTensorProductScoreModelAllAtom  # path to model class to load
   infer_target: bionemo.model.molecule.diffdock.infer.DiffDockModelInference # path to inferende class to load
   load_from_checkpoint: null

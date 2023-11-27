@@ -100,10 +100,12 @@ RUN pip install nvidia-pytriton==0.2.4
 #########################################################################################
 
 # The location of the installed library in the container. Set BIONEMO_HOME env to change this for development purposes.
-ARG BIONEMO_HOME=/opt/nvidia/bionemo
+ARG BIONEMO_HOME=/workspace/bionemo
 ENV BIONEMO_HOME=${BIONEMO_HOME}
 
-# Copy the repo
+RUN mkdir -p ${BIONEMO_HOME}
+
+# Copy the repo except the internal directory
 COPY LICENSE README.md artifact_paths download_models.sh launch.sh pytest.ini ${BIONEMO_HOME}/
 COPY bionemo ${BIONEMO_HOME}/bionemo
 COPY docs ${BIONEMO_HOME}/docs
@@ -113,6 +115,7 @@ COPY hydra_plugins ${BIONEMO_HOME}/hydra_plugins
 COPY proto ${BIONEMO_HOME}/proto
 COPY setup ${BIONEMO_HOME}/setup
 COPY tests ${BIONEMO_HOME}/tests
+COPY tokenizers ${BIONEMO_HOME}/tokenizers
 
 # NEMO_HOME must be unset for default NeMo install in /usr/local/lib/python3.8/dist-packages/nemo
 ARG NEMO_HOME
@@ -125,13 +128,6 @@ COPY ./setup/nemo-v-1.20-fix-for-esm2.patch /nemo-v-1.20-fix-for-esm2.patch
 RUN patch -p1 /usr/local/lib/python3.10/dist-packages/nemo/collections/nlp/data/language_modeling/megatron/dataset_utils.py /nemo-v-1.20-fix-for-esm2.patch \
     && rm /nemo-v-1.20-fix-for-esm2.patch
 
-COPY ./setup/startup.sh /opt/nvidia
-COPY ./tokenizers /tokenizers
-
-RUN mkdir -p /workspace/bionemo
-RUN ln -s /opt/nvidia/bionemo/examples/ /workspace/bionemo/examples
 RUN echo 'export PS1="(bionemo docker) $PS1"' > /docker_bashrc
 
-WORKDIR /workspace
-
-ENTRYPOINT ["/opt/nvidia/startup.sh"]
+ENTRYPOINT ["/workspace/bionemo/setup/startup.sh"]

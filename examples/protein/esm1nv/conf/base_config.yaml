@@ -23,7 +23,7 @@ trainer:
 
 exp_manager:
   name: ${name}
-  exp_dir: /result/nemo_experiments/${.name}/${.wandb_logger_kwargs.name}
+  exp_dir: ${oc.env:BIONEMO_HOME}/results/nemo_experiments/${.name}/${.wandb_logger_kwargs.name}
   explicit_log_dir: ${.exp_dir}
   create_wandb_logger: True 
   create_tensorboard_logger: True
@@ -155,7 +155,7 @@ model:
       shuffle: True
       num_workers: 8
       task_name: secondary_structure
-      dataset_path: /data/FLIP/${model.dwnstr_task_validation.dataset.task_name}
+      dataset_path: ${oc.env:BIONEMO_HOME}/data/FLIP/${model.dwnstr_task_validation.dataset.task_name}
       dataset:
         train: x000
         test: x000

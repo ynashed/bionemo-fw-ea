@@ -15,6 +15,7 @@
 
 import glob
 import math
+import os
 from contextlib import contextmanager
 from unittest.mock import patch
 
@@ -50,7 +51,10 @@ protein_sequences = [
 
 
 def get_tokenizer_model_paths():
-    file_list = glob.glob('/tokenizers/protein/*/vocab/protein_sequence_sentencepiece.model')
+    tokenizer_dir = os.path.join(
+        os.getenv("BIONEMO_HOME"), 'tokenizers/protein/*/vocab/protein_sequence_sentencepiece.model'
+    )
+    file_list = glob.glob(tokenizer_dir)
     file_list = [str(x) for x in file_list]
     return file_list
 

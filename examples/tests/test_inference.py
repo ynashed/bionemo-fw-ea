@@ -40,7 +40,6 @@ CONFIG_NAME = ['prott5nv_infer', 'esm1nv_infer', 'megamolbart_infer']
 
 HIDDEN_SIZE = [768, 768, 512]
 
-os.environ['PROJECT_MOUNT'] = os.environ.get('PROJECT_MOUNT', '/workspace/bionemo')
 THIS_FILE_DIR = pathlib.Path(os.path.abspath(__file__)).parent
 
 

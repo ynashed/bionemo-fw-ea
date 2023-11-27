@@ -21,7 +21,7 @@ set -x
 BIONEMO_IMAGE="??" # BioNeMo container image
 WANDB_API_KEY=?? # Add your WANDB API KEY
 
-CONFIG_NAME='pretrain_small_span_aug' # name of the yaml config file with parameters 
+CONFIG_NAME='pretrain_small_span_aug' # name of the yaml config file with parameters
 
 # Training parameters
 # =========================
@@ -62,7 +62,7 @@ MOUNTS="${RESULTS_PATH}:${RESULTS_MOUNT},${DATA_PATH}:${DATA_MOUNT}"
 export HYDRA_FULL_ERROR=1
 # =========================
 
-
+# Note: BIONEMO_HOME is set inside the container to the correct repo path (typically /workspace/bionemo)
 # Command
 # =========================
 read -r -d '' COMMAND <<EOF
@@ -70,10 +70,10 @@ echo "*******STARTING********" \
 && echo "---------------" \
 && wandb login ${WANDB_API_KEY} \
 && echo "Starting training" \
-&& cd /opt/nvidia/bionemo \
+&& cd \$BIONEMO_HOME \
 && cd examples/molecule/megamolbart \
-&& python /opt/nvidia/bionemo/examples/molecule/megamolbart/pretrain.py \
-    --config-path=/opt/nvidia/bionemo/examples/molecule/megamolbart/conf \
+&& python \$BIONEMO_HOME/examples/molecule/megamolbart/pretrain.py \
+    --config-path=\$BIONEMO_HOME/examples/molecule/megamolbart/conf \
     --config-name=${CONFIG_NAME} \
     exp_manager.exp_dir=${RESULTS_MOUNT} \
     exp_manager.create_wandb_logger=${CREATE_WANDB_LOGGER} \

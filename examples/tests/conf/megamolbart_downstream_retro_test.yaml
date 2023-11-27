@@ -14,13 +14,13 @@ model:
   micro_batch_size: 4
   global_batch_size: null
   data:
-    dataset_path: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/reaction/ # parent directory for data, contains train / val / test folders
+    dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/reaction/ # parent directory for data, contains train / val / test folders
     micro_batch_size: ${model.micro_batch_size}
     header_lines: 1
     num_workers: 10
 
 exp_manager:
-  exp_dir: /tmp/nemo_experiments/megamolbart_downstream_retro
+  exp_dir: ${oc.env:BIONEMO_HOME}/test_results/nemo_experiments/megamolbart_downstream_retro
   create_wandb_logger: False
   create_tensorboard_logger: False
   wandb_logger_kwargs:

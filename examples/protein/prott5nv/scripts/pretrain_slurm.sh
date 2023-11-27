@@ -19,7 +19,7 @@ set -x
 BIONEMO_IMAGE="??" # BioNeMo container image
 WANDB_API_KEY=?? # Add your WANDB API KEY
 
-CONFIG_NAME='pretrain_small' # name of the yaml config file with parameters 
+CONFIG_NAME='pretrain_small' # name of the yaml config file with parameters
 
 # Training parameters
 # =========================
@@ -32,10 +32,10 @@ MAX_STEPS=1000000 # duration of training as the number of training steps
 
 # Logging
 # =========================
-PROJECT_NAME="prott5_pretraining" # project name, will be used for logging 
+PROJECT_NAME="prott5_pretraining" # project name, will be used for logging
 EXP_TAG="-220M" # any additional experiment info, can be empty
 EXP_NAME="prott5_batch${MICRO_BATCH_SIZE}_gradacc${ACCUMULATE_GRAD_BATCHES}_nodes${SLURM_JOB_NUM_NODES}${EXP_TAG}"
-CREATE_WANDB_LOGGER=True # set to False if you don't want to log results with WandB 
+CREATE_WANDB_LOGGER=True # set to False if you don't want to log results with WandB
 WANDB_LOGGER_OFFLINE=False # set to True if there are issues uploading to WandB during training
 # =========================
 
@@ -59,16 +59,16 @@ MOUNTS="${RESULTS_PATH}:${RESULTS_MOUNT},${DATA_PATH}:${DATA_MOUNT}"
 # =========================
 export HYDRA_FULL_ERROR=1
 # =========================
-
+# Note: BIONEMO_HOME is set inside the container to the correct repo path (typically /workspace/bionemo)
 read -r -d '' COMMAND <<EOF
 echo "*******STARTING********" \
 && echo "---------------" \
 && wandb login ${WANDB_API_KEY} \
 && echo "Starting training" \
-&& cd /opt/nvidia/bionemo \
+&& cd \$BIONEMO_HOME \
 && cd examples/protein/prott5nv \
-&& python /opt/nvidia/bionemo/examples/protein/prott5nv/pretrain.py \
-    --config-path=/opt/nvidia/bionemo/examples/protein/prott5nv/conf \
+&& python \$BIONEMO_HOME/examples/protein/prott5nv/pretrain.py \
+    --config-path=\$BIONEMO_HOME/examples/protein/prott5nv/conf \
     --config-name=${CONFIG_NAME} \
     exp_manager.exp_dir=${RESULTS_MOUNT} \
     exp_manager.create_wandb_logger=${CREATE_WANDB_LOGGER} \
@@ -85,7 +85,7 @@ echo "*******STARTING********" \
     model.data.dataset_path=${DATA_MOUNT}/${DATASET} \
     model.data.dataset.train=${TRAIN_FILES} \
     model.data.dataset.val=${VAL_FILES} \
-    model.data.dataset.test=${TEST_FILES} 
+    model.data.dataset.test=${TEST_FILES}
 
 EOF
 

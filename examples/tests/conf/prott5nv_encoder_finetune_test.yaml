@@ -4,7 +4,7 @@ defaults:
 name: prott5nv_sec_str
 do_training: True # set to false if data preprocessing steps must be completed
 do_testing: False # set to true to run evaluation on test data after training
-restore_from_path: /model/protein/prott5nv/prott5nv.nemo
+restore_from_path: ${oc.env:BIONEMO_HOME}/models/protein/prott5nv/prott5nv.nemo
 target: bionemo.model.protein.prott5nv.prott5_model.ProtT5nvModel
 infer_target: bionemo.model.protein.prott5nv.infer.ProtT5nvInference
 
@@ -19,7 +19,7 @@ trainer:
   num_sanity_val_steps: 0
 
 exp_manager:
-  exp_dir: /tmp/nemo_experiments/prott5nv_encoder_finetuning
+  exp_dir: ${oc.env:BIONEMO_HOME}/test_results/nemo_experiments/prott5nv_encoder_finetuning
   create_wandb_logger: False
   create_tensorboard_logger: False
   wandb_logger_kwargs:
@@ -34,7 +34,7 @@ model:
   data:
     task_type: token-level-classification
     emb_batch_size: ${model.micro_batch_size}
-    dataset_path: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/protein/downstream
+    dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/protein/downstream
     dataset:
       train: x000
       test: x000

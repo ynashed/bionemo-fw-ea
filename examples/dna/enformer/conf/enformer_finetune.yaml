@@ -19,7 +19,7 @@ trainer:
 
 exp_manager:
   name: check
-  exp_dir: /results
+  exp_dir: ${oc.env:BIONEMO_HOME}/results
   version: finetune
   resume_if_exists: False
   checkpoint_callback_params:

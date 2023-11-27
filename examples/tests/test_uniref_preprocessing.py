@@ -11,13 +11,12 @@ from bionemo.utils.tests import get_directory_hash
 
 
 # THe UniRef file takes ~20 minutes to download so the default test uses a smaller (local) file.
-os.environ['PROJECT_MOUNT'] = os.environ.get('PROJECT_MOUNT', '/workspace/bionemo')
 ROOT_DIR = 'uniref'
 SAMPLE_DATA = os.path.join(
-    os.environ['PROJECT_MOUNT'], 'examples/tests/test_data/preprocessing/test/uniref2022_small.fasta'
+    os.environ['BIONEMO_HOME'], 'examples/tests/test_data/preprocessing/test/uniref2022_small.fasta'
 )
 SAMPLE_NGC_FILE = os.path.join(
-    os.environ['PROJECT_MOUNT'], 'examples/tests/test_data/preprocessing/uniref2022_UR50.fasta'
+    os.environ['BIONEMO_HOME'], 'examples/tests/test_data/preprocessing/uniref2022_UR50.fasta'
 )
 NGC_REGISTRY_TARGET = "uniref50_2022_05"
 NGC_REGISTRY_VERSION = "v23.06"

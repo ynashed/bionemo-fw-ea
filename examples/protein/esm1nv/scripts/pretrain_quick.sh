@@ -23,7 +23,7 @@
 CONFIG_FILE=pretrain_small
 PROJECT=ESM1nv
 DATA_MOUNT=/data/uniref2022_05
-PROJECT_MOUNT=/workspace/bionemo # /workspace/bionemo if library mounted or /opt/nvidia/bionemo
+BIONEMO_HOME=/workspace/bionemo # /workspace/bionemo if library mounted or $BIONEMO_HOME
 OUTPUT_MOUNT=/result
 WANDB_OFFLINE=True # set to False to upload to WandB while training, otherwise True
 RESULTS_MOUNT=${OUTPUT_MOUNT}/nemo_experiments/${PROJECT}/${CONFIG_FILE}
@@ -31,10 +31,9 @@ DATA_FILES_SELECTED=x_OP_000..049_CL_  # x000 for a single file for x_OP_000..04
 ### END CONFIG ###
 
 # Don't change these
-BIONEMO_HOME=/opt/nvidia/bionemo # Where BioNeMo is installed in container, set the same as Docker container
-BIONEMO_WORKSPACE=/workspace/bionemo # Location of examples / config files and where BioNeMo code can be mounted for development
+BIONEMO_HOME=/workspace/bionemo # Location of examples / config files and where BioNeMo code can be mounted for development
 RUN_SCRIPT="pretrain.py"
-RUN_SCRIPT_DIRECTORY="${PROJECT_MOUNT}/examples/protein/esm1nv"
+RUN_SCRIPT_DIRECTORY="${BIONEMO_HOME}/examples/protein/esm1nv"
 usage() {
 cat <<EOF
 USAGE: pretrain_quick.sh
@@ -58,7 +57,7 @@ pretrain_quick.sh [command]
         -a|--args
             Additional training arguments to be added, repeat flag for additional arguments
             e.g. --args "++trainer.devices=2" --args "++model.tensor_model_parallel_size=2"
-            
+
 
 EOF
 }
@@ -120,15 +119,7 @@ parse_args() {
 
 
 mkdir -p ${RESULTS_MOUNT}
-export PROJECT_MOUNT=${PROJECT_MOUNT}
-
-if [[ ${PROJECT_MOUNT} != ${BIONEMO_HOME} ]]; then
-    echo "Prepending ${PROJECT_MOUNT} to PYTHONPATH for development"
-    DEV_PYTHONPATH=${PROJECT_MOUNT}
-else
-    DEV_PYTHONPATH=""
-fi
-export PYTHONPATH="${DEV_PYTHONPATH}:${BIONEMO_WORKSPACE}:${BIONEMO_WORKSPACE}/generated:$PYTHONPATH"
+export PYTHONPATH="${BIONEMO_HOME}:${BIONEMO_HOME}/generated:$PYTHONPATH"
 
 export HYDRA_FULL_ERROR=1
 cd ${RUN_SCRIPT_DIRECTORY}
