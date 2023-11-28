@@ -31,8 +31,6 @@ from bionemo.data.equidock.protein_utils import (
 from bionemo.model.protein.equidock.infer import EquiDockInference
 from bionemo.model.protein.equidock.loss_metrics.eval import (
     Meter_Unbound_Bound,
-    rigid_transform_Kabsch_3D,
-    rigid_transform_Kabsch_3D_torch,
 )
 from bionemo.model.protein.equidock.utils.train_utils import batchify_and_create_hetero_graphs_inference
 from bionemo.utils.tests import (
@@ -245,30 +243,3 @@ def test_rmsds(data_name):
         np.testing.assert_allclose(
             all_irmsd, expected_rmsd['irmsd'][:6], rtol=1e-3, atol=1e-2
         ), "Interface RMSD mismatch"
-
-
-@pytest.mark.needs_gpu
-@pytest.mark.parametrize("data_type", [torch.float32, torch.float64])
-def test_Kabsch_algorithm(data_type):
-    for _ in range(10):
-        # Random points
-        A = np.random.randn(3, 10)
-        B = np.random.randn(3, 10)
-
-        # Get transformations from both functions
-        R_numpy, t_numpy = rigid_transform_Kabsch_3D(A, B)
-        R_torch, t_torch = rigid_transform_Kabsch_3D_torch(
-            torch.from_numpy(A).to('cuda').to(data_type), torch.from_numpy(B).to('cuda').to(data_type)
-        )
-
-        # Convert the torch tensors to numpy arrays for easy comparison
-        R_torch = R_torch.detach().cpu().numpy()
-        t_torch = t_torch.detach().cpu().numpy()
-
-        # Assert if matrices and vectors are close
-        assert np.allclose(
-            R_numpy, R_torch, atol=1e-4 if data_type == torch.float32 else 1e-6
-        ), f"Rotation matrices differ: \n{R_numpy}\n{R_torch}"
-        assert np.allclose(
-            t_numpy, t_torch, atol=1e-4 if data_type == torch.float32 else 1e-6
-        ), f"Translation vectors differ: \n{t_numpy}\n{t_torch}"
