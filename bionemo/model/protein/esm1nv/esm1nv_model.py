@@ -108,13 +108,15 @@ class ESM1nvModel(ESMnvMegatronBertModel):
         # Add collate function and unpin memory to avoid crash with CUDA misaligned address
         dataloader.pin_memory = False  # must be False with CSV dataset TODO check with binary
         pad_size_divisible_by_8 = True if self._cfg.masked_softmax_fusion else False
-
+        if self.cfg.pipeline_model_parallel_size > 1 and self.cfg.data.dynamic_padding:
+            raise ValueError("Pipeline model parallelism does not support dynamic_padding.")
         dataloader.collate_fn = ProteinBertCollate(
             tokenizer=self.tokenizer,
             seq_length=self._cfg.seq_length,
             pad_size_divisible_by_8=pad_size_divisible_by_8,
             modify_percent=self._cfg.data.modify_percent,
             perturb_percent=self._cfg.data.perturb_percent,
+            dynamic_padding=self.cfg.data.dynamic_padding,
         ).collate_fn
 
         return dataloader

@@ -119,6 +119,7 @@ model:
     perturb_percent: 0.5
     task_type: token-level-classification
     emb_batch_size: ${model.micro_batch_size}
+    dynamic_padding: "false"
     sequence_column: sequence
     target_column:
     - 3state

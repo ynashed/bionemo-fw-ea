@@ -66,7 +66,7 @@ model:
   attention_dropout: 0.0 # ESM2 does not use attention dropout
   normalize_attention_scores: False # ESM2 does not use normalized attention scores
   tensor_model_parallel_size: 1 # model parallelism
-  pipeline_model_parallel_size: 1 # model parallelism
+  pipeline_model_parallel_size: 1 # model parallelism. If enabled, you need to set data.dynamic_padding to False as pipeline parallelism requires fixed-length padding.
   bias_gelu_fusion: False
   # NOTE: these are compatability features
   use_esm_attention: True # Use specific attention modifications for ESM2
@@ -144,6 +144,8 @@ model:
     skip_lines: 0
     drop_last: False
     pin_memory: False
+    dynamic_padding: False # If True, each batch is padded to the maximum sequence length within that batch. 
+              #    Set it to False when model.pipeline_model_parallel_size > 1, as pipeline parallelism requires fixed-length padding.
 
 
     # Below is the configuration for UF90 resampling.

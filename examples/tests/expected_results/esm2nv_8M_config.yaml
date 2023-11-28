@@ -162,6 +162,7 @@ model:
     modify_percent: 0.1
     perturb_percent: 0.5
     index_mapping_dir: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/uniref202104_esm2_qc_test200_val200
+    dynamic_padding: "false"
   dwnstr_task_validation:
     enabled: false
     dataset:

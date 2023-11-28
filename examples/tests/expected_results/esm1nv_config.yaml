@@ -115,6 +115,7 @@ model:
       val: x[000..001]
     modify_percent: 0.1
     perturb_percent: 0.5
+    dynamic_padding: "false"
   optim:
     name: fused_adam
     lr: 0.0002

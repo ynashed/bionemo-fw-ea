@@ -34,6 +34,7 @@ class ProteinBertCollate(BertCollate):
         pad_size_divisible_by_8: bool,
         modify_percent: float = 0.1,
         perturb_percent: float = 0.5,
+        dynamic_padding: bool = True,
     ):
         """
         A collate function for Protein sequences.
@@ -47,6 +48,9 @@ class ProteinBertCollate(BertCollate):
             perturb_percent (float): Of the total tokens being modified,
                 percentage of tokens to perturb. Perturbation changes the
                 tokens randomly to some other non-special token.
+            dynamic_padding: If True, enables dynamic batch padding, where
+                each batch is padded to the maximum sequence length within that batch.
+                By default True.
         """
         tokenizer = SentencePieceTokenizerAdapter(tokenizer)
         masking = BertMasking(
@@ -59,6 +63,7 @@ class ProteinBertCollate(BertCollate):
             seq_length=seq_length,
             pad_size_divisible_by_8=pad_size_divisible_by_8,
             masking_strategy=masking,
+            dynamic_padding=dynamic_padding,
         )
 
 
@@ -75,6 +80,7 @@ class ESM2BertCollate(ProteinBertCollate):
         pad_size_divisible_by_8: bool,
         modify_percent: float = 0.1,
         perturb_percent: float = 0.5,
+        dynamic_padding: bool = True,
     ):
         """Extends the parent class by allowing collate_fns that operate on dictionaries rather
         that lists of strings.
@@ -88,6 +94,9 @@ class ESM2BertCollate(ProteinBertCollate):
             perturb_percent (float): Of the total tokens being modified,
                 percentage of tokens to perturb. Perturbation changes the
                 tokens randomly to some other non-special token.
+            dynamic_padding: If True, enables dynamic batch padding, where
+                each batch is padded to the maximum sequence length within that batch.
+                By default True.
         """
         super().__init__(
             tokenizer=tokenizer,
@@ -95,6 +104,7 @@ class ESM2BertCollate(ProteinBertCollate):
             pad_size_divisible_by_8=pad_size_divisible_by_8,
             modify_percent=modify_percent,
             perturb_percent=perturb_percent,
+            dynamic_padding=dynamic_padding,
         )
 
     def collate_fn(self, batch: List[BatchItem], label_pad: int = -1):

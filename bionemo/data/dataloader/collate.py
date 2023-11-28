@@ -420,6 +420,7 @@ class BertCollate:
         seq_length: int,
         pad_size_divisible_by_8: bool,
         masking_strategy: Optional[Callable] = None,
+        dynamic_padding: bool = True,
     ):
         """
 
@@ -434,6 +435,9 @@ class BertCollate:
                 list has the same shape as the original.
                 Used to modify the unadulterated token strings for pre-training
                 purposes.
+            dynamic_padding: If True, enables dynamic batch padding, where
+                each batch is padded to the maximum sequence length within that batch.
+                By default True.
         """
         self.sampler = TokenSampler()
         self._tokenizer = tokenizer
@@ -443,6 +447,7 @@ class BertCollate:
                 self.tokenizer,
             )
         self.masking_strategy = masking_strategy
+        self.dynamic_padding = dynamic_padding
         # workaround for CUDA alignment bug
         self.pad_size_divisible_by_8 = pad_size_divisible_by_8
 
@@ -515,7 +520,10 @@ class BertCollate:
 
     def _pad_seqs(self, seqs, masks, pad_token):
         # TODO: switch to torch.nn.utils.rnn.pad_sequence
-        pad_length = max([len(seq) for seq in seqs])
+        if self.dynamic_padding:
+            pad_length = max([len(seq) for seq in seqs])
+        else:
+            pad_length = self.seq_length
         if self.pad_size_divisible_by_8:
             pad_length = int(math.ceil(pad_length / 8) * 8)
 
