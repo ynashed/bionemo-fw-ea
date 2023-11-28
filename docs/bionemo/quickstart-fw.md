@@ -103,8 +103,14 @@ In the sample configuration below, update `{deploy_ngc_org}` and `{deploy_ngc_te
 
 ```bash
 BIONEMO_IMAGE={deploy_ngc_registry}/{deploy_ngc_org_team}/{deploy_container_name}:{deploy_container_tag}               # Container with tag
-DOCKER_MOUNT_PATH=/workspace/bionemo
-BIONEMO_HOME=$(pwd)                                                      # Path of env config and optional development code
+LOCAL_REPO_PATH=$(pwd) # This needs to be set to BIONEMO_HOME for local (non-dockerized) use
+DOCKER_REPO_PATH=/workspace/bionemo # This is set to BIONEMO_HOME in container
+LOCAL_RESULTS_PATH=$(pwd)/results
+DOCKER_RESULTS_PATH=/workspace/bionemo/results
+LOCAL_DATA_PATH=$(pwd)/data
+DOCKER_DATA_PATH=/workspace/bionemo/data
+LOCAL_MODELS_PATH=$(pwd)/models
+DOCKER_MODELS_PATH=/workspace/bionemo/models
 WANDB_API_KEY=<Insert WANDB API KEY>                                     # WandB logging requires API key configuration
 JUPYTER_PORT=8888                                                        # Jupyter port for inference notebooks
 REGISTRY={deploy_ngc_registry}                                                         # Only required for registry login
@@ -231,7 +237,7 @@ The BioNeMo repo is organized by biological entity (`molecule`, `protein`) and b
 
 ### Mounting Code in a Container
 
-It is possible to mount an alternative version of BioNeMo code inside the container for development purposes. This requires setting `BIONEMO_HOME` in the `.env` file to the path of the code to be mounted, and then launching the container in interactive development mode with `./launch.sh dev`. Inside the container, the `BIONEMO_HOME` environment variable will be defined and set to the container path (`/workspace/bionemo`).
+It is possible to mount an alternative version of BioNeMo code inside the container for development purposes. This requires setting `DOCKER_REPO_PATH` variable in the `.env` file and then launching the container in interactive development mode with `./launch.sh dev`. Inside the container, the `BIONEMO_HOME` environment variable will be defined and set to the mounted repo path. By default, the `launch.sh` script will set `DOCKER_REPO_PATH` to `/workspace/bionemo`, which will overwrite the pre-shipped code inside the container (which is also located at `/workspace/bionemo`).
 
 It may also be necessary to recompile the Megatron helpers, which can be done with the script `setup/recompile_megatron_helper.sh`. This recompilation should also be done immediately before training starts on clusters as a best practice.
 

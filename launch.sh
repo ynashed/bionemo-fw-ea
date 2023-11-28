@@ -75,12 +75,12 @@ variables:
     BIONEMO_IMAGE
         Container image for BioNeMo training, prepended with registry. e.g.,
         Note that this is a separate (precursor) container from any service associated containers
-    DOCKER_MOUNT_PATH
-        Set this to change the location of the library in the container, e.g. for development work.
-        It is set to /workspace/bionemo by default and a lot of the examples expect this path to be valid.
-    BIONEMO_HOME
+    LOCAL_REPO_PATH
         Path on workstation or cluster to code, e.g., /home/user/code/bionemo. Inside the bionemo container,
         this is set to /workspace/bionemo by default.
+    DOCKER_REPO_PATH
+        Set this to change the location of the library in the container, e.g. for development work.
+        It is set to /workspace/bionemo by default and a lot of the examples expect this path to be valid.
     WANDB_API_KEY
         Weights and Balances API key to upload runs to WandB. Can also be uploaded afterwards., e.g. Dkjdf...
         This value is optional -- Weights and Biases will log data and not upload if missing.
@@ -107,17 +107,16 @@ EOF
     exit
 }
 
-# Check if BIONEMO_HOME is already set externally (which would be the case inside
-# the docker image)
-if [ -v BIONEMO_HOME ]; then
-    PREVIOUSLY_SET_BIONEMO_HOME=${BIONEMO_HOME}
-    echo Found \$BIONEMO_HOME = ${BIONEMO_HOME}
-fi
-
 # Defaults for `.env` file
 BIONEMO_IMAGE=${BIONEMO_IMAGE:=nvcr.io/nvidian/cvai_bnmo_trng/bionemo:dev}
-DOCKER_MOUNT_PATH=${DOCKER_MOUNT_PATH:=/workspace/bionemo}
-BIONEMO_HOME=${BIONEMO_HOME:=$(pwd)}
+LOCAL_REPO_PATH=$(pwd)
+DOCKER_REPO_PATH=${DOCKER_REPO_PATH:=/workspace/bionemo}
+LOCAL_RESULTS_PATH=${LOCAL_RESULTS_PATH:=${LOCAL_REPO_PATH}/results}
+DOCKER_RESULTS_PATH=${DOCKER_RESULTS_PATH:=${DOCKER_REPO_PATH}/results}
+LOCAL_DATA_PATH=${LOCAL_DATA_PATH:=${LOCAL_REPO_PATH}/data}
+DOCKER_DATA_PATH=${DOCKER_DATA_PATH:=${DOCKER_REPO_PATH}/data}
+LOCAL_MODELS_PATH=${LOCAL_MODELS_PATH:=${LOCAL_REPO_PATH}/models}
+DOCKER_MODELS_PATH=${DOCKER_MODELS_PATH:=${DOCKER_REPO_PATH}/models}
 WANDB_API_KEY=${WANDB_API_KEY:=NotSpecified}
 JUPYTER_PORT=${JUPYTER_PORT:=8888}
 REGISTRY=${REGISTRY:=NotSpecified}
@@ -143,8 +142,14 @@ fi
 # If $LOCAL_ENV was not found, write out a template for user to edit
 if [ $write_env -eq 1 ]; then
     echo BIONEMO_IMAGE=${BIONEMO_IMAGE} >> $LOCAL_ENV
-    echo DOCKER_MOUNT_PATH=${DOCKER_MOUNT_PATH} \# This wil be BIONEMO_HOME in container >> $LOCAL_ENV
-    echo BIONEMO_HOME=${BIONEMO_HOME} >> $LOCAL_ENV
+    echo LOCAL_REPO_PATH=${LOCAL_REPO_PATH} \# This needs to be set to BIONEMO_HOME for local \(non-dockerized\) use >> $LOCAL_ENV
+    echo DOCKER_REPO_PATH=${DOCKER_REPO_PATH} \# This is set to BIONEMO_HOME in container >> $LOCAL_ENV
+    echo LOCAL_RESULTS_PATH=${LOCAL_RESULTS_PATH} >> $LOCAL_ENV
+    echo DOCKER_RESULTS_PATH=${DOCKER_RESULTS_PATH} >> $LOCAL_ENV
+    echo LOCAL_DATA_PATH=${LOCAL_DATA_PATH} >> $LOCAL_ENV
+    echo DOCKER_DATA_PATH=${DOCKER_DATA_PATH} >> $LOCAL_ENV
+    echo LOCAL_MODELS_PATH=${LOCAL_MODELS_PATH} >> $LOCAL_ENV
+    echo DOCKER_MODELS_PATH=${DOCKER_MODELS_PATH} >> $LOCAL_ENV
     echo WANDB_API_KEY=${WANDB_API_KEY} >> $LOCAL_ENV
     echo JUPYTER_PORT=${JUPYTER_PORT} >> $LOCAL_ENV
     echo REGISTRY=${REGISTRY} >> $LOCAL_ENV
@@ -155,20 +160,25 @@ if [ $write_env -eq 1 ]; then
     echo NGC_CLI_TEAM=${NGC_CLI_TEAM} >> $LOCAL_ENV
     echo NGC_CLI_FORMAT_TYPE=${NGC_CLI_FORMAT_TYPE} >> $LOCAL_ENV
 fi
-echo $PREVIOUSLY_SET_BIONEMO_HOME
-echo $BIONEMO_HOME
 
-if [[ -n $PREVIOUSLY_SET_BIONEMO_HOME && "${PREVIOUSLY_SET_BIONEMO_HOME}" != "${BIONEMO_HOME}" ]]; then
-    echo "WARNING! \$BIONEMO_HOME was set externally to be: ${PREVIOUSLY_SET_BIONEMO_HOME}"
-    echo "which does not match the \$BIONEMO_HOME set inside of the .env configuration file: ${BIONEMO_HOME}"
-    echo "Using the externally set \$BIONEMO_HOME value of: ${PREVIOUSLY_SET_BIONEMO_HOME}"
-    BIONEMO_HOME=${PREVIOUSLY_SET_BIONEMO_HOME}
+# Default paths for framework. We switch these depending on whether or not we are inside
+# a docker environment. It is assumed that if we are in a docker environment, then it's the
+# bionemo image built with `setup/Dockerfile`.
+
+
+if [ -f /.dockerenv ]; then
+    echo "Running inside a Docker container, using DOCKER paths from .env file."
+    RESULT_PATH=${DOCKER_RESULTS_PATH}
+    DATA_PATH=${DOCKER_DATA_PATH}
+    MODEL_PATH=${DOCKER_MODELS_PATH}
+    BIONEMO_HOME=${DOCKER_REPO_PATH}
+else
+    echo "Not running inside a Docker container, using LOCAL paths from .env file."
+    RESULT_PATH=${LOCAL_RESULTS_PATH}
+    DATA_PATH=${LOCAL_DATA_PATH}
+    MODEL_PATH=${LOCAL_MODELS_PATH}
+    BIONEMO_HOME=${LOCAL_REPO_PATH}
 fi
-
-# Default paths for framework
-DATA_PATH=${BIONEMO_HOME}/data
-MODEL_PATH=${BIONEMO_HOME}/models
-RESULT_PATH=${BIONEMO_HOME}/results/nemo_experiments
 
 # Additional variables that will be used in the script when sent in the .env file:
 # BASE_IMAGE        Custom Base image for building.
@@ -361,6 +371,9 @@ setup() {
         DEV_PYTHONPATH="${DEV_PYTHONPATH}:/workspace/nemo"
     fi
 
+    # Note: For BIONEMO_HOME, if we are invoking docker, this should always be
+    # the docker repo path.
+    DOCKER_CMD="${DOCKER_CMD} --env BIONEMO_HOME=$DOCKER_REPO_PATH"
     DOCKER_CMD="${DOCKER_CMD} --env WANDB_API_KEY=$WANDB_API_KEY"
     DOCKER_CMD="${DOCKER_CMD} --env NGC_CLI_API_KEY=$NGC_CLI_API_KEY"
     DOCKER_CMD="${DOCKER_CMD} --env NGC_CLI_ORG=$NGC_CLI_ORG"
@@ -368,8 +381,11 @@ setup() {
     DOCKER_CMD="${DOCKER_CMD} --env NGC_CLI_FORMAT_TYPE=$NGC_CLI_FORMAT_TYPE"
 
     # For development work
-    echo "Mounting ${BIONEMO_HOME} at ${DOCKER_MOUNT_PATH} for development"
-    DOCKER_CMD="${DOCKER_CMD} -v ${BIONEMO_HOME}:${DOCKER_MOUNT_PATH} -e HOME=${DOCKER_MOUNT_PATH} -w ${DOCKER_MOUNT_PATH} "
+    echo "Mounting ${LOCAL_REPO_PATH} at ${DOCKER_REPO_PATH} for development"
+    DOCKER_CMD="${DOCKER_CMD} -v ${LOCAL_REPO_PATH}:${DOCKER_REPO_PATH} -e HOME=${DOCKER_REPO_PATH} -w ${DOCKER_REPO_PATH} "
+    DOCKER_CMD="${DOCKER_CMD} -v ${LOCAL_RESULTS_PATH}:${DOCKER_RESULTS_PATH}"
+    DOCKER_CMD="${DOCKER_CMD} -v ${LOCAL_DATA_PATH}:${DOCKER_DATA_PATH}"
+    DOCKER_CMD="${DOCKER_CMD} -v ${LOCAL_MODELS_PATH}:${DOCKER_MODELS_PATH}"
     DOCKER_CMD="${DOCKER_CMD} -v /etc/passwd:/etc/passwd:ro "
     DOCKER_CMD="${DOCKER_CMD} -v /etc/group:/etc/group:ro "
     DOCKER_CMD="${DOCKER_CMD} -v /etc/shadow:/etc/shadow:ro "
@@ -381,8 +397,8 @@ setup() {
         echo "Mounting ~/.ssh up for development"
         DOCKER_CMD="$DOCKER_CMD -v ${HOME}/.ssh:${HOME}/.ssh:ro"
 
-        echo "Prepending ${DOCKER_MOUNT_PATH} to PYTHONPATH for development"
-        DEV_PYTHONPATH="${DOCKER_MOUNT_PATH}:${DOCKER_MOUNT_PATH}/generated:${DEV_PYTHONPATH}"
+        echo "Prepending ${DOCKER_REPO_PATH} to PYTHONPATH for development"
+        DEV_PYTHONPATH="${DOCKER_REPO_PATH}:${DOCKER_REPO_PATH}/generated:${DEV_PYTHONPATH}"
         DOCKER_CMD="${DOCKER_CMD} --env PYTHONPATH=${DEV_PYTHONPATH}"
     fi
 }
@@ -445,7 +461,7 @@ run() {
     done
 
     set -x
-    ${DOCKER_CMD} --rm -it --gpus all -e HOME=${BIONEMO_HOME} -w ${BIONEMO_HOME} --name ${DEV_CONT_NAME} ${BIONEMO_IMAGE} ${CMD}
+    ${DOCKER_CMD} --rm -it --gpus all -e HOME=${DOCKER_REPO_PATH} -w ${DOCKER_REPO_PATH} --name ${DEV_CONT_NAME} ${BIONEMO_IMAGE} ${CMD}
     set +x
     exit
 }
