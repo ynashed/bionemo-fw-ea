@@ -15,18 +15,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Below is a sample set of parameters for launching ESM-1nv or ProtT5nv finetuning for a secondary structure predition
-# downstream task with BioNeMo on BCP clusters
-# Replace all ?? with appropriate values prior to launching a job
-# Any parameters not specified in this script can be changed in the yaml config file
-# located in examples/protein/prott5nv/conf/ for ProtT5nv model
-# or in examples/protein/esm1nv/conf/ for ESM-1nv model
+# Usage
+# =========================
+# This is an example script for running a predictive task on BCP.
+# Below is a sample set of parameters for launching ESM-{1,2}nv or ProtT5nv 
+# finetuning for a FLIP downstream task with BioNeMo on BCP clusters.
+# Replace all ?? with appropriate values prior to launching a job.
+# Any parameters not specified in this script, such as the ESM-2 checkpoint size, 
+# can be changed in the yaml config file located in examples/protein/MODEL/conf/ 
+# directory where MODEL is {esm1nv, esm2nv, prott5nv}.
 
 BIONEMO_IMAGE=?? # BioNeMo container image
 WANDB_API_KEY=?? # Add your WANDB API KEY
 
-CONFIG_NAME='downstream_flip_sec_str' # name of the yaml config file with parameters, should be aligned with TASK_NAME parameter
-PROTEIN_MODEL=esm2nv # protein LM name, can be esm2nv, esm1nv or prott5nv
+CONFIG_NAME='downstream_flip_sec_str' # yaml config file {downstream_flip_sec_str, downstream_flip_scl, downstream_flip_meltome}, should be aligned with TASK_NAME parameter.
+PROTEIN_MODEL=esm2nv # protein LM name, can be {esm1nv, esm2nv, prott5nv}
+# =========================
 
 # NGC specific parameters
 # =========================
@@ -61,8 +65,8 @@ VAL_CHECK_INTERVAL=20 # how often validation step is performed, including downst
 # =========================
 DATA_PATH=/data/FLIP
 TASK_NAME=secondary_structure # FLIP task name: secondary_structure, scl, meltome, etc.
-EXP_DIR=/workspace/nemo_experiments/${PROTEIN_MODEL}/downstream_sec_str_encoder_frozen-${ENCODER_FROZEN}_tp${TENSOR_MODEL_PARALLEL_SIZE}_grad_acc${ACCUMULATE_GRAD_BATCHES}
-WANDB_LOGGER_NAME=${PROTEIN_MODEL}_sec_str_finetune_encoder_frozen-${ENCODER_FROZEN}_tp${TENSOR_MODEL_PARALLEL_SIZE}_grad_acc${ACCUMULATE_GRAD_BATCHES}
+EXP_DIR=/workspace/nemo_experiments/${PROTEIN_MODEL}/${CONFIG_NAME}_encoder_frozen-${ENCODER_FROZEN}_tp${TENSOR_MODEL_PARALLEL_SIZE}_grad_acc${ACCUMULATE_GRAD_BATCHES}
+WANDB_LOGGER_NAME=${PROTEIN_MODEL}_${CONFIG_NAME}_finetune_encoder_frozen-${ENCODER_FROZEN}_tp${TENSOR_MODEL_PARALLEL_SIZE}_grad_acc${ACCUMULATE_GRAD_BATCHES}
 WANDB_LOGGER_OFFLINE=False # set to True if uploading results to WandB online is undesired
 
 CONFIG_PATH=../${PROTEIN_MODEL}/conf
@@ -72,8 +76,8 @@ CONFIG_PATH=../${PROTEIN_MODEL}/conf
 # =========================
 read -r -d '' BCP_COMMAND <<EOF
 bcprun --debug --nnodes=${NGC_ARRAY_SIZE} --npernode=${NGC_GPUS_PER_NODE} -w /workspace/bionemo -e WANDB_API_KEY=${WANDB_API_KEY} --cmd 'export NGC_CLI_ORG=$NGC_CLI_ORG NGC_CLI_API_KEY=$NGC_CLI_API_KEY MODEL_PATH=/model; ./launch.sh download';
-bcprun --debug --nnodes=${NGC_ARRAY_SIZE} --npernode=1 -w /workspace/bionemo/examples/protein/downstream -e WANDB_API_KEY=${WANDB_API_KEY} --cmd 'python downstream_sec_str.py do_training=False';
-bcprun --debug --nnodes=${NGC_ARRAY_SIZE} --npernode=${NGC_GPUS_PER_NODE} -w /workspace/bionemo/examples/protein/downstream -e WANDB_API_KEY=${WANDB_API_KEY} --cmd 'python downstream_sec_str.py --config-path=${CONFIG_PATH} \
+bcprun --debug --nnodes=${NGC_ARRAY_SIZE} --npernode=1 -w /workspace/bionemo/examples/protein/downstream -e WANDB_API_KEY=${WANDB_API_KEY} --cmd 'python downstream_flip.py do_training=False';
+bcprun --debug --nnodes=${NGC_ARRAY_SIZE} --npernode=${NGC_GPUS_PER_NODE} -w /workspace/bionemo/examples/protein/downstream -e WANDB_API_KEY=${WANDB_API_KEY} --cmd 'python downstream_flip.py --config-path=${CONFIG_PATH} \
     --config-name=${CONFIG_NAME} exp_manager.exp_dir=${EXP_DIR} exp_manager.wandb_logger_kwargs.offline=${WANDB_LOGGER_OFFLINE} \
     trainer.devices=${NGC_GPUS_PER_NODE} trainer.num_nodes=${NGC_ARRAY_SIZE} ++model.dwnstr_task_validation.enabled=False \
     model.micro_batch_size=${MICRO_BATCH_SIZE} model.data.task_name=${TASK_NAME} model.data.dataset_path=${DATA_PATH}/${TASK_NAME} \
@@ -83,7 +87,7 @@ bcprun --debug --nnodes=${NGC_ARRAY_SIZE} --npernode=${NGC_GPUS_PER_NODE} -w /wo
 EOF
 # =========================
 
-#Add --array-type "PYTORCH" to command below for multinode jobs
+# Add --array-type "PYTORCH" to command below for multinode jobs
 echo "ngc batch run --name "${JOB_NAME}" --priority NORMAL \
       --preempt RUNONCE --total-runtime ${TIME_LIMIT} --ace "${ACE}" \
       --instance "${INSTANCE}" --commandline "\"${BCP_COMMAND}"\" \

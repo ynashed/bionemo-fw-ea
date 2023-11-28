@@ -11,20 +11,22 @@
 #SBATCH --exclusive                   # exclusive node access
 set -x
 
-# Below is a sample set of parameters for launching ESM-1nv or ProtT5nv finetuning for a secondary structure predition
-# downstream task with BioNeMo on SLURM-based clusters
-# Replace all ?? with appropriate values prior to launching a job
-# Any parameters not specified in this script can be changed in the yaml config file
-# located in examples/protein/prott5nv/conf/downstream_flip_sec_str.yaml for ProtT5nv model
-# or in examples/protein/esm1nv/conf/downstream_flip_sec_str.yaml for ESM-1nv model
-# - place holder for ESM2 instructions -
-# Other downstream yaml files can be found in those locations as well
+# Usage
+# =========================
+# This is an example script for running a predictive task on a SLURM cluster.
+# Below is a sample set of parameters for launching ESM-{1,2}nv or ProtT5nv 
+# finetuning for a FLIP downstream task with BioNeMo on BCP clusters.
+# Replace all ?? with appropriate values prior to launching a job.
+# Any parameters not specified in this script, such as the ESM-2 checkpoint size, 
+# can be changed in the yaml config file located in examples/protein/MODEL/conf/ 
+# directory where MODEL is {esm1nv, esm2nv, prott5nv}.
 
 BIONEMO_IMAGE=?? # BioNeMo container image
 WANDB_API_KEY=?? # Add your WANDB API KEY
 
-CONFIG_NAME='downstream_flip_sec_str' # name of the yaml config file with parameters, should be aligned with TASK_NAME parameter
-PROTEIN_MODEL=esm2nv # protein LM name, can be esm2nv, esm1nv or prott5nv
+CONFIG_NAME='downstream_flip_sec_str' # yaml config file {downstream_flip_sec_str, downstream_flip_scl, downstream_flip_meltome}, should be aligned with TASK_NAME parameter.
+PROTEIN_MODEL=esm2nv # protein LM name, can be {esm1nv, esm2nv, prott5nv}
+# =========================
 
 # Training parameters
 # =========================
@@ -41,8 +43,8 @@ VAL_CHECK_INTERVAL=20 # how often validation step is performed, including downst
 # =========================
 TASK_NAME=secondary_structure # FLIP task name: secondary_structure, scl, meltome, etc.
 EXP_TAG="" # any additional experiment info, can be empty
-EXP_NAME="${PROTEIN_MODEL}_batch${MICRO_BATCH_SIZE}_gradacc${ACCUMULATE_GRAD_BATCHES}_nodes${SLURM_JOB_NUM_NODES}_encoder-frozen-${ENCODER_FROZEN}${EXP_TAG}"
-CREATE_WANDB_LOGGER=True # set to False if you don't want to log results with WandB
+EXP_NAME="${PROTEIN_MODEL}_${CONFIG_NAME}_batch${MICRO_BATCH_SIZE}_gradacc${ACCUMULATE_GRAD_BATCHES}_nodes${SLURM_JOB_NUM_NODES}_encoder-frozen-${ENCODER_FROZEN}${EXP_TAG}"
+CREATE_WANDB_LOGGER=True # set to False if you don't want to log results with WandB 
 WANDB_LOGGER_OFFLINE=False # set to True if there are issues uploading to WandB during training
 
 PROJECT_NAME="${PROTEIN_MODEL}_${CONFIG_NAME}"  # project name, will be used for logging
@@ -73,7 +75,7 @@ echo "*******STARTING********" \
 && echo "Starting training" \
 && cd \$BIONEMO_HOME \
 && cd examples/protein/downstream \
-&& python \$BIONEMO_HOME/examples/protein/downstream/downstream_sec_str.py \
+&& python \$BIONEMO_HOME/examples/protein/downstream/downstream_flip.py \
     --config-path=\$BIONEMO_HOME/examples/protein/${PROTEIN_MODEL}/conf \
     --config-name=${CONFIG_NAME} \
     exp_manager.exp_dir=${RESULTS_MOUNT} \

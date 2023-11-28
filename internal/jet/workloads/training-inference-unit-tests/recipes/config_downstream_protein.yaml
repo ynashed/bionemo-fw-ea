@@ -46,7 +46,7 @@ products:
     gpus: [1, 8]
     precision: [16, 32, bf16]
     domain: [protein]
-    variant: [downstream_sec_str]
+    variant: [downstream_flip]
     products:
       - model: [esm1nv]
         batch_size: [32]

@@ -58,7 +58,7 @@ If you want to enable validation in the loop of downstream tasks, you should use
 
 ```bash
 export DATA_MOUNT=??  # data path in the mounted workspace
-ngc batch run --name "FLIP_preprocessing" --priority HIGH --order 1 --preempt RUNONCE --min-timeslice 0s --total-runtime 172800s --ace nv-us-east-2 --instance dgxa100.80g.2.norm --commandline "cd /workspace/bionemo/examples/protein/downstream && python downstream_sec_str.py do_training=False ++model.data.preprocessed_data_path=/data/${DATA_MOUNT}" --result /results --image ?? --org ?? --team ?? --workspace ${WKSP_ID}:/data:RW --label ml__bionemo
+ngc batch run --name "FLIP_preprocessing" --priority HIGH --order 1 --preempt RUNONCE --min-timeslice 0s --total-runtime 172800s --ace nv-us-east-2 --instance dgxa100.80g.2.norm --commandline "cd /workspace/bionemo/examples/protein/downstream && python downstream_flip.py do_training=False ++model.data.preprocessed_data_path=/data/${DATA_MOUNT}" --result /results --image ?? --org ?? --team ?? --workspace ${WKSP_ID}:/data:RW --label ml__bionemo
 ```
 Ensure that you have your NGC workspace ID, relevant paths, and configurations set correctly.
 
