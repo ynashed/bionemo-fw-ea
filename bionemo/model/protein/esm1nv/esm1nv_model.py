@@ -309,12 +309,14 @@ class ESM2nvModel(ESM1nvModel):
         dataloader.pin_memory = False
 
         pad_size_divisible_by_8 = True if self._cfg.masked_softmax_fusion else False
-
+        if self.cfg.pipeline_model_parallel_size > 1 and self.cfg.data.dynamic_padding:
+            raise ValueError("Pipeline model parallelism does not support dynamic_padding.")
         dataloader.collate_fn = ESM2BertCollate(
             tokenizer=self.tokenizer,
             seq_length=self._cfg.seq_length,
             pad_size_divisible_by_8=pad_size_divisible_by_8,
             modify_percent=self._cfg.data.modify_percent,
             perturb_percent=self._cfg.data.perturb_percent,
+            dynamic_padding=self.cfg.data.dynamic_padding,
         ).collate_fn
         return dataloader
