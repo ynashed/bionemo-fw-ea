@@ -206,8 +206,7 @@ def get_results_from_jet(
                     continue
 
                 info_job[name] = asset["s_url"]
-                if save_dir is None:
-                    msg += f'\n{name}: {info_job[name]}'
+                msg += f'\n{name}: {info_job[name]}'
 
             if info_job["exit_code"] != 0 and print_script:
                 msg += f"\n\nScript:\n {obj_workload['obj_spec']['s_script']}\n\n"

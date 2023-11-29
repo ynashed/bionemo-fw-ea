@@ -91,7 +91,7 @@ code_format:
   tags:
    - generic
 
-# TODO(@dorotat): consider splitting this into build-base and build-devel
+# TODO(dorotat): consider splitting this into build-base and build-devel
 build:
   extends:
     - .docker-setup
@@ -212,6 +212,7 @@ jet-configure:
     JET_BUILDS_PLATFORMS: linux/amd64
   trigger:
     project: dl/jet/ci
+    branch: bionemo # NOTE: this branch name enables running JET on Draco OCI
     strategy: depend
 
 
@@ -233,7 +234,7 @@ jet-trigger:
         JET_WORKLOADS_REF: "ephemeral/bionemo/${CI_COMMIT_BRANCH}/${CI_PIPELINE_ID}"
 
 
-# TODO(@dorotat): use image gitlab-master.nvidia.com:5005/dl/jet/api:latest
+# TODO(dorotat): use image gitlab-master.nvidia.com:5005/dl/jet/api:latest
 jet-test:
   needs: [jet-trigger]
   image:

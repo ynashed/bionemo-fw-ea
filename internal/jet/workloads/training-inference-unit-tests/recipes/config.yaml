@@ -20,8 +20,8 @@ spec:
   build: bionemo
   scope: perf-train
   platforms: [linux/amd64]
-  BIONEMO_HOME: "/opt/nvidia/bionemo"
-  MODEL_PATH: "/model"
+  BIONEMO_HOME: "/workspace/bionemo"
+  MODEL_PATH: "/workspace/bionemo/models"
   NGC_CLI_FORMAT_TYPE: ascii
   NGC_CLI_ORG: nvidian
   NGC_CLI_TEAM: clara-lifesciences
@@ -29,8 +29,33 @@ spec:
   warmup: 0
   default_overwrites: "++exp_manager.create_wandb_logger=False ++exp_manager.create_tensorboard_logger=False ++exp_manager.exp_dir=/tmp/nemo_experiments/ ++exp_manager.create_checkpoint_callback=False ++exp_manager.resume_if_exists=False"
   extra_overwrites: ""
-  script: "cd {BIONEMO_HOME}\nexport NGC_CLI_ORG={NGC_CLI_ORG} \nexport NGC_CLI_TEAM={NGC_CLI_TEAM} \nexport NGC_CLI_FORMAT_TYPE={NGC_CLI_FORMAT_TYPE} \nexport MODEL_PATH={MODEL_PATH}\nexport PROJECT_MOUNT={BIONEMO_HOME}\nif [ \"$SLURM_LOCALID\" = \"0\" ]; then\n  source download_models.sh && download_bionemo_models;\n  unzip examples/tests/test_data/uniref202104_esm2_qc_test200_val200.zip -d examples/tests/test_data/;\n  touch .download-finished;\nelse\n  until [ -f .download-finished ]; do\n    sleep 5;\n  done\nfi   \npython examples/{domain}/{model}/{variant}.py --config-path {BIONEMO_HOME}/{config_path} --config-name {config_name} \\\ntrainer.num_nodes={nodes} trainer.devices={gpus} trainer.precision={precision} model.micro_batch_size={batch_size} \\\n++model.dwnstr_task_validation.enabled={dwnstr_task} \\\n{default_overwrites} {extra_overwrites} hydra.searchpath=[file://{BIONEMO_HOME}/examples/{domain}/{model}/conf] \\\n++create_dllogger_callbacks=True ++create_trainer_metric_callback=True \\\n++dllogger_callbacks_kwargs.use_existing_dllogger=True ++dllogger_callbacks_kwargs.warmup={warmup} \\\n++dllogger_callbacks_kwargs.json_file={dllogger_file} ++trainer_metric_callback_kwargs.log_path={assets_dir} ++logs_dir={logs_dir}"
-  time_limit: 1800
+  script: |-
+    cd {BIONEMO_HOME}
+    export NGC_CLI_ORG={NGC_CLI_ORG} 
+    export NGC_CLI_TEAM={NGC_CLI_TEAM} 
+    export NGC_CLI_FORMAT_TYPE={NGC_CLI_FORMAT_TYPE} 
+    export MODEL_PATH={MODEL_PATH}
+    if [ "$SLURM_LOCALID" = "0" ]; then
+      if [ "{model}" = "megamolbart" ]; then
+        source download_models.sh && download_bionemo_models;
+      fi
+      if [ "{model}" = "esm2nv" ]; then
+        unzip examples/tests/test_data/uniref202104_esm2_qc_test200_val200.zip -d examples/tests/test_data/;
+      fi      
+      touch .download-finished;
+    else
+      until [ -f .download-finished ]; do
+        sleep 5;
+      done
+    fi   
+    python examples/{domain}/{model}/{variant}.py --config-path {BIONEMO_HOME}/{config_path} --config-name {config_name} \
+    trainer.num_nodes={nodes} trainer.devices={gpus} trainer.precision={precision} model.micro_batch_size={batch_size} \
+    ++model.dwnstr_task_validation.enabled={dwnstr_task} \
+    {default_overwrites} {extra_overwrites} hydra.searchpath=[file://{BIONEMO_HOME}/examples/{domain}/{model}/conf] \
+    ++create_dllogger_callbacks=True ++create_trainer_metric_callback=True \
+    ++dllogger_callbacks_kwargs.use_existing_dllogger=True ++dllogger_callbacks_kwargs.warmup={warmup} \
+    ++dllogger_callbacks_kwargs.json_file={dllogger_file} ++trainer_metric_callback_kwargs.log_path={assets_dir} ++logs_dir={logs_dir}
+  time_limit: 3600
   artifacts: {}
   metrics:
     throughput_train:

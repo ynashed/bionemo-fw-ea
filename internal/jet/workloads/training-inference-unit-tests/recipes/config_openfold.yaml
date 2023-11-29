@@ -19,8 +19,7 @@ spec:
   build: bionemo
   scope: perf-train
   platforms: [linux/amd64]
-  BIONEMO_HOME: "/opt/nvidia/bionemo"
-  MODEL_PATH: "/model"
+  BIONEMO_HOME: "/workspace/bionemo"
   NGC_CLI_FORMAT_TYPE: ascii
   NGC_CLI_ORG: nvidian
   NGC_CLI_TEAM: clara-lifesciences
@@ -34,8 +33,6 @@ spec:
     export NGC_CLI_ORG={NGC_CLI_ORG} 
     export NGC_CLI_TEAM={NGC_CLI_TEAM} 
     export NGC_CLI_FORMAT_TYPE={NGC_CLI_FORMAT_TYPE} 
-    export MODEL_PATH={MODEL_PATH}
-    export PROJECT_MOUNT={BIONEMO_HOME}
     if [ "$SLURM_LOCALID" = "0" ]; then
       source examples/protein/openfold/scripts/download_data_sample.sh;
       if [ "{kalignu}" = "True" ]; then
@@ -56,7 +53,7 @@ spec:
     ++create_dllogger_callbacks=True ++create_trainer_metric_callback=True \
     ++dllogger_callbacks_kwargs.use_existing_dllogger=True ++dllogger_callbacks_kwargs.warmup={warmup} \
     ++dllogger_callbacks_kwargs.json_file={dllogger_file} ++trainer_metric_callback_kwargs.log_path={assets_dir} ++logs_dir={logs_dir}
-  time_limit: 1800
+  time_limit: 3600
   artifacts: {}
   metrics:
     throughput_train:
