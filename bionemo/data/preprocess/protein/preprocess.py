@@ -335,16 +335,15 @@ class UniRef50Preprocess:
 class ESM2Preprocess(UniRef50Preprocess):
     def prepare_dataset(
         self,
-        uf50_datapath,
-        uf90_datapath,
-        cluster_mapping_tsv,
-        uf50_output_dir,
-        uf90_output_dir,
-        num_csv_files=50,
-        val_size=5000,
-        test_size=1000000,
-        random_seed=0,
-        sort_fastas=True,
+        uf50_datapath: pathlib.Path,
+        uf50_output_dir: pathlib.Path,
+        cluster_mapping_tsv: Optional[pathlib.Path] = None,
+        uf90_datapath: Optional[pathlib.Path] = None,
+        uf90_output_dir: Optional[pathlib.Path] = None,
+        num_csv_files: int = 50,
+        sort_fastas: bool = False,
+        mode: str = "train",
+        num_preprocess_workers: int = 16,
     ):
         """
         Prepares and splits the dataset into train/test/validation subsets, converts the fasta files to CSV format,
@@ -352,21 +351,20 @@ class ESM2Preprocess(UniRef50Preprocess):
         and are *required.*
 
         Args:
-            uf50_datapath (str): Path to the raw fasta file for UniRef50. The data is divided into train/test/validation
+            uf50_datapath: Path to the raw fasta file for UniRef50. The data is divided into train/test/validation
                 subsets and is utilized to decide which clusters to sample.
-            uf90_datapath (str): Path to the raw fasta file for UniRef90. The data is processed into CSV format similar to
+            uf90_datapath: Path to the raw fasta file for UniRef90. The data is processed into CSV format similar to
                 uf50 but isn't split into train/test/validation. The sequences are ultimately used during training.
-            cluster_mapping_tsv (str): Path to the TSV file where the first column represents the cluster ID (fasta header in uf50)
+            cluster_mapping_tsv: Path to the TSV file where the first column represents the cluster ID (fasta header in uf50)
                 and the second column lists the members separated by commas. The members correspond to entries in the uf90 fasta file.
-            uf50_output_dir (str): Directory where the processed CSVs for uf50 are saved. This directory will have subdirectories
+            uf50_output_dir: Directory where the processed CSVs for uf50 are saved. This directory will have subdirectories
                 'train', 'test', and 'val'.
-            uf90_output_dir (str): Directory where the processed CSVs for uf90 are saved. A child directory named 'uf90_csvs' is
+            uf90_output_dir: Directory where the processed CSVs for uf90 are saved. A child directory named 'uf90_csvs' is
                 created inside this directory for storing the CSVs.
             num_csv_files (int, optional): Number of files to divide each fasta file into after preprocessing. Defaults to 50.
-            val_size (int): Number of samples designated for the validation set.
-            test_size (int): Number of samples designated for the test set. The training size is inferred from
-                test_size and val_size.
-            random_seed (int, optional): Seed for randomization when splitting samples for train/test/validation. Defaults to 0.
+            sort_fastas: Booleal flag indicating whether or not to sort the fasta files. Default is False which means we do not sort.
+            mode: A string indicating whether we want one of "train", "val" or "test.
+            num_preprocess_workers: Int indicating how many workers we want to use for our _protein_sequence_filewriter_map
 
         Returns:
             None
@@ -375,91 +373,89 @@ class ESM2Preprocess(UniRef50Preprocess):
             The method constructs 'cluster_map.json' inside the `uf90_output_dir` which is vital for subsequent steps.
             The structure of the output directories is essential for the YAML configuration file.
         """
-        if val_size == 0 or test_size == 0:
-            raise ValueError(
-                f"Cannot set validation or test size to zero during pre-training {val_size=} {test_size=}"
-            )
+
+        if mode not in ["train", "val", "test"]:
+            raise ValueError(f"Mode {mode} is not one of train, val, test.")
+
+        if mode != "train" and sort_fastas is True:
+            raise ValueError("Cannot have val/test mode with sort_fastas True")
+
+        if mode == "train" and sort_fastas is False:
+            logging.warning("Mode is train, but sort_fastas is false. This might have unintended behavior.")
+
+        if mode != "train" and uf90_datapath is not None:
+            raise ValueError("Currently, only training mode utilizes the uf90 datapaths.")
 
         logging.info('Indexing UniRef50 dataset.')
         uf50_fasta_indexer = pyfastx.Fasta(uf50_datapath, build_index=True, uppercase=True)
-        if (val_size + test_size) >= len(uf50_fasta_indexer):
-            raise ValueError(
-                f"{val_size=}+{test_size=} is larger than the total cluster size {len(uf50_fasta_indexer)=}, choose smaller values so your model can actually be trained."
-            )
 
         os.makedirs(uf50_output_dir, exist_ok=True)
-        os.makedirs(uf90_output_dir, exist_ok=True)
+        if uf90_output_dir is not None:
+            os.makedirs(uf90_output_dir, exist_ok=True)
 
-        logging.info('Indexing UniRef90 dataset.')
-        uf90_fasta_indexer = pyfastx.Fasta(uf90_datapath, build_index=True, uppercase=True)
+        if uf90_datapath is not None:
+            logging.info('Indexing UniRef90 dataset.')
+            uf90_fasta_indexer = pyfastx.Fasta(uf90_datapath, build_index=True, uppercase=True)
 
         logging.info('Creating cluster mapping')
-        global_starts, global_counts, all_cids, all_cmembers = self._load_cluster_mapping(cluster_mapping_tsv)
+        if cluster_mapping_tsv is not None:
+            global_starts, global_counts, all_cids, all_cmembers = self._load_cluster_mapping(cluster_mapping_tsv)
 
         if sort_fastas:
-            new_uf50_fn, new_uf90_fn = self._sort_fastas(
+            uf50_datapath, uf90_datapath = self._sort_fastas(
                 uf50_fasta_indexer=uf50_fasta_indexer,
                 uf90_fasta_indexer=uf90_fasta_indexer,
                 all_cids=all_cids,
                 all_cmembers=all_cmembers,
             )
-        else:
-            new_uf50_fn, new_uf90_fn = uf50_datapath, uf90_datapath
+            new_uf90_fasta_indexer = pyfastx.Fasta(uf90_datapath, build_index=True)
 
         logging.info('Loading sorted fasta files')
-        new_uf50_fasta_indexer = pyfastx.Fasta(new_uf50_fn, build_index=True)
-        new_uf90_fasta_indexer = pyfastx.Fasta(new_uf90_fn, build_index=True)
+        new_uf50_fasta_indexer = pyfastx.Fasta(uf50_datapath, build_index=True)
 
-        # Undo the shuffling that occurs when splitting with sort.
-        train_samples, val_samples, test_samples = map(
-            np.sort,
-            self._index_fasta_data(
-                fasta_indexer=new_uf50_fasta_indexer, val_size=val_size, test_size=test_size, random_seed=random_seed
-            ),
-        )
+        record_id_list = np.sort(np.arange(len(new_uf50_fasta_indexer)))
 
-        for split_name, record_id_list in zip(['train', 'val', 'test'], [train_samples, val_samples, test_samples]):
-            logging.info(f"Making cluster memmap for {split_name}")
-            split_path = os.path.join(uf50_output_dir, split_name)
-            pathlib.Path(split_path).mkdir(parents=True, exist_ok=True)
+        split_path = os.path.join(uf50_output_dir, mode)
+        pathlib.Path(split_path).mkdir(parents=True, exist_ok=True)
+        # Create the memmap files.
+        counts_fn = os.path.join(split_path, 'counts.mmap')
+        starts_fn = os.path.join(split_path, 'starts.mmap')
 
-            counts_fn = os.path.join(split_path, 'counts.mmap')
-            starts_fn = os.path.join(split_path, 'starts.mmap')
+        # Create the CSV files
+        logging.info(f'Writing processed uf50 {mode} dataset files to {uf50_output_dir}...')
+        for file_index, record_id_split in enumerate(np.array_split(record_id_list, num_csv_files)):
+            logging.debug(f'Writing file number {file_index}...')
+            self._protein_sequence_filewriter(
+                record_id_list=record_id_split,
+                file_index=file_index,
+                split_name=mode,
+                fasta_indexer=new_uf50_fasta_indexer,
+                output_dir=uf50_output_dir,
+            )
 
-            logging.warning("Not tracking mmap dtype- should intantiate this")
-            _counts, _starts = self._make_local_memmaps(
+        # force the new cluster order for uf90
+        if mode == "train":
+            _, _ = self._make_local_memmaps(
                 record_id_list, global_starts, global_counts, counts_mmap_fn=counts_fn, starts_mmap_fn=starts_fn
             )
 
-        logging.info(f'Writing processed uf50 dataset files to {uf50_output_dir}...')
-        self.train_val_test_split(
-            train_samples=train_samples,
-            val_samples=val_samples,
-            test_samples=test_samples,
-            num_csv_files=num_csv_files,
-            fasta_indexer=new_uf50_fasta_indexer,
-            output_dir=uf50_output_dir,
-        )
-
-        # force the new cluster order for uf90
-        new_uf90_fasta_indexer = pyfastx.Fasta(new_uf90_fn, build_index=True, uppercase=True)  # Duplicate for testing
-        record_id_list = np.arange(len(new_uf90_fasta_indexer))
-        split_name = 'uf90_csvs'
-        with Pool(16) as p:
-            p.map(
-                UniRef50Preprocess._protein_sequence_filewriter_map,
-                [
-                    {
-                        'record_id_list': record_id_split,
-                        'file_index': file_index,
-                        'split_name': split_name,
-                        'fasta_indexer': new_uf90_fn,
-                        'output_dir': uf90_output_dir,
-                        'delimiter': ',',
-                    }
-                    for file_index, record_id_split in enumerate(np.array_split(record_id_list, num_csv_files))
-                ],
-            )
+            record_id_list = np.arange(len(new_uf90_fasta_indexer))
+            split_name = 'uf90_csvs'
+            with Pool(num_preprocess_workers) as p:
+                p.map(
+                    UniRef50Preprocess._protein_sequence_filewriter_map,
+                    [
+                        {
+                            'record_id_list': record_id_split,
+                            'file_index': file_index,
+                            'split_name': split_name,
+                            'fasta_indexer': uf90_datapath,
+                            'output_dir': uf90_output_dir,
+                            'delimiter': ',',
+                        }
+                        for file_index, record_id_split in enumerate(np.array_split(record_id_list, num_csv_files))
+                    ],
+                )
 
     @staticmethod
     def _make_local_memmaps(
@@ -483,7 +479,26 @@ class ESM2Preprocess(UniRef50Preprocess):
         return counts_local_mm, starts_local_mm
 
     @staticmethod
-    def _sort_fastas(uf50_fasta_indexer, uf90_fasta_indexer, all_cids, all_cmembers) -> Tuple[str, str]:
+    def _sort_fastas(
+        uf50_fasta_indexer, uf90_fasta_indexer, all_cids, all_cmembers
+    ) -> Tuple[pathlib.Path, pathlib.Path]:
+        """
+        Sorta fasta from the sampling pool for train.
+
+        This function is required for the memmap dependency. For memmap, we want all samples
+        sorted into the order in which we are going to use them for training.
+
+        Args:
+            uf50_fasta_indexer: The fasta indexer generated by pyfastx, from the uniref50 fasta file.
+            uf90_fasta_indexer: The fasta indexer generated by pyfastx, from the uniref90 fasta file.
+            all_cids: All uniref50 training samples.
+            all_cmembers: All the members that can be sampled from uniref90, which
+                can also be a 50, since they are sampled with replacement.
+
+        Returns:
+            A filename for the UF50 files.
+            A filename for the UF90 files.
+        """
         new_uf50_fn = tempfile.NamedTemporaryFile().name
         new_uf90_fn = tempfile.NamedTemporaryFile().name
         logging.info(f"Sorting fasta files in temporary file: {new_uf50_fn=} {new_uf90_fn=}")

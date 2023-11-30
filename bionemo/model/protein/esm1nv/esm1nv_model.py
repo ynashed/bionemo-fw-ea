@@ -12,14 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import os
-from typing import Dict, Optional
+from typing import Dict, List, Optional, Union
 
 import torch
 from nemo.collections.nlp.modules.common.megatron.utils import (
     average_losses_across_data_parallel_group,
 )
 from nemo.collections.nlp.modules.common.tokenizer_utils import get_nmt_tokenizer
+from nemo.core import Dataset
 from nemo.core.neural_types import NeuralType
 from nemo.utils import logging
 from omegaconf.dictconfig import DictConfig
@@ -29,8 +31,7 @@ from torch.cuda.amp import autocast
 from bionemo.data.dataloader import ProteinBertCollate
 from bionemo.data.dataloader.protein_collate import ESM2BertCollate
 from bionemo.data.dataset_builder_utils import build_typed_dataset
-from bionemo.data.mapped_dataset import NeMoUpsampling, Uniref90ClusterMappingDataset
-from bionemo.data.molecule import megamolbart_build_train_valid_test_datasets
+from bionemo.data.mapped_dataset import Uniref90ClusterMappingDataset
 from bionemo.model.protein.esm1nv.base import ESMnvMegatronBertModel
 
 
@@ -43,6 +44,56 @@ except (ImportError, ModuleNotFoundError):
     HAVE_APEX = False
 
 __all__ = ["ESM1nvModel", "ESM2nvModel"]
+
+
+def esm1nv_build_train_valid_test_datasets(
+    cfg: DictConfig, train_valid_test_num_samples: Dict[str, Optional[int]]
+) -> List[Dataset]:
+    """
+    Build train, validation and test for pretraining of MegaMolBartModel.
+    Args:
+        cfg: config of data components
+        train_valid_test_num_samples: dict that specifies split-specific size of loaded dataset
+    Returns:
+        list of dataset for splits
+    """
+    cfg = copy.deepcopy(cfg)
+
+    # setting
+    use_upsampling: bool = cfg.get('use_upsampling', True)
+    data_impl: str = cfg.get('data_impl', None)
+    # assert data_impl is not None, 'Config "cfg" should contain field "cfg.data_impl"'
+    dataset_path: str = cfg.get('dataset_path', None)
+    assert dataset_path is not None, 'Config "cfg" should contain field "cfg.dataset_path"'
+
+    assert all(
+        split in ['train', 'val', 'test'] for split in train_valid_test_num_samples.keys()
+    ), 'Incorrect key in train_valid_test_num_samples!'
+
+    datasets = []
+    # Build individual datasets.
+    for split in train_valid_test_num_samples.keys():
+        num_samples = train_valid_test_num_samples[split]
+        print(f'{split}:{num_samples}')
+        if num_samples is None or num_samples > 0:
+            ds_name: Optional[Union[str, List[Union[int, str]]]] = cfg.dataset.get(split, None)
+            assert ds_name is not None, (
+                f'Config "cfg" should contain field "cfg.dataset.{split}" with name or list of '
+                f'names corresponding to the data files used to construct the dataset'
+            )
+            filepath: str = os.path.join(dataset_path, split, ds_name)
+            dataset = build_typed_dataset(
+                dataset_paths=filepath,
+                data_impl=data_impl,
+                use_upsampling=use_upsampling if num_samples is not None else False,
+                cfg=cfg,
+                num_samples=num_samples,
+            )
+        else:
+            dataset = None
+        datasets.append(dataset)  # These can be my train/ val/ test datasets.
+
+    return datasets
 
 
 class ESM1nvModel(ESMnvMegatronBertModel):
@@ -153,7 +204,8 @@ class ESM1nvModel(ESMnvMegatronBertModel):
             'test': int(test_iters * global_batch_size),
         }
 
-        _train_ds, _validation_ds, _test_ds = megamolbart_build_train_valid_test_datasets(
+        # Note(@jomitchell) ESM should not be calling megamolbart's dataset builder.
+        _train_ds, _validation_ds, _test_ds = esm1nv_build_train_valid_test_datasets(
             cfg=model_cfg.data, train_valid_test_num_samples=train_valid_test_num_samples
         )
 
@@ -239,61 +291,102 @@ class ESM2nvModel(ESM1nvModel):
     def __init__(self, cfg: DictConfig, trainer: Trainer):
         super().__init__(cfg, trainer)
 
-    @staticmethod
-    def _build_train_valid_test_datasets(trainer, model_cfg, keep_uf50=False):
-        '''
-        keep_uf50 - use this flag for testing, manually assigns the uniref50_dataset object to the resulting Uniref90ClusterMappingDataset object.
-        '''
-        _train_ds, _validation_ds, _test_ds = ESM1nvModel._build_train_valid_test_datasets(trainer, model_cfg)
+    def build_train_dataset(
+        self, model_cfg: DictConfig, num_samples: Optional[int] = None
+    ) -> Uniref90ClusterMappingDataset:
+        """Constructs a train dataset.
 
-        dataset_path = model_cfg.data.uf90.uniref90_path
-        split = 'uf90_csvs'
-        ds_name = model_cfg.data.uf90.dataset.get(split, None)
-        filepath: str = os.path.join(dataset_path, split, ds_name)
+        Args:
+            num_samples: The number of samples in the dataset
+            model_cfg: A config file that contains certain keys that tell us:
+                1. Where the UF50 dataset lies
+                2. Where the UF90 dataset lies
+                3. How we want to map between the two etc.
+        Returns:
+            train_dataset: A UF90 cluster mapping train dataset.
 
-        data_impl = model_cfg.data.uf90.get('data_impl', None)
-        assert data_impl is not None, 'Config "cfg" should contain field "cfg.data_impl"'
-        # NOTE train/val/test will all each into uniref90, since we are split on clusters, we now they are independent.
-        #   hence, we only need one dataset object for uf90
+        # TODO(@jomitchell) Enable creation of train dataset from single .fasta file.
+        """
+        # Create the training dataset
+        train_ds = build_typed_dataset(
+            dataset_paths=os.path.join(model_cfg.data.train.dataset_path, 'train', model_cfg.data.train.range),
+            data_impl=model_cfg.data.train.data_impl,
+            cfg=model_cfg.data.train,
+            use_upsampling=model_cfg.data.train.use_upsampling,
+            num_samples=num_samples,  # TODO(@jomitchell) Question: Are we subsampling the training dataset by having the num_samples variable here?
+        )
+
         uniref90_dataset = build_typed_dataset(
-            dataset_paths=filepath,
-            data_impl=data_impl,
-            cfg=model_cfg.data.uf90,
+            dataset_paths=os.path.join(
+                model_cfg.data.train.uf90.uniref90_path, 'uf90_csvs', model_cfg.data.train.range
+            ),
+            data_impl=model_cfg.data.train.uf90.data_impl,
+            cfg=model_cfg.data.train.uf90,
             use_upsampling=False,
             num_samples=None,
         )
 
-        results = []
-        for ds, split in zip([_train_ds, _validation_ds, _test_ds], ['train', 'val', 'test']):
-            # TypeHint for intellisense
-            _ds: NeMoUpsampling = ds
+        index_mapping_dir = train_ds.index_mapping_dir
+        mmap_dataset_path: str = os.path.join(model_cfg.data.train.dataset_path, "train")
+        # Setup the resampling
+        train_dataset = Uniref90ClusterMappingDataset(
+            uniref50_dataset=train_ds,
+            uniref90_dataset=uniref90_dataset,
+            data_prefix="train",  # used for index creation
+            seed=model_cfg.seed,  # used for rng, although awkward because global statehood
+            index_mapping_dir=index_mapping_dir,  # stores index
+            cluster_map_starts_fn=f'{mmap_dataset_path}/starts.mmap',
+            cluster_map_counts_fn=f'{mmap_dataset_path}/counts.mmap',
+            name=train_ds.name,
+        )
+        return train_dataset
 
-            index_mapping_dir = ds.index_mapping_dir
+    def build_val_dataset(self, model_cfg: DictConfig, num_samples: Optional[int] = None):
+        # TODO: If `num_samples is None` do we load the full dataset?
+        # IF not default none -> raise warning.
+        val_ds = build_typed_dataset(
+            dataset_paths=os.path.join(model_cfg.data.val.dataset_path, 'val', model_cfg.data.val.range),
+            data_impl=model_cfg.data.val.data_impl,
+            cfg=model_cfg.data.val,
+            use_upsampling=False,
+            num_samples=num_samples,
+        )
+        return val_ds
 
-            path_root: str = os.path.join(model_cfg.data.dataset_path, split)
-            # Setup the resampling
-            ds = Uniref90ClusterMappingDataset(
-                uniref50_dataset=_ds,
-                uniref90_dataset=uniref90_dataset,
-                data_prefix=split,  # used for index creation
-                seed=model_cfg.seed,  # used for rng, although awkward because global statehood
-                index_mapping_dir=index_mapping_dir,  # stores index
-                cluster_map_starts_fn=f'{path_root}/starts.mmap',
-                cluster_map_counts_fn=f'{path_root}/counts.mmap',
-                name=ds.name,
-            )
+    def build_test_dataset(self, model_cfg: DictConfig, num_samples: Optional[int] = None):
+        test_ds = build_typed_dataset(
+            dataset_paths=os.path.join(model_cfg.data.test.dataset_path, 'test', model_cfg.data.test.range),
+            data_impl=model_cfg.data.test.data_impl,
+            cfg=model_cfg.data.test,
+            use_upsampling=False,
+            num_samples=num_samples,
+        )
+        return test_ds
 
-            if keep_uf50:
-                ds.uniref50_dataset = _ds
+    def build_train_valid_test_datasets(self):
+        global_batch_size = self.trainer.world_size * self._cfg.micro_batch_size / self._cfg.tensor_model_parallel_size
+        # Compute training micro-batch steps: total_global_batch_steps x grad_acumms_per_global_batch
+        max_train_steps = self.trainer.max_steps * self.trainer.accumulate_grad_batches
+        num_train_samples = int(max_train_steps * global_batch_size)
 
-            results.append(ds)
+        # num_val_samples = int(eval_iters * global_batch_size)
+        # Note: I set this to None so we use the entire val set.
+        num_val_samples = None
 
-        [_train_ds, _validation_ds, _test_ds] = results
-        logging.info(f'Length of train dataset: {len(_train_ds)}')
-        logging.info(f'Length of val dataset: {len(_validation_ds)}')
-        logging.info(f'Length of test dataset: {len(_test_ds)}')
-        logging.info('Finished building Bert datasets.')
-        return _train_ds, _validation_ds, _test_ds
+        # num_test_samples = int(test_iters * global_batch_size)
+        # Note: I set this to None so we use the entire test set.
+        num_test_samples = None
+
+        self._train_ds = self.build_train_dataset(self._cfg, num_train_samples)
+        logging.info(f'Length of train dataset: {len(self._train_ds)}')
+
+        self._validation_ds = self.build_val_dataset(self._cfg, num_val_samples)
+        logging.info(f'Length of val dataset: {len(self._validation_ds)}')
+
+        self._test_ds = self.build_test_dataset(self._cfg, num_test_samples)
+        logging.info(f'Length of test dataset: {len(self._test_ds)}')
+
+        return self._train_ds, self._validation_ds, self._test_ds
 
     def build_pretraining_data_loader(self, dataset, consumed_samples, num_workers=None):
         """Buld dataloader given an input dataset."""
@@ -320,3 +413,15 @@ class ESM2nvModel(ESM1nvModel):
             dynamic_padding=self.cfg.data.dynamic_padding,
         ).collate_fn
         return dataloader
+
+    def setup_validation_data(self, cfg):
+        if hasattr(self, '_validation_ds'):
+            consumed_samples = 0
+            self._validation_dl = self.build_pretraining_data_loader(
+                self._validation_ds, consumed_samples, num_workers=0
+            )
+
+    def setup_test_data(self, cfg):
+        if hasattr(self, '_test_ds'):
+            consumed_samples = 0
+            self._test_dl = self.build_pretraining_data_loader(self._test_ds, consumed_samples, num_workers=0)

@@ -97,13 +97,17 @@ def get_data_overrides(script_or_cfg_path: str) -> str:
     elif model == 'esm2nv' and "infer" not in script:
         # TODO(dorotat) Simplify this case when data-related utils for ESM2 are refactored
         UNIREF_FOLDER = "uniref202104_esm2_qc_test200_val200"
+        MAIN = f'{DATA}.train.dataset_path={TEST_DATA_DIR}/%s'
         esm2_overwrites = (
-            MAIN % f'{UNIREF_FOLDER}/uf50' + f"{DATA}.cluster_mapping_tsv={TEST_DATA_DIR}/{UNIREF_FOLDER}/mapping.tsv"
-            f"{DATA}.index_mapping_dir={TEST_DATA_DIR}/{UNIREF_FOLDER}"
-            f"{DATA}.uf90.uniref90_path={TEST_DATA_DIR}/{UNIREF_FOLDER}/uf90/"
-            + DOWNSTREAM % f'{domain}/{task[domain]}'
+            MAIN % f'{UNIREF_FOLDER}/uf50'
+            + f"{DATA}.train.cluster_mapping_tsv={TEST_DATA_DIR}/{UNIREF_FOLDER}/mapping.tsv"
+            f"{DATA}.train.index_mapping_dir={TEST_DATA_DIR}/{UNIREF_FOLDER}"
+            f"{DATA}.train.uf90.uniref90_path={TEST_DATA_DIR}/{UNIREF_FOLDER}/uf90/"
+            f"{DATA}.val.dataset_path={TEST_DATA_DIR}/{UNIREF_FOLDER}/uf50/"
+            f"{DATA}.test.dataset_path={TEST_DATA_DIR}/{UNIREF_FOLDER}/uf50/" + DOWNSTREAM % f'{domain}/{task[domain]}'
         )
         return esm2_overwrites
+
     else:
         return (MAIN + DOWNSTREAM) % (domain, f'{domain}/{task[domain]}')
 

@@ -153,6 +153,8 @@ unit-test-pytest:
     - export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
     - bash ./examples/molecule/diffdock/scripts/download_data_sample.sh -data_path $BIONEMO_HOME/examples/tests/test_data/molecule/diffdock/ -pbss
     - bash ./examples/protein/openfold/scripts/download_data_sample.sh -data_path $BIONEMO_HOME/examples/tests/test_data/ -pbss
+    - echo "Checking test data contents..."
+    - ls examples/tests/test_data/uniref202104_esm2_qc_test200_val200
     - pytest -v --cov=bionemo --cov-report term --cov-report xml:coverage.xml -k "not test_model_training"
   coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
   artifacts:
