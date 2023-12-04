@@ -101,7 +101,7 @@ variables:
     NGC_CLI_FORMAT_TYPE
         NGC cli format. Default is ascii.  Run \`ngc config --help\` for details.
     GITLAB_TOKEN
-        gitlab access token, used when build container with wheels stored in gitlab registery
+        gitlab access token with api access, used when build container with wheels stored in gitlab registery
 
 EOF
     exit
@@ -126,6 +126,7 @@ NGC_CLI_API_KEY=${NGC_CLI_API_KEY:=NotSpecified}
 NGC_CLI_ORG=${NGC_CLI_ORG:=nvidian}
 NGC_CLI_TEAM=${NGC_CLI_TEAM:=NotSpecified}
 NGC_CLI_FORMAT_TYPE=${NGC_CLI_FORMAT_TYPE:=ascii}
+GITLAB_TOKEN=${GITLAB_TOKEN:=NotSpecified}
 
 
 # if $LOCAL_ENV file exists, source it to specify my environment
@@ -159,6 +160,7 @@ if [ $write_env -eq 1 ]; then
     echo NGC_CLI_ORG=${NGC_CLI_ORG} >> $LOCAL_ENV
     echo NGC_CLI_TEAM=${NGC_CLI_TEAM} >> $LOCAL_ENV
     echo NGC_CLI_FORMAT_TYPE=${NGC_CLI_FORMAT_TYPE} >> $LOCAL_ENV
+    echo GITLAB_TOKEN=${GITLAB_TOKEN} \# This needs to be created via your gitlab account as a personal access token with API access enabled. >> $LOCAL_ENV
 fi
 
 # Default paths for framework. We switch these depending on whether or not we are inside
@@ -263,6 +265,12 @@ build() {
     local IMG_NAME=($(echo ${BIONEMO_IMAGE} | tr ":" "\n"))
     local PACKAGE=0
     local CLEAN=0
+
+    if [[ "${GITLAB_TOKEN}" == "" || "${GITLAB_TOKEN}" == "NotSpecified" ]]; then
+      echo "ERROR: need to set GITLAB_TOKEN to build the docker image. Please see instructions at https://confluence.nvidia.com/display/CLD/Onboarding+Guide#OnboardingGuide-GitLabDockerRegistry"
+      exit 1
+    fi
+
 
     while [[ $# -gt 0 ]]; do
         case $1 in
