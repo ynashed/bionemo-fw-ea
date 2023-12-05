@@ -5,6 +5,7 @@ defaults:
 # The following scripts assumes MSA for each sequence will be generated offline. Template hits can be generated
 # dynamically, but this require additional software (HH-suite)
 
+force: false  # overwrite inference output
 restore_from_path: ${oc.env:BIONEMO_HOME}/models/protein/openfold/openfold.nemo  # user must provide a checkpoint to load
 results_path: ${oc.env:BIONEMO_HOME}/test_results/openfold_inference # a directory where all predictions are stored
 # either a list of sequences or a path to a FASTA file
@@ -17,6 +18,10 @@ seq_names: # Optional. If not provided, sequences will be named with consecutive
   - second_sequence
 
 model:
+  downstream_task:
+    outputs: []  # Optional features to dump for downstream tasks.
+    # Common options: single, msa, pair and sm_single.
+
   stage: finetuning
   precision: tf32 # TODO: this should be merged with trainer precision
   seed: 44

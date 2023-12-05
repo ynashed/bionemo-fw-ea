@@ -208,7 +208,7 @@ class PDBMMCIFPreprocess:
         self.original_dirpath.mkdir(exist_ok=True, parents=True)
 
         if any(self.original_dirpath.iterdir()) and not self.force:
-            raise Exception(
+            raise FileExistsError(
                 "Download directory is non-empty. Download aborted." "Use 'force' flag to override this behavior"
             )
 
@@ -265,7 +265,7 @@ class PDBMMCIFPreprocess:
 
         self.processed_dirpath.mkdir(exist_ok=True, parents=True)
         if any(self.processed_dirpath.iterdir()) and not self.force:
-            raise Exception(
+            raise FileExistsError(
                 "Processing directory is non-empty. Processing aborted. \
                              Use 'force' flag to override this behavior"
             )
@@ -349,10 +349,11 @@ class PDBMMCIFPreprocess:
             assert subdirname == preprocessing_log["subdirname"]
             preprocessing_logs.append(preprocessing_log)
 
-        output_fielpath = pdb_mmcif_dicts_dirpath / subdirname
+        output_filepath = pdb_mmcif_dicts_dirpath / subdirname
         if not self.force:
-            assert not output_fielpath.exists()
-        with open(output_fielpath, "wb") as f:
+            if output_filepath.exists():
+                raise FileExistsError(f'{output_filepath} already exists.')
+        with open(output_filepath, "wb") as f:
             pickle.dump(mmcif_dicts, f)
 
         preprocessing_logs_df = pd.DataFrame(preprocessing_logs)

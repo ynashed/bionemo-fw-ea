@@ -25,7 +25,7 @@ from bionemo.data.protein.openfold.datasets import PredictDataset
 from bionemo.data.protein.openfold.helpers import collate
 from bionemo.model.protein.openfold.checkpoint_utils import load_pt_checkpoint
 from bionemo.model.protein.openfold.openfold_model import AlphaFold
-from bionemo.model.protein.openfold.writer import PredictionPDBWriter
+from bionemo.model.protein.openfold.writer import PredictionFeatureWriter, PredictionPDBWriter
 from bionemo.model.utils import setup_trainer
 
 
@@ -40,8 +40,11 @@ def main(cfg) -> None:
 
     np.random.seed(cfg.model.seed)
     pl.seed_everything(cfg.model.seed)
-    writer = PredictionPDBWriter(cfg.results_path)
-    trainer = setup_trainer(cfg, callbacks=[writer])
+
+    writers = [PredictionPDBWriter(cfg.results_path, cfg.force)]
+    if cfg.model.downstream_task.outputs:
+        writers.append(PredictionFeatureWriter(cfg.results_path, cfg.model.downstream_task.outputs, cfg.force))
+    trainer = setup_trainer(cfg, callbacks=writers)
 
     if cfg.get('restore_from_path', None):
         alphafold = AlphaFold.restore_from(

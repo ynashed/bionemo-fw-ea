@@ -101,7 +101,7 @@ class TemplateHitFeaturizer:
         shuffling_seed: Optional[int] = None,
     ) -> dict:
         if len(template_hits) == 0:
-            return _create_empty_template_feats(len(query_sequence))
+            return create_empty_template_feats(len(query_sequence))
 
         prefiltered_template_hits = _prefilter_template_hits(
             template_hits=template_hits,
@@ -175,7 +175,7 @@ class TemplateHitFeaturizer:
             ):
                 template_features[key] = np.stack(template_features[key], axis=0)
         else:
-            template_features = _create_empty_template_feats(seqlen=len(query_sequence))
+            template_features = create_empty_template_feats(seqlen=len(query_sequence))
 
         if self.verbose:
             errors_str = f" errors: {errors}" if errors else ""
@@ -208,7 +208,7 @@ def _load_pdb_obsolete_mapping(pdb_obsolete_filepath: Path) -> Dict[str, str]:
     return mapping
 
 
-def _create_empty_template_feats(seqlen: int) -> dict:
+def create_empty_template_feats(seqlen: int) -> dict:
     return {
         "template_domain_names": [],
         "template_sequence": [],

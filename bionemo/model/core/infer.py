@@ -134,7 +134,7 @@ class BaseEncoderDecoderInference(LightningModule):
 
         # Validate input sequences length
         if any(len(t) > self.model.cfg.seq_length for t in token_ids):
-            raise Exception(f'One or more sequence exceeds max length({self.model.cfg.seq_length}).')
+            raise ValueError(f'One or more sequence exceeds max length({self.model.cfg.seq_length}).')
 
         # Pad token ids (1/True = Active, 0/False = Inactive)
         token_ids, mask = pad_token_ids(

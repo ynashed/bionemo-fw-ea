@@ -98,7 +98,7 @@ class OpenProteinSetPreprocess:
     def download(self):
         self.original_dirpath.mkdir(exist_ok=True, parents=True)
         if any(self.original_dirpath.iterdir()) and not self.force:
-            raise Exception(
+            raise FileExistsError(
                 "Download directory is non-empty. Processing aborted. \
                              Use 'force' flag to override this behavior"
             )
@@ -150,7 +150,7 @@ class OpenProteinSetPreprocess:
         logging.info(f"output uniclust30 targets shards will be saved to {output_uniclust30_targets_dirpath}")
 
         if any(output_uniclust30_targets_dirpath.iterdir()) and not self.force:
-            raise Exception(
+            raise FileExistsError(
                 "uniclust30_targets directory is non-empty. Processing aborted. \
                              Use 'force' flag to override this behavior"
             )
@@ -251,7 +251,7 @@ class OpenProteinSetPreprocess:
         logging.info(f"output pdb alignments shards will be saved to {output_pdb_alignments_dirpath}")
 
         if any(output_pdb_alignments_dirpath.iterdir()) and not self.force:
-            raise Exception(
+            raise FileExistsError(
                 "pdb_alignments directory is non-empty. Processing aborted. \
                              Use 'force' flag to override this behavior"
             )
@@ -297,8 +297,11 @@ class OpenProteinSetPreprocess:
         logging.info(f"len(pdb_alignments_super_index)={len(pdb_alignments_super_index)}")
 
         pdb_alignments_super_index_filepath = output_pdb_alignments_dirpath / "super.index"
-        if not self.force:
-            assert not pdb_alignments_super_index_filepath.exists()  # TODO: change to an exception
+        if not self.force and pdb_alignments_super_index_filepath.exists():
+            raise FileExistsError(
+                f"super.index found under {output_pdb_alignments_dirpath} but not forced. \
+                                    Processing aborted."
+            )
         with open(pdb_alignments_super_index_filepath, "w") as f:
             json.dump(pdb_alignments_super_index, f)
         logging.info(f"pdb alignments super index saved to {pdb_alignments_super_index_filepath} successfully!")
@@ -315,7 +318,7 @@ class OpenProteinSetPreprocess:
         output_uniclust30_alignments_dirpath = self.processed_dirpath / "uniclust30_alignments"
         output_uniclust30_alignments_dirpath.mkdir(exist_ok=True)
         if any(output_uniclust30_alignments_dirpath.iterdir()) and not self.force:
-            raise Exception(
+            raise FileExistsError(
                 "uniclust30_alignments directory is non-empty. Processing aborted. \
                              Use 'force' flag to override this behavior."
             )

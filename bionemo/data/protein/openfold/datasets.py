@@ -39,7 +39,7 @@ from bionemo.data.protein.openfold.helpers import datetime_from_string
 from bionemo.data.protein.openfold.mmcif import load_mmcif_chains_df, load_mmcif_dict
 from bionemo.data.protein.openfold.parsers import parse_fasta
 from bionemo.data.protein.openfold.protein import Protein
-from bionemo.data.protein.openfold.templates import TemplateHitFeaturizer
+from bionemo.data.protein.openfold.templates import TemplateHitFeaturizer, create_empty_template_feats
 from bionemo.data.protein.openfold.tools.hhsearch import HHSearch
 
 
@@ -558,30 +558,28 @@ class PredictDataset(Dataset):
         pdb_mmcif_dicts_dirpath: Path,
         pdb_obsolete_filepath: Path,
         sequences: Union[str, List[str]],
-        seq_names: Optional[List[str]],
+        seq_names: List[str],
         template_hhr_filepaths: Optional[List[List[Path]]],
         msa_a3m_filepaths: Optional[List[List[Path]]],
         generate_templates_if_missing: bool,
         pdb70_database_path: Optional[str],
         cfg: Union[DictConfig, Dict],
     ):
+        """Dataset class for AlphaFold inference.
+
+        Args:
+            pdb_mmcif_chains_filepath (Path): Path to pdb_mmcif chain database.
+            pdb_mmcif_dicts_dirpath (Path): Path to pdb_mmcif dict database.
+            pdb_obsolete_filepath (Path): Path to obsolete pdb database.
+            sequences (Union[str, List[str]]): Path to fasta or list of sequences in string.
+            seq_names (List[str]): List of sequence names
+            template_hhr_filepaths (Optional[List[List[Path]]]): Lists of paths to template hhr. One list per sequence.
+            msa_a3m_filepaths (Optional[List[List[Path]]]): Lists of paths to msa in a3m format. One list per sequence.
+            generate_templates_if_missing (bool): Generate template if none is given. Default to false.
+            pdb70_database_path: (Optional[str]): Path to pdb70 database.
+            cfg (Union[DictConfig, Dict]): AlphaFold model config.
+        """
         self.cfg = cfg
-
-        pdb_mmcif_chains_df = load_mmcif_chains_df(
-            mmcif_chains_filepath=pdb_mmcif_chains_filepath,
-            verbose=False,
-        )
-
-        self.template_hit_featurizer = TemplateHitFeaturizer(
-            max_template_hits=self.cfg.max_templates,
-            pdb_mmcif_dicts_dirpath=pdb_mmcif_dicts_dirpath,
-            template_pdb_chain_ids=set(pdb_mmcif_chains_df["pdb_chain_id"]),
-            pdb_release_dates={},
-            pdb_obsolete_filepath=pdb_obsolete_filepath,
-            shuffle_top_k_prefiltered=None,
-            realign_when_required=False,
-            verbose=False,
-        )
 
         if isinstance(sequences, str):
             # parse_fasta returns a  tuple (sequences, descriptions)
@@ -591,8 +589,8 @@ class PredictDataset(Dataset):
             self.sequences = sequences
 
         self.seq_names = seq_names
-        if self.seq_names and len(seq_names) != len(sequences):
-            raise Exception(
+        if self.seq_names is None or len(seq_names) != len(sequences):
+            raise ValueError(
                 'Each sequence must have a name if sequence names are provided.'
                 'Please check length of sequence list and how many names were provided.'
             )
@@ -600,8 +598,28 @@ class PredictDataset(Dataset):
         self.template_hhr_filepaths = template_hhr_filepaths
         self.generate_templates_if_missing = generate_templates_if_missing
         if self.generate_templates_if_missing:
+            if pdb70_database_path is None:
+                raise ValueError('User must provide pdb70_database_path if generate_templates_if_missing.')
             self.hhsearch_pdb70_runner = HHSearch(
                 databases=[pdb70_database_path],
+            )
+
+        # locate templates only if needed
+        if self.template_hhr_filepaths or self.generate_templates_if_missing:
+            pdb_mmcif_chains_df = load_mmcif_chains_df(
+                mmcif_chains_filepath=pdb_mmcif_chains_filepath,
+                verbose=False,
+            )
+
+            self.template_hit_featurizer = TemplateHitFeaturizer(
+                max_template_hits=self.cfg.max_templates,
+                pdb_mmcif_dicts_dirpath=pdb_mmcif_dicts_dirpath,
+                template_pdb_chain_ids=set(pdb_mmcif_chains_df["pdb_chain_id"]),
+                pdb_release_dates={},
+                pdb_obsolete_filepath=pdb_obsolete_filepath,
+                shuffle_top_k_prefiltered=None,
+                realign_when_required=False,
+                verbose=False,
             )
 
     def __len__(self):
@@ -640,15 +658,20 @@ class PredictDataset(Dataset):
             domain_name='description',  # TODO: is description required here?
         )
 
-        template_features = create_template_features(
-            sequence=sequence,
-            hhr_string=hhr_string,
-            template_hit_featurizer=self.template_hit_featurizer,
-            release_date="2999-12-31",
-            pdb_id=None,
-            days_before_release=0,
-            shuffling_seed=None,
-        )
+        if hhr_string:  # search template only when generate_if_missing or template hhr is given
+            template_features = create_template_features(
+                sequence=sequence,
+                hhr_string=hhr_string,
+                template_hit_featurizer=self.template_hit_featurizer,
+                release_date="2999-12-31",
+                pdb_id=None,
+                days_before_release=0,
+                shuffling_seed=None,
+            )
+        else:
+            logging.warning(f'No template hhr is given/found for sequence {idx}. Pass empty template features.')
+            seq_len = len(sequence_features['residue_index'])
+            template_features = create_empty_template_feats(seq_len)
 
         msa_features = create_msa_features(
             sequence=sequence,
