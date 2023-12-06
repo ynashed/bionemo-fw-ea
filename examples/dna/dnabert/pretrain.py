@@ -22,6 +22,7 @@ from omegaconf.omegaconf import OmegaConf
 from bionemo.data.preprocess.dna.preprocess import DNABERTPreprocess
 from bionemo.model.dna.dnabert import DNABERTModel
 from bionemo.model.utils import setup_trainer
+from bionemo.utils.connectors import BioNeMoSaveRestoreConnector
 
 
 @hydra_runner(config_path="conf", config_name="dnabert_config")
@@ -29,7 +30,22 @@ def main(cfg) -> None:
     logging.info("\n\n************** Experiment configuration ***********")
     logging.info(f'\n{OmegaConf.to_yaml(cfg)}')
 
-    if cfg.do_preprocess:
+    np.random.seed(cfg.model.seed)
+    pl.seed_everything(cfg.model.seed)
+
+    if cfg.do_training:
+        trainer = setup_trainer(cfg)
+        if cfg.restore_from_path:
+            logging.info("\nRestoring model from .nemo file " + cfg.restore_from_path)
+            model = DNABERTModel.restore_from(
+                cfg.restore_from_path, cfg.model, trainer=trainer, save_restore_connector=BioNeMoSaveRestoreConnector()
+            )
+        else:
+            model = DNABERTModel(cfg.model, trainer)
+        logging.info("************** Starting Training ***********")
+        trainer.fit(model)
+        logging.info("*************** Finish Training ************")
+    else:
         logging.info("************** Starting Preprocessing ***********")
 
         preprocessor = DNABERTPreprocess(
@@ -42,17 +58,6 @@ def main(cfg) -> None:
         preprocessor.preprocess()
 
         logging.info("*************** Finish Preprocessing ************")
-
-    np.random.seed(cfg.model.seed)
-    pl.seed_everything(cfg.model.seed)
-
-    trainer = setup_trainer(cfg)
-    model = DNABERTModel(cfg.model, trainer)
-
-    if cfg.do_training:
-        logging.info("************** Starting Training ***********")
-        trainer.fit(model)
-        logging.info("*************** Finish Training ************")
 
 
 if __name__ == '__main__':

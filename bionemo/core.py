@@ -231,11 +231,13 @@ class BioNeMoBertModel(MegatronBertModel):
             self._validation_dl = self.build_pretraining_data_loader(
                 self._validation_ds, consumed_samples, num_workers=0
             )
+            self.data_module.adjust_val_dataloader(self, self._validation_dl)
 
     def setup_test_data(self, cfg):
         if hasattr(self, '_test_ds'):
             consumed_samples = 0
             self._test_dl = self.build_pretraining_data_loader(self._test_ds, consumed_samples, num_workers=0)
+            self.data_module.adjust_test_dataloader(self, self._test_dl)
 
     @classmethod
     def list_available_models(cls):

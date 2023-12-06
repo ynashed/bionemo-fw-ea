@@ -23,14 +23,14 @@ trainer:
 
 exp_manager:
   explicit_log_dir: null
-  exp_dir: null
+  exp_dir: ${oc.env:BIONEMO_HOME}/results/nemo_experiments/${.name}/${.wandb_logger_kwargs.name}
   name: dnabert
   create_wandb_logger: False
   wandb_logger_kwargs:
     project: null
-    name: null
-    offline: True
-  resume_if_exists: False
+    name: dnabert-base
+    offline: False
+  resume_if_exists: True
   resume_ignore_no_checkpoint: True
   create_checkpoint_callback: True
   checkpoint_callback_params:

@@ -1,12 +1,12 @@
 defaults:
   - dnabert_base_config
 trainer:
-  devices: 1
-  val_check_interval: 100
+  devices: 2
+  val_check_interval: 1000
   max_steps: 100000 # consumed_samples = global_step * micro_batch_size * data_parallel_size * accumulate_grad_batches
 model:
   num_layers: 12
-  micro_batch_size: 4
+  micro_batch_size: 16
   pre_process: True # add embedding
   post_process: True # add pooler
   bert_binary_head: False # BERT binary head
