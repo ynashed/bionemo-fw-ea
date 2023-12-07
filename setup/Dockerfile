@@ -19,7 +19,6 @@
 #   - libstdcxx-ng=11.1.0=h56837e0_8
 #   - pycairo=1.20.1=py38hf61ee4a_0
 
-
 ARG BASE_IMAGE=nvcr.io/nvidia/nemo:23.06
 FROM ${BASE_IMAGE}
 
@@ -60,23 +59,21 @@ RUN dpkg -i ./code-server_4.4.0_amd64.deb && rm -f code-server_4.4.0_amd64.deb
 # Install extensions from the marketplace
 RUN code-server --install-extension ms-python.python
 
+ARG GITLAB_TOKEN
+
 COPY setup/requirements.txt /tmp/requirements.txt
-RUN pip3 install -r /tmp/requirements.txt
-COPY setup/requirements-linter.txt /tmp/requirements-linter.txt
-RUN pip3 install -r /tmp/requirements-linter.txt
+RUN pip install -r /tmp/requirements.txt
+# TODO: unnecessary for main container, move test+dev dep installation to dev only & update CI to use dev image
+COPY setup/requirements-test.txt /tmp/requirements-test.txt
+RUN pip install -r /tmp/requirements-test.txt
+COPY setup/requirements-dev.txt /tmp/requirements-dev.txt
+RUN pip install -r /tmp/requirements-dev.txt
+# end TODO
 
 # AWS CLI is inside requirements.txt. Add config file.
 # This config file does not contain access keys.
 RUN mkdir $HOME/.aws
 COPY setup/aws-config-swiftstack $HOME/.aws/config
-
-## Install PyG packages with pre-built wheel from gitlab registry
-ARG GITLAB_TOKEN
-ARG PIP_URL=https://__token__:${GITLAB_TOKEN}@gitlab-master.nvidia.com/api/v4/projects/65301/packages/pypi/simple
-RUN pip install torch_cluster==1.6.1 --index-url ${PIP_URL}
-RUN pip install torch_sparse==0.6.17 --index-url ${PIP_URL}
-RUN pip install torch-geometric==2.3.0 --index-url ${PIP_URL}
-RUN pip install torch-scatter==2.0.9 --index-url ${PIP_URL}
 
 ## Install NGC cli in container for artifact download
 ENV NGC_CLI_INSTALL_PREFIX=/usr/local/bin
@@ -92,9 +89,6 @@ RUN NEMO_PATH=$(python -c 'import nemo; print(nemo.__path__[0])') && \
    cd ${NEMO_PATH}/collections/nlp/data/language_modeling/megatron && \
    make
 
-RUN pip install -U --extra-index-url https://pypi.ngc.nvidia.com triton-model-navigator==0.7.3
-RUN pip install nvidia-pytriton==0.2.4
-
 #########################################################################################
 # BioNeMo Build
 #########################################################################################
@@ -106,10 +100,11 @@ ENV BIONEMO_HOME=${BIONEMO_HOME}
 RUN mkdir -p ${BIONEMO_HOME}
 
 # Copy the repo except the internal directory
-COPY LICENSE README.md artifact_paths download_models.sh launch.sh pytest.ini ${BIONEMO_HOME}/
+COPY LICENSE README.md artifact_paths download_models.sh launch.sh pytest.ini pyproject.toml ${BIONEMO_HOME}/
 COPY bionemo ${BIONEMO_HOME}/bionemo
 COPY docs ${BIONEMO_HOME}/docs
 COPY examples ${BIONEMO_HOME}/examples
+# TODO remove generated/ in !554
 COPY generated ${BIONEMO_HOME}/generated
 COPY hydra_plugins ${BIONEMO_HOME}/hydra_plugins
 COPY proto ${BIONEMO_HOME}/proto
@@ -121,6 +116,8 @@ COPY tokenizers ${BIONEMO_HOME}/tokenizers
 ARG NEMO_HOME
 ENV NEMO_HOME=${NEMO_HOME}
 
+# TODO remove generated/ in !554
+# TODO remove PYTHONPATH manipulation in !555
 ENV PYTHONPATH=${BIONEMO_HOME}:${BIONEMO_HOME}/generated:${NEMO_HOME}:$PYTHONPATH
 
 # TODO(trvachov): Remove after NeMo is upgraded to 1.21

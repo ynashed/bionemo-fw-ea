@@ -370,13 +370,13 @@ setup() {
     mkdir -p ${DATA_PATH}
     mkdir -p ${RESULT_PATH}
     mkdir -p ${MODEL_PATH}
-    DEV_PYTHONPATH=""
+    DEV_PYTHONPATH="" # TODO: remove once pyproject.toml setup MR is complete
 
     if [ ! -z "${NEMO_HOME}" ];
     then
         DOCKER_CMD="${DOCKER_CMD} -v ${NEMO_HOME}:/workspace/nemo "
         DOCKER_CMD="${DOCKER_CMD} --env NEMO_HOME=${NEMO_HOME} "
-        DEV_PYTHONPATH="${DEV_PYTHONPATH}:/workspace/nemo"
+        DEV_PYTHONPATH="${DEV_PYTHONPATH}:/workspace/nemo" # TODO: remove once pyproject.toml setup MR is complete
     fi
 
     # Note: For BIONEMO_HOME, if we are invoking docker, this should always be
@@ -404,10 +404,11 @@ setup() {
     if [[ $1 == "dev" ]]; then
         echo "Mounting ~/.ssh up for development"
         DOCKER_CMD="$DOCKER_CMD -v ${HOME}/.ssh:${HOME}/.ssh:ro"
-
+        # TODO: remove once pyproject.toml setup MR is complete
         echo "Prepending ${DOCKER_REPO_PATH} to PYTHONPATH for development"
         DEV_PYTHONPATH="${DOCKER_REPO_PATH}:${DOCKER_REPO_PATH}/generated:${DEV_PYTHONPATH}"
         DOCKER_CMD="${DOCKER_CMD} --env PYTHONPATH=${DEV_PYTHONPATH}"
+        # end TODO
     fi
 }
 

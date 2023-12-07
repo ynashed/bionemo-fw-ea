@@ -1,3 +1,5 @@
+--extra-index-url https://pypi.ngc.nvidia.com
+--extra-index-url "https://__token__:${GITLAB_TOKEN}@gitlab-master.nvidia.com/api/v4/projects/65301/packages/pypi/simple"
 pyfastx==1.1.0
 matplotlib==3.4.3
 pillow==9.3.0
@@ -7,16 +9,13 @@ ijson==3.2.3
 numpy==1.22.2
 wandb==0.15.6
 einops==0.6.1
-pytest-forked==1.6.0
 pyfaidx==0.7.2
 webdataset==0.2.33
 polars==0.16.7
 more_itertools==10.1.0
-pytest-dependency==0.5.1
-testbook==0.4.2
 git+https://github.com/prokotg/tfrecord@float16zlib
-requests_mock==1.11.0
 nvidia-pytriton==0.4.0
+triton-model-navigator==0.7.4
 git+https://github.com/NVIDIA/dllogger@v1.0.0#egg=dllogger
 POT==0.7.0
 dgllife==0.2.8
@@ -26,21 +25,21 @@ joblib==1.2.0
 dill==0.3.7
 biopython==1.79
 Pympler==1.0.1
-dacite==1.7.0
-ipdb==0.13.11
-pytest-cov==4.1.0
+dacite==1.8.1
+jupyterlab==2.3.2
+click==8.1.7
 # For SwiftStack access
 awscli==1.29.67
-# Linters
-ruff==0.0.292
-black==23.1.0
-pre-commit==3.4.0
 # diffdock
 biopandas==0.4.1
-biopython==1.79
 git+https://github.com/e3nn/e3nn.git@0.5.1
 rdkit-pypi==2022.9.5
 spyrmsd==0.5.2
 git+https://github.com/facebookresearch/esm.git@v2.0.0
-pytest-timeout==2.2.0
 click==8.1.7
+# note: these must either be built from source 
+# OR use the pre-built binaries on gitlab, which are compatible w/ bionemo's cuda version
+torch_cluster==1.6.1
+torch_sparse==0.6.17
+torch-geometric==2.3.0
+torch-scatter==2.0.9

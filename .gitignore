@@ -161,6 +161,15 @@ cifar-10-batches-py
 tests/.data
 tests/data
 **/openfold_data
+*.npz
+*.pkl
+examples/tests/test_data/
+nemo_experiments/
+
+# Devlopment
+navigator_workspace/
+.pdbhistory
+.lesshst
 
 # outputs folder
 examples/*/outputs
