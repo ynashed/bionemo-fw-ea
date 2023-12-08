@@ -29,6 +29,7 @@ from nemo.utils.app_state import AppState
 from nemo.utils.exp_manager import StatelessTimer, exp_manager
 from nemo.utils.model_utils import import_class_by_path
 from omegaconf import OmegaConf
+from omegaconf.dictconfig import DictConfig
 from omegaconf.omegaconf import open_dict
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelSummary
@@ -185,7 +186,7 @@ class TrainerBuilder:
             no_ddp_communication_hook=True,
             # Allocate gradients in a contiguous bucket to save memory (less fragmentation and buffer memory)
             gradient_as_bucket_view=cfg.model.get('gradient_as_bucket_view', True),
-            find_unused_parameters=False,
+            find_unused_parameters=cfg.model.get('find_unused_parameters', False),
         )
 
     @staticmethod
@@ -252,7 +253,7 @@ def setup_inference_trainer(cfg, builder=None, adjust_config=True):
     return setup_trainer(cfg, builder, adjust_config=adjust_config)
 
 
-def restore_model(restore_path, trainer=None, cfg=None, model_cls=None, adjust_config=True):
+def restore_model(restore_path, trainer=None, cfg=None, model_cls=None, adjust_config=True, strict=True):
     """Restore model from checkpoint"""
     logging.info(f"Restoring model from {restore_path}")
 
@@ -269,7 +270,7 @@ def restore_model(restore_path, trainer=None, cfg=None, model_cls=None, adjust_c
         return_config=True,
     )
     with open_dict(cfg):
-        cfg.model = OmegaConf.merge(restore_cfg, cfg.model)
+        cfg.model = OmegaConf.merge(restore_cfg, cfg.model) if hasattr(cfg, 'model') else restore_cfg
 
     # build trainer if not provided
     if trainer is None:
@@ -284,8 +285,51 @@ def restore_model(restore_path, trainer=None, cfg=None, model_cls=None, adjust_c
         trainer=trainer,
         override_config_path=cfg,
         save_restore_connector=NLPSaveRestoreConnector(),
+        strict=strict,
+    )
+    if cfg.get('load_from_checkpoint') is not None:
+        model.load_from_checkpoint(checkpoint_path=cfg.load_from_checkpoint, strict=strict)
+
+    return model
+
+
+def load_model_for_inference(cfg: DictConfig, strict: bool = True):
+    """load model with config for model inference. Freeze model and reconfigure DDP and batch size.
+
+    Args:
+        cfg (DictConfig): Omega config
+        strict (bool, optional): Whether to ignore non-matching keys when loading model, ignore if set to False. Defaults to True.
+
+    Returns:
+        Loaded model
+    """
+
+    # load model class from config which is required to load the .nemo file
+    model = restore_model(
+        restore_path=cfg.restore_from_path,
+        cfg=cfg,
+        strict=strict,
     )
 
+    # check whether the DDP is initialized
+    if parallel_state.is_unitialized():
+        logging.info("DDP is not initialized. Initializing...")
+
+        def dummy():
+            return
+
+        if model.trainer.strategy.launcher is not None:
+            model.trainer.strategy.launcher.launch(dummy, trainer=model.trainer)
+        model.trainer.strategy.setup_environment()
+    # Reconfigure microbatch sizes here because on model restore, this will contain the micro/global batch configuration used while training.
+    _reconfigure_microbatch_calculator(
+        rank=0,  # This doesn't matter since it is only used for logging
+        rampup_batch_size=None,
+        global_batch_size=1,
+        micro_batch_size=1,  # Make sure that there is no "grad acc" while decoding.
+        data_parallel_size=1,  # We check above to make sure that dataparallel size is always 1 at inference.
+    )
+    model.freeze()
     return model
 
 

@@ -28,7 +28,6 @@ from bionemo.model.molecule.diffdock.models.nemo_model import (
 from bionemo.model.molecule.diffdock.models.nemo_model import (
     DiffdockTensorProductScoreModelAllAtom as AAScoreModel,
 )
-from bionemo.model.molecule.diffdock.setup_trainer import DiffdockTrainerBuilder
 from bionemo.model.utils import setup_trainer
 from bionemo.utils.tests import (
     BioNemoSearchPathConfig,
@@ -96,7 +95,7 @@ def test_diffdock_fast_dev_run(tmp_directory, config_name, batch_sampler, tensor
         os.system(f"bash {TEST_DATA_DOWNLOAD_SCRIPT}")
 
     data_manager = DataManager(cfg)
-    trainer = setup_trainer(cfg, builder=DiffdockTrainerBuilder)
+    trainer = setup_trainer(cfg)
     if "all_atoms" in cfg.data and cfg.data.all_atoms:
         model = AAScoreModel(cfg=cfg, trainer=trainer, data_manager=data_manager)
     else:

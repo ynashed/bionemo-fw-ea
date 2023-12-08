@@ -35,6 +35,27 @@ from bionemo.model.molecule.diffdock.utils.diffusion import get_t_schedule
 from bionemo.model.molecule.diffdock.utils.diffusion import t_to_sigma as t_to_sigma_compl
 from bionemo.model.molecule.diffdock.utils.sampling import randomize_position, sampling
 from bionemo.model.molecule.diffdock.utils.visualise import PDBFile
+from bionemo.model.utils import (
+    load_model_for_inference,
+)
+
+
+class DiffDockModelInference(LightningModule):
+    """
+    Base class for inference.
+    """
+
+    def __init__(self, cfg):
+        super().__init__()
+        self.cfg = cfg
+        self.model = load_model_for_inference(cfg, strict=False)
+        # move self to same device as loaded model
+        self.to(self.model.device)
+        self._trainer = self.model.trainer
+
+    def forward(self, batch):
+        """Forward pass of the model"""
+        return self.model.model.net(batch)
 
 
 def do_inference_sampling(
@@ -63,6 +84,9 @@ def do_inference_sampling(
     Returns:
         Tuple[int, int]: Number of Failed cases, number of skipped cases
     """
+    model.eval()
+    if confidence_model is not None:
+        confidence_model.eval()
 
     for name in complex_name_list:
         write_dir = f'{cfg.out_dir}/{name}'

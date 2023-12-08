@@ -252,11 +252,6 @@ def safe_index(l, e):
 
 
 def parse_receptor(pdbid, pdbbind_dir):
-    rec = parsePDB(pdbid, pdbbind_dir)
-    return rec
-
-
-def parsePDB(pdbid, pdbbind_dir):
     rec_path = os.path.join(pdbbind_dir, pdbid, f'{pdbid}_protein_processed.pdb')
     return parse_pdb_from_path(rec_path)
 

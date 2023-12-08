@@ -240,6 +240,7 @@ class TensorProductScoreModel(torch.nn.Module):
                 residual=False,
                 dropout=dropout,
                 batch_norm=batch_norm,
+                batch_norm_with_shift=batch_norm_with_shift,
                 tp_type='e3nn',
             )
             self.tr_final_layer = nn.Sequential(
@@ -274,6 +275,7 @@ class TensorProductScoreModel(torch.nn.Module):
                     residual=False,
                     dropout=dropout,
                     batch_norm=batch_norm,
+                    batch_norm_with_shift=batch_norm_with_shift,
                     tp_type='e3nn',
                 )
                 self.tor_final_layer = nn.Sequential(

@@ -23,8 +23,7 @@ from omegaconf.omegaconf import OmegaConf
 from torch_geometric.seed import seed_everything
 
 from bionemo.data.diffdock.inference import build_inference_datasets
-from bionemo.model.molecule.diffdock.setup_trainer import DiffDockModelInference
-from bionemo.model.molecule.diffdock.utils.inference import do_inference_sampling
+from bionemo.model.molecule.diffdock.infer import DiffDockModelInference, do_inference_sampling
 
 
 @hydra_runner(config_path="conf", config_name="infer")
@@ -41,12 +40,10 @@ def main(cfg) -> None:
 
     # load score model
     model = DiffDockModelInference(cfg.score_infer)
-    model.eval()
 
     # load confidence model
-    if cfg.confidence_infer is not None:
+    if 'confidence_infer' in cfg:
         confidence_model = DiffDockModelInference(cfg.confidence_infer)
-        confidence_model.eval()
     else:
         confidence_model = None
 

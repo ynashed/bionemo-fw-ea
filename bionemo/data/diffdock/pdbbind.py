@@ -22,8 +22,10 @@ import pickle
 import random
 from collections import defaultdict
 from concurrent import futures
+from contextlib import contextmanager
 from functools import lru_cache
-from multiprocessing import Pool, set_start_method
+from multiprocessing import Pool, get_start_method, set_start_method
+from typing import Literal, Optional
 
 import numpy as np
 import torch
@@ -129,6 +131,29 @@ class NoiseTransform(BaseTransform):
         return data
 
 
+@contextmanager
+def ForkingBehavior(
+    *,
+    start_method: Literal['spawn', 'fork', 'forkserver'],
+    force: bool,
+):
+    """Contextmanager to set the method for starting child processes in multiprocessing.
+    Refer to https://docs.python.org/3/library/multiprocessing.html#multiprocessing.set_start_method
+
+    Args:
+        start_method (Literal['spawn', 'fork', 'forkserver']): multiprocessing start method to use in the context
+        force (bool): Raises RuntimeError if the start method has already been set and force is not True.
+                      If start_method is None and force is True then the start method is set to None.
+                      If start_method is None and force is False then the context is set to the default context.
+    """
+    prev_start_method = get_start_method()
+    set_start_method(start_method, force=force)
+    try:
+        yield
+    finally:
+        set_start_method(prev_start_method, force=True)
+
+
 class PDBBind(Dataset):
     def __init__(
         self,
@@ -178,17 +203,39 @@ class PDBBind(Dataset):
         self.atom_radius, self.atom_max_neighbors = atom_radius, atom_max_neighbors
         self.chunk_size = chunk_size
 
-        self.full_cache_path = self.get_heterograph_cache_path(cache_path)
+        self.heterograph_store: Optional[HeterographStore] = None
+        self.full_cache_path = self.heterograph_cache_path(cache_path)
         if not os.path.exists(os.path.join(self.full_cache_path, "heterographs.sqlite3")):
-            local_rank = get_rank()
-            if local_rank == 0:
-                os.makedirs(self.full_cache_path, exist_ok=True)
-                if self.protein_path_list is None or self.ligand_descriptions is None:
-                    self.preprocessing()
+            self.complex_graphs_ready = False
+            # self.build_complex_graphs():
+        else:
+            self.complex_graphs_ready = True
 
-        self.heterograph_store = HeterographStore(os.path.join(self.full_cache_path, "heterographs.sqlite3"))
+    def build_complex_graphs(self):
+        local_rank = get_rank()
+        if local_rank == 0:
+            os.makedirs(self.full_cache_path, exist_ok=True)
+        if not os.path.exists(os.path.join(self.full_cache_path, "heterographs.sqlite3")):
+            if self.protein_path_list is None or self.ligand_descriptions is None:
+                self.preprocessing()
+                self.complex_graphs_ready = True
+        else:
+            logging.warning(
+                "Trying to call build scorec complex graph dataset, "
+                f"but cached file is here {self.confidence_cache_store_path}. "
+                "skip dataset building, if it is intended, remove the cached file."
+            )
+            self.complex_graphs_ready = True
 
-    def get_heterograph_cache_path(self, cache_path):
+    def load_complex_graphs(self):
+        if self.complex_graphs_ready:
+            self.heterograph_store = HeterographStore(os.path.join(self.full_cache_path, "heterographs.sqlite3"))
+        else:
+            raise RuntimeError(
+                f"Failed to load cached heterographs.sqlite3 file in this folder {self.full_cache_path}"
+            )
+
+    def heterograph_cache_path(self, cache_path):
         full_cache_path = make_cache_path(
             cache_path=cache_path,
             split_path=self.split_path,
@@ -218,55 +265,52 @@ class PDBBind(Dataset):
         return complex_graph
 
     def preprocessing(self):
-        set_start_method('spawn', force=True)
-        logging.info(
-            f"[preprocessing] processing complexes from [{self.split_path}] and saving it to [{self.full_cache_path}]"
-        )
-        logging.info(f"[preprocessing] reading complexes from split file {self.split_path}")
-        complex_names_all = read_strings_from_txt(self.split_path)
-        if self.limit_complexes is not None and self.limit_complexes != 0:
-            complex_names_all = complex_names_all[: self.limit_complexes]
-
-        num_cores = multiprocessing.cpu_count()
-        if self.num_workers < num_cores:
-            logging.info(f"num_workers < num_cores: {self.num_workers} < {num_cores}")
-
-        if self.esm_embeddings_path is not None:
+        with ForkingBehavior(start_method="spawn", force=True):
             logging.info(
-                f"[preprocessing] loading {len(complex_names_all)} complexes with {self.num_workers} threads."
+                f"[preprocessing] processing complexes from [{self.split_path}] and saving it to [{self.full_cache_path}]"
             )
-            chain_embeddings_dictlist = defaultdict(list)
+            logging.info(f"[preprocessing] reading complexes from split file {self.split_path}")
+            complex_names_all = read_strings_from_txt(self.split_path)
+            if self.limit_complexes is not None and self.limit_complexes != 0:
+                complex_names_all = complex_names_all[: self.limit_complexes]
 
-            def _pattern_search(complex_name):
-                emb_store = EmbeddingStore(db_path=self.esm_embeddings_path)
-                result = emb_store.search(complex_name)
-                result = [pickle.loads(x[1]) for x in result]
-                chain_embeddings_dictlist[complex_name] = result
-                emb_store.conn.close()
+            num_cores = multiprocessing.cpu_count()
+            if self.num_workers < num_cores:
+                logging.info(f"num_workers < num_cores: {self.num_workers} < {num_cores}")
 
-            with futures.ThreadPoolExecutor(max_workers=self.num_workers) as executor:
-                executor.map(_pattern_search, complex_names_all)
-            lm_embeddings_chains_all = []
-            for name in complex_names_all:
-                lm_embeddings_chains_all.append(chain_embeddings_dictlist[name])
-        else:
-            lm_embeddings_chains_all = [None] * len(complex_names_all)
+            if self.esm_embeddings_path is not None:
+                logging.info(
+                    f"[preprocessing] loading {len(complex_names_all)} complexes with {self.num_workers} threads."
+                )
+                chain_embeddings_dictlist = defaultdict(list)
 
-        chunk_size = len(complex_names_all) // (self.num_workers * self.chunk_size)
-        chunks = math.ceil(len(complex_names_all) / chunk_size)
-        complex_chunks = [complex_names_all[chunk_size * i : chunk_size * (i + 1)] for i in range(chunks)]
-        lm_chunks = [lm_embeddings_chains_all[chunk_size * i : chunk_size * (i + 1)] for i in range(chunks)]
+                def _pattern_search(complex_name):
+                    emb_store = EmbeddingStore(db_path=self.esm_embeddings_path)
+                    result = emb_store.search(complex_name)
+                    result = [pickle.loads(x[1]) for x in result]
+                    chain_embeddings_dictlist[complex_name] = result
+                    emb_store.conn.close()
 
-        p = Pool(self.num_workers)
-        p.__enter__()
-        map_fn = p.imap_unordered if self.num_workers > 1 else map
-        logging.info(f"Computing for {len(complex_names_all)} complexes...")
-        total = 0
-        for lig_cnt, _ in map_fn(self.get_complex, zip(complex_chunks, lm_chunks)):
-            total += lig_cnt
-        logging.info(f"Total processed complexes: {total}")
-        p.__exit__(None, None, None)
-        set_start_method('fork', force=True)
+                with futures.ThreadPoolExecutor(max_workers=self.num_workers) as executor:
+                    executor.map(_pattern_search, complex_names_all)
+                lm_embeddings_chains_all = []
+                for name in complex_names_all:
+                    lm_embeddings_chains_all.append(chain_embeddings_dictlist[name])
+            else:
+                lm_embeddings_chains_all = [None] * len(complex_names_all)
+
+            chunk_size = len(complex_names_all) // (self.num_workers * self.chunk_size)
+            chunks = math.ceil(len(complex_names_all) / chunk_size)
+            complex_chunks = [complex_names_all[chunk_size * i : chunk_size * (i + 1)] for i in range(chunks)]
+            lm_chunks = [lm_embeddings_chains_all[chunk_size * i : chunk_size * (i + 1)] for i in range(chunks)]
+
+            with Pool(self.num_workers) as p:
+                map_fn = p.imap_unordered if self.num_workers > 1 else map
+                logging.info(f"Computing for {len(complex_names_all)} complexes...")
+                total = 0
+                for lig_cnt, _ in map_fn(self.get_complex, zip(complex_chunks, lm_chunks)):
+                    total += lig_cnt
+                logging.info(f"Total processed complexes: {total}")
 
     def get_complex(self, par):
         names, lm_embedding_chains = par

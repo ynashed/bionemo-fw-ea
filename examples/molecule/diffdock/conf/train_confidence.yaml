@@ -4,6 +4,7 @@ defaults:
 
 name: ConfidenceModel
 do_embedding_preprocessing: False # prepares PDB files to ESM embeddings needed for training.
+do_preprocessing: False # prepare the complex graphs needed for training as input.
 do_training: True # set to false if data preprocessing steps must be completed
 do_testing: False # set to true to run evaluation on test data after training, requires test_dataset section
 seed: 42
@@ -123,6 +124,9 @@ model:
   # model-specific control
   inference_earlystop_metric: 'loss' # Metric to track for early stopping. Mostly [loss, accuracy, ROC AUC], # main_metric
   inference_earlystop_goal: 'min' # can be ['min', 'max'] # main_metric_goal
+  find_unused_parameters: True # the model has certain parameters may not be used during training in some batches
+                               # set to True so for multi-gpu training, if unused parameters are found, the gradient Reducer will only wait for unready parameters
+                               # refer to https://pytorch.org/docs/stable/notes/ddp.html for more details.
 
   optim:
     name: fused_adam # fused optimizers used by model

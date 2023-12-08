@@ -7,6 +7,7 @@ training_data:
   chain_cutoff: 10
 name: diffdock_score_training_test
 do_embedding_preprocessing: false
+do_preprocessing: false
 do_training: true
 do_testing: false
 seed: 0
@@ -122,6 +123,7 @@ model:
   num_denoising_inference_complexes: 500
   inference_earlystop_metric: valinf_rmsds_lt2
   inference_earlystop_goal: max
+  find_unused_parameters: true
   optim:
     name: fused_adam
     lr: 0.001

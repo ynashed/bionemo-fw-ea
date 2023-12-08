@@ -143,7 +143,7 @@ class ConfidenceDataset(Dataset):
             self.complex_graphs_ready = False
             # self.build_complex_graphs()
         else:
-            self.load_complex_graphs()
+            self.complex_graphs_ready = True
 
         self.full_cache_path = os.path.join(
             cache_path,
@@ -159,7 +159,7 @@ class ConfidenceDataset(Dataset):
             self.confidence_dataset_ready = False
             # self.build_confidence_dataset()
         else:
-            self.load_confidence_dataset()
+            self.confidence_dataset_ready = True
 
     def len(self):
         return len(self.dataset_names)
@@ -169,7 +169,7 @@ class ConfidenceDataset(Dataset):
         split = self.split
         if not os.path.exists(self.complex_graphs_cache_sqlite_path):
             logging.info(f"Create complex graph dataset: {self.complex_graphs_cache_sqlite_path}.")
-            PDBBind(
+            pdbbind = PDBBind(
                 transform=None,
                 root=cfg.data_dir,
                 limit_complexes=cfg.limit_complexes,
@@ -191,7 +191,14 @@ class ConfidenceDataset(Dataset):
                 num_workers=cfg.num_workers,
                 chunk_size=cfg.chunk_size,
             )
-            self.load_complex_graphs()
+            pdbbind.build_complex_graphs()
+            self.complex_graphs_ready = True
+        else:
+            logging.warning(
+                "Trying to call build confidence complex graph dataset, "
+                f"but cached file is here {self.complex_graphs_cache_sqlite_path}. "
+                "skip dataset building, if it is intended, remove the cached file."
+            )
             self.complex_graphs_ready = True
 
     def load_complex_graphs(self):
@@ -206,9 +213,18 @@ class ConfidenceDataset(Dataset):
         if not os.path.exists(self.confidence_cache_store_path) and self.cache_creation_id is None:
             logging.info(f"Create confidence dataset: {self.confidence_cache_store_path}.")
             self.preprocessing(score_model)
-            self.load_confidence_dataset()
+            self.confidence_dataset_ready = True
+        else:
+            logging.warning(
+                "Trying to call build confidence dataset with ligand poses, "
+                f"but cached file is here {self.confidence_cache_store_path}. "
+                "skip dataset building, if it is intended, remove the cached file."
+            )
+            self.confidence_dataset_ready = True
 
     def load_confidence_dataset(self):
+        self.load_complex_graphs()
+
         limit_complexes = self.limit_complexes
         samples_per_complex = self.samples_per_complex
         generated_rmsd_complex_names, self.full_ligand_positions, self.rmsds = (

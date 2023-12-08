@@ -24,6 +24,7 @@ score_infer:
     precision: 32
 name: diffdock_confidence_training_test
 do_embedding_preprocessing: false
+do_preprocessing: false
 do_training: true
 do_testing: false
 seed: 0
@@ -130,6 +131,7 @@ model:
     no_torsion: false
   inference_earlystop_metric: loss
   inference_earlystop_goal: min
+  find_unused_parameters: true
   optim:
     name: fused_adam
     lr: 0.001

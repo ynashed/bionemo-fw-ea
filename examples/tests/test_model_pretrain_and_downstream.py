@@ -39,7 +39,6 @@ from bionemo.model.molecule.diffdock.models.nemo_model import (
 from bionemo.model.molecule.diffdock.models.nemo_model import (
     DiffdockTensorProductScoreModelAllAtom as DiffdockConfidenceModel,
 )
-from bionemo.model.molecule.diffdock.setup_trainer import DiffdockTrainerBuilder
 from bionemo.model.molecule.megamolbart import FineTuneMegaMolBART, MegaMolBARTModel, MegaMolBARTRetroModel
 from bionemo.model.protein.downstream import FineTuneProteinModel
 from bionemo.model.protein.equidock.equidock_model import EquiDock
@@ -236,9 +235,7 @@ def test_model_size(prepend_config_path, config_name, model_class, model_paramet
         model = model_class(cfg, trainer)
     elif model_class == DiffdockScoreModel or model_class == DiffdockConfidenceModel:
         data_manager = DiffdockDataManagers(cfg)
-        trainer = setup_trainer(cfg, builder=DiffdockTrainerBuilder)
         model = model_class(cfg=cfg, trainer=trainer, data_manager=data_manager)
-
     elif model_class == EquiDock:
         data_manager = DataManager(cfg)
         cfg.model.input_edge_feats_dim = data_manager.train_ds[0][0].edata['he'].shape[1]
@@ -277,7 +274,6 @@ def test_model_training(prepend_config_path, config_name, model_class, correct_r
         torch.use_deterministic_algorithms(True, warn_only=True)
         torch.backends.cudnn.benchmark = False
         data_manager = DiffdockDataManagers(cfg)
-        trainer = setup_trainer(cfg, builder=DiffdockTrainerBuilder)
         model = model_class(cfg=cfg, trainer=trainer, data_manager=data_manager)
     elif model_class == EquiDock:
         data_manager = DataManager(cfg)

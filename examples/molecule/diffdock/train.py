@@ -34,7 +34,6 @@ from bionemo.model.molecule.diffdock.models.nemo_model import (
 from bionemo.model.molecule.diffdock.models.nemo_model import (
     DiffdockTensorProductScoreModelAllAtom as AAScoreModel,
 )
-from bionemo.model.molecule.diffdock.setup_trainer import DiffdockTrainerBuilder
 from bionemo.model.utils import setup_trainer
 
 
@@ -61,25 +60,25 @@ def main(cfg) -> None:
         prep_embedding(cfg.training_data)
 
     data_manager = DataManager(cfg)
-    trainer = setup_trainer(cfg, builder=DiffdockTrainerBuilder)
+    if cfg.do_preprocessing:
+        logging.info("************** Starting Complex Graph PreProcessing ***********")
+        data_manager.preprocess()
 
-    if "all_atoms" in cfg.data and cfg.data.all_atoms:
-        model = AAScoreModel(cfg=cfg, trainer=trainer, data_manager=data_manager)
-    else:
-        model = CGScoreModel(cfg=cfg, trainer=trainer, data_manager=data_manager)
+    if cfg.do_training and data_manager.datasets_ready:
+        trainer = setup_trainer(cfg)
 
-    if cfg.model.confidence_mode:
-        logging.info(">>> Configured Confidence Model ...")
-    else:
-        logging.info(">>> Configured Score Model ...")
+        if "all_atoms" in cfg.data and cfg.data.all_atoms:
+            model = AAScoreModel(cfg=cfg, trainer=trainer, data_manager=data_manager)
+        else:
+            model = CGScoreModel(cfg=cfg, trainer=trainer, data_manager=data_manager)
 
-    if cfg.do_training:
+        if cfg.model.confidence_mode:
+            logging.info(">>> Configured Confidence Model ...")
+        else:
+            logging.info(">>> Configured Score Model ...")
+
         logging.info("************** Starting Training ***********")
         trainer.fit(model)
-
-    if cfg.do_testing:
-        logging.info("************** Starting Testing ***********")
-        trainer.test(model)
 
 
 if __name__ == "__main__":

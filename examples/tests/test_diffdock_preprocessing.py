@@ -32,7 +32,7 @@ from bionemo.data.diffdock.embedding_preprocess import prep_embedding
 from bionemo.data.diffdock.embedding_store import EmbeddingStore
 from bionemo.data.diffdock.heterograph_store import HeterographStore
 from bionemo.data.diffdock.pdbbind import diffdock_build_dataset
-from bionemo.model.molecule.diffdock.setup_trainer import DiffDockModelInference
+from bionemo.model.molecule.diffdock.infer import DiffDockModelInference
 from bionemo.model.molecule.diffdock.utils.diffusion import t_to_sigma as t_to_sigma_compl
 from bionemo.utils.tests import (
     BioNemoSearchPathConfig,
@@ -109,7 +109,8 @@ def test_diffdock_prepare_score_dataset(tmp_directory, config_name):
 
     t_to_sigma = partial(t_to_sigma_compl, cfg=cfg.model)
 
-    diffdock_build_dataset(cfg.model.train_ds, t_to_sigma, _num_conformers=True, mode="train")
+    dataset = diffdock_build_dataset(cfg.model.train_ds, t_to_sigma, _num_conformers=True, mode="train")
+    dataset.build_complex_graphs()
 
     assert os.path.isfile(
         os.path.join(cfg.model.train_ds.cache_path, cfg.train_graph_folder_name, 'heterographs.sqlite3')
@@ -152,8 +153,7 @@ def test_diffdock_prepare_confidence_dataset(tmp_directory, config_name):
     seed_everything(cfg.seed)
 
     dataset = diffdock_confidence_dataset(cfg.model.train_ds, mode="train")
-    if not dataset.complex_graphs_ready:
-        dataset.build_complex_graphs()
+    dataset.build_complex_graphs()
 
     assert os.path.isfile(
         os.path.join(cfg.model.train_ds.cache_path, cfg.train_graph_folder_name, 'heterographs.sqlite3')
@@ -189,10 +189,9 @@ def test_diffdock_prepare_confidence_dataset(tmp_directory, config_name):
                     torch.tensor(getattr(sample[key], attr)), torch.tensor(getattr(ref_sample[key], attr)), atol=0.01
                 ), f"{key}.{attr} is wrong"
 
-    if not dataset.confidence_dataset_ready:
-        score_model = DiffDockModelInference(cfg.score_infer)
-        score_model.eval()
-        dataset.build_confidence_dataset(score_model)
+    score_model = DiffDockModelInference(cfg.score_infer)
+    score_model.eval()
+    dataset.build_confidence_dataset(score_model)
 
     assert os.path.isfile(
         os.path.join(cfg.model.train_ds.cache_path, cfg.ligand_pose_folder_name, 'confidence_cache_id_base.sqlite3')

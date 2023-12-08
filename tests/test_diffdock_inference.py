@@ -26,8 +26,7 @@ from pytorch_lightning import seed_everything
 from rdkit import Chem
 
 from bionemo.data.diffdock.inference import build_inference_datasets
-from bionemo.model.molecule.diffdock.setup_trainer import DiffDockModelInference
-from bionemo.model.molecule.diffdock.utils.inference import do_inference_sampling
+from bionemo.model.molecule.diffdock.infer import DiffDockModelInference, do_inference_sampling
 from bionemo.utils.tests import (
     BioNemoSearchPathConfig,
     check_model_exists,
