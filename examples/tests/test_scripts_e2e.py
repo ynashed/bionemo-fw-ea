@@ -43,6 +43,7 @@ DIRS_TO_TEST = [
     'examples/protein/esm2nv/',
     'examples/protein/prott5nv/',
     'examples/protein/openfold/',
+    'examples/molecule/diffdock/',
 ]
 
 TRAIN_SCRIPTS = []
@@ -75,6 +76,7 @@ def get_data_overrides(script_or_cfg_path: str) -> str:
         'prott5nv',
         'downstream',
         'openfold',
+        'diffdock',
     ), 'update this function, patterns might be wrong'
 
     task = {
@@ -92,6 +94,13 @@ def get_data_overrides(script_or_cfg_path: str) -> str:
         return MAIN % 'reaction'
     elif model == 'openfold':
         return MAIN % 'openfold_data'
+    elif model == 'diffdock':
+        return (
+            f' ++data.split_train={TEST_DATA_DIR}/molecule/diffdock/splits/timesplit_no_lig_overlap_train'
+            + f' ++data.split_val={TEST_DATA_DIR}/molecule/diffdock/splits/timesplit_no_lig_overlap_val'
+            + f' ++data.split_test={TEST_DATA_DIR}/molecule/diffdock/splits/timesplit_test'
+            + f' ++data.cache_path={TEST_DATA_DIR}/molecule/diffdock/data_cache'
+        )
     elif 'downstream' in script:
         return MAIN % f'{domain}/{task[domain]}'
     elif model == 'esm2nv' and "infer" not in script:
@@ -122,6 +131,12 @@ def get_train_args_overrides(script_or_cfg_path, train_args):
         train_args['model.train_sequence_crop_size'] = 32
         # do not use kalign as it requires third-party-download and it not essential for testing
         train_args['model.data.realign_when_required'] = False
+    elif model == "diffdock":
+        # Use size aware batch sampler, and set the size control to default
+        train_args['model.micro_batch_size'] = 2
+        train_args['model.estimate_memory_usage.maximal'] = 'null'
+        train_args['model.max_total_size'] = 'null'
+
     return train_args
 
 
@@ -142,13 +157,18 @@ def test_train_scripts(script_path, train_args, data_args, tmp_path):
     assert process_handle.returncode == 0, f"Command failed:\n{cmd}\n Error log:\n{error_out}"
 
 
-def get_infer_args_overrides(config_path):
+def get_infer_args_overrides(config_path, tmp_path):
     if 'openfold' in config_path:
         return {
             # cropped 7YVT_B  # cropped 7ZHL
             # predicting on longer sequences will result in CUDA OOM.
             # TODO: if preparing MSA is to be tested, the model has to be further scaled down
             'sequences': r"\['GASTATVGRWMGPAEYQQMLDTGTVVQSSTGTTHVAYPAD','MTDSIKTLSAHRSFGGVQHFHEHASREIGLPMRFAAYLPP'\]"
+        }
+    if 'diffdock' in config_path:
+        return {
+            # save the inference results to tmp_path.
+            'out_dir': f'{tmp_path}',
         }
     return {}
 
@@ -159,7 +179,7 @@ def get_infer_args_overrides(config_path):
 def test_infer_script(config_path, tmp_path):
     config_dir, config_name = os.path.split(config_path)
     script_path = os.path.join(os.path.dirname(config_dir), 'infer.py')
-    infer_args = get_infer_args_overrides(config_path)
+    infer_args = get_infer_args_overrides(config_path, tmp_path)
     if not os.path.exists(script_path):
         script_path = 'examples/infer.py'
     cmd = (
