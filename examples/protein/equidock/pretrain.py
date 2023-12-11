@@ -56,6 +56,7 @@ def main(cfg) -> None:
     val_cfg = cfg.model.validation_ds
 
     if not cfg.do_training:
+        # preprocessing the original raw data in EquiDock repo
         logging.info("\n Preprocessing validation dataset!")
         logging.info(f"\n{OmegaConf.to_yaml(val_cfg)}")
         preprocess(val_cfg)
@@ -103,8 +104,6 @@ def main(cfg) -> None:
 
         if cfg.do_testing:
             logging.info(f"***** Testing dataset {cfg.data.data_name} ***** ")
-            model = model.load_from_checkpoint(trainer.checkpoint_callback.best_model_path)
-            model.reload_nemo_model(cfg, trainer, data_manager)
             trainer.test(model, verbose=True)
 
 

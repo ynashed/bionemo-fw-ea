@@ -87,6 +87,7 @@ def test_rmsds(data_name):
     cfg.data.data_name = data_name
     # Set number of devices to 1 to be compatible with testing infra
     cfg.trainer.devices = 1
+    cfg.exp_manager.exp_dir = None
 
     model = EquiDockInference(cfg=cfg)
     model.eval()
