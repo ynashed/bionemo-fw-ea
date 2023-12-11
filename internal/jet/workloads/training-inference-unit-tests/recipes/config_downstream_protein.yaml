@@ -30,18 +30,18 @@ spec:
   extra_overwrites: ""
   script: |-
     cd {BIONEMO_HOME}
-    export NGC_CLI_ORG={NGC_CLI_ORG} 
-    export NGC_CLI_TEAM={NGC_CLI_TEAM} 
-    export NGC_CLI_FORMAT_TYPE={NGC_CLI_FORMAT_TYPE} 
+    export NGC_CLI_ORG={NGC_CLI_ORG}
+    export NGC_CLI_TEAM={NGC_CLI_TEAM}
+    export NGC_CLI_FORMAT_TYPE={NGC_CLI_FORMAT_TYPE}
     export MODEL_PATH={MODEL_PATH}
     if [ "$SLURM_LOCALID" = "0" ]; then
-      source download_models.sh && download_bionemo_models;
+      python download_models.py megamolbart esm1nv esm2nv_650m esm2nv_3b prott5nv --download_dir ${MODEL_PATH}
       touch .download-finished;
     else
       until [ -f .download-finished ]; do
         sleep 5;
       done
-    fi  
+    fi
     python examples/{domain}/downstream/{variant}.py --config-path {BIONEMO_HOME}/{config_path} --config-name {config_name} \
     trainer.num_nodes={nodes} trainer.devices={gpus} trainer.precision={precision} model.micro_batch_size={batch_size} \
     {default_overwrites} {extra_overwrites} hydra.searchpath=[file://{BIONEMO_HOME}/examples/{domain}/{model}/conf] \

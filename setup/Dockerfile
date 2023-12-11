@@ -100,7 +100,7 @@ ENV BIONEMO_HOME=${BIONEMO_HOME}
 RUN mkdir -p ${BIONEMO_HOME}
 
 # Copy the repo except the internal directory
-COPY LICENSE README.md artifact_paths download_models.sh launch.sh pytest.ini pyproject.toml ${BIONEMO_HOME}/
+COPY LICENSE README.md artifact_paths.yaml download_models.py launch.sh pytest.ini pyproject.toml ${BIONEMO_HOME}/
 COPY bionemo ${BIONEMO_HOME}/bionemo
 COPY docs ${BIONEMO_HOME}/docs
 COPY examples ${BIONEMO_HOME}/examples

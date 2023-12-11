@@ -188,7 +188,7 @@ The configs of the tests that are supplied to JET CI can be found in JET Workloa
 The tests in JET can be only run for a model that is implemented in a specified BioNeMo's container.
 The python method `internal/jet/run_jet_downstream_pipeline.py` allows to run the test for a single model from the command line.
 It requires [JET API](https://gitlab-master.nvidia.com/dl/jet/api) to be installed. It uses as a default test template config, the JET reference [bionemo/new-model-dev](https://gitlab-master.nvidia.com/dl/jet/workloads-registry/-/blob/bionemo/new-model-dev/recipes/config.yaml) with default container set to `dev-latest-devel`.
-During the testing, models checkpoints are downloaded to NGC under `/model` in the docker container by executing `source download_models.sh && download_bionemo_models` before the python script.
+During the testing, models checkpoints are downloaded to NGC under `/model` in the docker container by executing `python download_models.py all --download_dir $MODEL_PATH` before the python script.
 
 ### Defining tests
 See the docstrings of `internal/jet/run_jet_downstream_pipeline.py` for more info about its arguments. The most important ones for building a training script and specifying tested cases are:
@@ -396,7 +396,7 @@ export NGC_CLI_ORG=nvidian
 export NGC_CLI_TEAM=clara-lifesciences
 export NGC_CLI_FORMAT_TYPE=ascii
 export MODEL_PATH=/model
-source download_models.sh && download_bionemo_models
+python download_models.py all --download_dir ${MODEL_PATH} --verbose
 python examples/molecule/megamolbart/pretrain.py --config-path $BIONEMO_HOME/examples/tests/conf/ --config-name megamolbart_test \
 trainer.num_nodes=1 trainer.devices=8 trainer.precision=32 model.micro_batch_size=32 \
 ++model.dwnstr_task_validation.enabled=False \

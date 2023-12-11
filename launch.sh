@@ -15,8 +15,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-source download_models.sh
-
 current_script="$0"
 
 # Check if the script is executable
@@ -227,7 +225,7 @@ DOCKER_BUILD_CMD="docker build --network host \
 
 download() {
     mkdir -p ${MODEL_PATH}
-    download_bionemo_models "${@}"
+    python download_models.py all --source ngc --download_dir ${MODEL_PATH} --verbose
 }
 
 download_test_data() {
@@ -242,7 +240,13 @@ download_test_data() {
     echo 'ESM2 test data unzipped.'
 }
 
-
+ngc_api_key_is_set() {
+    if [ ! -z ${NGC_CLI_API_KEY} ] && [ ${NGC_CLI_API_KEY} != 'NotSpecified' ]; then
+        echo true
+    else
+        echo false
+    fi
+}
 
 docker_login() {
     local ngc_api_key_is_set_=$(ngc_api_key_is_set)
