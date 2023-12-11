@@ -17,11 +17,7 @@ from typing import Tuple
 
 import dgl
 import numpy as np
-from nemo.collections.nlp.parts.nlp_overrides import NLPSaveRestoreConnector
 from nemo.utils import logging
-from nemo.utils.model_utils import import_class_by_path
-from omegaconf import OmegaConf
-from omegaconf.omegaconf import open_dict
 from pytorch_lightning.core import LightningModule
 
 from bionemo.data.equidock.protein_utils import (
@@ -30,45 +26,7 @@ from bionemo.data.equidock.protein_utils import (
     protein_to_graph_unbound_bound,
 )
 from bionemo.model.protein.equidock.equidock_model import EquiDock
-from bionemo.model.utils import _reconfigure_microbatch_calculator, parallel_state, setup_inference_trainer
-
-
-def restore_model(restore_path, trainer=None, cfg=None, model_cls=None, adjust_config=True):
-    """Restore model from checkpoint"""
-    logging.info(f"Restoring model from {restore_path}")
-
-    # infer model_cls from cfg if missing
-    if model_cls is None:
-        logging.info(f"Loading model class: {cfg.model.target}")
-        model_cls = import_class_by_path(cfg.model.target)
-
-    # merge the config from restore_path with the provided config
-    restore_cfg = model_cls.restore_from(
-        restore_path=restore_path,
-        trainer=trainer,
-        save_restore_connector=NLPSaveRestoreConnector(),
-        return_config=True,
-    )
-    # build trainer if not provided
-    if trainer is None:
-        trainer = setup_inference_trainer(cfg=cfg, adjust_config=adjust_config)
-
-    # overwrite model config from checkpoint
-    with open_dict(cfg):
-        cfg.model = OmegaConf.merge(cfg.model, restore_cfg)
-
-    # enforce trainer precition
-    with open_dict(cfg):
-        cfg.trainer.precision = trainer.precision
-
-    model = model_cls.restore_from(
-        restore_path=restore_path,
-        trainer=trainer,
-        override_config_path=cfg,
-        save_restore_connector=NLPSaveRestoreConnector(),
-    )
-
-    return model
+from bionemo.model.utils import _reconfigure_microbatch_calculator, parallel_state, restore_model
 
 
 class EquiDockInference(LightningModule):

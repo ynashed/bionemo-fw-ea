@@ -278,6 +278,9 @@ def restore_model(restore_path, trainer=None, cfg=None, model_cls=None, adjust_c
 
     # enforce trainer precition
     with open_dict(cfg):
+        if "EquiDock" in cfg.model.get("name", ""):
+            # overwrite model cfg from checkpoint (to get the input_edge_feats_dim)
+            cfg.model = OmegaConf.merge(cfg.model, restore_cfg)
         cfg.model.precision = trainer.precision
 
     model = model_cls.restore_from(
