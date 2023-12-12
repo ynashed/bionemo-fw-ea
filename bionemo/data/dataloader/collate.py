@@ -34,7 +34,7 @@ import copy
 import math
 import random
 from dataclasses import dataclass
-from typing import Callable, List, Optional
+from typing import Callable, Dict, List, Optional, Union
 
 import torch
 from nemo.collections.common.tokenizers import TokenizerSpec
@@ -533,17 +533,22 @@ class BertCollate:
         masks = [mask + ([0] * (pad_length - len(mask))) for mask in masks]
         return padded, masks, padding_mask
 
-    def collate_fn(self, batch: List[str], label_pad: int = -1):
+    def collate_fn(self, batch: List[str], label_pad: int = -1) -> Dict[str, Union[torch.Tensor, List[str]]]:
         """Collate function for NeMo BERT.
+        The function prepares the dictionary of tensors expected by the BERT language model.
+        - It tokenizes the input strings based on the provided tokenizer `self._tokenize`,
+        - randomly masks a subset of tokens in each sequence, and
+        - pads the sequences to the maximum length in the given batch, using the pad index from `self.tokenizer.get_pad_id()`.
 
         Args:
-            batch (List[str]): Strings to tokenize
+            batch: A list of Strings to tokenize.
 
         Returns:
-            Dict: the keys are the following:
+            collate_output: A dictionary with the following key-value pairs:
                 {
                     'text' (torch.Tensor[int]): padded and modified sequences of token IDs,
-                    'types' (torch.Tensor[int]): possible types within tokens, in this case set all to 0
+                    'types' (torch.Tensor[int]): possible types within tokens, generally used to refer to tokens from two segments
+                        in the same input string.  In this case set all to 0, as each string corresponds to exactly one segment.
                     'is_random' (torch.Tensor[int]): order of the sequences in the batch, len(is_random) == len(text)
                     'loss_mask' (List[List[float]]): same shape as `text`. 1 indicates the token has been modified,
                                                      otherwise 0,

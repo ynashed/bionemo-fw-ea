@@ -35,14 +35,6 @@ from bionemo.data.mapped_dataset import Uniref90ClusterMappingDataset
 from bionemo.model.protein.esm1nv.base import ESMnvMegatronBertModel
 
 
-# TODO(trvachov): Clean up deps
-try:
-    from apex.transformer import tensor_parallel  # noqa: F401
-
-    HAVE_APEX = True
-except (ImportError, ModuleNotFoundError):
-    HAVE_APEX = False
-
 __all__ = ["ESM1nvModel", "ESM2nvModel"]
 
 
@@ -222,11 +214,24 @@ class ESM1nvModel(ESMnvMegatronBertModel):
         self._test_ds = test
         return self._train_ds, self._validation_ds, self._test_ds
 
-    def validation_epoch_end(self, outputs):
+    def validation_epoch_end(self, outputs: List[Dict[str, torch.Tensor]]) -> None:
+        """The function computes and logs three scores:
+            - The average cross entropy loss over the validation data
+            - The exponential of the averaged loss
+            - The average perplexity score over the validation data.
+
+        The estimate of the perplexity is defined as the exponential of the average of the masked CE losses: `exp(-loss_mean)`
+
+        Args:
+            outputs: A list of dictionaries, where each dictionary represents the output of a validation step.
+            The computed values are logged using the Lightning logger.
+        """
         if not outputs:
             return
         averaged_loss = torch.stack(outputs).mean()
+        average_perplexity = averaged_loss.exp()
         self.log('val_loss', averaged_loss, prog_bar=True)
+        self.log('val_perplexity', average_perplexity)
         self.log('val_loss_ECE', pow(2, averaged_loss))  # calculate exponential cross entropy loss for logs
         self.log('consumed_samples', self.compute_consumed_samples(self.trainer.global_step - self.init_global_step))
 
@@ -238,10 +243,24 @@ class ESM1nvModel(ESMnvMegatronBertModel):
                 hidden_states = hidden_states[0]
         return hidden_states
 
-    def test_epoch_end(self, outputs):
+    def test_epoch_end(self, outputs: List[Dict[str, torch.Tensor]]) -> None:
+        """
+        The function computes and logs three scores:
+            - the average cross-entropy loss over the test data,
+            - the exponential of the averaged loss, and
+            - the average perplexity score over the test data.
+
+        The estimate of the perplexity is defined as the exponential of the average of the masked CE losses: `exp(-loss_mean)`
+        This function is called at the end of the testing step `model.test()`.
+
+        Args:
+            outputs: A list of dictionaries, where each dictionary represents the output of a validation step.
+            The computed values are logged using the NeMo logger.
+        """
         averaged_loss = average_losses_across_data_parallel_group(outputs)
         logging.info(f'test_loss: {averaged_loss[0]}')
         logging.info(f'test_loss_ECE: {pow(2, averaged_loss[0])}')
+        logging.info(f'test_perplexity: {averaged_loss[0].exp()}')
 
     @property
     def input_names(self):
