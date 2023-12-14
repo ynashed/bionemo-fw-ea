@@ -40,9 +40,9 @@ data:
   world_size: ${multiply:${trainer.devices}, ${trainer.num_nodes}}
   esm_embeddings_path: ${training_data.esm_embeddings_path} # If this is set then the LM embeddings at that path will be used for the receptor features
   data_dir: ${training_data.protein_data_dir} # Folder containing original structures
-  split_train: ${oc.env:BIONEMO_HOME}/examples/molecule/diffdock/data/splits/timesplit_no_lig_overlap_train # Path of file defining the split
-  split_val: ${oc.env:BIONEMO_HOME}/examples/molecule/diffdock/data/splits/timesplit_no_lig_overlap_val # Path of file defining the split
-  split_test: ${oc.env:BIONEMO_HOME}/examples/molecule/diffdock/data/splits/timesplit_test # Path of file defining the split
+  split_train: ${oc.env:BIONEMO_HOME}/data/splits/timesplit_no_lig_overlap_train # Path of file defining the split
+  split_val: ${oc.env:BIONEMO_HOME}/data/splits/timesplit_no_lig_overlap_val # Path of file defining the split
+  split_test: ${oc.env:BIONEMO_HOME}/data/splits/timesplit_test # Path of file defining the split
   cache_path: ${oc.env:BIONEMO_HOME}/data/data_cache # Folder from where to load/restore cached dataset
   chunk_size: 5 # Number of samples as a chunk given to each process to process each time when preparing the dataset in class PDBBind, default is 5
   use_original_model_cache: false # If this is true, the same dataset as in the original model will be used. Otherwise, the dataset parameters are used
