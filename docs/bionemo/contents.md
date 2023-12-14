@@ -46,6 +46,7 @@ models/esm1-nv
 models/esm2-nv
 models/prott5nv
 models/megamolbart
+models/diffdock
 models/model-benchmarks
 ```
 
@@ -55,6 +56,7 @@ models/model-benchmarks
 
 datasets/uniprot
 datasets/zinc15
+datasets/pdb
 ```
 
 ```{toctree}
