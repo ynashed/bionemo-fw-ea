@@ -45,8 +45,6 @@ TEST_DATA_DOWNLOAD_SCRIPT = os.path.join(
     os.environ["BIONEMO_HOME"], 'examples/molecule/diffdock/scripts/download_data_sample.sh'
 )
 ROOT_DIR = 'diffdock'
-if 'USE_FAST_TP' in os.environ:
-    del os.environ['USE_FAST_TP']
 
 inputs = [
     ('diffdock_score_training_test', None, 'e3nn'),
@@ -89,8 +87,13 @@ def test_diffdock_fast_dev_run(tmp_directory, config_name, batch_sampler, tensor
     cfg = get_cfg(tmp_directory, PREPEND_CONFIG_DIR, config_name)
     with open_dict(cfg):
         cfg.model.batch_sampler = batch_sampler
-        cfg.model.tensor_product.type = tensor_prodcut_type
-    if not os.path.exists(os.path.join(cfg.tmp_directory, "data_cache")):
+    if tensor_prodcut_type == 'USE_FAST_TP':
+        os.environ['USE_FAST_TP'] = '1'
+    else:
+        with open_dict(cfg):
+            cfg.model.tensor_product.type = tensor_prodcut_type
+
+    if not os.path.exists(cfg.data.cache_path):
         # download data from ngc
         os.system(f"bash {TEST_DATA_DOWNLOAD_SCRIPT}")
 

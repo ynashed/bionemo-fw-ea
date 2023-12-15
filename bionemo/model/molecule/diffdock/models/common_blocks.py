@@ -18,18 +18,14 @@ from typing import Literal
 
 import torch
 from e3nn import o3
+from nemo.core import NeuralModule
 from torch import nn
 from torch.cuda.amp import autocast
 from torch.nn import functional as F
 from torch_scatter import scatter
 
-
-if "USE_FAST_TP" in os.environ:
-    from bionemo.model.molecule.diffdock.utils.fast_tensor_product import FullyConnectedTP as FastTP
-
-from nemo.core import NeuralModule
-
 from bionemo.model.molecule.diffdock.utils.batchnorm import BatchNorm
+from bionemo.model.molecule.diffdock.utils.fast_tensor_product import FullyConnectedTP as FastTP
 from bionemo.model.molecule.diffdock.utils.tensor_product import (
     TPFirst,
     TPForth,

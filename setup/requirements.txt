@@ -43,3 +43,4 @@ torch_cluster==1.6.1
 torch_sparse==0.6.17
 torch-geometric==2.3.0
 torch-scatter==2.0.9
+diffdock==0.0.5

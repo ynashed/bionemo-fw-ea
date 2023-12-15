@@ -59,7 +59,7 @@ data:
 trainer:
   devices: 1
   num_nodes: 1
-  precision: 32 # To activate AMP set to 16 or 'bf16'; otherwise will be float32
+  precision: 32 # currently only single precision is supported
   accelerator: gpu # gpu or cpu
   max_epochs: 100 # set to null when using max_steps instead with NeMo model
   max_steps: -1
