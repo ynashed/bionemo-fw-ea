@@ -72,7 +72,8 @@ def test_body_intersection_loss():
         old_res = new_res
 
 
-def test_cross_attention():
+@pytest.mark.parametrize("cross_msgs", [True, False])
+def test_cross_attention(cross_msgs: bool):
     N = 21
     M = 11
     D = 16
@@ -86,13 +87,18 @@ def test_cross_attention():
     a = mask * (q @ k.transpose([1, 0])) - 1000.0 * (1.0 - mask)
 
     a_x = np.exp(a) / np.exp(a).sum(axis=1, keepdims=True)
-    expected = a_x @ v
+    if cross_msgs:
+        expected = a_x @ v
+    else:
+        expected = (
+            q * 0
+        )  # TODO: should it be v * 0? The paper has q*0, but maybe that's just because q.shape[1:] == v.shape[1:]?
 
     q = torch.from_numpy(q)
     k = torch.from_numpy(k)
     v = torch.from_numpy(v)
-    mask = torch.from_numpy(mask)
+    mask = torch.from_numpy(mask).bool()
 
-    result = compute_cross_attention(q, k, v, mask, True).detach().cpu().numpy()
+    result = compute_cross_attention(q, k, v, mask, cross_msgs).detach().cpu().numpy()
 
     assert np.allclose(expected, result, atol=1e-4), f"Cross message attention fails: \n{expected}\n{result}"

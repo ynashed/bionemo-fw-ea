@@ -17,6 +17,7 @@
 
 import torch
 from torch import nn
+from torch.nn import functional as F
 
 from bionemo.model.protein.equidock.model.graph_norm import GraphNorm
 
@@ -56,7 +57,6 @@ def apply_final_h_layer_norm(g, h, node_type, norm_type, norm_layer):
     return norm_layer(h)
 
 
-# Test this
 def compute_cross_attention(queries, keys, values, mask, cross_msgs):
     """Compute cross attention.
     x_i attend to y_j:
@@ -66,22 +66,29 @@ def compute_cross_attention(queries, keys, values, mask, cross_msgs):
       queries: NxD float tensor --> queries
       keys: MxD float tensor --> keys
       values: Mxd
-      mask: NxM
+      mask: NxM a boolean or boolean-like (eg 0,1 integer) attention mask
+      cross_msgs: bool. If false, we bypass attention and just return a zero vector in the shape of queries (TODO shouldn't this be value shaped?)
     Returns:
       attention_x: Nxd float tensor.
+
+    See https://pytorch.org/docs/stable/generated/torch.nn.functional.scaled_dot_product_attention.html for notes on how to enable the different
+        scaled dot product attention speed-ups if you don't want the default selection to be used (chosen based on inputs).
     """
     if not cross_msgs:
         return queries * 0.0
-    a = mask * torch.mm(queries, torch.transpose(keys, 1, 0)) - 1000.0 * (1.0 - mask)
-    a_x = torch.softmax(a, dim=1)  # i->j, NxM, a_x.sum(dim=1) = torch.ones(N)
-    attention_x = torch.mm(a_x, values)  # (N,d)
-    return attention_x
+
+    # The original equidock paper does not apply dimension-based scaling, and is not causal. They also do not apply attention dropout
+    #  during training.
+    return F.scaled_dot_product_attention(
+        queries, keys, values, attn_mask=mask, dropout_p=0.0, is_causal=False, scale=1.0
+    )
 
 
 def get_mask(ligand_batch_num_nodes, receptor_batch_num_nodes, device):
     rows = sum(ligand_batch_num_nodes)
     cols = sum(receptor_batch_num_nodes)
-    mask = torch.zeros(rows, cols).to(device)
+    # mask is expected to be a boolean matrix in F.scaled_dot_product_attention
+    mask = torch.zeros(rows, cols, dtype=torch.bool, device=device)
     partial_l = 0
     partial_r = 0
     for l_n, r_n in zip(ligand_batch_num_nodes, receptor_batch_num_nodes):
