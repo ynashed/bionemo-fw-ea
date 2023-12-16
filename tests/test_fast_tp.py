@@ -20,7 +20,6 @@ from e3nn import o3
 from bionemo.model.molecule.diffdock.utils.fast_tensor_product import FullyConnectedTP
 
 
-@pytest.mark.skip(reason="Need fast tp compiled for Telsa K4 used in CI/CD")
 @pytest.mark.needs_gpu
 def test_fast_tp_backward():
     dtype = torch.float32
