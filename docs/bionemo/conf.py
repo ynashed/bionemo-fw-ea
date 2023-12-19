@@ -15,10 +15,6 @@ from docutils import nodes
 from sphinx import search
 
 
-# import sys
-# sys.path.insert(0, os.path.abspath('.'))
-
-
 # -- Project information -----------------------------------------------------
 
 project = 'NVIDIA BioNeMo Framework'

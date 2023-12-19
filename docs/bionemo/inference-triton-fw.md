@@ -3,12 +3,21 @@
 This section will use the pre-trained BioNeMo checkpoints to demonstrate NVIDIA [Triton Inference Server](https://github.com/triton-inference-server).
 [PyTriton](https://github.com/triton-inference-server/pytriton), which is a Flask/FastAPI-like interface that simplifies Triton deployment in Python environments will be used.
 
+
 ## Prerequisites
 
 * Linux OS
 * Pascal, Volta, Turing, or an NVIDIA Ampere architecture-based GPU.
 * NVIDIA Driver
+* CUDA toolkit installed
 * Docker
+
+
+## Using Predefined Server-Client Scripts
+
+BioNeMo comes with a set of example scripts for inference with PyTriton. If you would like to skip to using these, see the 
+[BioNeMo PyTriton README](./bionemo/triton/README.md) file for instructions and detailed documentation.
+
 
 ## Detailed Example with ESM-1nv
 
@@ -40,30 +49,26 @@ On the server side, an inference callable that performs the following must be im
 Mark this callable with the `@batch` decorator from PyTriton. This decorator converts the input request into a more suitable format that can be directly passed to the model (refer to more details on batch decorator in the [PyTrtion documentation](https://github.com/triton-inference-server/pytriton/blob/main/docs/decorators.md#batch)).
 
 An example inference callable is provided below:
-
 ```python
+from typing import Dict
+
 import numpy as np
 from pytriton.decorators import batch
 
-@batch
-def _infer_fn(sequences: np.ndarray):
+model: ESM1nvInference = ...
 
+@batch
+def infer_fn(sequences: np.ndarray) -> Dict[str, np.ndarray]:
     sequences = np.char.decode(sequences.astype("bytes"), "utf-8")
     sequences = sequences.squeeze(1).tolist()
 
-    embedding = MODEL.seq_to_embeddings(sequences)
+    embedding = model.seq_to_embeddings(sequences)
 
-    response = {
-        "embedding":  embedding.cpu().numpy(),
-    }
-
+    response = {"embeddings": embedding.cpu().numpy()}
     return response
 ```
 
-where `MODEL` is an instance of `ESM1nvInference` class.
-
 Now, define and start the server:
-
 ```python
 from pytriton.model_config import Tensor
 from pytriton.triton import Triton
@@ -73,100 +78,33 @@ with Triton() as triton:
         model_name="ESM1",
         infer_func=_infer_fn,
         inputs=[
-                Tensor(name="sequences", dtype=bytes, shape=(1,)),
-            ],
-            outputs=[
-                Tensor(name="embedding", dtype=np.float32, shape=(-1,)),
-            ],
+            Tensor(name="sequences", dtype=bytes, shape=(1,)),
+        ],
+        outputs=[
+            Tensor(name="embeddings", dtype=np.float32, shape=(-1,)),
+        ],
     )
 
     triton.serve()
 ```
 
 :::{note}
-The expected shapes for the inputs and outputs are defined in `_infer_fn` (without the batch dimension), where -1 denotes a dynamic size.
+The expected shapes for the inputs and outputs are defined in `infer_fn` (without the batch dimension), where -1 denotes a dynamic size.
+:::
+
+:::{warning}
+When using the `@batch` decorator, it is **vital** that the `infer_fn` parmaeter names align exactly with what is 
+deinfed for `inputs` to the `.bind()` call. These names are how PyTriton ensures that the right tensors are passed
+along. Similiarly, the keys in the returned dictionary must align 1:1 with the names defined in the output tensors.
 :::
 
 When the server is running, use the client to perform a query:
-
 ```python
 from pytriton.client import ModelClient
 
 with ModelClient("localhost", "ESM1") as client:
     result_dict = client.infer_batch(sequences)
 ```
-
-## Predefined Server-Client Scripts
-
-BioNeMo comes with a set of example scripts for inference with PyTriton.
-
-These scripts utilize hydra configs available in the `bionemo/examples/` directory to set up the model for inference. The three BioNeMo models are supported: MegaMolBART, ESM1 and ProtT5; and two inference modes: **Sequence to Embedding** (for all 3 models) and **Sampling** (for MegaMolBART)
-
-### Starting the Server
-
-To start the Triton Server (and send it to the background) run:
-
-```bash
-python bionemo/examples/triton/<embeddings,sampling>_server.py --config-path </path/to/dir/with/inference/config> &
-```
-
-You can start server for generating embeddings with MegaMolBART:
-
-```bash
-python bionemo/examples/triton/embeddings_server.py --config-path /workspace/bionemo/examples/molecule/megamolbart/conf &
-```
-
-For ESM1:
-
-```bash
-python bionemo/examples/triton/embeddings_server.py --config-path /workspace/bionemo/examples/protein/esm1nv/conf/ &
-```
-
-And for ProtT5:
-
-```bash
-python bionemo/examples/triton/embeddings_server.py --config-path /workspace/bionemo/examples/protein/prott5nv/conf/ &
-```
-
-Alternatively start server for sampling new sequences with MegaMolBART:
-
-```bash
-python bionemo/examples/triton/sampling_server.py --config-path /workspace/bionemo/examples/molecule/megamolbart/conf &
-```
-
-The scripts use `hydra` and load model configuration from `infer.yaml` present in the specified config directory, so custom configurations can be provided by specifying a different yaml file or overriding particular arguments.
-
-### Querying the Server
-
-Regardless of the model and server type selected, you can send a query with the general-purpose client script:
-
-```bash
-python bionemo/examples/triton/client.py --sequences SEQUENCES [SEQUENCES ...] [--output_path OUTPUT_PATH]
-```
-
-The only required argument is `--sequences`, which should be a whitespace separated list of SMILES (for molecules) or FASTA (for protein) sequences.
-Optionally, you can also provide `--output_path` flag to save the pickled results in a specified file. If this argument is not given, the results will be printed.
-
-For example:
-
-```bash
-python bionemo/examples/triton/client.py --sequences "CN1C=NC2=C1C(=O)N(C(=O)N2C)C" "c1ccccc1CC(O)=O"
-```
-
-if MegaMolBART was loaded by the server script, or:
-
-```bash
-python bionemo/examples/triton/client.py --sequences "MTADAHWIPVPTNVAYDALNPGAPGTLAFAAANGWQHHPLVTVQPLPGVVFRDAAGRSRFTQRAGD"
-```
-for one of the protein models, ESM1 or ProtT5.
-
-
-To interact with a server set up in a different way (refer to [Extending These Examples](#extending-these-examples)), provide the url with `--url` flag (defaults to `"localhost"`).
-
-
-### Closing the Server
-
-The server can be distbled by bringing it from the background (`fg`) and killing it with `ctrl+c`.
 
 
 ## Extending These Examples
@@ -177,6 +115,6 @@ The server can be distbled by bringing it from the background (`fg`) and killing
 
 3. Use one of the provided components (server or client) alone - they are fully compatible with native solutions for Triton Inference Server.
 * Query the server with a different tool, like you would do with any other Triton instance
-* Yse the client to interact with any Triton server, not necessarily set up with PyTriton
+* Use the client to interact with any Triton server, not necessarily set up with PyTriton
 
 1. Finally, PyTriton provides variety of options to customize the server. Refer to the [PyTriton documentation](https://triton-inference-server.github.io/pytriton/0.1.5/).

@@ -181,8 +181,8 @@ def test_infer_script(config_path, tmp_path):
     script_path = os.path.join(os.path.dirname(config_dir), 'infer.py')
     infer_args = get_infer_args_overrides(config_path, tmp_path)
     if not os.path.exists(script_path):
-        script_path = 'examples/infer.py'
-    cmd = (
+        script_path = 'bionemo/model/infer.py'
+    cmd: str = (
         f'python {script_path} --config-dir {config_dir} --config-name {config_name} ++exp_manager.exp_dir={tmp_path} '
         + ' '.join(f'++{k}={v}' for k, v in infer_args.items())
     )
