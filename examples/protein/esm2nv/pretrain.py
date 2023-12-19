@@ -18,6 +18,7 @@ from nemo.utils import logging
 from omegaconf.omegaconf import OmegaConf
 
 from bionemo.callbacks import setup_dwnstr_task_validation_callbacks
+from bionemo.data import FLIPPreprocess
 from bionemo.data.preprocess.protein.preprocess import ESM2Preprocess
 from bionemo.model.protein.esm1nv import esm1nv_model
 from bionemo.model.utils import setup_trainer
@@ -108,6 +109,17 @@ def main(cfg) -> None:
         if not os.path.isdir(cfg.model.data.test.dataset_path):
             raise ValueError(
                 "Attempted to create a dataset output directory: {cfg.model.data.test.dataset_path} but it failed and was not created."
+            )
+
+        # Downloading and preprocessing data for downstream task validation
+        if cfg.model.dwnstr_task_validation.enabled:
+            flip_preprocessor = FLIPPreprocess()
+            if "task_name" not in cfg.model.dwnstr_task_validation.dataset:
+                task_name = cfg.model.dwnstr_task_validation.dataset.dataset_path.split("/")[-1]
+            else:
+                task_name = cfg.model.dwnstr_task_validation.dataset.task_name
+            flip_preprocessor.prepare_dataset(
+                output_dir=cfg.model.dwnstr_task_validation.dataset.dataset_path, task_name=task_name
             )
 
 
