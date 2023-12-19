@@ -128,15 +128,26 @@ The supported method of code development is using a prebuilt BioNeMo container w
 
 Optionally, after the container is started, you can attach to the running container via the VSCode [Docker](https://code.visualstudio.com/docs/containers/overview) and [VSCode Dev Container](https://code.visualstudio.com/docs/devcontainers/containers) extensions.
 
-### Local Machine Setup
+### Local Development
 
-Local machine install is possible, but not recommended:
+You must run all `bionemo` code, including tests, within a Docker container from the `bionemo` image. The recommended workflow is to run `./launch.sh dev` and then perform all commands from this development container. You may run `./launch.sh build` whenever you need to rebuild the image. Note that you must restart the development container each time you make a new image.
 
+### `download_all`
+Before you begin development, you must run `./launch.sh download_all` on your **host machine**. The `./launch.sh dev` command will volume-mount your local `git` repository clone and the `download_all` command will obtain models, datasets, and test data and place them within this local directory.
+
+### `git-lfs`
+Furthermore, some unit tests require data that is stored using `git-lfs`. You must install this on your host machine and set it up. Complete instructions are accessible [from the `git-lfs` project page](https://github.com/git-lfs/git-lfs). An abgrided set of instructions are as follows (assuming you are in the `bionemo` repository root):
 ```bash
-pip install Cython
-pip install -r setup/requirements.txt
+sudo apt install git-lfs
+git lfs install
+git lfs pull
+```
+
+### Running `pytest` Tests
+To run tests using `pytest`, execute the following command:
+```bash
 # Run tests to check setup
-pytest .
+pytest -v --durations=0 --cov=bionemo --cov-report term --cov-report xml:coverage.xml -k "not test_model_training" .
 ```
 Note, some tests require pretrained model checkpoints -- see below.
 
