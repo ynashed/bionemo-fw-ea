@@ -61,14 +61,14 @@ fi
 if [ -n "$PBSS" ]; then
     echo "Downloading from PBSS to $DATA_PATH"
     aws s3 cp s3://bionemo-ci/test-data/diffdock/diffdock_vprocessed_sample $DATA_PATH --endpoint-url https://pbss.s8k.io --recursive
+    aws s3 cp s3://bionemo-ci/test-data/diffdock/diffdock_vpreprocessing_test $DATA_PATH --endpoint-url https://pbss.s8k.io --recursive
     # Add actions for pbss
 else
     echo "Downloading from NGC to $DATA_PATH"
     ngc registry resource download-version nvidian/clara-lifesciences/diffdock:processed_sample
     tar -xvf diffdock_vprocessed_sample/diffdock_processsed_sample.tar.gz -C $DATA_PATH
     rm -r diffdock_vprocessed_sample/
+    ngc registry resource download-version nvidian/clara-lifesciences/diffdock:preprocessing_test
+    tar -xvf diffdock_vpreprocessing_test/preprocessing_test.tar.gz -C $DATA_PATH
+    rm -r diffdock_vpreprocessing_test/
 fi
-
-
-
-

@@ -17,7 +17,6 @@ import os
 import pathlib
 import pickle
 from functools import partial
-from zipfile import ZipFile
 
 import pytest
 import torch
@@ -47,20 +46,10 @@ TEST_DATA_FILE = os.path.join(THIS_FILE_DIR, './test_data/molecule/diffdock/diff
 ROOT_DIR = 'diffdock'
 
 
-def extract_to_dir(zipfile, dir):
-    if not os.path.exists(os.path.join(dir, "./ref")):
-        with ZipFile(zipfile, 'r') as zipper:
-            # extracting all the files
-            zipper.extractall(dir)
-
-
 @pytest.fixture(scope="session")
 def tmp_directory(tmp_path_factory, root_directory=ROOT_DIR):
     """Create tmp directory"""
     tmp_path_factory.mktemp(root_directory)
-
-    # extract input and reference test data to tmp directory
-    extract_to_dir(TEST_DATA_FILE, tmp_path_factory.getbasetemp())
     return tmp_path_factory.getbasetemp()
 
 
