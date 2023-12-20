@@ -20,7 +20,11 @@ EquiDock is designed to treat proteins as rigid bodies and would not work well w
 
 ### Dataset
 
-The EquiDock model was trained on two datasets: The Docking Benchmark 5.5 (DB5.5) dataset {cite:p}`vreven2015updates` consisting of high quality structures and the Database of Interacting Protein Structures (DIPS) {cite:p}`townshend2019end` mined from the Protein Data Bank.
+The EquiDock model leverages two primary datasets: Docking Benchmark 5.5 (DB5.5) {cite:p}`vreven2015updates` and the Database of Interacting Protein Structures (DIPS) {cite:p}`townshend2019end`. DB5.5, considered a gold standard dataset for data quality, consists of 253 structures. On the other hand, DIPS is a larger dataset of protein complex structures obtained from the Protein Data Bank (PDB), specifically tailored for rigid body docking. It's noted that DIPS contains only bound structures, making it suitable for rigid docking, while DB5.5 includes unbound protein structures, mostly displaying rigid structures.
+
+Training involves initially training models on the training part of DIPS using the Adam optimizer with a learning rate of 2e-4. Early stopping is employed with a patience of 30 epochs. The best validation model is determined based on Ligand RMSD on the DIPS validation set.
+
+For DB5.5, the DIPS pre-trained model is fine-tuned on the DB5.5 training set using a learning rate of 1e-4 and early stopping with 150 epochs patience. During training, roles of ligand and receptor are randomly assigned, and both ligand rotation and translation are randomly applied, even though the model is invariant to these operations.
 
 ### Infrastructure and Configuration
 

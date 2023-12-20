@@ -46,6 +46,7 @@ models/esm1-nv
 models/esm2-nv
 models/prott5nv
 models/megamolbart
+models/equidock
 models/diffdock
 models/model-benchmarks
 ```
@@ -56,6 +57,8 @@ models/model-benchmarks
 
 datasets/uniprot
 datasets/zinc15
+datasets/DIPS
+datasets/DB5.5
 datasets/pdb
 ```
 
