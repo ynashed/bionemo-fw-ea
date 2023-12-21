@@ -39,6 +39,8 @@ Example:
         ./launch_docs.sh build
     To start BioNeMo Documentation Build Container for development
         ./launch_docs.sh dev
+    To attach to a running BioNeMo Documentation Container
+        ./launch_docs.sh attach
 "
 
 }

@@ -24,6 +24,7 @@ If you are on a workstation and will be starting and stopping a dev container, w
 download this data first _onto your host machine_. You should then always mount this data into your container.
 
 
+
 # Supported Models
 All base encoder-decoder bionemo models are supported. All Triton and Model Navigator-using scripts use the 
 `--config-path` CLI argument to specify a local directory path containing the saved model configuration.
@@ -31,16 +32,17 @@ All base encoder-decoder bionemo models are supported. All Triton and Model Navi
 Examples of supported models are below. Use the `C` env var for compatibility with documented example commands:
 - MegaMolBART: `CONFIG_PATH="${BIONEMO_HOME}/examples/molecule/megamolbart/conf"`
 - ESM1nv: `CONFIG_PATH="${BIONEMO_HOME}/examples/protein/esm1nv/conf/"`
+- ESM2nv: `CONFIG_PATH="${BIONEMO_HOME}/examples/protein/esm2nv/conf/"`
 - ProtT5nv: `CONFIG_PATH="${BIONEMO_HOME}/examples/protein/prott5nv/conf"`
 
 
 
 # Starting the Dev Model Servers
 The `bionemo.triton` package provides scripts to use Triton to serve every base encoding-decoding bionemo model.
-Triton provides HTTP and GRPC based APIs for each model and serving component. 
+Triton provides HTTP and gRPC based APIs for each model and serving component. 
 
 ```bash
-python bionemo/triton/{embedding,hidden,sampling}_server.py --config-path /path/to/dir/with/inference/conf
+python -m bionemo.triton.{embedding,hidden,sampling}_server --config-path /path/to/dir/with/inference/conf
 ```
 
 Under the hood, the scripts use `hydra` and load model configuration from `infer.yaml` present in the specified 
@@ -48,23 +50,70 @@ config directory, so you can provide custom configuration by specifying a differ
 arguments.
 
 ## Embedding Server
-You can start an HTTP or GRPC server for generating embeddings as::
+You can start an HTTP or gRPC server for generating embeddings as:
 
 ```bash
-python bionemo/triton/embedding_server.py --config-path ${CONFIG_PATH}
+python -m bionemo.triton.embedding_server --config-path ${CONFIG_PATH}
 ```
 
 ## Hidden State Server
-You can start an HTTP or GRPC server for generating the model's internal hidden states as:
+You can start an HTTP or gRPC server for generating the model's internal hidden states as:
 
 ```bash
-python bionemo/triton/hidden_server.py --config-path ${CONFIG_PATH}
+python -m bionemo.triton.hidden_server --config-path ${CONFIG_PATH}
 ```
 
 ## Sampling Server
-You can start an HTTP and GRPC server for sampling new sequences as:
+You can start an HTTP and gRPC server for sampling new sequences as:
 ```bash
-python bionemo/triton/samplings_server.py --config-path ${CONFIG_PATH}
+python -m bionemo.triton.samplings_server --config-path ${CONFIG_PATH}
+```
+
+## Decoding Server
+You can start an HTTP or gRPC server for decoding the original sequence from a model's masked hidden state representation as:
+
+```bash
+python -m bionemo.triton.decodes_server --config-path ${CONFIG_PATH}
+```
+
+NOTE: Only MegaMolBART implements sampling and decoding behavior. All models implement embedding and hidden inference capabilities.
+
+
+
+# Interacting with the Server
+
+## `client_encode`
+You may use the `client_encode` for the `embedding`, `hidden`, and `sampling` servers:
+```bash
+python -m bionemo.triton.client_encode --help
+```
+
+For example:
+```bash
+python -m bionemo.triton.client_encode --sequences "CN1C=NC2=C1C(=O)N(C(=O)N2C)C" --sequences "c1ccccc1CC(O)=O"
+```
+if you loaded MegaMolBART in the server script, or:
+
+```bash
+python -m bionemo.triton.client_encode --sequences "MTADAHWIPVPTNVAYDALNPGAPGTLAFAAANGWQHHPLVTVQPLPGVVFRDAAGRSRFTQRAGD"
+```
+if you're serving one of the protein models, such as ESM1nv, ESM2nv, or ProtT5.
+
+
+## `client_decode`
+If you are using the `decode` server, you must use a different client:
+```bash
+python -m bionemo.triton.client_decode --help
+```
+
+For example, if you save the hidden-state output from MegaMolBART, obtained by starting `hiddens_server` and querrying with `client_encode`:
+```bash
+python -m bionemo.triton.client_encode --sequences "MTADAHWIPVPTNVAYDALNPGAPGTLAFAAANGWQHHPLVTVQPLPGVVFRDAAGRSRFTQRAGD" --output hiddens.json
+```
+
+Then you can decode back into the original sequence by starting a `decodes_server` with MegaMolBART and querrying with `client_decode`:
+```bash
+python bionemo/triton/client_decode.py --input hiddens.json
 ```
 
 
@@ -73,67 +122,30 @@ python bionemo/triton/samplings_server.py --config-path ${CONFIG_PATH}
 The embeddings, sampling, and hidden state servers uses runtimes optimized by [model navigator](https://github.com/triton-inference-server/model_navigator) package for inference.
 You need to prepare the model before starting the embeddings server. You need to perform this step only once.
 
+NOTE: To use this optimized artifact in `bionemo.triton.inference_wrapper`, you must provide the `--nav` argument.
+
 Run the conversion with:
 ```bash
-python bionemo/triton/nav_embeddings_export.py --config-path ${CONFIG_PATH} 
+python -m bionemo.triton.nav_embeddings_export --config-path "${CONFIG_PATH}" 
 ```
 
 You can run the conversion for MegaMolBART:
 ```bash
-python bionemo/triton/nav_embeddings_export.py --config-path /workspace/bionemo/examples/molecule/megamolbart/conf
+python -m bionemo.triton.nav_embeddings_export --config-path /workspace/bionemo/examples/molecule/megamolbart/conf
 ```
 ...ESM1nv:
 ```bash
-python bionemo/triton/nav_embeddings_export.py --config-path /workspace/bionemo/examples/protein/esm1nv/conf
+python -m bionemo.triton.nav_embeddings_export --config-path /workspace/bionemo/examples/protein/esm1nv/conf
+```
+
+...ESM2nv:
+```bash
+python -m bionemo.triton.nav_embeddings_export --config-path /workspace/bionemo/examples/protein/esm2nv/conf
 ```
 
 ...and ProtT5nv:
 ```bash
-python bionemo/triton/nav_embeddings_export.py --config-path /workspace/bionemo/examples/protein/prott5nv/conf
-```
-
-Under the hood, the scripts use `hydra` and load model configuration for `infer.yaml`, so you can provide custom 
-configuration by specifying a different yaml or overriding particular arguments. For example:
-```bash
-python bionemo/triton/nav_embeddings_export.py --config-path /workspace/bionemo/examples/protein/esm1nv/conf model.data.batch_size=4
-```
-
-
-
-# Querying the Server
-
-## `client_encode`
-You may use the `client_encode` for the `embedding`, `hidden`, and `sampling` servers:
-```bash
-python bionemo/triton/client_encode.py --help
-```
-
-For example:
-```bash
-python bionemo/triton/client_encode.py --sequences "CN1C=NC2=C1C(=O)N(C(=O)N2C)C" --sequences "c1ccccc1CC(O)=O"
-```
-if you loaded MegaMolBART in the server script, or:
-
-```bash
-python bionemo/triton/client_encode.py --sequences "MTADAHWIPVPTNVAYDALNPGAPGTLAFAAANGWQHHPLVTVQPLPGVVFRDAAGRSRFTQRAGD"
-```
-if you're serving one of the protein models, such as ESM1nv, ESM2nv, or ProtT5.
-
-
-## `client_decode`
-If you are using the `decode` server, you must use a different client:
-```bash
-python bionemo/triton/client_decode.py --help
-```
-
-For example, if you save the hidden-state output from MegaMolBART, obtained by starting `hiddens_server` and querrying with `client_encode`:
-```bash
-python bionemo/triton/client_encode.py --sequences "MTADAHWIPVPTNVAYDALNPGAPGTLAFAAANGWQHHPLVTVQPLPGVVFRDAAGRSRFTQRAGD" --output hiddens.json
-```
-
-Then you can decode back into the original sequence by starting a `decodes_server` with MegaMolBART and querrying with `client_decode`:
-```bash
-python bionemo/triton/client_decode.py --input hiddens.json
+python -m bionemo.triton.nav_embeddings_export --config-path /workspace/bionemo/examples/protein/prott5nv/conf
 ```
 
 

@@ -217,11 +217,14 @@ BioNeMo supports optional logging with Tensorboard and Weights and Biases. Tenso
 
 ## Inference
 
-Trained BioNeMo models are provided on NGC for use. These models can be loaded with a gRPC interface provided in BioNeMo. Example notebooks are provided in the corresponding `nbs` directory in `examples`, for example, `examples/molecule/megamolbart/nbs`.
+Trained BioNeMo models are provided on NGC for use. These models can be loaded with a Triton gRPC interface provided by BioNeMo. Example notebooks are provided in the corresponding `nbs` directory in `examples`, for example, `examples/molecule/megamolbart/nbs`. 
+
+The `bionemo.triton.inference_wrapper` module's `__main__` program starts this inference server. For convience, you may use the [`setup/startup.sh`](../../setup/startup.sh) script to start both
+this and a Jupyer Lab server that points to the model's inference notebook(s).
 
 If a local copy of the code exists on the workstation, download the pre-trained models with `./launch.sh download`. Alternatively, the models can be downloaded inside the container by running `python download_models.py all --download_dir .`. Model weights downloaded from NGC will require an [NGC API key](https://docs.nvidia.com/ngc/ngc-overview/index.html#generating-api-key) to be configured.
 
-To launch the gRPC interface and a Jupyter notebook service in the corresponding directory, ensure that `JUPYTER_PORT` is set correctly in the `.env` file, then run `./launch.sh dev -c <model_name>`, where `<model_name>` is one of the following: `megamolbart`, `prott5nv`, `esm-1nv`. Then open a browser at `http://<<HOST_NAME>>:$JUPYTER_PORT` to execute the notebook.
+To launch the inference server and a Jupyter notebook service in the corresponding directory, ensure that `JUPYTER_PORT` is set correctly in the `.env` file, then run `./launch.sh dev -c <model_name>`, where `<model_name>` is one of the following: `megamolbart`, `prott5nv`, `esm-1nv`, or `esm-2nv`. Then open a browser at `http://<<HOST_NAME>>:$JUPYTER_PORT` to execute the notebook. NOTE: If `JUPYER_PORT` is not set, it will default to `8888`.
 
 ## Code Development Setup
 ### Code Organization

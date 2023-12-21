@@ -409,7 +409,7 @@ setup() {
         DOCKER_CMD="$DOCKER_CMD -v ${HOME}/.ssh:${HOME}/.ssh:ro"
         # TODO: remove once pyproject.toml setup MR is complete
         echo "Prepending ${DOCKER_REPO_PATH} to PYTHONPATH for development"
-        DEV_PYTHONPATH="${DOCKER_REPO_PATH}:${DOCKER_REPO_PATH}/generated:${DEV_PYTHONPATH}"
+        DEV_PYTHONPATH="${DOCKER_REPO_PATH}:${DEV_PYTHONPATH}"
         DOCKER_CMD="${DOCKER_CMD} --env PYTHONPATH=${DEV_PYTHONPATH}"
         # end TODO
     fi
@@ -488,18 +488,6 @@ attach() {
 }
 
 
-protoc() {
-    # Generate python stubs for protobuf and grpc services.
-    local GEN_DIR="./generated/"
-    python3 -m grpc_tools.protoc \
-        -I./proto/ \
-        --python_out=./generated/ \
-        --grpc_python_out=${GEN_DIR} \
-        --experimental_allow_proto3_optional \
-        ./proto/*.proto
-    echo "Generated code is at ${GEN_DIR}."
-}
-
 
 case $1 in
     download)
@@ -511,7 +499,7 @@ case $1 in
         download "$@"
         download_test_data
         ;;
-    protoc | build | run | push | pull | dev | attach | download_test_data)
+    build | run | push | pull | dev | attach | download_test_data)
         $@
         ;;
     *)

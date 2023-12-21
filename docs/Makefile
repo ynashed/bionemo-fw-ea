@@ -8,8 +8,6 @@ SPHINXBUILD   ?= sphinx-build
 SOURCEDIR     = bionemo
 BUILDDIR      = build
 
-PROTOBUFFILES = $(wildcard ../riva/proto/*.proto)
-
 # Put it first so that "make" without argument is like "make help".
 help:
 	@$(SPHINXBUILD) -M help "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)

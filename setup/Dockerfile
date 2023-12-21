@@ -104,10 +104,7 @@ COPY LICENSE README.md artifact_paths.yaml download_models.py launch.sh pytest.i
 COPY bionemo ${BIONEMO_HOME}/bionemo
 COPY docs ${BIONEMO_HOME}/docs
 COPY examples ${BIONEMO_HOME}/examples
-# TODO remove generated/ in !554
-COPY generated ${BIONEMO_HOME}/generated
 COPY hydra_plugins ${BIONEMO_HOME}/hydra_plugins
-COPY proto ${BIONEMO_HOME}/proto
 COPY setup ${BIONEMO_HOME}/setup
 COPY tests ${BIONEMO_HOME}/tests
 COPY tokenizers ${BIONEMO_HOME}/tokenizers
@@ -116,9 +113,8 @@ COPY tokenizers ${BIONEMO_HOME}/tokenizers
 ARG NEMO_HOME
 ENV NEMO_HOME=${NEMO_HOME}
 
-# TODO remove generated/ in !554
-# TODO remove PYTHONPATH manipulation in !555
-ENV PYTHONPATH=${BIONEMO_HOME}:${BIONEMO_HOME}/generated:${NEMO_HOME}:$PYTHONPATH
+# TODO remove PYTHONPATH manipulation in !555 (pyproject.toml build)
+ENV PYTHONPATH=${BIONEMO_HOME}:${NEMO_HOME}:$PYTHONPATH
 
 # TODO(trvachov): Remove after NeMo is upgraded to 1.21
 COPY ./setup/nemo-v-1.20-fix-for-esm2.patch /nemo-v-1.20-fix-for-esm2.patch

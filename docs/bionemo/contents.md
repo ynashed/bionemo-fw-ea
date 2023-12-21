@@ -18,8 +18,8 @@ known-issues-fw
 bionemo-fw-for-model-training-fw
 data-module-fw
 dwnstr-task-validation
-inference-grpc-fw
 inference-triton-fw
+deep-dive-esm1-pytriton-inference
 ```
 
 ```{toctree}
