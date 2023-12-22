@@ -182,7 +182,8 @@ fi
 
 # Additional variables that will be used in the script when sent in the .env file:
 # BASE_IMAGE        Custom Base image for building.
-# NEMO_HOME         Path to external copy of NeMo source code, which is mounted at /workspace/nemo. This allows a different version of NeMo to be used with code.
+# NEMO_HOME         Path to external copy of NeMo source code, which is mounted into the nemo dependency install location in the environment. 
+#                   This allows a different version of NeMo to be used with code.
 # TOKENIZERS_PATH   Workstation directory to be mounted to /tokenizers inside container
 
 # Compare Docker version to find Nvidia Container Toolkit support.
@@ -373,13 +374,12 @@ setup() {
     mkdir -p ${DATA_PATH}
     mkdir -p ${RESULT_PATH}
     mkdir -p ${MODEL_PATH}
-    DEV_PYTHONPATH="" # TODO: remove once pyproject.toml setup MR is complete
 
     if [ ! -z "${NEMO_HOME}" ];
     then
-        DOCKER_CMD="${DOCKER_CMD} -v ${NEMO_HOME}:/workspace/nemo "
-        DOCKER_CMD="${DOCKER_CMD} --env NEMO_HOME=${NEMO_HOME} "
-        DEV_PYTHONPATH="${DEV_PYTHONPATH}:/workspace/nemo" # TODO: remove once pyproject.toml setup MR is complete
+        # NOTE: If we change the Python version, we will have a different mount path!
+        echo "Making a volume mount for nemo (/usr/local/lib/python3.10/dist-packages/nemo) to NEMO_HOME (${NEMO_HOME})"
+        DOCKER_CMD="${DOCKER_CMD} -v ${NEMO_HOME}:/usr/local/lib/python3.10/dist-packages/nemo "
     fi
 
     # Note: For BIONEMO_HOME, if we are invoking docker, this should always be
@@ -407,11 +407,6 @@ setup() {
     if [[ $1 == "dev" ]]; then
         echo "Mounting ~/.ssh up for development"
         DOCKER_CMD="$DOCKER_CMD -v ${HOME}/.ssh:${HOME}/.ssh:ro"
-        # TODO: remove once pyproject.toml setup MR is complete
-        echo "Prepending ${DOCKER_REPO_PATH} to PYTHONPATH for development"
-        DEV_PYTHONPATH="${DOCKER_REPO_PATH}:${DEV_PYTHONPATH}"
-        DOCKER_CMD="${DOCKER_CMD} --env PYTHONPATH=${DEV_PYTHONPATH}"
-        # end TODO
     fi
 }
 

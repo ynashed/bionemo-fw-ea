@@ -140,8 +140,6 @@ pytest:
     # TODO(trvachov): Here, we test the code inside the gitlab mounted path, /builds/clara-discovery/bionemo - CI_PROJECT_DIR
     # We do not test the code that's mounted to /workspace/bionemo. We probably need two separate test paths for this.
     - cd $BIONEMO_HOME
-    # TODO [mgreaves] Remove PYTHONPATH manipulation with !555 (pyproject.toml build)
-    - export PYTHONPATH=${BIONEMO_HOME}:${PYTHON_PATH}
     - ls -ltr
     - ls -lts /
     - df -Thl

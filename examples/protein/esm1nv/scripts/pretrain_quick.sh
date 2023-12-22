@@ -119,7 +119,6 @@ parse_args() {
 
 
 mkdir -p ${RESULTS_MOUNT}
-export PYTHONPATH="${BIONEMO_HOME}:$PYTHONPATH"
 
 export HYDRA_FULL_ERROR=1
 cd ${RUN_SCRIPT_DIRECTORY}

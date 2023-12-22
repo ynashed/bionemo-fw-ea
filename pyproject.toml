@@ -1,18 +1,76 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm", "wheel"]
+build-backend = "setuptools.build_meta"
+
+# For guidance, see: https://packaging.python.org/en/latest/guides/writing-pyproject-toml/
+[project]
+name = "bionemo"
+dynamic = ["version"] # see [tools.setuptools.dynamic] !
+authors = [ {name = "NVIDIA BioNeMo Team" } ]
+description = "BioNeMo, a library for large language models in drug discovery. Trainable with NeMo."
+readme = "README.md"
+requires-python = ">=3.10"
+keywords = ["drug discovery", "cheminformatics", "proeteomics", "deep learning", "machine learning", "gpu", "NeMo", "nvidia", "pytorch", "torch"]
+license = {text = "Copyright (c) 2022-2024 NVIDIA Corp. All rights reserved except when distributed to approved users under the terms of the Apache2 license."}
+classifiers = [
+    "Programming Language :: Python :: 3.10",
+    "Development Status :: 4 - Beta",
+    "Environment :: GPU :: NVIDIA CUDA :: 12 :: 12.1",
+    "Private :: Do Not Upload", # REMOVE ONCE BioNeMo IS OPEN-SOURCED !!
+]
+
+# TODO [mgreaves]: need to include reqs here for distribution, but still must support image-caching install of deps.
+#                  Currently, depednecies are installed via pip from setup/requirements.txt
+#dependencies = [ 'package-name-here; python_version<"3.8" <other classifiers>', ]
+# TODO: potentially, use this to define main, test, and dev dependencies ??
+#[project.optional-dependencies]
+#rest = ["abcxyz ==1.1, ==1.4"]
+
+# TODO [mgreaves]: develop, then install important main programs here:
+#  - unified trainer ?? (dev/debug + distrubted on $CLUSTER_TYPE, prod-ready for science)
+#  - unified perft tester ?? (distrubted on $CLUSTER_TYPE, outputs reports to single shared loc)
+#  - unified dev-mode pytrition server ?? (same API as prod services, rapid prototyping)
+[project.scripts]
+bionemo-serve-pytriton = "bionemo.triton.inference_wrapper:entrypoint"
+# bionemo-train = "???:entrypoint"
+# bionemo-perf = ""???:entrypoint"
+
+[tool.setuptools.dynamic]
+version = {attr = "bionemo.package_info.__version__"}
+
+# https://setuptools.pypa.io/en/latest/userguide/pyproject_config.html
+[tool.setuptools.packages.find]
+where = ["."]  # list of folders that contain the packages (["."] by default)
+include = ["bionemo*"] # package names should match these glob patterns (["*"] by default)
+exclude = ["tests*", "examples*"]
+namespaces = false  # to disable scanning PEP 420 namespaces (true by default)
+
+[tool.pytest.ini_options]
+addopts = "--forked"
+markers = [
+    'slow: marks tests as slow (deselect with `-m "not slow"`)',
+    'needs_gpu: marks tests as requiring gpu (deselect with `-m "not needs_gpu"`)',
+    'needs_checkpoint: marks tests as requiring trained model checkpoint (deselect with `-m "not needs_checkpoint"`)',
+]
+testpaths = ["tests",  "examples/tests",]
+filterwarnings = [ "ignore::DeprecationWarning",]
+
+[tool.coverage.run]
+source = ["bionemo", "examples"]
+
 [tool.black]
 line-length = 119
 target-version = ['py310']
-# force-exclude = ''
 
 [tool.ruff]
-ignore = ["C901", "E741", "E501"]
+ignore = ["C901", "E741", "E501",]
 # Run `ruff linter` for a description of what selection means.
-select = ["C", "E", "F", "I", "W"]
+select = ["C", "E", "F", "I", "W",]
 line-length = 119
-# exclude = []
 
 # Ignore import violations in all `__init__.py` files.
 [tool.ruff.per-file-ignores]
-"__init__.py" = ["E402", "F401", "F403", "F811"]
+"__init__.py" = ["E402", "F401", "F403", "F811",]
 
 [tool.ruff.isort]
 lines-after-imports = 2

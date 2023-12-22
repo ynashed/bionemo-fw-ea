@@ -25,6 +25,9 @@ FROM ${BASE_IMAGE}
 ENV TERM=xterm
 ENV FORCE_CUDA=1
 
+# makes the interactive bash shell "login" have this in the prompt
+RUN echo 'export PS1="(bionemo docker) $PS1"' > /docker_bashrc
+
 WORKDIR /workspace/
 # TODO: Long term, docker should not be running as root.
 ENV HOME=/root
@@ -39,9 +42,6 @@ RUN cd dgl/python && python setup.py install && cd ../.. && rm -rf dgl
 # LABEL "com.nvidia.nemo.release"="r1.19.0"
 # LABEL "com.nvidia.nemo.git_hash"="a5fbsegy"
 # LABEL "com.nvidia.nemo.description"="Cusotom build with XYZ fixed"
-
-# Activating base environment
-ENV TERM=xterm
 
 ## Installing dependencies and tools
 RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
@@ -93,29 +93,13 @@ RUN NEMO_PATH=$(python -c 'import nemo; print(nemo.__path__[0])') && \
 # BioNeMo Build
 #########################################################################################
 
-# The location of the installed library in the container. Set BIONEMO_HOME env to change this for development purposes.
+### The location of the installed library in the container. Set BIONEMO_HOME env to change this for development purposes.
 ARG BIONEMO_HOME=/workspace/bionemo
 ENV BIONEMO_HOME=${BIONEMO_HOME}
-
 RUN mkdir -p ${BIONEMO_HOME}
 
-# Copy the repo except the internal directory
-COPY LICENSE README.md artifact_paths.yaml download_models.py launch.sh pytest.ini pyproject.toml ${BIONEMO_HOME}/
-COPY bionemo ${BIONEMO_HOME}/bionemo
-COPY docs ${BIONEMO_HOME}/docs
-COPY examples ${BIONEMO_HOME}/examples
-COPY hydra_plugins ${BIONEMO_HOME}/hydra_plugins
-COPY setup ${BIONEMO_HOME}/setup
-COPY tests ${BIONEMO_HOME}/tests
-COPY tokenizers ${BIONEMO_HOME}/tokenizers
 
-# NEMO_HOME must be unset for default NeMo install in /usr/local/lib/python3.8/dist-packages/nemo
-ARG NEMO_HOME
-ENV NEMO_HOME=${NEMO_HOME}
-
-# TODO remove PYTHONPATH manipulation in !555 (pyproject.toml build)
-ENV PYTHONPATH=${BIONEMO_HOME}:${NEMO_HOME}:$PYTHONPATH
-
+### Patching dependencies.
 # TODO(trvachov): Remove after NeMo is upgraded to 1.21
 COPY ./setup/nemo-v-1.20-fix-for-esm2.patch /nemo-v-1.20-fix-for-esm2.patch
 RUN patch -p1 /usr/local/lib/python3.10/dist-packages/nemo/collections/nlp/data/language_modeling/megatron/dataset_utils.py /nemo-v-1.20-fix-for-esm2.patch \
@@ -125,10 +109,30 @@ RUN patch -p1 /usr/local/lib/python3.10/dist-packages/nemo/collections/nlp/data/
 #       This is exposed through the `iteractive=True` constructor parameter.
 #       In MegaMolBart, specifically, this patch adds support for recongifure_minibatch as a flag
 #       in its decode method.
+# TODO [mgreaves] Upstream this patch and then remove here when we can upgrade our nemo dependency.
+#                 https://jirasw.nvidia.com/browse/CDISCOVERY-2146
 COPY ./setup/nemo-v-1.20-support_interactive_megamolbart_lm-decode_reconfigure_minibatch.patch /nemo-v-1.20-support_interactive_megamolbart_lm-decode_reconfigure_minibatch.patch
 RUN patch -p1 /usr/local/lib/python3.10/dist-packages/nemo/collections/nlp/models/language_modeling/megatron_lm_encoder_decoder_model.py /nemo-v-1.20-support_interactive_megamolbart_lm-decode_reconfigure_minibatch.patch \
     && rm /nemo-v-1.20-support_interactive_megamolbart_lm-decode_reconfigure_minibatch.patch
 
-RUN echo 'export PS1="(bionemo docker) $PS1"' > /docker_bashrc
 
+### Copy the bionemo repo contents for distribution
+COPY LICENSE README.md artifact_paths.yaml download_models.py launch.sh setup.py pyproject.toml ${BIONEMO_HOME}/
+COPY setup ${BIONEMO_HOME}/setup
+COPY docs ${BIONEMO_HOME}/docs
+COPY hydra_plugins ${BIONEMO_HOME}/hydra_plugins
+COPY tokenizers ${BIONEMO_HOME}/tokenizers
+# copy the package contents *last* as most churn occurs here
+# --> we can cache the lower-chrun things in previous layers
+COPY examples ${BIONEMO_HOME}/examples
+COPY tests ${BIONEMO_HOME}/tests
+COPY bionemo ${BIONEMO_HOME}/bionemo
+
+
+### install bionemo
+WORKDIR ${BIONEMO_HOME}
+# we already install dependencies earlier, directly from the requirements*.txt files
+RUN pip install --no-deps -e .
+
+# FIXME: If BIONEMO_HOME _is not_ /workspace/bionemo, then this ENTRYPOINT is invalid!
 ENTRYPOINT ["/workspace/bionemo/setup/startup.sh"]

@@ -43,7 +43,7 @@ coverage.xml
 **/lightning_logs
 **/*.npy
 
-# internal
+# internal bionemo development: not for public release
 .gitlab-ci.yaml
 
 # configs
