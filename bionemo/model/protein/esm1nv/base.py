@@ -294,7 +294,7 @@ class ESMnvTransformerLanguageModel(TransformerLanguageModel):
                 num_attention_heads_kerple=None,
                 max_seq_len=max_position_embeddings,
             )
-            assert use_flash_attention is False  # flash-attention not supported with kerple at this point
+            assert use_flash_attention is False, "flash-attention not supported with kerple at this point"
 
         elif position_embedding_type == 'sandwich':
             self.encoder_relative_position_embedding = SandwichRelativePositionEmbedding(

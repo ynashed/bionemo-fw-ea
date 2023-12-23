@@ -12,11 +12,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import List
+from typing import List, Optional, Sequence, Tuple
 
 import torch
 
 from bionemo.model.core.infer import BaseEncoderDecoderInference
+
+
+__all__: Sequence[str] = ("ESM1nvInference",)
 
 
 class ESM1nvInference(BaseEncoderDecoderInference):
@@ -24,7 +27,16 @@ class ESM1nvInference(BaseEncoderDecoderInference):
     All inference functions
     '''
 
-    def __init__(self, cfg, model=None, freeze=True, restore_path=None, training=False, adjust_config=True):
+    def __init__(
+        self,
+        cfg,
+        model=None,
+        freeze: bool = True,
+        restore_path: Optional[str] = None,
+        training: bool = False,
+        adjust_config: bool = True,
+        interactive: bool = False,
+    ):
         super().__init__(
             cfg=cfg,
             model=model,
@@ -32,9 +44,10 @@ class ESM1nvInference(BaseEncoderDecoderInference):
             restore_path=restore_path,
             training=training,
             adjust_config=adjust_config,
+            interactive=interactive,
         )
 
-    def _tokenize(self, sequences: List[str]):
+    def _tokenize(self, sequences: List[str]) -> List[torch.Tensor]:
         """
         ESM expects input format:
 
@@ -46,7 +59,7 @@ class ESM1nvInference(BaseEncoderDecoderInference):
 
         return token_ids
 
-    def seq_to_hiddens(self, sequences):
+    def seq_to_hiddens(self, sequences: List[str]) -> Tuple[torch.Tensor, torch.Tensor]:
         '''
         Transforms Sequences into hidden state.
         Should be implemented in a child class, since it is model specific.

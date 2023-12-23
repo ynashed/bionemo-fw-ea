@@ -23,6 +23,7 @@ from nemo.utils import logging
 from omegaconf import DictConfig
 from pytriton.triton import Triton
 
+from bionemo.model.core.infer import M
 from bionemo.triton import decodes
 from bionemo.triton.embeddings import nav_triton_embedding_infer_fn, triton_embedding_infer_fn
 from bionemo.triton.hiddens import triton_hidden_infer_fn
@@ -35,7 +36,6 @@ from bionemo.triton.types_constants import (
     HIDDENS,
     SAMPLINGS,
     SEQUENCES,
-    M,
     StrInferFn,
 )
 from bionemo.triton.utils import (

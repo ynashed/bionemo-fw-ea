@@ -1,4 +1,4 @@
-# Copyright (c) 2022, NVIDIA CORPORATION.
+# Copyright (c) 2022-2024, NVIDIA CORPORATION.
 # SPDX-License-Identifier: Apache-2.0
 
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,6 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from pathlib import Path
+from typing import Sequence
 
 from nemo.core.optim.lr_scheduler import register_scheduler
 
@@ -21,8 +23,16 @@ from bionemo.utils.scheduler import (
 )
 
 
+__all__: Sequence[str] = ("BIONEMO_PY_ROOT",)
+
+# TODO [mgreaves]: Refactor, don't modify global state on bionemo import.
+#                  Instead, perform this registration on a per-model-train basis.
 register_scheduler(
     'LinearWarmupHoldDecayPolicy',
     LinearWarmupHoldDecayPolicy,
     LinearWarmupHoldDecayParams,
 )
+
+BIONEMO_PY_ROOT: Path = Path(__file__).parent
+"""The directory containg the bionemo Python package.
+"""

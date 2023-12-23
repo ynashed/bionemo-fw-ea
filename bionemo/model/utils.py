@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import re
+from typing import Optional, Type, TypeVar
 
 import pytorch_lightning as pl
 import torch
@@ -28,8 +29,7 @@ from nemo.utils import logging
 from nemo.utils.app_state import AppState
 from nemo.utils.exp_manager import StatelessTimer, exp_manager
 from nemo.utils.model_utils import import_class_by_path
-from omegaconf import OmegaConf
-from omegaconf.dictconfig import DictConfig
+from omegaconf import DictConfig, OmegaConf
 from omegaconf.omegaconf import open_dict
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelSummary
@@ -41,6 +41,10 @@ from pytorch_lightning.trainer.connectors.checkpoint_connector import (
 
 from bionemo.callbacks.utils import add_test_callbacks
 
+
+M = TypeVar('M')
+"""Supposed to be `bionemo.model.core.infer.M`, but cannot import that here due to circular imports.
+"""
 
 try:
     import apex
@@ -221,7 +225,7 @@ class InferenceTrainerBuilder(TrainerBuilder):
         pass
 
 
-def setup_trainer(cfg, builder=None, callbacks=[], adjust_config=True, verbose=True):
+def setup_trainer(cfg, builder=None, callbacks=[], adjust_config=True, verbose=True, interactive: bool = False):
     """NeMo Trainer setup functions"""
     if builder is None:
         builder = TrainerBuilder
@@ -232,11 +236,20 @@ def setup_trainer(cfg, builder=None, callbacks=[], adjust_config=True, verbose=T
     mode = "train" if cfg.get("do_training", False) else "test"
     callbacks = builder.configure_callbacks(cfg, callbacks)
     add_test_callbacks(cfg, callbacks=callbacks, mode="infer" if builder == InferenceTrainerBuilder else mode)
-    strategy = builder.configure_strategy(cfg)
+
+    if interactive:
+        strategy = 'auto'
+        # strategy = 'ddp_notebook'
+        print(f"Interactive mode selected, using {strategy=}")
+    else:
+        strategy = builder.configure_strategy(cfg)
 
     trainer = Trainer(plugins=plugins, strategy=strategy, callbacks=callbacks, **cfg.trainer)
+
     exp_manager(trainer, cfg.get("exp_manager", None))
+
     builder.resume_checkpoint(cfg, trainer)
+
     # log trainer configuration (which might be different from input cfg)
     if verbose:
         logging.info("\n\n************** Trainer configuration ***********")
@@ -245,16 +258,27 @@ def setup_trainer(cfg, builder=None, callbacks=[], adjust_config=True, verbose=T
     return trainer
 
 
-def setup_inference_trainer(cfg, builder=None, adjust_config=True):
+def setup_inference_trainer(cfg, builder=None, adjust_config=True, interactive: bool = False):
     """NeMo Trainer setup functions for inference"""
     if builder is None:
         builder = InferenceTrainerBuilder
 
-    return setup_trainer(cfg, builder, adjust_config=adjust_config)
+    return setup_trainer(cfg, builder, adjust_config=adjust_config, interactive=interactive)
 
 
-def restore_model(restore_path, trainer=None, cfg=None, model_cls=None, adjust_config=True, strict=True):
-    """Restore model from checkpoint"""
+def restore_model(
+    restore_path: str,
+    trainer: Optional[pl.Trainer] = None,
+    cfg: Optional[DictConfig] = None,
+    model_cls: Optional[Type[M]] = None,
+    adjust_config: bool = True,
+    strict: bool = True,
+    interactive: bool = False,
+) -> M:
+    """Restore model from checkpoint.
+
+    The supplied `model_cls`
+    """
     logging.info(f"Restoring model from {restore_path}")
 
     # infer model_cls from cfg if missing
@@ -274,7 +298,7 @@ def restore_model(restore_path, trainer=None, cfg=None, model_cls=None, adjust_c
 
     # build trainer if not provided
     if trainer is None:
-        trainer = setup_inference_trainer(cfg=cfg, adjust_config=adjust_config)
+        trainer = setup_inference_trainer(cfg=cfg, adjust_config=adjust_config, interactive=interactive)
 
     # enforce trainer precition
     with open_dict(cfg):
@@ -381,16 +405,16 @@ def _reconfigure_inference_batch(global_batch_per_gpu, global_batch_size=None):
         )
 
 
-def initialize_model_parallel(model):
+def _dummy() -> None:
+    return
+
+
+def initialize_model_parallel(model, interactive: bool = False) -> None:
     # check whether the DDP is initialized
-    if parallel_state.is_unitialized():
+    if not interactive and parallel_state.is_unitialized():
         logging.info("DDP is not initialized. Initializing...")
-
-        def dummy():
-            return
-
         if model.trainer.strategy.launcher is not None:
-            model.trainer.strategy.launcher.launch(dummy, trainer=model.trainer)
+            model.trainer.strategy.launcher.launch(_dummy, trainer=model.trainer)
         model.trainer.strategy.setup_environment()
 
 
@@ -399,20 +423,19 @@ def initialize_distributed_parallel_state(
     tensor_model_parallel_size: int = 1,
     pipeline_model_parallel_size: int = 1,
     pipeline_model_parallel_split_rank: int = 0,
-):
+    interactive: bool = False,
+) -> None:
     # initialize pytorch DDP
+    # if not interactive and not torch.distributed.is_initialized():
     if not torch.distributed.is_initialized():
         logging.info("pytorch DDP is not initialized. Initializing with pytorch-lightening...")
-        trainer = pl.Trainer(gpus=1, strategy='ddp', num_nodes=1)
-
-        def dummy():
-            return
+        trainer = pl.Trainer(gpus=1, strategy='ddp' if not interactive else "auto", num_nodes=1)
 
         if trainer.strategy.launcher is not None:
-            trainer.strategy.launcher.launch(dummy, trainer=trainer)
+            trainer.strategy.launcher.launch(_dummy, trainer=trainer)
         trainer.strategy.setup_environment()
 
-    if parallel_state.is_unitialized():
+    if not interactive and parallel_state.is_unitialized():
         logging.info("Megatron DDP is not initialized. Initializing...")
         parallel_state.initialize_model_parallel(
             tensor_model_parallel_size=tensor_model_parallel_size,

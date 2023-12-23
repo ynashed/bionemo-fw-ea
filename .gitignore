@@ -183,6 +183,12 @@ dump.py
 
 docs/sources/source/test_build/
 
+test_results/
+
+# only ignore the root-level models/ directory
+/models
+/data
+
 # Checkpoints, config files and temporary files created in tutorials.
 examples/neural_graphs/*.chkpt
 examples/neural_graphs/*.yml

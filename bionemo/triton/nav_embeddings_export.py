@@ -22,8 +22,9 @@ from nemo.core.config import hydra_runner
 from omegaconf import DictConfig
 from torch.utils.data import DataLoader
 
+from bionemo.model.core.infer import M
 from bionemo.model.loading import setup_inference
-from bionemo.triton.types_constants import EMBEDDINGS, M
+from bionemo.triton.types_constants import EMBEDDINGS
 from bionemo.triton.utils import NavWrapper, model_navigator_filepath
 
 

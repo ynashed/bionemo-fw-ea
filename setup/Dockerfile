@@ -121,6 +121,14 @@ COPY ./setup/nemo-v-1.20-fix-for-esm2.patch /nemo-v-1.20-fix-for-esm2.patch
 RUN patch -p1 /usr/local/lib/python3.10/dist-packages/nemo/collections/nlp/data/language_modeling/megatron/dataset_utils.py /nemo-v-1.20-fix-for-esm2.patch \
     && rm /nemo-v-1.20-fix-for-esm2.patch
 
+# NOTE: This is to support the MegaMolBart LM model compatability with Jupyter notebooks and ipdb.
+#       This is exposed through the `iteractive=True` constructor parameter.
+#       In MegaMolBart, specifically, this patch adds support for recongifure_minibatch as a flag
+#       in its decode method.
+COPY ./setup/nemo-v-1.20-support_interactive_megamolbart_lm-decode_reconfigure_minibatch.patch /nemo-v-1.20-support_interactive_megamolbart_lm-decode_reconfigure_minibatch.patch
+RUN patch -p1 /usr/local/lib/python3.10/dist-packages/nemo/collections/nlp/models/language_modeling/megatron_lm_encoder_decoder_model.py /nemo-v-1.20-support_interactive_megamolbart_lm-decode_reconfigure_minibatch.patch \
+    && rm /nemo-v-1.20-support_interactive_megamolbart_lm-decode_reconfigure_minibatch.patch
+
 RUN echo 'export PS1="(bionemo docker) $PS1"' > /docker_bashrc
 
 ENTRYPOINT ["/workspace/bionemo/setup/startup.sh"]

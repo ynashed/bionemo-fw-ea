@@ -18,7 +18,8 @@ from typing import Callable, Sequence, TypedDict
 import numpy as np
 from pytriton.decorators import batch
 
-from bionemo.triton.types_constants import HIDDENS, MASK, M
+from bionemo.model.core.infer import M
+from bionemo.triton.types_constants import HIDDENS, MASK
 from bionemo.triton.utils import decode_str_batch
 
 

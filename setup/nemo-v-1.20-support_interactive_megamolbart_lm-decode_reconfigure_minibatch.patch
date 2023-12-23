@@ -1,0 +1,74 @@
+1046a1047
+>         reconfigure_microbatch: bool = True,
+1095,1101c1096,1103
+<             _reconfigure_microbatch_calculator(
+<                 rank=0,  # This doesn't matter since it is only used for logging
+<                 rampup_batch_size=None,
+<                 global_batch_size=1,
+<                 micro_batch_size=1,  # Make sure that there is no "grad acc" while decoding.
+<                 data_parallel_size=1,  # We check above to make sure that dataparallel size is always 1 at inference.
+<             )
+---
+>             if reconfigure_microbatch:
+>                 _reconfigure_microbatch_calculator(
+>                     rank=0,  # This doesn't matter since it is only used for logging
+>                     rampup_batch_size=None,
+>                     global_batch_size=1,
+>                     micro_batch_size=1,  # Make sure that there is no "grad acc" while decoding.
+>                     data_parallel_size=1,  # We check above to make sure that dataparallel size is always 1 at inference.
+>                 )
+1119,1125c1121,1128
+<         _reconfigure_microbatch_calculator(
+<             rank=app_state.global_rank,
+<             rampup_batch_size=None,
+<             global_batch_size=global_batch_per_gpu * parallel_state.get_data_parallel_world_size(),
+<             micro_batch_size=global_batch_per_gpu,  # Make sure that there is no "grad acc" while decoding.
+<             data_parallel_size=parallel_state.get_data_parallel_world_size(),
+<         )
+---
+>         if reconfigure_microbatch: 
+>             _reconfigure_microbatch_calculator(
+>                 rank=app_state.global_rank,
+>                 rampup_batch_size=None,
+>                 global_batch_size=global_batch_per_gpu * parallel_state.get_data_parallel_world_size(),
+>                 micro_batch_size=global_batch_per_gpu,  # Make sure that there is no "grad acc" while decoding.
+>                 data_parallel_size=parallel_state.get_data_parallel_world_size(),
+>             )
+1142c1145
+<                 tokens_enc=tokens_enc, enc_mask=enc_mask, encoder_input=encoder_input, reconfigure_microbatch=False
+---
+>                 tokens_enc=tokens_enc, enc_mask=enc_mask, encoder_input=encoder_input, reconfigure_microbatch=reconfigure_microbatch
+1208,1214c1211,1218
+<                         _reconfigure_microbatch_calculator(
+<                             rank=app_state.global_rank,
+<                             rampup_batch_size=None,
+<                             global_batch_size=global_batch_per_gpu * parallel_state.get_data_parallel_world_size(),
+<                             micro_batch_size=global_batch_per_gpu,
+<                             data_parallel_size=parallel_state.get_data_parallel_world_size(),
+<                         )
+---
+>                         if reconfigure_microbatch:
+>                             _reconfigure_microbatch_calculator(
+>                                 rank=app_state.global_rank,
+>                                 rampup_batch_size=None,
+>                                 global_batch_size=global_batch_per_gpu * parallel_state.get_data_parallel_world_size(),
+>                                 micro_batch_size=global_batch_per_gpu,
+>                                 data_parallel_size=parallel_state.get_data_parallel_world_size(),
+>                             )
+1299,1305c1303,1310
+<         _reconfigure_microbatch_calculator(
+<             rank=app_state.global_rank,
+<             rampup_batch_size=None,
+<             global_batch_size=global_batch_per_gpu * parallel_state.get_data_parallel_world_size(),
+<             micro_batch_size=global_batch_per_gpu // num_micro_batches_before_decode,
+<             data_parallel_size=parallel_state.get_data_parallel_world_size(),
+<         )
+---
+>         if reconfigure_microbatch:
+>             _reconfigure_microbatch_calculator(
+>                 rank=app_state.global_rank,
+>                 rampup_batch_size=None,
+>                 global_batch_size=global_batch_per_gpu * parallel_state.get_data_parallel_world_size(),
+>                 micro_batch_size=global_batch_per_gpu // num_micro_batches_before_decode,
+>                 data_parallel_size=parallel_state.get_data_parallel_world_size(),
+>             )

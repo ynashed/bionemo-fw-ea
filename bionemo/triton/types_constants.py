@@ -2,12 +2,9 @@ from typing import Callable, Dict, List, Literal, Sequence, Tuple, TypeVar, Unio
 
 import numpy as np
 
-from bionemo.model.core import BaseEncoderDecoderInference
-
 
 __all__: Sequence[str] = (
     # types
-    "M",
     "StrArray",
     "NamedArrays",
     "StrInferFn",
@@ -38,10 +35,6 @@ BIONEMO_MODEL: Literal['bionemo_model'] = "bionemo_model"
 GENERATED: Literal['generated'] = "generated"
 
 MASK: Literal['mask'] = "mask"
-
-M = TypeVar('M', bound=BaseEncoderDecoderInference)
-"""Generic type for any BioNeMo encoder-decoder model: any type that extends BaseEncoderDecoderInference.
-"""
 
 StrArray = np.ndarray[Tuple[Literal[1]], bytes]
 """A string of characters, as a UTF-8 encoded bytestring, implemented as a single-dimension NumPy array.

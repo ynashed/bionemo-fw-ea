@@ -20,8 +20,9 @@ import torch
 from model_navigator.package.package import Package
 from pytriton.decorators import batch
 
+from bionemo.model.core.infer import M
 from bionemo.model.protein.esm1nv.esm1nv_model import ESM1nvModel
-from bionemo.triton.types_constants import EMBEDDINGS, M, StrArray
+from bionemo.triton.types_constants import EMBEDDINGS, StrArray
 from bionemo.triton.utils import decode_str_batch
 
 

@@ -16,7 +16,8 @@ from typing import Callable, List, Sequence, TypedDict
 import numpy as np
 from pytriton.decorators import batch
 
-from bionemo.triton.types_constants import GENERATED, M
+from bionemo.model.core.infer import M
+from bionemo.triton.types_constants import GENERATED
 from bionemo.triton.utils import decode_str_batch
 
 

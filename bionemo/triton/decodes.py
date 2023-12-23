@@ -17,7 +17,8 @@ import numpy as np
 import torch
 from pytriton.decorators import batch
 
-from bionemo.triton.types_constants import HIDDENS, MASK, SEQUENCES, M, SeqsOrBatch
+from bionemo.model.core.infer import M
+from bionemo.triton.types_constants import HIDDENS, MASK, SEQUENCES, SeqsOrBatch
 from bionemo.triton.utils import encode_str_batch
 
 

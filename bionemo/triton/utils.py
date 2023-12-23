@@ -19,6 +19,8 @@ import model_navigator
 import numpy as np
 import torch
 from hydra import compose, initialize_config_dir
+from hydra.core.config_search_path import ConfigSearchPath
+from hydra.plugins.search_path_plugin import SearchPathPlugin
 from model_navigator.package.package import Package
 from model_navigator.runtime_analyzer.strategy import RuntimeSearchStrategy
 from nemo.utils import logging
@@ -27,17 +29,18 @@ from omegaconf import DictConfig, OmegaConf
 from pytriton.model_config import ModelConfig, Tensor
 from pytriton.triton import Triton
 
-from bionemo.model import initialize_distributed_parallel_state
+from bionemo.model.core.infer import M
+from bionemo.model.utils import initialize_distributed_parallel_state
 from bionemo.triton.types_constants import (
     EMBEDDINGS,
     HIDDENS,
     MASK,
     SEQUENCES,
-    M,
     NamedArrays,
     SeqsOrBatch,
     StrInferFn,
 )
+from bionemo.utils.tests import register_searchpath_config_plugin
 
 
 __all__: Sequence[str] = (
@@ -156,6 +159,15 @@ def register_masked_decode_infer_fn(
 def load_model_config(
     config_path: Union[Path, str], config_name: str, *, logger: Optional[Logger] = None
 ) -> DictConfig:
+    class C(SearchPathPlugin):
+        def __init__(self) -> None:
+            super().__init__()
+
+        def manipulate_search_path(self, search_path: ConfigSearchPath) -> None:
+            search_path.prepend(provider="bionemo-searchpath-plugin", path="file:///workspace/bionemo/examples/conf")
+
+    register_searchpath_config_plugin(C)
+
     with initialize_config_dir(version_base=None, config_dir=str(config_path)):
         cfg = compose(config_name=config_name.replace('.yaml', ''))
     if logger is not None:
@@ -164,28 +176,7 @@ def load_model_config(
     return cfg
 
 
-# TODO [mgreaves] This is the version that will go in for !553
-# def load_model_for_inference(cfg: DictConfig, *, interactive: bool = False) -> M:
-#     """Loads a bionemo encoder-decoder model from a complete configuration, preparing it only for inference."""
-#     if not hasattr(cfg, "infer_target"):
-#         raise ValueError(f"Expecting configuration to have an `infer_target` attribute. Invalid config: {cfg=}")
-#     infer_class = import_class_by_path(cfg.infer_target)
-#
-#     initialize_distributed_parallel_state(
-#         local_rank=0,
-#         tensor_model_parallel_size=1,
-#         pipeline_model_parallel_size=1,
-#         pipeline_model_parallel_split_rank=0,
-#         interactive=interactive,
-#     )
-#
-#     model = infer_class(cfg, interactive=interactive)
-#     model.freeze()
-#
-#     return model
-
-
-def load_model_for_inference(cfg: DictConfig) -> M:
+def load_model_for_inference(cfg: DictConfig, *, interactive: bool = False) -> M:
     """Loads a bionemo encoder-decoder model from a complete configuration, preparing it only for inference."""
     if not hasattr(cfg, "infer_target"):
         raise ValueError(f"Expecting configuration to have an `infer_target` attribute. Invalid config: {cfg=}")
@@ -196,9 +187,10 @@ def load_model_for_inference(cfg: DictConfig) -> M:
         tensor_model_parallel_size=1,
         pipeline_model_parallel_size=1,
         pipeline_model_parallel_split_rank=0,
+        interactive=interactive,
     )
 
-    model = infer_class(cfg)
+    model = infer_class(cfg, interactive=interactive)
     model.freeze()
 
     return model

@@ -1,3 +1,17 @@
+# Copyright (c) 2022-2024, NVIDIA CORPORATION.
+# SPDX-License-Identifier: Apache-2.0
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 from typing import Sequence, Tuple
 
 import pytorch_lightning as pl
@@ -11,28 +25,25 @@ from bionemo.data.mapped_dataset import FilteredMappedDataset
 from bionemo.data.memmap_csv_fields_dataset import CSVFieldsMemmapDataset
 from bionemo.data.memmap_fasta_fields_dataset import FASTAFieldsMemmapDataset
 from bionemo.data.utils import expand_dataset_paths
-from bionemo.triton.types_constants import M
+from bionemo.model.core.infer import M
 
 
 __all__: Sequence[str] = ("setup_inference",)
 
 
-# TODO [mgreaves] uncommment with !553
-# def setup_inference(cfg: DictConfig, *, interactive: bool = False) -> Tuple[M, pl.Trainer, DataLoader]:
-def setup_inference(cfg: DictConfig) -> Tuple[M, pl.Trainer, DataLoader]:
+def setup_inference(cfg: DictConfig, *, interactive: bool = False) -> Tuple[M, pl.Trainer, DataLoader]:
     logging.info("\n\n************** Experiment configuration ***********")
     logging.info(f'\n{OmegaConf.to_yaml(cfg)}')
 
     infer_class = import_class_by_path(cfg.infer_target)
 
-    # TODO [mgreaves] uncomment with !553
-    # infer_model = infer_class(cfg, interactive=interactive)
-    infer_model = infer_class(cfg)
+    infer_model = infer_class(cfg, interactive=interactive)
     trainer = infer_model.trainer
 
     logging.info("\n\n************** Restored model configuration ***********")
     logging.info(f'\n{OmegaConf.to_yaml(infer_model.model.cfg)}')
 
+    # TODO [???]: move this code into a dataset builder in data utils
     if not cfg.model.data.data_impl:
         # try to infer data_impl from the dataset_path file extension
         if cfg.model.data.dataset_path.endswith('.fasta'):
@@ -41,6 +52,7 @@ def setup_inference(cfg: DictConfig) -> Tuple[M, pl.Trainer, DataLoader]:
             # Data are assumed to be CSV format if no extension provided
             logging.info('File extension not supplied for data, inferring csv.')
             cfg.model.data.data_impl = 'csv_fields_mmap'
+
         logging.info(f'Inferred data_impl: {cfg.model.data.data_impl}')
 
     if cfg.model.data.data_impl == "csv_fields_mmap":
