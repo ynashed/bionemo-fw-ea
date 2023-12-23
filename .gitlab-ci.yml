@@ -153,8 +153,6 @@ unit-test-pytest:
     - unzip examples/tests/test_data/uniref202104_esm2_qc_test200_val200.zip -d examples/tests/test_data/
     - bash ./examples/molecule/diffdock/scripts/download_data_sample.sh -data_path $BIONEMO_HOME/examples/tests/test_data/molecule/diffdock/ -pbss
     - bash ./examples/protein/openfold/scripts/download_data_sample.sh -data_path $BIONEMO_HOME/examples/tests/test_data/ -pbss
-    - echo "Checking test data contents..."
-    - ls examples/tests/test_data/uniref202104_esm2_qc_test200_val200
     - rm -rf ./.pytest_cache/
     - pytest -v --durations=0 --cov=bionemo --cov-report term --cov-report xml:coverage.xml -k "not test_model_training"
     - df -Thl
