@@ -12,5 +12,8 @@ RUN pip install jet-api --upgrade \
     --extra-index-url https://sc-hw-artf.nvidia.com/api/pypi/hw-joc-pypi/simple \
     --extra-index-url https://sc-hw-artf.nvidia.com/api/pypi/compute-pypi/simple
 
+# TODO(trvachov): Fix this JET conflict. It seems that installing JET will downgrade pydantic.
+RUN pip install pydantic==2.5.3
+
 COPY ./internal ${BIONEMO_HOME}/internal
 COPY CONTRIBUTING.md ${BIONEMO_HOME}/

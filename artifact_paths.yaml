@@ -1,3 +1,17 @@
+# This file specifies the source locations of pretrained models, and what
+# the target locations to which they should be downloaded.
+#
+# The model source can be from either NGC (for internal nvidia + external customer use)
+# or from SwiftStack (aka PBSS) for internal nvidia use.
+#
+# The download_models.py script requires the download directory be specified, but there
+# are two extra parameters here that can further specify what to do with the downloaded file.
+# "symlink" is used to specify if any symlinking operation needs to happen after download.
+# "relative_download_dir" is used to specify the subdirectory to which the files should
+# be downloaded.
+# "extra_args" specifies any extra arguments that should be passed the ngc download or
+# s3 download commands.
+
 models:
     esm1nv:
         ngc: "nvidian/clara-lifesciences/esm1nv:23.06"
@@ -57,9 +71,20 @@ models:
             target: "protein/esm2nv/esm2nv_3B_converted.nemo"
     openfold_inh_finetuned:
         #TODO: update path when model is released
-        ngc: "nvidian/cvai_bnmo_trng/openfold:finetuning_pub_0.1.0"
+        ngc: "nvidian/cvai_bnmo_trng/openfold:finetuning_pub_0.1.1"
         pbss: "s3://bionemo-ci/models/openfold.nemo"
         symlink:
             source: "../../openfold.nemo"
             target: "protein/openfold/openfold.nemo"
-
+    esm2_650m_huggingface:
+        pbss: "s3://bionemo-ci/models/esm2-650M-huggingface"
+        relative_download_dir: "protein/esm2nv/esm2-650M-huggingface"
+        # Hugging face models are multiple files in a directory, so the recursive
+        # flag is used to download everything in the dir.
+        extra_args: "--recursive"
+    esm2_3b_huggingface:
+        pbss: "s3://bionemo-ci/models/esm2-3B-huggingface"
+        relative_download_dir: "protein/esm2nv/esm2-3B-huggingface"
+        # Hugging face models are multiple files in a directory, so the recursive
+        # flag is used to download everything in the dir.
+        extra_args: "--recursive"
