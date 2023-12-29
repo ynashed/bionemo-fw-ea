@@ -34,13 +34,11 @@ spec:
     export NGC_CLI_ORG={NGC_CLI_ORG}
     export NGC_CLI_TEAM={NGC_CLI_TEAM}
     export NGC_CLI_FORMAT_TYPE={NGC_CLI_FORMAT_TYPE}
-    export MODEL_PATH={MODEL_PATH}
     if [ "$SLURM_LOCALID" = "0" ]; then
       if [ "{model}" = "megamolbart" ]; then
-        python download_models.py megamolbart --download_dir $MODEL_PATH;
+        python download_models.py {model} --download_dir {MODEL_PATH} --verbose;
       fi
       if [ "{model}" = "esm2nv" ]; then
-        python download_models.py esm2nv_650m esm2nv_3b --download_dir $MODEL_PATH;
         unzip examples/tests/test_data/uniref202104_esm2_qc_test200_val200.zip -d examples/tests/test_data/;
       fi
       touch .download-finished;

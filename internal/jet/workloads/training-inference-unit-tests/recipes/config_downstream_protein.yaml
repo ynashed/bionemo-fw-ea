@@ -33,9 +33,8 @@ spec:
     export NGC_CLI_ORG={NGC_CLI_ORG}
     export NGC_CLI_TEAM={NGC_CLI_TEAM}
     export NGC_CLI_FORMAT_TYPE={NGC_CLI_FORMAT_TYPE}
-    export MODEL_PATH={MODEL_PATH}
     if [ "$SLURM_LOCALID" = "0" ]; then
-      python download_models.py megamolbart esm1nv esm2nv_650m esm2nv_3b prott5nv --download_dir ${MODEL_PATH}
+      python download_models.py {model} --download_dir {MODEL_PATH} --verbose;
       touch .download-finished;
     else
       until [ -f .download-finished ]; do

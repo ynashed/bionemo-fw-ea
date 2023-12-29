@@ -56,6 +56,11 @@ def entrypoint(cfg: DictConfig) -> None:
         logging.warning(
             "Configuration's output filename already exists! " f"Making unique with filename suffix: {output_fname=}"
         )
+    else:
+        output_folderpath: str = os.path.dirname(output_fname)
+        if not os.path.exists(output_folderpath):
+            os.makedirs(output_folderpath, exist_ok=True)
+            print(f"Directory of output filename '{output_folderpath}' created")
 
     if not output_fname.endswith(".pkl"):
         output_fname += ".pkl"

@@ -137,7 +137,7 @@ pytest:
     - nvidia-smi
     - df -Thl
     - pwd
-    # TODO(trvachov): Here, we test the code inside the gitlab mounted path, /builds/clara-discovery/bionemo
+    # TODO(trvachov): Here, we test the code inside the gitlab mounted path, /builds/clara-discovery/bionemo - CI_PROJECT_DIR
     # We do not test the code that's mounted to /workspace/bionemo. We probably need two separate test paths for this.
     - cd $BIONEMO_HOME
     # TODO [mgreaves] Remove PYTHONPATH manipulation with !555 (pyproject.toml build)
@@ -184,7 +184,7 @@ pytest-internal:
     - nvidia-smi
     - df -Thl
     - pwd
-    # TODO(trvachov): Here, we test the code inside the gitlab mounted path, /builds/clara-discovery/bionemo
+    # TODO(trvachov): Here, we test the code inside the gitlab mounted path, /builds/clara-discovery/bionemo - CI_PROJECT_DIR
     # We do not test the code that's mounted to /workspace/bionemo. We probably need two separate test paths for this.
     - cd $BIONEMO_HOME
     - export PYTHONPATH=${BIONEMO_HOME}:${BIONEMO_HOME}/generated:${PYTHON_PATH}
@@ -199,6 +199,7 @@ pytest-internal:
     - rm -rf ./.pytest_cache/
     - pytest -m "internal" -v --durations=0 --cov=bionemo --cov-report term --cov-report xml:coverage.xml -k "not test_model_training"
     - df -Thl
+
 
 .jet-configure:
   stage: jet
@@ -273,11 +274,10 @@ jet-trigger:
         JET_WORKLOADS_REF: "ephemeral/bionemo/${CI_COMMIT_BRANCH}/${CI_PIPELINE_ID}"
 
 
-# TODO(dorotat): use image gitlab-master.nvidia.com:5005/dl/jet/api:latest
 jet-test:
   needs: [jet-trigger]
   image:
-    name: "${PIPELINE_TAG}-devel"
+    name: gitlab-master.nvidia.com:5005/dl/jet/api:latest
     entrypoint: [ "" ]
   tags:
     - generic
@@ -294,8 +294,9 @@ jet-test:
     - export RO_API_TOKEN CI_PROJECT_ID CI_PIPELINE_ID GITLAB_USER_LOGIN CI_JOB_JWT
     - jet secrets jwt-login jwt/nvidia/gitlab-master bionemo-ci $CI_JOB_JWT
   script:
+    - pip install tqdm
     - echo "CI_PROJECT_ID ${CI_PROJECT_ID}, CI PIPELINE_ID ${CI_PIPELINE_ID}"
-    - bash internal/jet/scripts/run_jet_test.sh
+    - bash $CI_PROJECT_DIR/internal/jet/scripts/run_jet_test.sh
 
 
 dev-deploy:

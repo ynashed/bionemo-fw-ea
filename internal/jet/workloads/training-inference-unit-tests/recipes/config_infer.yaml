@@ -25,6 +25,7 @@ spec:
   NGC_CLI_ORG: nvidian
   NGC_CLI_TEAM: clara-lifesciences
   config_path: "examples/tests/conf/"
+  script_path: "bionemo/model"
   default_overwrites: "++exp_manager.exp_dir=/tmp/nemo_experiments/"
   extra_overwrites: ""
   warmup: 0
@@ -33,16 +34,15 @@ spec:
     export NGC_CLI_ORG={NGC_CLI_ORG}
     export NGC_CLI_TEAM={NGC_CLI_TEAM}
     export NGC_CLI_FORMAT_TYPE={NGC_CLI_FORMAT_TYPE}
-    export MODEL_PATH={MODEL_PATH}
     if [ "$SLURM_LOCALID" = "0" ]; then
-      python download_models.py all --download_dir ${MODEL_PATH} --verbose
+      python download_models.py {checkpoint_name} --download_dir {MODEL_PATH} --verbose;
       touch .download-finished;
     else
       until [ -f .download-finished ]; do
         sleep 5;
       done
     fi
-    python examples/{variant}.py --config-path {BIONEMO_HOME}/{config_path} --config-name {config_name} \
+    python {script_path}/{variant}.py --config-path {BIONEMO_HOME}/{config_path} --config-name {config_name} \
     trainer.num_nodes={nodes} trainer.devices={gpus} trainer.precision={precision} ++model.data.batch_size={batch_size} \
     {default_overwrites} {extra_overwrites}  \
     ++create_dllogger_callbacks=True ++dllogger_callbacks_kwargs.use_existing_dllogger=True \
@@ -76,9 +76,12 @@ products:
           - model: [esm1nv]
             config_name: [esm1nv_infer]
             batch_size: [4]
+            checkpoint_name: [esm1nv]
           - model: [esm2nv]
             config_name: [esm2nv_infer]
             batch_size: [4]
+            checkpoint_name: [esm2nv_650m]
           - model: [prott5nv]
             config_name: [prott5nv_infer]
             batch_size: [4]
+            checkpoint_name: [prott5nv]
