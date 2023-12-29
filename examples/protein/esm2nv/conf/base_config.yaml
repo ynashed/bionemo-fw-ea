@@ -164,9 +164,9 @@ model:
         header_lines: 1
         # Rest of these are inherited
 
-    uf50_datapath: '/data/uniref202104_esm2/uniref50_train_filt.fasta'
-    uf90_datapath: '/data/uniref202104_esm2/uniref90membersandreps_ur50trainfiltreps.fasta'
-    cluster_mapping_tsv: '/data/uniref202104_esm2/uniref50_mapper_to_uniref90clustermembers_andselfuniref50.tsv'
+    uf50_datapath: ${oc.env:BIONEMO_HOME}/data/uniref202104_esm2/uniref50_train_filt.fasta
+    uf90_datapath: ${oc.env:BIONEMO_HOME}/data/uniref202104_esm2/uniref90membersandreps_ur50trainfiltreps.fasta
+    cluster_mapping_tsv: ${oc.env:BIONEMO_HOME}/data/uniref202104_esm2/uniref50_mapper_to_uniref90clustermembers_andselfuniref50.tsv
     # TODO These need to be updated to values we actually like
     dataset_path: ${oc.env:BIONEMO_HOME}/data/uniref202104_esm2/uf50 # parent directory for data, contains train / val / test folders. Needs to be writeable for index creation.
     # NOTE test_size and val_size must be smaller than the total dataset size.
