@@ -112,7 +112,7 @@ def get_available_models(config: Config, source: ModelSource) -> List[str]:
 
 
 def download_models(
-    config: Config, model_list: List, source: ModelSource, download_dir: Path, stream_stdout: bool = False
+    config: Config, model_list: List, source: ModelSource, download_dir_base: Path, stream_stdout: bool = False
 ) -> None:
     """
     Download models from a given source.
@@ -122,7 +122,7 @@ def download_models(
         model_list (List): A list of model names to download that should be present in
                            the config.
         source (str): The source of the models to download, "ngc" or "pbss".
-        download_dir (str): The target local directory for download.
+        download_dir_base (str): The target local directory for download.
         stream_stdout (bool): If true, stream the subprocess calls to stdout.
     """
     if len(model_list) == 0:
@@ -135,16 +135,20 @@ def download_models(
             continue
 
         if config.models[model].relative_download_dir:
-            download_dir = download_dir / config.models[model].relative_download_dir
+            complete_download_dir = download_dir_base / config.models[model].relative_download_dir
+        else:
+            complete_download_dir = download_dir_base
 
         if source == "ngc":
             # NGC seems to always download to a specific directory that we can't
             # specify ourselves
             ngc_dirname = Path(os.path.split(model_source_path)[1].replace(":", "_v"))
-            ngc_dirname = download_dir / ngc_dirname
-            command = f"mkdir -p {str(download_dir)} && ngc registry model download-version {model_source_path} --dest {str(download_dir)} && mv {str(ngc_dirname)}/* {str(download_dir)}/ && rm -d {str(ngc_dirname)}"
+            ngc_dirname = complete_download_dir / ngc_dirname
+            command = f"mkdir -p {str(complete_download_dir)} && ngc registry model download-version {model_source_path} --dest {str(complete_download_dir)} && mv {str(ngc_dirname)}/* {str(complete_download_dir)}/ && rm -d {str(ngc_dirname)}"
         elif source == "pbss":
-            command = f"aws s3 cp {str(model_source_path)} {str(download_dir)}/ --endpoint-url https://pbss.s8k.io"
+            command = (
+                f"aws s3 cp {str(model_source_path)} {str(complete_download_dir)}/ --endpoint-url https://pbss.s8k.io"
+            )
         if config.models[model].extra_args:
             extra_args = config.models[model].extra_args
             command = f"{command} {extra_args}"
@@ -155,7 +159,7 @@ def download_models(
         # Create symlinks, if necessary
         if config.models[model].symlink:
             source_file = config.models[model].symlink.source
-            target_file = download_dir / config.models[model].symlink.target
+            target_file = complete_download_dir / config.models[model].symlink.target
             target_dir = target_file.parent
             command = f"mkdir -p {target_dir} && ln -sf {str(source_file)} {str(target_file)}"
             _, stderr, retcode = streamed_subprocess_call(command, stream_stdout=True)
