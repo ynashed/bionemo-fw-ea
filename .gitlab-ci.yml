@@ -169,8 +169,7 @@ pytest-internal:
     name: "$PIPELINE_TAG-devel"
     entrypoint: [ "" ]
   stage: test
-  # TODO(trvachov): Remove failure allowance once devs fix tests.
-  allow_failure: true
+  allow_failure: false
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $SKIP_CI_MR == "true"
       when: never
