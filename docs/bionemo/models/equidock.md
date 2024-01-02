@@ -30,6 +30,38 @@ For DB5.5, the DIPS pre-trained model is fine-tuned on the DB5.5 training set us
 
 The EquiDock model can be trained from scratch with the code and datasets provided. The `equidock_dips.nemo` and `equidock_db5.nemo` model checkpoints provided here were adapted from the public chekpoints available on [GitHub](https://github.com/octavian-ganea/equidock_public/tree/main/checkpts).
 
+
+## Benchmarks
+
+Two pretrained EquiDock checkpoints are available for download: `equidock_dips.nemo` and `equidock_db5.nemo`. These have been converted to the NeMo format from publicly available checkpoints. This section provides accuracy benchmarks for these models, as well as information on expected training speed performance. Currently, models trained from randomly initialized weights within the BioNeMo framework are not provided. The production of these models is ongoing work.
+
+### Accuracy Benchmarks
+
+The accuracy of EquiDock was measured using the complex and interface root-mean-squared distance {cite:p}`ganea2021independent`, which are measured over test datasets of DIPS and DB5.
+
+
+| RMSD type                       | Checkpoint Name      | Dataset           | Dataset Split for Measurement | Metric    | BioNeMo  |  Public  |
+|---------------------------------|----------------------|-------------------|-------------------------------|-----------|----------|----------|
+| Complex RMSD                    | equidock_dips.nemo   | DIPS              | test                          | median    | 13.39    | 13.39    |
+| Complex RMSD                    | equidock_dips.nemo   | DIPS              | test                          | mean      | 14.52    | 14.52    |
+| Complex RMSD                    | equidock_dips.nemo   | DIPS              | test                          | std       | 7.13     | 7.13     |
+| Interface RMSD                  | equidock_dips.nemo   | DIPS              | test                          | median    | 10.24    | 10.24    |
+| Interface RMSD                  | equidock_dips.nemo   | DIPS              | test                          | mean      | 11.92    | 11.92    |
+| Interface RMSD                  | equidock_dips.nemo   | DIPS              | test                          | std       | 7.01     | 7.01     |
+| Complex RMSD                    | equidock_db5.nemo    | DB5               | test                          | median    | 14.13    | 14.13    |
+| Complex RMSD                    | equidock_db5.nemo    | DB5               | test                          | mean      | 14.73    | 14.72    |
+| Complex RMSD                    | equidock_db5.nemo    | DB5               | test                          | std       | 5.31     | 5.31     |
+| Interface RMSD                  | equidock_db5.nemo    | DB5               | test                          | median    | 11.97    | 11.97    |
+| Interface RMSD                  | equidock_db5.nemo    | DB5               | test                          | mean      | 13.23    | 13.23    |
+| Interface RMSD                  | equidock_db5.nemo    | DB5               | test                          | std       | 4.93     | 4.93     |
+
+
+### Training Performance Benchmarks
+
+Training speed was tested on DGX-A100 systems with 8 IEGM layers over DIPS dataset for one epoch, on GPUs with 80GB of memory.
+
+![EquiDock benchmarks](../../readme-images/equidock_epoch_per_hour.png)
+
 ## License
 
 EquiDock is provided under the {{model_license_slug}}.
