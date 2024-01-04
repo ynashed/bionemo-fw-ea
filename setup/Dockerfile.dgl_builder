@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=nvcr.io/nvidia/nemo:23.03
+ARG BASE_IMAGE=nvcr.io/nvidia/nemo:23.06
 FROM ${BASE_IMAGE}
 
 ENV DEBIAN_FRONTEND=noninteractive
