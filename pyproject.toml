@@ -16,7 +16,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Development Status :: 4 - Beta",
     "Environment :: GPU :: NVIDIA CUDA :: 12 :: 12.1",
-    "Private :: Do Not Upload", # REMOVE ONCE BioNeMo IS OPEN-SOURCED !!
+    "Private :: Do Not Upload", # TODO [mgreaves] REMOVE ONCE BioNeMo IS OPEN-SOURCED !!
 ]
 
 # TODO [mgreaves]: need to include reqs here for distribution, but still must support image-caching install of deps.
@@ -51,6 +51,8 @@ markers = [
     'slow: marks tests as slow (deselect with `-m "not slow"`)',
     'needs_gpu: marks tests as requiring gpu (deselect with `-m "not needs_gpu"`)',
     'needs_checkpoint: marks tests as requiring trained model checkpoint (deselect with `-m "not needs_checkpoint"`)',
+    'internal: marks tests that can only be run inside of NVIDIA -- will not function in external customer code (deselect with `-m "not internal"`)',
+    'integration_test: marks tests that rely on external subsystems to run, e.g. data download or NGC cluster use (deselect with `-m not integration_test"`)',
 ]
 testpaths = ["tests",  "examples/tests",]
 filterwarnings = [ "ignore::DeprecationWarning",]
