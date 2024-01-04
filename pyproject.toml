@@ -11,7 +11,7 @@ description = "BioNeMo, a library for large language models in drug discovery. T
 readme = "README.md"
 requires-python = ">=3.10"
 keywords = ["drug discovery", "cheminformatics", "proeteomics", "deep learning", "machine learning", "gpu", "NeMo", "nvidia", "pytorch", "torch"]
-license = {text = "Copyright (c) 2022-2024 NVIDIA Corp. All rights reserved except when distributed to approved users under the terms of the Apache2 license."}
+license = {file = "LICENSE/license.txt"}
 classifiers = [
     "Programming Language :: Python :: 3.10",
     "Development Status :: 4 - Beta",
