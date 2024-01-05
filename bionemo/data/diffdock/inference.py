@@ -25,7 +25,7 @@ from esm.data import FastaBatchedDataset
 from nemo.utils import logging
 from omegaconf.dictconfig import DictConfig
 from rdkit import Chem
-from rdkit.Chem import AddHs, MolFromSmiles
+from rdkit.Chem import AddHs, MolFromSmiles, MolToSmiles
 from torch_geometric.data import Dataset, HeteroData
 from torch_geometric.loader import DataLoader
 
@@ -188,6 +188,9 @@ class InferenceDataset(Dataset):
                 if mol is None:
                     raise Exception('RDKit could not read the molecule ', ligand_description)
                 mol.RemoveAllConformers()
+                mol = MolFromSmiles(
+                    MolToSmiles(mol)
+                )  # To avoid code freeze in the following generate_conformer() with using certain sdf files, convert to smiles and reload the molecule object
                 mol = AddHs(mol)
                 generate_conformer(mol)
         except Exception as e:
