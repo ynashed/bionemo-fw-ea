@@ -69,14 +69,14 @@ Alternatively (recommended approach), once the `launch.sh` script is configured 
 
 ### Code Access
 
-BioNeMo code is provided inside the container. The following bash script will launch the docker container and copy the code directory from the container to a workstation path:
+BioNeMo code is provided inside the container. The code is located `/workspace/bionemo`, and this path is stored in the environment variable `$BIONEMO_HOME`. In general, all tests and configuration files rely on the `$BIONEMO_HOME`, and this variable will be referenced inside yaml configuration files as `${oc.env:BIONEMO_HOME}`. If there are issues with paths in configuration files it's prudent to check that this variable's value is set correctly. The following bash script will launch the docker container and copy the code directory from the container to a workstation path:
 
 ```bash
 CONTAINER="{deploy_ngc_registry}/{deploy_ngc_org_team}/{deploy_container_name}:{deploy_container_tag}"
 DEST_PATH="."
 CONTAINER_NAME=bionemo
 docker run --name $CONTAINER_NAME -itd --rm $CONTAINER bash
-docker cp $CONTAINER_NAME:/opt/nvidia/bionemo $DEST_PATH
+docker cp $CONTAINER_NAME:/workspace/bionemo $DEST_PATH
 docker kill $CONTAINER_NAME
 ```
 
@@ -96,7 +96,6 @@ Please reach out to NVIDIA if you do not know the appropriate values to set for 
 |  `NGC_CLI_API_KEY`     | Required to access BioNeMo resources, obtain container, etc.    |
 |  `NGC_CLI_ORG`  | Required to access ORG specific resources, including containers.       |
 |  `NGC_CLI_TEAM`  | Required for team specific resource logistics |
-|  `ACE_VALUE`     | Required for ACE specific compute resource allocations   |
 |  `WANDB_API_KEY`  | Optional, to enable monitoring via Weights and Biases       |
 
 In the sample configuration below, update `{deploy_ngc_org}` and `{deploy_ngc_team}` with the correct NGC org and team name, respectively.
@@ -121,7 +120,7 @@ NGC_CLI_TEAM={deploy_ngc_team}
 NGC_CLI_FORMAT_TYPE=ascii
 ```
 
-In order to prevent downloading and processing of data each time a new container is launched, be sure to set a valid path for `DATA_PATH` in the `.env` file. This directory will be mounted inside the container at `/data`. Once a container has been pulled and the `.env` file has been setup, the container can be started in interactive development mode with `./launch.sh dev`.
+In order to prevent downloading and processing of data each time a new container is launched, be sure to set a valid path for `LOCAL_DATA_PATH` in the `.env` file. This directory will be mounted inside the container at `DOCKER_DATA_PATH` (`/workspace/bionemo/data` by default). Once a container has been pulled and the `.env` file has been setup, the container can be started in interactive development mode with `./launch.sh dev`.
 
 ## Training Configuration
 
@@ -217,7 +216,7 @@ BioNeMo supports optional logging with Tensorboard and Weights and Biases. Tenso
 
 ## Inference
 
-Trained BioNeMo models are provided on NGC for use. These models can be loaded with a Triton gRPC interface provided by BioNeMo. Example notebooks are provided in the corresponding `nbs` directory in `examples`, for example, `examples/molecule/megamolbart/nbs`. 
+Trained BioNeMo models are provided on NGC for use. These models can be loaded with a Triton gRPC interface provided by BioNeMo. Example notebooks are provided in the corresponding `nbs` directory in `examples`, for example, `examples/molecule/megamolbart/nbs`.
 
 The `bionemo.triton.inference_wrapper` module's `__main__` program starts this inference server. For convience, you may use the [`setup/startup.sh`](../../setup/startup.sh) script to start both
 this and a Jupyer Lab server that points to the model's inference notebook(s).

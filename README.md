@@ -52,7 +52,7 @@ BIONEMO_HOME='/workspace/bionemo' # This is the default value
 cd $BIONEMO_HOME
 # Ensure you have downloaded the model checkpoints already - if not, run this command.
 # It will use your NGC credentials stored in $BIONEMO_HOME/.env (Company specific).
-# And download all model checkpoints to the 'MODEL_PATH' variable in $BIONEMO_HOME/.env (default: /model)
+# And download all model checkpoints to the 'LOCAL_MODELS_PATH' or 'DOCKER_MODELS_PATH' variable in the .env file (default: $BIONEMO_HOME/models)
 ./launch.sh download
 # Next we navigate to the location of infer.sh and set up the required variables.
 cd $BIONEMO_HOME/examples/protein/esm2nv/

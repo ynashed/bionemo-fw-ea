@@ -4,7 +4,7 @@ In the sections below, key components of the BioNeMo framework and their use wil
 
 ## Overview & Core Features
 
-The NVIDIA BioNeMo framework exists for training and deploying large biomolecular language models at supercomputing scale for the discovery and development of therapeutics. The large language model (LLM) framework currently has models for small molecules (SMILES) and protein sequences. Its modular design and high-level APIs make it easy to create, train, and deploy complex models for a variety of downstream tasks. The extensive collection of pre-trained models and scripts further facilitates rapid prototyping and development, and developers can customize the repository according to their needs. 
+The NVIDIA BioNeMo framework exists for training and deploying large biomolecular language models at supercomputing scale for the discovery and development of therapeutics. The large language model (LLM) framework currently has models for small molecules (SMILES) and protein sequences. Its modular design and high-level APIs make it easy to create, train, and deploy complex models for a variety of downstream tasks. The extensive collection of pre-trained models and scripts further facilitates rapid prototyping and development, and developers can customize the repository according to their needs.
 
 :::{note}
 For detailed information on model pre-training or fine-tuning, users should consult the Tutorials section. This BioNeMo Core section is intended for advanced use cases.
@@ -23,7 +23,7 @@ class ESM1nvModel(MegatronBertModel):
 
     def __init__(self, cfg: DictConfig, trainer: Trainer):
         super().__init__(cfg, trainer=trainer)
-    
+
     (...)
 ```
 
@@ -79,7 +79,7 @@ On the other hand, the ESM-1nv implementation, which is based on a BERT (an enco
 def sample_molecules(self, tokens_enc, enc_mask, hidden_states=None):
         (...)
         self.freeze()
-        
+
         # Decode encoder hidden state to tokens
         predicted_tokens_ids, log_probs = self.decode(tokens_enc,
                                                       enc_mask,
@@ -105,27 +105,27 @@ def sample_molecules(self, tokens_enc, enc_mask, hidden_states=None):
 
 Here's a summary of each model's superclass:
 
-| **Model**             | **Superclass**                   | 
+| **Model**             | **Superclass**                   |
 |-----------------------|----------------------------------|
-| ESM-1nv               | MegatronBertModel                | 
-| ProtT5nv              | MegatronT5Model                  | 
-| MegaMolBART           | MegatronLMEncoderDecoderModel    | 
+| ESM-1nv               | MegatronBertModel                |
+| ProtT5nv              | MegatronT5Model                  |
+| MegaMolBART           | MegatronLMEncoderDecoderModel    |
 
 Customizations can also vary from simple changes in the tokenizer methods to more involved changes in the model architecture, including alterations in how the forward step is computed, callbacks or data augmentation functions.
 
 ## Config Files
 
-BioNeMo framework offers the option to easily set up and change model configurations for pre-training or fine-tuning workflows. Such configuration modifications can range from simple hyperparameters, such as number of hidden states to more advanced oodifications for data handling or connections to [Weights & Biases Dashboards](#weights-and-biases-charts) for experiment tracking; for example, refer to  `bionemo/examples/protein/esm1nv/conf/base_config.yaml`
+BioNeMo framework offers the option to easily set up and change model configurations for pre-training or fine-tuning workflows. Such configuration modifications can range from simple hyperparameters, such as number of hidden states to more advanced oodifications for data handling or connections to [Weights & Biases Dashboards](#weights-and-biases-charts) for experiment tracking; for example, refer to  `bionemo/examples/protein/esm1nv/conf/base_config.yaml`. You can reference environment variables inside the configuration files using [OmegaConf resolvers](https://omegaconf.readthedocs.io/en/latest/custom_resolvers.html); for example the variable `$BIONEMO_HOME` maybe referenced via `${oc.env:BIONEMO_HOME}`.
 
 Examples of typical configuration modifications for training can be fouind in the _.yaml_ files within the framework
 
 ```yaml
 trainer:
-  devices: 8 # number of GPUs 
+  devices: 8 # number of GPUs
   num_nodes: 2 # If you are working with a multi-node setting, for example, 2xDGX systems
   precision: 16 # FP 16, 32
   (...)
-  accumulate_grad_batches: 1 
+  accumulate_grad_batches: 1
 
 ```
 
@@ -134,10 +134,10 @@ BioNeMo also makes it easier to distribute weights for models that are too large
 ```yaml
 model:
   micro_batch_size: 1
-  global_batch_size: 2 
+  global_batch_size: 2
   tensor_model_parallel_size: 1 # Increase this number to distribute the model across GPUs
   (...)
-  seq_length: 512 
+  seq_length: 512
   (...)
   num_attention_heads: 12
   activation: 'gelu' # Options ['gelu', 'geglu', 'swiglu', 'reglu']
@@ -158,10 +158,10 @@ It is also straightforward to change the configuration file to download and proc
     seq_length_dec: 256 # Target sequence length
     skip_warmup: True
     num_workers: 16 # number of workers to be used for dataset preprocessing. 0 -- all available workers
-    dataloader_type: single 
+    dataloader_type: single
 ```
 
-Some configuration parameters are inter-dependent. For example, `global_batch_size`, if provided, must be computed by a formula `micro_batch_size` * `devices` * `accumulate_grad_batches` / (`tensor_model_parallel_size` * `pipeline_model_parallel_size`). For simplicity, `global_batch_size` can be left to `null`, and the appropriate value will be inferred automatically. 
+Some configuration parameters are inter-dependent. For example, `global_batch_size`, if provided, must be computed by a formula `micro_batch_size` * `devices` * `accumulate_grad_batches` / (`tensor_model_parallel_size` * `pipeline_model_parallel_size`). For simplicity, `global_batch_size` can be left to `null`, and the appropriate value will be inferred automatically.
 
 There are also configuration parameters that are relevant to the model's tasks and multiple config files can be set. For example, under `examples/molecule/megamolbart/` there are several config files, each of which establishing a specific behavior for pre-training tasks.
 
@@ -180,7 +180,7 @@ model:
 
 ## Command Line Configuration
 
-BioNeMo framework users can count on resources improved management of containers and configuration settings of complex applications. There are two main components employed for that: NGC CLI and Hydra. 
+BioNeMo framework users can count on resources improved management of containers and configuration settings of complex applications. There are two main components employed for that: NGC CLI and Hydra.
 
 NVIDIA NGC CLI is a command-line interface tool for managing Docker containers in the NVIDIA NGC Registry. With NGC CLI, you can perform the same operations that are available from the NGC website, such as running jobs, viewing ACE and node information, and viewing Docker repositories within your orgs. For more information about how to set up CLI, check the [NGC CLI SETUP](https://ngc.nvidia.com/setup/installers/cli) page and [NGC CLI Docs](https://docs.ngc.nvidia.com/cli/index.html).
 
@@ -203,7 +203,7 @@ The `@hydra_runner` Decorator can also help in multi-run configs. This can be us
 
 Typically, the config files can be found under the `conf` directory in the same folder as the training script. For example, the config file for pre-training a [ProtT5](https://arxiv.org/abs/2007.06225) model is located at `examples/protein/prott5nv/conf/pretrain_small.yaml`.
 
-## Checkpoints 
+## Checkpoints
 
 Pre-trained checkpoints are also provided based on the models described in the [Introduction](./index.md). These checkpoints will have token-size limitations.
 
@@ -211,7 +211,7 @@ Pre-trained checkpoints are also provided based on the models described in the [
 |-----------------------|----------------------------------|------------------------------------------------------------------------------------------------------------------------------|
 | ESM-1nv & ProtT5nv    | 512 Tokens (Amino Acids)                  | Thermostability, Secondary Structure Prediction, Subcellular Localization (check [FLIP Benchmark](./models/model-benchmarks.md))         |
 | MegaMolBART           | 512 Tokens (SMILES)              | Representation Learning, Structure Prediction, Molecule Generation                                                           |
- 
+
 To enable support for longer sequences, customize configuration parameters to allow sequence lengths, assuming the user has the computational resources to support expansion. Taking ProtT5nv as example, several different configuration options are available in the _.yaml_ file. Under `examples/protein/prott5nv/conf/` the `base_config.yaml` file is the basis for production-level work. More information about how to use checkpoints can be found in the [Quickstart Guide](./quickstart-fw.md) and in the [Save-Restore Connectors](#save-restore-connectors) section below.
 
 ### Save-Restore Connectors
@@ -250,7 +250,7 @@ Given the ease to operate with [Data Module](./data-module-fw.md) and [Save-Rest
 
 ## Datasets
 
-BioNeMo framework pipelines are configured for specific dataset formats. 
+BioNeMo framework pipelines are configured for specific dataset formats.
 
 | **Model**             | **Data Type**                    | **Common Public Datasets**   |
 |-----------------------|----------------------------------|------------------------------|
@@ -272,19 +272,19 @@ Enabling integration with Weights & Biases is highly recommended. To leverage th
 
 ### Weights and Biases Charts
 
-In the image below are examples of metrics and dashboards used to monitor model training progress. 
+In the image below are examples of metrics and dashboards used to monitor model training progress.
 
 ![WANDB](./images/wandb-dashboard.png)
 
-These training and system related metrics are automatically logged in the online dashboard when an API key is provided and upload to Weights and Biases is enabled. 
+These training and system related metrics are automatically logged in the online dashboard when an API key is provided and upload to Weights and Biases is enabled.
 
-Training related metrics include:  
+Training related metrics include:
 
-- **Reduced Train Loss**: is the value of the training loss function aggregated from all parallel processes. If the training loss doesn't decrease or explodes, this is a possible sign that the learning rate needs to be reduced. 
+- **Reduced Train Loss**: is the value of the training loss function aggregated from all parallel processes. If the training loss doesn't decrease or explodes, this is a possible sign that the learning rate needs to be reduced.
 
 - **Loss Scale**: the scaling factor of the loss.
 
-- **Gradient Norm**: the value of the gradient norm. Increasing or undefined (NaN) values of the gradient norm usually indicate instabilities in training. In such cases, the learning rate may need to be reduced. 
+- **Gradient Norm**: the value of the gradient norm. Increasing or undefined (NaN) values of the gradient norm usually indicate instabilities in training. In such cases, the learning rate may need to be reduced.
 
 - **Learning Rate**: the value of the learning rate.
 
