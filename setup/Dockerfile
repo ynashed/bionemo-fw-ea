@@ -33,7 +33,7 @@ WORKDIR /workspace/
 ENV HOME=/root
 # copy built DGL and install it
 # dgl_builder is created with setup/Dockerfile.dgl_builder
-COPY --from=gitlab-master.nvidia.com:5005/clara-discovery/bionemo:dgl_builder /dgl ./dgl
+COPY --from=gitlab-master.nvidia.com:5005/clara-discovery/bionemo:dgl_builder_v1.1.3 /dgl ./dgl
 RUN cd dgl/python && python setup.py install && cd ../.. && rm -rf dgl
 
 # Please populate the labels below if using a custom base container (ie not NeMo GA)
