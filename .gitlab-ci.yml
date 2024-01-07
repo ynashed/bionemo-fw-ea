@@ -123,13 +123,6 @@ build-docs-image:
   extends:
     - .docker-setup
   stage: build
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $SKIP_CI_MR == "true"
-      when: never
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $SKIP_CI_MR != "true"
-    - if: $CI_COMMIT_BRANCH == "dev"
-    - if: $CI_COMMIT_BRANCH == "main"
-    - if: $CI_COMMIT_BRANCH == "bionemo-rc2306-v1"
   script:
     - if [[ $NIGHTLY = true ]]; then
       base="--build-arg BASE_IMAGE=$NEMO_NIGHTLY_TAG";
@@ -152,10 +145,6 @@ build-docs:
     entrypoint: [ "" ]
   stage: build
   needs: [build-docs-image]
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $SKIP_CI_MR == "true"
-      when: never
-    - when: on_success
   tags:
     - generic
   variables:
