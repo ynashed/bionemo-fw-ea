@@ -48,6 +48,7 @@ variables:
   JET_WORKLOADS_: "internal/jet/workloads/training-inference-unit-tests"
   SKIP_CI_MR: "false"
   SKIP_CI_MR_JET: "false"
+  # For DIND volume mounting
 
 # TODO(dorotat) solution with SKIP_CI flag is error-prone and should be replaced with better logic!!!!
 workflow:
@@ -92,7 +93,7 @@ code_format:
    - generic
 
 # TODO(dorotat): consider splitting this into build-base and build-devel
-build:
+build-bionemo-image:
   extends:
     - .docker-setup
   stage: build
@@ -118,6 +119,57 @@ build:
       -t $PIPELINE_TAG-devel -f internal/Dockerfile-devel .
     - docker push $PIPELINE_TAG-devel
 
+build-docs-image:
+  extends:
+    - .docker-setup
+  stage: build
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $SKIP_CI_MR == "true"
+      when: never
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $SKIP_CI_MR != "true"
+    - if: $CI_COMMIT_BRANCH == "dev"
+    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "bionemo-rc2306-v1"
+  script:
+    - if [[ $NIGHTLY = true ]]; then
+      base="--build-arg BASE_IMAGE=$NEMO_NIGHTLY_TAG";
+      else
+      base="";
+      fi
+    - cd docs/
+    - docker build --network host --no-cache ${base} --label com.nvidia.bionemo.git_hash=${CI_COMMIT_SHORT_SHA}
+      -t $PIPELINE_TAG-docs -f Dockerfile.docs .
+    - docker push $PIPELINE_TAG-docs
+# Note: It is tempting to build the docs in the same job as build-docs-image, i.e. have a
+# `docker run ... sphinx-build ...` command here, however getting the output of this build
+# is non-trivial. It is non-trivial to mount volumes to docker commands when DIND is used in
+# gitlab-ci, therefore we split the docs image build and docs build into separate jobs,
+# where the latter doesn't require DIND.
+
+build-docs:
+  image:
+    name: "$PIPELINE_TAG-docs"
+    entrypoint: [ "" ]
+  stage: build
+  needs: [build-docs-image]
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $SKIP_CI_MR == "true"
+      when: never
+    - when: on_success
+  tags:
+    - generic
+  variables:
+    GIT_STRATEGY: none
+    GIT_CHECKOUT: "false"
+  script:
+    # Build the docs, store as artifact
+    - mkdir -p /builds/clara-discovery/bionemo/docs_build
+    - cd /docs
+    - sphinx-build bionemo /builds/clara-discovery/bionemo/docs_build/html
+  artifacts:
+      paths:
+        - docs_build
+      expire_in: 1 week
 
 pytest:
   image:
