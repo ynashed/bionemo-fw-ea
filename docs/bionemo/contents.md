@@ -57,8 +57,6 @@ models/model-benchmarks
 
 datasets/uniprot
 datasets/zinc15
-datasets/DIPS
-datasets/DB5.5
 datasets/pdb
 ```
 
