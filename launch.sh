@@ -117,7 +117,7 @@ LOCAL_MODELS_PATH=${LOCAL_MODELS_PATH:=${LOCAL_REPO_PATH}/models}
 DOCKER_MODELS_PATH=${DOCKER_MODELS_PATH:=${DOCKER_REPO_PATH}/models}
 WANDB_API_KEY=${WANDB_API_KEY:=NotSpecified}
 JUPYTER_PORT=${JUPYTER_PORT:=8888}
-REGISTRY=${REGISTRY:=NotSpecified}
+REGISTRY=${REGISTRY:=nvcr.io}
 REGISTRY_USER=${REGISTRY_USER:='$oauthtoken'}
 DEV_CONT_NAME=${DEV_CONT_NAME:=bionemo}
 NGC_CLI_API_KEY=${NGC_CLI_API_KEY:=NotSpecified}
@@ -182,7 +182,7 @@ fi
 
 # Additional variables that will be used in the script when sent in the .env file:
 # BASE_IMAGE        Custom Base image for building.
-# NEMO_HOME         Path to external copy of NeMo source code, which is mounted into the nemo dependency install location in the environment. 
+# NEMO_HOME         Path to external copy of NeMo source code, which is mounted into the nemo dependency install location in the environment.
 #                   This allows a different version of NeMo to be used with code.
 # TOKENIZERS_PATH   Workstation directory to be mounted to /tokenizers inside container
 
@@ -252,7 +252,7 @@ ngc_api_key_is_set() {
 docker_login() {
     local ngc_api_key_is_set_=$(ngc_api_key_is_set)
     if [ $ngc_api_key_is_set_ == true ]; then
-        docker login ${REGISTRY} -u ${REGISTRY_USER} -p ${NGC_CLI_API_KEY}
+        docker login -u "${REGISTRY_USER}" -p ${NGC_CLI_API_KEY} ${REGISTRY}
     else
         echo 'Docker login has been skipped. Container pushing and pulling may fail.'
     fi
@@ -445,6 +445,7 @@ Available options are -a(--additional-args), -i(--image), -d(--demon) and -c(--c
 
     setup "dev"
     set -x
+    docker_login
     ${DOCKER_CMD} --rm -it --name ${DEV_CONT_NAME} ${BIONEMO_IMAGE} ${CMD}
     set +x
     exit
@@ -481,7 +482,6 @@ attach() {
     ${DOCKER_CMD} -it ${CONTAINER_ID} /bin/bash
     exit
 }
-
 
 
 case $1 in

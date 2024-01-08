@@ -10,11 +10,9 @@ Note that this repository is in *early access*, therefore some parts are still u
 
 ## Quick Start
 
-An NGC API KEY is required for these steps.  You will need to configure NGC with your org and team.
-```bash
-# Login to NVIDIA docker registry:
-docker login nvcr.io # Username will be $oauthtoken, password will be NGC API KEY
+An NGC API KEY is required for these steps.  You will need to configure [NGC](https://catalog.ngc.nvidia.com/?filters=&orderBy=weightPopularDESC&query=) with your org and team. See also Prerequisites below.
 
+```bash
 # Clone repository:
 git clone https://github.com/NVIDIA/bionemo-fw-ea.git
 cd bionemo-fw-ea
@@ -30,21 +28,23 @@ NGC_CLI_TEAM= # Your team name
 NGC_CLI_ORG= # Your organization name
 
 # Pull the latest BioNeMo image:
+#   Time estimate: 5min  
 ./launch.sh pull
 
 # Download all pretrained checkpoints from NGC:
+#   Time estimate: 10min
 ./launch.sh download
 
 # Launch an interactive session inside the pulled image:
 ./launch.sh dev
 ```
 
-Once the container is running, you can run the training and inference examples, or develop and test your own code.
+Once the container is running, you can run the training and inference examples, see [BioNeMo Framework Tutorials](https://docs.nvidia.com/bionemo-framework/latest/tutorials-fw.html), or develop and test your own code.
 
 As an example, For ESM1-nv, ESM2-nv, and ProtT5-nv, we provide an `infer.sh` script under `examples/protein/<MODEL_NAME>`, to run inference in offline mode (without running a remote inference client).
 Users must specify an input CSV file with sequence data, and a CONFIG file with model specifics and data paths. Example config files are provided at  `examples/protein/<MODEL_NAME>/conf`. Example input data file is provided at `examples/tests/test_data/protein/test/x000.csv`.
 The following is an example use of `infer.sh` to run inference on ESM2-nv using a csv file with sequence data. We use the `infer.yaml` config available at `examples/protein/esm2nv/conf/infer.yaml`. This config contains the `model.data.dataset` variable that can also be used to set the input file - in our example we override this default to point to an example file we include in the BioNeMo Framework codebase.
-The set of commands below generates a pickle file with the embeddings of all sequences, at `/data/bionemo_esm2_example.pkl` file specified by `model.data.output_fname`.
+The set of commands below generates a pickle file with the embeddings of all sequences, at `$BIONEMO_HOME/data/bionemo_esm2_example.pkl`, specified by `model.data.output_fname`.
 
 ```bash
 # Set the path to your local BioNeMo Framework codebase using the BIONEMO_HOME variable. In the docker container, this is set to /workspace/bionemo by default.
@@ -58,15 +58,35 @@ cd $BIONEMO_HOME
 cd $BIONEMO_HOME/examples/protein/esm2nv/
 example_file=$BIONEMO_HOME/examples/tests/test_data/protein/test/x000.csv
 config_name='infer.yaml'
-restore_from_path='/model/protein/esm2nv/esm2nv_650M_converted.nemo'
-outfile='/data/bionemo_ems2_example.pkl'
+restore_from_path=$BIONEMO_HOME/models/protein/esm2nv/esm2nv_650M_converted.nemo
+outfile=$BIONEMO_HOME/data/bionemo_esm2_example.pkl
 ./infer.sh --config-name "$config_name" ++model.data.output_fname="$outfile" ++model.data.dataset_path="$example_file" ++model.downstream_task.restore_from_path="$restore_from_path"
 ```
+A successful execution of this command will result in command-line output similar to
+```
+[NeMo I 2023-12-15 18:24:21 infer:152] Saving 9 samples to output_fname = /workspace/bionemo/data/bionemo_ems2_example.pkl
+```
+
 More tutorials using ESM inference can be found [here.](http://10.110.42.241:8082/inference-grpc-fw.html)
 
 ## Prerequisites
 
 BioNeMo containers and pre-trained models are delivered via [NVIDIA GPU Cloud (NGC)](https://catalog.ngc.nvidia.com/?filters=&orderBy=weightPopularDESC&query=), therefore it is recommended to create an NGC account, [download the NGC CLI](https://ngc.nvidia.com/setup), and generate API keys for access.
+
+Additional requirement for this quickstart:
+1. **'sudo-less' docker commands** The script launch.sh executed docker commands without a sudo prefix, so your environment's username must be added to the docker group, see Step 2 at [docker-on-ubuntu-22-04](https://www.digitalocean.com/community/tutorials/how-to-install-and-use-docker-on-ubuntu-22-04).
+
+2. [Installing the NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). If the the 'nvidia container toolkit' is not installed, you may see an error like
+```
+docker: Error response from daemon: could not select device driver "" with capabilities: [[gpu]].
+```
+See related discussion at [could-not-select-device-driver-with-capabilities-gpu](https://forums.developer.nvidia.com/t/could-not-select-device-driver-with-capabilities-gpu/259324)
+
+3. **Optional environment customizations**  To add aliases and environment variables to the running docker container shells, first copy the files with aliases and env variables from your machine to the running docker container, by executing the follow command from your your machine, outside the running container:
+```
+docker cp some_file_with_aliases_or_env_vars:/workspace/some_file_with_aliases_or_env_vars
+```
+For example `some_file_with_aliases_or_env_vars` could be `.bash_aliases`.  Second, from the running container execute `source /workspace/some_file_with_aliases_or_env_vars`.  The aliases and env variables will be added to the current shell. 
 
 ## Implemented Models
 
@@ -199,6 +219,12 @@ Before commiting code, make sure to setup the auto-formatter and linter via prec
 pip install pre-commit
 pre-commit install
 ```
+
+To push a commit on a branch with a merge request, the CI pipeline trigger can be avoided by including [skip ci] in the commit message.
+**Warning**  If the [skip ci] tag is used for some commits on a branch with an MR, 
+we ask that the final commit before merge should omit this tag, so that all 
+continuous integration steps are triggered before the merge is attempted.
+
 ### VSCode into DGX Cloud
 [Visual Studio Code](https://code.visualstudio.com/) is an extremely useful IDE for development and debugging. If you want to run a workload on NGC and develop with VSCode you can now do that seemlessly on our platform.
 
