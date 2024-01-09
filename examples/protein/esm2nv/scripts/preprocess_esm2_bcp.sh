@@ -24,30 +24,13 @@
 # notes:
 #   Step (2) does the preprocessing of raw data
 #     Input files and key parameters:
-#       model.data.cluster_mapping_tsv=${dataset_dir_local_full_path}/${MAPPING_BASE_FILENAME}
 #       model.data.uf50_datapath=${dataset_dir_local_full_path}/${UF50_TRAIN_SEQUENCES_BASE_FILENAME}
 #       model.data.uf90_datapath=${dataset_dir_local_full_path}/${UF90_AND_UF50_SEQUENCES_BASE_FILENAME}
-#       model.data.train.cluster_mapping_tsv=${dataset_dir_local_full_path}/${MAPPING_BASE_FILENAME}
-#       model.data.train.uf50_datapath=${dataset_dir_local_full_path}/${UF50_TRAIN_SEQUENCES_BASE_FILENAME}
-#       model.data.train.uf90_datapath=${dataset_dir_local_full_path}/${UF90_AND_UF50_SEQUENCES_BASE_FILENAME}
-#       model.data.val.uf50_datapath=${dataset_dir_local_full_path}/${UF50_VALID_SEQUENCES_BASE_FILENAME}
-#       model.data.test.uf50_datapath=${dataset_dir_local_full_path}/${UF50_TRAIN_SEQUENCES_BASE_FILENAME}
-#       model.data.dataset_path=${dataset_dir_local_full_path}/${UF50}
-#       model.data.uf90.uniref90_path=${dataset_dir_local_full_path}/${UF90}
-#       model.data.train.dataset_path=${dataset_dir_local_full_path}/${UF50}
-#       model.data.train.uf90.uniref90_path=${dataset_dir_local_full_path}/${UF90}
-#       model.data.val.dataset_path=${dataset_dir_local_full_path}/${UF50}
-#       model.data.test.dataset_path=${dataset_dir_local_full_path}/${UF50}
-#       model.data.val_size=${VAL_SIZE}
-#       model.data.test_size=${TEST_SIZE}
+#       model.data.cluster_mapping_tsv=${dataset_dir_local_full_path}/${MAPPING_BASE_FILENAME}
 #       
 #     Output files: program will create and populate these directories
 #       model.data.dataset_path=${dataset_dir_local_full_path}/${UF50}
 #       model.data.uf90.uniref90_path=${dataset_dir_local_full_path}/${UF90}
-#       model.data.train.dataset_path=<path to dataset>/uf50
-#       model.data.train.uf90.uniref90_path=<path to dataset>/uf90
-#       model.data.val.dataset_path=<path to dataset>/uf50
-#       model.data.test.dataset_path=<path to dataset>/uf50
 #
 #   See also https://google.github.io/styleguide/shellguide.html
 #
@@ -60,12 +43,9 @@ printf "${MESSAGE_TEMPLATE}" "begin"
 CONFIG_NAME=pretrain_esm2_650M
 UF50_TRAIN_SEQUENCES_BASE_FILENAME=uniref50_train_filt.fasta
 UF90_AND_UF50_SEQUENCES_BASE_FILENAME=uniref90membersandreps_ur50trainfiltreps.fasta
-UF50_VALID_SEQUENCES_BASE_FILENAME=uniref50_valid_filt.fasta
 MAPPING_BASE_FILENAME=mapping.tsv
 UF50=uf50
 UF90=uf90
-VAL_SIZE=500
-TEST_SIZE=100
 FORMAT_DATETIME_STD='%Y-%m-%d %H:%M:%S'
 
 # default values may not be correct for NVIDIA-external users
@@ -127,22 +107,11 @@ python ${BIONEMO_HOME_THIS}/examples/protein/esm2nv/pretrain.py \\
     --config-name=${CONFIG_NAME} \\
     ++do_preprocess=True \\
     ++do_training=False \\
-    ++model.data.cluster_mapping_tsv=${dataset_dir_local_full_path}/${MAPPING_BASE_FILENAME} \\
     ++model.data.uf50_datapath=${dataset_dir_local_full_path}/${UF50_TRAIN_SEQUENCES_BASE_FILENAME} \\
     ++model.data.uf90_datapath=${dataset_dir_local_full_path}/${UF90_AND_UF50_SEQUENCES_BASE_FILENAME} \\
-    ++model.data.train.cluster_mapping_tsv=${dataset_dir_local_full_path}/${MAPPING_BASE_FILENAME} \\
-    ++model.data.train.uf50_datapath=${dataset_dir_local_full_path}/${UF50_TRAIN_SEQUENCES_BASE_FILENAME} \\
-    ++model.data.train.uf90_datapath=${dataset_dir_local_full_path}/${UF90_AND_UF50_SEQUENCES_BASE_FILENAME} \\
-    ++model.data.val.uf50_datapath=${dataset_dir_local_full_path}/${UF50_VALID_SEQUENCES_BASE_FILENAME} \\
-    ++model.data.test.uf50_datapath=${dataset_dir_local_full_path}/${UF50_TRAIN_SEQUENCES_BASE_FILENAME} \\
+    ++model.data.cluster_mapping_tsv=${dataset_dir_local_full_path}/${MAPPING_BASE_FILENAME} \\
     ++model.data.dataset_path=${dataset_dir_local_full_path}/${UF50} \\
-    ++model.data.uf90.uniref90_path=${dataset_dir_local_full_path}/${UF90} \\
-    ++model.data.train.dataset_path=${dataset_dir_local_full_path}/${UF50} \\
-    ++model.data.train.uf90.uniref90_path=${dataset_dir_local_full_path}/${UF90} \\
-    ++model.data.val.dataset_path=${dataset_dir_local_full_path}/${UF50} \\
-    ++model.data.test.dataset_path=${dataset_dir_local_full_path}/${UF50} \\
-    ++model.data.val_size=${VAL_SIZE} \\
-    ++model.data.test_size=${TEST_SIZE}
+    ++model.data.uf90.uniref90_path=${dataset_dir_local_full_path}/${UF90}
 EOF
 
 printf "${MESSAGE_TEMPLATE}" "PYTHON_COMMAND="
