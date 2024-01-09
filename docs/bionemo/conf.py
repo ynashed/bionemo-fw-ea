@@ -18,7 +18,7 @@ from sphinx import search
 # -- Project information -----------------------------------------------------
 
 project = 'NVIDIA BioNeMo Framework'
-copyright = '2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved'
+copyright = '2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.'
 author = 'NVIDIA'
 
 # The full version, including alpha/beta/rc tags
