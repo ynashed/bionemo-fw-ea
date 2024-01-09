@@ -445,7 +445,6 @@ Available options are -a(--additional-args), -i(--image), -d(--demon) and -c(--c
 
     setup "dev"
     set -x
-    docker_login
     ${DOCKER_CMD} --rm -it --name ${DEV_CONT_NAME} ${BIONEMO_IMAGE} ${CMD}
     set +x
     exit
