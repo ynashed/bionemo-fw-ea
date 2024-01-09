@@ -1,9 +1,9 @@
 training_data:
   protein_path: null
   protein_ligand_csv: null
-  protein_data_dir: ${oc.env:BIONEMO_HOME}/data/PDBBind_processed
-  output_fasta_file: ${oc.env:BIONEMO_HOME}/data/pdbbind_sequences.fasta
-  esm_embeddings_path: ${oc.env:BIONEMO_HOME}/data/esm2_3billion_embeddings.sqlite3
+  protein_data_dir: ${oc.env:BIONEMO_HOME}/data/PDB_processed
+  output_fasta_file: ${oc.env:BIONEMO_HOME}/data/pdb_sequences.fasta
+  esm_embeddings_path: ${oc.env:BIONEMO_HOME}/data/esm2_embeddings.sqlite3
   chain_cutoff: 10
 score_infer:
   name: paper_large_score
@@ -54,9 +54,9 @@ data:
   world_size: ${multiply:${trainer.devices}, ${trainer.num_nodes}}
   esm_embeddings_path: ${training_data.esm_embeddings_path}
   data_dir: ${training_data.protein_data_dir}
-  split_train: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/splits/timesplit_no_lig_overlap_train
-  split_val: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/splits/timesplit_no_lig_overlap_val
-  split_test: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/splits/timesplit_test
+  split_train: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/splits/split_train
+  split_val: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/splits/split_val
+  split_test: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/splits/split_test
   cache_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/data_cache
   chunk_size: 5
   use_original_model_cache: false

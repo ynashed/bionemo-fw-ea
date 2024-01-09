@@ -30,11 +30,11 @@ data:
   world_size: ${multiply:${trainer.devices}, ${trainer.num_nodes}}
   esm_embeddings_path: ${training_data.esm_embeddings_path}
   data_dir: ${training_data.protein_data_dir} # Folder containing original structures
-  split_train: ${oc.env:BIONEMO_HOME}/data/splits/timesplit_no_lig_overlap_train # Path of file defining the split.
-  split_val: ${oc.env:BIONEMO_HOME}/data/splits/timesplit_no_lig_overlap_val # Path of file defining the split
-  split_test: ${oc.env:BIONEMO_HOME}/data/splits/timesplit_test # Path of file defining the split
+  split_train: ${oc.env:BIONEMO_HOME}/data/splits/split_train # Path of file defining the split.
+  split_val: ${oc.env:BIONEMO_HOME}/data/splits/split_val # Path of file defining the split
+  split_test: ${oc.env:BIONEMO_HOME}/data/splits/split_test # Path of file defining the split
   cache_path: ${oc.env:BIONEMO_HOME}/data/data_cache # Folder from where to load/restore cached dataset
-  chunk_size: 5 # Number of samples as a chunk given to each process to process each time when preparing the dataset in class PDBBind, default is 5
+  chunk_size: 5 # Number of samples as a chunk given to each process to process each time when preparing the dataset in class ProteinLigandDockingDataset, default is 5
 
 trainer:
   devices: 1

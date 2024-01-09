@@ -154,7 +154,9 @@ def ForkingBehavior(
         set_start_method(prev_start_method, force=True)
 
 
-class PDBBind(Dataset):
+class ProteinLigandDockingDataset(Dataset):
+    """Protein ligand complex graph dataset"""
+
     def __init__(
         self,
         root,
@@ -181,9 +183,10 @@ class PDBBind(Dataset):
         ligand_descriptions=None,
         keep_local_structures=False,
         chunk_size=5,
+        seed=None,
     ):
-        super(PDBBind, self).__init__(root, transform)
-        self.pdbbind_dir = root
+        super(ProteinLigandDockingDataset, self).__init__(root, transform)
+        self.protein_dir = root
         self.max_lig_size = max_lig_size
         self.split_path = split_path
         self.limit_complexes = limit_complexes
@@ -202,6 +205,7 @@ class PDBBind(Dataset):
         self.all_atoms = all_atoms
         self.atom_radius, self.atom_max_neighbors = atom_radius, atom_max_neighbors
         self.chunk_size = chunk_size
+        self.seed = seed
 
         self.heterograph_store: Optional[HeterographStore] = None
         self.full_cache_path = self.heterograph_cache_path(cache_path)
@@ -330,7 +334,7 @@ class PDBBind(Dataset):
                 ligand = ligands[i]
                 ligand_description = ligand_descriptions[i]
 
-            if not os.path.exists(os.path.join(self.pdbbind_dir, name)) and ligand is None:
+            if not os.path.exists(os.path.join(self.protein_dir, name)) and ligand is None:
                 logging.warning(f"Folder not found: {name}")
                 return [], []
 
@@ -340,13 +344,13 @@ class PDBBind(Dataset):
                 ligs = [ligand]
             else:
                 try:
-                    rec_model = parse_receptor(name, self.pdbbind_dir)
+                    rec_model = parse_receptor(name, self.protein_dir)
                 except Exception as e:
                     logging.error(f"Skipping {name} because of the error:")
                     logging.error(e)
                     return [], []
 
-                ligs = read_mols(self.pdbbind_dir, name, remove_hs=False)
+                ligs = read_mols(self.protein_dir, name, remove_hs=False)
             complex_graphs = []
             failed_indices = []
             for i, lig in enumerate(ligs):
@@ -367,6 +371,7 @@ class PDBBind(Dataset):
                         self.keep_original,
                         self.num_conformers,
                         remove_hs=self.remove_hs,
+                        seed=self.seed,
                     )
                     rec, rec_coords, c_alpha_coords, n_coords, c_coords, lm_embeddings = extract_receptor_structure(
                         copy.deepcopy(rec_model), lig, lm_embedding_chains=lm_embedding_chain
@@ -431,25 +436,25 @@ class PDBBind(Dataset):
         return total_ligands, total_complexes
 
 
-def read_mol(pdbbind_dir, name, remove_hs=False):
-    lig = read_molecule(os.path.join(pdbbind_dir, name, f"{name}_ligand.sdf"), remove_hs=remove_hs, sanitize=True)
+def read_mol(protein_dir, name, remove_hs=False):
+    lig = read_molecule(os.path.join(protein_dir, name, f"{name}_ligand.sdf"), remove_hs=remove_hs, sanitize=True)
     if lig is None:  # read mol2 file if sdf file cannot be sanitized
-        lig = read_molecule(os.path.join(pdbbind_dir, name, f"{name}_ligand.mol2"), remove_hs=remove_hs, sanitize=True)
+        lig = read_molecule(os.path.join(protein_dir, name, f"{name}_ligand.mol2"), remove_hs=remove_hs, sanitize=True)
     return lig
 
 
-def read_mols(pdbbind_dir, name, remove_hs=False):
+def read_mols(protein_dir, name, remove_hs=False):
     ligs = []
-    for file in os.listdir(os.path.join(pdbbind_dir, name)):
+    for file in os.listdir(os.path.join(protein_dir, name)):
         if file.endswith(".sdf") and "rdkit" not in file:
-            lig = read_molecule(os.path.join(pdbbind_dir, name, file), remove_hs=remove_hs, sanitize=True)
+            lig = read_molecule(os.path.join(protein_dir, name, file), remove_hs=remove_hs, sanitize=True)
             # read mol2 file if sdf file cannot be sanitized
-            if lig is None and os.path.exists(os.path.join(pdbbind_dir, name, file[:-4] + ".mol2")):
+            if lig is None and os.path.exists(os.path.join(protein_dir, name, file[:-4] + ".mol2")):
                 logging.warning(
                     "Using the .sdf file failed. We found a .mol2 file instead and are trying to use that."
                 )
                 lig = read_molecule(
-                    os.path.join(pdbbind_dir, name, file[:-4] + ".mol2"), remove_hs=remove_hs, sanitize=True
+                    os.path.join(protein_dir, name, file[:-4] + ".mol2"), remove_hs=remove_hs, sanitize=True
                 )
             if lig is not None:
                 ligs.append(lig)
@@ -477,10 +482,11 @@ def diffdock_build_dataset(data_config, t_to_sigma, _num_conformers=True, mode="
         "atom_max_neighbors": data_config.atom_max_neighbors,
         "esm_embeddings_path": data_config.esm_embeddings_path,
         "chunk_size": data_config.get("chunk_size", 5),
+        "seed": data_config.get("seed"),
     }
     if mode == "train":
         if _num_conformers:
-            dataset = PDBBind(
+            dataset = ProteinLigandDockingDataset(
                 cache_path=data_config.cache_path,
                 split_path=data_config.split_train,
                 keep_original=True,
@@ -488,7 +494,7 @@ def diffdock_build_dataset(data_config, t_to_sigma, _num_conformers=True, mode="
                 **common_args,
             )
         else:
-            dataset = PDBBind(
+            dataset = ProteinLigandDockingDataset(
                 cache_path=data_config.cache_path,
                 split_path=data_config.split_train,
                 keep_original=True,
@@ -497,7 +503,7 @@ def diffdock_build_dataset(data_config, t_to_sigma, _num_conformers=True, mode="
 
     elif mode == "validation":
         if _num_conformers:
-            dataset = PDBBind(
+            dataset = ProteinLigandDockingDataset(
                 cache_path=data_config.cache_path,
                 split_path=data_config.split_val,
                 keep_original=True,
@@ -505,13 +511,13 @@ def diffdock_build_dataset(data_config, t_to_sigma, _num_conformers=True, mode="
                 **common_args,
             )
         else:
-            dataset = PDBBind(
+            dataset = ProteinLigandDockingDataset(
                 cache_path=data_config.cache_path, split_path=data_config.split_val, keep_original=True, **common_args
             )
 
     elif mode == "test":
         if _num_conformers:
-            dataset = PDBBind(
+            dataset = ProteinLigandDockingDataset(
                 cache_path=data_config.cache_path,
                 split_path=data_config.split_test,
                 keep_original=True,
@@ -519,7 +525,7 @@ def diffdock_build_dataset(data_config, t_to_sigma, _num_conformers=True, mode="
                 **common_args,
             )
         else:
-            dataset = PDBBind(
+            dataset = ProteinLigandDockingDataset(
                 cache_path=data_config.cache_path, split_path=data_config.split_test, keep_original=True, **common_args
             )
     else:

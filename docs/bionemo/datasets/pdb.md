@@ -3,10 +3,8 @@ The Protein Data Bank is a public repository for experimental and computational 
 
 Given its size, diversity in chemistry, and experimental validity, pruning techniques are often used to select what are seen as the optimal samples for the model problem at hand. Derived from the original PDB depositions, separate databases have been curated and maintained with supplemental information, or fully extracted for future academic use. 
 
-## PDBBind {cite:p}`liu2017score`
-The PDBBind effort is the first database that systematically annotates the protein-ligand complexes in the Protein Data Bank (PDB) with experimental binding data. This database has been updated annually since its first public release in 2004. Data sets provided by PDBbind have been applied to many computational and statistical studies on protein-ligand interaction and various subjects. Total entries have exceeded ~20k for protein-protein, and protein-ligand interactions. 
-
-DiffDock makes use of a Time-Split method for training, where data from the PDBBind database up to 2017 is used as training/validation, with 2018 through 2020 as the test set. The original PDBBind database can be found [here](http://pdbbind.org.cn/index.php), and an academic version that only includes structural information [here](https://zenodo.org/records/6408497)
+## PoseBusters Benchmark {cite:p}`buttenschoen2023posebusters`
+The PoseBusters Benchmark set is a new set of 308 carefully-selected publicly-available crystal complexes from the PDB. It is a diverse set of recent high-quality protein-ligand complexes which contain drug-like molecules. It only contains complexes released since 2021 and therefore does not contain any complexes present in the PDBbind General Set v2020 used to train many of the methods. 
 
 ## The Docking Benchmark 5.5 (DB5.5) {cite:p}`vreven2015updates`
 Docking Benchmark 5.5 ([DB5.5](https://zlab.umassmed.edu/benchmark/)) {cite:p}`vreven2015updates` is an updated and integrated version of a widely utilized protein–protein docking and binding affinity benchmark. This benchmark comprises non-redundant, high-quality structures of protein–protein complexes along with the unbound structures of their components. The update includes the addition of 55 new protein–protein complexes, of which 35 have experimentally measured binding affinities, resulting in a total of 230 entries for the docking benchmark and 179 entries for the affinity benchmark.

@@ -96,9 +96,9 @@ def get_data_overrides(script_or_cfg_path: str) -> str:
         return MAIN % 'openfold_data'
     elif model == 'diffdock':
         return (
-            f' ++data.split_train={TEST_DATA_DIR}/molecule/diffdock/splits/timesplit_no_lig_overlap_train'
-            + f' ++data.split_val={TEST_DATA_DIR}/molecule/diffdock/splits/timesplit_no_lig_overlap_val'
-            + f' ++data.split_test={TEST_DATA_DIR}/molecule/diffdock/splits/timesplit_test'
+            f' ++data.split_train={TEST_DATA_DIR}/molecule/diffdock/splits/split_train'
+            + f' ++data.split_val={TEST_DATA_DIR}/molecule/diffdock/splits/split_val'
+            + f' ++data.split_test={TEST_DATA_DIR}/molecule/diffdock/splits/split_test'
             + f' ++data.cache_path={TEST_DATA_DIR}/molecule/diffdock/data_cache'
         )
     elif 'downstream' in script:

@@ -2,10 +2,10 @@ defaults:
   - score_infer # you can override with adding flags to score_infer, refer to this default yaml file
 
 protein_ligand_csv: null # Path to a .csv file specifying the input as described in the README. If this is not None, it will be used instead of the --protein_path and --ligand parameters
-complex_name: 1a0q # Name that the complex will be saved with
-protein_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/1a0q/1a0q_protein_processed.pdb # Path to the protein .pdb file
+complex_name: 5s8i # Name that the complex will be saved with
+protein_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/5s8i/5s8i_protein.pdb # Path to the protein .pdb file
 protein_sequence: null # Sequence of the protein for ESMFold, this is ignored if --protein_path is not None
-ligand_description: COc(cc1)ccc1C#N # Either a SMILES string or the path to a molecule file that rdkit can read
+ligand_description: CNC(=O)c1c2c(cs1)OCCO2 # Either a SMILES string or the path to a molecule file that rdkit can read
 out_dir: ${oc.env:BIONEMO_HOME}/results/nemo_experiments/user_inference # Directory where the outputs will be written to
 
 seed: null

@@ -1,5 +1,5 @@
 
-protein_data_dir: ${oc.env:BIONEMO_HOME}/data/PDBBind_processed
+protein_data_dir: ${oc.env:BIONEMO_HOME}/data/PDB_processed
 
 data:
   split_test: ${oc.env:BIONEMO_HOME}/examples/molecule/diffdock/data/splits/timesplit_test # Path of file defining the split

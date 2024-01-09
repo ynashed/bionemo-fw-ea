@@ -29,8 +29,8 @@ from rdkit.Chem import AddHs, MolFromSmiles, MolToSmiles
 from torch_geometric.data import Dataset, HeteroData
 from torch_geometric.loader import DataLoader
 
+from bionemo.data.diffdock.docking_dataset import read_mol
 from bionemo.data.diffdock.embedding_preprocess import compute_ESM_embeddings, get_sequences_from_pdbfile
-from bionemo.data.diffdock.pdbbind import read_mol
 from bionemo.data.diffdock.process_mols import (
     extract_receptor_structure,
     generate_conformer,
@@ -103,6 +103,7 @@ class InferenceDataset(Dataset):
         all_atoms=False,
         atom_radius=5,
         atom_max_neighbors=None,
+        seed=None,
     ):
         super(InferenceDataset, self).__init__()
         self.receptor_radius = receptor_radius
@@ -115,6 +116,8 @@ class InferenceDataset(Dataset):
         self.protein_files = protein_files
         self.ligand_descriptions = ligand_descriptions
         self.protein_sequences = protein_sequences
+
+        self.seed = seed
 
         # generate LM embeddings
         if lm_embeddings and (precomputed_lm_embeddings is None or precomputed_lm_embeddings[0] is None):
@@ -182,7 +185,7 @@ class InferenceDataset(Dataset):
 
             if mol is not None:
                 mol = AddHs(mol)
-                generate_conformer(mol)
+                generate_conformer(mol, seed=self.seed)
             else:
                 mol = read_molecule(ligand_description, remove_hs=False, sanitize=True)
                 if mol is None:
@@ -192,7 +195,7 @@ class InferenceDataset(Dataset):
                     MolToSmiles(mol)
                 )  # To avoid code freeze in the following generate_conformer() with using certain sdf files, convert to smiles and reload the molecule object
                 mol = AddHs(mol)
-                generate_conformer(mol)
+                generate_conformer(mol, seed=self.seed)
         except Exception as e:
             print(
                 'Failed to read molecule ', ligand_description, ' We are skipping it. The reason is the exception: ', e
@@ -212,6 +215,7 @@ class InferenceDataset(Dataset):
                 keep_original=False,
                 num_conformers=1,
                 remove_hs=self.remove_hs,
+                seed=self.seed,
             )
             rec, rec_coords, c_alpha_coords, n_coords, c_coords, lm_embeddings = extract_receptor_structure(
                 rec_model, mol, lm_embedding_chains=lm_embedding
@@ -301,6 +305,7 @@ def build_inference_datasets(cfg: DictConfig) -> Tuple[List, Dataset, Dataset, D
         all_atoms=score_model_cfg.data.all_atoms,
         atom_radius=score_model_cfg.data.atom_radius,
         atom_max_neighbors=score_model_cfg.data.atom_max_neighbors,
+        seed=cfg.seed,
     )
 
     test_loader = DataLoader(dataset=test_dataset, batch_size=1, shuffle=False)
@@ -327,6 +332,7 @@ def build_inference_datasets(cfg: DictConfig) -> Tuple[List, Dataset, Dataset, D
                 atom_radius=confidence_model_cfg.data.atom_radius,
                 atom_max_neighbors=confidence_model_cfg.data.atom_max_neighbors,
                 precomputed_lm_embeddings=test_dataset.lm_embeddings,
+                seed=cfg.seed,
             )
     else:
         confidence_test_dataset = None

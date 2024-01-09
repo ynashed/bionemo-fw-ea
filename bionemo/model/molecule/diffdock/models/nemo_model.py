@@ -283,7 +283,7 @@ class TensorProductScoreModelBase(ModelPT):
 
         # Computing RMSDs from the generated ligand positions via reverse diffusion using the traing score model.
         # The steps:
-        #     1. Randomize original ligand positions from PDBBind
+        #     1. Randomize original ligand positions
         #     2. Do reverse diffusion from t: 1->0 with num_inferecen steps
         #     3. Compute the RMSDs from the generated ligand positions
         # DiffDock use valinf_rmsds_lt2 (percent of inference rmsds less than 2.0 Ang on validation dataset)
@@ -346,7 +346,7 @@ class TensorProductScoreModelBase(ModelPT):
         """
         Computing RMSDs from the generated ligand positions via reverse diffusion using the traing score model.
         The steps:
-            1. Randomize original ligand positions from PDBBind
+            1. Randomize original ligand positions
             2. Do reverse diffusion from t: 1->0 with num_inferecen steps
             3. Compute the RMSDs from the generated ligand positions
         """

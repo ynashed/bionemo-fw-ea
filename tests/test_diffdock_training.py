@@ -47,11 +47,11 @@ TEST_DATA_DOWNLOAD_SCRIPT = os.path.join(
 ROOT_DIR = 'diffdock'
 
 inputs = [
-    ('diffdock_score_training_test', None, 'e3nn'),
+    ('diffdock_score_training_test', None, 'USE_FAST_TP'),
     ('diffdock_score_training_test', None, 'marta'),
-    ('diffdock_score_training_test', 'SizeAwareBatchSampler', 'e3nn'),
+    ('diffdock_score_training_test', 'SizeAwareBatchSampler', 'USE_FAST_TP'),
     ('diffdock_score_training_test', 'SizeAwareBatchSampler', 'marta'),
-    ('diffdock_confidence_training_test', None, 'e3nn'),
+    ('diffdock_confidence_training_test', None, 'USE_FAST_TP'),
 ]
 
 
@@ -90,6 +90,8 @@ def test_diffdock_fast_dev_run(tmp_directory, config_name, batch_sampler, tensor
     if tensor_prodcut_type == 'USE_FAST_TP':
         os.environ['USE_FAST_TP'] = '1'
     else:
+        if 'USE_FAST_TP' in os.environ:
+            del os.environ['USE_FAST_TP']
         with open_dict(cfg):
             cfg.model.tensor_product.type = tensor_prodcut_type
 
@@ -105,3 +107,5 @@ def test_diffdock_fast_dev_run(tmp_directory, config_name, batch_sampler, tensor
         model = CGScoreModel(cfg=cfg, trainer=trainer, data_manager=data_manager)
 
     trainer.fit(model)
+    if 'USE_FAST_TP' in os.environ:
+        del os.environ['USE_FAST_TP']

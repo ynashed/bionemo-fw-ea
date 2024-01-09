@@ -40,19 +40,7 @@ The pretrained DiffDock checkpoints for score and confidence models are availabl
 
 ### Accuracy Benchmarks
 
-The accuracy of DiffDock was measured over the holo crystal protein complexes from the same test set, as in the [public DiffDock GitHub repository](https://github.com/gcorso/DiffDock/blob/main/data/testset_csv.csv), from the PDBBind processed dataset in [zenodo](https://zenodo.org/record/6408497). The metrics was computed from three independent runs. Due to the inherent stochasticity of DiffDock during the molecular docking generation, the metrics are not expected to be identical to the public ones.
-
-| Proteins              | Number of Poses Sampled | Dataset       | Dataset Split for Measurement | Metric                                      | BioNeMo | Public |
-|-----------------------|-------------------------|---------------|-------------------------------|---------------------------------------------|---------|--------|
-| Holo Crystal Proteins | 10                      | PDBBind_processed | test                          | Percentage of Top-1 RMSD<2 Å (%) &uarr; | 35.7    | 35.0   |
-| Holo Crystal Proteins | 10                      | PDBBind_processed | test                          | Median of Top-1 RMSD (Å) &darr;         | 3.52    | 3.6    |
-| Holo Crystal Proteins | 10                      | PDBBind_processed | test                          | Percentage of Top-5 RMSD<2 Å (%) &uarr; | 42.6    | 40.7   |
-| Holo Crystal Proteins | 10                      | PDBBind_processed | test                          | Median of Top-5 RMSD (Å) &darr;         | 2.54    | 2.65   |
-| Holo Crystal Proteins | 40                      | PDBBind_processed | test                          | Percentage of Top-1 RMSD<2 Å (%) &uarr; | 37.4    | 38.2   |
-| Holo Crystal Proteins | 40                      | PDBBind_processed | test                          | Median of Top-1 RMSD (Å) &darr;         | 3.2    | 3.3    |
-| Holo Crystal Proteins | 40                      | PDBBind_processed | test                          | Percentage of Top-5 RMSD<2 Å (%) &uarr; | 46.5    | 44.7   |
-| Holo Crystal Proteins | 40                      | PDBBind_processed | test                          | Median of Top-5 RMSD (Å) &darr;         | 2.22    | 2.4    |
-
+To be added soon.
 
 
 ## Limitations

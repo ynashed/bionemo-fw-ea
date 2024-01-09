@@ -1,7 +1,7 @@
 training_data:
   protein_path: null
   protein_ligand_csv: null
-  protein_data_dir: ${oc.env:BIONEMO_HOME}/data/PDBBind_processed # ${oc.env:BIONEMO_HOME}/data/structures <- for Marta
-  output_fasta_file: ${oc.env:BIONEMO_HOME}/data/pdbbind_sequences.fasta
-  esm_embeddings_path: ${oc.env:BIONEMO_HOME}/data/esm2_3billion_embeddings.sqlite3
+  protein_data_dir: ${oc.env:BIONEMO_HOME}/data/PDB_processed
+  output_fasta_file: ${oc.env:BIONEMO_HOME}/data/pdb_sequences.fasta
+  esm_embeddings_path: ${oc.env:BIONEMO_HOME}/data/esm2_embeddings.sqlite3
   chain_cutoff: 10

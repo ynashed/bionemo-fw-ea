@@ -3,7 +3,7 @@
 
 This section outlines the steps to prepare your workspace with pre-processed files for training DiffDock using the NVIDIA NGC platform. 
 
-This workspace can then be used to launch ESM2nv training job using the template script `<BioNeMO_Workspace>/examples/molecule/diffdock/scripts/train_bcp.sh`. 
+This workspace can then be used to launch DiffDock training job using the template script `<BioNeMO_Workspace>/examples/molecule/diffdock/scripts/train_bcp.sh`.
 
 For more information about how to launch DiffDock training using BCP script, you can check [Running BioNeMo on DGX-Cloud using BCP](./bcp-specific-commands-fw.md) tutorial.
 
@@ -32,28 +32,41 @@ Mount the NGC workspace to your local directory using the following command.
 ngc workspace mount $WKSP_ID ~/diffdock_data --mode RW
 ```
 
-### Step 4: Download Raw Data
-This command downloads the PDBBind v2020 dataset from [zenodo](https://zenodo.org/records/6408497).
-You can manually download it from the link or use the following command:
+### Step 4: Prepare Raw PDB Data
+Gather and clean your own pdb data, for each receptor-ligand complex with pdbid, prepare the processed protein pdb as `<pdbid>_protein_processed.pdb`, and each ligand file as `<pdbid>_ligand.sdf` or `<pdbid>_ligand.mol2`, and put them under folder like `~/PDB_processed/<pdbid>/`.
+After you clean all the pdb data you have, inside this folder `~/PDB_processed/`, you will have many folders named with pdbid, and in each folder, you have have the protein and ligand files. As an example, you will have
+
 ```bash
-cd ~/ && wget https://zenodo.org/records/6408497/files/PDBBind.zip
+tree ~/PDB_processed/
 ```
-Note that the data size is ~1.7GB. So, the download could take a while.
-After downloading, unzip and copy the data to the mounted directory in your NGC workspace.
-```bash
-cd ~/ && unzip ~/PDBBind.zip
-cp -r ~/PDBBind_processed ~/diffdock_data/data
+will give this file tree:
 ```
-And get the data split files from public [diffdock](https://github.com/gcorso/DiffDock), and copy it to
-the mounted directory in your NGC workspace.
+├── 6t88
+│   ├── 6t88_ligand.sdf
+│   └── 6t88_protein_processed.pdb
+├── 6vs3
+│   ├── 6vs3_ligand.sdf
+│   └── 6vs3_protein_processed.pdb
+├── 6wtn
+│   ├── 6wtn_ligand.sdf
+│   └── 6wtn_protein_processed.pdb
+├── 6yqv
+│   ├── 6yqv_ligand.sdf
+│   └── 6yqv_protein_processed.pdb
+...
+```
+Then copy the data to the mounted directory in your NGC workspace.
 ```bash
-mkdir ~/splits
-cd ~/splits
-wget https://raw.githubusercontent.com/gcorso/DiffDock/main/data/splits/timesplit_no_lig_overlap_train
-wget https://raw.githubusercontent.com/gcorso/DiffDock/main/data/splits/timesplit_no_lig_overlap_val
-wget https://raw.githubusercontent.com/gcorso/DiffDock/main/data/splits/timesplit_test
-wget https://raw.githubusercontent.com/gcorso/DiffDock/main/data/splits/timesplit_test_no_rec_overlap
-cp -r ~/splits ~/diffdock_data/data
+cp -r ~/PDB_processed ~/diffdock_data/data
+```
+And prepare the split files for train, validation and test, and put them in `~/diffdock_data/data/splits/`. Here we name them as `split_train`, `split_val`, and `split_test`, accordingly.
+These split files are text files, with each row as pdbid name. These will look like this:
+```bash
+$ head -n 4 ~/diffdock_data/data/splits/split_train
+6t88
+6vs3
+6wtn
+6yqv
 ```
 
 ### Step 5: Run Pre-processing of Train Data for Score Model
@@ -72,12 +85,12 @@ export BIONEMO_IMAGE=??
 First do protein embedding using esm2:
 
 ```bash
-ngc batch run --name "DiffDock_PDBBind_Protein_Embedding" --priority NORMAL --preempt RUNONCE --ace nv-us-east-2 --instance dgxa100.80g.2.norm --commandline "ln -s /bionemo_diffdock/data \\${BIONEMO_HOME}/data; bcprun --debug --nnodes=1 --npernode=1 -w /workspace/bionemo --cmd 'python examples/molecule/diffdock/train.py do_embedding_preprocessing=True do_training=False '" --result /results --image ${BIONEMO_IMAGE} --org ${NGC_CLI_ORG} --team ${NGC_CLI_TEAM} --workspace ${WKSP_ID}:/bionemo_diffdock:RW --label ml__bionemo
+ngc batch run --name "DiffDock_Protein_Embedding" --priority NORMAL --preempt RUNONCE --ace nv-us-east-2 --instance dgxa100.80g.2.norm --commandline "ln -s /bionemo_diffdock/data \\${BIONEMO_HOME}/data; bcprun --debug --nnodes=1 --npernode=1 -w /workspace/bionemo --cmd 'python examples/molecule/diffdock/train.py do_embedding_preprocessing=True do_training=False '" --result /results --image ${BIONEMO_IMAGE} --org ${NGC_CLI_ORG} --team ${NGC_CLI_TEAM} --workspace ${WKSP_ID}:/bionemo_diffdock:RW --label ml__bionemo
 ```
 
 Then, do the graph preprocessing for score model:
 ```bash
-ngc batch run --name "DiffDock_PDBBind_Graph_Preprocessing_Score" --priority NORMAL --preempt RUNONCE --ace nv-us-east-2 --instance dgxa100.80g.2.norm --commandline "ln -s /bionemo_diffdock/data \\${BIONEMO_HOME}/data; bcprun --debug --nnodes=1 --npernode=1 -w /workspace/bionemo --cmd 'python examples/molecule/diffdock/train.py do_preprocessing=True do_training=False data.num_workers=20 '" --result /results --image ${BIONEMO_IMAGE} --org ${NGC_CLI_ORG} --team ${NGC_CLI_TEAM} --workspace ${WKSP_ID}:/bionemo_diffdock:RW --label ml__bionemo
+ngc batch run --name "DiffDock_Complex_Graph_Preprocessing_Score" --priority NORMAL --preempt RUNONCE --ace nv-us-east-2 --instance dgxa100.80g.2.norm --commandline "ln -s /bionemo_diffdock/data \\${BIONEMO_HOME}/data; bcprun --debug --nnodes=1 --npernode=1 -w /workspace/bionemo --cmd 'python examples/molecule/diffdock/train.py do_preprocessing=True do_training=False data.num_workers=20 '" --result /results --image ${BIONEMO_IMAGE} --org ${NGC_CLI_ORG} --team ${NGC_CLI_TEAM} --workspace ${WKSP_ID}:/bionemo_diffdock:RW --label ml__bionemo
 ```
 
 
@@ -90,9 +103,9 @@ ls ~/diffdock_data/data
 It will have following files:
 ```
 data_cache
-esm2_3billion_embeddings.sqlite3
-PDBBind_processed
-pdbbind_sequences.fasta
+esm2_embeddings.sqlite3
+PDB_processed
+pdb_sequences.fasta
 splits
 ```
 
@@ -102,9 +115,9 @@ ls ~/diffdock_data/data/data_cache
 
 It will show following files:
 ```
-torsion_limit0_INDEXtimesplit_no_lig_overlap_train_maxLigSizeNone_H0_recRad15_recMax24_esmEmbeddings
-torsion_limit0_INDEXtimesplit_no_lig_overlap_val_maxLigSizeNone_H0_recRad15_recMax24_esmEmbeddings
-torsion_limit0_INDEXtimesplit_test_maxLigSizeNone_H0_recRad15_recMax24_esmEmbeddings
+torsion_limit0_INDEXsplit_train_maxLigSizeNone_H0_recRad15_recMax24_esmEmbeddings
+torsion_limit0_INDEXsplit_val_maxLigSizeNone_H0_recRad15_recMax24_esmEmbeddings
+torsion_limit0_INDEXsplit_test_maxLigSizeNone_H0_recRad15_recMax24_esmEmbeddings
 ```
 
 
@@ -123,7 +136,7 @@ export DIFFDOCK_SCORE_MODEL=models/small_score_model.nemo
 
 we can do the data preprocessing for confidence model:
 ```bash
-ngc batch run --name "DiffDock_PDBBind_Preprocessing_Confidence" --priority NORMAL --preempt RUNONCE --ace nv-us-east-2 --instance dgxa100.80g.2.norm --commandline "ln -s /bionemo_diffdock/data \\${BIONEMO_HOME}/data; bcprun --debug --nnodes=1 --npernode=1 -w /workspace/bionemo --cmd 'export USE_FAST_TP=1; python examples/molecule/diffdock/train.py --config-name=train_confidence do_preprocessing=True do_training=False data.num_workers=20 score_infer.restore_from_path=/workspace/bionemo/${DIFFDOCK_SCORE_MODEL} '" --result /results --image ${BIONEMO_IMAGE} --org ${NGC_CLI_ORG} --team ${NGC_CLI_TEAM} --workspace ${WKSP_ID}:/bionemo_diffdock:RW --label ml__bionemo
+ngc batch run --name "DiffDock_Complex_Graph_Preprocessing_Confidence" --priority NORMAL --preempt RUNONCE --ace nv-us-east-2 --instance dgxa100.80g.2.norm --commandline "ln -s /bionemo_diffdock/data \\${BIONEMO_HOME}/data; bcprun --debug --nnodes=1 --npernode=1 -w /workspace/bionemo --cmd 'export USE_FAST_TP=1; python examples/molecule/diffdock/train.py --config-name=train_confidence do_preprocessing=True do_training=False data.num_workers=20 score_infer.restore_from_path=/workspace/bionemo/${DIFFDOCK_SCORE_MODEL} '" --result /results --image ${BIONEMO_IMAGE} --org ${NGC_CLI_ORG} --team ${NGC_CLI_TEAM} --workspace ${WKSP_ID}:/bionemo_diffdock:RW --label ml__bionemo
 ```
 
 If you want to use the score model checkpoint converted from [public diffdock](https://github.com/gcorso/DiffDock/tree/main/workdir/paper_score_model), replace the setting of small score model with following commands:

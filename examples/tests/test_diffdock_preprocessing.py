@@ -18,6 +18,7 @@ import pathlib
 import pickle
 from functools import partial
 
+import e3nn
 import pytest
 import torch
 from Bio import SeqIO
@@ -27,10 +28,10 @@ from pytorch_lightning import seed_everything
 
 from bionemo.data.diffdock.confidence_dataset import diffdock_confidence_dataset
 from bionemo.data.diffdock.confidence_store import ConfidenceStore
+from bionemo.data.diffdock.docking_dataset import diffdock_build_dataset
 from bionemo.data.diffdock.embedding_preprocess import prep_embedding
 from bionemo.data.diffdock.embedding_store import EmbeddingStore
 from bionemo.data.diffdock.heterograph_store import HeterographStore
-from bionemo.data.diffdock.pdbbind import diffdock_build_dataset
 from bionemo.model.molecule.diffdock.infer import DiffDockModelInference
 from bionemo.model.molecule.diffdock.utils.diffusion import t_to_sigma as t_to_sigma_compl
 from bionemo.utils.tests import (
@@ -40,9 +41,13 @@ from bionemo.utils.tests import (
 )
 
 
+e3nn.set_optimization_defaults(optimize_einsums=False)
+torch.use_deterministic_algorithms(True, warn_only=True)
+torch.backends.cudnn.benchmark = False
+
+
 THIS_FILE_DIR = os.path.dirname(os.path.realpath(__file__))
 PREPEND_CONFIG_DIR = os.path.join(THIS_FILE_DIR, './conf')
-TEST_DATA_FILE = os.path.join(THIS_FILE_DIR, './test_data/molecule/diffdock/diffdock_preprocessing_test.zip')
 ROOT_DIR = 'diffdock'
 
 
@@ -197,24 +202,7 @@ def test_diffdock_prepare_confidence_dataset(tmp_directory, config_name):
         ref_sample = ref_ligand_poses[0] if sample[0] == ref_ligand_poses[0][0] else ref_ligand_poses[1]
 
         # ligand positions
-        assert torch.allclose(torch.from_numpy(sample[1]), torch.from_numpy(ref_sample[1]), atol=2.0)
+        assert torch.allclose(torch.from_numpy(sample[1]), torch.from_numpy(ref_sample[1]), atol=0.01)
 
         # RMSD
-        assert torch.allclose(torch.from_numpy(sample[2]), torch.from_numpy(ref_sample[2]), atol=0.2)
-
-
-@pytest.mark.slow
-@pytest.mark.needs_gpu
-@pytest.mark.needs_checkpoint
-@pytest.mark.timeout(40)
-@pytest.mark.skip(reason="loading model blocking data preprocessing in diffdock confidence model")
-@pytest.mark.parametrize('config_name', ['diffdock_confidence_preprocessing_test'])
-def test_diffdock_prepare_confidence_dataset_blocking(tmp_directory, config_name):
-    cfg = get_cfg(tmp_directory, PREPEND_CONFIG_DIR, config_name)
-
-    # loading score model will block building complex graphs with multiprocessing
-    # comment out the score model loading will make this test pass
-    dataset = diffdock_confidence_dataset(cfg.model.train_ds, mode="train")
-    score_model = DiffDockModelInference(cfg.score_infer)
-    score_model.eval()
-    dataset.build_complex_graphs()
+        assert torch.allclose(torch.from_numpy(sample[2]), torch.from_numpy(ref_sample[2]), atol=0.01)

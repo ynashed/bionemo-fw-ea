@@ -31,8 +31,8 @@ from torch_geometric.loader import DataLoader
 from tqdm import tqdm
 
 from bionemo.data.diffdock.confidence_store import ConfidenceStore
+from bionemo.data.diffdock.docking_dataset import ProteinLigandDockingDataset, make_cache_path
 from bionemo.data.diffdock.heterograph_store import HeterographStore
-from bionemo.data.diffdock.pdbbind import PDBBind, make_cache_path
 from bionemo.model.molecule.diffdock.utils.ddp import get_rank
 from bionemo.model.molecule.diffdock.utils.diffusion import get_t_schedule
 from bionemo.model.molecule.diffdock.utils.diffusion import (
@@ -92,7 +92,7 @@ def get_confidence_cache_path(cache_dir, cache_creation_id=None):
 
 class ConfidenceDataset(Dataset):
     """Confidence dataset
-    There are complex PDBBind graphs, and also ligand poses from reverse diffusion.
+    There are receptor-ligand complex graphs, and also ligand poses from reverse diffusion.
     """
 
     def __init__(
@@ -108,6 +108,7 @@ class ConfidenceDataset(Dataset):
         rmsd_classification_cutoff=2,
         cache_ids_to_combine=None,
         cache_creation_id=None,  # set this to anything beside None to enforce caching confidence sqlite
+        seed=None,
     ):
         super(ConfidenceDataset, self).__init__()
         self.limit_complexes = limit_complexes
@@ -122,6 +123,7 @@ class ConfidenceDataset(Dataset):
         self.cfg = cfg
         self.limit_complexes = limit_complexes
         self.samples_per_complex = samples_per_complex
+        self.seed = seed
 
         self.complex_graphs_cache = (
             self.original_model_cache if self.use_original_model_cache else get_cache_path(cfg, split)
@@ -169,7 +171,7 @@ class ConfidenceDataset(Dataset):
         split = self.split
         if not os.path.exists(self.complex_graphs_cache_sqlite_path):
             logging.info(f"Create complex graph dataset: {self.complex_graphs_cache_sqlite_path}.")
-            pdbbind = PDBBind(
+            complex_dataset = ProteinLigandDockingDataset(
                 transform=None,
                 root=cfg.data_dir,
                 limit_complexes=cfg.limit_complexes,
@@ -190,8 +192,9 @@ class ConfidenceDataset(Dataset):
                 require_ligand=True,
                 num_workers=cfg.num_workers,
                 chunk_size=cfg.chunk_size,
+                seed=self.seed,
             )
-            pdbbind.build_complex_graphs()
+            complex_dataset.build_complex_graphs()
             self.complex_graphs_ready = True
         else:
             logging.warning(
@@ -448,6 +451,7 @@ def diffdock_confidence_dataset(data_config, mode="train"):
         "use_original_model_cache": data_config.use_original_model_cache,
         "cache_creation_id": data_config.cache_creation_id,
         "cache_ids_to_combine": data_config.cache_ids_to_combine,
+        "seed": data_config.seed,
     }
     dataset = ConfidenceDataset(split=mode, cfg=data_config, **common_args)
     return dataset

@@ -18,7 +18,7 @@ import sqlite3
 
 
 class HeterographStore:
-    """sqlite3 database to store processed PDBBind graphs from model training.
+    """sqlite3 database to store processed complex graphs from model training.
     The database table has ligand, and the complex graph.
     """
 

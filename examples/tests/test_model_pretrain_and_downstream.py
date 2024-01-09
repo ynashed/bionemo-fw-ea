@@ -271,6 +271,8 @@ def test_model_training(prepend_config_path, config_name, model_class, correct_r
             override_config_path=cfg,
         )
     elif model_class == DiffdockScoreModel or model_class == DiffdockConfidenceModel:
+        if 'USE_FAST_TP' in os.environ:
+            del os.environ['USE_FAST_TP']
         torch.use_deterministic_algorithms(True, warn_only=True)
         torch.backends.cudnn.benchmark = False
         data_manager = DiffdockDataManagers(cfg)

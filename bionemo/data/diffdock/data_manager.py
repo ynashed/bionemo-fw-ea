@@ -18,7 +18,7 @@ from functools import partial
 from nemo.utils import logging
 
 from bionemo.data.diffdock.confidence_dataset import ListDataset, diffdock_confidence_dataset
-from bionemo.data.diffdock.pdbbind import diffdock_build_dataset
+from bionemo.data.diffdock.docking_dataset import diffdock_build_dataset
 from bionemo.model.molecule.diffdock.infer import DiffDockModelInference
 from bionemo.model.molecule.diffdock.utils.diffusion import t_to_sigma as t_to_sigma_compl
 

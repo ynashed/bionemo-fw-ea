@@ -11,9 +11,9 @@ seed: 0
 
 data:
   num_workers: 1
-  split_train: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/splits/timesplit_no_lig_overlap_train # Path of file defining the split.
-  split_val: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/splits/timesplit_no_lig_overlap_val # Path of file defining the split
-  split_test: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/splits/timesplit_test # Path of file defining the split
+  split_train: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/splits/split_train # Path of file defining the split.
+  split_val: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/splits/split_val # Path of file defining the split
+  split_test: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/splits/split_test # Path of file defining the split
   cache_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/data_cache # Folder from where to load/restore cached dataset
 
 trainer:

@@ -84,7 +84,7 @@ BIONEMO_HOME==${BIONEMO_HOME:/workspace/bionemo}
 
 # Mounts
 # =========================
-DATASET_ID=1616536 # PDBBind processed sample dataset for diffdock score and confidence model training
+DATASET_ID=1617183 # processed sample dataset for diffdock score and confidence model training
 RESULTS_PATH="${BIONEMO_HOME}/result/nemo_experiments/${PROJECT_NAME}/${EXP_NAME}" # directory to store logs, checkpoints and results
 
 # =========================

@@ -251,8 +251,8 @@ def safe_index(l, e):
         return len(l) - 1
 
 
-def parse_receptor(pdbid, pdbbind_dir):
-    rec_path = os.path.join(pdbbind_dir, pdbid, f'{pdbid}_protein_processed.pdb')
+def parse_receptor(pdbid, protein_dir):
+    rec_path = os.path.join(protein_dir, pdbid, f'{pdbid}_protein_processed.pdb')
     return parse_pdb_from_path(rec_path)
 
 
@@ -383,9 +383,11 @@ def get_lig_graph(mol, complex_graph):
     return
 
 
-def generate_conformer(mol):
+def generate_conformer(mol, seed=None):
     ps = AllChem.ETKDGv2()
     id = AllChem.EmbedMolecule(mol, ps)
+    if seed is not None:
+        ps.randomSeed = seed
     if id == -1:
         logging.info('rdkit coords could not be generated without using random coords. using random coords now.')
         ps.useRandomCoords = True
@@ -394,7 +396,7 @@ def generate_conformer(mol):
 
 
 def get_lig_graph_with_matching(
-    mol_, complex_graph, popsize, maxiter, matching, keep_original, num_conformers, remove_hs
+    mol_, complex_graph, popsize, maxiter, matching, keep_original, num_conformers, remove_hs, seed=None
 ):
     if matching:
         mol_maybe_noh = copy.deepcopy(mol_)
@@ -412,7 +414,7 @@ def get_lig_graph_with_matching(
 
             mol_rdkit.RemoveAllConformers()
             mol_rdkit = AllChem.AddHs(mol_rdkit)
-            generate_conformer(mol_rdkit)
+            generate_conformer(mol_rdkit, seed=seed)
             if remove_hs:
                 mol_rdkit = RemoveHs(mol_rdkit, sanitize=True)
             mol = copy.deepcopy(mol_maybe_noh)
