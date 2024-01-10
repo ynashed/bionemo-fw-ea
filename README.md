@@ -13,6 +13,9 @@ Note that this repository is in *early access*, therefore some parts are still u
 An NGC API KEY is required for these steps.  You will need to configure [NGC](https://catalog.ngc.nvidia.com/?filters=&orderBy=weightPopularDESC&query=) with your org and team. See also Prerequisites below.
 
 ```bash
+# Login to NVIDIA docker registry:
+docker login nvcr.io # Username will be $oauthtoken, password will be NGC API KEY
+
 # Clone repository:
 git clone https://github.com/NVIDIA/bionemo-fw-ea.git
 cd bionemo-fw-ea
