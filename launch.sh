@@ -378,8 +378,10 @@ setup() {
     if [ ! -z "${NEMO_HOME}" ];
     then
         # NOTE: If we change the Python version, we will have a different mount path!
-        echo "Making a volume mount for nemo (/usr/local/lib/python3.10/dist-packages/nemo) to NEMO_HOME (${NEMO_HOME})"
-        DOCKER_CMD="${DOCKER_CMD} -v ${NEMO_HOME}:/usr/local/lib/python3.10/dist-packages/nemo "
+        echo "Making a volume mount for NeMo!" \
+             "Mounting package (\$NEMO_HOME/nemo) in Python environment (/usr/local/lib/python3.10/dist-packages/nemo)" \
+             "and NEMO_HOME (${NEMO_HOME}) to /workspace/nemo"
+        DOCKER_CMD="${DOCKER_CMD} -v ${NEMO_HOME}/nemo:/usr/local/lib/python3.10/dist-packages/nemo -v ${NEMO_HOME}:/workspace/nemo"
     fi
 
     # Note: For BIONEMO_HOME, if we are invoking docker, this should always be
