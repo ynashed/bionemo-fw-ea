@@ -134,5 +134,9 @@ WORKDIR ${BIONEMO_HOME}
 # we already install dependencies earlier, directly from the requirements*.txt files
 RUN pip install --no-deps -e .
 
+# Remove nvm as it's not expected users will need this, and it introduces unfixable vulnerabilties:
+# https://nvd.nist.gov/vuln/detail/CVE-2023-32002
+RUN rm -rf /usr/local/nvm
+
 # FIXME: If BIONEMO_HOME _is not_ /workspace/bionemo, then this ENTRYPOINT is invalid!
 ENTRYPOINT ["/workspace/bionemo/setup/startup.sh"]
