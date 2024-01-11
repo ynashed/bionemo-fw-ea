@@ -40,7 +40,17 @@ The pretrained DiffDock checkpoints for score and confidence models are availabl
 
 ### Accuracy Benchmarks
 
-To be added soon.
+The accuracy of DiffDock was measured over the 428 protein complexes from the PoseBusters benchmark {cite:p}`buttenschoen2023posebusters` available in [zenodo](https://zenodo.org/records/8278563). The metrics was computed from 20 independent runs with the [DiffDock GitHub](https://github.com/gcorso/DiffDock/commit/bc6b5151457ea5304ee69779d92de0fded599a2c) and the DiffDock in this BioNeMo Framework, and use the same evaluation scripts as in DiffDock GitHub. Due to the inherent stochasticity of DiffDock during the molecular docking generation, the metrics are not expected to be identical.
+
+| Dataset     | Number of Poses Sampled | Metric                                  | BioNeMo | GitHub |
+|-------------|-------------------------|-----------------------------------------|---------|--------|
+| PoseBusters |            10           | Percentage of Top-1 RMSD<2 Å (%) &uarr; | 27.06   | 25.30  |
+| PoseBusters |            10           | Median of Top-1 RMSD (Å) &darr;         | 5.07    | 5.35   |
+| PoseBusters |            10           | Percentage of Top-5 RMSD<2 Å (%) &uarr; | 37.53   | 35.48  |
+| PoseBusters |            10           | Median of Top-5 RMSD (Å) &darr;         | 2.91    | 3.06   |
+
+
+### Training Performance Benchmarks
 
 Training speed was tested on DGX-A100 systems GPUs with 80GB of memory. Three comparisons were made: 1) DiffDock GitHub As-Received from original author source 2) DiffDock integrated into BioNeMo FW 3) NVIDIA Acceleration of Tensor Product operation in DiffDock. Transition 1-->2 highlights the BioNeMo FW, while 2-->3 showcases the minute operation improvement and subsequent scaling implemented by NVIDIA engineers. 
 
