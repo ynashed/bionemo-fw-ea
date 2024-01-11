@@ -42,6 +42,13 @@ The pretrained DiffDock checkpoints for score and confidence models are availabl
 
 To be added soon.
 
+Training speed was tested on DGX-A100 systems GPUs with 80GB of memory. Three comparisons were made: 1) DiffDock GitHub As-Received from original author source 2) DiffDock integrated into BioNeMo FW 3) NVIDIA Acceleration of Tensor Product operation in DiffDock. Transition 1-->2 highlights the BioNeMo FW, while 2-->3 showcases the minute operation improvement and subsequent scaling implemented by NVIDIA engineers. 
+
+While the BioNeMo FW makes use of adaptive batch samplers depending on dataset size, we keep a fixed micro_batch size of 4 in the FW, and a batch size of 4 for the DiffDock As-Received code.
+
+The As-Received version of DiffDock does not support multi-GPU operations, and therefore is not shown in the second panel of benchmarking. 
+
+![EquiDock benchmarks](../images/diffdock_perf.png)
 
 ## Limitations
 DiffDock is currently restricted to static snapshot understanding of single ligand and protein interactions. For more involved systems included multi-ligands in a single protein pocket, multiple protein pockets without a ligand blocker, DiffDock inference may perform poorly due to the unaware implications of ligand-ligand interactions in solvent. Because ESM2 is used as a featurizer, some non-standard amino acids are ignored in the process. 
