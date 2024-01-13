@@ -110,10 +110,25 @@ build-bionemo-image:
       else
       base="";
       fi
-    - docker build --network host --no-cache ${base} --label com.nvidia.bionemo.git_hash=${CI_COMMIT_SHORT_SHA}
-      --build-arg GITLAB_TOKEN=${RO_API_TOKEN}
-      -t $PIPELINE_TAG -f setup/Dockerfile .
+    - docker build 
+      --network host --no-cache ${base} 
+      --label com.nvidia.bionemo.git_hash=${CI_COMMIT_SHORT_SHA}
+      --secret id=GITLAB_TOKEN,env=RO_API_TOKEN
+      -t $PIPELINE_TAG  -f setup/Dockerfile .
     - docker push $PIPELINE_TAG
+    # FIXME [mgreaves] See note in internal/Dockerfile-devel about this (it is commented as another 'FIXME').
+    #                  tl;dr Secuirty leak: passing in CI_JOB_TOKEN as a build-arg persists its value in the image!
+    #
+    # To fix, we'll need something like:
+    #  
+    # - TPL_REPO=https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab-master.nvidia.com/dl/gwe/torch_performance_linter
+    # - docker build 
+    #   --network host --no-cache 
+    #   --build-arg BIONEMO_IMAGE="$PIPELINE_TAG"
+    #   --secret id=TPL_REPO,env=TPL_REPO
+    #   -t $PIPELINE_TAG-devel -f internal/Dockerfile-devel .
+    #
+    # As in, ensure that the CI_JOB_TOKEN makes it way via --secret, not --build-arg.
     - docker build --network host --no-cache --build-arg BIONEMO_IMAGE="$PIPELINE_TAG"
       --build-arg TPL_REPO=https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab-master.nvidia.com/dl/gwe/torch_performance_linter
       -t $PIPELINE_TAG-devel -f internal/Dockerfile-devel .

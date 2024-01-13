@@ -54,10 +54,9 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
 # # Install extensions from the marketplace
 # RUN code-server --install-extension ms-python.python
 
-ARG GITLAB_TOKEN
 
 COPY setup/requirements.txt /tmp/requirements.txt
-RUN pip install -r /tmp/requirements.txt
+RUN --mount=type=secret,id=GITLAB_TOKEN GITLAB_TOKEN=$(cat /run/secrets/GITLAB_TOKEN) pip install -r /tmp/requirements.txt
 # TODO: unnecessary for main container, move test+dev dep installation to dev only & update CI to use dev image
 COPY setup/requirements-test.txt /tmp/requirements-test.txt
 RUN pip install -r /tmp/requirements-test.txt
