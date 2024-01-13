@@ -1,4 +1,22 @@
 # Release Notes
+## BioNeMo Framework v1.1
+## New Models
+* EquiDock for protein-protein docking pose prediction
+* DiffDock for protein-ligand blind docking pose generation
+
+### New Features
+* Training recipes for EquiDock and DiffDock, including automated data processing and full configuration for training.
+* Accelerated inference and training for DiffDock via fast tensor-product kernels.        
+* Example tutorials for running inference using EquiDock and DiffDock.
+* Recipes for running EquiDock and DiffDock on BCP and Slurm.
+* Pipeline parallel supported for ESM-2nv.
+* Migration of inference notebooks to using pytriton.
+
+### Bug fixes and Improvements
+* Faster pre-processing of data on BCP.
+* Refactor of download_models.sh to download_models.py for easier CLI use.
+* Refactor of install structure to move from /opt/nvidia to /workspace/bionemo. The environment variable $BIONEMO_HOME now points to the repo base and is required to be set for tests to pass.
+
 ## BioNeMo Framework v1.0
 ## New Models
 * ESM-2nv for protein sequence representations, pretrained weights of ESM-2 650M and ESM-2 3B converted from HF checkpoint available.
