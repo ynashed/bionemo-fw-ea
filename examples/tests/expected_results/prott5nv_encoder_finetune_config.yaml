@@ -3,6 +3,7 @@ desc: Base parameters for ProtT5nv model
 do_training: true
 do_testing: false
 restore_from_path: ${oc.env:BIONEMO_HOME}/models/protein/prott5nv/prott5nv.nemo
+use_peft: false
 trainer:
   devices: 1
   num_nodes: 1

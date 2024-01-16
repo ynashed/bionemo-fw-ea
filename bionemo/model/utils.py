@@ -18,6 +18,7 @@ from nemo.collections.nlp.parts.nlp_overrides import (
     MegatronHalfPrecisionPlugin,
     NLPDDPStrategy,
     NLPSaveRestoreConnector,
+    PEFTSaveRestoreConnector,
     PipelineMixedPrecisionPlugin,
 )
 from nemo.utils import logging
@@ -302,11 +303,24 @@ def restore_model(
             cfg.model = OmegaConf.merge(cfg.model, restore_cfg)
         cfg.model.precision = trainer.precision
 
+    if cfg.get('use_peft', False):  # skipped if use_peft is false or not present in config
+        if cfg.model.resume_from_checkpoint is not None:
+            resume_from_checkpoint = cfg.model.resume_from_checkpoint
+        else:
+            resume_from_checkpoint = trainer._checkpoint_connector.resume_from_checkpoint_fit_path
+        logging.info(f'Resuming training from checkpoint: {resume_from_checkpoint}')
+
+        save_restore_connector = PEFTSaveRestoreConnector(
+            peft_model_nemo_path=cfg.model.peft.restore_from_path, peft_model_ckpt_path=resume_from_checkpoint
+        )
+    else:
+        save_restore_connector = NLPSaveRestoreConnector()
+
     model = model_cls.restore_from(
         restore_path=restore_path,
         trainer=trainer,
         override_config_path=cfg,
-        save_restore_connector=NLPSaveRestoreConnector(),
+        save_restore_connector=save_restore_connector,
         strict=strict,
     )
     if cfg.get('load_from_checkpoint') is not None:

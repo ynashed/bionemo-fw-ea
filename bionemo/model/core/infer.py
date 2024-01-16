@@ -155,7 +155,10 @@ class BaseEncoderDecoderInference(LightningModule):
                 data_parallel_size=1,  # We check above to make sure that dataparallel size is always 1 at inference.
             )
 
-        if self._freeze_model:
+        # Check for PEFT flag before calling `setup_optimizer_param_groups`
+        if cfg.get('use_peft', False):  # skipped if use_peft is false or not present in config
+            model.setup_optimizer_param_groups()
+        elif self._freeze_model:  # only use encoder_frozen flag if not doing peft
             model.freeze()
 
         self.model = model

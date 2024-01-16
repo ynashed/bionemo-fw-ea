@@ -3,6 +3,7 @@ do_training: true
 do_testing: false
 seed: 42
 restore_from_path: null
+use_peft: false
 trainer:
   devices: 1
   num_nodes: 1

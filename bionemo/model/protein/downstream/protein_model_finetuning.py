@@ -29,6 +29,10 @@ class FineTuneProteinModel(EncoderFineTuning):
         self.full_cfg = cfg
         self.encoder_frozen = self.full_cfg.model.encoder_frozen
         self.task_type = self.full_cfg.model.data.task_type
+
+        if self.encoder_frozen and self.full_cfg.get('use_peft', False):
+            raise ValueError("Using PEFT requires encoder_frozen: False for training")
+
         super().__init__(cfg.model, trainer=trainer)
 
     def configure_optimizers(self):
@@ -64,6 +68,7 @@ class FineTuneProteinModel(EncoderFineTuning):
         return task_head
 
     def setup_encoder_model(self, cfg, trainer):
+        # Uses PEFT flag to determine whether to load enconder +/- adapters
         infer_class = import_class_by_path(self.full_cfg.infer_target)
         pretrained_model = infer_class(
             self.full_cfg,
@@ -76,6 +81,7 @@ class FineTuneProteinModel(EncoderFineTuning):
 
     @lru_cache
     def data_setup(self):
+        # TODO: address behavior for when we want peft
         if self.encoder_frozen:
             model = self.encoder_model
         else:
@@ -152,3 +158,11 @@ class FineTuneProteinModel(EncoderFineTuning):
             target = self.get_target_from_batch(batch)
         loss = self.loss_fn(output_tensor, target)
         return loss, output_tensor, target
+
+    def state_dict(self, destination=None, prefix=None, keep_vars=False):
+        custom_state_dict = super(FineTuneProteinModel, self).state_dict()
+
+        if self.full_cfg.get('use_peft', False):  # skipped if use_peft is false or not present in config
+            custom_state_dict.update(self.encoder_model.model.state_dict())
+
+        return custom_state_dict

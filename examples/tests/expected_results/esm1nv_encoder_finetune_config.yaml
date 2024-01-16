@@ -2,6 +2,7 @@ name: esm1nv_sec_str
 do_training: true
 do_testing: false
 restore_from_path: ${oc.env:BIONEMO_HOME}/models/protein/esm1nv/esm1nv.nemo
+use_peft: false
 trainer:
   devices: 1
   num_nodes: 1

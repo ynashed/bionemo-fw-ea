@@ -2,6 +2,7 @@ name: esm1nv
 do_training: true
 do_testing: false
 restore_from_path: null
+use_peft: false
 trainer:
   devices: 1
   num_nodes: 1

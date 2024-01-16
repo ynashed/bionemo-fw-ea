@@ -3,6 +3,7 @@ do_training: true
 do_testing: true
 seed: 42
 restore_from_path: ${oc.env:BIONEMO_HOME}/models/molecule/megamolbart/megamolbart.nemo
+use_peft: false
 trainer:
   devices: 1
   num_nodes: 1
