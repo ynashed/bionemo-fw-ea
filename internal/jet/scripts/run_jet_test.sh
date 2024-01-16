@@ -2,12 +2,13 @@
 status=0
 
 jet_pipeline_id=$(curl --silent --header "PRIVATE-TOKEN: ${RO_API_TOKEN}" "https://gitlab-master.nvidia.com/api/v4/projects/${CI_PROJECT_ID}/pipelines/${CI_PIPELINE_ID}/bridges" | jq '.[0].downstream_pipeline.id')
-python internal/jet/get_results_from_jet.py --pipeline_id $jet_pipeline_id --print_script --most_recent --save_dir .
+python internal/jet/get_results_from_jet.py --pipeline_id $jet_pipeline_id  --save_dir . -vv
 
 # Extracts the 10th and 11th column from the csv file with information about jobs in jet pipeline corresponding
 # to workload id and job key and creates workload_ids and job_keys arrays.
 filename="jet_query_${jet_pipeline_id}.csv"
-workload_ids=($(cat $filename | cut -d ',' -f10))
+workload_ids=($(cat $filename | cut -d ',' -f9))
+echo $workload_ids
 job_keys=($(cat $filename  | cut -d ',' -f11))
 
 

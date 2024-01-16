@@ -33,6 +33,7 @@ RUN pip install jet-api --upgrade \
 
 # TODO(trvachov): Fix this JET conflict. It seems that installing JET will downgrade pydantic.
 RUN pip install pydantic==2.5.3
+RUN pip install tabulate==0.9.0
 
 COPY ./internal ${BIONEMO_HOME}/internal
 COPY CONTRIBUTING.md ${BIONEMO_HOME}/
