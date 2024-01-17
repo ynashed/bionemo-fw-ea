@@ -40,7 +40,6 @@ def print_table_with_results(df: pd.DataFrame) -> None:
     table_dict["Job Type"] = df.job_type
     table_dict["Job Key"] = df.job_key.str.split("/", expand=True)[1]
     table_dict["Status"] = df.status
-    table_dict["Log URL"] = df.log_output_script if "log_output_script" in df else ""
     table = tabulate(table_dict, headers=list(table_dict.keys()), tablefmt="psql")
 
     print(table)
@@ -62,9 +61,7 @@ def get_duration_stats(
     print('\n')
     N = len(job_durations)
     pipelines_duration = pd.Series([v["duration"] for _, v in pipelines_info.items()])
-    logging.info(
-        f"Duration information for {N} jobs in {len(pipelines_info)} pipeline(s): {','.join(pipelines_info.keys())}\n"
-    )
+    logging.info(f"Duration information for {N} jobs in {len(pipelines_info)} pipeline(s)\n")
     duration_info = OrderedDict({"pipeline": pipelines_duration, "job": job_durations, "scripts": script_durations})
 
     duration_stats = OrderedDict()
@@ -358,10 +355,10 @@ def get_results_from_jet(
     if not all_jobs:
         df = filter_out_failed_and_rerun_jobs(df=df, n_all_results=df.shape[0])
 
-    if verbosity_level > 1:
+    if verbosity_level > 2:
         log_detailed_job_info(df=df)
 
-    if verbosity_level >= 1:
+    if verbosity_level >= 2:
         print_table_with_results(df=df)
 
     # Calculating duration-related analytics (overall, pipeline and job specific)
