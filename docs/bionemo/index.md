@@ -34,10 +34,7 @@ Some of the key features of BioNeMo Framework are:
 
 ## Prerequisites
 
-Before you begin using BioNeMo, ensure the following prerequisites are met:
-
-1. Access to [BioNeMo Framework](https://www.nvidia.com/en-us/gpu-cloud/bionemo/) from NVIDIA.
-2. Access to NVIDIA DGX compute infrastructure ([DGX-Cloud](https://www.nvidia.com/en-us/data-center/dgx-cloud/) or [DGX-Pod](https://www.nvidia.com/en-us/data-center/dgx-basepod/)).
+Please follow the instructions on the [pre-requisites documentation](./pre-reqs.md) page.
 
 
 ## BioNeMo Models: Overview

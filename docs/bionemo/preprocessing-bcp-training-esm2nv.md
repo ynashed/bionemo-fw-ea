@@ -1,4 +1,3 @@
-
 # Preparing Workspace and Data for Pre-training
 
 This section outlines the steps to 
@@ -21,6 +20,8 @@ tutorial.
 The commands below expect that you have the NGC CLI [installed](https://docs.nvidia.com/base-command-platform/user-guide/latest/index.html#installing-ngc-cli) and [configured](https://docs.nvidia.com/base-command-platform/user-guide/latest/#configuring-the-cli-for-your-use)
 on your machine.  All of the commands below can then be run outside of a BioNeMo Docker 
 container.  Your machine serves as a terminal for submitting NGC commands.
+
+NOTE: If this is your first time, make sure to follow the instructions on the [pre-requisites documentation](./pre-reqs.md) page!
 
 ## Part 1: Create a Workspace
 ### Step 1.1: Add Variables to Your Environment
