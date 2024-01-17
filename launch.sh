@@ -101,25 +101,34 @@ EOF
 }
 
 # Defaults for `.env` file
-BIONEMO_IMAGE=${BIONEMO_IMAGE:=nvcr.io/nvidian/cvai_bnmo_trng/bionemo:dev}
-LOCAL_REPO_PATH=$(pwd)
-DOCKER_REPO_PATH=${DOCKER_REPO_PATH:=/workspace/bionemo}
-LOCAL_RESULTS_PATH=${LOCAL_RESULTS_PATH:=${LOCAL_REPO_PATH}/results}
-DOCKER_RESULTS_PATH=${DOCKER_RESULTS_PATH:=${DOCKER_REPO_PATH}/results}
-LOCAL_DATA_PATH=${LOCAL_DATA_PATH:=${LOCAL_REPO_PATH}/data}
-DOCKER_DATA_PATH=${DOCKER_DATA_PATH:=${DOCKER_REPO_PATH}/data}
-LOCAL_MODELS_PATH=${LOCAL_MODELS_PATH:=${LOCAL_REPO_PATH}/models}
-DOCKER_MODELS_PATH=${DOCKER_MODELS_PATH:=${DOCKER_REPO_PATH}/models}
-WANDB_API_KEY=${WANDB_API_KEY:=NotSpecified}
-JUPYTER_PORT=${JUPYTER_PORT:=8888}
-REGISTRY=${REGISTRY:=nvcr.io}
-REGISTRY_USER=${REGISTRY_USER:='$oauthtoken'}
-DEV_CONT_NAME=${DEV_CONT_NAME:=bionemo}
-NGC_CLI_API_KEY=${NGC_CLI_API_KEY:=NotSpecified}
-NGC_CLI_ORG=${NGC_CLI_ORG:=nvidian}
-NGC_CLI_TEAM=${NGC_CLI_TEAM:=NotSpecified}
-NGC_CLI_FORMAT_TYPE=${NGC_CLI_FORMAT_TYPE:=ascii}
-GITLAB_TOKEN=${GITLAB_TOKEN:=NotSpecified}
+export BIONEMO_IMAGE=${BIONEMO_IMAGE:=nvcr.io/nvidian/cvai_bnmo_trng/bionemo:dev}
+export LOCAL_REPO_PATH=$(pwd)
+export DOCKER_REPO_PATH=${DOCKER_REPO_PATH:=/workspace/bionemo}
+export LOCAL_RESULTS_PATH=${LOCAL_RESULTS_PATH:=${LOCAL_REPO_PATH}/results}
+export DOCKER_RESULTS_PATH=${DOCKER_RESULTS_PATH:=${DOCKER_REPO_PATH}/results}
+export LOCAL_DATA_PATH=${LOCAL_DATA_PATH:=${LOCAL_REPO_PATH}/data}
+export DOCKER_DATA_PATH=${DOCKER_DATA_PATH:=${DOCKER_REPO_PATH}/data}
+export LOCAL_MODELS_PATH=${LOCAL_MODELS_PATH:=${LOCAL_REPO_PATH}/models}
+export DOCKER_MODELS_PATH=${DOCKER_MODELS_PATH:=${DOCKER_REPO_PATH}/models}
+export WANDB_API_KEY=${WANDB_API_KEY:=NotSpecified}
+export JUPYTER_PORT=${JUPYTER_PORT:=8888}
+export REGISTRY=${REGISTRY:=nvcr.io}
+export REGISTRY_USER=${REGISTRY_USER:='$oauthtoken'}
+export DEV_CONT_NAME=${DEV_CONT_NAME:=bionemo}
+export NGC_CLI_API_KEY=${NGC_CLI_API_KEY:=NotSpecified}
+export NGC_CLI_ORG=${NGC_CLI_ORG:=nvidian}
+export NGC_CLI_TEAM=${NGC_CLI_TEAM:=NotSpecified}
+export NGC_CLI_FORMAT_TYPE=${NGC_CLI_FORMAT_TYPE:=ascii}
+export GITLAB_TOKEN=${GITLAB_TOKEN:=NotSpecified}
+# NOTE: Some variables need to be present in the environment of processes this script kicks off.
+#       Most notably, `docker build` requires the GITLAB_TOKEN env var. Otherwise, building fails.
+#
+#       For uniformity of behavior between externally setting an environment variable before
+#       executing this script and using the .env file, we make sure to explicitly `export` every
+#       environment variable that we use and may define in the .env file.
+#
+#       This way, all of these variables and their values will always guarenteed to be present
+#       in the environment of all processes forked from this script's.
 
 
 # if $LOCAL_ENV file exists, source it to specify my environment
