@@ -32,19 +32,35 @@ class PerTokenMaskedCrossEntropyLoss(_WeightedLoss):
 
 
 class ConvNet(torch.nn.Module):
-    def __init__(self, embed_dim: int, output_sizes: List[int]):
+    """
+    A convolutional neural network class for residue-level classification.
+
+    Attributes:
+    ----------
+        elmo_feature_extractor (torch.nn.Sequential): A sequential model with a Conv2D layer, ReLU activation, and optional Dropout.
+        class_heads (torch.nn.ModuleList): A list of convolutional layers, each corresponding to a different class head.
+            These are used for producing logits scores of varying sizes as specified in `output_sizes`.
+
+    Parameters:
+    -----------
+        embed_dim: The embedding dimension of the input data.
+        output_sizes: A list of integers where each integer represents the output size for each class head.
+        bottleneck_dim: The number of output channels in the bottleneck layer of the convolution. Defaults to 32.
+        dropout_rate: The dropout rate applied in the dropout layer. Defaults to 0.25.
+    """
+
+    def __init__(self, embed_dim: int, output_sizes: List[int], bottleneck_dim: int = 32, dropout_rate: float = 0.25):
         super(ConvNet, self).__init__()
         # This is only called "elmo_feature_extractor" for historic reason
-        # CNN weights are trained on ProtT5 embeddings
+        # CNN weights are trained on encoder's embeddings
         self.elmo_feature_extractor = torch.nn.Sequential(
-            torch.nn.Conv2d(embed_dim, 32, kernel_size=(7, 1), padding=(3, 0)),  # 7x32
+            torch.nn.Conv2d(embed_dim, bottleneck_dim, kernel_size=(7, 1), padding=(3, 0)),  # 7x32
             torch.nn.ReLU(),
-            torch.nn.Dropout(0.25),
+            torch.nn.Dropout(dropout_rate),
         )
-        n_final_in = 32
         self.class_heads = torch.nn.ModuleList([])
         for head_size in output_sizes:
-            self.class_heads.append(torch.nn.Conv2d(n_final_in, head_size, kernel_size=(7, 1), padding=(3, 0)))
+            self.class_heads.append(torch.nn.Conv2d(bottleneck_dim, head_size, kernel_size=(7, 1), padding=(3, 0)))
 
     def forward(self, x):
         # IN: X = (B x L x F); OUT: (B x F x L, 1)

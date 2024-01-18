@@ -28,7 +28,7 @@ model:
   tensor_model_parallel_size: 1  # model parallelism
   loss_func: MSELoss
   hidden_layer_size: 128
-  
+  dropout_rate: 0.1 # dropout rate for downstream task
   data:
     task_name: meltome # options: aav, bind, conservation, gb1, meltome, sav, scl, secondary_structure
     task_type: regression #'token-level-classification'  # alternative: classification, regression

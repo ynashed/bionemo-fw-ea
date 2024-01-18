@@ -28,6 +28,7 @@ model:
   tensor_model_parallel_size: 1  # model parallelism
   loss_func: CrossEntropyLoss
   hidden_layer_size: 256
+  dropout_rate: 0.1 # dropout rate for downstream task
   
   data:
     task_name: scl # options: aav, bind, conservation, gb1, meltome, sav, scl, secondary_structure

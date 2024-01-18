@@ -26,7 +26,8 @@ model:
   micro_batch_size: 64 # NOTE: adjust to occupy ~ 90% of GPU memory
   global_batch_size: null # if null will be computed automatically
   tensor_model_parallel_size: 1  # model parallelism
-  
+  dropout_rate: 0.25 # dropout rate for downstream task
+  cnn_dim: 32 # output channels in the downstream convolution layer
   data:
     task_name: secondary_structure # options: aav, bind, conservation, gb1, meltome, sav, scl, secondary_structure
     task_type: 'token-level-classification'  # alternative: classification, regression
@@ -37,9 +38,9 @@ model:
       val: x000
       test: x000
     sequence_column: "sequence" # name of column with protein sequence in csv file
-    target_column: ["3state", "resolved"] # names of label columns in csv file
-    target_sizes: [3, 2] # number of classes in each label
-    mask_column: ["resolved", null] # names of mask columns in csv file, masks must be 0 or 1
+    target_column: ["3state"] # names of label columns in csv file
+    target_sizes: [3] # number of classes in each label
+    mask_column: ["resolved"] # names of mask columns in csv file, masks must be 0 or 1
     num_workers: 8
     max_seq_length: ${model.seq_length}
     emb_batch_size: ${model.micro_batch_size}

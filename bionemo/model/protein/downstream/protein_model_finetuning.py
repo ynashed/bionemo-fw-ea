@@ -60,11 +60,16 @@ class FineTuneProteinModel(EncoderFineTuning):
                     self.cfg.hidden_layer_size,
                     self.cfg.data.target_sizes[0],
                 ],
-                dropout=0.1,
+                dropout=self.cfg.model.dropout_rate,
             )
 
         elif self.task_type == 'token-level-classification':
-            task_head = ConvNet(self.full_cfg.model.hidden_size, output_sizes=self.cfg.data.target_sizes)
+            task_head = ConvNet(
+                self.full_cfg.model.hidden_size,
+                output_sizes=self.cfg.data.target_sizes,
+                bottleneck_dim=self.full_cfg.model.cnn_dim,
+                dropout_rate=self.full_cfg.model.dropout_rate,
+            )
         return task_head
 
     def setup_encoder_model(self, cfg, trainer):
