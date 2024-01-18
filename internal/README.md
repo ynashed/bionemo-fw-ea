@@ -32,6 +32,18 @@ bash $BIONEMO_HOME/internal/run_tpl.sh /path/to/your/script.py arg1=val1 +arg2=v
 TAP_MODE=auto python /path/to/your/script.py arg1=val1 +arg2=val2 ...
 ```
 
+
+
+# Building Models and Wide Hardware Support
+
+If you're building models or testing models against the wide variety of hardware `bionemo` supports, be sure to know the pitfals that exist with the TF32 floating point standard. While it is [actually a 19-bit number format](https://moocaholic.medium.com/fp64-fp32-fp16-bfloat16-tf32-and-other-members-of-the-zoo-a1ca7897d407), TF32 supports the same numeric range as FP32 while decreasing precision. It can represent the same exponents that FP32 (IEEE 754) can, but it can only handle the same fractional values present in FP16 numbers. This makes TF32 _almost_ a drop-in replacement for FP32: any FP32 number can be represented in TF32, albeit with more precision loss.
+
+TF32 supports significantly faster FLOPs than FP32 while usually providing the same amount of precision necessary for deep learning. However, there are **many** instances where using TF32 will fail while FP32 will not. If you see **convergence** issues during training, or training **diverging**, models performing worse than expected, or models producing invalid results, the issue _may_ be due to using TF32.
+
+If you haven't already, be sure to [read this detailed collection of TF-32 related issues found in PyTorch](https://docs.google.com/document/d/1O1JTi33VgNykZLr6F-Qn4CphFmBYXdoxFBBoUorOYrs/edit).
+
+
+
 # Performance analysis and optimization
 
 `devel` docker container contains two tools that can help you to analyze and optimize performance of your model:
