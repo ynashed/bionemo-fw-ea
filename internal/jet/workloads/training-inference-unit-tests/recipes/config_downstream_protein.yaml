@@ -61,8 +61,8 @@ spec:
       tags: [secondary]
 products:
   - nodes: [1]
-    gpus: [1, 8]
-    precision: [16, 32, bf16]
+    gpus: [8]
+    precision: [32, bf16]
     domain: [protein]
     variant: [downstream_flip]
     products:

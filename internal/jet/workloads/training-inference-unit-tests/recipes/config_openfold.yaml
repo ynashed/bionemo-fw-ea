@@ -61,7 +61,7 @@ spec:
       tags: [primary]
 products:
   - nodes: [1]
-    gpus: [1, 8]
+    gpus: [8]
     precision: [32]
     domain: [ protein ]
     batch_size: [ 1 ]
