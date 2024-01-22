@@ -380,9 +380,9 @@ def get_lig_graph(mol, complex_graph):
 
 def generate_conformer(mol, seed=None):
     ps = AllChem.ETKDGv2()
-    id = AllChem.EmbedMolecule(mol, ps)
     if seed is not None:
         ps.randomSeed = seed
+    id = AllChem.EmbedMolecule(mol, ps)
     if id == -1:
         logging.info('rdkit coords could not be generated without using random coords. using random coords now.')
         ps.useRandomCoords = True
