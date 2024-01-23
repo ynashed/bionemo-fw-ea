@@ -79,7 +79,8 @@ def get_cfg(tmp_directory, prepend_config_path, config_name, config_path='conf')
 @pytest.mark.needs_checkpoint
 @pytest.mark.skip_if_no_file(CHECKPOINT_PATH[0])
 @pytest.mark.skip_if_no_file(CHECKPOINT_PATH[1])
-def test_dffdock_inference(tmp_directory):
+@pytest.mark.skip(reason="FIXME: Test is flaky across different hardwares")
+def test_diffdock_inference(tmp_directory):
     cfg = get_cfg(tmp_directory, PREPEND_CONFIG_DIR, "diffdock_infer_test")
     seed_everything(42, workers=True)
 

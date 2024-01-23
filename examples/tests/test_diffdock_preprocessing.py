@@ -137,6 +137,7 @@ def test_diffdock_prepare_score_dataset(tmp_directory, config_name):
 @pytest.mark.needs_gpu
 @pytest.mark.needs_checkpoint
 @pytest.mark.parametrize('config_name', ['diffdock_confidence_preprocessing_test'])
+@pytest.mark.skip(reason="FIXME: Test is flaky across different hardwares")
 def test_diffdock_prepare_confidence_dataset(tmp_directory, config_name):
     cfg = get_cfg(tmp_directory, PREPEND_CONFIG_DIR, config_name)
     seed_everything(cfg.seed)

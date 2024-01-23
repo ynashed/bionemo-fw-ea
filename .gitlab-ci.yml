@@ -10,8 +10,6 @@ stages:
   - jet
   - deploy
 
-services:
-  - docker:20.10.16-dind
 
 variables:
   NGC_REGISTRY_IMAGE: "nvcr.io/nvidian/cvai_bnmo_trng/bionemo"
@@ -75,6 +73,8 @@ skip_ci:
 
 
 .docker-setup:
+  services:
+    - docker:20.10.16-dind
   tags:
     - dind
   before_script:
@@ -110,8 +110,8 @@ build-bionemo-image:
       else
       base="";
       fi
-    - docker build 
-      --network host --no-cache ${base} 
+    - docker build
+      --network host --no-cache ${base}
       --label com.nvidia.bionemo.git_hash=${CI_COMMIT_SHORT_SHA}
       --secret id=GITLAB_TOKEN,env=RO_API_TOKEN
       -t $PIPELINE_TAG  -f setup/Dockerfile .
@@ -120,10 +120,10 @@ build-bionemo-image:
     #                  tl;dr Secuirty leak: passing in CI_JOB_TOKEN as a build-arg persists its value in the image!
     #
     # To fix, we'll need something like:
-    #  
+    #
     # - TPL_REPO=https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab-master.nvidia.com/dl/gwe/torch_performance_linter
-    # - docker build 
-    #   --network host --no-cache 
+    # - docker build
+    #   --network host --no-cache
     #   --build-arg BIONEMO_IMAGE="$PIPELINE_TAG"
     #   --secret id=TPL_REPO,env=TPL_REPO
     #   -t $PIPELINE_TAG-devel -f internal/Dockerfile-devel .
@@ -185,7 +185,7 @@ pytest:
       when: never
     - when: on_success
   tags:
-    - gpu-dev
+    - gpu
   variables:
     GIT_STRATEGY: none
     GIT_CHECKOUT: "false"
@@ -229,7 +229,7 @@ pytest-internal:
       when: never
     - when: on_success
   tags:
-    - gpu-dev
+    - gpu
   variables:
     GIT_STRATEGY: none
     GIT_CHECKOUT: "false"
