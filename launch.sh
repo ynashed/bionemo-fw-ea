@@ -243,6 +243,10 @@ DOCKER_BUILD_CMD="docker build --network host \
 
 
 download() {
+    if [ $(pip list | grep -F "pydantic" | wc -l) -eq 0 ]; then
+        read -p 'Pydantic module (Python) not found. Install in current environment? (y/N):' confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] || exit 1
+        pip install $(cat setup/requirements.txt | grep pydantic)
+    fi
     mkdir -p ${MODEL_PATH}
     python download_models.py all --source ngc --download_dir ${MODEL_PATH} --verbose
 }
