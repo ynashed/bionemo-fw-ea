@@ -6,7 +6,7 @@ EquiDock {cite:p}`ganea2021independent` is an SE(3)-equivariant model that can p
 
 ## Intended Use
 
-Almost all biological processes involve proteins interacting with each other. Prediction of protein complexes can be used understand disease progression and also in the design of novel proteins that can preferentially interact with other proteins of choice.
+Almost all biological processes involve proteins interacting with each other. Prediction of protein complexes can be used to understand disease progression and also in the design of novel proteins that can preferentially interact with other proteins of choice.
 
 ## Model Architecture
 
