@@ -8,7 +8,7 @@ from bionemo.data.dataset_builder_utils import (
     _FASTA_FIELDS_MMAP_TYPE,
     build_typed_dataset,
 )
-from bionemo.data.mapped_dataset import NeMoUpsampling
+from bionemo.data.mapped_dataset import ResamplingMappedDataset
 from bionemo.model.utils import initialize_distributed_parallel_state
 
 
@@ -129,6 +129,6 @@ def test_dataset_builder_upsampling():
     )
     assert len(dataset) == num_samples and len(dataset._dataset) == 10
 
-    assert isinstance(dataset, NeMoUpsampling) and isinstance(
+    assert isinstance(dataset, ResamplingMappedDataset) and isinstance(
         dataset._dataset, _DATA_IMPL_TYPE_CLS[_CSV_FIELDS_MMAP_TYPE]
     )

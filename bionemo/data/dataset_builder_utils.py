@@ -6,7 +6,7 @@ from nemo.collections.nlp.data.language_modeling.text_memmap_dataset import CSVM
 from nemo.core import Dataset
 from omegaconf import OmegaConf
 
-from bionemo.data.mapped_dataset import NeMoUpsampling
+from bionemo.data.mapped_dataset import ResamplingMappedDataset
 from bionemo.data.memmap_csv_fields_dataset import CSVFieldsMemmapDataset
 from bionemo.data.memmap_fasta_fields_dataset import FASTAFieldsMemmapDataset
 from bionemo.data.utils import check_paths_exist, expand_dataset_paths
@@ -88,7 +88,7 @@ def build_typed_dataset(
         data_prefix = cfg.get('data_prefix', None)
         if data_prefix is None:
             data_prefix = os.path.commonprefix(dataset_paths)
-        dataset = NeMoUpsampling(
+        dataset = ResamplingMappedDataset(
             dataset,
             num_samples=num_samples,
             cfg=cfg,

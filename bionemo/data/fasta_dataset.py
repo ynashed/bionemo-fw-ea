@@ -28,7 +28,7 @@ from bionemo.data.dataloader import (
     SpanMasking,
 )
 from bionemo.data.dataloader.kmer_collate import DeterministicLengthTruncator
-from bionemo.data.mapped_dataset import MappedDataset, NeMoUpsampling
+from bionemo.data.mapped_dataset import MappedDataset, ResamplingMappedDataset
 from bionemo.data.utils import (
     DatasetBuilderSpec,
     FormattedDatasetFactory,
@@ -270,7 +270,7 @@ class InternallyIndexedFastaMemMapDataset(Dataset):
 
     def __getitem__(self, index):
         index = handle_index(self, index)
-        # TODO: this lookup is currently a litle roundabout: it tells you which entry
+        # TODO: this lookup is currently a little roundabout: it tells you which entry
         # we want to go to, then uses that to lookup the file and get the entry position
         # within the file. We can probably restructure the indices to go directly
         # to the entry without needing to know its global position
@@ -670,7 +670,7 @@ class DNABERTDataModule(BioNeMoDataModule):
             self.cfg.dataset_path,
             'train',
         )
-        dataset = NeMoUpsampling(
+        dataset = ResamplingMappedDataset(
             dataset,
             num_samples=num_samples,
             cfg=self.cfg,
@@ -699,7 +699,7 @@ class DNABERTDataModule(BioNeMoDataModule):
             self.cfg.dataset_path,
             'val',
         )
-        dataset = NeMoUpsampling(
+        dataset = ResamplingMappedDataset(
             dataset,
             num_samples=num_samples,
             cfg=self.cfg,

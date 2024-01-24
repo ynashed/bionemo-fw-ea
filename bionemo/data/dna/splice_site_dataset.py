@@ -10,7 +10,7 @@ from torch.utils.data import ConcatDataset, Dataset
 from bionemo.core import BioNeMoDataModule
 from bionemo.data.dataloader.kmer_collate import KmerBertCollate
 from bionemo.data.fasta_dataset import ConcatFastaDataset
-from bionemo.data.mapped_dataset import NeMoUpsampling
+from bionemo.data.mapped_dataset import ResamplingMappedDataset
 from bionemo.data.utils import expand_dataset_paths
 from bionemo.data.validation_dataset import DataFrameTransformDataset
 
@@ -262,7 +262,7 @@ class SpliceSiteDataModule(BioNeMoDataModule):
         """Creates an upsampled version of the DNABERT training dataset"""
         num_samples = self.train_num_samples
         dataset_dir = self.cfg.dataset_path
-        dataset = NeMoUpsampling(
+        dataset = ResamplingMappedDataset(
             dataset,
             num_samples=num_samples,
             cfg=self.cfg,
@@ -278,7 +278,7 @@ class SpliceSiteDataModule(BioNeMoDataModule):
             return dataset
         num_samples = self.val_num_samples
         dataset_dir = self.cfg.dataset_path
-        dataset = NeMoUpsampling(
+        dataset = ResamplingMappedDataset(
             dataset,
             num_samples=num_samples,
             cfg=self.cfg,

@@ -8,10 +8,11 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
+import functools
 import os
 import time
 from abc import ABC, abstractmethod
-from typing import Dict, Optional
+from typing import Dict, Optional, Sequence
 
 import numpy as np
 import torch
@@ -22,7 +23,7 @@ from nemo.utils import logging
 from bionemo.data.utils import handle_index
 
 
-__all__ = ['MappedDataset', 'SliceDataset', 'NeMoUpsampling', 'FilteredMappedDataset']
+__all__ = ['MappedDataset', 'SliceDataset', 'OnlineSampleMapping', 'ResamplingMappedDataset', 'FilteredMappedDataset']
 
 
 class SliceIndex:
@@ -47,7 +48,7 @@ class SliceIndex:
 
 
 class MappedDataset(Dataset, ABC):
-    def __init__(self, dataset: Dataset, num_samples: Optional[int] = None, consolidate_sample_mapping=True):
+    def __init__(self, dataset: Dataset, num_samples: Optional[int] = None, consolidate_sample_mapping: bool = False):
         """
         Produces a remapped version of a `Dataset`.
         Can be used to create a subset of a dataset, or to shuffle it.
@@ -59,6 +60,8 @@ class MappedDataset(Dataset, ABC):
                 contain. The sampling strategy is based on
                 `create_sample_mapping`. `create_sample_mapping` must support
                 `num_samples=None` in order for this `num_samples` to be None.
+            consolidate_sample_mapping (bool): If True, the sample mapping will flatten any chained MappedDatasets
+                                               (default: False since memory consumption will be high for large num_samples)
         """
         self._dataset = dataset
 
@@ -82,7 +85,7 @@ class MappedDataset(Dataset, ABC):
         return self._dataset[idx]
 
     @abstractmethod
-    def create_sample_mapping(self, dataset: Dataset, num_samples: int):
+    def create_sample_mapping(self, dataset: Dataset, num_samples: int) -> Sequence[int]:
         """Sample mapping used to remap a dataset. Implemented by child class.
 
         Arguments:
@@ -113,7 +116,7 @@ class SliceDataset(MappedDataset):
         self.end = handle_index(dataset, end)
         super().__init__(dataset, None)
 
-    def create_sample_mapping(self, dataset: Dataset, num_samples: Optional[int]):
+    def create_sample_mapping(self, dataset: Dataset, num_samples: Optional[int]) -> Sequence[int]:
         """Creates a sample mapping for trimming the `dataset` to length
         based on the slice arguments.
 
@@ -194,7 +197,7 @@ class Uniref90ClusterMappingDataset(MappedDataset):
 
     def __init__(
         self,
-        uniref50_dataset: 'NeMoUpsampling',
+        uniref50_dataset: 'ResamplingMappedDataset',
         uniref90_dataset: Dataset,
         cluster_map_starts_fn: str,
         cluster_map_counts_fn: str,
@@ -313,12 +316,186 @@ class Uniref90ClusterMappingDataset(MappedDataset):
 
         return sample_map
 
-    def create_sample_mapping(self, dataset, num_samples=None) -> np.array:
+    def create_sample_mapping(self, dataset, num_samples=None) -> Sequence[int]:
         return self.sample_map
 
 
-class NeMoUpsampling(MappedDataset):
-    """Upsamples a dataset to a target length by repeating samples."""
+class OnlineSampleMapping:
+    """
+    This class replaces NeMo's get_samples_mapping function which pre-computes.
+    It is used to create a sample mapping for certain number of samples, including
+    pseudo-random shuffling.
+    The sampler allows to down, or upsample a given dataset.
+    Shuffling leads to pseudo-random shuffling, where blocks are shuffled,
+    and each block is internally shuffled.
+    """
+
+    def __init__(
+        self,
+        dataset_size: int,
+        num_samples: int,
+        block_size: int = 1000000,
+        cache_maxsize: int = 2,
+        seed: int = 1,
+        shuffle: bool = True,
+        truncate_to_block_boundary: bool = False,
+    ):
+        """
+        Args:
+            dataset_size (int): Size of the dataset.
+            num_samples (int): Number of samples the dataset should contain.
+            block_size (int): Size of each sample block. This is used to shuffle the samples.
+                              None will be replaced with dataset size.
+            cache_maxsize (int): Maximum size of the blocks cache for the get_sample_block function.
+            seed (int): Seed for the random number generator used for shuffling.
+            shuffle (bool): Whether to shuffle the samples.
+            truncate_to_block_boundary (bool): Whether to truncate the last block to the block boundary (could drop samples).
+        """
+        self.dataset_size = dataset_size
+        self.num_samples = num_samples
+        self.block_size = block_size if block_size is not None else self.dataset_size
+        self.cache_maxsize = cache_maxsize
+        self.seed = seed
+        self.shuffle = shuffle
+        self.truncate_to_block_boundary = truncate_to_block_boundary
+
+        # we need at least num_samples (up-sampling) or dataset_size samples (correct down-sampling)
+        self.required_samples = max(self.num_samples, self.dataset_size)
+        # block size cannot be larger than dataset size
+        self.block_size = min(self.block_size, self.dataset_size)
+        # reduce the last block if needed, to match the required number of samples
+        last_block_size = self.required_samples % self.block_size
+        # store required blocks to cover num_samples samples and dataset_size samples
+        self.num_blocks = int(np.ceil(self.required_samples / self.block_size))
+
+        # if required, truncate the last block to the block boundary
+        if self.truncate_to_block_boundary and last_block_size:
+            # update num_samples to account for truncated last block only if needed
+            if self.required_samples == self.num_samples:
+                self.num_samples -= last_block_size
+
+            # apdate num_blocks to account for truncated last block
+            self.num_blocks -= 1
+            self.required_samples -= last_block_size
+            last_block_size = 0
+
+        # create a list of blocks (should cover the entire dataset for correct down sampling)
+        block_idx_list = np.arange(self.num_blocks)
+        # compute the size of each block
+        block_size_list = np.full(self.num_blocks, self.block_size)
+        if last_block_size:
+            block_size_list[-1] = last_block_size
+            self.use_digitize = True
+        else:
+            self.use_digitize = False
+        if shuffle:
+            local_rng = np.random.RandomState(seed=self.seed)
+            idx = local_rng.permutation(np.arange(self.num_blocks))
+            block_idx_list = block_idx_list[idx]
+            block_size_list = block_size_list[idx]
+
+        # store only required number of blocks
+        self.block_idx_list = block_idx_list
+        self.block_size_list = block_size_list
+        self.block_bins = np.cumsum(block_size_list)
+
+        # NOTE: MAKE get_sample_block A CACHED FUNCTION!!!
+        self.get_sample_block = functools.lru_cache(maxsize=cache_maxsize, typed=False)(self.get_sample_block)
+
+    def __str__(self):
+        return f"OnlineSampleMapping(dataset_size={self.dataset_size}, num_samples={self.num_samples}, block_size={self.block_size}, cache_maxsize={self.cache_maxsize}, seed={self.seed}, shuffle={self.shuffle}, truncate_to_block_boundary={self.truncate_to_block_boundary})"
+
+    def __getitem__(self, idx: int) -> int:
+        # handle slices
+        if isinstance(idx, slice):
+            slc = idx
+            start, stop, step = slc.start, slc.stop, slc.step
+
+            # Handle None values
+            start = handle_index(self, start if start is not None else 0)
+            if start >= self.num_samples:
+                start = self.num_samples
+            stop = handle_index(self, stop if stop is not None else self.num_samples)
+            if stop >= self.num_samples:
+                stop = self.num_samples
+            step = step if step is not None else 1
+            sample_slice = [self[idx] for idx in range(start, stop, step)]
+            return sample_slice
+        # handle indices
+        else:
+            # If the index is out of range, raise IndexError
+            if idx >= self.num_samples:
+                raise IndexError("Index out of range")
+
+            # support negative indices
+            if idx < 0:
+                idx += self.num_samples
+
+                if idx < 0:
+                    raise IndexError("Index out of range")
+
+            # fetch the block sample index
+            if self.use_digitize:
+                block_idx = np.digitize(idx, self.block_bins)
+            else:
+                block_idx = idx // self.block_size
+            sample_block = self.get_sample_block(block_idx)
+
+            # use the local index to fetch the sample
+            local_idx = idx - self.block_bins[block_idx]
+            sample_idx = sample_block[local_idx]
+
+            return sample_idx
+
+    def __len__(self) -> int:
+        return self.num_samples
+
+    def __reduce__(self):
+        """Add support for pickling. Needed due to functools.lru_cache."""
+        # Return a tuple with a callable and arguments to recreate the object
+        return (
+            self.__class__,
+            (
+                self.dataset_size,
+                self.num_samples,
+                self.block_size,
+                self.cache_maxsize,
+                self.seed,
+                self.shuffle,
+                self.truncate_to_block_boundary,
+            ),
+        )
+
+    def __reduce_ex__(self, protocol):
+        # Optional method that defines the protocol version
+        return self.__reduce__()
+
+    def get_sample_block(self, block_idx: int) -> np.ndarray:
+        """
+        Returns a block of samples of size self.block_size, shuffled if needed.
+        NOTE: This method will be cached using functools.lru_cache for efficiency during construction.
+        """
+        if block_idx >= self.num_blocks:
+            raise IndexError(f"block_idx {block_idx} is out of range. Maximum block_idx is {self.num_blocks-1}")
+
+        # recover index of original block (before shuffling)
+        start_idx = self.block_idx_list[block_idx] * self.block_size
+        end_idx = start_idx + self.block_size_list[block_idx]
+        sample_block = np.arange(start_idx, end_idx)
+
+        # shuffle if needed
+        if self.shuffle:
+            local_rng = np.random.RandomState(seed=self.seed + block_idx)
+            sample_block = local_rng.permutation(sample_block)
+
+        # project indices to the dataset size
+        sample_block = sample_block % self.dataset_size
+
+        return sample_block
+
+
+class ResamplingMappedDataset(MappedDataset):
+    """Upsamples / downsamples a dataset to a target length by repeating samples."""
 
     def __init__(
         self,
@@ -334,32 +511,56 @@ class NeMoUpsampling(MappedDataset):
         self.data_prefix, self.max_seq_length, self.seed = _infer_kwarg_values(cfg, data_prefix, max_seq_length, seed)
         self.index_mapping_dir = index_mapping_dir
         self.name = name
+        self.cfg = cfg
 
         super().__init__(dataset, num_samples)
 
-    def create_sample_mapping(self, dataset: Dataset, num_samples: int):
+    def create_sample_mapping(self, dataset: Dataset, num_samples: int) -> Sequence[int]:
         if num_samples is None:
             num_samples = len(dataset)
 
         if num_samples == 0:
             raise ValueError('Number of samples is 0. Cannot be sampled.')
 
+        # TODO: change default to 'online' once validated (and remove support in memmap?)
+        index_mapping_type = self.cfg.get('index_mapping_type', 'memmap')
         # map dataset samples to the desired num_samples
-        samples_mapping = get_samples_mapping(
-            indexed_dataset=dataset,
-            data_prefix=self.data_prefix,
-            num_epochs=None,
-            max_num_samples=num_samples,
-            # account for <BOS> / <EOS>
-            max_seq_length=self.max_seq_length,
-            short_seq_prob=0,
-            seed=self.seed,
-            name=self.data_prefix.split('/')[-1] if self.name is None else self.name,
-            binary_head=False,
-            index_mapping_dir=self.index_mapping_dir,
-        )
+        if index_mapping_type == 'online':
+            samples_mapping = OnlineSampleMapping(
+                dataset_size=len(dataset),
+                num_samples=num_samples,
+                block_size=self.cfg.get("block_size", 1000000),
+                cache_maxsize=self.cfg.get("cache_maxsize", 2),
+                seed=self.seed,
+                shuffle=self.cfg.get("shuffle", True),
+                truncate_to_block_boundary=self.cfg.get("truncate_to_block_boundary", False),
+            )
 
-        samples_mapping = samples_mapping[:num_samples, 0]
+            # test if samples_mapping.num_samples == num_samples and alert if truncation happened
+            if samples_mapping.num_samples != num_samples:
+                logging.warning(
+                    f"Requested {num_samples} samples, but only {samples_mapping.num_samples} samples were generated due to truncation to block_size boundary."
+                )
+        elif index_mapping_type == 'memmap':
+            # TODO: remove support for memmap and use OnlineSampleMapping instead (more efficient)
+            samples_mapping = get_samples_mapping(
+                indexed_dataset=dataset,
+                data_prefix=self.data_prefix,
+                num_epochs=None,
+                max_num_samples=num_samples,
+                # account for <BOS> / <EOS>
+                max_seq_length=self.max_seq_length,
+                short_seq_prob=0,
+                seed=self.seed,
+                name=self.data_prefix.split('/')[-1] if self.name is None else self.name,
+                binary_head=False,
+                index_mapping_dir=self.index_mapping_dir,
+            )
+            # truncate to max number of num_samples (None is all samples)
+            samples_mapping = samples_mapping[:num_samples, 0]
+        else:
+            raise ValueError(f'Unknown index_mapping_type: {index_mapping_type}, expected "online" or "memmap"')
+
         return samples_mapping
 
 

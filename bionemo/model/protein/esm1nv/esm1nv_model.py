@@ -25,7 +25,7 @@ from torch.cuda.amp import autocast
 from bionemo.data.dataloader import ProteinBertCollate
 from bionemo.data.dataloader.protein_collate import ESM2BertCollate
 from bionemo.data.dataset_builder_utils import build_typed_dataset
-from bionemo.data.mapped_dataset import NeMoUpsampling, Uniref90ClusterMappingDataset
+from bionemo.data.mapped_dataset import ResamplingMappedDataset, Uniref90ClusterMappingDataset
 from bionemo.data.molecule import megamolbart_build_train_valid_test_datasets
 from bionemo.model.protein.esm1nv.base import ESMnvMegatronBertModel
 
@@ -281,7 +281,7 @@ class ESM2nvModel(ESM1nvModel):
         results = []
         for ds, split in zip([_train_ds, _validation_ds, _test_ds], ['train', 'val', 'test']):
             # TypeHint for intellisense
-            _ds: NeMoUpsampling = ds
+            _ds: ResamplingMappedDataset = ds
 
             index_mapping_dir = ds.index_mapping_dir
 
