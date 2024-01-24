@@ -348,7 +348,7 @@ jet-test:
     - jet secrets jwt-login jwt/nvidia/gitlab-master bionemo-ci $CI_JOB_JWT
   script:
     - pip install tqdm
-    - echo "CI_PROJECT_ID ${CI_PROJECT_ID}, CI PIPELINE_ID ${CI_PIPELINE_ID}"
+    - echo "CI_PROJECT_ID=${CI_PROJECT_ID}, CI_PIPELINE_ID=${CI_PIPELINE_ID}"
     - bash $CI_PROJECT_DIR/internal/jet/scripts/run_jet_test.sh
 
 

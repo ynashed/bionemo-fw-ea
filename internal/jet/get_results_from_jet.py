@@ -136,6 +136,7 @@ def log_detailed_job_info(df: pd.DataFrame) -> None:
     Logs to the console detailed summary of JET test execution such as job id and the status of the job,
     its duration as well as script to execute if the job failed
     """
+    logging.info('Additional information about jobs in JET listed below')
 
     for _, job_info in df.iterrows():
         msg = (
@@ -355,9 +356,6 @@ def get_results_from_jet(
     if not all_jobs:
         df = filter_out_failed_and_rerun_jobs(df=df, n_all_results=df.shape[0])
 
-    if verbosity_level > 2:
-        log_detailed_job_info(df=df)
-
     if verbosity_level >= 2:
         print_table_with_results(df=df)
 
@@ -366,6 +364,9 @@ def get_results_from_jet(
         get_duration_stats(
             pipelines_info=pipelines_info, job_durations=df.jet_ci_job_duration, script_durations=df.script_duration
         )
+
+    if verbosity_level > 2:
+        log_detailed_job_info(df=df)
 
     if save_dir is not None:
         filename = f'jet_query_{"_".join(pipelines_info.keys())}.csv'
