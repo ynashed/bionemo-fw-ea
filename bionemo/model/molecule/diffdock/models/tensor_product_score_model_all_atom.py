@@ -171,6 +171,9 @@ class TensorProductScoreModelAllAtom(torch.nn.Module):
             if tensor_product_type == "e3nn" or use_second_order_repr:
                 tp_type = "e3nn"
                 tp_param = -1
+            elif tensor_product_type == "fast_tp":
+                tp_type = "fast_tp"
+                tp_param = -1
             elif tensor_product_type == "marta":
                 tp_type = "marta"
                 tp_param = min(i, 3)

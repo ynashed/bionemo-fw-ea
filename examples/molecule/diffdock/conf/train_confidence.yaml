@@ -100,7 +100,7 @@ model:
   no_batch_norm: false # If set, it removes the batch norm
   tensor_product:
     use_second_order_repr: False # Whether to use only up to first order representations or also second
-    type: "e3nn" # choose from ["e3nn" (default), "marta"] NOTE: if use_second_order_repr is True, it must be e3nn at this time
+    type: "e3nn" # choose from ["e3nn" (default), "fast_tp"] NOTE: if use_second_order_repr is True, it must be e3nn at this time
   cross_max_distance: 80
   dynamic_max_cross: true
   dropout: 0.0 # MLP dropout

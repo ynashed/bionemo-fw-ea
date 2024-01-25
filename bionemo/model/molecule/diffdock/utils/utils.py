@@ -8,7 +8,6 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
-import logging
 import os
 import signal
 import subprocess
@@ -19,6 +18,7 @@ from datetime import datetime
 import numpy as np
 import torch
 import yaml
+from nemo.utils import logging
 from rdkit import Chem
 from rdkit.Chem import MolToPDBFile, RemoveHs
 from spyrmsd import molecule, rmsd

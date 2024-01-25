@@ -138,6 +138,7 @@ def get_train_args_overrides(script_or_cfg_path, train_args):
         train_args['model.micro_batch_size'] = 2
         train_args['model.estimate_memory_usage.maximal'] = 'null'
         train_args['model.max_total_size'] = 'null'
+        train_args['model.tensor_product.type'] = 'fast_tp'
 
     return train_args
 
