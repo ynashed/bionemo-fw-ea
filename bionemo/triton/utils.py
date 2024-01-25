@@ -1,4 +1,3 @@
-# Copyright (c) 2023, NVIDIA CORPORATION.
 # SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: LicenseRef-NvidiaProprietary
 #
@@ -9,8 +8,10 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
+from contextlib import ExitStack
 from logging import Logger
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 from typing import Callable, Generic, List, Optional, Sequence, Tuple, Union
 
 import model_navigator
@@ -263,3 +264,42 @@ def encode_str_batch(sequences: SeqsOrBatch) -> np.ndarray:
         # assume List[List[str]] case
         seqs = sequences
     return np.char.encode(np.array(seqs), encoding='utf-8')
+
+
+def read_bytes_from_filepath(filepath: Union[str, Path]) -> bytes:
+    """Reads file content in bytes"""
+    with open(str(filepath), 'rb') as rb:
+        return rb.read()
+
+
+def read_bytes_from_filepaths(*filepaths) -> List[bytes]:
+    """Reads file contents in bytes from all filepaths"""
+    return [read_bytes_from_filepath(f) for f in filepaths]
+
+
+def write_tempfiles_from_str_list(
+    strings: List[str], exit_stack: Optional[ExitStack] = None, **tempfile_kwargs
+) -> List[NamedTemporaryFile]:
+    """Writes and returns list of strings to temporary files
+
+    Args:
+        strings (List[str]): list of strings to be written to NamedTemporaryFile
+        exit_stack (contextlib.ExitStack): exit stack for automated NamedTemporaryFile clean up
+        **tempfile_kwargs: kwargs for NamedTemporaryFile
+
+    Returns:
+        List[NamedTemporaryFile]: list of temporary file objects for each input string
+    """
+    temp_files = []
+    for string in strings:
+        if exit_stack is None:
+            temp_file = exit_stack.enter_context(NamedTemporaryFile(**tempfile_kwargs))
+        else:
+            temp_file = NamedTemporaryFile(**tempfile_kwargs)
+
+        with open(temp_file.name, 'w') as fopen:
+            fopen.write(string)
+
+        temp_files.append(temp_file)
+
+    return temp_files
