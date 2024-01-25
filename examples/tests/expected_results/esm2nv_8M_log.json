@@ -1,13 +1,13 @@
 {
     "consumed_samples": 1000.0,
     "global_step": 499.0,
-    "grad_norm": 2.8949713706970215,
+    "grad_norm": 6.513640403747559,
     "loss_scale": 65536.0,
     "lr": 9.639999916544184e-05,
-    "reduced_train_loss": 2.851994276046753,
-    "train_backward_timing": 3.3855438232421875e-05,
-    "train_step_timing": 0.03252100944519043,
-    "val_loss": 2.988468647003174,
-    "val_loss_ECE": 7.9363112449646,
-    "validation_step_timing": 0.016628026962280273
+    "reduced_train_loss": 2.830383539199829,
+    "train_backward_timing": 8.392333984375e-05,
+    "train_step_timing": 0.06114077568054199,
+    "val_loss": 2.9698851108551025,
+    "val_loss_ECE": 7.834738254547119,
+    "validation_step_timing": 0.02860283851623535
 }

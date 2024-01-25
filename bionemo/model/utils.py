@@ -120,6 +120,10 @@ class TrainerBuilder:
         n_nodes = cfg.trainer.num_nodes
         acc_grad_batches = cfg.trainer.get("accumulate_grad_batches", 1)
 
+        # Note: NeMo framework allows users to specify the global batch size and it infers the accumulate grad batches
+        # and other parameters. In NeMo you need to have accumulate grad batches = 1. In BioNemo, we want to directly
+        # change and manipulate these values, which BioNemo allows. However, this function below enables us to
+        # convert that back into the NeMo compatible methods.
         global_batch_size = infer_global_batch_size(
             micro_batch_size=micro_batch_size,
             n_devices=n_devices,

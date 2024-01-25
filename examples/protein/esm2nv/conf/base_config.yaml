@@ -5,7 +5,7 @@ restore_from_path: null # used when starting from a .nemo file
 use_peft: False # indicates whether we intend to use PEFT technique
 
 trainer:
-  devices: 2 # number of GPUs or CPUs
+  devices: 1 # number of GPUs or CPUs
   num_nodes: 1 
   accelerator: gpu #gpu or cpu
   precision: 16 #16 or 32
@@ -15,8 +15,8 @@ trainer:
   max_epochs: null # # use max_steps instead with NeMo Megatron model
   log_every_n_steps: 10  # number of interations between logging
   val_check_interval: 1500
-  limit_val_batches: 50 # number of batches in validation step, use fraction for fraction of data, 0 to disable
-  limit_test_batches: 500 # number of batches in test step, use fraction for fraction of data, 0 to disable
+  limit_val_batches: 1.0  # Number of batches in the validation step. Use 0 for no batches, 1 for full dataset, and 0<x<1 for fractional data. If > 1 it will take that number as the number of batches.
+  limit_test_batches: 1.0 # Number of batches in the test set. Use 0 for no batches, or 0<x<1 for fractional data. Do not use 1.
   accumulate_grad_batches: 1
   gradient_clip_val: 1.0
   benchmark: False
@@ -148,53 +148,87 @@ model:
     dynamic_padding: False # If True, each batch is padded to the maximum sequence length within that batch. 
               #    Set it to False when model.pipeline_model_parallel_size > 1, as pipeline parallelism requires fixed-length padding.
 
-
     # Below is the configuration for UF90 resampling.
+    # TODO(@jomitchell) Can remove this??
     force_regen_sample_mapping: false # When true, will always generate a new uf90 resampling. otherwise, change the seed.
-    data_impl: "csv_mmap"
-    # Supported kwargs (with default values): 
-    #     text_mmap (newline_int=10, header_lines=0, workers=None, sort_dataset_paths=True)
-    #     csv_mmap (newline_int=10, header_lines=0,workers=None, sort_dataset_paths=True, data_col=1, data_sep=",")
-    dataset: # inclusive range of data files to load x[000..049] or can a single file, e.g. x000
-      train: x[000..049]
-      test: x[000..049]
-      val: x[000..049]
-    data_impl_kwargs:
-      csv_mmap:
-        data_col: 1 # 0-based
-        header_lines: 1
-        # Rest of these are inherited
-
-    uf50_datapath: ${oc.env:BIONEMO_HOME}/data/uniref202104_esm2/uniref50_train_filt.fasta
-    uf90_datapath: ${oc.env:BIONEMO_HOME}/data/uniref202104_esm2/uniref90membersandreps_ur50trainfiltreps.fasta
-    cluster_mapping_tsv: ${oc.env:BIONEMO_HOME}/data/uniref202104_esm2/uniref50_mapper_to_uniref90clustermembers_andselfuniref50.tsv
-    # TODO These need to be updated to values we actually like
-    dataset_path: ${oc.env:BIONEMO_HOME}/data/uniref202104_esm2/uf50 # parent directory for data, contains train / val / test folders. Needs to be writeable for index creation.
-    # NOTE test_size and val_size must be smaller than the total dataset size.
-    # you can check this with grep -c '>' <uf50_datapath.fasta>
-    val_size: 5000
-    test_size: 1000000
-    sort_fastas: false # If true, assumes the input files are not sorted, and sorts them before creating the cluster mapping. Unsorted fastas will break the cluster map.
-    uf90:
-      uniref90_path: ${oc.env:BIONEMO_HOME}/data/uniref202104_esm2/uf90/ # created and populated my preprocessing
-      dataset: 
-        uf90_csvs: x[000..049] # created and populated by preprocessing, this key is a directory inside uniref90_path
+    preprocessing:
+      num_preprocess_workers: 16
+    train:
+      data_impl: "csv_mmap"
+      data_impl_kwargs:
+        csv_mmap:
+          data_col: 1 # 0-based
+          header_lines: 1
+      use_upsampling: True # if the data should be upsampled to max number of steps in the training
+      range: x[000..049]
+      sample_from_map: True # TODO: Use uf90_datapath and cluster_mapping_tsv to create resampled dataset for training with uf50_datapath. If False, only uf50_datapath is used for training. 
+      uf50_datapath: '${oc.env:BIONEMO_HOME}/data/uniref202104_esm2/uniref50_train_filt.fasta'
+      uf90_datapath: '${oc.env:BIONEMO_HOME}/data/uniref202104_esm2/uniref90membersandreps_ur50trainfiltreps.fasta'
+      cluster_mapping_tsv: '${oc.env:BIONEMO_HOME}/data/uniref202104_esm2/uniref50_mapper_to_uniref90clustermembers_andselfuniref50.tsv'
+      dataset_path: ${oc.env:BIONEMO_HOME}/data/uniref202104_esm2/uf50 # parent directory for data, contains  train folder. Requires write for for index creation.
+      sort_fastas: True # If true, assumes the input files are not sorted, and sorts them before creating the cluster mapping. Unsorted fastas will break the cluster map.
+      num_workers: ${model.data.num_workers}
+      uf90:
+        uniref90_path: ${oc.env:BIONEMO_HOME}/data/uniref202104_esm2/uf90/ # created and populated my preprocessing
+        dataset: 
+          uf90_csvs: x[000..049] # created and populated by preprocessing, this key is a directory inside uniref90_path
+        data_impl: 'csv_fields_mmap'
+        data_impl_kwargs:
+          csv_fields_mmap:
+            header_lines: 1
+            newline_int: 10 # byte-value of newline
+            workers: ${model.data.train.num_workers} # number of workers when creating missing index files (null defaults to cpu_num // 2)
+            sort_dataset_paths: True # if True datasets will be sorted by name
+            data_sep: ',' # string to split text into columns
+            data_fields:
+              sequence: 3
+              sequence_id: 1
+        index_mapping_dir: ${model.data.index_mapping_dir}
+      max_seq_length: ${model.seq_length} # Maximum input sequence length. Longer sequences are truncated
+      seed: ${model.seed} # Random seed
+    val:
+      use_upsampling: False
+      range: x[000..049]
+      uf50_datapath: '${oc.env:BIONEMO_HOME}/data/dataqc/uniref50_train_filt.fasta'
+      dataset_path: ${oc.env:BIONEMO_HOME}/data/dataqc/uf50 # holds validation data.
       data_impl: 'csv_fields_mmap'
+      num_workers: ${model.data.num_workers}
       data_impl_kwargs:
         csv_fields_mmap:
           header_lines: 1
           newline_int: 10 # byte-value of newline
-          workers: ${model.data.num_workers} # number of workers when creating missing index files (null defaults to cpu_num // 2)
+          workers: ${model.data.val.num_workers} # number of workers when creating missing index files (null defaults to cpu_num // 2)
           sort_dataset_paths: True # if True datasets will be sorted by name
           data_sep: ',' # string to split text into columns
           data_fields:
             sequence: 3
             sequence_id: 1
-      index_mapping_dir: ${model.data.index_mapping_dir}
+        index_mapping_dir: ${model.data.index_mapping_dir}
+      max_seq_length: ${model.seq_length} # Maximum input sequence length. Longer sequences are truncated
+      seed: ${model.seed} # Random seed
+    test:
+      use_upsampling: False
+      range: x[000..049]
+      uf50_datapath: '${oc.env:BIONEMO_HOME}/data/uniref202104_esm2/uniref50_train_filt.fasta'
+      dataset_path: ${oc.env:BIONEMO_HOME}/data/dataqc/uf50 # holds testing data.
+      data_impl: 'csv_fields_mmap'
+      num_workers: ${model.data.num_workers}
+      data_impl_kwargs:
+        csv_fields_mmap:
+          header_lines: 1
+          newline_int: 10 # byte-value of newline
+          workers: ${model.data.test.num_workers} # number of workers when creating missing index files (null defaults to cpu_num // 2)
+          sort_dataset_paths: True # if True datasets will be sorted by name
+          data_sep: ',' # string to split text into columns
+          data_fields:
+            sequence: 3
+            sequence_id: 1
+        index_mapping_dir: ${model.data.index_mapping_dir}
+      max_seq_length: ${model.seq_length} # Maximum input sequence length. Longer sequences are truncated
+      seed: ${model.seed} # Random seed
 
-    use_upsampling: True # if the data should be upsampled to max number of steps in the training
-    seed: ${model.seed} # Random seed
-    max_seq_length: ${model.seq_length} # Maximum input sequence length. Longer sequences are truncated
+    
+    
     modify_percent: 0.1 # Percentage of characters in a protein sequence to modify. (Modification means replacing with another amino acid or with a mask token)
     perturb_percent: 0.5 # Of the modify_percent, what percentage of characters are to be replaced with another amino acid.
     index_mapping_dir: ${oc.env:BIONEMO_HOME}/data/uniref202104_esm2/

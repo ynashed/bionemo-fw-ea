@@ -29,6 +29,7 @@ def build_typed_dataset(
     use_upsampling: bool,
     cfg: OmegaConf,
     num_samples: Optional[int] = None,
+    limit_batches_scale_factor: Optional[float] = None,
 ) -> Dataset:
     """
     Builds dataset based on preferred implementation given provided paths to the files with data and
@@ -38,6 +39,7 @@ def build_typed_dataset(
         data_impl: dataset implementation type specified as key in _DATA_IMPL_TYPE_CLS
         cfg: config to be passed to a dataset constructor
         num_samples: down/upsample size of the dataset, if applicable. If None, then the num_samples equals len(dataset)
+        limit_batches_scale_factor: Reduces the number of samples to be `limit_batches_scale_factor` * len(dataset) samples instead of all samples.
     Returns:
         Dataset
     """
@@ -85,6 +87,9 @@ def build_typed_dataset(
             'To enable upsampling, "num_samples" need to be specified as '
             'the number of samples in the upsampled dataset'
         )
+        # We save the scaling down for here.
+        if limit_batches_scale_factor is not None:
+            num_samples = int(num_samples * (limit_batches_scale_factor * len(dataset)))
         data_prefix = cfg.get('data_prefix', None)
         if data_prefix is None:
             data_prefix = os.path.commonprefix(dataset_paths)
