@@ -3,7 +3,7 @@ defaults:
   - pretrain_esm2_650M
 do_training: True # set to false if data preprocessing steps must be completed
 do_testing: True # set to true to run evaluation on test data after training
-restore_from_path: /model/protein/esm2nv/esm2nv_650M_converted.nemo # path to nemo checkpoint of the protein model. Other options: esm2nv_3B_converted.nemo
+restore_from_path: ${oc.env:BIONEMO_HOME}/models/protein/esm2nv/esm2nv_650M_converted.nemo # path to nemo checkpoint of the protein model. Other options: esm2nv_3B_converted.nemo
 target: bionemo.model.protein.esm1nv.ESM2nvModel # target class for protein model
 infer_target: bionemo.model.protein.esm1nv.infer.ESM1nvInference # target inference class for protein model
 
@@ -32,7 +32,7 @@ model:
   data:
     task_name: scl # options: aav, bind, conservation, gb1, meltome, sav, scl, secondary_structure
     task_type: classification #'token-level-classification'  # alternative: classification, regression
-    preprocessed_data_path: /data/FLIP # path where all preprocessed FLIP datasets are saved
+    preprocessed_data_path: ${oc.env:BIONEMO_HOME}/data/FLIP # path where all preprocessed FLIP datasets are saved
     dataset_path: ${model.data.preprocessed_data_path}/${model.data.task_name} # path to a training data
     dataset:
       train: x000

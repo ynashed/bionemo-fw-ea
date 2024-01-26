@@ -7,12 +7,12 @@ from bionemo.data import PhysChemPreprocess
 from bionemo.utils.tests import get_directory_hash
 
 
+BIONEMO_HOME = os.getenv("BIONEMO_HOME")
 # Physchem secondary structure benchmark dataset is small and will be fully downloaded in this test
-os.environ['PROJECT_MOUNT'] = os.environ.get('PROJECT_MOUNT', '/workspace/bionemo')
 ROOT_DIR = 'physchem_data'
 CONFIG = {
     'url': None,
-    'links_file': '/workspace/bionemo/examples/molecule/megamolbart/dataset/PhysChem-downloader.txt',
+    'links_file': os.path.join(BIONEMO_HOME, 'examples/molecule/megamolbart/dataset/PhysChem-downloader.txt'),
     'test_frac': 0.15,
     'val_frac': 0.15,
 }

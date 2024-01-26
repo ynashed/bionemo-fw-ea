@@ -19,10 +19,6 @@ class NeMoConfigSearchPathConfig(SearchPathPlugin):
     When a config is requested, the first matching config in the search path is selected, hence a user needs to be
     careful to name configs uniquely especially regarding file names in NEMO_APPEND_SEARCH_PATH.
 
-    The files in thedefault NeMo (as well as BioNeMo) container under /workspace/nemo/examples/ correspond to files
-    in /opt/nvidia/nemo/examples if no NEMO_PATH is mounted during ./launch.sh dev.
-    See NeMo's Dockerfile: https://github.com/NVIDIA/NeMo/blob/main/Dockerfile
-
     See hydra.searchpath details: https://hydra.cc/docs/advanced/search_path/
 
     *** USAGE ****

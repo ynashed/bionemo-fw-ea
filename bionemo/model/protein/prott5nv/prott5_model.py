@@ -1,16 +1,12 @@
-# Copyright (c) 2022, NVIDIA CORPORATION.  All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
 
 import os
 
@@ -39,20 +35,34 @@ class ProtT5nvModel(MegatronT5Model):
 
     def setup_validation_data(self, cfg):
         if hasattr(self, '_validation_ds'):
-            consumed_samples = 0
-            self._validation_dl = self.build_pretraining_data_loader(
-                self._validation_ds, consumed_samples, num_workers=0
-            )
+            if self._validation_ds is not None:
+                consumed_samples = 0
+                self._validation_dl = self.build_pretraining_data_loader(
+                    self._validation_ds, consumed_samples, num_workers=0
+                )
 
     def setup_test_data(self, cfg):
         if hasattr(self, '_test_ds'):
-            consumed_samples = 0
-            self._test_dl = self.build_pretraining_data_loader(self._test_ds, consumed_samples, num_workers=0)
+            if self._test_ds is not None:
+                consumed_samples = 0
+                self._test_dl = self.build_pretraining_data_loader(self._test_ds, consumed_samples, num_workers=0)
 
     def build_train_valid_test_datasets(self):
         logging.info(f'Building {self.model_name} datasets.')
         global_batch_size = self._cfg.global_batch_size
-        eval_iters = (self.trainer.max_steps // self.trainer.val_check_interval + 1) * self.trainer.limit_val_batches
+
+        # Calculating number of times when validation stage is performed during a model's training assuming
+        # trainer.max_steps is set, not trainer.max_epochs
+        if self.trainer.max_steps is None:
+            raise ValueError("ProtT5nvModel requires setting self.trainer.max_steps")
+
+        if isinstance(self.trainer.val_check_interval, float):
+            # if trainer.val_check_interval is a float, it represents a fraction of the training epoch
+            # to check validation, hence we need to check how many times the validation stage will be executed
+            val_steps = int(1 // self.trainer.val_check_interval)
+        else:
+            val_steps = self.trainer.max_steps // self.trainer.val_check_interval
+        eval_iters = (val_steps + 1) * self.trainer.limit_val_batches
         test_iters = self.trainer.limit_test_batches
         train_valid_test_num_samples = [
             self.trainer.max_steps * global_batch_size,
@@ -110,6 +120,6 @@ class ProtT5nvModel(MegatronT5Model):
 
         logging.info(f'Length of train dataset: {len(self._train_ds)}')
         logging.info(f'Length of val dataset: {len(self._validation_ds)}')
-        logging.info(f'Length of test dataset: {len(self._test_ds)}')
+        logging.info(f'Length of test dataset: {len(self._test_ds) if self._test_ds is not None else None}')
         logging.info(f'Finished building {self.model_name} datasets.')
         return self._train_ds, self._validation_ds, self._test_ds

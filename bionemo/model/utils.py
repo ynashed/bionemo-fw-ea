@@ -1,19 +1,15 @@
-# Copyright (c) 2022, NVIDIA CORPORATION.
-# SPDX-License-Identifier: Apache-2.0
-
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
 
 import re
+from typing import Optional, Type, TypeVar
 
 import pytorch_lightning as pl
 import torch
@@ -28,7 +24,7 @@ from nemo.utils import logging
 from nemo.utils.app_state import AppState
 from nemo.utils.exp_manager import StatelessTimer, exp_manager
 from nemo.utils.model_utils import import_class_by_path
-from omegaconf import OmegaConf
+from omegaconf import DictConfig, OmegaConf
 from omegaconf.omegaconf import open_dict
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelSummary
@@ -38,8 +34,12 @@ from pytorch_lightning.trainer.connectors.checkpoint_connector import (
     CheckpointConnector,
 )
 
-from bionemo.tests.utils import add_test_callbacks
+from bionemo.callbacks.utils import add_test_callbacks
 
+
+M = TypeVar('M')
+"""Supposed to be `bionemo.model.core.infer.M`, but cannot import that here due to circular imports.
+"""
 
 try:
     import apex
@@ -109,7 +109,7 @@ def get_num_devices(n_devices):
     return n_devices
 
 
-class TrainerBuilder(object):
+class TrainerBuilder:
     @staticmethod
     def adjust_config(cfg):
         micro_batch_size = cfg.model.micro_batch_size
@@ -185,7 +185,7 @@ class TrainerBuilder(object):
             no_ddp_communication_hook=True,
             # Allocate gradients in a contiguous bucket to save memory (less fragmentation and buffer memory)
             gradient_as_bucket_view=cfg.model.get('gradient_as_bucket_view', True),
-            find_unused_parameters=False,
+            find_unused_parameters=cfg.model.get('find_unused_parameters', False),
         )
 
     @staticmethod
@@ -220,7 +220,7 @@ class InferenceTrainerBuilder(TrainerBuilder):
         pass
 
 
-def setup_trainer(cfg, builder=None, callbacks=[], adjust_config=True, verbose=True):
+def setup_trainer(cfg, builder=None, callbacks=[], adjust_config=True, verbose=True, interactive: bool = False):
     """NeMo Trainer setup functions"""
     if builder is None:
         builder = TrainerBuilder
@@ -231,11 +231,20 @@ def setup_trainer(cfg, builder=None, callbacks=[], adjust_config=True, verbose=T
     mode = "train" if cfg.get("do_training", False) else "test"
     callbacks = builder.configure_callbacks(cfg, callbacks)
     add_test_callbacks(cfg, callbacks=callbacks, mode="infer" if builder == InferenceTrainerBuilder else mode)
-    strategy = builder.configure_strategy(cfg)
+
+    if interactive:
+        strategy = 'auto'
+        # strategy = 'ddp_notebook'
+        print(f"Interactive mode selected, using {strategy=}")
+    else:
+        strategy = builder.configure_strategy(cfg)
 
     trainer = Trainer(plugins=plugins, strategy=strategy, callbacks=callbacks, **cfg.trainer)
+
     exp_manager(trainer, cfg.get("exp_manager", None))
+
     builder.resume_checkpoint(cfg, trainer)
+
     # log trainer configuration (which might be different from input cfg)
     if verbose:
         logging.info("\n\n************** Trainer configuration ***********")
@@ -244,16 +253,27 @@ def setup_trainer(cfg, builder=None, callbacks=[], adjust_config=True, verbose=T
     return trainer
 
 
-def setup_inference_trainer(cfg, builder=None, adjust_config=True):
+def setup_inference_trainer(cfg, builder=None, adjust_config=True, interactive: bool = False):
     """NeMo Trainer setup functions for inference"""
     if builder is None:
         builder = InferenceTrainerBuilder
 
-    return setup_trainer(cfg, builder, adjust_config=adjust_config)
+    return setup_trainer(cfg, builder, adjust_config=adjust_config, interactive=interactive)
 
 
-def restore_model(restore_path, trainer=None, cfg=None, model_cls=None, adjust_config=True):
-    """Restore model from checkpoint"""
+def restore_model(
+    restore_path: str,
+    trainer: Optional[pl.Trainer] = None,
+    cfg: Optional[DictConfig] = None,
+    model_cls: Optional[Type[M]] = None,
+    adjust_config: bool = True,
+    strict: bool = True,
+    interactive: bool = False,
+) -> M:
+    """Restore model from checkpoint.
+
+    The supplied `model_cls`
+    """
     logging.info(f"Restoring model from {restore_path}")
 
     # infer model_cls from cfg if missing
@@ -269,14 +289,17 @@ def restore_model(restore_path, trainer=None, cfg=None, model_cls=None, adjust_c
         return_config=True,
     )
     with open_dict(cfg):
-        cfg.model = OmegaConf.merge(restore_cfg, cfg.model)
+        cfg.model = OmegaConf.merge(restore_cfg, cfg.model) if hasattr(cfg, 'model') else restore_cfg
 
     # build trainer if not provided
     if trainer is None:
-        trainer = setup_inference_trainer(cfg=cfg, adjust_config=adjust_config)
+        trainer = setup_inference_trainer(cfg=cfg, adjust_config=adjust_config, interactive=interactive)
 
     # enforce trainer precition
     with open_dict(cfg):
+        if "EquiDock" in cfg.model.get("name", ""):
+            # overwrite model cfg from checkpoint (to get the input_edge_feats_dim)
+            cfg.model = OmegaConf.merge(cfg.model, restore_cfg)
         cfg.model.precision = trainer.precision
 
     model = model_cls.restore_from(
@@ -284,8 +307,51 @@ def restore_model(restore_path, trainer=None, cfg=None, model_cls=None, adjust_c
         trainer=trainer,
         override_config_path=cfg,
         save_restore_connector=NLPSaveRestoreConnector(),
+        strict=strict,
+    )
+    if cfg.get('load_from_checkpoint') is not None:
+        model.load_from_checkpoint(checkpoint_path=cfg.load_from_checkpoint, strict=strict)
+
+    return model
+
+
+def load_model_for_inference(cfg: DictConfig, strict: bool = True):
+    """load model with config for model inference. Freeze model and reconfigure DDP and batch size.
+
+    Args:
+        cfg (DictConfig): Omega config
+        strict (bool, optional): Whether to ignore non-matching keys when loading model, ignore if set to False. Defaults to True.
+
+    Returns:
+        Loaded model
+    """
+
+    # load model class from config which is required to load the .nemo file
+    model = restore_model(
+        restore_path=cfg.restore_from_path,
+        cfg=cfg,
+        strict=strict,
     )
 
+    # check whether the DDP is initialized
+    if parallel_state.is_unitialized():
+        logging.info("DDP is not initialized. Initializing...")
+
+        def dummy():
+            return
+
+        if model.trainer.strategy.launcher is not None:
+            model.trainer.strategy.launcher.launch(dummy, trainer=model.trainer)
+        model.trainer.strategy.setup_environment()
+    # Reconfigure microbatch sizes here because on model restore, this will contain the micro/global batch configuration used while training.
+    _reconfigure_microbatch_calculator(
+        rank=0,  # This doesn't matter since it is only used for logging
+        rampup_batch_size=None,
+        global_batch_size=1,
+        micro_batch_size=1,  # Make sure that there is no "grad acc" while decoding.
+        data_parallel_size=1,  # We check above to make sure that dataparallel size is always 1 at inference.
+    )
+    model.freeze()
     return model
 
 
@@ -334,16 +400,16 @@ def _reconfigure_inference_batch(global_batch_per_gpu, global_batch_size=None):
         )
 
 
-def initialize_model_parallel(model):
+def _dummy() -> None:
+    return
+
+
+def initialize_model_parallel(model, interactive: bool = False) -> None:
     # check whether the DDP is initialized
-    if parallel_state.is_unitialized():
+    if not interactive and parallel_state.is_unitialized():
         logging.info("DDP is not initialized. Initializing...")
-
-        def dummy():
-            return
-
         if model.trainer.strategy.launcher is not None:
-            model.trainer.strategy.launcher.launch(dummy, trainer=model.trainer)
+            model.trainer.strategy.launcher.launch(_dummy, trainer=model.trainer)
         model.trainer.strategy.setup_environment()
 
 
@@ -352,20 +418,19 @@ def initialize_distributed_parallel_state(
     tensor_model_parallel_size: int = 1,
     pipeline_model_parallel_size: int = 1,
     pipeline_model_parallel_split_rank: int = 0,
-):
+    interactive: bool = False,
+) -> None:
     # initialize pytorch DDP
+    # if not interactive and not torch.distributed.is_initialized():
     if not torch.distributed.is_initialized():
         logging.info("pytorch DDP is not initialized. Initializing with pytorch-lightening...")
-        trainer = pl.Trainer(gpus=1, strategy='ddp', num_nodes=1)
-
-        def dummy():
-            return
+        trainer = pl.Trainer(gpus=1, strategy='ddp' if not interactive else "auto", num_nodes=1)
 
         if trainer.strategy.launcher is not None:
-            trainer.strategy.launcher.launch(dummy, trainer=trainer)
+            trainer.strategy.launcher.launch(_dummy, trainer=trainer)
         trainer.strategy.setup_environment()
 
-    if parallel_state.is_unitialized():
+    if not interactive and parallel_state.is_unitialized():
         logging.info("Megatron DDP is not initialized. Initializing...")
         parallel_state.initialize_model_parallel(
             tensor_model_parallel_size=tensor_model_parallel_size,

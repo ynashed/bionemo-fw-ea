@@ -1,24 +1,26 @@
-# Copyright (c) 2022, NVIDIA CORPORATION.
-# SPDX-License-Identifier: Apache-2.0
-
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
 
-from typing import List
+# Copyright (c) Meta Platforms, Inc. and affiliates.
+#
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+
+from typing import List, Optional, Sequence, Tuple
 
 import torch
-from torch.cuda.amp import autocast
 
 from bionemo.model.core.infer import BaseEncoderDecoderInference
+
+
+__all__: Sequence[str] = ("ESM1nvInference",)
 
 
 class ESM1nvInference(BaseEncoderDecoderInference):
@@ -26,7 +28,16 @@ class ESM1nvInference(BaseEncoderDecoderInference):
     All inference functions
     '''
 
-    def __init__(self, cfg, model=None, freeze=True, restore_path=None, training=False, adjust_config=True):
+    def __init__(
+        self,
+        cfg,
+        model=None,
+        freeze: bool = True,
+        restore_path: Optional[str] = None,
+        training: bool = False,
+        adjust_config: bool = True,
+        interactive: bool = False,
+    ):
         super().__init__(
             cfg=cfg,
             model=model,
@@ -34,9 +45,10 @@ class ESM1nvInference(BaseEncoderDecoderInference):
             restore_path=restore_path,
             training=training,
             adjust_config=adjust_config,
+            interactive=interactive,
         )
 
-    def _tokenize(self, sequences: List[str]):
+    def _tokenize(self, sequences: List[str]) -> List[torch.Tensor]:
         """
         ESM expects input format:
 
@@ -48,7 +60,7 @@ class ESM1nvInference(BaseEncoderDecoderInference):
 
         return token_ids
 
-    def seq_to_hiddens(self, sequences):
+    def seq_to_hiddens(self, sequences: List[str]) -> Tuple[torch.Tensor, torch.Tensor]:
         '''
         Transforms Sequences into hidden state.
         Should be implemented in a child class, since it is model specific.
@@ -64,17 +76,11 @@ class ESM1nvInference(BaseEncoderDecoderInference):
             enc_mask (torch.Tensor, long): boolean mask for special tokens (<BOS> and <EOS>) and padded sections
         '''
         token_ids, enc_mask = self.tokenize(sequences)
-        # FIXME this autocast shouldn't be needed
-        with autocast(enabled=self.model.enable_autocast):
-            hidden_states = self.model(token_ids, enc_mask, None)
+        hidden_states = self.model.encode(token_ids, enc_mask)
 
         # ignore <BOS> and <EOS> tokens
         enc_mask[:, 0:2] = 0
         enc_mask = torch.roll(enc_mask, shifts=-1, dims=1)
-
-        # Want to check actual value in the model and not in the config
-        if self.model.model.post_process:
-            hidden_states = hidden_states[0]
 
         return hidden_states, enc_mask
 

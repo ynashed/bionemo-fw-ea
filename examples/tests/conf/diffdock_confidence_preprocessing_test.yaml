@@ -1,0 +1,39 @@
+defaults:
+  - train_confidence
+
+hydra:
+  searchpath:
+     - ${oc.env:BIONEMO_HOME}/examples/molecule/diffdock/conf
+
+tmp_directory: ???
+
+seed: 42
+
+training_data:
+  protein_data_dir:  ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/preprocessing_test/posebusters_benchmark_subset
+  output_fasta_file: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/preprocessing_test/ref/pdb_sequences.fasta
+  esm_embeddings_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/preprocessing_test/ref/esm2_embeddings.sqlite3
+
+model:
+  train_ds:
+    num_workers: 2
+    chunk_size: 1
+    split_train: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/preprocessing_test/train_split
+    cache_path: ${tmp_directory}/data_cache
+
+
+
+score_infer:
+  trainer:
+    deterministic: warn
+
+  model:
+    train_ds:
+      split_train: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/preprocessing_test/train_split
+      cache_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/preprocessing_test/ref/data_cache
+
+train_graph_folder_name: allatoms_limit0_INDEXtrain_split_maxLigSizeNone_H0_recRad15_recMax24_atomRad5.0_atomMax8_esmEmbeddings
+ref_train_graph_file: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/preprocessing_test/ref/data_cache/${train_graph_folder_name}/heterographs.sqlite3
+
+ligand_pose_folder_name: model_paper_large_score_split_train_limit_0
+ref_ligand_pose_file: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/preprocessing_test/ref/data_cache/${ligand_pose_folder_name}/confidence_cache_id_base.sqlite3

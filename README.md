@@ -2,7 +2,7 @@
 
 ## Introduction
 
-NVIDIA BioNeMo is a framework for training and deploying large biomolecular language models at supercomputing scale for the discovery and development of therapeutics. The large language model (LLM) framework currently has models for small molecules (SMILES) and protein sequences. More information about the models and their training is available in the [model guides](https://docs.nvidia.com/bionemo-framework/latest/models/esm2-nv.html).
+NVIDIA BioNeMo is a framework for training and deploying large biomolecular language models at supercomputing scale for the discovery and development of therapeutics. The large language model (LLM) framework currently has models for small molecules (SMILES) and protein sequences. More information about the models and their training is available in the [model guides](http://10.110.42.241:8082/models/esm2-nv.html).
 
 BioNeMo relies on [NeMo](https://github.com/NVIDIA/NeMo). NeMo provides a robust environment for developing, training, and deploying deep learning models, including Megatron models. NeMo provides enhancements to [PyTorch Lighting](https://lightning.ai/) such as hyperparameter configurability with YAML files and checkpoint management. It also enables the development and training of large transformer models using NVIDIA's [Megatron](https://github.com/NVIDIA/Megatron-LM) framework, which makes multi-GPU, multi-node training with data parallelism, model parallelism, and mixed precision easily configurable. The [NeMo User Guide](https://docs.nvidia.com/deeplearning/nemo/user-guide/docs/en/main/) contains more information about all of these features. It is highly suggested to review at least the [NeMo Fundamentals](https://docs.nvidia.com/deeplearning/nemo/user-guide/docs/en/stable/starthere/tutorials.html) tutorial to understand how to configure jobs.
 
@@ -10,7 +10,8 @@ Note that this repository is in *early access*, therefore some parts are still u
 
 ## Quick Start
 
-An NGC API KEY is required for these steps.  You will need to configure NGC with your org and team.
+An NGC API KEY is required for these steps.  You will need to configure [NGC](https://catalog.ngc.nvidia.com/?filters=&orderBy=weightPopularDESC&query=) with your org and team. See also Prerequisites below.
+
 ```bash
 # Login to NVIDIA docker registry:
 docker login nvcr.io # Username will be $oauthtoken, password will be NGC API KEY
@@ -30,43 +31,65 @@ NGC_CLI_TEAM= # Your team name
 NGC_CLI_ORG= # Your organization name
 
 # Pull the latest BioNeMo image:
+#   Time estimate: 5min
 ./launch.sh pull
 
 # Download all pretrained checkpoints from NGC:
+#   Time estimate: 10min
 ./launch.sh download
 
 # Launch an interactive session inside the pulled image:
 ./launch.sh dev
 ```
 
-Once the container is running, you can run the training and inference examples, or develop and test your own code.
+Once the container is running, you can run the training and inference examples, see [BioNeMo Framework Tutorials](https://docs.nvidia.com/bionemo-framework/latest/tutorials-fw.html), or develop and test your own code.
 
 As an example, For ESM1-nv, ESM2-nv, and ProtT5-nv, we provide an `infer.sh` script under `examples/protein/<MODEL_NAME>`, to run inference in offline mode (without running a remote inference client).
 Users must specify an input CSV file with sequence data, and a CONFIG file with model specifics and data paths. Example config files are provided at  `examples/protein/<MODEL_NAME>/conf`. Example input data file is provided at `examples/tests/test_data/protein/test/x000.csv`.
 The following is an example use of `infer.sh` to run inference on ESM2-nv using a csv file with sequence data. We use the `infer.yaml` config available at `examples/protein/esm2nv/conf/infer.yaml`. This config contains the `model.data.dataset` variable that can also be used to set the input file - in our example we override this default to point to an example file we include in the BioNeMo Framework codebase.
-The set of commands below generates a pickle file with the embeddings of all sequences, at `/data/bionemo_esm2_example.pkl` file specified by `model.data.output_fname`.
+The set of commands below generates a pickle file with the embeddings of all sequences, at `$BIONEMO_HOME/data/bionemo_esm2_example.pkl`, specified by `model.data.output_fname`.
 
 ```bash
-# Set the path to your local BioNeMo Framework codebase. In the default Docker container, this is /workspace/bionemo
-BIONEMO='/workspace/bionemo'
-cd $BIONEMO
+# Set the path to your local BioNeMo Framework codebase using the BIONEMO_HOME variable. In the docker container, this is set to /workspace/bionemo by default.
+BIONEMO_HOME='/workspace/bionemo' # This is the default value
+cd $BIONEMO_HOME
 # Ensure you have downloaded the model checkpoints already - if not, run this command.
-# It will use your NGC credentials stored in $BIONEMO/.env (Company specific).
-# And download all model checkpoints to the 'MODEL_PATH' variable in $BIONEMO/.env (default: /model)
+# It will use your NGC credentials stored in $BIONEMO_HOME/.env (Company specific).
+# And download all model checkpoints to the 'LOCAL_MODELS_PATH' or 'DOCKER_MODELS_PATH' variable in the .env file (default: $BIONEMO_HOME/models)
 ./launch.sh download
 # Next we navigate to the location of infer.sh and set up the required variables.
-cd $BIONEMO/examples/protein/esm2nv/
-example_file=$BIONEMO/examples/tests/test_data/protein/test/x000.csv
+cd $BIONEMO_HOME/examples/protein/esm2nv/
+example_file=$BIONEMO_HOME/examples/tests/test_data/protein/test/x000.csv
 config_name='infer.yaml'
-restore_from_path='/model/protein/esm2nv/esm2nv_650M_converted.nemo'
-outfile='/data/bionemo_ems2_example.pkl'
+restore_from_path=$BIONEMO_HOME/models/protein/esm2nv/esm2nv_650M_converted.nemo
+outfile=$BIONEMO_HOME/data/bionemo_esm2_example.pkl
 ./infer.sh --config-name "$config_name" ++model.data.output_fname="$outfile" ++model.data.dataset_path="$example_file" ++model.downstream_task.restore_from_path="$restore_from_path"
 ```
-More tutorials using ESM inference can be found [here.](https://docs.nvidia.com/bionemo-framework/latest/inference-grpc-fw.html)
+A successful execution of this command will result in command-line output similar to
+```
+[NeMo I 2023-12-15 18:24:21 infer:152] Saving 9 samples to output_fname = /workspace/bionemo/data/bionemo_ems2_example.pkl
+```
+
+More tutorials using ESM inference can be found [here.](http://10.110.42.241:8082/inference-grpc-fw.html)
 
 ## Prerequisites
 
 BioNeMo containers and pre-trained models are delivered via [NVIDIA GPU Cloud (NGC)](https://catalog.ngc.nvidia.com/?filters=&orderBy=weightPopularDESC&query=), therefore it is recommended to create an NGC account, [download the NGC CLI](https://ngc.nvidia.com/setup), and generate API keys for access.
+
+Additional requirement for this quickstart:
+1. **'sudo-less' docker commands** The script launch.sh executed docker commands without a sudo prefix, so your environment's username must be added to the docker group, see Step 2 at [docker-on-ubuntu-22-04](https://www.digitalocean.com/community/tutorials/how-to-install-and-use-docker-on-ubuntu-22-04).
+
+2. [Installing the NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). If the the 'nvidia container toolkit' is not installed, you may see an error like
+```
+docker: Error response from daemon: could not select device driver "" with capabilities: [[gpu]].
+```
+See related discussion at [could-not-select-device-driver-with-capabilities-gpu](https://forums.developer.nvidia.com/t/could-not-select-device-driver-with-capabilities-gpu/259324)
+
+3. **Optional environment customizations**  To add aliases and environment variables to the running docker container shells, first copy the files with aliases and env variables from your machine to the running docker container, by executing the follow command from your your machine, outside the running container:
+```
+docker cp some_file_with_aliases_or_env_vars:/workspace/some_file_with_aliases_or_env_vars
+```
+For example `some_file_with_aliases_or_env_vars` could be `.bash_aliases`.  Second, from the running container execute `source /workspace/some_file_with_aliases_or_env_vars`.  The aliases and env variables will be added to the current shell.
 
 ## Implemented Models
 
@@ -84,7 +107,7 @@ The following is a list of models implemented inside BioNeMo. This means the mod
 |            | `pretrain_large_span_aug.yaml`         |   1                |
 | **ProtT5nv** |  `pretrain_small.yaml`| 1         | LLM for protein embeddings, [Elnaggar et al.](https://arxiv.org/pdf/2007.06225.pdf), [Sevgen et al.](https://www.biorxiv.org/content/10.1101/2023.01.23.525232v1.full.pdf) |
 
-The models were tested on DGX-A100 and DGX-H100 systems, on GPUs with 80GB of memory. Many of the models are expected to run on consumer-grade GPUs with less than 80GB of meomory, and if memory issues are encountered it is suggested to reduce the `micro_batch_size` in the configuration files. A detailed list of system requirements is available in the [Installation Section](#installation).
+The models were tested on DGX-A100 and DGX-H100 systems, on GPUs with 80GB of memory. Many of the models are expected to run on consumer-grade GPUs with less than 80GB of meomory, and if memory issues are encountered it is suggested to reduce the `micro_batch_size` in the configuration files. A detailed list of system requirements is available in the [Installation Section](##Installation).
 
 Sample benchmarks for ESM2 pretraining:
 ![ESM2 benchmarks](docs/readme-images/esm2_days_to_train.png)
@@ -100,7 +123,7 @@ Furthermore, we provide preset configation files for training downstream tasks o
 
 ## Documentation
 
-[BioNeMo Documentation](https://docs.nvidia.com/bionemo-framework/latest)
+[BioNeMo Documentation VDR Mirror](http://10.110.42.241:8082/)
 
 ## Installation
 
@@ -124,25 +147,36 @@ System Requirements:
 
 ### Dockerized Install
 
-The supported method of code development is using a prebuilt BioNeMo container which is [available via the NGC registry](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/clara/containers/bionemo-framework). This container can be pulled via the registry directly `docker pull nvcr.io/nvidia/clara/bionemo-framework:1.0` or via the launch script, `./launch.sh pull`. `./launch.sh dev` will start an interactive shell inside the container.
+The supported method of code development is using a prebuilt BioNeMo container which is [available via the NGC registry](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/clara/containers/bionemo-framework). This container can be pulled via the registry directly `docker pull nvcr.io/nvidia/clara/bionemo-framework:1.1` or via the launch script, `./launch.sh pull`. `./launch.sh dev` will start an interactive shell inside the container.
 
 Optionally, after the container is started, you can attach to the running container via the VSCode [Docker](https://code.visualstudio.com/docs/containers/overview) and [VSCode Dev Container](https://code.visualstudio.com/docs/devcontainers/containers) extensions.
 
-### Local Machine Setup
+### Local Development
 
-Local machine install is possible, but not recommended:
+You must run all `bionemo` code, including tests, within a Docker container from the `bionemo` image. The recommended workflow is to run `./launch.sh dev` and then perform all commands from this development container. You may run `./launch.sh build` whenever you need to rebuild the image. Note that you must restart the development container each time you make a new image.
 
+### `download_all`
+Before you begin development, you must run `./launch.sh download_all` on your **host machine**. The `./launch.sh dev` command will volume-mount your local `git` repository clone and the `download_all` command will obtain models, datasets, and test data and place them within this local directory.
+
+### `git-lfs`
+Furthermore, some unit tests require data that is stored using `git-lfs`. You must install this on your host machine and set it up. Complete instructions are accessible [from the `git-lfs` project page](https://github.com/git-lfs/git-lfs). An abgrided set of instructions are as follows (assuming you are in the `bionemo` repository root):
 ```bash
-pip install Cython
-pip install -r setup/requirements.txt
+sudo apt install git-lfs
+git lfs install
+git lfs pull
+```
+
+### Running `pytest` Tests
+To run tests using `pytest`, execute the following command:
+```bash
 # Run tests to check setup
-pytest .
+pytest -v --durations=0 --cov=bionemo --cov-report term --cov-report xml:coverage.xml -k "not test_model_training" .
 ```
 Note, some tests require pretrained model checkpoints -- see below.
 
 ## Downloading Pretrained Models
 
-The BioNeMo framework is released with pre-trained checkpoints for inference or as a starting point for further training/finetuning. Models are release via [NGC](https://catalog.ngc.nvidia.com/models), and can be downloaded via the NGC CLI. `./launch.sh download` can also be used to download the models, assuming your NGC account has been created and your `NGC_CLI_API_KEY` is set inside the `.env` file. Make sure you have your environment configure as described [in the Quickstart](#quick-start).
+The BioNeMo framework is released with pre-trained checkpoints for inference or as a starting point for further training/finetuning. Models are release via [NGC](https://catalog.ngc.nvidia.com/models), and can be downloaded via the NGC CLI. `./launch.sh download` can also be used to download the models, assuming your NGC account has been created and your `NGC_CLI_API_KEY` is set inside the `.env` file. Make sure you have your environment configure as described [in the Quickstart](##quick-start).
 ```bash
 ./launch.sh download
 ```
@@ -181,15 +215,56 @@ The BioNeMo repo is organized by biological entity (molecule, protein) and by de
 
 Regardless of your system, the easiest way to develop and test code is to mount a local copy of the code inside the BioNeMo Docker container. While you may [build the image from the Dockerfile](./setup/Dockerfile), we encourage folks to use the [launcher script, `launch.sh`](./launch.sh).
 
-The `launch.sh` script mounts the current working directory inside the container by default. This behavior can be customized by editing `PROJECT_PATH`, which is the local copy of the code, and `BIONEMO_PATH` in the `.env` file.
-
-`BIONEMO_PATH` is an environment variable used to select the path to the BioNeMo library in use. By default, this is the library installation path (`/opt/nvidia/bionemo`). For development, code should be mounted inside the container at `/workspace/bionemo`.
+The `launch.sh` script mounts the current working directory inside the container by default. This behavior can be customized by editing `BIONEMO_HOME` and `DOCKER_MOUTH_PATH`.
 
 Before commiting code, make sure to setup the auto-formatter and linter via precommit hooks:
 ```bash
 pip install pre-commit
 pre-commit install
 ```
+
+To push a commit on a branch with a merge request, the CI pipeline trigger can be avoided by including [skip ci] in the commit message.
+**Warning**  If the [skip ci] tag is used for some commits on a branch with an MR,
+we ask that the final commit before merge should omit this tag, so that all
+continuous integration steps are triggered before the merge is attempted.
+
+### VSCode into DGX Cloud
+[Visual Studio Code](https://code.visualstudio.com/) is an extremely useful IDE for development and debugging. If you want to run a workload on NGC and develop with VSCode you can now do that seemlessly on our platform.
+
+To startup a VSCode server, you must replace the `--command` portion of your `ngc base-command` command with
+```bash
+--commandline "\
+PASSWORD=mypass code-server --auth password --bind-addr 0.0.0.0:8899 /workspace & \
+sleep infinity"
+```
+This will tell DGX Cloud to sleep and wait for you to attach via the VSCode environment. Then you can run all your jobs through VSCode.
+
+
+#### Sample command:
+```bash
+ngc base-command job run \
+--name "myjobnamedummy" \
+--priority HIGH \
+--order 1 \
+--preempt RUNONCE \
+--min-timeslice 0s \
+--ace nv-us-east-2 \
+--org nvidia \
+--team clara \
+--instance  dgxa100.80g.8.norm \
+--image "nvcr.io/nvidia/clara/bionemo-framework:1.1" \
+--port 8888 \
+--port 8899 \
+--total-runtime 8h  \
+--result \results \
+--commandline "\
+PASSWORD=mypass code-server --auth password --bind-addr 0.0.0.0:8899 /workspace & \
+sleep infinity"
+```
+
+Once that is done, take a look at the ngc [jobs](https://bc.ngc.nvidia.com/jobs) page and find your job. Under the `Service Mapped Ports` section, click
+on the top port `8899` and you should be taken to a VSCode server.
+
 
 ### Build and Start Container from Source
 
@@ -202,6 +277,7 @@ Once a container has been built, it can be started in interactive mode with `./l
 
 
 ### Quick Links
-For a detailed guide on setting up the repo and launching example jobs, checkout the [Quickstart Guide](https://docs.nvidia.com/bionemo-framework/latest/quickstart-fw.html) in the documentation.
+For a detailed guide on setting up the repo and launching example jobs, checkout the [Quickstart Guide](http://10.110.42.241:8082/quickstart-fw.html) in the documentation.
 
-For example data-processing, pretraining and inference setup, checkout the [Tutorials](https://docs.nvidia.com/bionemo-framework/latest/tutorials-fw.html).
+For example data-processing, pretraining and inference setup, checkout the [Tutorials](http://10.110.42.241:8082/tutorials-fw.html).
+

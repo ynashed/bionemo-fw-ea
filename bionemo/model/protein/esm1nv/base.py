@@ -1,3 +1,18 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+#
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
+
+# Copyright (c) Meta Platforms, Inc. and affiliates.
+#
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+
 # Own imports
 # Imports needed for redefinition of TransformerLanguageModel
 import torch
@@ -55,6 +70,7 @@ except (ImportError, ModuleNotFoundError):
 
 # Additional imports needed for BertModel
 from nemo.collections.nlp.models.language_modeling.megatron.bert_model import BertLMHead
+from nemo.utils import logging
 
 
 class ESMnvEmbedding(Embedding):
@@ -72,6 +88,8 @@ class ESMnvEmbedding(Embedding):
         if mask_token_id is None:
             mask_token_id = torch.nan
         self.mask_token_id = mask_token_id
+        if self.token_dropout or self.use_attention_mask:
+            logging.warning("Using custom ESM2 Embeddings instead of the default NeMo version")
 
     def forward(
         self,
@@ -83,6 +101,7 @@ class ESMnvEmbedding(Embedding):
         words_embeddings = self.word_embeddings(input_ids)
 
         # BIONEMO: add custom logic for attention masking and token dropout
+        # TODO(srabhi, georgea): refactor the custom ESMnvEmbedding module using Megatron Core when NeMo 1.21 is available
         embeddings_mask = None
         if attention_mask is not None and (self.token_dropout or self.use_attention_mask):
             embeddings_mask = ~attention_mask[:, 0, :, 0]
@@ -111,6 +130,7 @@ class ESMnvEmbedding(Embedding):
             assert self.tokentype_embeddings is None
 
         # BIONEMO: include attention masking from ESM2
+        # TODO(srabhi, georgea): refactor the custom ESMnvEmbedding module using Megatron Core when NeMo 1.21 is available
         if embeddings_mask is not None and self.use_attention_mask:
             embeddings = (embeddings * embeddings_mask.unsqueeze(-1)).to(embeddings.dtype)
         # END BIONEMO
@@ -238,6 +258,7 @@ class ESMnvTransformerLanguageModel(TransformerLanguageModel):
         # Embeddings.
         if self.pre_process:
             # BIONEMO: New embedding class
+            # TODO(srabhi, georgea): refactor the custom ESMnvEmbedding module using Megatron Core when NeMo 1.21 is available
             self.embedding = ESMnvEmbedding(
                 hidden_size=self.hidden_size,
                 vocab_size=self.vocab_size,
@@ -288,7 +309,7 @@ class ESMnvTransformerLanguageModel(TransformerLanguageModel):
                 num_attention_heads_kerple=None,
                 max_seq_len=max_position_embeddings,
             )
-            assert use_flash_attention is False  # flash-attention not supported with kerple at this point
+            assert use_flash_attention is False, "flash-attention not supported with kerple at this point"
 
         elif position_embedding_type == 'sandwich':
             self.encoder_relative_position_embedding = SandwichRelativePositionEmbedding(
@@ -444,6 +465,7 @@ class ESMnvTransformerLanguageModel(TransformerLanguageModel):
         # Embeddings.
         if self.pre_process and encoder_input is None:
             # BIONEMO: add attn_mask to embeddings call
+            # TODO(srabhi, georgea): refactor the custom ESMnvEmbedding module using Megatron Core when NeMo 1.21 is available
             encoder_input = self.embedding(
                 enc_input_ids, enc_position_ids, token_type_ids=token_type_ids, attention_mask=enc_attn_mask
             )
@@ -632,6 +654,7 @@ def esm_get_language_model(
 
     # Language model.
     # BIONEMO: use custom class
+    # TODO(srabhi, georgea): refactor the custom ESMnvTransformerLanguageModel module using Megatron Core when NeMo 1.21 is available
     language_model = ESMnvTransformerLanguageModel(
         init_method=init_method,
         output_layer_init_method=scaled_init_method,
@@ -767,6 +790,7 @@ class ESMnvBertModel(BertModel):
         scaled_init_method = scaled_init_method_normal(init_method_std, num_layers)
 
         # BIONEMO: use custom language model constructor
+        # TODO(srabhi, georgea): refactor the custom esm_get_language_model method using Megatron Core when NeMo 1.21 is available
         self.language_model, self._language_model_key = esm_get_language_model(
             vocab_size=vocab_size,
             hidden_size=hidden_size,
@@ -839,7 +863,7 @@ class ESMnvMegatronBertModel(MegatronBertModel):
     def model_provider_func(self, pre_process, post_process):
         cfg = self.cfg
         num_tokentypes = 2 if cfg.bert_binary_head else 0
-
+        # TODO(srabhi, georgea): refactor the custom ESMnvBertModel method using Megatron Core when NeMo 1.21 is available
         model = ESMnvBertModel(
             vocab_size=self.padded_vocab_size,
             hidden_size=cfg.hidden_size,

@@ -18,8 +18,8 @@ known-issues-fw
 bionemo-fw-for-model-training-fw
 data-module-fw
 dwnstr-task-validation
-inference-grpc-fw
 inference-triton-fw
+deep-dive-esm1-pytriton-inference
 ```
 
 ```{toctree}
@@ -46,6 +46,8 @@ models/esm1-nv
 models/esm2-nv
 models/prott5nv
 models/megamolbart
+models/equidock
+models/diffdock
 models/model-benchmarks
 ```
 
@@ -55,6 +57,7 @@ models/model-benchmarks
 
 datasets/uniprot
 datasets/zinc15
+datasets/pdb
 ```
 
 ```{toctree}

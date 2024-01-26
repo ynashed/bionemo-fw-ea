@@ -1,7 +1,7 @@
 defaults:
   - base_config
 
-restore_from_path: /model/protein/esm1nv/esm1nv.nemo
+restore_from_path: ${oc.env:BIONEMO_HOME}/models/protein/esm1nv/esm1nv.nemo
 trainer:
   devices: 1
   num_nodes: 1
@@ -21,10 +21,10 @@ model:
   tokenizer:
     library: 'sentencepiece'
     type: null
-    model: /tokenizers/protein/esm1nv/vocab/protein_sequence_sentencepiece.model
-    vocab_file: /tokenizers/protein/esm1nv/vocab/protein_sequence_sentencepiece.vocab
+    model: ${oc.env:BIONEMO_HOME}/tokenizers/protein/esm1nv/vocab/protein_sequence_sentencepiece.model
+    vocab_file: ${oc.env:BIONEMO_HOME}/tokenizers/protein/esm1nv/vocab/protein_sequence_sentencepiece.vocab
   data:
-    dataset_path: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/protein # parent directory for data, contains train / val / test folders
+    dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/protein # parent directory for data, contains train / val / test folders
     dataset: # inclusive range of data files to load or can load a single file, e.g. x000.csv
       train: x[000..001]
       test: x[000..001]
@@ -40,7 +40,7 @@ model:
     data_prefix: null
 
 exp_manager:
-  exp_dir: /tmp/nemo_experiments/esm1nv_pretrain
+  exp_dir: ${oc.env:BIONEMO_HOME}/test_results/nemo_experiments/esm1nv_pretrain
   create_wandb_logger: False
   create_tensorboard_logger: False
   wandb_logger_kwargs:

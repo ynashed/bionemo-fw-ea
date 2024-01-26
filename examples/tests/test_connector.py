@@ -1,17 +1,13 @@
-# Copyright (c) 2023, NVIDIA CORPORATION.
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+#
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
 
-# Licensed under the Apache License, Version 2.0 (the 'License');
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an 'AS IS' BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
 
 import os
 import pathlib
@@ -19,12 +15,12 @@ import pathlib
 import pytest
 from hydra import compose, initialize
 
+from bionemo.callbacks import setup_dwnstr_task_validation_callbacks
 from bionemo.model.molecule.megamolbart import MegaMolBARTModel
 from bionemo.model.protein.downstream import FineTuneProteinModel
 from bionemo.model.protein.esm1nv import ESM1nvModel
 from bionemo.model.protein.prott5nv import ProtT5nvModel
 from bionemo.model.utils import setup_trainer
-from bionemo.utils.callbacks.callback_utils import setup_callbacks
 from bionemo.utils.tests import BioNemoSearchPathConfig, register_searchpath_config_plugin, update_relative_config_dir
 
 
@@ -54,7 +50,6 @@ MODEL_PARAMETERS = [
     44926976,
 ]
 
-os.environ['PROJECT_MOUNT'] = os.environ.get('PROJECT_MOUNT', '/workspace/bionemo')
 THIS_FILE_DIR = pathlib.Path(os.path.abspath(__file__)).parent
 
 
@@ -82,7 +77,7 @@ def test_model_size(prepend_config_path, config_name, model_class, model_paramet
     '''Check that number of model weights are correct'''
 
     cfg = get_cfg(prepend_config_path, config_name)
-    callbacks = setup_callbacks(cfg)
+    callbacks = setup_dwnstr_task_validation_callbacks(cfg)
 
     trainer = setup_trainer(cfg, callbacks=callbacks)
     if model_class == FineTuneProteinModel:

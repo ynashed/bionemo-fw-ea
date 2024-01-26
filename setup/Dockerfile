@@ -1,17 +1,12 @@
-# Copyright (c) 2022, NVIDIA CORPORATION.
-# SPDX-License-Identifier: Apache-2.0
-
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
 
 # TODO: check if the following missing dependencies are needed
 #   - lcms2=2.12=hddcbb42_0
@@ -19,13 +14,22 @@
 #   - libstdcxx-ng=11.1.0=h56837e0_8
 #   - pycairo=1.20.1=py38hf61ee4a_0
 
-
 ARG BASE_IMAGE=nvcr.io/nvidia/nemo:23.06
 FROM ${BASE_IMAGE}
+
+ENV TERM=xterm
+ENV FORCE_CUDA=1
+
+# makes the interactive bash shell "login" have this in the prompt
+RUN echo 'export PS1="(bionemo docker) $PS1"' > /docker_bashrc
 
 WORKDIR /workspace/
 # TODO: Long term, docker should not be running as root.
 ENV HOME=/root
+# copy built DGL and install it
+# dgl_builder is created with setup/Dockerfile.dgl_builder
+COPY --from=gitlab-master.nvidia.com:5005/clara-discovery/bionemo:dgl_builder_v1.1.3 /dgl ./dgl
+RUN cd dgl/python && python setup.py install && cd ../.. && rm -rf dgl
 
 # Please populate the labels below if using a custom base container (ie not NeMo GA)
 # For nightly NeMo builds, only com.nvidia.nemo.description should be provided
@@ -33,9 +37,6 @@ ENV HOME=/root
 # LABEL "com.nvidia.nemo.release"="r1.19.0"
 # LABEL "com.nvidia.nemo.git_hash"="a5fbsegy"
 # LABEL "com.nvidia.nemo.description"="Cusotom build with XYZ fixed"
-
-# Activating base environment
-ENV TERM=xterm
 
 ## Installing dependencies and tools
 RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
@@ -45,10 +46,23 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
         wget git unzip tmux vim tree xterm && \
     rm -rf /var/lib/apt/lists/*
 
+# Install code-server to enable easy remote development on a container
+# More info about code-server be found here: https://coder.com/docs/code-server/v4.4.0
+# ADD https://github.com/coder/code-server/releases/download/v4.4.0/code-server_4.4.0_amd64.deb code-server_4.4.0_amd64.deb
+# RUN dpkg -i ./code-server_4.4.0_amd64.deb && rm -f code-server_4.4.0_amd64.deb
+#
+# # Install extensions from the marketplace
+# RUN code-server --install-extension ms-python.python
+
+
 COPY setup/requirements.txt /tmp/requirements.txt
-RUN pip3 install -r /tmp/requirements.txt
-COPY setup/requirements-linter.txt /tmp/requirements-linter.txt
-RUN pip3 install -r /tmp/requirements-linter.txt
+RUN --mount=type=secret,id=GITLAB_TOKEN GITLAB_TOKEN=$(cat /run/secrets/GITLAB_TOKEN) pip install -r /tmp/requirements.txt
+# TODO: unnecessary for main container, move test+dev dep installation to dev only & update CI to use dev image
+COPY setup/requirements-test.txt /tmp/requirements-test.txt
+RUN pip install -r /tmp/requirements-test.txt
+COPY setup/requirements-dev.txt /tmp/requirements-dev.txt
+RUN pip install -r /tmp/requirements-dev.txt
+# end TODO
 
 # AWS CLI is inside requirements.txt. Add config file.
 # This config file does not contain access keys.
@@ -73,39 +87,50 @@ RUN NEMO_PATH=$(python -c 'import nemo; print(nemo.__path__[0])') && \
 # BioNeMo Build
 #########################################################################################
 
-# The location of the installed library in the container. Set BIONEMO_HOME env to change this for development purposes.
-ARG BIONEMO_HOME=/opt/nvidia/bionemo
+### The location of the installed library in the container. Set BIONEMO_HOME env to change this for development purposes.
+ARG BIONEMO_HOME=/workspace/bionemo
 ENV BIONEMO_HOME=${BIONEMO_HOME}
+RUN mkdir -p ${BIONEMO_HOME}
 
-# Copy the repo
-COPY LICENSE README.md artifact_paths download_models.sh launch.sh pytest.ini ${BIONEMO_HOME}/
-COPY bionemo ${BIONEMO_HOME}/bionemo
-COPY docs ${BIONEMO_HOME}/docs
-COPY examples ${BIONEMO_HOME}/examples
-COPY generated ${BIONEMO_HOME}/generated
-COPY hydra_plugins ${BIONEMO_HOME}/hydra_plugins
-COPY proto ${BIONEMO_HOME}/proto
-COPY setup ${BIONEMO_HOME}/setup
-COPY tests ${BIONEMO_HOME}/tests
 
-# NEMO_HOME must be unset for default NeMo install in /usr/local/lib/python3.8/dist-packages/nemo
-ARG NEMO_HOME
-ENV NEMO_HOME=${NEMO_HOME}
-
-ENV PYTHONPATH=${BIONEMO_HOME}:${BIONEMO_HOME}/generated:${NEMO_HOME}:$PYTHONPATH
-
+### Patching dependencies.
 # TODO(trvachov): Remove after NeMo is upgraded to 1.21
 COPY ./setup/nemo-v-1.20-fix-for-esm2.patch /nemo-v-1.20-fix-for-esm2.patch
 RUN patch -p1 /usr/local/lib/python3.10/dist-packages/nemo/collections/nlp/data/language_modeling/megatron/dataset_utils.py /nemo-v-1.20-fix-for-esm2.patch \
     && rm /nemo-v-1.20-fix-for-esm2.patch
 
-COPY ./setup/startup.sh /opt/nvidia
-COPY ./tokenizers /tokenizers
+# NOTE: This is to support the MegaMolBart LM model compatability with Jupyter notebooks and ipdb.
+#       This is exposed through the `iteractive=True` constructor parameter.
+#       In MegaMolBart, specifically, this patch adds support for recongifure_minibatch as a flag
+#       in its decode method.
+# TODO [mgreaves] Upstream this patch and then remove here when we can upgrade our nemo dependency.
+#                 https://jirasw.nvidia.com/browse/CDISCOVERY-2146
+COPY ./setup/nemo-v-1.20-support_interactive_megamolbart_lm-decode_reconfigure_minibatch.patch /nemo-v-1.20-support_interactive_megamolbart_lm-decode_reconfigure_minibatch.patch
+RUN patch -p1 /usr/local/lib/python3.10/dist-packages/nemo/collections/nlp/models/language_modeling/megatron_lm_encoder_decoder_model.py /nemo-v-1.20-support_interactive_megamolbart_lm-decode_reconfigure_minibatch.patch \
+    && rm /nemo-v-1.20-support_interactive_megamolbart_lm-decode_reconfigure_minibatch.patch
 
-RUN mkdir -p /workspace/bionemo
-RUN ln -s /opt/nvidia/bionemo/examples/ /workspace/bionemo/examples
-RUN echo 'export PS1="(bionemo docker) $PS1"' > /docker_bashrc
 
-WORKDIR /workspace
+### Copy the bionemo repo contents for distribution
+COPY LICENSE README.md artifact_paths.yaml download_models.py launch.sh setup.py pyproject.toml ${BIONEMO_HOME}/
+COPY setup ${BIONEMO_HOME}/setup
+COPY docs ${BIONEMO_HOME}/docs
+COPY hydra_plugins ${BIONEMO_HOME}/hydra_plugins
+COPY tokenizers ${BIONEMO_HOME}/tokenizers
+# copy the package contents *last* as most churn occurs here
+# --> we can cache the lower-chrun things in previous layers
+COPY examples ${BIONEMO_HOME}/examples
+COPY tests ${BIONEMO_HOME}/tests
+COPY bionemo ${BIONEMO_HOME}/bionemo
 
-ENTRYPOINT ["/opt/nvidia/startup.sh"]
+
+### install bionemo
+WORKDIR ${BIONEMO_HOME}
+# we already install dependencies earlier, directly from the requirements*.txt files
+RUN pip install --no-deps -e .
+
+# Remove nvm as it's not expected users will need this, and it introduces unfixable vulnerabilties:
+# https://nvd.nist.gov/vuln/detail/CVE-2023-32002
+RUN rm -rf /usr/local/nvm
+
+# FIXME: If BIONEMO_HOME _is not_ /workspace/bionemo, then this ENTRYPOINT is invalid!
+ENTRYPOINT ["/workspace/bionemo/setup/startup.sh"]

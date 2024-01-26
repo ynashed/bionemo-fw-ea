@@ -1,21 +1,14 @@
 #!/bin/bash
 #
-# Copyright (c) 2023, NVIDIA CORPORATION.
-# SPDX-License-Identifier: Apache-2.0
-
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-source download_models.sh
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
 
 current_script="$0"
 
@@ -26,7 +19,6 @@ if [ ! -x "$current_script" ]; then
     chmod +x "$current_script"
     echo "Done."
 fi
-
 
 ###############################################################################
 #
@@ -48,13 +40,15 @@ launch.sh [command]
 
     valid commands:
 
-    pull      - pull an existing container
-    download  - download pre-trained models
-    build     - build a container, only recommended if customization is needed
-    run       - launch the docker container in non-dev mode. Code is cloned from git and installed.
-    push      - push a container to a registry
-    dev       - launch a new container in development mode. Local copy of the code is mounted and installed.
-    attach    - attach to a running container
+    pull               - pull an existing container
+    download           - download pre-trained models
+    download_test_data - download data necessary for diffdock tests.
+    download_all       - download_test_data and download pretrained models.
+    build              - build a container, only recommended if customization is needed
+    run                - launch the docker container in non-dev mode. Code is cloned from git and installed.
+    push               - push a container to a registry
+    dev                - launch a new container in development mode. Local copy of the code is mounted and installed.
+    attach             - attach to a running container
 
 
 Getting Started tl;dr
@@ -74,19 +68,12 @@ variables:
     BIONEMO_IMAGE
         Container image for BioNeMo training, prepended with registry. e.g.,
         Note that this is a separate (precursor) container from any service associated containers
-    PROJECT_MOUNT
+    LOCAL_REPO_PATH
+        Path on workstation or cluster to code, e.g., /home/user/code/bionemo. Inside the bionemo container,
+        this is set to /workspace/bionemo by default.
+    DOCKER_REPO_PATH
         Set this to change the location of the library in the container, e.g. for development work.
         It is set to /workspace/bionemo by default and a lot of the examples expect this path to be valid.
-        Use of /workspace/bionemo is strongly recommended as the alternative for development work.
-        Only change this if you know what you're doing.
-    PROJECT_PATH
-        Path on workstation or cluster to code, e.g., /home/user/code/bionemo
-    DATA_PATH
-        Path on workstation or cluster to data, e.g., /data
-    MODEL_PATH
-        Location of the models when downloaded. Defaults to '$PROJECT_PATH/models' on workstation or /model in container.
-    RESULT_PATH
-        Path on workstation or cluster to directory for results, e.g. /home/user/results/nemo_experiments
     WANDB_API_KEY
         Weights and Balances API key to upload runs to WandB. Can also be uploaded afterwards., e.g. Dkjdf...
         This value is optional -- Weights and Biases will log data and not upload if missing.
@@ -106,33 +93,34 @@ variables:
         NGC team name.  Run \`ngc config --help\` for details.
     NGC_CLI_FORMAT_TYPE
         NGC cli format. Default is ascii.  Run \`ngc config --help\` for details.
+    GITLAB_TOKEN
+        gitlab access token with api access, used when build container with wheels stored in gitlab registery
 
 EOF
     exit
 }
 
-
-# Don't change these
-BIONEMO_HOME=/opt/nvidia/bionemo # Where BioNeMo is installed in container, set the same as Docker container
-BIONEMO_WORKSPACE=/workspace/bionemo # Location of examples / config files and where BioNeMo code can be mounted for development
-
-
 # Defaults for `.env` file
-BIONEMO_IMAGE=${BIONEMO_IMAGE:=nvcr.io/nvidia/clara/bionemo-framework:1.0}
-PROJECT_MOUNT=${PROJECT_MOUNT:=/workspace/bionemo}
-PROJECT_PATH=${PROJECT_PATH:=$(pwd)}
-DATA_PATH=${DATA_PATH:=/tmp}
-MODEL_PATH=${MODEL_PATH:=${PROJECT_PATH}/models}
-RESULT_PATH=${RESULT_PATH:=${HOME}/results/nemo_experiments}
+BIONEMO_IMAGE=${BIONEMO_IMAGE:=nvcr.io/nvidian/cvai_bnmo_trng/bionemo:dev}
+LOCAL_REPO_PATH=$(pwd)
+DOCKER_REPO_PATH=${DOCKER_REPO_PATH:=/workspace/bionemo}
+LOCAL_RESULTS_PATH=${LOCAL_RESULTS_PATH:=${LOCAL_REPO_PATH}/results}
+DOCKER_RESULTS_PATH=${DOCKER_RESULTS_PATH:=${DOCKER_REPO_PATH}/results}
+LOCAL_DATA_PATH=${LOCAL_DATA_PATH:=${LOCAL_REPO_PATH}/data}
+DOCKER_DATA_PATH=${DOCKER_DATA_PATH:=${DOCKER_REPO_PATH}/data}
+LOCAL_MODELS_PATH=${LOCAL_MODELS_PATH:=${LOCAL_REPO_PATH}/models}
+DOCKER_MODELS_PATH=${DOCKER_MODELS_PATH:=${DOCKER_REPO_PATH}/models}
 WANDB_API_KEY=${WANDB_API_KEY:=NotSpecified}
 JUPYTER_PORT=${JUPYTER_PORT:=8888}
-REGISTRY=${REGISTRY:=NotSpecified}
+REGISTRY=${REGISTRY:=nvcr.io}
 REGISTRY_USER=${REGISTRY_USER:='$oauthtoken'}
 DEV_CONT_NAME=${DEV_CONT_NAME:=bionemo}
 NGC_CLI_API_KEY=${NGC_CLI_API_KEY:=NotSpecified}
 NGC_CLI_ORG=${NGC_CLI_ORG:=nvidian}
 NGC_CLI_TEAM=${NGC_CLI_TEAM:=NotSpecified}
 NGC_CLI_FORMAT_TYPE=${NGC_CLI_FORMAT_TYPE:=ascii}
+GITLAB_TOKEN=${GITLAB_TOKEN:=NotSpecified}
+
 
 # if $LOCAL_ENV file exists, source it to specify my environment
 if [ -e ./$LOCAL_ENV ]
@@ -148,11 +136,14 @@ fi
 # If $LOCAL_ENV was not found, write out a template for user to edit
 if [ $write_env -eq 1 ]; then
     echo BIONEMO_IMAGE=${BIONEMO_IMAGE} >> $LOCAL_ENV
-    echo PROJECT_MOUNT=${PROJECT_MOUNT} >> $LOCAL_ENV
-    echo PROJECT_PATH=${PROJECT_PATH} >> $LOCAL_ENV
-    echo DATA_PATH=${DATA_PATH} >> $LOCAL_ENV
-    echo MODEL_PATH=${MODEL_PATH} >> $LOCAL_ENV
-    echo RESULT_PATH=${RESULT_PATH} >> $LOCAL_ENV
+    echo LOCAL_REPO_PATH=${LOCAL_REPO_PATH} \# This needs to be set to BIONEMO_HOME for local \(non-dockerized\) use >> $LOCAL_ENV
+    echo DOCKER_REPO_PATH=${DOCKER_REPO_PATH} \# This is set to BIONEMO_HOME in container >> $LOCAL_ENV
+    echo LOCAL_RESULTS_PATH=${LOCAL_RESULTS_PATH} >> $LOCAL_ENV
+    echo DOCKER_RESULTS_PATH=${DOCKER_RESULTS_PATH} >> $LOCAL_ENV
+    echo LOCAL_DATA_PATH=${LOCAL_DATA_PATH} >> $LOCAL_ENV
+    echo DOCKER_DATA_PATH=${DOCKER_DATA_PATH} >> $LOCAL_ENV
+    echo LOCAL_MODELS_PATH=${LOCAL_MODELS_PATH} >> $LOCAL_ENV
+    echo DOCKER_MODELS_PATH=${DOCKER_MODELS_PATH} >> $LOCAL_ENV
     echo WANDB_API_KEY=${WANDB_API_KEY} >> $LOCAL_ENV
     echo JUPYTER_PORT=${JUPYTER_PORT} >> $LOCAL_ENV
     echo REGISTRY=${REGISTRY} >> $LOCAL_ENV
@@ -162,15 +153,32 @@ if [ $write_env -eq 1 ]; then
     echo NGC_CLI_ORG=${NGC_CLI_ORG} >> $LOCAL_ENV
     echo NGC_CLI_TEAM=${NGC_CLI_TEAM} >> $LOCAL_ENV
     echo NGC_CLI_FORMAT_TYPE=${NGC_CLI_FORMAT_TYPE} >> $LOCAL_ENV
+    echo GITLAB_TOKEN=${GITLAB_TOKEN} \# This needs to be created via your gitlab account as a personal access token with API access enabled. >> $LOCAL_ENV
 fi
 
-# Mount paths
-DATA_MOUNT_PATH="/data"
-RESULT_MOUNT_PATH="/result/nemo_experiments"
+# Default paths for framework. We switch these depending on whether or not we are inside
+# a docker environment. It is assumed that if we are in a docker environment, then it's the
+# bionemo image built with `setup/Dockerfile`.
+
+
+if [ -f /.dockerenv ]; then
+    echo "Running inside a Docker container, using DOCKER paths from .env file."
+    RESULT_PATH=${DOCKER_RESULTS_PATH}
+    DATA_PATH=${DOCKER_DATA_PATH}
+    MODEL_PATH=${DOCKER_MODELS_PATH}
+    BIONEMO_HOME=${DOCKER_REPO_PATH}
+else
+    echo "Not running inside a Docker container, using LOCAL paths from .env file."
+    RESULT_PATH=${LOCAL_RESULTS_PATH}
+    DATA_PATH=${LOCAL_DATA_PATH}
+    MODEL_PATH=${LOCAL_MODELS_PATH}
+    BIONEMO_HOME=${LOCAL_REPO_PATH}
+fi
 
 # Additional variables that will be used in the script when sent in the .env file:
 # BASE_IMAGE        Custom Base image for building.
-# NEMO_HOME         Path to external copy of NeMo source code, which is mounted at /workspace/nemo. This allows a different version of NeMo to be used with code.
+# NEMO_HOME         Path to external copy of NeMo source code, which is mounted into the nemo dependency install location in the environment.
+#                   This allows a different version of NeMo to be used with code.
 # TOKENIZERS_PATH   Workstation directory to be mounted to /tokenizers inside container
 
 # Compare Docker version to find Nvidia Container Toolkit support.
@@ -190,8 +198,6 @@ DOCKER_CMD="docker run \
     --network host \
     ${PARAM_RUNTIME} \
     -p ${JUPYTER_PORT}:8888 \
-    -v ${DATA_PATH}:${DATA_MOUNT_PATH} \
-    -v ${RESULT_PATH}:${RESULT_MOUNT_PATH} \
     --shm-size=4g \
     --ulimit memlock=-1 \
     --ulimit stack=67108864 \
@@ -200,29 +206,59 @@ DOCKER_CMD="docker run \
 
 
 # add current git hash as docker image metadata
-# add current git hash as docker image metadata
 if git rev-parse --git-dir > /dev/null 2>&1; then
     BIONEMO_GIT_HASH=$(git rev-parse --short HEAD)
 else
     BIONEMO_GIT_HASH="not in git repository"
 fi
+
+# NOTE: It is **extremely important** to **never** pass in a secret / password / API key as either:
+#         -- an environment variable
+#         -- a file
+#       Into a docker build process. This includes passing in an env var via --build-args.
+#       
+#       This is to ensure that the secret's value is never leaked: doing any of the above means
+#       that the secret value will be **persisted in the image**. Thus, when a user creates a container
+#       from the image, they will have access to this secret value (if it's a file or ENV). Or, they will
+#       be able to `docker inspect` the image and glean the secret value from looking at the layer creations
+#       (occurs when the value is an ARG).
+#
+#       Known bionemo build-time secrets:
+#         - GITLAB_TOKEN
+#
 DOCKER_BUILD_CMD="docker build --network host \
     -t ${BIONEMO_IMAGE} \
-    --label com.nvidia.bionemo.git_hash=${BIONEMO_GIT_HASH} \
+    --secret id=GITLAB_TOKEN,env=GITLAB_TOKEN \
+    --label com.nvidia.bionemo.git_hash='${BIONEMO_GIT_HASH}' \
     -f setup/Dockerfile"
 
 
 download() {
     mkdir -p ${MODEL_PATH}
-    download_bionemo_models "${@}"
+    python download_models.py all --source ngc --download_dir ${MODEL_PATH} --verbose
 }
 
+download_test_data() {
+    echo 'Downloading test data for diffdock...'
+    source $BIONEMO_HOME/examples/molecule/diffdock/scripts/download_data_sample.sh
+    echo 'Diffdock data download complete.'
+    echo 'Unzipping ESM2 test data...'
+    unzip $BIONEMO_HOME/examples/tests/test_data/uniref202104_esm2_qc_test200_val200.zip -d $BIONEMO_HOME/examples/tests/test_data/
+    echo 'ESM2 test data unzipped.'
+}
 
+ngc_api_key_is_set() {
+    if [ ! -z ${NGC_CLI_API_KEY} ] && [ ${NGC_CLI_API_KEY} != 'NotSpecified' ]; then
+        echo true
+    else
+        echo false
+    fi
+}
 
 docker_login() {
     local ngc_api_key_is_set_=$(ngc_api_key_is_set)
     if [ $ngc_api_key_is_set_ == true ]; then
-        docker login ${REGISTRY} -u ${REGISTRY_USER} -p ${NGC_CLI_API_KEY}
+        docker login -u "${REGISTRY_USER}" -p ${NGC_CLI_API_KEY} ${REGISTRY}
     else
         echo 'Docker login has been skipped. Container pushing and pulling may fail.'
     fi
@@ -240,6 +276,11 @@ build() {
     local IMG_NAME=($(echo ${BIONEMO_IMAGE} | tr ":" "\n"))
     local PACKAGE=0
     local CLEAN=0
+
+    if [[ "${GITLAB_TOKEN}" == "" || "${GITLAB_TOKEN}" == "NotSpecified" ]]; then
+      echo "ERROR: need to set GITLAB_TOKEN to build the docker image. Please see instructions at https://confluence.nvidia.com/display/CLD/Onboarding+Guide#OnboardingGuide-GitLabDockerRegistry"
+      exit 1
+    fi
 
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -339,26 +380,19 @@ setup() {
     mkdir -p ${DATA_PATH}
     mkdir -p ${RESULT_PATH}
     mkdir -p ${MODEL_PATH}
-    DEV_PYTHONPATH=""
 
     if [ ! -z "${NEMO_HOME}" ];
     then
-        DOCKER_CMD="${DOCKER_CMD} -v ${NEMO_HOME}:/workspace/nemo "
-        DOCKER_CMD="${DOCKER_CMD} --env NEMO_HOME=${NEMO_HOME} "
-        DEV_PYTHONPATH="${DEV_PYTHONPATH}:/workspace/nemo"
+        # NOTE: If we change the Python version, we will have a different mount path!
+        echo "Making a volume mount for NeMo!" \
+             "Mounting package (\$NEMO_HOME/nemo) in Python environment (/usr/local/lib/python3.10/dist-packages/nemo)" \
+             "and NEMO_HOME (${NEMO_HOME}) to /workspace/nemo"
+        DOCKER_CMD="${DOCKER_CMD} -v ${NEMO_HOME}/nemo:/usr/local/lib/python3.10/dist-packages/nemo -v ${NEMO_HOME}:/workspace/nemo"
     fi
 
-    DOCKER_CMD="${DOCKER_CMD} -v ${MODEL_PATH}:/model "
-
-    # For dev use the tokenizers in /tokenizers dir
-    if [ ! -z "${TOKENIZERS_PATH}" ];
-    then
-        DOCKER_CMD="${DOCKER_CMD} -v ${TOKENIZERS_PATH}:/tokenizers "
-    else
-        DOCKER_CMD="${DOCKER_CMD} -v ${PROJECT_PATH}/tokenizers:/tokenizers "
-    fi
-
-    DOCKER_CMD="${DOCKER_CMD} --env MODEL_PATH=/model"
+    # Note: For BIONEMO_HOME, if we are invoking docker, this should always be
+    # the docker repo path.
+    DOCKER_CMD="${DOCKER_CMD} --env BIONEMO_HOME=$DOCKER_REPO_PATH"
     DOCKER_CMD="${DOCKER_CMD} --env WANDB_API_KEY=$WANDB_API_KEY"
     DOCKER_CMD="${DOCKER_CMD} --env NGC_CLI_API_KEY=$NGC_CLI_API_KEY"
     DOCKER_CMD="${DOCKER_CMD} --env NGC_CLI_ORG=$NGC_CLI_ORG"
@@ -366,8 +400,11 @@ setup() {
     DOCKER_CMD="${DOCKER_CMD} --env NGC_CLI_FORMAT_TYPE=$NGC_CLI_FORMAT_TYPE"
 
     # For development work
-    echo "Mounting ${PROJECT_PATH} at ${PROJECT_MOUNT} for development"
-    DOCKER_CMD="${DOCKER_CMD} -v ${PROJECT_PATH}:${PROJECT_MOUNT} -e HOME=${PROJECT_MOUNT} -w ${PROJECT_MOUNT} "
+    echo "Mounting ${LOCAL_REPO_PATH} at ${DOCKER_REPO_PATH} for development"
+    DOCKER_CMD="${DOCKER_CMD} -v ${LOCAL_REPO_PATH}:${DOCKER_REPO_PATH} -e HOME=${DOCKER_REPO_PATH} -w ${DOCKER_REPO_PATH} "
+    DOCKER_CMD="${DOCKER_CMD} -v ${LOCAL_RESULTS_PATH}:${DOCKER_RESULTS_PATH}"
+    DOCKER_CMD="${DOCKER_CMD} -v ${LOCAL_DATA_PATH}:${DOCKER_DATA_PATH}"
+    DOCKER_CMD="${DOCKER_CMD} -v ${LOCAL_MODELS_PATH}:${DOCKER_MODELS_PATH}"
     DOCKER_CMD="${DOCKER_CMD} -v /etc/passwd:/etc/passwd:ro "
     DOCKER_CMD="${DOCKER_CMD} -v /etc/group:/etc/group:ro "
     DOCKER_CMD="${DOCKER_CMD} -v /etc/shadow:/etc/shadow:ro "
@@ -378,10 +415,6 @@ setup() {
     if [[ $1 == "dev" ]]; then
         echo "Mounting ~/.ssh up for development"
         DOCKER_CMD="$DOCKER_CMD -v ${HOME}/.ssh:${HOME}/.ssh:ro"
-
-        echo "Prepending ${PROJECT_MOUNT} to PYTHONPATH for development"
-        DEV_PYTHONPATH="${PROJECT_MOUNT}:${PROJECT_MOUNT}/generated:${DEV_PYTHONPATH}"
-        DOCKER_CMD="${DOCKER_CMD} --env PYTHONPATH=${DEV_PYTHONPATH}"
     fi
 }
 
@@ -443,7 +476,7 @@ run() {
     done
 
     set -x
-    ${DOCKER_CMD} --rm -it --gpus all -e HOME=${BIONEMO_WORKSPACE} -w ${BIONEMO_WORKSPACE} --name ${DEV_CONT_NAME} ${BIONEMO_IMAGE} ${CMD}
+    ${DOCKER_CMD} --rm -it --gpus all -e HOME=${DOCKER_REPO_PATH} -w ${DOCKER_REPO_PATH} --name ${DEV_CONT_NAME} ${BIONEMO_IMAGE} ${CMD}
     set +x
     exit
 }
@@ -458,25 +491,17 @@ attach() {
 }
 
 
-protoc() {
-    # Generate python stubs for protobuf and grpc services.
-    local GEN_DIR="./generated/"
-    python3 -m grpc_tools.protoc \
-        -I./proto/ \
-        --python_out=./generated/ \
-        --grpc_python_out=${GEN_DIR} \
-        --experimental_allow_proto3_optional \
-        ./proto/*.proto
-    echo "Generated code is at ${GEN_DIR}."
-}
-
-
 case $1 in
     download)
         shift
         download "$@"
         ;;
-    protoc | build | run | push | pull | dev | attach)
+    download_all)
+        shift
+        download "$@"
+        download_test_data
+        ;;
+    build | run | push | pull | dev | attach | download_test_data)
         $@
         ;;
     *)

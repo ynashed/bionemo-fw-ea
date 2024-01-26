@@ -1,0 +1,275 @@
+training_data:
+  protein_path: null
+  protein_ligand_csv: null
+  protein_data_dir: ${oc.env:BIONEMO_HOME}/data/PDB_processed
+  output_fasta_file: ${oc.env:BIONEMO_HOME}/data/pdb_sequences.fasta
+  esm_embeddings_path: ${oc.env:BIONEMO_HOME}/data/esm2_embeddings.sqlite3
+  chain_cutoff: 10
+score_infer:
+  name: paper_large_score
+  restore_from_path: ${oc.env:BIONEMO_HOME}/models/molecule/diffdock/diffdock_score.nemo
+  target: bionemo.model.molecule.diffdock.models.nemo_model.DiffdockTensorProductScoreModel
+  infer_target: bionemo.model.molecule.diffdock.infer.DiffDockModelInference
+  load_from_checkpoint: null
+  data:
+    all_atoms: false
+    receptor_radius: 15
+    c_alpha_max_neighbors: 24
+    atom_radius: 5.0
+    atom_max_neighbors: 8
+    remove_hs: true
+  trainer:
+    devices: 1
+    num_nodes: 1
+    precision: 32
+name: diffdock_confidence_training_test
+do_embedding_preprocessing: false
+do_preprocessing: false
+do_training: true
+do_testing: false
+seed: 0
+restore_from_path: null
+cluster_type: None
+target: bionemo.model.molecule.diffdock.models.nemo_model.DiffdockTensorProductScoreModelAllAtom
+infer_target: bionemo.model.molecule.diffdock.infer.DiffDockModelInference
+transfer_weights: false
+data:
+  score_model_name: ${score_infer.name}
+  num_workers: 1
+  pin_memory: false
+  limit_complexes: 0
+  all_atoms: true
+  multiplicity: 1
+  chain_cutoff: 10
+  receptor_radius: 15
+  c_alpha_max_neighbors: 24
+  atom_radius: 5.0
+  atom_max_neighbors: 8
+  matching_popsize: 20
+  matching_maxiter: 20
+  max_lig_size: null
+  remove_hs: true
+  num_conformers: 1
+  no_torsion: ${model.diffusion.no_torsion}
+  world_size: ${multiply:${trainer.devices}, ${trainer.num_nodes}}
+  esm_embeddings_path: ${training_data.esm_embeddings_path}
+  data_dir: ${training_data.protein_data_dir}
+  split_train: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/splits/split_train
+  split_val: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/splits/split_val
+  split_test: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/splits/split_test
+  cache_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/data_cache
+  chunk_size: 5
+  use_original_model_cache: false
+  cache_ids_to_combine: null
+  cache_creation_id: null
+  samples_per_complex: 7
+  balance: false
+  rmsd_prediction: false
+  rmsd_classification_cutoff:
+  - 2.0
+trainer:
+  devices: 1
+  num_nodes: 1
+  precision: 32
+  accelerator: gpu
+  max_epochs: 1
+  max_steps: -1
+  log_every_n_steps: 50
+  val_check_interval: 1.0
+  num_sanity_val_steps: 0
+  limit_val_batches: 200
+  limit_test_batches: 0
+  gradient_clip_val: 1.0
+  logger: false
+  enable_checkpointing: false
+  replace_sampler_ddp: false
+  reload_dataloaders_every_n_epochs: 100000
+  accumulate_grad_batches: 1
+  deterministic: warn
+model:
+  name: ${name}
+  esm_embeddings_path: ${data.esm_embeddings_path}
+  rmsd_classification_cutoff: ${data.rmsd_classification_cutoff}
+  rmsd_prediction: ${data.rmsd_prediction}
+  seed: ${seed}
+  micro_batch_size: 5
+  global_batch_size: null
+  resume_from_checkpoint: null
+  tensor_model_parallel_size: 1
+  pipeline_model_parallel_size: 1
+  confidence_mode: true
+  num_conv_layers: 5
+  max_radius: 5.0
+  scale_by_sigma: true
+  ns: 24
+  nv: 6
+  distance_embed_dim: 32
+  cross_distance_embed_dim: 32
+  no_batch_norm: false
+  tensor_product:
+    use_second_order_repr: false
+    type: e3nn
+  cross_max_distance: 80
+  dynamic_max_cross: true
+  dropout: 0.0
+  embedding_type: sinusoidal
+  sigma_embed_dim: 32
+  embedding_scale: 10000
+  all_atoms: ${data.all_atoms}
+  confidence_no_batchnorm: false
+  confidence_dropout: 0.0
+  diffusion:
+    tr_weight: 0.33
+    rot_weight: 0.33
+    tor_weight: 0.33
+    tr_sigma_min: 0.1
+    tr_sigma_max: 34
+    rot_sigma_min: 0.03
+    rot_sigma_max: 1.55
+    tor_sigma_min: 0.0314
+    tor_sigma_max: 3.14
+    no_torsion: false
+  inference_earlystop_metric: loss
+  inference_earlystop_goal: min
+  find_unused_parameters: true
+  optim:
+    name: fused_adam
+    lr: 0.001
+    betas:
+    - 0.9
+    - 0.999
+    eps: 1.0e-08
+    weight_decay: 0.0
+    sched:
+      name: ReduceLROnPlateau
+      patience: 50
+      monitor: val_loss
+      mode: min
+  train_ds:
+    micro_batch_size: ${model.micro_batch_size}
+    pin_memory: ${data.pin_memory}
+    seed: ${seed}
+    no_torsion: ${model.diffusion.no_torsion}
+    all_atoms: ${data.all_atoms}
+    data_dir: ${data.data_dir}
+    limit_complexes: ${data.limit_complexes}
+    receptor_radius: ${data.receptor_radius}
+    c_alpha_max_neighbors: ${data.c_alpha_max_neighbors}
+    remove_hs: ${data.remove_hs}
+    max_lig_size: ${data.max_lig_size}
+    matching_popsize: ${data.matching_popsize}
+    matching_maxiter: ${data.matching_maxiter}
+    num_workers: ${data.num_workers}
+    atom_radius: ${data.atom_radius}
+    atom_max_neighbors: ${data.atom_max_neighbors}
+    esm_embeddings_path: ${data.esm_embeddings_path}
+    world_size: ${multiply:${trainer.devices}, ${trainer.num_nodes}}
+    cache_path: ${data.cache_path}
+    num_conformers: ${data.num_conformers}
+    split_train: ${data.split_train}
+    chunk_size: ${data.chunk_size}
+    samples_per_complex: ${data.samples_per_complex}
+    balance: ${data.balance}
+    rmsd_classification_cutoff: ${data.rmsd_classification_cutoff}
+    use_original_model_cache: ${data.use_original_model_cache}
+    cache_creation_id: ${data.cache_creation_id}
+    cache_ids_to_combine: ${data.cache_ids_to_combine}
+    score_model_name: ${data.score_model_name}
+  validation_ds:
+    micro_batch_size: ${model.micro_batch_size}
+    pin_memory: ${data.pin_memory}
+    seed: ${seed}
+    no_torsion: ${model.diffusion.no_torsion}
+    all_atoms: ${data.all_atoms}
+    data_dir: ${data.data_dir}
+    limit_complexes: ${data.limit_complexes}
+    receptor_radius: ${data.receptor_radius}
+    c_alpha_max_neighbors: ${data.c_alpha_max_neighbors}
+    remove_hs: ${data.remove_hs}
+    max_lig_size: ${data.max_lig_size}
+    matching_popsize: ${data.matching_popsize}
+    matching_maxiter: ${data.matching_maxiter}
+    num_workers: ${data.num_workers}
+    atom_radius: ${data.atom_radius}
+    atom_max_neighbors: ${data.atom_max_neighbors}
+    esm_embeddings_path: ${data.esm_embeddings_path}
+    world_size: ${multiply:${trainer.devices}, ${trainer.num_nodes}}
+    cache_path: ${data.cache_path}
+    num_conformers: ${data.num_conformers}
+    split_val: ${data.split_val}
+    chunk_size: ${data.chunk_size}
+    samples_per_complex: ${data.samples_per_complex}
+    balance: ${data.balance}
+    rmsd_classification_cutoff: ${data.rmsd_classification_cutoff}
+    use_original_model_cache: ${data.use_original_model_cache}
+    cache_creation_id: ${data.cache_creation_id}
+    cache_ids_to_combine: ${data.cache_ids_to_combine}
+    score_model_name: ${data.score_model_name}
+  test_ds:
+    micro_batch_size: ${model.micro_batch_size}
+    pin_memory: ${data.pin_memory}
+    seed: ${seed}
+    no_torsion: ${model.diffusion.no_torsion}
+    all_atoms: ${data.all_atoms}
+    data_dir: ${data.data_dir}
+    limit_complexes: ${data.limit_complexes}
+    receptor_radius: ${data.receptor_radius}
+    c_alpha_max_neighbors: ${data.c_alpha_max_neighbors}
+    remove_hs: ${data.remove_hs}
+    max_lig_size: ${data.max_lig_size}
+    matching_popsize: ${data.matching_popsize}
+    matching_maxiter: ${data.matching_maxiter}
+    num_workers: ${data.num_workers}
+    atom_radius: ${data.atom_radius}
+    atom_max_neighbors: ${data.atom_max_neighbors}
+    esm_embeddings_path: ${data.esm_embeddings_path}
+    world_size: ${multiply:${trainer.devices}, ${trainer.num_nodes}}
+    cache_path: ${data.cache_path}
+    num_conformers: ${data.num_conformers}
+    split_test: ${data.split_test}
+    chunk_size: ${data.chunk_size}
+    samples_per_complex: ${data.samples_per_complex}
+    balance: ${data.balance}
+    rmsd_classification_cutoff: ${data.rmsd_classification_cutoff}
+    use_original_model_cache: ${data.use_original_model_cache}
+    cache_creation_id: ${data.cache_creation_id}
+    cache_ids_to_combine: ${data.cache_ids_to_combine}
+    score_model_name: ${data.score_model_name}
+exp_manager:
+  name: ${name}
+  resume_if_exists: true
+  resume_ignore_no_checkpoint: true
+  create_checkpoint_callback: true
+  checkpoint_callback_params:
+    save_top_k: 3
+    monitor: val_loss
+    mode: min
+    save_last: true
+    always_save_nemo: true
+    filename: ${name}-${model.name}-{val_loss:.4f}-{train_loss:.4f}-{step}
+  ema:
+    enable: true
+    decay: 0.999
+    cpu_offload: false
+    every_n_steps: 1
+    validate_original_weights: false
+  exp_dir: ${oc.env:BIONEMO_HOME}/test_results/${name}
+  explicit_log_dir: ${.exp_dir}
+  create_wandb_logger: false
+  create_tensorboard_logger: false
+  wandb_logger_kwargs:
+    project: diffdock_confidence_model
+    name: ${model.name}_training
+    group: ${model.name}
+    job_type: Localhost_nodes_${trainer.num_nodes}_gpus_${trainer.devices}
+    notes: 'date: ${now:%y%m%d-%H%M%S}'
+    tags:
+    - ${name}
+    - ${model.name}
+nsys_profile:
+  enabled: false
+  start_step: 0
+  end_step: 0
+  ranks:
+  - 0
+  gen_shape: false

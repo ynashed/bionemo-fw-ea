@@ -12,8 +12,7 @@ from bionemo.data import Zinc15Preprocess
 from bionemo.utils.tests import get_directory_hash
 
 
-os.environ['PROJECT_MOUNT'] = os.environ.get('PROJECT_MOUNT', '/workspace/bionemo')
-TEST_DATA_DIR = os.path.join(os.environ['PROJECT_MOUNT'], 'examples/tests/test_data/molecule/zinc15')
+TEST_DATA_DIR = os.path.join(os.environ['BIONEMO_HOME'], 'examples/tests/test_data/molecule/zinc15')
 ROOT_DIR = 'zinc15'
 CONFIG = {
     'max_smiles_length': 512,

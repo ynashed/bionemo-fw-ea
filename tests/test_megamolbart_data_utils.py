@@ -14,14 +14,13 @@ from bionemo.model.utils import initialize_distributed_parallel_state
 from tests.test_megamolbart_inference import get_cfg
 
 
-os.environ["PROJECT_MOUNT"] = os.environ.get("PROJECT_MOUNT", '/workspace/bionemo')
-
-PREPEND_DIR = "../examples/tests/"
+BIONEMO_HOME = os.getenv("BIONEMO_HOME")
+PREPEND_DIR = "../examples/tests/"  # Hydra config paths must be relative
 CONFIG_PATH = os.path.join(PREPEND_DIR, 'conf')
-PREPEND_CONFIG_DIR = '../examples/molecule/megamolbart/conf'
+PREPEND_CONFIG_DIR = os.path.join(BIONEMO_HOME, 'examples/molecule/megamolbart/conf')
 
-TOKENIZER_MODEL = '/tokenizers/molecule/megamolbart/vocab/megamolbart.model'
-TOKENIZER_VOCAB = '/tokenizers/molecule/megamolbart/vocab/megamolbart.vocab'
+TOKENIZER_MODEL = os.path.join(BIONEMO_HOME, 'tokenizers/molecule/megamolbart/vocab/megamolbart.model')
+TOKENIZER_VOCAB = os.path.join(BIONEMO_HOME, 'tokenizers/molecule/megamolbart/vocab/megamolbart.vocab')
 SEQ_LEN = 512
 SEED = 42
 

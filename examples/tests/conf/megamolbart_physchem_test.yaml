@@ -3,7 +3,7 @@ defaults:
   - pretrain_small_span_aug
 do_training: True # set to false if data preprocessing steps must be completed
 do_testing: True # set to true to run evaluation on test data after training, requires test_dataset section
-restore_from_path: /model/molecule/megamolbart/megamolbart.nemo
+restore_from_path: ${oc.env:BIONEMO_HOME}/models/molecule/megamolbart/megamolbart.nemo
 target: bionemo.model.molecule.megamolbart.MegaMolBARTModel
 infer_target: bionemo.model.molecule.megamolbart.infer.MegaMolBARTInference
 
@@ -42,8 +42,8 @@ model:
 
   data:
     # Preprocessing data params
-    links_file: ${oc.env:PROJECT_MOUNT}/examples/molecule/megamolbart/dataset/PhysChem-downloader.txt
-    dataset_path: ${oc.env:PROJECT_MOUNT}/examples/tests/test_data/molecule/physchem/${model.data.task_name}
+    links_file: ${oc.env:BIONEMO_HOME}/examples/molecule/megamolbart/dataset/PhysChem-downloader.txt
+    dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/physchem/${model.data.task_name}
     split_data: True
     val_frac: 0.15 # proportion of samples used for validation set
     test_frac: 0.15 # proportion of samples used for test set

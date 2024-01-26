@@ -30,6 +30,7 @@ coverage.xml
 **/*.idx.npy
 **/*.idx.info
 **/*_indexmap_*.npy
+**/openfold_data
 
 # experiments artifacts
 **/nemo_experiments/
@@ -42,7 +43,7 @@ coverage.xml
 **/lightning_logs
 **/*.npy
 
-# internal
+# internal bionemo development: not for public release
 .gitlab-ci.yaml
 
 # configs

@@ -62,7 +62,7 @@ UPDATE_EXPECTED_CFG=1 pytest examples/tests/test_model_pretrain_and_downstream.p
 ## Stages of the gitlab CI pipeline during Merge Requests
 The MR pipeline must be completed successfully if MR is to be merged. The subsequent stages are outlined in  `.gitlab-ci.yml` file:
 1) `build` - builds a pipeline-specific docker image which can be found in the [Container Registry](https://gitlab-master.nvidia.com/clara-discovery/bionemo/container_registry) searching for `pipeline-<GITLAB-PIPELINE_ID>` and `pipeline-<GITLAB-PIPELINE_ID>-devel`
-2) `download` - the checkpoints of the models listed in `artifact_paths` are downloaded by `download_models.sh`
+2) `download` - the checkpoints of the models listed in `artifact_paths.yaml` are downloaded by `download_models.py`
 3) `test` - CPU-specific and GPU-specific unit tests are run using `pytest`, excluding `pytest examples/tests/test_model_pretrain_and_downstream.py -k test_model_training`
 4) `jet` - comprehensive performance and convergence tests of BioNeMo models that are run and managed by [JET](https://jet.nvidia.com/docs), this step can be omitted if a MR is eligible for NOT running it (see below). More information on JET in `internal/README.md`
 
@@ -72,12 +72,12 @@ Before MR is ready to be merged, all CI pipelines must be completed and successf
 
 ## Type of changes to the codebase that can be merged WITHOUT BioNeMo CI or `jet` stage being triggered
 One stage of a pipeline is called `jet` and triggers comprehensive performance and convergence tests of BioNeMo models in [JET](https://jet.nvidia.com/docs). The tests are more comprehensive than the tests invoked by `pytest examples/tests/test_model_pretrain_and_downstream.py -k test_model_training`.
-This stage is resources- and time-consuming and can be **OMITTED** for some changes to the codebase by `JET_NOT_REQUIRED` label as one of MR's labels. 
+This stage is resources- and time-consuming and can be **OMITTED** for some changes to the codebase by `JET_NOT_REQUIRED` label as one of MR's labels.
 Also, some changes to the codebase do not require to run time-consuming BioNeMo CI and can use `SKIP_CI` label.
 
 The changes to the codebase that are eligible for using `SKIP_CI` label are:
 * changes to the files with extension `.md` or `.ipynb`
-* changes under folders `docs`, `LICENSE`, 
+* changes under folders `docs`, `LICENSE`,
 * changes to the files with extension `.sh` under `examples/**/scripts/*.sh` related to training scripts of models
 * updating files with extensions different than `*.sh`, `*.py`, `*.yaml`, `*.yml`,  `Dockerfile*` or `requirements.txt` that **DO NOT** affect model checkpoints or data download, docker building, unit tests and model performance or convergence
 
@@ -88,7 +88,7 @@ The changes to the codebase that are eligible for using `JET_NOT_REQUIRE` label 
 * changes to `Dockerfile` or `requirements.txt` that **DO NOT** affect model performance or convergence. Changes that **REQUIRE** `jet` stage are, for instance, python package update or a NeMo container version update.
 * updating files with extensions different that `*.py`, `*.yaml`, `*.yml`,  `Dockerfile` or `requirements.txt` that **DO NOT** affect model performance or convergence
 
-As a final remark, most of the changes to files with extensions `*.py`, `*.yaml`, `*.yml`,  `Dockerfile*` or `requirements.txt` DO REQUIRE both BioNeMo CI and `jet` stage to be run, should be carefully tested and ARE NOT eligible to use `SKIP_CI` or `JET_NOT_REQUIRE` label as they affect model performance or convergence. 
+As a final remark, most of the changes to files with extensions `*.py`, `*.yaml`, `*.yml`,  `Dockerfile*` or `requirements.txt` DO REQUIRE both BioNeMo CI and `jet` stage to be run, should be carefully tested and ARE NOT eligible to use `SKIP_CI` or `JET_NOT_REQUIRE` label as they affect model performance or convergence.
 
 # General principles
 1. **User-oriented**: make it easy for end users, even at the cost of writing more code in the background

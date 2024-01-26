@@ -1,0 +1,48 @@
+defaults:
+  - score_infer # you can override with adding flags to score_infer, refer to this default yaml file
+
+protein_ligand_csv: null # Path to a .csv file specifying the input as described in the README. If this is not None, it will be used instead of the --protein_path and --ligand parameters
+complex_name: 5s8i # Name that the complex will be saved with
+protein_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/5s8i/5s8i_protein.pdb # Path to the protein .pdb file
+protein_sequence: null # Sequence of the protein for ESMFold, this is ignored if --protein_path is not None
+ligand_description: CNC(=O)c1c2c(cs1)OCCO2 # Either a SMILES string or the path to a molecule file that rdkit can read
+out_dir: ${oc.env:BIONEMO_HOME}/results/nemo_experiments/user_inference # Directory where the outputs will be written to
+
+seed: null
+samples_per_complex: 40
+save_visualisation: false
+
+denoising_actual_steps: 18
+denoising_inference_steps: 20
+
+amp: false
+no_random: false
+micro_batch_size: 10
+no_final_step_noise: true
+ode: false
+
+###############################################################################################################
+# confidence model config, used to load the model from checkpoint
+###############################################################################################################
+confidence_infer:
+  use_original_model_cache: false # If this is true, the same dataset as in the original model will be used. Otherwise, the dataset parameters are used
+  transfer_weights: false
+  rmsd_classification_cutoff:
+    - 2.0
+  restore_from_path: ${oc.env:BIONEMO_HOME}/models/molecule/diffdock/diffdock_confidence.nemo # used when starting from a .nemo file
+  target: bionemo.model.molecule.diffdock.models.nemo_model.DiffdockTensorProductScoreModelAllAtom  # path to model class to load
+  infer_target: bionemo.model.molecule.diffdock.infer.DiffDockModelInference # path to inferende class to load
+  load_from_checkpoint: null
+
+  data:
+    receptor_radius: 15
+    c_alpha_max_neighbors: 24
+    atom_radius: 5.0
+    all_atoms: true
+    remove_hs: true
+    atom_max_neighbors: 8
+
+  trainer:
+    devices: 1
+    num_nodes: 1
+    precision: 32 # bf16 # To activate AMP set to 16 or 'bf16'; otherwise will be float32

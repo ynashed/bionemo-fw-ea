@@ -1,40 +1,40 @@
 # Quickstart Guide
 
-The purpose of this quickstart is to make users familiar with the different components, features and functionalities of the BioNeMo framework. It outlines how to access various resources related to BioNeMo, what is provided inside the BioNeMo container, and how a user can adapt different parts of BioNeMo for their intended use case. 
+The purpose of this quickstart is to make users familiar with the different components, features and functionalities of the BioNeMo framework. It outlines how to access various resources related to BioNeMo, what is provided inside the BioNeMo container, and how a user can adapt different parts of BioNeMo for their intended use case.
 
-The former part of this guide contains information about 
+The former part of this guide contains information about
 - configuring BioNeMo for data processing
 - training of BioNeMo models
 - information about various output files generated
 
-The latter section includes documentation relevant to code development with BioNeMo. 
-  
+The latter section includes documentation relevant to code development with BioNeMo.
+
 If you’re new to BioNeMo, the best way to get started is to take a look at the following [tutorials](./tutorials-fw.md):
 
 - [Custom dataset pre-processing](./notebooks/custom-dataset-preprocessing-fw.ipynb)
-- [BioNeMo LLM training](./notebooks/model_training_esm1nv.ipynb) 
-- [Fine-tuning](./notebooks/bionemo-finetuning-overview.ipynb) 
-- [Inferencing](./notebooks/MMB_GenerativeAI_Inference_with_examples.ipynb) 
+- [BioNeMo LLM training](./notebooks/model_training_esm1nv.ipynb)
+- [Fine-tuning](./notebooks/bionemo-finetuning-overview.ipynb)
+- [Inferencing](./notebooks/MMB_GenerativeAI_Inference_with_examples.ipynb)
 
-Finally, some advanced steps related to using BioNeMo on NVIDIA's Base Command Platform (BCP) are also provided. Refer to [Running BCP jobs](./bcp-specific-commands-fw.md). 
+Finally, some advanced steps related to using BioNeMo on NVIDIA's Base Command Platform (BCP) are also provided. Refer to [Running BCP jobs](./bcp-specific-commands-fw.md).
 
 
 ## Setup
-### Accessing BioNeMo Framework 
+### Accessing BioNeMo Framework
 
 To get the access to BioNeMo, visit the {{bionemo_info_url}}.
 
 ### NGC Setup
 
-NVIDIA NGC is the cloud platform offering fully managed services for AI solutions. Learn more about [NGC here](https://docs.nvidia.com/ngc/gpu-cloud/ngc-user-guide/index.html). 
+NVIDIA NGC is the cloud platform offering fully managed services for AI solutions. Learn more about [NGC here](https://docs.nvidia.com/ngc/gpu-cloud/ngc-user-guide/index.html).
 
-A user is required to configure the NGC access to obtain the BioNeMo container, relevant example datasets, pre-trained models, and more. It is also needed for using the NGC compute resources / DGX Cloud for training LLM and performing inference at scale. 
+A user is required to configure the NGC access to obtain the BioNeMo container, relevant example datasets, pre-trained models, and more. It is also needed for using the NGC compute resources / DGX Cloud for training LLM and performing inference at scale.
 
 To configure the NGC cli and setup an API token:
 
 1. Sign into [NGC](https://catalog.ngc.nvidia.com/).
 2. The NGC CLI must be installed on the workstation, and it can be downloaded from [NGC setup](https://ngc.nvidia.com/setup).
-3. An NGC API token can be acquired at the [NGC setup](https://ngc.nvidia.com/setup) page when logged in with NVIDIA credentials. The API key is only displayed once for security, so it should be copied to a safe location. 
+3. An NGC API token can be acquired at the [NGC setup](https://ngc.nvidia.com/setup) page when logged in with NVIDIA credentials. The API key is only displayed once for security, so it should be copied to a safe location.
 4. Follow the instructions provided to [setup NGC Access](https://ngc.nvidia.com/setup/api-key).
 
 
@@ -45,7 +45,7 @@ BioNeMo provides a feature for logging the LLM training progress with Weights an
 ---
 
 :::{note}
-The following sections on [Docker Container Access](./quickstart-fw.md#docker-container-access), and [Code Access](./quickstart-fw.md#code-access) are intended for users who wish to run BioNeMo tasks on a local workstation. For running BioNeMo on DGX-nodes using BCP, please refer to relevant [tutorials](./tutorials-fw.md). 
+The following sections on [Docker Container Access](./quickstart-fw.md#docker-container-access), and [Code Access](./quickstart-fw.md#code-access) are intended for users who wish to run BioNeMo tasks on a local workstation. For running BioNeMo on DGX-nodes using BCP, please refer to relevant [tutorials](./tutorials-fw.md).
 :::
 
 
@@ -59,7 +59,7 @@ Username: $oauthtoken
 Password <insert NGC API token here>
 ```
 
-Details related to the BioNeMo container addreess on NGC, organization ID, Team, (and ACE in case of DGX-Cloud) will be provided to the users in NGC invitation e-mail. To pull the container, execute the following, where  `{deploy_ngc_org}` and `{deploy_ngc_team}` should be updated with the correct NGC org and team names, respectively: 
+Details related to the BioNeMo container addreess on NGC, organization ID, Team, (and ACE in case of DGX-Cloud) will be provided to the users in NGC invitation e-mail. To pull the container, execute the following, where  `{deploy_ngc_org}` and `{deploy_ngc_team}` should be updated with the correct NGC org and team names, respectively:
 
 ```bash
 docker pull {deploy_ngc_registry}/{deploy_ngc_org_team}/{deploy_container_name}:{deploy_container_tag}
@@ -69,14 +69,14 @@ Alternatively (recommended approach), once the `launch.sh` script is configured 
 
 ### Code Access
 
-BioNeMo code is provided inside the container. The following bash script will launch the docker container and copy the code directory from the container to a workstation path:
+BioNeMo code is provided inside the container. The code is located `/workspace/bionemo`, and this path is stored in the environment variable `$BIONEMO_HOME`. In general, all tests and configuration files rely on the `$BIONEMO_HOME`, and this variable will be referenced inside yaml configuration files as `${oc.env:BIONEMO_HOME}`. If there are issues with paths in configuration files it's prudent to check that this variable's value is set correctly. The following bash script will launch the docker container and copy the code directory from the container to a workstation path:
 
 ```bash
 CONTAINER="{deploy_ngc_registry}/{deploy_ngc_org_team}/{deploy_container_name}:{deploy_container_tag}"
 DEST_PATH="."
 CONTAINER_NAME=bionemo
 docker run --name $CONTAINER_NAME -itd --rm $CONTAINER bash
-docker cp $CONTAINER_NAME:/opt/nvidia/bionemo $DEST_PATH
+docker cp $CONTAINER_NAME:/workspace/bionemo $DEST_PATH
 docker kill $CONTAINER_NAME
 ```
 
@@ -86,9 +86,9 @@ If the user has access to the BioNeMo code and needs to download and run the con
 
 The launch script requires a settings file called `.env`, which will be automatically created in the project directory if it does not exist on first launch. If created manually, it should be named `.env` and placed inside the repo directory on the workstation. All of the variables are described in the `usage` section of the launch script.
 
-Some of the variables are required to be updated according to the BioNeMo framework and compute access. `BIONEMO_IMAGE` is required, and should point to the BioNeMo container address on NGC. Some of the `.env` variables are optional, for example, `WANDB_API_KEY` is only required if the logging is monitored using Weights and Biases (WandB). Similarly, `NGC_CLI_TEAM` is optional and can be omitted if it does not exist. In contrast, `NGC_CLI_API_KEY` is essential for downloading the BioNeMo container image, pre-trained model weights, relevant datasets, and using NGC DGX-cloud compute resources. A list of variables are provided in the table here.  
+Some of the variables are required to be updated according to the BioNeMo framework and compute access. `BIONEMO_IMAGE` is required, and should point to the BioNeMo container address on NGC. Some of the `.env` variables are optional, for example, `WANDB_API_KEY` is only required if the logging is monitored using Weights and Biases (WandB). Similarly, `NGC_CLI_TEAM` is optional and can be omitted if it does not exist. In contrast, `NGC_CLI_API_KEY` is essential for downloading the BioNeMo container image, pre-trained model weights, relevant datasets, and using NGC DGX-cloud compute resources. A list of variables are provided in the table here.
 
-Please reach out to NVIDIA if you do not know the appropriate values to set for these variables, for your company.   
+Please reach out to NVIDIA if you do not know the appropriate values to set for these variables, for your company.
 
 | Variable      | Description |
 | ----------- | ----------- |
@@ -96,20 +96,22 @@ Please reach out to NVIDIA if you do not know the appropriate values to set for 
 |  `NGC_CLI_API_KEY`     | Required to access BioNeMo resources, obtain container, etc.    |
 |  `NGC_CLI_ORG`  | Required to access ORG specific resources, including containers.       |
 |  `NGC_CLI_TEAM`  | Required for team specific resource logistics |
-|  `ACE_VALUE`     | Required for ACE specific compute resource allocations   |
 |  `WANDB_API_KEY`  | Optional, to enable monitoring via Weights and Biases       |
 
-In the sample configuration below, update `{deploy_ngc_org}` and `{deploy_ngc_team}` with the correct NGC org and team name, respectively.  
+In the sample configuration below, update `{deploy_ngc_org}` and `{deploy_ngc_team}` with the correct NGC org and team name, respectively.
 
 ```bash
 BIONEMO_IMAGE={deploy_ngc_registry}/{deploy_ngc_org_team}/{deploy_container_name}:{deploy_container_tag}               # Container with tag
-BIONEMO_PATH=/workspace/bionemo                                          # Location of code to be used /workspace/bionemo or /opt/nvidia/bionemo
-PROJECT_PATH=$(pwd)                                                      # Path of env config and optional development code
-DATA_PATH=${HOME}/data                                                   # Local path to save downloaded and processed data
-RESULT_PATH=${HOME}/result/bionemo_experiments                           # Path for training results
+LOCAL_REPO_PATH=$(pwd) # This needs to be set to BIONEMO_HOME for local (non-dockerized) use
+DOCKER_REPO_PATH=/workspace/bionemo # This is set to BIONEMO_HOME in container
+LOCAL_RESULTS_PATH=$(pwd)/results
+DOCKER_RESULTS_PATH=/workspace/bionemo/results
+LOCAL_DATA_PATH=$(pwd)/data
+DOCKER_DATA_PATH=/workspace/bionemo/data
+LOCAL_MODELS_PATH=$(pwd)/models
+DOCKER_MODELS_PATH=/workspace/bionemo/models
 WANDB_API_KEY=<Insert WANDB API KEY>                                     # WandB logging requires API key configuration
 JUPYTER_PORT=8888                                                        # Jupyter port for inference notebooks
-PROJECT_MOUNT=/workspace/bionemo                                         # Location of library in container /workspace/bionemo for dev work or /opt/nvidia/bionemo for non-dev use                                      
 REGISTRY={deploy_ngc_registry}                                                         # Only required for registry login
 REGISTRY_USER='$oauthtoken'                                              # Only required for registry login
 NGC_CLI_API_KEY=$(grep -m 1 apikey ~/.ngc/config | head -n 1 | cut -d' ' -f3) # Requires NGC cli configuration
@@ -118,7 +120,7 @@ NGC_CLI_TEAM={deploy_ngc_team}
 NGC_CLI_FORMAT_TYPE=ascii
 ```
 
-In order to prevent downloading and processing of data each time a new container is launched, be sure to set a valid path for `DATA_PATH` in the `.env` file. This directory will be mounted inside the container at `/data`. Once a container has been pulled and the `.env` file has been setup, the container can be started in interactive development mode with `./launch.sh dev`.  
+In order to prevent downloading and processing of data each time a new container is launched, be sure to set a valid path for `LOCAL_DATA_PATH` in the `.env` file. This directory will be mounted inside the container at `DOCKER_DATA_PATH` (`/workspace/bionemo/data` by default). Once a container has been pulled and the `.env` file has been setup, the container can be started in interactive development mode with `./launch.sh dev`.
 
 ## Training Configuration
 
@@ -179,7 +181,7 @@ bash pretrain_quick.sh \
 train
 ```
 
-For more advanced customization, the shell script can be modified with additional training arguments. 
+For more advanced customization, the shell script can be modified with additional training arguments.
 
 ### Pre-Processing ZINC15 Data
 
@@ -212,13 +214,16 @@ NeMo can also create a `*.nemo` checkpoint which has the optimizer states remove
 
 BioNeMo supports optional logging with Tensorboard and Weights and Biases. Tensorboard logging will create the standard `events.out.tfevents.....` file, while Weights and Biases logs are stored in a directory called `wandb`. Weights and Biases logging can be done offline if cluster restrictions do not allow upload of files during training. To enable offline logging and upload the contents after training, follow the directions for [offline sync](https://docs.wandb.ai/guides/technical-faq/setup#can-i-run-wandb-offline).
 
-## Inference 
+## Inference
 
-Trained BioNeMo models are provided on NGC for use. These models can be loaded with a gRPC interface provided in BioNeMo. Example notebooks are provided in the corresponding `nbs` directory in `examples`, for example, `examples/molecule/megamolbart/nbs`. 
+Trained BioNeMo models are provided on NGC for use. These models can be loaded with a Triton gRPC interface provided by BioNeMo. Example notebooks are provided in the corresponding `nbs` directory in `examples`, for example, `examples/molecule/megamolbart/nbs`.
 
-If a local copy of the code exists on the workstation, download the pre-trained models with `./launch.sh download`. Alternatively, the models can be downloaded inside the container by running `source download_models.sh && download_bionemo_models`. Model weights downloaded from NGC will require an [NGC API key](https://docs.nvidia.com/ngc/ngc-overview/index.html#generating-api-key) to be configured.
+The `bionemo.triton.inference_wrapper` module's `__main__` program starts this inference server. For convience, you may use the [`setup/startup.sh`](../../setup/startup.sh) script to start both
+this and a Jupyer Lab server that points to the model's inference notebook(s).
 
-To launch the gRPC interface and a Jupyter notebook service in the corresponding directory, ensure that `JUPYTER_PORT` is set correctly in the `.env` file, then run `./launch.sh dev -c <model_name>`, where `<model_name>` is one of the following: `megamolbart`, `prott5nv`, `esm-1nv`. Then open a browser at `http://<<HOST_NAME>>:$JUPYTER_PORT` to execute the notebook.
+If a local copy of the code exists on the workstation, download the pre-trained models with `./launch.sh download`. Alternatively, the models can be downloaded inside the container by running `python download_models.py all --download_dir .`. Model weights downloaded from NGC will require an [NGC API key](https://docs.nvidia.com/ngc/ngc-overview/index.html#generating-api-key) to be configured.
+
+To launch the inference server and a Jupyter notebook service in the corresponding directory, ensure that `JUPYTER_PORT` is set correctly in the `.env` file, then run `./launch.sh dev -c <model_name>`, where `<model_name>` is one of the following: `megamolbart`, `prott5nv`, `esm-1nv`, or `esm-2nv`. Then open a browser at `http://<<HOST_NAME>>:$JUPYTER_PORT` to execute the notebook. NOTE: If `JUPYER_PORT` is not set, it will default to `8888`.
 
 ## Code Development Setup
 ### Code Organization
@@ -234,7 +239,7 @@ The BioNeMo repo is organized by biological entity (`molecule`, `protein`) and b
 
 ### Mounting Code in a Container
 
-It is possible to mount an alternative version of BioNeMo code inside the container for development purposes. This requires setting `PROJECT_PATH` in the `.env` file to the path of the code to be mounted, and then launching the container in interactive development mode with `./launch.sh dev`. Inside the container, the `PROJECT_PATH` environment variable will be defined and set to the container path (`/workspace/bionemo`). 
+It is possible to mount an alternative version of BioNeMo code inside the container for development purposes. This requires setting `DOCKER_REPO_PATH` variable in the `.env` file and then launching the container in interactive development mode with `./launch.sh dev`. Inside the container, the `BIONEMO_HOME` environment variable will be defined and set to the mounted repo path. By default, the `launch.sh` script will set `DOCKER_REPO_PATH` to `/workspace/bionemo`, which will overwrite the pre-shipped code inside the container (which is also located at `/workspace/bionemo`).
 
 It may also be necessary to recompile the Megatron helpers, which can be done with the script `setup/recompile_megatron_helper.sh`. This recompilation should also be done immediately before training starts on clusters as a best practice.
 

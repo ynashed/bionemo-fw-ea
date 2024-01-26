@@ -11,7 +11,7 @@ defaults:
 
 name: MegaMolBARTRetro_uspto50k
 # model architecture compatible with MegaMolBart model downloaded by executing ./launch.sh download
-restore_from_path: /model/molecule/megamolbart/megamolbart.nemo # set to null to start from randomly initialize weights
+restore_from_path: ${oc.env:BIONEMO_HOME}/models/molecule/megamolbart/megamolbart.nemo # set to null to start from randomly initialize weights
 
 trainer:
   num_nodes: 1
@@ -37,7 +37,7 @@ model:
     # https://az.app.box.com/s/7eci3nd9vy0xplqniitpk02rbg9q2zcq/file/854847820319#:~:text=by%20Ross%20Irwin-,Download,-Sign%20up
     ngc_registry_target: uspto_50k_dataset
     ngc_registry_version: v23.06
-    dataset_path: /data/uspto_50k_dataset # TODO how to determine this
+    dataset_path: ${oc.env:BIONEMO_HOME}/data/uspto_50k_dataset # TODO how to determine this
     index_mapping_dir: null
 
     data_impl: "csv_fields_mmap"

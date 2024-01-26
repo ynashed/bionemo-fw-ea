@@ -1,0 +1,6 @@
+cache/
+__pycache__/
+.vscode/
+DIPS/data/DIPS/interim/pairs-pruned/??/
+DIPS/src/*
+checkpts/EQUIDOCK*

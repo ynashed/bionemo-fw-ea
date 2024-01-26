@@ -24,7 +24,7 @@ trainer:
 
 exp_manager:
   name: ${name}
-  exp_dir: /result/nemo_experiments/${.name}/${.wandb_logger_kwargs.name}
+  exp_dir: ${oc.env:BIONEMO_HOME}/results/nemo_experiments/${.name}/${.wandb_logger_kwargs.name}
   explicit_log_dir: ${.exp_dir}
   create_wandb_logger: True 
   create_tensorboard_logger: True
@@ -104,8 +104,8 @@ model:
   tokenizer:
     library: 'sentencepiece'
     type: null
-    model: /tokenizers/protein/prott5nv/vocab/protein_sequence_sentencepiece.model
-    vocab_file: /tokenizers/protein/prott5nv/vocab/protein_sequence_sentencepiece.vocab
+    model: ${oc.env:BIONEMO_HOME}/tokenizers/protein/prott5nv/vocab/protein_sequence_sentencepiece.model
+    vocab_file: ${oc.env:BIONEMO_HOME}/tokenizers/protein/prott5nv/vocab/protein_sequence_sentencepiece.vocab
     merge_file: null
     num_sentinel_tokens: 96 # number of sentinel tokens in T5 model, must be greater or equal to (seq_length * masked_lm_prob)
 
@@ -129,7 +129,7 @@ model:
     # Path to data must be specified by the user.
     ngc_registry_target: uniref50_2022_05
     ngc_registry_version: v23.06
-    dataset_path: /data/uniref2022_05 # parent directory for data, contains train / val / test folders
+    dataset_path: ${oc.env:BIONEMO_HOME}/data/uniref2022_05 # parent directory for data, contains train / val / test folders
     dataset: # inclusive range of data files to load or can load a single file (e.g. x000.csv). See data_impl for default file extentions
       train: x000
       test: x000
@@ -180,7 +180,7 @@ model:
   dwnstr_task_validation:
     enabled: False
     dataset:
-      class: PerTokenPredictionCallback
+      class: bionemo.model.core.dwnstr_task_callbacks.PerTokenPredictionCallback
       task_type: token-level-classification
       infer_target: bionemo.model.protein.prott5nv.infer.ProtT5nvInference
       max_seq_length: ${model.seq_length}
@@ -190,7 +190,7 @@ model:
       shuffle: True
       num_workers: 8
       task_name: secondary_structure
-      dataset_path: /data/FLIP/${model.dwnstr_task_validation.dataset.task_name}
+      dataset_path: ${oc.env:BIONEMO_HOME}/data/FLIP/${model.dwnstr_task_validation.dataset.task_name}
       dataset:
         train: x000
         test: x000

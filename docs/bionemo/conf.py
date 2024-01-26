@@ -15,14 +15,10 @@ from docutils import nodes
 from sphinx import search
 
 
-# import sys
-# sys.path.insert(0, os.path.abspath('.'))
-
-
 # -- Project information -----------------------------------------------------
 
 project = 'NVIDIA BioNeMo Framework'
-copyright = '2023 NVIDIA CORPORATION & AFFILIATES. All rights reserved'
+copyright = '2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.'
 author = 'NVIDIA'
 
 # The full version, including alpha/beta/rc tags

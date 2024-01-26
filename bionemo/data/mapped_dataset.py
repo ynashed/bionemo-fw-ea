@@ -1,21 +1,16 @@
-# Copyright (c) 2022, NVIDIA CORPORATION.
-# SPDX-License-Identifier: Apache-2.0
-
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
 
 import os
 import time
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from typing import Dict, Optional
 
 import numpy as np
@@ -51,7 +46,7 @@ class SliceIndex:
         return self.length
 
 
-class MappedDataset(Dataset):
+class MappedDataset(Dataset, ABC):
     def __init__(self, dataset: Dataset, num_samples: Optional[int] = None, consolidate_sample_mapping=True):
         """
         Produces a remapped version of a `Dataset`.

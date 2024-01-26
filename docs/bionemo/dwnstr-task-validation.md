@@ -72,10 +72,13 @@ The ConvNet model architecture consists of 2D convolutional layer with `in_chann
 Validation with a downstream task is implemented in the form of a callback that is called at the end of every validation epoch. Parameters for the callback must be provided in the YAML configuration file. The callback is set up and added to the trainer with the following commands at the beginning of the training script:
 
 ```python
-from bionemo.utils.callbacks.callback_utils import setup_callbacks
+
+from bionemo.callbacks import setup_dwnstr_task_validation_callbacks
+
+
 def main(cfg) -> None:
-    callbacks = setup_callbacks(cfg)
-    trainer = setup_trainer(cfg, callbacks=callbacks)
+  callbacks = setup_dwnstr_task_validation_callbacks(cfg)
+  trainer = setup_trainer(cfg, callbacks=callbacks)
 ```
 
 Downstream task validation is defined in the `model.dwnstr_task_validation` section of the YAML configuration file. The parameter `model.dwnstr_task_validation.enabled` can be set to `True` to enable the feature, or to `False ` to disable it:
@@ -92,7 +95,7 @@ If downstream task validation is enabled, a set of parameters must be specified 
 
 ### Universal Parameters
 
-* `class` defines a type of callback. Available options are: `SingleValuePredictionCallback` for sequence-level classification or regression and `PerTokenPredictionCallback` for token-level classification.
+* `class` defines a type of callback. Available options are: `bionemo.model.core.dwnstr_task_callbacks.SingleValuePredictionCallback` for sequence-level classification or regression and `bionemo.model.core.dwnstr_task_callbacks.PerTokenPredictionCallback` for token-level classification.
 
 * `task_type` defines a type of downstream task. Available options are `classification` or `regression`. `PerTokenPredictionCallback` supports only `classification`.
 
@@ -125,7 +128,7 @@ If downstream task validation is enabled, a set of parameters must be specified 
 
 * `num_classes` defines the number of class labels in the target and must be provided only in case of `task_type: classification` in the `SingleValuePredictionCallback`.
 
-An example of `SingleValuePredictionCallback` can be found in `/workspace/bionemo/examples/molecule/megamolbart/conf/pretrain_xsmall_span_aug.yaml`.
+An example of `SingleValuePredictionCallback` can be found in `/workspace/bionemo/examples/molecule/megamolbart/conf/pretrain_base.yaml`.
 
 ### `PerTokenPredictionCallback` Parameters
 

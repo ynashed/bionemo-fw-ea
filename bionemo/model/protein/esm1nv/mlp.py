@@ -1,3 +1,18 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+#
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
+
+# Copyright (c) Meta Platforms, Inc. and affiliates.
+#
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+
 import torch
 import torch.nn.functional as F
 from nemo.collections.nlp.modules.common.megatron.adapters.parallel_adapters import (
@@ -39,6 +54,7 @@ except (ImportError, ModuleNotFoundError):
 import math
 
 from nemo.collections.nlp.modules.common.megatron.mlp import ParallelMLP
+from nemo.utils import logging
 
 from bionemo.model.protein.esm1nv.layernorm import esm_get_layer_norm
 
@@ -80,6 +96,7 @@ class ESMnvParallelMLP(ParallelMLP):
         use_pt_mlp_out=False,
         # END BIONEMO
     ):
+        # TODO(srabhi, georgea): refactor the custom ESMnvParallelMLP module using Megatron Core when NeMo 1.21 is available
         super(ParallelMLP, self).__init__()
         self.activation = activation
         self.bias = bias
@@ -179,6 +196,7 @@ class ESMnvParallelMLP(ParallelMLP):
             self.activation_func = openai_gelu_func
         # BIONEMO allow esm gelu
         elif esm_gelu:
+            logging.warning("Using custom ESM2 GELU function instead of the default NeMo version")
             self.activation_func = esm_gelu_func
         elif activation in ["gelu", "geglu", "fast-geglu"]:
             self.activation_func = F.gelu
@@ -194,6 +212,9 @@ class ESMnvParallelMLP(ParallelMLP):
 
         # Project back to h.
         if use_pt_mlp_out:
+            logging.warning(
+                "Using PyTorch Linear instead of the default NeMo RowParallelLinear for `dense_4h_to_h` module"
+            )
             self.dense_4h_to_h = torch.nn.Linear(ffn_hidden_size, hidden_size, bias=bias, dtype=dtype)
         else:
             self.dense_4h_to_h = tensor_parallel.RowParallelLinear(

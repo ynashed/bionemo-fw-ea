@@ -15,6 +15,7 @@ In both types of tutorials, it is convenient to first launch the BioNeMo Framewo
 | Model Pre-Training | [Launching a MegaMolBART model pre-training with ZINC-15 dataset](./notebooks/model_training_mmb.ipynb) |
 | Model Pre-Training | [Launching an ESM-1nv model pre-training with UniRef50 dataset](./notebooks/model_training_esm1nv.ipynb) |
 | Model Pre-Training | [Launching an ESM-2nv model pre-training with curated data from UniRef50, UniRef90](./notebooks/model_training_esm2nv.ipynb) |
+| Model Training     | [Launching an EquiDock model pre-training with DIPS or DB5 datasets](./notebooks/model_training_equidock.ipynb)|
 | Inference          | [Performing Inference with MegaMolBART for Generative Chemistry and Predictive Modeling with RAPIDS](./notebooks/MMB_GenerativeAI_Inference_with_examples.ipynb) |
 | Inference          | [Performing Inference with ESM1-nv and Predictive Modeling with RAPIDS](./notebooks/protein-esm1nv-clustering.ipynb) |
 | Inference          | [Performing Inference with ESM2-nv and Predictive Modeling with RAPIDS](./notebooks/protein-esm2nv-clustering.ipynb) |

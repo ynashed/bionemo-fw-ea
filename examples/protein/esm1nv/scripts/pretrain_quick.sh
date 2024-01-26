@@ -1,19 +1,14 @@
 #!/bin/bash
 
-# Copyright (c) 2022, NVIDIA CORPORATION.
-# SPDX-License-Identifier: Apache-2.0
-
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
 
 ####
 # Example shell script to run ESM1nv training.
@@ -23,7 +18,7 @@
 CONFIG_FILE=pretrain_small
 PROJECT=ESM1nv
 DATA_MOUNT=/data/uniref2022_05
-PROJECT_MOUNT=/workspace/bionemo # /workspace/bionemo if library mounted or /opt/nvidia/bionemo
+BIONEMO_HOME=/workspace/bionemo # /workspace/bionemo if library mounted or $BIONEMO_HOME
 OUTPUT_MOUNT=/result
 WANDB_OFFLINE=True # set to False to upload to WandB while training, otherwise True
 RESULTS_MOUNT=${OUTPUT_MOUNT}/nemo_experiments/${PROJECT}/${CONFIG_FILE}
@@ -31,10 +26,9 @@ DATA_FILES_SELECTED=x_OP_000..049_CL_  # x000 for a single file for x_OP_000..04
 ### END CONFIG ###
 
 # Don't change these
-BIONEMO_HOME=/opt/nvidia/bionemo # Where BioNeMo is installed in container, set the same as Docker container
-BIONEMO_WORKSPACE=/workspace/bionemo # Location of examples / config files and where BioNeMo code can be mounted for development
+BIONEMO_HOME=/workspace/bionemo # Location of examples / config files and where BioNeMo code can be mounted for development
 RUN_SCRIPT="pretrain.py"
-RUN_SCRIPT_DIRECTORY="${PROJECT_MOUNT}/examples/protein/esm1nv"
+RUN_SCRIPT_DIRECTORY="${BIONEMO_HOME}/examples/protein/esm1nv"
 usage() {
 cat <<EOF
 USAGE: pretrain_quick.sh
@@ -58,7 +52,7 @@ pretrain_quick.sh [command]
         -a|--args
             Additional training arguments to be added, repeat flag for additional arguments
             e.g. --args "++trainer.devices=2" --args "++model.tensor_model_parallel_size=2"
-            
+
 
 EOF
 }
@@ -120,15 +114,6 @@ parse_args() {
 
 
 mkdir -p ${RESULTS_MOUNT}
-export PROJECT_MOUNT=${PROJECT_MOUNT}
-
-if [[ ${PROJECT_MOUNT} != ${BIONEMO_HOME} ]]; then
-    echo "Prepending ${PROJECT_MOUNT} to PYTHONPATH for development"
-    DEV_PYTHONPATH=${PROJECT_MOUNT}
-else
-    DEV_PYTHONPATH=""
-fi
-export PYTHONPATH="${DEV_PYTHONPATH}:${BIONEMO_WORKSPACE}:${BIONEMO_WORKSPACE}/generated:$PYTHONPATH"
 
 export HYDRA_FULL_ERROR=1
 cd ${RUN_SCRIPT_DIRECTORY}

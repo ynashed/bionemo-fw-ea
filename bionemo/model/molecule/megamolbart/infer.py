@@ -1,28 +1,29 @@
-# Copyright (c) 2022, NVIDIA CORPORATION.
-# SPDX-License-Identifier: Apache-2.0
-
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
 
 import logging
-from typing import List, Optional
+from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple, Union
 
 import torch
 
-from bionemo.model.core.infer import BaseEncoderDecoderInference
+from bionemo.model.core.infer import BaseEncoderDecoderInference, SeqsOrBatch
 
 
 log = logging.getLogger(__name__)
-__all__ = ["MegaMolBARTInference"]
+
+__all__: Sequence[str] = (
+    "MegaMolBARTInference",
+    "SamplingMethods",
+)
+
+SamplingMethods = Literal["greedy-perturbate", "topkp-perturbate", "beam-search-perturbate"]
 
 
 class MegaMolBARTInference(BaseEncoderDecoderInference):
@@ -30,7 +31,16 @@ class MegaMolBARTInference(BaseEncoderDecoderInference):
     All inference functions
     '''
 
-    def __init__(self, cfg, model=None, freeze=True, restore_path=None, training=False, adjust_config=True):
+    def __init__(
+        self,
+        cfg,
+        model: Optional[Any] = None,
+        freeze: bool = True,
+        restore_path: Optional[str] = None,
+        training: bool = False,
+        adjust_config: bool = True,
+        interactive: bool = False,
+    ):
         super().__init__(
             cfg=cfg,
             model=model,
@@ -38,9 +48,10 @@ class MegaMolBARTInference(BaseEncoderDecoderInference):
             restore_path=restore_path,
             training=training,
             adjust_config=adjust_config,
+            interactive=interactive,
         )
 
-    def _tokenize(self, sequences: List[str]):
+    def _tokenize(self, sequences: List[str]) -> List[int]:
         """
         ProtT5 expects input/output format:
 
@@ -53,7 +64,7 @@ class MegaMolBARTInference(BaseEncoderDecoderInference):
 
         return token_ids
 
-    def seq_to_hiddens(self, sequences):
+    def seq_to_hiddens(self, sequences) -> Tuple[torch.Tensor, torch.Tensor]:
         '''
         Transforms Sequences into hidden state.
         Should be implemented in a child class, since it is model specific.
@@ -69,11 +80,15 @@ class MegaMolBARTInference(BaseEncoderDecoderInference):
             enc_mask (torch.Tensor, long): boolean mask for padded sections
         '''
         token_ids, enc_mask = self.tokenize(sequences)
-        embedding = self.model.encode(tokens_enc=token_ids, enc_mask=enc_mask)
+        embedding = self.model.encode(
+            tokens_enc=token_ids,
+            enc_mask=enc_mask,
+            reconfigure_microbatch=not self.interactive,
+        )
 
         return embedding, enc_mask
 
-    def hiddens_to_seq(self, hidden_states, enc_mask, **kwargs):
+    def hiddens_to_seq(self, hidden_states, enc_mask, **kwargs) -> SeqsOrBatch:
         '''
         Transforms hidden state into sequences (i.e., sampling in most cases).
         This class should be implemented in a child class, since it is model specific.
@@ -86,18 +101,20 @@ class MegaMolBARTInference(BaseEncoderDecoderInference):
         Returns:
             sequences (list[str]) or list[list[str]]): list of sequences
         '''
+
         predicted_tokens_ids, _ = self.model.decode(
             tokens_enc=None,
             enc_mask=enc_mask,
             num_tokens_to_generate=self.model.cfg.max_position_embeddings,
             enc_output=hidden_states,
+            reconfigure_microbatch=not self.interactive,
             **kwargs,
         )
         sequences = self.detokenize(tokens_ids=predicted_tokens_ids)
         return sequences
 
     @property
-    def default_sampling_kwargs(self):
+    def default_sampling_kwargs(self) -> Dict[SamplingMethods, Dict[str, Any]]:
         """
         Returns a dict of default sampling kwargs per sampling method.
         """
@@ -115,9 +132,9 @@ class MegaMolBARTInference(BaseEncoderDecoderInference):
         self,
         num_samples: Optional[int] = 10,
         return_embedding: bool = False,
-        sampling_method: str = "greedy-perturbate",
+        sampling_method: SamplingMethods = "greedy-perturbate",
         **sampling_kwarg,
-    ):
+    ) -> Union[SeqsOrBatch, Tuple[SeqsOrBatch, torch.Tensor]]:
         """
         Sample from the model given sampling_method.
 
@@ -144,7 +161,7 @@ class MegaMolBARTInference(BaseEncoderDecoderInference):
         ), f'Invalid sampling method {sampling_method}, supported sampling methods are {list(default_sampling_kwarg.keys())}'
 
         smis = sampling_kwarg.pop("smis")
-        if not len(smis):
+        if len(smis) == 0:
             raise ValueError('No SMILES strings provided for sampling via "smis" argument')
 
         hidden_states, enc_masks = self.seq_to_hiddens(smis)
@@ -177,6 +194,9 @@ class MegaMolBARTInference(BaseEncoderDecoderInference):
             samples = self.hiddens_to_seq(
                 perturbed_hiddens, sample_masks, sampling_method="beam-search", sampling_kwargs=sampling_kwarg
             )
+
+        else:
+            raise ValueError(f"Unknown {sampling_method=}, supported {SamplingMethods=}")
 
         if return_embedding:
             embs = self.hiddens_to_embedding(perturbed_hiddens, sample_masks)

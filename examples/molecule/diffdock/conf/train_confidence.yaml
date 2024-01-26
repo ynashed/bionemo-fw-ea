@@ -1,0 +1,288 @@
+defaults:
+  - embedding_preprocess
+  - score_infer # you can override with adding flags to score_infer, refer to this default yaml file
+
+name: ConfidenceModel
+do_embedding_preprocessing: False # prepares PDB files to ESM embeddings needed for training.
+do_preprocessing: False # prepare the complex graphs needed for training as input.
+do_training: True # set to false if data preprocessing steps must be completed
+do_testing: False # set to true to run evaluation on test data after training, requires test_dataset section
+seed: 42
+restore_from_path: null # used when starting from a .nemo file
+cluster_type: None # set to 'BCP' if needed
+
+target: bionemo.model.molecule.diffdock.models.nemo_model.DiffdockTensorProductScoreModelAllAtom  # path to model class to load
+infer_target: bionemo.model.molecule.diffdock.infer.DiffDockModelInference # path to inferende class to load
+
+
+#---------------------- Confidence-Specific Configs
+transfer_weights: false # ???
+#-----------------------
+
+data:
+  score_model_name: ${score_infer.name}
+  num_workers: 24
+  pin_memory: False
+  limit_complexes: 0
+  all_atoms: true
+  multiplicity: 1
+  chain_cutoff: 10
+  receptor_radius: 15
+  c_alpha_max_neighbors: 24
+  atom_radius: 5.0
+  atom_max_neighbors: 8
+  matching_popsize: 20
+  matching_maxiter: 20
+  max_lig_size: null # Maximum number of heavy atoms
+  remove_hs: true
+  num_conformers: 1
+  no_torsion: ${model.diffusion.no_torsion}
+  world_size: ${multiply:${trainer.devices}, ${trainer.num_nodes}}
+  esm_embeddings_path: ${training_data.esm_embeddings_path} # If this is set then the LM embeddings at that path will be used for the receptor features
+  data_dir: ${training_data.protein_data_dir} # Folder containing original structures
+  split_train: ${oc.env:BIONEMO_HOME}/data/splits/split_train # Path of file defining the split.
+  split_val: ${oc.env:BIONEMO_HOME}/data/splits/split_val # Path of file defining the split
+  split_test: ${oc.env:BIONEMO_HOME}/data/splits/split_test # Path of file defining the split
+  cache_path: ${oc.env:BIONEMO_HOME}/data/data_cache # Folder from where to load/restore cached dataset
+  chunk_size: 5 # Number of samples as a chunk given to each process to process each time when preparing the dataset in class ProteinLigandDockingDataset, default is 5
+  use_original_model_cache: false # If this is true, the same dataset as in the original model will be used. Otherwise, the dataset parameters are used
+  cache_ids_to_combine: null # RMSD value below which a prediction is considered a positive. This can also be multiple cutoffs
+  cache_creation_id: null # number of times that inference is run on the full dataset before concatenating it and coming up with the full confidence dataset
+  samples_per_complex: 7
+  balance: false # If this is true than we do not force the samples seen during training to be the same amount of negatives as positives
+  rmsd_prediction: false
+  # rmsd_classification_cutoff: 2.0 # RMSD value below which a prediction is considered a postitive. This can also be multiple cutoffs
+  rmsd_classification_cutoff:
+    - 2.0
+
+
+trainer:
+  devices: 1
+  num_nodes: 1
+  precision: 32 # currently only single precision is supported
+  accelerator: gpu # gpu or cpu
+  max_epochs: 100 # set to null when using max_steps instead with NeMo model
+  max_steps: -1
+  log_every_n_steps: 50 # number of iterations between logging
+  val_check_interval: 1.0 # set to integer when using steps to determine frequency of validation, use fraction with epochs
+  num_sanity_val_steps: 2 # set to 0 or small number to test validation before training
+  limit_val_batches: 200 # number of batches in validation step, use fraction for fraction of data
+  limit_test_batches: 0 # number of batches in test step, use fraction for fraction of data
+  gradient_clip_val: 1.0
+  logger: False # logger is provided by NeMo exp_manager
+  enable_checkpointing: False # checkpointing is done by NeMo exp_manager
+  replace_sampler_ddp: False # set to False if using custom sampler
+  reload_dataloaders_every_n_epochs: 100000 # Set to a non-negative integer to reload dataloaders every n epochs. Default: ``0``.
+  accumulate_grad_batches: 1
+
+
+model:
+  name: ${name}
+  esm_embeddings_path: ${data.esm_embeddings_path}
+  rmsd_classification_cutoff: ${data.rmsd_classification_cutoff}
+  rmsd_prediction: ${data.rmsd_prediction}
+  seed: ${seed}
+  # data parallelism
+  micro_batch_size: 16 # num of graphs per device
+  global_batch_size: null # this will be set automatically by the `setup_trainer(cfg)`
+  resume_from_checkpoint: null # manually set the checkpoint file to load from
+  tensor_model_parallel_size: 1
+  pipeline_model_parallel_size: 1
+  # model architecture
+  confidence_mode: True # False: train score model; True: train confidence model
+  num_conv_layers: 5 # Number of interaction layers
+  max_radius: 5.0 # Radius cutoff for geometric graph
+  scale_by_sigma: true # Whether to normalise the score
+  ns: 24 # Number of hidden features per node of order 0
+  nv: 6 # Number of hidden features per node of order >0
+  distance_embed_dim: 32
+  cross_distance_embed_dim: 32
+  no_batch_norm: false # If set, it removes the batch norm
+  tensor_product:
+    use_second_order_repr: False # Whether to use only up to first order representations or also second
+    type: "e3nn" # choose from ["e3nn" (default), "marta"] NOTE: if use_second_order_repr is True, it must be e3nn at this time
+  cross_max_distance: 80
+  dynamic_max_cross: true
+  dropout: 0.0 # MLP dropout
+  embedding_type: "sinusoidal"
+  sigma_embed_dim: 32
+  embedding_scale: 10000
+  all_atoms: ${data.all_atoms}
+  confidence_no_batchnorm: false
+  confidence_dropout: 0.0 # MLP dropout in confidence readout
+  diffusion:
+    tr_weight: 0.33
+    rot_weight: 0.33
+    tor_weight: 0.33
+    tr_sigma_min: 0.1
+    tr_sigma_max: 34
+    rot_sigma_min: 0.03
+    rot_sigma_max: 1.55
+    tor_sigma_min: 0.0314 # 'Minimum sigma for torsional component'
+    tor_sigma_max: 3.14 # 'Maximum sigma for torsional component'
+    no_torsion: False # 'If set only rigid matching'
+  # model-specific control
+  inference_earlystop_metric: 'loss' # Metric to track for early stopping. Mostly [loss, accuracy, ROC AUC], # main_metric
+  inference_earlystop_goal: 'min' # can be ['min', 'max'] # main_metric_goal
+  find_unused_parameters: True # the model has certain parameters may not be used during training in some batches
+                               # set to True so for multi-gpu training, if unused parameters are found, the gradient Reducer will only wait for unready parameters
+                               # refer to https://pytorch.org/docs/stable/notes/ddp.html for more details.
+
+  optim:
+    name: fused_adam # fused optimizers used by model
+    lr: 0.001 # max is scaled by scheduler
+    betas:
+      - 0.9
+      - 0.999
+    eps: 1e-8
+    weight_decay: 0.0
+    sched:
+      name: ReduceLROnPlateau # plateau
+      patience: 50
+      monitor: val_loss # key for ReduceLROnPlateau
+      mode: min
+      # d_model: null # ${model.hidden_size}
+      # warmup_steps: null # use to set warmup_steps explicitly or leave as null to calculate
+      # warmup_ratio: null # calculate warmup_steps from warmup_ratio * max_steps, but will throw error if max_steps * warmup_ratio < 1
+      # max_steps: ${trainer.max_steps} # can also use ${trainer.max_steps} to scale
+      # min_lr: 1e-8
+
+  train_ds:
+    micro_batch_size: ${model.micro_batch_size}
+    pin_memory: ${data.pin_memory}
+    seed: ${seed}
+    no_torsion: ${model.diffusion.no_torsion}
+    all_atoms: ${data.all_atoms}
+    data_dir: ${data.data_dir}
+    limit_complexes: ${data.limit_complexes}
+    receptor_radius: ${data.receptor_radius}
+    c_alpha_max_neighbors: ${data.c_alpha_max_neighbors}
+    remove_hs: ${data.remove_hs}
+    max_lig_size: ${data.max_lig_size}
+    matching_popsize: ${data.matching_popsize}
+    matching_maxiter: ${data.matching_maxiter}
+    num_workers: ${data.num_workers}
+    atom_radius: ${data.atom_radius}
+    atom_max_neighbors: ${data.atom_max_neighbors}
+    esm_embeddings_path: ${data.esm_embeddings_path}
+    world_size: ${multiply:${trainer.devices}, ${trainer.num_nodes}}
+    cache_path: ${data.cache_path}
+    num_conformers: ${data.num_conformers}
+    split_train: ${data.split_train}
+    chunk_size: ${data.chunk_size}
+    samples_per_complex: ${data.samples_per_complex}
+    balance: ${data.balance}
+    rmsd_classification_cutoff: ${data.rmsd_classification_cutoff}
+    use_original_model_cache: ${data.use_original_model_cache}
+    cache_creation_id: ${data.cache_creation_id}
+    cache_ids_to_combine: ${data.cache_ids_to_combine}
+    score_model_name: ${data.score_model_name}
+
+  validation_ds:
+    micro_batch_size: ${model.micro_batch_size}
+    pin_memory: ${data.pin_memory}
+    seed: ${seed}
+    no_torsion: ${model.diffusion.no_torsion}
+    all_atoms: ${data.all_atoms}
+    data_dir: ${data.data_dir}
+    limit_complexes: ${data.limit_complexes}
+    receptor_radius: ${data.receptor_radius}
+    c_alpha_max_neighbors: ${data.c_alpha_max_neighbors}
+    remove_hs: ${data.remove_hs}
+    max_lig_size: ${data.max_lig_size}
+    matching_popsize: ${data.matching_popsize}
+    matching_maxiter: ${data.matching_maxiter}
+    num_workers: ${data.num_workers}
+    atom_radius: ${data.atom_radius}
+    atom_max_neighbors: ${data.atom_max_neighbors}
+    esm_embeddings_path: ${data.esm_embeddings_path}
+    world_size: ${multiply:${trainer.devices}, ${trainer.num_nodes}}
+    cache_path: ${data.cache_path}
+    num_conformers: ${data.num_conformers}
+    split_val: ${data.split_val}
+    chunk_size: ${data.chunk_size}
+    samples_per_complex: ${data.samples_per_complex}
+    balance: ${data.balance}
+    rmsd_classification_cutoff: ${data.rmsd_classification_cutoff}
+    use_original_model_cache: ${data.use_original_model_cache}
+    cache_creation_id: ${data.cache_creation_id}
+    cache_ids_to_combine: ${data.cache_ids_to_combine}
+    score_model_name: ${data.score_model_name}
+
+  test_ds:
+    micro_batch_size: ${model.micro_batch_size}
+    pin_memory: ${data.pin_memory}
+    seed: ${seed}
+    no_torsion: ${model.diffusion.no_torsion}
+    all_atoms: ${data.all_atoms}
+    data_dir: ${data.data_dir}
+    limit_complexes: ${data.limit_complexes}
+    receptor_radius: ${data.receptor_radius}
+    c_alpha_max_neighbors: ${data.c_alpha_max_neighbors}
+    remove_hs: ${data.remove_hs}
+    max_lig_size: ${data.max_lig_size}
+    matching_popsize: ${data.matching_popsize}
+    matching_maxiter: ${data.matching_maxiter}
+    num_workers: ${data.num_workers}
+    atom_radius: ${data.atom_radius}
+    atom_max_neighbors: ${data.atom_max_neighbors}
+    esm_embeddings_path: ${data.esm_embeddings_path}
+    world_size: ${multiply:${trainer.devices}, ${trainer.num_nodes}}
+    cache_path: ${data.cache_path}
+    num_conformers: ${data.num_conformers}
+    split_test: ${data.split_test}
+    chunk_size: ${data.chunk_size}
+    samples_per_complex: ${data.samples_per_complex}
+    balance: ${data.balance}
+    rmsd_classification_cutoff: ${data.rmsd_classification_cutoff}
+    use_original_model_cache: ${data.use_original_model_cache}
+    cache_creation_id: ${data.cache_creation_id}
+    cache_ids_to_combine: ${data.cache_ids_to_combine}
+    score_model_name: ${data.score_model_name}
+
+
+exp_manager:
+  name: ${name}
+  # checkpoint reloading and saving
+  resume_if_exists: True # autmatically resume if checkpoint exists
+  resume_ignore_no_checkpoint: True # leave as True, will start new training if resume_if_exists is True but no checkpoint exists
+  create_checkpoint_callback: True # leave as True, use exp_manger for checkpoints
+  checkpoint_callback_params:
+    save_top_k: 3 # number of checkpoints to save
+    monitor: val_loss # use loss to select best checkpoints
+    mode: min # use min or max of monitored metric to select best checkpoints
+    save_last: True # always save last checkpoint
+    always_save_nemo: True # not implemented for model parallel, additionally save NeMo-style checkpoint during validation, set to False if checkpoint saving is time consuming
+    filename: '${name}-${model.name}-{val_loss:.4f}-{train_loss:.4f}-{step}' # -{consumed_samples}'
+  # EMA
+  ema: # Exponential Moving Average; is picked up by exp_manager()
+    enable: True # Creates EMA callback in exp_manager
+    decay: 0.999 # (ema_rate) The exponential decay used when calculating the moving average. Has to be between 0-1.
+    cpu_offload: False  # If EMA parameters should be offloaded to CPU to save GPU memory
+    every_n_steps: 1 # Apply EMA every n global steps
+    validate_original_weights: False # Validate the EMA weights instead of the original weights. Note this means that when saving the model, the validation metrics are calculated with the EMA weights.
+  # logging
+  exp_dir: ${oc.env:BIONEMO_HOME}/results/nemo_experiments/${.name}/${.wandb_logger_kwargs.name}
+  explicit_log_dir: ${.exp_dir}
+  create_wandb_logger: False
+  create_tensorboard_logger: False
+  wandb_logger_kwargs:
+    project: diffdock_confidence_model
+    name: ${model.name}_training
+    group: ${model.name}
+    job_type: Localhost_nodes_${trainer.num_nodes}_gpus_${trainer.devices}
+    notes: "date: ${now:%y%m%d-%H%M%S}"
+    tags:
+      - ${name}
+      - ${model.name}
+
+
+nsys_profile:
+  enabled: False
+  start_step: 0  # Global batch to start profiling
+  end_step: 0 # Global batch to end profiling
+  ranks: [0] # Global rank IDs to profile
+  gen_shape: False # Generate model and kernel details including input shapes
+# And then wrap the model training script with:
+# nsys profile -s none -o <profile filepath>  -t cuda,nvtx --force-overwrite true --capture-range=cudaProfilerApi --capture-range-end=stop python ./examples/...
+# See more options at: https://docs.nvidia.com/nsight-systems/UserGuide/index.html#cli-profiling

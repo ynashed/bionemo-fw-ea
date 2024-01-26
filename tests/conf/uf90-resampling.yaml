@@ -21,7 +21,7 @@ trainer:
   benchmark: false
 exp_manager:
   name: ${name}
-  exp_dir: /tmp/bionemo-tests/
+  exp_dir: ${oc.env:BIONEMO_HOME}/test_results/bionemo-tests/
   explicit_log_dir: ${.exp_dir}
   create_tensorboard_logger: true
   resume_if_exists: false
@@ -59,8 +59,8 @@ model:
   tokenizer:
     library: sentencepiece
     type: null
-    model: /tokenizers/protein/esm1nv/vocab/protein_sequence_sentencepiece.model
-    vocab_file: /tokenizers/vocab/protein_sequence_sentencepiece.vocab
+    model: ${oc.env:BIONEMO_HOME}/tokenizers/protein/esm1nv/vocab/protein_sequence_sentencepiece.model
+    vocab_file: ${oc.env:BIONEMO_HOME}/tokenizers/vocab/protein_sequence_sentencepiece.vocab
     merge_file: null
   native_amp_init_scale: 4294967296
   native_amp_growth_interval: 1000
@@ -87,7 +87,7 @@ model:
     skip_lines: 0
     drop_last: false
     pin_memory: false
-    cluster_map_json_path: /data/uniref2022_05/fake_uf_map90/cluster-map.json
+    cluster_map_json_path: ${oc.env:BIONEMO_HOME}/data/uniref2022_05/fake_uf_map90/cluster-map.json
     force_regen_sample_mapping: true
     data_impl: csv_mmap
     data_impl_kwargs:
@@ -101,17 +101,17 @@ model:
     use_upsampling: true
     seed: ${model.seed}
     max_seq_length: ${model.seq_length}
-    cluster_mapping_tsv: /data/uniref2022_05/fake-uniref/mapping.tsv
-    uf50_datapath: /data/uniref2022_05/fake-uniref/Fake50.fasta 
-    uf90_datapath: /data/uniref2022_05/fake-uniref/Fake90.fasta 
-    dataset_path: /data/uniref2022_05/fake_uf_map
+    cluster_mapping_tsv: ${oc.env:BIONEMO_HOME}/data/uniref2022_05/fake-uniref/mapping.tsv
+    uf50_datapath: ${oc.env:BIONEMO_HOME}/data/uniref2022_05/fake-uniref/Fake50.fasta 
+    uf90_datapath: ${oc.env:BIONEMO_HOME}/data/uniref2022_05/fake-uniref/Fake90.fasta 
+    dataset_path: ${oc.env:BIONEMO_HOME}/data/uniref2022_05/fake_uf_map
     dataset:
       train: x[000..049]
       test: x[000..049]
       val: x[000..049]
     micro_batch_size: ${model.micro_batch_size}
     uf90:
-      uniref90_path: /data/uniref2022_05/fake_uf_map90
+      uniref90_path: ${oc.env:BIONEMO_HOME}/data/uniref2022_05/fake_uf_map90
       dataset:
         uf90_csvs: x[000..049]
       data_impl: csv_fields_mmap
@@ -142,7 +142,7 @@ model:
   dwnstr_task_validation:
     enabled: false
     dataset:
-      class: PerTokenPredictionCallback
+      class: bionemo.model.core.dwnstr_task_callbacks.PerTokenPredictionCallback
       task_type: classification
       infer_target: bionemo.model.protein.esm1nv.infer.ESM1nvInference
       max_seq_length: ${model.seq_length}
@@ -152,7 +152,7 @@ model:
       shuffle: true
       num_workers: 8
       task_name: secondary_structure
-      dataset_path: /data/FLIP/secondary_structure
+      dataset_path: ${oc.env:BIONEMO_HOME}/data/FLIP/secondary_structure
       dataset:
         train: x000
         test: x000

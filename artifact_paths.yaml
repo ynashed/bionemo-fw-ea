@@ -1,0 +1,83 @@
+# This file specifies the source locations of pretrained models, and what
+# the target locations to which they should be downloaded.
+#
+# The model source can be from either NGC (for internal nvidia + external customer use)
+# or from SwiftStack (aka PBSS) for internal nvidia use.
+#
+# The download_models.py script requires the download directory be specified, but there
+# are two extra parameters here that can further specify what to do with the downloaded file.
+# "symlink" is used to specify if any symlinking operation needs to happen after download.
+# "relative_download_dir" is used to specify the subdirectory to which the files should
+# be downloaded.
+# "extra_args" specifies any extra arguments that should be passed the ngc download or
+# s3 download commands.
+
+models:
+    esm1nv:
+        ngc: "nvidia/clara/esm1nv:1.0"
+        pbss: "s3://bionemo-ci/models/esm1nv.nemo"
+        symlink:
+            source: "../../esm1nv.nemo"
+            target: "protein/esm1nv/esm1nv.nemo"
+    prott5nv:
+        ngc: "nvidia/clara/prott5nv:1.0"
+        pbss: "s3://bionemo-ci/models/prott5nv.nemo"
+        symlink:
+            source: "../../prott5nv.nemo"
+            target: "protein/prott5nv/prott5nv.nemo"
+    megamolbart:
+        ngc: "nvidia/clara/megamolbart:1.0"
+        pbss: "s3://bionemo-ci/models/megamolbart.nemo"
+        symlink:
+            source: "../../megamolbart.nemo"
+            target: "molecule/megamolbart/megamolbart.nemo"
+    equidock_dips:
+        ngc: "nvidia/clara/equidock_dips:1.1"
+        pbss: "s3://bionemo-ci/models/equidock_dips.nemo"
+        symlink:
+            source: "../../equidock_dips.nemo"
+            target: "protein/equidock/equidock_dips.nemo"
+    equidock_db5:
+        ngc: "nvidia/clara/equidock_db5:1.1"
+        pbss: "s3://bionemo-ci/models/equidock_db5.nemo"
+        symlink:
+            source: "../../equidock_db5.nemo"
+            target: "protein/equidock/equidock_db5.nemo"
+    diffdock_score:
+        ngc: "nvidia/clara/diffdock_score:1.1"
+        pbss: "s3://bionemo-ci/models/diffdock_score.nemo"
+        symlink:
+            source: "../../diffdock_score.nemo"
+            target: "molecule/diffdock/diffdock_score.nemo"
+    diffdock_confidence:
+        ngc: "nvidia/clara/diffdock_confidence:1.1"
+        pbss: "s3://bionemo-ci/models/diffdock_confidence.nemo"
+        symlink:
+            source: "../../diffdock_confidence.nemo"
+            target: "molecule/diffdock/diffdock_confidence.nemo"
+    esm2nv_650m:
+        #TODO: update path when model is released
+        ngc: "nvidia/clara/esm2nv650m:1.0"
+        pbss: "s3://bionemo-ci/models/esm2nv_650M_converted.nemo"
+        symlink:
+            source: "../../esm2nv_650M_converted.nemo"
+            target: "protein/esm2nv/esm2nv_650M_converted.nemo"
+    esm2nv_3b:
+        #TODO: update path when model is released
+        ngc: "nvidia/clara/esm2nv3b:1.0"
+        pbss: "s3://bionemo-ci/models/esm2nv_3B_converted.nemo"
+        symlink:
+            source: "../../esm2nv_3B_converted.nemo"
+            target: "protein/esm2nv/esm2nv_3B_converted.nemo"
+    esm2_650m_huggingface:
+        pbss: "s3://bionemo-ci/models/esm2-650M-huggingface"
+        relative_download_dir: "protein/esm2nv/esm2-650M-huggingface"
+        # Hugging face models are multiple files in a directory, so the recursive
+        # flag is used to download everything in the dir.
+        extra_args: "--recursive"
+    esm2_3b_huggingface:
+        pbss: "s3://bionemo-ci/models/esm2-3B-huggingface"
+        relative_download_dir: "protein/esm2nv/esm2-3B-huggingface"
+        # Hugging face models are multiple files in a directory, so the recursive
+        # flag is used to download everything in the dir.
+        extra_args: "--recursive"

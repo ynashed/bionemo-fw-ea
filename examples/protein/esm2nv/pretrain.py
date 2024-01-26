@@ -1,35 +1,31 @@
-# Copyright (c) 2023, NVIDIA CORPORATION.  All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
 
 from nemo.core.config import hydra_runner
 from nemo.utils import logging
 from omegaconf.omegaconf import OmegaConf
 
+from bionemo.callbacks import setup_dwnstr_task_validation_callbacks
 from bionemo.data import FLIPPreprocess
 from bionemo.data.preprocess.protein.preprocess import ESM2Preprocess
 from bionemo.model.protein.esm1nv import esm1nv_model
 from bionemo.model.utils import setup_trainer
-from bionemo.utils import BioNeMoSaveRestoreConnector
-from bionemo.utils.callbacks.callback_utils import setup_callbacks
+from bionemo.utils.connectors import BioNeMoSaveRestoreConnector
 
 
-@hydra_runner(config_path="../../../examples/protein/esm2nv/conf", config_name="pretrain_esm2_8M")
+@hydra_runner(config_path="conf", config_name="pretrain_esm2_8M")
 def main(cfg) -> None:
     logging.info("\n\n************** Experiment configuration ***********")
     logging.info(f'\n{OmegaConf.to_yaml(cfg)}')
 
-    callbacks = setup_callbacks(cfg)
+    callbacks = setup_dwnstr_task_validation_callbacks(cfg)
 
     if cfg.do_training:
         trainer = setup_trainer(cfg, callbacks=callbacks)

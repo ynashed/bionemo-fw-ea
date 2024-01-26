@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 import pytest
 
@@ -148,3 +149,13 @@ def skip_if_file_missing(request):
     if request.node.get_closest_marker('skip_if_no_file'):
         if not os.path.exists(request.node.get_closest_marker('skip_if_no_file').args[0]):
             pytest.skip('skipped because model does not exist')
+
+
+@pytest.fixture(scope='session')
+def bionemo_home() -> Path:
+    try:
+        x = os.environ['BIONEMO_HOME']
+    except KeyError:
+        raise ValueError("Need to set BIONEMO_HOME in order to run unit tests! See docs for instructions.")
+    else:
+        yield Path(x).absolute()

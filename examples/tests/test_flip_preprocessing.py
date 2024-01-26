@@ -9,7 +9,6 @@ from bionemo.utils.tests import get_directory_hash
 
 
 # FLIP secondary structure benchmark dataset is small and will be fully downloaded in this test
-os.environ['PROJECT_MOUNT'] = os.environ.get('PROJECT_MOUNT', '/workspace/bionemo')
 ROOT_DIR = 'FLIP'
 CONFIG = {'url': None, 'num_csv_files': 1}
 HEADER = 'id,sequence,3state,resolved'

@@ -23,7 +23,7 @@ trainer:
 
 exp_manager:
   name: ${name}
-  exp_dir: /result/nemo_experiments/${.name}/${.wandb_logger_kwargs.name}
+  exp_dir: ${oc.env:BIONEMO_HOME}/results/nemo_experiments/${.name}/${.wandb_logger_kwargs.name}
   explicit_log_dir: ${.exp_dir}
   create_wandb_logger: True 
   create_tensorboard_logger: True
@@ -55,7 +55,7 @@ model:
   seq_length: 1024
   num_layers: 6
   hidden_size: 320
-  ffn_hidden_size: 1280 # Transformer FFN hidden size. Usually 4 * hidden_size.
+  ffn_hidden_size: ${multiply:${model.hidden_size}, 4} # Transformer FFN hidden size. Usually 4 * hidden_size.
   num_attention_heads: 20
   megatron_legacy: false 
   position_embedding_type: rope # ESM2 uses relative positional encoding 'ROPE' to extrapolate to longer sequences unseen during training
@@ -66,7 +66,7 @@ model:
   attention_dropout: 0.0 # ESM2 does not use attention dropout
   normalize_attention_scores: False # ESM2 does not use normalized attention scores
   tensor_model_parallel_size: 1 # model parallelism
-  pipeline_model_parallel_size: 1 # model parallelism
+  pipeline_model_parallel_size: 1 # model parallelism. If enabled, you need to set data.dynamic_padding to False as pipeline parallelism requires fixed-length padding.
   bias_gelu_fusion: False
   # NOTE: these are compatability features
   use_esm_attention: True # Use specific attention modifications for ESM2
@@ -144,6 +144,8 @@ model:
     skip_lines: 0
     drop_last: False
     pin_memory: False
+    dynamic_padding: False # If True, each batch is padded to the maximum sequence length within that batch. 
+              #    Set it to False when model.pipeline_model_parallel_size > 1, as pipeline parallelism requires fixed-length padding.
 
 
     # Below is the configuration for UF90 resampling.
@@ -162,18 +164,18 @@ model:
         header_lines: 1
         # Rest of these are inherited
 
-    uf50_datapath: '/data/uniref202104_esm2/uniref50_train_filt.fasta'
-    uf90_datapath: '/data/uniref202104_esm2/uniref90membersandreps_ur50trainfiltreps.fasta'
-    cluster_mapping_tsv: '/data/uniref202104_esm2/uniref50_mapper_to_uniref90clustermembers_andselfuniref50.tsv'
+    uf50_datapath: ${oc.env:BIONEMO_HOME}/data/uniref202104_esm2/uniref50_train_filt.fasta
+    uf90_datapath: ${oc.env:BIONEMO_HOME}/data/uniref202104_esm2/uniref90membersandreps_ur50trainfiltreps.fasta
+    cluster_mapping_tsv: ${oc.env:BIONEMO_HOME}/data/uniref202104_esm2/uniref50_mapper_to_uniref90clustermembers_andselfuniref50.tsv
     # TODO These need to be updated to values we actually like
-    dataset_path: /data/uniref202104_esm2/uf50 # parent directory for data, contains train / val / test folders. Needs to be writeable for index creation.
+    dataset_path: ${oc.env:BIONEMO_HOME}/data/uniref202104_esm2/uf50 # parent directory for data, contains train / val / test folders. Needs to be writeable for index creation.
     # NOTE test_size and val_size must be smaller than the total dataset size.
     # you can check this with grep -c '>' <uf50_datapath.fasta>
     val_size: 5000
     test_size: 1000000
     sort_fastas: false # If true, assumes the input files are not sorted, and sorts them before creating the cluster mapping. Unsorted fastas will break the cluster map.
     uf90:
-      uniref90_path: /data/uniref202104_esm2/uf90/ # created and populated my preprocessing
+      uniref90_path: ${oc.env:BIONEMO_HOME}/data/uniref202104_esm2/uf90/ # created and populated my preprocessing
       dataset: 
         uf90_csvs: x[000..049] # created and populated by preprocessing, this key is a directory inside uniref90_path
       data_impl: 'csv_fields_mmap'
@@ -194,13 +196,13 @@ model:
     max_seq_length: ${model.seq_length} # Maximum input sequence length. Longer sequences are truncated
     modify_percent: 0.1 # Percentage of characters in a protein sequence to modify. (Modification means replacing with another amino acid or with a mask token)
     perturb_percent: 0.5 # Of the modify_percent, what percentage of characters are to be replaced with another amino acid.
-    index_mapping_dir: /data/uniref202104_esm2/
+    index_mapping_dir: ${oc.env:BIONEMO_HOME}/data/uniref202104_esm2/
 
   
   dwnstr_task_validation:
     enabled: False 
     dataset:
-      class: PerTokenPredictionCallback
+      class: bionemo.model.core.dwnstr_task_callbacks.PerTokenPredictionCallback
       task_type: token-level-classification
       infer_target: bionemo.model.protein.esm1nv.infer.ESM1nvInference
       max_seq_length: ${model.seq_length}
@@ -210,7 +212,7 @@ model:
       shuffle: True
       num_workers: 8
       task_name: secondary_structure
-      dataset_path: /data/FLIP/${model.dwnstr_task_validation.dataset.task_name}
+      dataset_path: ${oc.env:BIONEMO_HOME}/data/FLIP/${model.dwnstr_task_validation.dataset.task_name}
       dataset:
         train: x000
         test: x000

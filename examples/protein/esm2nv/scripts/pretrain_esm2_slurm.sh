@@ -35,7 +35,7 @@ PRECISION=32 #fp [16, 32]
 PROJECT_NAME="esm2_pretraining" # project name, will be used for logging
 EXP_TAG="??" # any additional experiment info, can be empty
 EXP_NAME="esm2_batch${MICRO_BATCH_SIZE}_fp${PRECISION}_gradacc${ACCUMULATE_GRAD_BATCHES}_nodes${SLURM_JOB_NUM_NODES}${EXP_TAG}"
-CREATE_WANDB_LOGGER=True # set to False if you don't want to log results with WandB 
+CREATE_WANDB_LOGGER=True # set to False if you don't want to log results with WandB
 WANDB_LOGGER_OFFLINE=False # set to True if there are issues uploading to WandB during training
 # =========================
 
@@ -43,8 +43,8 @@ WANDB_LOGGER_OFFLINE=False # set to True if there are issues uploading to WandB 
 # =========================
 DATA_MOUNT=/data # where data will be mounted in the container
 DATA_PATH="??" # Directory with data for model training and downstream task validation
-DATASET=uniref202104_esm2/uf50 # ESM2 data folder containing data for model training
-DATASET_90=uniref202104_esm2/uf90 
+DATASET=uniref202104_esm2/uf50 # ESM1 data uniref2022_1024 # folder containing data for model training
+DATASET_90=uniref202104_esm2/uf90
 MAPPING_FILE=uniref202104_esm2/uniref50_mapper_to_uniref90clustermembers_andselfuniref50.tsv
 TRAIN_FILES='x_OP_000..049_CL_' # Range for the train dataset
 TEST_FILES='x_OP_000..049_CL_'  # Range for the test dataset
@@ -52,7 +52,7 @@ VAL_FILES='x_OP_000..049_CL_'   # Range for the val dataset
 RESULTS_MOUNT=/results # directory where results folder will be mounted in the container
 RESULTS_PATH="??/results/${PROJECT_NAME}/${EXP_NAME}" # directory to store logs, checkpoints and results
 mkdir -p ${RESULTS_PATH}
-CODE_MOUNT=/opt/nvidia/bionemo # directory where code folder will be mounted in the container
+CODE_MOUNT=/workspace/bionemo # directory where code folder will be mounted in the container
 CODE_PATH="" #leave empty if using container bionemo else use path to custom version
 if [ -z "$CODE_PATH" ]; then
   MOUNTS="${RESULTS_PATH}:${RESULTS_MOUNT},${DATA_PATH}:${DATA_MOUNT}"

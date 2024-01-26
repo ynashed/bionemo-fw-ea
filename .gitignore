@@ -160,6 +160,16 @@ cifar-10-batches-py
 # Test data.
 tests/.data
 tests/data
+**/openfold_data
+*.npz
+*.pkl
+examples/tests/test_data/
+nemo_experiments/
+
+# Devlopment
+navigator_workspace/
+.pdbhistory
+.lesshst
 
 # outputs folder
 examples/*/outputs
@@ -172,6 +182,12 @@ wandb
 dump.py
 
 docs/sources/source/test_build/
+
+test_results/
+
+# only ignore the root-level models/ directory
+/models
+/data
 
 # Checkpoints, config files and temporary files created in tutorials.
 examples/neural_graphs/*.chkpt
@@ -192,6 +208,13 @@ nemo_error_log*.txt
 *.nemo
 *.version
 *.npy
+
+.python_history
+.config
+.ipython
+
+.dotnet
+tmp
 *.swp
 *.idx.info
 .dgl/

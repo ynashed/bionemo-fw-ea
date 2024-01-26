@@ -1,4 +1,28 @@
 # Release Notes
+## BioNeMo Framework v1.1
+## New Models
+* EquiDock for protein-protein docking pose prediction
+* DiffDock for protein-ligand blind docking pose generation
+
+### New Features
+* Training recipes for EquiDock and DiffDock, including automated data processing and full configuration for training.
+* Accelerated inference and training for DiffDock via fast tensor-product kernels.
+* Example tutorials for running inference using EquiDock and DiffDock.
+* Recipes for running EquiDock and DiffDock on BCP and Slurm.
+* Pipeline parallel supported for ESM-2nv.
+* Migration of inference notebooks to using pytriton.
+
+### Bug fixes and Improvements
+* Faster pre-processing of data on BCP.
+* Refactor of download_models.sh to download_models.py for easier CLI use.
+* Refactor of install structure to move from /opt/nvidia to /workspace/bionemo. The environment variable $BIONEMO_HOME now points to the repo base and is required to be set for tests to pass.
+
+### Security Notice
+
+SchedMD Slurm in the release container is shipped with a security vulnerability, [CVE-2022-29501](https://ubuntu.com/security/CVE-2022-29501), and therefore this version of Slurm should not be used to run a Slurm cluster (specifically, the processes `slurmdbd`, `slurmctld`, and `slurmd`).
+
+In general, the BioNeMo Framework container is designed to ship code and an environment that would be executed on local workstations, or deployed on clusters for large scale training jobs. This container is not designed to run as a service with public facing APIs. A full summary of security vulnerabilities can be found [here](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/clara/containers/bionemo-framework/security).
+
 ## BioNeMo Framework v1.0
 ## New Models
 * ESM-2nv for protein sequence representations, pretrained weights of ESM-2 650M and ESM-2 3B converted from HF checkpoint available.
@@ -6,12 +30,12 @@
 ### New Features
 * Pre-training recipes for ESM-2nv, including automated data processing and full configuration for training
 * Fine-tuning of ESM-2nv with encoder frozen or trainable
-* Downstream task finetuning support for single-value classification (e.g. subcellular localization), single-value regression (e.g. meltome) and per-token classification (e.g. secondary structure) 
+* Downstream task finetuning support for single-value classification (e.g. subcellular localization), single-value regression (e.g. meltome) and per-token classification (e.g. secondary structure)
 * Validation in loop to evaluate performance on downstream tasks during training
 * Example tutorials for pre-training, fine tuning, and downstream tasks
 
 ## BioNeMo Framework v0.4.0
-### New Models  
+### New Models
 * ESM-1nv for protein sequence representations, pretrained weights available
 * ProtT5nv for protein sequence representation and sequence-to-sequence tasks, pretrained weights available
 ### New Features

@@ -1,26 +1,22 @@
-# Copyright (c) 2022, NVIDIA CORPORATION.
-# SPDX-License-Identifier: Apache-2.0
-
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
 
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from functools import lru_cache
 
+import torch
 from nemo.collections.nlp.models.language_modeling.megatron_bert_model import MegatronBertModel
 from nemo.utils import logging
 
 
-class BioNeMoDataModule(object):
+class BioNeMoDataModule(ABC):
     """Base Class for BioNeMo Data Modules.
 
     Data Modules coordinate the data-driven functions for BioNeMo Modules:
@@ -225,12 +221,18 @@ class BioNeMoBertModel(MegatronBertModel):
         self.data_module.adjust_train_dataloader(self, self._train_dl)
 
     def setup_validation_data(self, cfg):
-        super().setup_validation_data(cfg)
-        self.data_module.adjust_val_dataloader(self, self._validation_dl)
+        if hasattr(self, '_validation_ds'):
+            consumed_samples = 0
+            self._validation_dl = self.build_pretraining_data_loader(
+                self._validation_ds, consumed_samples, num_workers=0
+            )
+            self.data_module.adjust_val_dataloader(self, self._validation_dl)
 
     def setup_test_data(self, cfg):
-        super().setup_test_data(cfg)
-        self.data_module.adjust_test_dataloader(self, self._test_dl)
+        if hasattr(self, '_test_ds'):
+            consumed_samples = 0
+            self._test_dl = self.build_pretraining_data_loader(self._test_ds, consumed_samples, num_workers=0)
+            self.data_module.adjust_test_dataloader(self, self._test_dl)
 
     @classmethod
     def list_available_models(cls):
@@ -256,3 +258,42 @@ class BioNeMoBertModel(MegatronBertModel):
         logging.info(f'Length of test dataset: {len(self._test_ds)}')
         logging.info('Finished building Bert datasets.')
         return self._train_ds, self._validation_ds, self._test_ds
+
+    def build_pretraining_data_loader(self, dataset, consumed_samples, num_workers=None):
+        """Buld dataloader given an input dataset."""
+
+        assert self._cfg.data.dataloader_type == 'single', AssertionError(
+            f'Only the Megatron sequential ("single") sampler is currently supported. {self._cfg.data.dataloader_type} was chosen.'
+        )
+
+        from megatron.core import parallel_state
+        from nemo.collections.nlp.data.language_modeling.megatron.data_samplers import (
+            MegatronPretrainingSampler,
+        )
+
+        # NOTE (SKH) this was taken directly from megatron, this is the 'single' dataloader type.
+        batch_sampler = MegatronPretrainingSampler(
+            total_samples=len(dataset),
+            consumed_samples=consumed_samples,
+            micro_batch_size=self.cfg.micro_batch_size,
+            global_batch_size=self.cfg.global_batch_size,
+            data_parallel_rank=parallel_state.get_data_parallel_rank(),
+            data_parallel_size=parallel_state.get_data_parallel_world_size(),
+            drop_last=self.cfg.get('drop_last', True),
+        )
+
+        if num_workers is None:
+            num_workers = self.cfg.data.num_workers
+        # Torch dataloader.
+        dataloader = torch.utils.data.DataLoader(
+            dataset,
+            batch_sampler=batch_sampler,
+            num_workers=num_workers,  # Needs to be set to zero.
+            pin_memory=True,
+            persistent_workers=True if num_workers > 0 else False,
+        )
+
+        # Add collate function and unpin memory to avoid crash with CUDA misaligned address
+        dataloader.pin_memory = False  # must be False with CSV dataset TODO check with binary
+
+        return dataloader

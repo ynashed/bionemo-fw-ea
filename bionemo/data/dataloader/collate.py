@@ -1,17 +1,12 @@
-# Copyright (c) 2022, NVIDIA CORPORATION.
-# SPDX-License-Identifier: Apache-2.0
-
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
 
 """
 This file implements a general collate function for NeMo BERT model.
@@ -34,7 +29,7 @@ import copy
 import math
 import random
 from dataclasses import dataclass
-from typing import Callable, List, Optional
+from typing import Callable, Dict, List, Optional, Union
 
 import torch
 from nemo.collections.common.tokenizers import TokenizerSpec
@@ -49,7 +44,7 @@ __all__ = [
 ]
 
 
-class TokenSampler(object):
+class TokenSampler:
     """Group of sampling methods for sampling from a list of tokens"""
 
     def sample_token_id(self, tokenizer: TokenizerSpec):
@@ -77,7 +72,7 @@ class TokenSampler(object):
         return random.sample(range(num_tokens), num_samples)
 
 
-class TokenizerAdapterSpec(object):
+class TokenizerAdapterSpec:
     """Interface for adapting tokenizers for DataLoaders.
 
     Tokenizers can be fairly homogenous, so an Adapter is used
@@ -305,7 +300,7 @@ class SentencePieceTokenizerAdapter(TokenizerAdapterSpec):
 
 
 @dataclass
-class BertMasking(object):
+class BertMasking:
 
     """
     Produces a callable that can be used to mask/perturb sequences of tokens.
@@ -413,13 +408,14 @@ class BertMasking(object):
         return modified_tokens, token_masks
 
 
-class BertCollate(object):
+class BertCollate:
     def __init__(
         self,
         tokenizer: TokenizerAdapterSpec,
         seq_length: int,
         pad_size_divisible_by_8: bool,
         masking_strategy: Optional[Callable] = None,
+        dynamic_padding: bool = True,
     ):
         """
 
@@ -434,6 +430,9 @@ class BertCollate(object):
                 list has the same shape as the original.
                 Used to modify the unadulterated token strings for pre-training
                 purposes.
+            dynamic_padding: If True, enables dynamic batch padding, where
+                each batch is padded to the maximum sequence length within that batch.
+                By default True.
         """
         self.sampler = TokenSampler()
         self._tokenizer = tokenizer
@@ -443,6 +442,7 @@ class BertCollate(object):
                 self.tokenizer,
             )
         self.masking_strategy = masking_strategy
+        self.dynamic_padding = dynamic_padding
         # workaround for CUDA alignment bug
         self.pad_size_divisible_by_8 = pad_size_divisible_by_8
 
@@ -515,7 +515,10 @@ class BertCollate(object):
 
     def _pad_seqs(self, seqs, masks, pad_token):
         # TODO: switch to torch.nn.utils.rnn.pad_sequence
-        pad_length = max([len(seq) for seq in seqs])
+        if self.dynamic_padding:
+            pad_length = max([len(seq) for seq in seqs])
+        else:
+            pad_length = self.seq_length
         if self.pad_size_divisible_by_8:
             pad_length = int(math.ceil(pad_length / 8) * 8)
 
@@ -525,17 +528,22 @@ class BertCollate(object):
         masks = [mask + ([0] * (pad_length - len(mask))) for mask in masks]
         return padded, masks, padding_mask
 
-    def collate_fn(self, batch: List[str], label_pad: int = -1):
+    def collate_fn(self, batch: List[str], label_pad: int = -1) -> Dict[str, Union[torch.Tensor, List[str]]]:
         """Collate function for NeMo BERT.
+        The function prepares the dictionary of tensors expected by the BERT language model.
+        - It tokenizes the input strings based on the provided tokenizer `self._tokenize`,
+        - randomly masks a subset of tokens in each sequence, and
+        - pads the sequences to the maximum length in the given batch, using the pad index from `self.tokenizer.get_pad_id()`.
 
         Args:
-            batch (List[str]): Strings to tokenize
+            batch: A list of Strings to tokenize.
 
         Returns:
-            Dict: the keys are the following:
+            collate_output: A dictionary with the following key-value pairs:
                 {
                     'text' (torch.Tensor[int]): padded and modified sequences of token IDs,
-                    'types' (torch.Tensor[int]): possible types within tokens, in this case set all to 0
+                    'types' (torch.Tensor[int]): possible types within tokens, generally used to refer to tokens from two segments
+                        in the same input string.  In this case set all to 0, as each string corresponds to exactly one segment.
                     'is_random' (torch.Tensor[int]): order of the sequences in the batch, len(is_random) == len(text)
                     'loss_mask' (List[List[float]]): same shape as `text`. 1 indicates the token has been modified,
                                                      otherwise 0,

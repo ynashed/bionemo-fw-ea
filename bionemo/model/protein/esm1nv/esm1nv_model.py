@@ -1,19 +1,20 @@
-# Copyright (c) 2022, NVIDIA CORPORATION.  All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
+
+# Copyright (c) Meta Platforms, Inc. and affiliates.
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
 
 import os
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 import torch
 from nemo.collections.nlp.modules.common.megatron.utils import (
@@ -33,14 +34,6 @@ from bionemo.data.mapped_dataset import NeMoUpsampling, Uniref90ClusterMappingDa
 from bionemo.data.molecule import megamolbart_build_train_valid_test_datasets
 from bionemo.model.protein.esm1nv.base import ESMnvMegatronBertModel
 
-
-# TODO(trvachov): Clean up deps
-try:
-    from apex.transformer import tensor_parallel  # noqa: F401
-
-    HAVE_APEX = True
-except (ImportError, ModuleNotFoundError):
-    HAVE_APEX = False
 
 __all__ = ["ESM1nvModel", "ESM2nvModel"]
 
@@ -108,13 +101,15 @@ class ESM1nvModel(ESMnvMegatronBertModel):
         # Add collate function and unpin memory to avoid crash with CUDA misaligned address
         dataloader.pin_memory = False  # must be False with CSV dataset TODO check with binary
         pad_size_divisible_by_8 = True if self._cfg.masked_softmax_fusion else False
-
+        if self.cfg.pipeline_model_parallel_size > 1 and self.cfg.data.dynamic_padding:
+            raise ValueError("Pipeline model parallelism does not support dynamic_padding.")
         dataloader.collate_fn = ProteinBertCollate(
             tokenizer=self.tokenizer,
             seq_length=self._cfg.seq_length,
             pad_size_divisible_by_8=pad_size_divisible_by_8,
             modify_percent=self._cfg.data.modify_percent,
             perturb_percent=self._cfg.data.perturb_percent,
+            dynamic_padding=self.cfg.data.dynamic_padding,
         ).collate_fn
 
         return dataloader
@@ -124,15 +119,17 @@ class ESM1nvModel(ESMnvMegatronBertModel):
 
     def setup_validation_data(self, cfg):
         if hasattr(self, '_validation_ds'):
-            consumed_samples = 0
-            self._validation_dl = self.build_pretraining_data_loader(
-                self._validation_ds, consumed_samples, num_workers=0
-            )
+            if self._validation_ds is not None:
+                consumed_samples = 0
+                self._validation_dl = self.build_pretraining_data_loader(
+                    self._validation_ds, consumed_samples, num_workers=0
+                )
 
     def setup_test_data(self, cfg):
         if hasattr(self, '_test_ds'):
-            consumed_samples = 0
-            self._test_dl = self.build_pretraining_data_loader(self._test_ds, consumed_samples, num_workers=0)
+            if self._test_ds is not None:
+                consumed_samples = 0
+                self._test_dl = self.build_pretraining_data_loader(self._test_ds, consumed_samples, num_workers=0)
 
     @staticmethod
     def _build_train_valid_test_datasets(trainer, model_cfg):
@@ -155,7 +152,7 @@ class ESM1nvModel(ESMnvMegatronBertModel):
 
         logging.info(f'Length of train dataset: {len(_train_ds)}')
         logging.info(f'Length of val dataset: {len(_validation_ds)}')
-        logging.info(f'Length of test dataset: {len(_test_ds)}')
+        logging.info(f'Length of test dataset: {len(_test_ds) if _test_ds is not None else None}')
         logging.info('Finished building Bert datasets.')
         return _train_ds, _validation_ds, _test_ds
 
@@ -166,11 +163,24 @@ class ESM1nvModel(ESMnvMegatronBertModel):
         self._test_ds = test
         return self._train_ds, self._validation_ds, self._test_ds
 
-    def validation_epoch_end(self, outputs):
+    def validation_epoch_end(self, outputs: List[Dict[str, torch.Tensor]]) -> None:
+        """The function computes and logs three scores:
+            - The average cross entropy loss over the validation data
+            - The exponential of the averaged loss
+            - The average perplexity score over the validation data.
+
+        The estimate of the perplexity is defined as the exponential of the average of the masked CE losses: `exp(-loss_mean)`
+
+        Args:
+            outputs: A list of dictionaries, where each dictionary represents the output of a validation step.
+            The computed values are logged using the Lightning logger.
+        """
         if not outputs:
             return
         averaged_loss = torch.stack(outputs).mean()
+        average_perplexity = averaged_loss.exp()
         self.log('val_loss', averaged_loss, prog_bar=True)
+        self.log('val_perplexity', average_perplexity)
         self.log('val_loss_ECE', pow(2, averaged_loss))  # calculate exponential cross entropy loss for logs
         self.log('consumed_samples', self.compute_consumed_samples(self.trainer.global_step - self.init_global_step))
 
@@ -182,10 +192,24 @@ class ESM1nvModel(ESMnvMegatronBertModel):
                 hidden_states = hidden_states[0]
         return hidden_states
 
-    def test_epoch_end(self, outputs):
+    def test_epoch_end(self, outputs: List[Dict[str, torch.Tensor]]) -> None:
+        """
+        The function computes and logs three scores:
+            - the average cross-entropy loss over the test data,
+            - the exponential of the averaged loss, and
+            - the average perplexity score over the test data.
+
+        The estimate of the perplexity is defined as the exponential of the average of the masked CE losses: `exp(-loss_mean)`
+        This function is called at the end of the testing step `model.test()`.
+
+        Args:
+            outputs: A list of dictionaries, where each dictionary represents the output of a validation step.
+            The computed values are logged using the NeMo logger.
+        """
         averaged_loss = average_losses_across_data_parallel_group(outputs)
         logging.info(f'test_loss: {averaged_loss[0]}')
         logging.info(f'test_loss_ECE: {pow(2, averaged_loss[0])}')
+        logging.info(f'test_perplexity: {averaged_loss[0].exp()}')
 
     @property
     def input_names(self):
@@ -305,12 +329,14 @@ class ESM2nvModel(ESM1nvModel):
         dataloader.pin_memory = False
 
         pad_size_divisible_by_8 = True if self._cfg.masked_softmax_fusion else False
-
+        if self.cfg.pipeline_model_parallel_size > 1 and self.cfg.data.dynamic_padding:
+            raise ValueError("Pipeline model parallelism does not support dynamic_padding.")
         dataloader.collate_fn = ESM2BertCollate(
             tokenizer=self.tokenizer,
             seq_length=self._cfg.seq_length,
             pad_size_divisible_by_8=pad_size_divisible_by_8,
             modify_percent=self._cfg.data.modify_percent,
             perturb_percent=self._cfg.data.perturb_percent,
+            dynamic_padding=self.cfg.data.dynamic_padding,
         ).collate_fn
         return dataloader

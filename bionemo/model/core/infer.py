@@ -1,23 +1,18 @@
-# Copyright (c) 2022, NVIDIA CORPORATION.
-# SPDX-License-Identifier: Apache-2.0
-
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
 #
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
 
-from typing import Dict, List, Union
+from typing import Any, Dict, List, Optional, Sequence, Tuple, TypedDict, TypeVar, Union
 
 import torch
 from omegaconf import ListConfig
-from pandas import Series
+from pandas import DataFrame, Series
 from pytorch_lightning.core import LightningModule
 
 from bionemo.data.utils import pad_token_ids
@@ -29,9 +24,55 @@ try:
         _reconfigure_microbatch_calculator,
     )
 
-    HAVE_APEX = True
+    HAVE_APEX: bool = True
 except (ImportError, ModuleNotFoundError):
     HAVE_APEX = False
+
+
+__all__: Sequence[str] = (
+    "BaseEncoderDecoderInference",
+    "M",
+    "SeqsOrBatch",
+    "Forward",
+    "Inference",
+    "to_sequences_ids",
+    "HAVE_APEX",
+)
+
+SeqsOrBatch = Union[List[str], List[List[str]]]
+
+
+class IdedSeqs(TypedDict):
+    id: List[int]
+    sequences: List[str]
+
+
+class SI(TypedDict):
+    sequence_ids: torch.Tensor
+
+
+class Hidden(SI):
+    hiddens: torch.Tensor
+    mask: torch.Tensor
+
+
+class Embedding(SI):
+    embeddings: torch.Tensor
+
+
+class Forward(Embedding, Hidden, total=False):
+    """Output of BaseEncoderDecoderInference's forward()"""
+
+
+class InferenceBase(TypedDict):
+    hiddens: torch.Tensor
+    mask: torch.Tensor
+    embeddings: torch.Tensor
+    sequence: List[str]
+
+
+class Inference(InferenceBase, total=False):
+    id: List[int]
 
 
 # FIXME: add mask for all non-special tokens (add hiddens_tokens_only)
@@ -41,18 +82,46 @@ class BaseEncoderDecoderInference(LightningModule):
     Base class for inference.
     '''
 
-    def __init__(self, cfg, model=None, freeze=True, restore_path=None, training=False, adjust_config=True):
+    def __init__(
+        self,
+        cfg,
+        model: Optional[Any] = None,
+        freeze: bool = True,
+        restore_path: Optional[str] = None,
+        training: bool = False,
+        adjust_config: bool = True,
+        interactive: bool = False,
+    ):
         super().__init__()
 
         self.cfg = cfg
         self._freeze_model = freeze
         self.adjust_config = adjust_config
         self.training = training
+        self.interactive = interactive
         self.model = self.load_model(cfg, model=model, restore_path=restore_path)
         self._trainer = self.model.trainer
         self.tokenizer = self.model.tokenizer
 
-    def load_model(self, cfg, model=None, restore_path=None):
+        try:
+            self.k_sequence: Optional[str] = cfg.model.data.data_fields_map.sequence
+        except AttributeError:
+            print(
+                "WARNING: Missing key for extracting the sequence in batches! The forward method call will fail! "
+                "Provide a valid configuration that has this value under model.data.data_fields_map.sequence."
+            )
+            self.k_sequence = None
+
+        try:
+            self.k_id: Optional[str] = cfg.model.data.data_fields_map.id
+        except AttributeError:
+            print(
+                "WARNING: Missing key for extracting the sequence IDs in batches! The forward method call will fail! "
+                "Provide a valid configuration that has this value under model.data.data_fields_map.id."
+            )
+            self.k_id = None
+
+    def load_model(self, cfg, model: Optional[Any] = None, restore_path: Optional[str] = None) -> Any:
         """Load saved model checkpoint
 
         Params:
@@ -61,25 +130,31 @@ class BaseEncoderDecoderInference(LightningModule):
         Returns:
             Loaded model
         """
+
         # load model class from config which is required to load the .nemo file
+
         if model is None:
             if restore_path is None:
                 restore_path = cfg.model.downstream_task.restore_from_path
-            model = restore_model(restore_path=restore_path, cfg=cfg, adjust_config=self.adjust_config)
+            model = restore_model(
+                restore_path=restore_path, cfg=cfg, adjust_config=self.adjust_config, interactive=self.interactive
+            )
         # move self to same device as loaded model
         self.to(model.device)
 
         # check whether the DDP is initialized
-        initialize_model_parallel(model)
+        initialize_model_parallel(model, interactive=self.interactive)
 
-        # Reconfigure microbatch sizes here because on model restore, this will contain the micro/global batch configuration used while training.
-        _reconfigure_microbatch_calculator(
-            rank=0,  # This doesn't matter since it is only used for logging
-            rampup_batch_size=None,
-            global_batch_size=1,
-            micro_batch_size=1,  # Make sure that there is no "grad acc" while decoding.
-            data_parallel_size=1,  # We check above to make sure that dataparallel size is always 1 at inference.
-        )
+        if not self.interactive:
+            # Reconfigure microbatch sizes here because on model restore, this will contain the micro/global batch configuration used while training.
+            _reconfigure_microbatch_calculator(
+                rank=0,  # This doesn't matter since it is only used for logging
+                rampup_batch_size=None,
+                global_batch_size=1,
+                micro_batch_size=1,  # Make sure that there is no "grad acc" while decoding.
+                data_parallel_size=1,  # We check above to make sure that dataparallel size is always 1 at inference.
+            )
+
         if self._freeze_model:
             model.freeze()
 
@@ -87,10 +162,16 @@ class BaseEncoderDecoderInference(LightningModule):
 
         return model
 
-    def forward(self, batch):
+    def forward(self, batch: Dict[str, torch.Tensor]) -> Forward:
         """Forward pass of the model. Can return embeddings or hiddens, as required"""
-        sequences = batch[self.cfg.model.data.data_fields_map.sequence]
-        sequence_ids = batch[self.cfg.model.data.data_fields_map.id]
+        if self.k_sequence is None or self.k_id is None:
+            raise ValueError(
+                "Configuration used during initialization was invalid: it needs 2 keys. "
+                "(1) It needs a key to identify the sequence in each batch (model.data.data_fields_map.sequence). "
+                "(2) It needs a key to identify the sequence IDs in each batch (model.data.data_fields_map.id)."
+            )
+        sequences = batch[self.k_sequence]
+        sequence_ids = batch[self.k_id]
         prediction_data = {"sequence_ids": sequence_ids}
         outputs = self.cfg.model.downstream_task.outputs
         # make sure we have a list
@@ -98,7 +179,8 @@ class BaseEncoderDecoderInference(LightningModule):
             outputs = [outputs]
 
         # adjust microbatch size
-        _reconfigure_inference_batch(global_batch_per_gpu=len(sequences))
+        if not self.interactive:
+            _reconfigure_inference_batch(global_batch_per_gpu=len(sequences))
 
         with torch.set_grad_enabled(self._freeze_model):
             for output_type in outputs:
@@ -109,11 +191,14 @@ class BaseEncoderDecoderInference(LightningModule):
                 elif output_type == 'embeddings':
                     prediction_data["embeddings"] = self.seq_to_embeddings(sequences)
                 else:
-                    raise ValueError(f"Invalid prediction type: {self.cfg.model.downstream_task.prediction}")
+                    raise ValueError(
+                        f"Invalid prediction type: {self.cfg.model.downstream_task.prediction} "
+                        f"For output type: {output_type}"
+                    )
 
         return prediction_data
 
-    def _tokenize(self, sequences: List[str]):
+    def _tokenize(self, sequences: List[str]) -> torch.Tensor:
         """
         Model specific tokenization.
         Here <BOS> and <EOS> tokens are added for instance.
@@ -123,7 +208,7 @@ class BaseEncoderDecoderInference(LightningModule):
         """
         raise NotImplementedError("Please implement in child class")
 
-    def tokenize(self, sequences: List[str]):
+    def tokenize(self, sequences: List[str]) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Tokenize sequences.
         Returns:
@@ -134,7 +219,7 @@ class BaseEncoderDecoderInference(LightningModule):
 
         # Validate input sequences length
         if any(len(t) > self.model.cfg.seq_length for t in token_ids):
-            raise Exception(f'One or more sequence exceeds max length({self.model.cfg.seq_length}).')
+            raise ValueError(f'One or more sequence exceeds max length({self.model.cfg.seq_length}).')
 
         # Pad token ids (1/True = Active, 0/False = Inactive)
         token_ids, mask = pad_token_ids(
@@ -164,7 +249,7 @@ class BaseEncoderDecoderInference(LightningModule):
         sequences = self.tokenizer.ids_to_text(tokens_ids)
         return sequences
 
-    def detokenize(self, tokens_ids: torch.Tensor):
+    def detokenize(self, tokens_ids: torch.Tensor) -> SeqsOrBatch:
         """
         Detokenize a matrix of tokens into a list or nested list of sequences (i.e., strings).
 
@@ -181,22 +266,21 @@ class BaseEncoderDecoderInference(LightningModule):
         if tensor_dim == 2:
             # For instance, can correspond to the greedy search or topkp sampling where tensors with
             # predicted tokens ids have shape [batch_size, num_tokens_to_generate]
-            sequences = self._detokenize(tokens_ids=tokens_ids)
+            return self._detokenize(tokens_ids=tokens_ids)
         elif tensor_dim == 3:
             # For instance, can correspond to the beam search with beam_size >1 where tensors with predicted tokens ids
             # have shape [batch_size, beam_size, num_tokens_to_generate]
             sequences = []
             for tokens_ids_i in tokens_ids:
                 sequences.append(self._detokenize(tokens_ids=tokens_ids_i))
+            return sequences
         else:
             raise ValueError(
                 f'The shape of the tensor with token_ids is not supported. '
                 f'Supported numbers of dims: {supported_dims}'
             )
 
-        return sequences
-
-    def seq_to_hiddens(self, sequences: List[str]):
+    def seq_to_hiddens(self, sequences: List[str]) -> Tuple[torch.Tensor, torch.Tensor]:
         '''
         Transforms Sequences into hidden state.
         This class should be implemented in a child class, since it is model specific.
@@ -212,7 +296,7 @@ class BaseEncoderDecoderInference(LightningModule):
         '''
         raise NotImplementedError("Please implement in child class")
 
-    def hiddens_to_embedding(self, hidden_states, enc_mask):
+    def hiddens_to_embedding(self, hidden_states: torch.Tensor, enc_mask: torch.Tensor) -> torch.Tensor:
         '''
         Transforms hidden_states into embedding.
 
@@ -232,7 +316,7 @@ class BaseEncoderDecoderInference(LightningModule):
 
         return embeddings
 
-    def seq_to_embeddings(self, sequences: List[str]):
+    def seq_to_embeddings(self, sequences: List[str]) -> torch.Tensor:
         """Compute hidden-state and padding mask for sequences.
 
         Params
@@ -248,7 +332,7 @@ class BaseEncoderDecoderInference(LightningModule):
 
         return embeddings
 
-    def hiddens_to_seq(self, hidden_states, enc_mask, **kwargs):
+    def hiddens_to_seq(self, hidden_states: torch.Tensor, enc_mask: torch.Tensor, **kwargs) -> SeqsOrBatch:
         """
         Transforms hidden state into sequences (i.e., sampling in most cases).
         This class should be implemented in a child class, since it is model specific.
@@ -265,7 +349,7 @@ class BaseEncoderDecoderInference(LightningModule):
         raise NotImplementedError("Please implement in child class")
 
     @property
-    def supported_sampling_methods(self):
+    def supported_sampling_methods(self) -> List[str]:
         """
         Returns a list of supported sampling methods.
         Example:
@@ -274,7 +358,7 @@ class BaseEncoderDecoderInference(LightningModule):
         return list(self.default_sampling_kwargs.keys())
 
     @property
-    def default_sampling_kwargs(self):
+    def default_sampling_kwargs(self) -> Dict[str, Dict[str, Any]]:
         """
         Returns a dict of default sampling kwargs per sampling method.
         Example:
@@ -287,7 +371,13 @@ class BaseEncoderDecoderInference(LightningModule):
         """
         return {}
 
-    def sample(self, num_samples=1, return_embedding=False, sampling_method=None, **sampling_kwarg):
+    def sample(
+        self,
+        num_samples: int = 1,
+        return_embedding: bool = False,
+        sampling_method: Optional[str] = None,
+        **sampling_kwarg,
+    ) -> Union[SeqsOrBatch, Tuple[SeqsOrBatch, torch.Tensor]]:
         """
         Sample from the model given sampling_method.
 
@@ -299,7 +389,7 @@ class BaseEncoderDecoderInference(LightningModule):
         """
         raise NotImplementedError(f"Sampling is not supported in this class ({self.__class__.__name__})")
 
-    def __call__(self, sequences: Union[Series, Dict, List[str]]) -> torch.Tensor:
+    def __call__(self, sequences: Union[Series, IdedSeqs, List[str]]) -> Inference:
         """
         Computes embeddings for a list of sequences.
         Embeddings are detached from model.
@@ -310,20 +400,51 @@ class BaseEncoderDecoderInference(LightningModule):
         Returns
             embeddings
         """
-        ids = None
-        if isinstance(sequences, Series):
-            sequences = sequences.tolist()
-        if isinstance(sequences, Dict):
-            ids = sequences["id"]
-            sequences = sequences["sequence"]
-        result_dict = {}
-        hiddens, enc_mask = self.seq_to_hiddens(sequences)
+        seqs, ids = to_sequences_ids(sequences)
+
+        hiddens, enc_mask = self.seq_to_hiddens(seqs)
         embeddings = self.hiddens_to_embedding(hiddens, enc_mask)
-        result_dict["embeddings"] = embeddings.float().detach().clone()
-        result_dict["hiddens"] = hiddens.float().detach().clone()
-        result_dict["mask"] = enc_mask.detach().clone()
-        result_dict["sequence"] = sequences
+
+        result_dict: Inference = {
+            "embeddings": embeddings.float().detach().clone(),
+            "hiddens": hiddens.float().detach().clone(),
+            "mask": enc_mask.detach().clone(),
+            "sequence": seqs,
+        }
         if ids is not None:
             result_dict["id"] = ids
 
         return result_dict
+
+
+M = TypeVar('M', bound=BaseEncoderDecoderInference)
+"""Generic type for any model that implements :class:`BaseEncoderDecoderInference`.
+"""
+
+
+def to_sequences_ids(
+    sequences: Union[DataFrame, Series, IdedSeqs, List[str]]
+) -> Tuple[List[str], Optional[List[int]]]:
+    """Converts supported sequence data formats into a simple list of sequences and their ids.
+
+    The input must be one of:
+        - Pandas Series containing a list of strings
+        - A dictionary with `id` and `sequence`, int IDs along with each string sequence, respectively
+        - A DataFrame with columns `id` and `sequence`
+        - a list of strings (e.g., SMILES)
+
+    The returned output will be a copy of the sequences and their accompanying IDs. If there are no IDs,
+    then the returned IDs value is `None`.
+    """
+    ids: Optional[List[int]] = None
+    if isinstance(sequences, Series):
+        seqs: List[str] = sequences.tolist()
+    elif isinstance(sequences, Dict):
+        ids = sequences["id"]
+        seqs = sequences["sequence"]
+    elif isinstance(sequences, DataFrame):
+        ids = sequences.loc["id"].values.tolist()
+        seqs = sequences.loc["sequence"].values.tolist()
+    else:
+        seqs = list(sequences)
+    return seqs, ids
