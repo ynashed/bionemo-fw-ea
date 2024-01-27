@@ -4,24 +4,18 @@ defaults:
 # 2 devices 
 trainer:
   devices: 2
-  val_check_interval: 10000
-
+  val_check_interval: 1000
   # Custom settings to reduce time spent in validation
-  log_every_n_steps: 1000
+  log_every_n_steps: 100
   limit_val_batches: 8 # number of batches in validation step, use fraction for fraction of data, 0 to disable
   limit_test_batches: 500 # number of batches in test step, use fraction for fraction of data, 0 to disable
-
-  # DNABERT publication uses 120k steps with a batch size of 2000 = 240,000,000 samples
   max_steps: 400000 # consumed_samples = global_step * micro_batch_size * data_parallel_size * accumulate_grad_batches
-  # 400k * 16 * 2 = 12,800,000
-  # 400k * 32 * 2 = 12,800,000 (* 2)
-  # 400k * 64 * 2 = 12,800,000 (* 2 * 2)
-  # 400k * 128 * 2 = 12,800,000 (*8) = ~102,400,000 steps
-  precision: bf16
-
 model:
-  num_layers: 12
+  num_layers: 6
   micro_batch_size: 128
+  hidden_size: 256
+  ffn_hidden_size: 2048 # Transformer FFN hidden size. Usually 4 * hidden_size.
+  num_attention_heads: 4
   pre_process: True # add embedding
   post_process: True # add pooler
   bert_binary_head: False # BERT binary head
@@ -40,8 +34,20 @@ model:
     num_workers: 24
     dataloader_type: single
     dataset_format: fasta
-  megatron_amp_O2: False # Set to True to go fast
-  precision: bf16
+
+  optim:
+    name: fused_adam
+    lr: 2e-3
+    weight_decay: 0.01
+    betas:
+    - 0.9
+    - 0.98
+    sched:
+      name: CosineAnnealing
+      warmup_steps: 500
+      constant_steps: 50000
+      min_lr: 1e-5
+
 exp_manager:
   explicit_log_dir: null
   exp_dir: ${oc.env:BIONEMO_HOME}/results/nemo_experiments/${.name}/${.wandb_logger_kwargs.name}
@@ -49,6 +55,6 @@ exp_manager:
   create_wandb_logger: True
   wandb_logger_kwargs:
     project: null
-    name: dnabert-pretraining
+    name: dnabert-xsmall
     offline: False
-  resume_if_exists: True
+  resume_if_exists: False

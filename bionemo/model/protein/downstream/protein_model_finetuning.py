@@ -107,11 +107,19 @@ class FineTuneProteinModel(EncoderFineTuning):
         self._test_ds = self.data_module.get_sampled_test_dataset()
 
     def encoder_forward(self, protein_model, batch: dict):
+        '''
+        Params:
+            batch: Dictionary that conatains
+                "embeddings": this is a sequence of amino acids when `encoder_frozen` is False.
+        '''
         if self.encoder_frozen:
+            # If encoder is frozen, the Dataset returns the embedding directly
             enc_output = batch["embeddings"]
         elif self.task_type in ['regression', 'classification']:
+            # contains a sequence, not an embedding
             enc_output = protein_model.seq_to_embeddings(batch["embeddings"])  # (B, D)
         else:
+            # contains a sequence, not an embedding
             enc_output, _ = protein_model.seq_to_hiddens(batch["embeddings"])  # (B, S, D)
             batch_size, seq_len, emb_dim = enc_output.size()
             enc_output = torch.cat(

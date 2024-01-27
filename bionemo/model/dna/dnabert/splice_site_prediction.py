@@ -1,28 +1,51 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+#
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
 from functools import lru_cache
 
-from nemo.collections.nlp.parts.nlp_overrides import NLPSaveRestoreConnector
+from nemo.utils.model_utils import import_class_by_path
 from torch import nn
+from torch.cuda.amp import autocast
 
 from bionemo.data.dna.splice_site_dataset import SpliceSiteDataModule
 from bionemo.model.core import MLPModel
 from bionemo.model.core.encoder_finetuning import EncoderFineTuning
-from bionemo.model.dna.dnabert import DNABERTModel
+from bionemo.model.dna.dnabert.infer import DNABERTInference
 
 
 class SpliceSiteBERTPredictionModel(EncoderFineTuning):
     def __init__(self, cfg, trainer):
+        # commented code is old and dead
+        self.encoder_frozen = cfg.encoder_frozen
         super().__init__(cfg, trainer=trainer)
 
-        self.batch_target_name = cfg.target_name
-        # use this to get the embedding of the midpoint of the sequence
-        self.extract_idx = (cfg.seq_length - 1) // 2
+        # TODO: we might want to adjust this to be a magic value or something taken from the dataset object.
+        self.batch_target_name = self.cfg.target_name
+        self.extract_idx = (self.cfg.seq_length - 1) // 2
 
     def build_loss_fn(self):
         return nn.CrossEntropyLoss()
 
+    def configure_optimizers(self):
+        # TODO do we need to configure a distributed optimizer?, similar to here:
+        # https://github.com/NVIDIA/NeMo/blob/c9811f14fa1e1f990fd29f1aed1ae08e2ff6b014/nemo/collections/nlp/models/language_modeling/megatron_base_model.py#L349
+        super().setup_optimization(optim_config=self.cfg.finetuning_optim)
+
+        if self._scheduler is None:
+            return self._optimizer
+        else:
+            return [self._optimizer], [self._scheduler]
+
     def build_task_head(self):
+        # Task head in this case is a single layer
         return MLPModel(
-            layer_sizes=[self.cfg.hidden_size, self.cfg.n_outputs],
+            layer_sizes=[self.encoder_model.cfg.model.hidden_size, self.cfg.hidden_layer_size, self.cfg.n_outputs],
             dropout=0.1,
         )
 
@@ -30,23 +53,16 @@ class SpliceSiteBERTPredictionModel(EncoderFineTuning):
         return batch[self.batch_target_name]
 
     def setup_encoder_model(self, cfg, trainer):
-        # TODO this could be refactored to instantiate a new model if no
-        # checkpoint is specified
-
-        # TODO do we need to override any keys in the encoder_cfg?
-        # e.g., tensor_model_parallel_size and pipeline_model_parallel_size
-
-        model = DNABERTModel.restore_from(
-            restore_path=cfg.encoder.checkpoint,
-            trainer=trainer,
-            save_restore_connector=NLPSaveRestoreConnector(),
+        infer_class = import_class_by_path(self.cfg.encoder_cfg.infer_target)
+        pretrained_model = infer_class(
+            self.cfg.encoder_cfg,
+            freeze=self.cfg.encoder_frozen,
+            restore_path=self.cfg.restore_encoder_path,
+            training=not self.cfg.encoder_frozen,
+            adjust_config=False,
         )
 
-        # TODO should we be doing this with some sort of
-        # context management so it can be reversed?
-        model.model.post_process = False
-
-        return model
+        return pretrained_model
 
     def extract_for_task_head(self, input_tensor):
         return self.get_hiddens_for_idx(input_tensor, idx=self.extract_idx)
@@ -55,12 +71,21 @@ class SpliceSiteBERTPredictionModel(EncoderFineTuning):
     def get_hiddens_for_idx(input_tensor, idx):
         return input_tensor[:, idx, :]
 
-    def encoder_forward(self, bert_model, batch: dict):
-        tokens, types, _, _, lm_labels, padding_mask = bert_model.process_batch(batch)
-        if not bert_model.cfg.bert_binary_head:
-            types = None
-        output_tensor = bert_model(tokens, padding_mask, token_type_ids=types, lm_labels=lm_labels)
+    def encoder_forward(self, bert_model: DNABERTInference, batch: dict):
+        tokens = batch['text']
+        # 0 indicates padding, 1 indicates a lack of padding.
+        padding_mask = batch['padding_mask']
+        with autocast(enabled=True):
+            output_tensor = bert_model.model(tokens, padding_mask, token_type_ids=None, lm_labels=None)
         return output_tensor
+
+    def forward(self, batch: dict):
+        with autocast(enabled=True):
+            output_tensor = self.encoder_forward(self.encoder_model, batch)
+            task_input_tensor = self.extract_for_task_head(output_tensor)
+            output = self.task_head(task_input_tensor)
+
+        return output
 
     # the lru cache is kind of a hacky way to make sure this isn't set up if
     # it is already initialized, since this function doesn't return anything

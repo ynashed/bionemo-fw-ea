@@ -504,7 +504,7 @@ class ResamplingMappedDataset(MappedDataset):
         data_prefix=None,
         max_seq_length=None,
         seed=None,
-        cfg=None,
+        cfg=None,  # This is usually in model.data subfield
         index_mapping_dir=None,
         name=None,
     ):

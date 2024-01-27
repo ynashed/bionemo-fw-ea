@@ -1,11 +1,11 @@
 defaults:
-  - dnabert_config
+  - dnabert_xsmall
 
 target: bionemo.model.dna.dnabert.dnabert_model.DNABERTModel # path to model class to load
 infer_target: bionemo.model.dna.dnabert.infer.DNABERTInference  # path to inferende class to load
 
-do_training: true 
-do_predict: false 
+do_training: true
+do_predict: false
 
 restore_from_path: ??? # Restores from an existing downstream-task model nemo file.
 
@@ -15,9 +15,9 @@ trainer:
   max_steps: 6000
 
 model:
-  encoder_frozen: True # encoder trainable or frozen
+  restore_encoder_path: null # Points to a .nemo file containing the pretrained xsmall DNABERT
+  encoder_frozen: False # encoder trainable or frozen
   target_name: 'target'
-  restore_encoder_path: ${oc.env:BIONEMO_HOME}/models/dna/dnabert/dnabert-86M.nemo # path to nemo checkpoint of the DNABERT model.
 
   # Controls task head
   n_outputs: 3
@@ -42,7 +42,7 @@ model:
 
   finetuning_optim: # optimizer parameters for downstream task model
     name: adam
-    lr: 0.1
+    lr: 0.0001
 
 exp_manager:
   explicit_log_dir: null

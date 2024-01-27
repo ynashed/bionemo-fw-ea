@@ -88,3 +88,8 @@ models:
         # Hugging face models are multiple files in a directory, so the recursive
         # flag is used to download everything in the dir.
         extra_args: "--recursive"
+    dnabert:
+        pbss: "s3://bionemo-ci/models/dnabert-86M.nemo"
+        symlink:
+            source: "../../dnabert-86M.nemo"
+            target: "dna/dnabert/dnabert-86M.nemo"

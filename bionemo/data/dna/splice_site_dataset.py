@@ -1,3 +1,12 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+#
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
 import math
 import os
 from enum import IntEnum
@@ -121,8 +130,9 @@ def delistify_single_arg(fn: Callable[[List[Any]], Dict]) -> Callable[[Any], Dic
     return wrapper_fn
 
 
-def fetch_bert_dna(row: pd.Series, dataset, bert_prep, length: int):
-    """Fetches and preprocesses data based
+def fetch_bert_dna_midpoint(row: pd.Series, dataset: ConcatFastaDataset, bert_prep, length: int):
+    """Fetches a sequence from a FastaDataset based on the conti and midpoint contained
+    in `row`. The midpoint is expanded such that the returned sequence is of length `length`.
 
     Args:
         row (pd.Series): Row with `coord` and `id` attributes
@@ -168,7 +178,11 @@ def get_autosomes(root_directory, pattern):
 
 class SpliceSiteDataModule(BioNeMoDataModule):
     def __init__(self, cfg, trainer, model, fasta_backend='memory'):
-        """Data Module for Splice Site prediction
+        """Data Module for Splice Site prediction. Fetches sequences based on a GFF containing midpoints.
+        These midpoints represent acceptor and donor sites.
+
+        Note that donors are (forward): AG,  (reverse): CT
+            and acceptors are (forward):GT , (reverse): AC
 
         Args:
             cfg (OmegaConf): Model configuration object
@@ -203,7 +217,12 @@ class SpliceSiteDataModule(BioNeMoDataModule):
         """
         fasta_directory = self.cfg.data.fasta_directory
         pattern = self.cfg.data.fasta_pattern
-        return get_autosomes(fasta_directory, pattern)
+
+        # In the case its a singleton, just return that fasta file.
+        if os.path.exists(self.cfg.data.fasta_pattern):
+            return [self.cfg.data.fasta_pattern]
+        else:
+            return get_autosomes(fasta_directory, pattern)
 
     def train_dataset(self):
         gff_dataset = self.create_dataset(self.train_file)
@@ -222,7 +241,7 @@ class SpliceSiteDataModule(BioNeMoDataModule):
         return gff_dataset
 
     def create_dataset(self, filename):
-        """Creates a pytorch dataset from a CSV containing splice sites.
+        """Creates a pytorch dataset from a CSV containing splice site midpoints.
 
         Args:
             filename (str): splice site CSV. Requires `id` and `coord` columns.
@@ -236,7 +255,7 @@ class SpliceSiteDataModule(BioNeMoDataModule):
         bert_prep = delistify_single_arg(
             KmerBertCollate(
                 self.model.tokenizer,
-                modify_percent=0,
+                modify_percent=0,  # IMPORTANT, this keeps the lm_mask from ever being set.
                 seq_length=self.length,
                 pad_size_divisible_by_8=True,
             ).collate_fn
@@ -246,7 +265,7 @@ class SpliceSiteDataModule(BioNeMoDataModule):
             filename,
             functions=[
                 partial(
-                    fetch_bert_dna,
+                    fetch_bert_dna_midpoint,
                     dataset=self.fasta_dataset,
                     bert_prep=bert_prep,
                     length=self.length,

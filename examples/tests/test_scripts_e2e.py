@@ -45,6 +45,7 @@ DIRS_TO_TEST = [
     'examples/protein/esm2nv/',
     'examples/protein/prott5nv/',
     'examples/protein/openfold/',
+    'examples/dna/dnabert/',
     'examples/molecule/diffdock/',
 ]
 
@@ -78,12 +79,14 @@ def get_data_overrides(script_or_cfg_path: str) -> str:
         'prott5nv',
         'downstream',
         'openfold',
+        'dnabert',
         'diffdock',
     ), 'update this function, patterns might be wrong'
 
     task = {
         'molecule': 'physchem/SAMPL',
         'protein': 'downstream',
+        'dna': 'downstream',
     }
 
     if conf == ['conf']:
@@ -104,7 +107,29 @@ def get_data_overrides(script_or_cfg_path: str) -> str:
             + f' ++data.cache_path={TEST_DATA_DIR}/molecule/diffdock/data_cache'
         )
     elif 'downstream' in script:
-        return MAIN % f'{domain}/{task[domain]}'
+        if model == 'dnabert':
+            fasta_directory = os.path.join(TEST_DATA_DIR, 'dna/downstream')
+            fasta_pattern = fasta_directory + '/test-chr1.fa'
+            splicesite_overrides = (
+                f"++model.data.fasta_directory={fasta_directory} "
+                "++model.data.fasta_pattern=" + fasta_pattern + " "
+                f"++model.data.train_file={fasta_directory}/train.csv "
+                f"++model.data.val_file={fasta_directory}/val.csv "
+                f"++model.data.predict_file={fasta_directory}/test.csv "
+            )
+            return splicesite_overrides
+        else:
+            return MAIN % f'{domain}/{task[domain]}'
+    elif model == 'dnabert':
+        DNABERT_TEST_DATA_DIR = os.path.join(BIONEMO_HOME, 'examples/dna/dnabert/data/small-example')
+        dnabert_overrides = (
+            f"++model.data.dataset_path={DNABERT_TEST_DATA_DIR} "
+            "++model.data.dataset.train=chr1-trim-train.fna "
+            "++model.data.dataset.val=chr1-trim-val.fna "
+            "++do_training=True "
+            "++model.data.dataset.test=chr1-trim-test.fna "
+        )
+        return dnabert_overrides
     elif model == 'esm2nv' and "infer" not in script:
         # TODO(dorotat) Simplify this case when data-related utils for ESM2 are refactored
         UNIREF_FOLDER = "uniref202104_esm2_qc_test200_val200"
@@ -152,7 +177,7 @@ def test_train_scripts(script_path, train_args, data_args, tmp_path):
         f'++{k}={v}' for k, v in train_args.items()
     )
     # TODO(dorotat) Trye to simplify  when data-related utils for ESM2 are refactored
-    if "esm2" not in script_path:
+    if "esm2" not in script_path and "dnabert" not in script_path:
         cmd += ' ' + ' '.join(f'++{k}={v}' for k, v in data_args.items())
     print(cmd)
     process_handle = subprocess.run(cmd, shell=True, capture_output=True)
@@ -180,6 +205,9 @@ def get_infer_args_overrides(config_path, tmp_path):
 @pytest.mark.needs_gpu
 @pytest.mark.parametrize('config_path', INFERENCE_CONFIGS)
 def test_infer_script(config_path, tmp_path):
+    if 'dnabert' in config_path:
+        # Inference scripts make assumptions that are not met for DNABERT.
+        return
     config_dir, config_name = os.path.split(config_path)
     script_path = os.path.join(os.path.dirname(config_dir), 'infer.py')
     infer_args = get_infer_args_overrides(config_path, tmp_path)
@@ -194,6 +222,7 @@ def test_infer_script(config_path, tmp_path):
     if 'retro' in config_path:
         model_checkpoint_path = os.path.join(BIONEMO_HOME, "models/molecule/megamolbart/megamolbart.nemo")
         cmd += f" model.downstream_task.restore_from_path={model_checkpoint_path}"
+
     cmd += get_data_overrides(config_path)
     process_handle = subprocess.run(cmd, shell=True, capture_output=True)
     error_out = process_handle.stderr.decode('utf-8')

@@ -1,0 +1,113 @@
+name: dnabert_base_config
+restore_from_path: null
+do_training: ???
+trainer:
+  devices: 1
+  num_nodes: 1
+  accelerator: gpu
+  precision: 16
+  logger: false
+  enable_checkpointing: false
+  replace_sampler_ddp: false
+  max_epochs: 1
+  max_steps: 500
+  log_every_n_steps: 1000
+  val_check_interval: 1.0
+  limit_val_batches: 1
+  limit_test_batches: 500
+  accumulate_grad_batches: 1
+  gradient_clip_val: 1.0
+  benchmark: false
+exp_manager:
+  explicit_log_dir: null
+  exp_dir: ${oc.env:BIONEMO_HOME}/test_results/nemo_experiments/dnabert_pretrain
+  name: dnabert
+  create_wandb_logger: false
+  wandb_logger_kwargs:
+    project: null
+    name: dnabert-xsmall
+    offline: true
+  resume_if_exists: false
+  resume_ignore_no_checkpoint: true
+  create_checkpoint_callback: true
+  checkpoint_callback_params:
+    monitor: val_loss
+    save_top_k: 10
+    mode: min
+    always_save_nemo: true
+    filename: dnabert--{val_loss:.2f}-{step}-{consumed_samples}
+    model_parallel_size: ${multiply:${model.tensor_model_parallel_size}, ${model.pipeline_model_parallel_size}}
+  create_tensorboard_logger: false
+model:
+  micro_batch_size: 2
+  tensor_model_parallel_size: 1
+  pipeline_model_parallel_size: 1
+  seq_length: 512
+  encoder_seq_length: ${.seq_length}
+  max_position_embeddings: ${.seq_length}
+  num_layers: 6
+  hidden_size: 256
+  ffn_hidden_size: 2048
+  num_attention_heads: 4
+  init_method_std: 0.02
+  hidden_dropout: 0.0
+  kv_channels: null
+  apply_query_key_layer_scaling: true
+  layernorm_epsilon: 1.0e-05
+  make_vocab_size_divisible_by: 128
+  pre_process: true
+  post_process: true
+  bert_binary_head: false
+  resume_from_checkpoint: null
+  masked_softmax_fusion: true
+  tokenizer:
+    type: kmer
+    k: 3
+    model: ${oc.env:BIONEMO_HOME}/tokenizers/dna/dnabert/vocab/dnabert${.k}.model
+    vocab_file: ${oc.env:BIONEMO_HOME}/tokenizers/dna/dnabert/vocab/dnabert${.k}.vocab
+  native_amp_init_scale: 4294967296
+  native_amp_growth_interval: 1000
+  fp32_residual_connection: false
+  fp16_lm_cross_entropy: false
+  seed: 1234
+  use_cpu_initialization: false
+  onnx_safe: false
+  activations_checkpoint_method: null
+  activations_checkpoint_num_layers: 1
+  data:
+    dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/dna/
+    dataset_class: memmap
+    dataset_backend: null
+    discretize_train: false
+    data_prefix: ''
+    index_mapping_type: online
+    block_size: 1000000
+    cache_maxsize: 1000000
+    truncate_to_block_boundary: false
+    shuffle: true
+    dataset:
+      train: chr1-test.fa
+      test: chr1-test.fa
+      val: chr1-test.fa
+    index_mapping_dir: null
+    skip_warmup: true
+    num_workers: 1
+    dataloader_type: single
+    seq_length: ${model.seq_length}
+    k: ${model.tokenizer.k}
+    seed: ${model.seed}
+    micro_batch_size: ${model.micro_batch_size}
+    dataset_format: fasta
+  optim:
+    name: fused_adam
+    lr: 0.002
+    weight_decay: 0.0
+    betas:
+    - 0.9
+    - 0.98
+    sched:
+      name: CosineAnnealing
+      warmup_steps: 5
+      constant_steps: 50000
+      min_lr: 1.0e-05
+  attention_dropout: 0.0

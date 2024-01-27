@@ -1,7 +1,7 @@
 name: dnabert_base_config
 restore_from_path: null # used when starting from a .nemo file
-do_preprocess: True # set to true if data preprocessing steps must be completed. Preprocessing will be skipped if it is already completed.
-do_training: True # set to true to train a model
+
+do_training: ??? # set to true to train a model
 
 trainer:
   devices: 2
@@ -83,7 +83,7 @@ model:
 
 
   # miscellaneous
-  seed: 1235
+  seed: 1234
   use_cpu_initialization: False # Init weights on the CPU (slow for large models)
   onnx_safe: False # Use work-arounds for known problems with Torch ONNX exporter.
 
@@ -97,6 +97,11 @@ model:
     dataset_backend: null # Optional. Required if dataset_class='pyfastx'. Options: 'memory', 'file'.
     discretize_train: False # If True, the reference data for training is chunked.
     data_prefix: ''
+    index_mapping_type: 'online'
+    block_size: 1000000 # OnlineSampleMapping parameter
+    cache_maxsize: 1000000 # OnlineSampleMapping parameter
+    truncate_to_block_boundary: false
+    shuffle: true
     dataset:
       train: ???
       test: ???

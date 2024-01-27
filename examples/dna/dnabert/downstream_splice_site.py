@@ -8,13 +8,15 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
+from pathlib import PosixPath
+
 import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
 import torch
 from nemo.core.config import hydra_runner
 from nemo.utils import logging
-from omegaconf.omegaconf import OmegaConf
+from omegaconf.omegaconf import OmegaConf, open_dict
 
 from bionemo.data.preprocess.dna.preprocess import (
     GRCh38Ensembl99FastaResourcePreprocessor,
@@ -27,65 +29,67 @@ from bionemo.model.utils import (
     InferenceTrainerBuilder,
     setup_trainer,
 )
+from bionemo.utils.connectors import BioNeMoSaveRestoreConnector
 
 
 @hydra_runner(config_path="conf", config_name="dnabert_config_splice_site")
-def main(cfg) -> None:
+def main(cfg):
     logging.info("\n\n************** Experiment configuration ***********")
     logging.info(f"\n{OmegaConf.to_yaml(cfg)}")
 
-    do_training = cfg.task.get("do_training")
-    do_prediction = cfg.task.get("do_prediction")
-    do_preprocess = cfg.task.get("do_preprocess")
+    do_training = cfg.do_training
+    # TODO: fixup the rest of these.
+    do_prediction = cfg.get("do_prediction")
 
-    if do_preprocess:
+    with open_dict(cfg):
+        cfg.model.encoder_cfg = cfg
+
+    if not do_training:
         logging.info("************** Starting Preprocessing ***********")
         preprocessor = GRCh38Ensembl99GFF3ResourcePreprocessor(
-            dest_directory=cfg.task.model.data.dataset_path,  # Set to $BIONEMO_HOME/data
-            root_directory=cfg.task.model.data.root_directory,
-            train_perc=cfg.task.model.data.train_perc,
-            val_perc=cfg.task.model.data.val_perc,
-            test_perc=cfg.task.model.data.test_perc,
-            size=cfg.task.model.size,
+            dest_directory=cfg.model.data.dataset_path,  # Set to $BIONEMO_HOME/data
+            root_directory=cfg.model.data.root_directory,
+            train_perc=cfg.model.data.train_perc,
+            val_perc=cfg.model.data.val_perc,
+            test_perc=cfg.model.data.test_perc,
+            size=cfg.model.data.num_sites_to_include,
         )
         _data_paths = preprocessor.prepare()
 
         # Needed for our actual data loaders. Used inside SpliceSiteDataModule.get_fasta_files()
         fasta_preprocessor = GRCh38Ensembl99FastaResourcePreprocessor(
-            root_directory=cfg.task.model.data.root_directory,  # Set to $BIONEMO_HOME/data
-            dest_directory=cfg.task.model.data.dataset_path,
+            root_directory=cfg.model.data.root_directory,  # Set to $BIONEMO_HOME/data
+            dest_directory=cfg.model.data.dataset_path,
         )
         fasta_preprocessor.prepare()
-        # Simple assertion is making sure the files in cfg.model.data.train/test/val are the same returned.
-        from pathlib import PosixPath
 
-        assert PosixPath(cfg.task.model.data.train_file) in _data_paths
-        # Validation technically not required!
+        assert PosixPath(cfg.model.data.train_file) in _data_paths
         logging.info("*************** Finish Preprocessing ************")
 
     if do_prediction:
-        assert PosixPath(cfg.task.model.data.predict_file) in _data_paths
-        predictions_file = cfg.task.get("predictions_output_file")
+        if (predictions_file := cfg.get("predictions_output_file")) is None:
+            raise ValueError("predictions_output_file must be specified if do_prediction=True")
 
-    if do_prediction and predictions_file is None:
-        raise ValueError("predictions_output_file must be specified if do_prediction=True")
-
-    seed = cfg.task.model.seed
+    seed = cfg.model.seed
     np.random.seed(seed)
     pl.seed_everything(seed)
 
-    trainer = setup_trainer(cfg.task, builder=InferenceTrainerBuilder() if not do_training else None)
-    model = SpliceSiteBERTPredictionModel(cfg.task.model, trainer)
+    trainer = setup_trainer(cfg, builder=InferenceTrainerBuilder() if not do_training else None)
+    if cfg.restore_from_path:
+        logging.info("\nRestoring model from .nemo file " + cfg.restore_from_path)
+        model = SpliceSiteBERTPredictionModel.restore_from(
+            cfg.restore_from_path, cfg.model, trainer=trainer, save_restore_connector=BioNeMoSaveRestoreConnector()
+        )
+    else:
+        model = SpliceSiteBERTPredictionModel(cfg.model, trainer)
 
     if do_training:
         trainer.fit(model)
+        ckpt_path = 'best'
+
     if do_prediction:
         if not do_training:
-            ckpt_path = cfg.task.model.get("resume_from_checkpoint")
-            # NOTE when predicting in distributed, instead use a custom writer, like
-            # seen here: https://pytorch-lightning.readthedocs.io/en/latest/deploy/production_basic.html
             model.data_setup()
-        else:
             ckpt_path = None
 
         dataloader = model.predict_dataloader()
