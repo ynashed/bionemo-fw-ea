@@ -60,6 +60,7 @@ workflow:
         SKIP_CI_MR_JET: "true"
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_LABELS !~ /SKIP_CI/ && $CI_MERGE_REQUEST_LABELS !~ /JET_NOT_REQUIRED/
     - if: $CI_COMMIT_BRANCH == "dev"
+    - if: $CI_COMMIT_BRANCH == "dev-next"
     - if: $CI_COMMIT_BRANCH == "main"
     - if: $CI_COMMIT_BRANCH == "bionemo-rc2306-v1"
 
@@ -210,7 +211,8 @@ pytest:
     - bash ./examples/protein/openfold/scripts/download_data_sample.sh -data_path $BIONEMO_HOME/examples/tests/test_data/ -pbss
     - ls examples/tests/test_data/uniref202104_esm2_qc_test200_val200
     - rm -rf ./.pytest_cache/
-    - pytest -m "not internal" -v --durations=0 --cov=bionemo --cov-report term --cov-report xml:coverage.xml -k "not test_model_training"
+    #pytest -m "not internal" -v --durations=0 --cov=bionemo --cov-report term --cov-report xml:coverage.xml -k "not test_model_training"
+    - bash internal/run_pytest.sh
     - df -Thl
   coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
   artifacts:
@@ -218,6 +220,44 @@ pytest:
       coverage_report:
         coverage_format: cobertura
         path: coverage.xml
+
+pytest-e2e:
+  image:
+    name: "$PIPELINE_TAG-devel"
+    entrypoint: [ "" ]
+  stage: test
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $SKIP_CI_MR == "true"
+      when: never
+    - when: on_success
+  tags:
+    - gpu
+  variables:
+    GIT_STRATEGY: none
+    GIT_CHECKOUT: "false"
+  before_script:
+    - nvidia-smi
+    - df -Thl
+    - pwd
+    # TODO(trvachov): Here, we test the code inside the gitlab mounted path, /builds/clara-discovery/bionemo - CI_PROJECT_DIR
+    # We do not test the code that's mounted to /workspace/bionemo. We probably need two separate test paths for this.
+    - cd $BIONEMO_HOME
+    - ls -ltr
+    - ls -lts /
+    - df -Thl
+  script:
+    - export NGC_CLI_ORG NGC_CLI_TEAM NGC_CLI_FORMAT_TYPE NGC_CLI_API_KEY
+    - export AWS_ENDPOINT_URL=https://pbss.s8k.io
+    - export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
+    - export MODEL_PATH=${BIONEMO_HOME}/models
+    - python download_models.py openfold_inh_finetuned esm2nv_3b esm2nv_650m diffdock_confidence diffdock_score equidock_db5 equidock_dips megamolbart prott5nv esm1nv dnabert --source pbss --download_dir $MODEL_PATH --verbose
+    - unzip examples/tests/test_data/uniref202104_esm2_qc_test200_val200.zip -d examples/tests/test_data/
+    - bash ./examples/molecule/diffdock/scripts/download_data_sample.sh -data_path $BIONEMO_HOME/examples/tests/test_data/molecule/diffdock/ -pbss
+    - bash ./examples/protein/openfold/scripts/download_data_sample.sh -data_path $BIONEMO_HOME/examples/tests/test_data/ -pbss
+    - rm -rf ./.pytest_cache/
+    - pytest -v --durations=0 --cov=bionemo --cov-report term --cov-report xml:coverage.xml examples/tests/test_scripts_e2e.py
+    - df -Thl
+
 
 pytest-internal:
   image:

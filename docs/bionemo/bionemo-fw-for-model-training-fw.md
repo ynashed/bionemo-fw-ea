@@ -123,7 +123,7 @@ Examples of typical configuration modifications for training can be fouind in th
 trainer:
   devices: 8 # number of GPUs
   num_nodes: 2 # If you are working with a multi-node setting, for example, 2xDGX systems
-  precision: 16 # FP 16, 32
+  precision: 16-mixed # 16-mixed, bf16-mixed or 32
   (...)
   accumulate_grad_batches: 1
 

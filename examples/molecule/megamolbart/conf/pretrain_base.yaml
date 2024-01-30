@@ -8,7 +8,7 @@ use_peft: False # indicates whether we intend to use PEFT technique; not impleme
 trainer:
   devices: 8 # number of GPUs or CPUs
   num_nodes: 8
-  precision: 16 # 16, 32
+  precision: 16-mixed # 16-mixed, bf16-mixed, 32
   accelerator: gpu # gpu, cpu
   max_epochs: null # use max_steps instead with NeMo Megatron model
   max_steps: 2000000 # consumed_samples = global_step * micro_batch_size * data_parallel_size * accumulate_grad_batches
@@ -22,7 +22,7 @@ trainer:
   gradient_clip_val: 1.0
   logger: False # logger is provided by NeMo exp_manager
   enable_checkpointing: False # checkpointing is done by NeMo exp_manager
-  replace_sampler_ddp: False # use NeMo Megatron samplers
+  use_distributed_sampler: False # use NeMo Megatron samplers
 
 model:
   name: ${name}-united-token_head

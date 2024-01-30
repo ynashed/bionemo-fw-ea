@@ -33,28 +33,20 @@ MAX_LENGTH_URLS = [
     "http://files.docking.org/2D/KA/KAED.txt",  # small mols
     "http://files.docking.org/2D/AI/AIED.txt",
 ]  # large mols
-##############
 
 
-@pytest.fixture(scope="session")
-def tmp_directory(tmp_path_factory, root_directory=ROOT_DIR):
-    """Create tmp directory"""
-    tmp_path_factory.mktemp(root_directory)
-    return tmp_path_factory.getbasetemp()
-
-
-@pytest.fixture(scope="session")
-def download_directory(tmp_directory):
+@pytest.fixture(scope="function")
+def download_directory(tmp_path):
     """Create the temporary directory for testing and the download directory"""
-    download_directory = pathlib.Path(os.path.join(tmp_directory, 'raw'))
+    download_directory = pathlib.Path(os.path.join(tmp_path, 'raw'))
     download_directory.mkdir(parents=True, exist_ok=True)
     return download_directory
 
 
-@pytest.fixture(scope="session")
-def output_directory(tmp_directory):
+@pytest.fixture(scope="function")
+def output_directory(tmp_path):
     """Create the directory for processed data"""
-    download_dir = pathlib.Path(os.path.join(tmp_directory, 'processed'))
+    download_dir = pathlib.Path(os.path.join(tmp_path, 'processed'))
     download_dir.mkdir(parents=True, exist_ok=True)
     return download_dir
 
@@ -62,7 +54,7 @@ def output_directory(tmp_directory):
 # TODO mocker could probably be made into a fixture
 @requests_mock.Mocker(kw='mocker')
 @pytest.mark.parametrize('config', [(CONFIG)])
-def test_process_files(tmp_directory, download_directory, config, **kwargs):
+def test_process_files(tmp_path, download_directory, config, **kwargs):
     cfg = OmegaConf.create(config)
 
     mocker = kwargs['mocker']
@@ -73,7 +65,7 @@ def test_process_files(tmp_directory, download_directory, config, **kwargs):
             with open(os.path.join(TEST_DATA_DIR, data_filename), 'r') as fh:
                 mocker.get(url, text=fh.read())
 
-    preproc = Zinc15Preprocess(root_directory=tmp_directory)
+    preproc = Zinc15Preprocess(root_directory=tmp_path)
     preproc.process_files(
         links_file=cfg.links_file,
         download_dir=download_directory,
@@ -94,7 +86,7 @@ def test_process_files(tmp_directory, download_directory, config, **kwargs):
 
 @requests_mock.Mocker(kw='mocker')
 @pytest.mark.parametrize('config, header, hash_dict', [(CONFIG, HEADER, TRAIN_VAL_TEST_HASHES)])
-def test_prepare_dataset(tmp_directory, download_directory, output_directory, config, header, hash_dict, **kwargs):
+def test_prepare_dataset(tmp_path, download_directory, output_directory, config, header, hash_dict, **kwargs):
     cfg = OmegaConf.create(config)
 
     mocker = kwargs['mocker']
@@ -105,7 +97,7 @@ def test_prepare_dataset(tmp_directory, download_directory, output_directory, co
             with open(os.path.join(TEST_DATA_DIR, data_filename), 'r') as fh:
                 mocker.get(url, text=fh.read())
 
-    preproc = Zinc15Preprocess(root_directory=tmp_directory)
+    preproc = Zinc15Preprocess(root_directory=str(tmp_path))
     preproc.prepare_dataset(
         max_smiles_length=cfg.max_smiles_length,
         train_samples_per_file=cfg.train_samples_per_file,
@@ -144,13 +136,13 @@ def test_prepare_dataset(tmp_directory, download_directory, output_directory, co
 @requests_mock.Mocker(kw='mocker')
 @pytest.mark.parametrize('url', MAX_LENGTH_URLS)
 @pytest.mark.parametrize('max_smiles_length', (20, 100, 200))
-def test_filtering(tmp_directory, download_directory, url, max_smiles_length, **kwargs):
+def test_filtering(tmp_path, download_directory, url, max_smiles_length, **kwargs):
     data_filename = os.path.basename(url)
     mocker = kwargs['mocker']
     with open(os.path.join(TEST_DATA_DIR, data_filename), 'r') as fh:
         mocker.get(url, text=fh.read())
 
-    preproc = Zinc15Preprocess(root_directory=tmp_directory)
+    preproc = Zinc15Preprocess(root_directory=str(tmp_path))
     preproc._process_file(url, download_directory, max_smiles_length)
     filtered_data = pd.read_csv(download_directory / data_filename)
     if len(filtered_data) > 0:

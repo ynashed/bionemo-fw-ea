@@ -9,6 +9,7 @@ from nemo.collections.nlp.modules.common.megatron.adapters.parallel_adapters imp
 )
 from nemo.collections.nlp.modules.common.megatron.language_model import (
     Embedding,
+    ModelParallelConfig,
     Pooler,
     TransformerLanguageModel,
 )
@@ -49,8 +50,6 @@ try:
     HAVE_MEGATRON_CORE = True
 
 except (ImportError, ModuleNotFoundError):
-    ModelParallelConfig = ApexGuardDefaults
-
     HAVE_MEGATRON_CORE = False
 
 # Additional imports needed for BertModel
@@ -58,16 +57,39 @@ from nemo.collections.nlp.models.language_modeling.megatron.bert_model import Be
 from nemo.utils import logging
 
 
+# TODO(dorotat, georgea) Refactor these part to use directly megatron.core
 class ESMnvEmbedding(Embedding):
     def __init__(
         self,
-        *args,
+        config: ModelParallelConfig,
+        hidden_size,
+        vocab_size,
+        max_sequence_length,
+        embedding_dropout_prob,
+        init_method,
+        num_tokentypes=0,
+        dtype=torch.float32,
+        fp32_residual_connection=False,
+        position_embedding_type='learned_absolute',
+        transpose_batch_sequence=True,
+        # BIONEMO NEW ARGS
         token_dropout=False,
         use_attention_mask=False,
         mask_token_id=None,
-        **kwargs,
     ):
-        super(ESMnvEmbedding, self).__init__(*args, **kwargs)
+        super().__init__(
+            config=config,
+            hidden_size=hidden_size,
+            vocab_size=vocab_size,
+            max_sequence_length=max_sequence_length,
+            init_method=init_method,
+            num_tokentypes=num_tokentypes,
+            embedding_dropout_prob=embedding_dropout_prob,
+            position_embedding_type=position_embedding_type,
+            transpose_batch_sequence=transpose_batch_sequence,
+            fp32_residual_connection=fp32_residual_connection,
+            dtype=dtype,
+        )
         self.token_dropout = token_dropout
         self.use_attention_mask = use_attention_mask
         if mask_token_id is None:
@@ -106,6 +128,8 @@ class ESMnvEmbedding(Embedding):
             assert position_ids is not None
             position_embeddings = self.position_embeddings(position_ids)
             embeddings = words_embeddings + position_embeddings
+        elif self.position_embedding_type == 'learned_parameters':
+            embeddings = words_embeddings + self.position_embeddings
         else:
             embeddings = words_embeddings
         if token_type_ids is not None:
@@ -144,6 +168,7 @@ class ESMnvTransformerLanguageModel(TransformerLanguageModel):
     # modifications are annotated with `BIONEMO`.
     def __init__(
         self,
+        config: ModelParallelConfig,
         init_method,
         output_layer_init_method,
         encoder_attn_mask_type,
@@ -161,7 +186,6 @@ class ESMnvTransformerLanguageModel(TransformerLanguageModel):
         add_pooler=False,
         pre_process=True,
         post_process=True,
-        use_cpu_initialization=False,
         megatron_amp_O2=False,
         hidden_dropout=0.1,
         attention_dropout=0.1,
@@ -184,27 +208,27 @@ class ESMnvTransformerLanguageModel(TransformerLanguageModel):
         rotary_percentage=1.0,
         multi_query_attention=False,
         share_embeddings_and_output_weights=True,
-        gradient_accumulation_fusion=False,
         persist_layer_norm=False,
         openai_gelu=False,
         onnx_safe=False,
         megatron_legacy=False,
         activations_checkpoint_granularity=None,
         activations_checkpoint_layers_per_pipeline=None,
-        sequence_parallel=False,
         transformer_engine=False,
         fp8=False,
         fp8_e4m3=False,
         fp8_hybrid=False,
         fp8_margin=0,
         fp8_interval=1,
-        fp8_amax_history_len=1,
-        fp8_amax_compute_algo='most_recent',
+        fp8_amax_history_len=1024,
+        fp8_amax_compute_algo='max',
         reduce_amax=True,
         use_emha=False,
         ub_tp_comm_overlap=False,
         use_flash_attention=False,
-        # BIONEMO: New arguments
+        seq_len_interpolation_factor=None,
+        rotary_base=10000,
+        # BIONEMO: new arguments
         embedding_token_dropout=False,
         embedding_use_attention_mask=False,
         mask_token_id=None,
@@ -214,7 +238,9 @@ class ESMnvTransformerLanguageModel(TransformerLanguageModel):
         use_pt_layernorm=False,
         use_pt_mlp_out=False,
     ):
-        super(TransformerLanguageModel, self).__init__(share_token_embeddings=share_embeddings_and_output_weights)
+        super(TransformerLanguageModel, self).__init__(
+            config=config, share_token_embeddings=share_embeddings_and_output_weights
+        )
 
         self.pre_process = pre_process
         self.post_process = post_process
@@ -232,8 +258,8 @@ class ESMnvTransformerLanguageModel(TransformerLanguageModel):
         self.output_layer_init_method = output_layer_init_method
         self.position_embedding_type = position_embedding_type
         self.share_embeddings_and_output_weights = share_embeddings_and_output_weights
-        self.sequence_parallel = sequence_parallel
-        self.dtype = utils_funcs.dtype_from_precision(precision, megatron_amp_O2)
+        self.sequence_parallel = config.sequence_parallel
+        self.dtype = utils_funcs.torch_dtype_from_precision(precision, megatron_amp_O2)
         if kv_channels is None:
             assert (
                 hidden_size % num_attention_heads == 0
@@ -245,15 +271,13 @@ class ESMnvTransformerLanguageModel(TransformerLanguageModel):
             # BIONEMO: New embedding class
             # TODO(srabhi, georgea): refactor the custom ESMnvEmbedding module using Megatron Core when NeMo 1.21 is available
             self.embedding = ESMnvEmbedding(
+                config=config,
                 hidden_size=self.hidden_size,
                 vocab_size=self.vocab_size,
                 max_sequence_length=self.max_position_embeddings,
                 init_method=self.init_method,
                 num_tokentypes=self.num_tokentypes,
-                use_cpu_initialization=use_cpu_initialization,
-                megatron_amp_O2=megatron_amp_O2,
                 embedding_dropout_prob=self.hidden_dropout,
-                sequence_parallel=sequence_parallel,
                 position_embedding_type=position_embedding_type,
                 fp32_residual_connection=fp32_residual_connection,
                 dtype=self.dtype,
@@ -269,7 +293,12 @@ class ESMnvTransformerLanguageModel(TransformerLanguageModel):
             assert 0 < rotary_percentage <= 1
             if rotary_percentage < 1:
                 rotary_dim = int(rotary_dim * rotary_percentage)
-            self.rotary_pos_emb = RotaryEmbedding(rotary_dim)
+            self.rotary_pos_emb = RotaryEmbedding(
+                rotary_dim,
+                seq_len_interpolation_factor=seq_len_interpolation_factor,
+                pretrained_max_position_embeddings=max_position_embeddings,
+                rotary_base=rotary_base,
+            )
 
         elif position_embedding_type == 'alibi':
             # TODO: If this is used for encoder-decodemax_position_embeddingsr model, implement proper logic and following
@@ -307,6 +336,7 @@ class ESMnvTransformerLanguageModel(TransformerLanguageModel):
 
         # Transformer.
         self.encoder = ESMnvParallelTransformer(
+            config=config,
             init_method=self.init_method,
             output_layer_init_method=self.output_layer_init_method,
             num_layers=self.num_layers,
@@ -327,7 +357,6 @@ class ESMnvTransformerLanguageModel(TransformerLanguageModel):
             hidden_dropout=hidden_dropout,
             attention_dropout=attention_dropout,
             ffn_dropout=ffn_dropout,
-            use_cpu_initialization=use_cpu_initialization,
             megatron_amp_O2=megatron_amp_O2,
             persist_layer_norm=persist_layer_norm,
             openai_gelu=openai_gelu,
@@ -341,9 +370,7 @@ class ESMnvTransformerLanguageModel(TransformerLanguageModel):
             transformer_block_type=transformer_block_type,
             normalize_attention_scores=normalize_attention_scores,
             multi_query_attention=multi_query_attention,
-            gradient_accumulation_fusion=gradient_accumulation_fusion,
             megatron_legacy=megatron_legacy,
-            sequence_parallel=sequence_parallel,
             activations_checkpoint_granularity=activations_checkpoint_granularity,
             activations_checkpoint_layers_per_pipeline=activations_checkpoint_layers_per_pipeline,
             transformer_engine=transformer_engine,
@@ -370,6 +397,7 @@ class ESMnvTransformerLanguageModel(TransformerLanguageModel):
         # Decoder
         if self.add_decoder:
             self.decoder = ParallelTransformer(
+                config=config,
                 layer_type=LayerType.decoder,
                 self_attn_mask_type=self.decoder_attn_mask_type,
                 init_method=self.init_method,
@@ -390,17 +418,14 @@ class ESMnvTransformerLanguageModel(TransformerLanguageModel):
                 layernorm_epsilon=layernorm_epsilon,
                 hidden_dropout=hidden_dropout,
                 attention_dropout=attention_dropout,
-                use_cpu_initialization=use_cpu_initialization,
                 megatron_amp_O2=megatron_amp_O2,
                 bias_activation_fusion=bias_activation_fusion,
                 bias_dropout_add_fusion=bias_dropout_add_fusion,
                 masked_softmax_fusion=masked_softmax_fusion,
-                gradient_accumulation_fusion=gradient_accumulation_fusion,
                 persist_layer_norm=persist_layer_norm,
                 openai_gelu=openai_gelu,
                 onnx_safe=onnx_safe,
                 megatron_legacy=megatron_legacy,
-                sequence_parallel=sequence_parallel,
                 activations_checkpoint_granularity=activations_checkpoint_granularity,
                 activations_checkpoint_layers_per_pipeline=activations_checkpoint_layers_per_pipeline,
                 transformer_engine=transformer_engine,
@@ -412,15 +437,14 @@ class ESMnvTransformerLanguageModel(TransformerLanguageModel):
         if self.post_process:
             # Pooler.
             if self.add_pooler:
-                self.pooler = Pooler(self.hidden_size, self.init_method, sequence_parallel=sequence_parallel)
+                self.pooler = Pooler(self.hidden_size, self.init_method, sequence_parallel=self.sequence_parallel)
                 self._pooler_key = 'pooler'
 
             if not self.share_embeddings_and_output_weights:
                 self.output_layer = tensor_parallel.ColumnParallelLinear(
                     self.hidden_size,
                     self.vocab_size,
-                    use_cpu_initialization=use_cpu_initialization,
-                    params_dtype=self.dtype,
+                    config=config,
                     bias=False,  # Setting bias to False always to keep it consistent with embedding tying that also does not have a bias.
                     init_method=self.init_method,
                 )
@@ -552,6 +576,7 @@ class ESMnvTransformerLanguageModel(TransformerLanguageModel):
 
 
 def esm_get_language_model(
+    config: ModelParallelConfig,
     hidden_size,
     ffn_hidden_size,
     num_layers,
@@ -570,7 +595,6 @@ def esm_get_language_model(
     pre_process=True,
     post_process=True,
     init_method_std=0.02,
-    use_cpu_initialization=False,
     megatron_amp_O2=False,
     hidden_dropout=0.1,
     attention_dropout=0.1,
@@ -594,26 +618,26 @@ def esm_get_language_model(
     multi_query_attention=False,
     bias_dropout_add_fusion=True,
     bias=True,
-    gradient_accumulation_fusion=False,
     persist_layer_norm=False,
     openai_gelu=False,
     onnx_safe=False,
     megatron_legacy=False,
     activations_checkpoint_granularity=None,
     activations_checkpoint_layers_per_pipeline=None,
-    sequence_parallel=False,
     transformer_engine=False,
     fp8=False,
     fp8_e4m3=False,
     fp8_hybrid=False,
     fp8_margin=0,
     fp8_interval=1,
-    fp8_amax_history_len=1,
-    fp8_amax_compute_algo='most_recent',
+    fp8_amax_history_len=1024,
+    fp8_amax_compute_algo='max',
     reduce_amax=True,
     use_emha=False,
     ub_tp_comm_overlap=False,
     use_flash_attention=False,
+    seq_len_interpolation_factor=None,
+    rotary_base=10000,
     # BIONEMO: new arguments
     embedding_token_dropout=False,
     embedding_use_attention_mask=False,
@@ -641,6 +665,7 @@ def esm_get_language_model(
     # BIONEMO: use custom class
     # TODO(srabhi, georgea): refactor the custom ESMnvTransformerLanguageModel module using Megatron Core when NeMo 1.21 is available
     language_model = ESMnvTransformerLanguageModel(
+        config=config,
         init_method=init_method,
         output_layer_init_method=scaled_init_method,
         encoder_attn_mask_type=encoder_attn_mask_type,
@@ -658,7 +683,6 @@ def esm_get_language_model(
         add_pooler=add_pooler,
         pre_process=pre_process,
         post_process=post_process,
-        use_cpu_initialization=use_cpu_initialization,
         megatron_amp_O2=megatron_amp_O2,
         hidden_dropout=hidden_dropout,
         attention_dropout=attention_dropout,
@@ -675,7 +699,6 @@ def esm_get_language_model(
         rotary_percentage=rotary_percentage,
         share_embeddings_and_output_weights=share_embeddings_and_output_weights,
         masked_softmax_fusion=masked_softmax_fusion,
-        gradient_accumulation_fusion=gradient_accumulation_fusion,
         activation=activation,
         headscale=headscale,
         transformer_block_type=transformer_block_type,
@@ -688,7 +711,6 @@ def esm_get_language_model(
         megatron_legacy=megatron_legacy,
         activations_checkpoint_granularity=activations_checkpoint_granularity,
         activations_checkpoint_layers_per_pipeline=activations_checkpoint_layers_per_pipeline,
-        sequence_parallel=sequence_parallel,
         transformer_engine=transformer_engine,
         fp8=fp8,
         fp8_e4m3=fp8_e4m3,
@@ -701,6 +723,8 @@ def esm_get_language_model(
         use_emha=use_emha,
         ub_tp_comm_overlap=ub_tp_comm_overlap,
         use_flash_attention=use_flash_attention,
+        seq_len_interpolation_factor=seq_len_interpolation_factor,
+        rotary_base=rotary_base,
         # BIONEMO: add arguments
         embedding_token_dropout=embedding_token_dropout,
         embedding_use_attention_mask=embedding_use_attention_mask,
@@ -720,6 +744,7 @@ def esm_get_language_model(
 class ESMnvBertModel(BertModel):
     def __init__(
         self,
+        config: ModelParallelConfig,
         vocab_size,
         hidden_size,
         max_position_embeddings,
@@ -734,7 +759,6 @@ class ESMnvBertModel(BertModel):
         post_process=True,
         init_method_std=0.02,
         fp16_lm_cross_entropy=False,
-        use_cpu_initialization=False,
         megatron_amp_O2=False,
         hidden_dropout=0.1,
         precision=16,
@@ -746,6 +770,7 @@ class ESMnvBertModel(BertModel):
         layernorm_epsilon=1e-5,
         masked_softmax_fusion=False,
         bias_gelu_fusion=True,
+        bias_dropout_add_fusion=True,
         openai_gelu=False,
         onnx_safe=False,
         add_binary_head=True,
@@ -763,7 +788,7 @@ class ESMnvBertModel(BertModel):
         use_pt_layernorm=False,
         use_pt_mlp_out=False,
     ):
-        super(BertModel, self).__init__()
+        super(BertModel, self).__init__(config=config)
         self.fp16_lm_cross_entropy = fp16_lm_cross_entropy
         self.add_binary_head = add_binary_head
         self.parallel_output = parallel_output
@@ -777,6 +802,7 @@ class ESMnvBertModel(BertModel):
         # BIONEMO: use custom language model constructor
         # TODO(srabhi, georgea): refactor the custom esm_get_language_model method using Megatron Core when NeMo 1.21 is available
         self.language_model, self._language_model_key = esm_get_language_model(
+            config=config,
             vocab_size=vocab_size,
             hidden_size=hidden_size,
             hidden_dropout=hidden_dropout,
@@ -794,7 +820,6 @@ class ESMnvBertModel(BertModel):
             pre_process=self.pre_process,
             post_process=self.post_process,
             init_method_std=init_method_std,
-            use_cpu_initialization=use_cpu_initialization,
             megatron_amp_O2=megatron_amp_O2,
             precision=precision,
             fp32_residual_connection=fp32_residual_connection,
@@ -805,10 +830,10 @@ class ESMnvBertModel(BertModel):
             layernorm_epsilon=layernorm_epsilon,
             masked_softmax_fusion=masked_softmax_fusion,
             bias_activation_fusion=bias_gelu_fusion,
+            bias_dropout_add_fusion=bias_dropout_add_fusion,
             openai_gelu=openai_gelu,
             onnx_safe=onnx_safe,
             megatron_legacy=megatron_legacy,
-            sequence_parallel=sequence_parallel,
             position_embedding_type=position_embedding_type,
             # BIONEMO: use new arguments
             attention_dropout=attention_dropout,
@@ -828,6 +853,7 @@ class ESMnvBertModel(BertModel):
 
         if self.post_process:
             self.lm_head = BertLMHead(
+                config,
                 self.word_embeddings_weight().size(0),
                 hidden_size,
                 init_method,
@@ -835,7 +861,6 @@ class ESMnvBertModel(BertModel):
                 parallel_output,
                 openai_gelu,
                 onnx_safe,
-                sequence_parallel,
             )
             self._lm_head_key = 'lm_head'
             self.binary_head = None
@@ -850,6 +875,7 @@ class ESMnvMegatronBertModel(MegatronBertModel):
         num_tokentypes = 2 if cfg.bert_binary_head else 0
         # TODO(srabhi, georgea): refactor the custom ESMnvBertModel method using Megatron Core when NeMo 1.21 is available
         model = ESMnvBertModel(
+            config=self.model_parallel_config,
             vocab_size=self.padded_vocab_size,
             hidden_size=cfg.hidden_size,
             max_position_embeddings=cfg.max_position_embeddings,
@@ -865,7 +891,6 @@ class ESMnvMegatronBertModel(MegatronBertModel):
             init_method_std=cfg.get('init_method_std', 0.02),
             fp16_lm_cross_entropy=cfg.get('fp16_lm_cross_entropy', False),
             megatron_amp_O2=self.cfg.get('megatron_amp_O2', False),
-            use_cpu_initialization=cfg.get('use_cpu_initialization', False),
             hidden_dropout=cfg.get('hidden_dropout', 0.1),
             precision=cfg.get('precision', 16),
             fp32_residual_connection=cfg.get('fp32_residual_connection', False),
@@ -878,10 +903,10 @@ class ESMnvMegatronBertModel(MegatronBertModel):
             layernorm_epsilon=cfg.get('layernorm_epsilon', 1e-5),
             masked_softmax_fusion=cfg.get('masked_softmax_fusion', True),
             bias_gelu_fusion=cfg.get('bias_gelu_fusion', True),
+            bias_dropout_add_fusion=cfg.get("bias_dropout_add_fusion", True),
             onnx_safe=cfg.get('onnx_safe', False),
             add_binary_head=cfg.bert_binary_head,
             megatron_legacy=cfg.get('megatron_legacy', False),
-            sequence_parallel=self.cfg.get('sequence_parallel', False),
             position_embedding_type=self.cfg.get("position_embedding_type", "learned_absolute"),
             # BIONEMO: use custom flags
             embedding_token_dropout=self.cfg.get("embedding_token_dropout", False),

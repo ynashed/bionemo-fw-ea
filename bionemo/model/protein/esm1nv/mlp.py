@@ -7,13 +7,20 @@ from nemo.collections.nlp.modules.common.megatron.adapters.parallel_adapters imp
 from nemo.collections.nlp.modules.common.megatron.fused_bias_geglu import fused_bias_geglu
 from nemo.collections.nlp.modules.common.megatron.fused_bias_gelu import fused_bias_gelu
 from nemo.collections.nlp.modules.common.megatron.layer_norm_1p import LayerNorm1P
-from nemo.collections.nlp.modules.common.megatron.utils import ApexGuardDefaults, erf_gelu, squared_relu
-from nemo.collections.nlp.modules.common.megatron.utils import openai_gelu as openai_gelu_func
+from nemo.collections.nlp.modules.common.megatron.utils import (
+    ApexGuardDefaults,
+    ApproxGELUActivation,
+    erf_gelu,
+    squared_relu,
+)
+from nemo.collections.nlp.modules.common.megatron.utils import (
+    openai_gelu as openai_gelu_func,
+)
 
 
 try:
     from apex.normalization import MixedFusedRMSNorm
-    from apex.transformer import parallel_state, tensor_parallel
+    from apex.transformer import tensor_parallel
 
     HAVE_APEX = True
 
@@ -25,7 +32,8 @@ except (ImportError, ModuleNotFoundError):
 
 
 try:
-    from megatron.core import parallel_state, tensor_parallel
+    from megatron.core import tensor_parallel
+    from megatron.core.model_parallel_config import ModelParallelConfig
     from megatron.core.parallel_state import get_tensor_model_parallel_world_size
 
     HAVE_MEGATRON_CORE = True
@@ -54,14 +62,15 @@ def esm_gelu_func(x):
 # END BIONEMO
 
 
+# TODO(dorotat, georgea) Refactor these part to use directly megatron.core
 class ESMnvParallelMLP(ParallelMLP):
     def __init__(
         self,
+        config: ModelParallelConfig,
         init_method,
         output_layer_init_method,
         hidden_size,
         ffn_hidden_size,
-        use_cpu_initialization=False,
         dtype=torch.float32,
         bias_activation_fusion=True,
         openai_gelu=False,
@@ -72,8 +81,6 @@ class ESMnvParallelMLP(ParallelMLP):
         normalization='layernorm',
         layernorm_epsilon=1e-5,
         persist_layer_norm=False,
-        sequence_parallel=False,
-        gradient_accumulation_fusion=False,
         dropout=0.0,
         # BIONEMO ARGS
         esm_gelu=False,
@@ -82,7 +89,7 @@ class ESMnvParallelMLP(ParallelMLP):
         # END BIONEMO
     ):
         # TODO(srabhi, georgea): refactor the custom ESMnvParallelMLP module using Megatron Core when NeMo 1.21 is available
-        super(ParallelMLP, self).__init__()
+        super(ParallelMLP, self).__init__(config=config)
         self.activation = activation
         self.bias = bias
         self.transformer_block_type = transformer_block_type
@@ -92,8 +99,8 @@ class ESMnvParallelMLP(ParallelMLP):
         self.activation = activation
         self.dropout = dropout
         self.dtype = dtype
-        self.esm_layer = use_pt_mlp_out
         self.set_accepted_adapter_types([MLPInfusedAdapterConfig._target_])
+        self.esm_layer = use_pt_mlp_out
 
         supported_activations = [
             'gelu',
@@ -104,6 +111,7 @@ class ESMnvParallelMLP(ParallelMLP):
             'fast-geglu',
             'fast-swiglu',
             'fast-reglu',
+            'approx-gelu',
         ]
 
         if activation not in supported_activations:
@@ -112,24 +120,18 @@ class ESMnvParallelMLP(ParallelMLP):
             )
 
         self.fast_glu_activation = activation in ['fast-geglu', 'fast-swiglu', 'fast-reglu']
-        async_tensor_model_parallel_allreduce = (
-            parallel_state.get_tensor_model_parallel_world_size() > 1 and not sequence_parallel
-        )
+
         # Project to 4h.
         self.dense_h_to_4h = tensor_parallel.ColumnParallelLinear(
             hidden_size,
             ffn_hidden_size * 2
             if self.fast_glu_activation
             else ffn_hidden_size,  # NOTE: When using geglu, divide ffn dim by 2/3 to keep overall params the same.
+            config=config,
             gather_output=False,
             init_method=init_method,
             skip_bias_add=True,
-            use_cpu_initialization=use_cpu_initialization,
-            params_dtype=dtype,
             bias=bias,
-            sequence_parallel_enabled=sequence_parallel,
-            async_tensor_model_parallel_allreduce=async_tensor_model_parallel_allreduce,
-            gradient_accumulation_fusion=gradient_accumulation_fusion,
         )
 
         if activation in ['geglu', 'reglu', 'swiglu']:
@@ -138,15 +140,11 @@ class ESMnvParallelMLP(ParallelMLP):
             self.dense_h_to_4h_2 = tensor_parallel.ColumnParallelLinear(
                 hidden_size,
                 ffn_hidden_size,  # NOTE: When using *glu, divide ffn dim by 2/3 to keep overall params the same.
+                config=config,
                 gather_output=False,
                 init_method=init_method,
                 skip_bias_add=True,
-                use_cpu_initialization=use_cpu_initialization,
-                params_dtype=dtype,
                 bias=bias,
-                sequence_parallel_enabled=sequence_parallel,
-                async_tensor_model_parallel_allreduce=async_tensor_model_parallel_allreduce,
-                gradient_accumulation_fusion=gradient_accumulation_fusion,
             )
 
         self.glu_activation_family = activation in [
@@ -185,6 +183,8 @@ class ESMnvParallelMLP(ParallelMLP):
             self.activation_func = esm_gelu_func
         elif activation in ["gelu", "geglu", "fast-geglu"]:
             self.activation_func = F.gelu
+        elif activation == 'approx-gelu':
+            self.activation_func = ApproxGELUActivation
         elif onnx_safe:
             self.activation_func = erf_gelu
         elif activation in ["reglu", "fast-reglu"]:
@@ -205,14 +205,11 @@ class ESMnvParallelMLP(ParallelMLP):
             self.dense_4h_to_h = tensor_parallel.RowParallelLinear(
                 ffn_hidden_size,
                 hidden_size,
+                config=config,
                 input_is_parallel=True,
                 init_method=output_layer_init_method,
                 skip_bias_add=True,
-                use_cpu_initialization=use_cpu_initialization,
-                params_dtype=dtype,
                 bias=bias,
-                sequence_parallel_enabled=sequence_parallel,
-                gradient_accumulation_fusion=gradient_accumulation_fusion,
             )
 
         # Normformer normalization
@@ -228,7 +225,7 @@ class ESMnvParallelMLP(ParallelMLP):
                 self.normalization = LayerNorm1P(
                     ffn_hidden_size // get_tensor_model_parallel_world_size(),
                     layernorm_epsilon,
-                    sequence_parallel_enabled=sequence_parallel,
+                    sequence_parallel_enabled=config.sequence_parallel,
                 )
             else:
                 self.normalization = MixedFusedRMSNorm(
@@ -279,7 +276,7 @@ class ESMnvParallelMLP(ParallelMLP):
         if self.transformer_block_type == 'normformer':
             intermediate_parallel = self.normalization(intermediate_parallel)
 
-        # [s, b, h]
+        # [s, b, h] BIONEMO NEW, think about: output, output_bias = super().forward(hidden_states) and the inf statement
         if self.esm_layer:
             output = self.dense_4h_to_h(intermediate_parallel)
             output_bias = torch.zeros(size=(hidden_states.shape[-1],)).to(output.device)

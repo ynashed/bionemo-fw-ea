@@ -7,7 +7,7 @@ use_peft: false
 trainer:
   devices: 1
   num_nodes: 1
-  precision: 16
+  precision: 16-mixed
   accelerator: gpu
   max_epochs: 1
   max_steps: 500
@@ -21,7 +21,7 @@ trainer:
   gradient_clip_val: 1.0
   logger: false
   enable_checkpointing: false
-  replace_sampler_ddp: false
+  use_distributed_sampler: false
 model:
   name: xsmall_span_aug
   micro_batch_size: 4

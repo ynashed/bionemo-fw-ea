@@ -14,6 +14,12 @@ from copy import deepcopy
 from typing import Dict, List, Tuple
 
 import torch
+from apex.transformer.pipeline_parallel.utils import get_num_microbatches
+from megatron.core import parallel_state
+from megatron.core.pipeline_parallel.schedules import get_forward_backward_func
+from nemo.collections.nlp.data.language_modeling.megatron.data_samplers import (
+    MegatronPretrainingSampler,
+)
 from nemo.collections.nlp.models.language_modeling.megatron_lm_encoder_decoder_model import (
     MegatronLMEncoderDecoderModel,
 )
@@ -22,23 +28,6 @@ from nemo.utils import logging
 from omegaconf.dictconfig import DictConfig
 from pytorch_lightning.trainer.trainer import Trainer
 from rdkit import Chem, RDLogger
-
-
-try:
-    from apex.transformer.pipeline_parallel.utils import get_num_microbatches
-
-    HAVE_APEX = True
-
-except (ImportError, ModuleNotFoundError):
-    HAVE_APEX = False
-
-try:
-    from megatron.core.pipeline_parallel.schedules import get_forward_backward_func
-
-    HAVE_MEGATRON_CORE = True
-
-except (ImportError, ModuleNotFoundError):
-    HAVE_MEGATRON_CORE = False
 
 from bionemo.data import DatasetTypes
 from bionemo.utils import flatten_dict
@@ -63,6 +52,7 @@ class MegaMolBARTModelBase(MegatronLMEncoderDecoderModel, ABC):
         super().__init__(cfg, trainer=trainer)
         pad_size_divisible_by_8 = True if self._cfg.masked_softmax_fusion else False
         self._collate_fn = self._setup_collate(pad_size_divisible_by_8)
+        self._val_output_list = None
 
     @abstractmethod
     def _setup_collate(self, pad_size_divisible_by_8: bool):
@@ -158,11 +148,6 @@ class MegaMolBARTModelBase(MegatronLMEncoderDecoderModel, ABC):
         )
 
         # NOTE (SKH) this was taken directly from megatron, this is the 'single' dataloader type.
-        from megatron.core import parallel_state
-        from nemo.collections.nlp.data.language_modeling.megatron.data_samplers import (
-            MegatronPretrainingSampler,
-        )
-
         batch_sampler = MegatronPretrainingSampler(
             total_samples=len(dataset),
             consumed_samples=consumed_samples,
@@ -244,7 +229,6 @@ class MegaMolBARTModelBase(MegatronLMEncoderDecoderModel, ABC):
         self.log_dict(logged_results, prog_bar=True)
 
     def validation_step_logits(self, batch, batch_idx):
-        tensor_shape = [self.max_encoder_seq_length, self.cfg.micro_batch_size, self.cfg.encoder.hidden_size]
         arg_names = ['enc_input_ids', 'enc_attn_mask', 'dec_input_ids', 'dec_attn_mask']
         (
             encoder_input_ids,
@@ -267,12 +251,11 @@ class MegaMolBARTModelBase(MegatronLMEncoderDecoderModel, ABC):
             ),
             model=[self.enc_dec_model],
             num_microbatches=get_num_microbatches(),
-            forward_only=True,
-            tensor_shape=tensor_shape,
+            seq_length=self.max_encoder_seq_length,
+            micro_batch_size=self.cfg.micro_batch_size,
             decoder_seq_length=self.max_decoder_seq_length,
-            dtype=self.autocast_dtype,
-            grad_scaler=self.trainer.precision_plugin.scaler.scale if self.cfg.precision == 16 else None,
-            enable_autocast=self.enable_autocast,
+            forward_only=True,
+            collect_non_loss_data=False,
         )
 
         if output_tensor:
@@ -285,8 +268,13 @@ class MegaMolBARTModelBase(MegatronLMEncoderDecoderModel, ABC):
 
         return logits_tensor
 
+    def on_validation_epoch_start(self) -> None:
+        super().on_validation_epoch_start()
+        self._val_output_list = []
+        return
+
     def validation_step(self, batch, batch_idx):
-        loss_mean = super().validation_step(
+        logs = super().validation_step(
             iter(
                 [
                     batch,
@@ -314,29 +302,30 @@ class MegaMolBARTModelBase(MegatronLMEncoderDecoderModel, ABC):
             log_mol=log_mol,
         )
 
-        logs = {'loss': loss_mean}
         for metric_name, metric_value in metrics.items():
             logs[metric_name] = metric_value
 
         # return loss_mean
-        return logs
+        self._val_output_list.append(logs)
 
-    def validation_epoch_end(self, outputs):
+    def on_validation_epoch_end(self):
+        outputs = self._val_output_list
         if len(outputs) == 0:
             return
 
         logging.info('Finishing validation epoch')
-        all_keys = list(outputs[0].keys())
-        new_outputs = {}
-        for k in all_keys:
-            new_outputs[k] = super().validation_epoch_end([o[k] for o in outputs])
+        self.validation_step_outputs = [{'loss': o['loss']} for o in outputs]
+        super().on_validation_epoch_end()
 
         self._inference_epoch_end(outputs, mode='val')
+        self._val_output_list.clear()
 
-    def test_epoch_end(self, outputs):
+    def on_test_epoch_end(self):
         logging.info('Finishing test epoch')
-        super().test_epoch_end(outputs)
+        outputs = self.test_step_outputs[:]
+        super().on_test_epoch_end()
         self._inference_epoch_end(outputs, mode='test')
+        self.test_step_outputs.clear()
 
     def sample_molecules(
         self,

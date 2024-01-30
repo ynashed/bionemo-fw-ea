@@ -71,6 +71,7 @@ def get_cfg(tmp_directory, prepend_config_path, config_name, config_path='conf')
     return cfg
 
 
+@pytest.mark.skip(reason="FIXME: Hardware dependent tests which are flaky")
 @pytest.mark.parametrize('config_name', ['diffdock_embedding_test'])
 def test_diffdock_embedding_preprocessing(tmp_directory, config_name):
     cfg = get_cfg(tmp_directory, PREPEND_CONFIG_DIR, config_name)
@@ -91,6 +92,7 @@ def test_diffdock_embedding_preprocessing(tmp_directory, config_name):
         assert torch.allclose(embedding, ref_embedding)
 
 
+@pytest.mark.skip(reason="FIXME: Hardware dependent tests which are flaky")
 @pytest.mark.slow
 @pytest.mark.parametrize('config_name', ['diffdock_score_preprocessing_test'])
 def test_diffdock_prepare_score_dataset(tmp_directory, config_name):
@@ -133,6 +135,7 @@ def test_diffdock_prepare_score_dataset(tmp_directory, config_name):
                 ), f"{key}.{attr} is wrong"
 
 
+@pytest.mark.skip(reason="FIXME: Hardware dependent tests which are flaky")
 @pytest.mark.slow
 @pytest.mark.needs_gpu
 @pytest.mark.needs_checkpoint

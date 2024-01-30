@@ -18,6 +18,7 @@ from argparse import ArgumentParser
 from typing import Dict, List
 
 import torch
+from megatron.core import parallel_state
 from nemo.collections.nlp.parts.nlp_overrides import (
     NEMO_MEGATRON_MODEL_PARALLEL_APPSTATE_OVERRIDE,
     NLPDDPStrategy,
@@ -882,8 +883,6 @@ def main():
 
     convert_vp = vp_size > 1
     if convert_vp:
-        from megatron.core import parallel_state
-
         parallel_state.set_virtual_pipeline_model_parallel_world_size(vp_size)
 
         hparams_filepath = args.hparams_file

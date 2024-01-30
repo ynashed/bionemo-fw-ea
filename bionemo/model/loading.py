@@ -10,6 +10,7 @@
 from typing import Sequence, Tuple
 
 import pytorch_lightning as pl
+from nemo.collections.nlp.data.language_modeling.text_memmap_dataset import CSVFieldsMemmapDataset
 from nemo.utils import logging
 from nemo.utils.model_utils import import_class_by_path
 from omegaconf import DictConfig
@@ -17,7 +18,6 @@ from omegaconf.omegaconf import OmegaConf
 from torch.utils.data import DataLoader
 
 from bionemo.data.mapped_dataset import FilteredMappedDataset
-from bionemo.data.memmap_csv_fields_dataset import CSVFieldsMemmapDataset
 from bionemo.data.memmap_fasta_fields_dataset import FASTAFieldsMemmapDataset
 from bionemo.data.utils import expand_dataset_paths
 from bionemo.model.core.infer import M

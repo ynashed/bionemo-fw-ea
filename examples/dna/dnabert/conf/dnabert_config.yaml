@@ -17,7 +17,7 @@ trainer:
   # 400k * 32 * 2 = 12,800,000 (* 2)
   # 400k * 64 * 2 = 12,800,000 (* 2 * 2)
   # 400k * 128 * 2 = 12,800,000 (*8) = ~102,400,000 steps
-  precision: bf16
+  precision: bf16-mixed
 
 model:
   num_layers: 12
@@ -41,7 +41,7 @@ model:
     dataloader_type: single
     dataset_format: fasta
   megatron_amp_O2: False # Set to True to go fast
-  precision: bf16
+  precision: bf16-mixed
 exp_manager:
   explicit_log_dir: null
   exp_dir: ${oc.env:BIONEMO_HOME}/results/nemo_experiments/${.name}/${.wandb_logger_kwargs.name}

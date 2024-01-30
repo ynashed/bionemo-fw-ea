@@ -349,8 +349,8 @@ class AlphaFold(ModelPT):
         Returns:
             int: iteration number
         """
-        if self.trainer._ckpt_path:
-            return int(re.search(r".*step=(\d)--.*", self.trainer._ckpt_path).group(1)) - 1
+        if self.trainer.ckpt_path:
+            return int(re.search(r".*step=(\d)--.*", self.trainer.ckpt_path).group(1)) - 1
         else:
             return 0
 

@@ -41,6 +41,7 @@ from bionemo.triton.utils import (
     load_model_config,
     load_model_for_inference,
 )
+from bionemo.utils.tests import reset_microbatch_calculator
 
 
 SMILES = ['c1ccc2ccccc2c1', 'COc1cc2nc(N3CCN(C(=O)c4ccco4)CC3)nc(N)c2cc1OC']
@@ -64,6 +65,7 @@ def cfg(bionemo_home: Path) -> DictConfig:
 
 @pytest.fixture(scope='module')
 def model(cfg: DictConfig) -> MegaMolBARTInference:
+    reset_microbatch_calculator()
     # TODO [mgreaves] replace with this in !553
     # model = load_model_for_inference(cfg, interactive=False)
     return load_model_for_inference(cfg)

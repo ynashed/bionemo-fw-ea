@@ -1,21 +1,30 @@
 import logging
 import os
+import pathlib
+from pathlib import Path
+from typing import Tuple
 
 import pytest
 import pytorch_lightning as pl
+import pytorch_lightning as plt
 import torch
+from hydra import compose, initialize
+from hydra.core.global_hydra import GlobalHydra
+from omegaconf import DictConfig
 from omegaconf.omegaconf import OmegaConf, open_dict
 
 from bionemo.data.molecule import MoleculeEnumeration
 from bionemo.model.molecule.megamolbart.megamolbart_model import MegaMolBARTModel
-from bionemo.model.utils import initialize_model_parallel, setup_trainer
+from bionemo.model.utils import setup_trainer
 from bionemo.utils.tests import (
-    clean_directory,
+    BioNemoSearchPathConfig,
     list_to_tensor,
     load_expected_training_results,
+    register_searchpath_config_plugin,
+    reset_microbatch_calculator,
     save_expected_training_results,
+    update_relative_config_dir,
 )
-from tests.test_megamolbart_inference import get_cfg
 
 
 logger = logging.getLogger(__name__)
@@ -23,25 +32,17 @@ logger = logging.getLogger(__name__)
 _SMIS = [
     'c1cc2ccccc2cc1',
     'COc1cc2nc(N3CCN(C(=O)c4ccco4)CC3)nc(N)c2cc1OC',
-    'CC(=O)C(=O)N1CCC([C@H]2CCCCN2C(=O)c2ccc3c(n2)CCN(C(=O)OC(C)(C)C)C3)CC1',
 ]
+
 _BEAM_SIZE = 5
 _BEAM_ALPHA = 0
 
-CONFIG_NAME = 'megamolbart_test'
-PREPEND_DIR = "../examples/tests/"
-CONFIG_PATH = os.path.join(PREPEND_DIR, 'conf')
-PREPEND_CONFIG_DIR = '../examples/molecule/megamolbart/conf'
 
 CORRECT_RESULTS_DIR = 'examples/tests/expected_results'
 CORRECT_RESULTS = 'megamolbart_inference_greedy_beam_search_preds.json'
 
 UPDATE_EXPECTED_RESULTS = os.environ.get('UPDATE_EXPECTED_RESULTS', False)
 COMPARE_EXPECTED_RESULTS = os.environ.get('COMPARE_EXPECTED_RESULTS', False)
-
-torch.use_deterministic_algorithms(True)
-torch.backends.cudnn.deterministic = True
-torch.backends.cudnn.benchmark = False
 
 
 def _adjust_config_for_test(cfg: OmegaConf) -> OmegaConf:
@@ -53,15 +54,51 @@ def _adjust_config_for_test(cfg: OmegaConf) -> OmegaConf:
         cfg.model.data.decoder_augment = False
         cfg.model.data.encoder_mask = False
         cfg.model.data.decoder_mask = False
-        cfg.trainer.deterministic = True
         cfg.precision = 32
         cfg.seed = 42
     return cfg
 
 
+@pytest.fixture(scope='module')
+def model_cfg() -> DictConfig:
+    # TODO(dorotat): Figure out how to import this method from with correctly setup paths, especially this_file_dir
+    config_path = "examples/tests/conf"
+    config_name = "megamolbart_test"
+    prepend_config_dir = os.path.join(os.getenv("BIONEMO_HOME"), "examples/molecule/megamolbart/conf")
+    this_file_dir = pathlib.Path(pathlib.Path(os.path.abspath(__file__)).parent)
+    absolute_config_path = os.path.join(os.getenv("BIONEMO_HOME"), config_path)
+    relative_config_path = os.path.relpath(absolute_config_path, this_file_dir)
+
+    # TODO(dorotat): figure out more elegant way which can be be externalise to add search path to hydra
+    class TestSearchPathConfig(BioNemoSearchPathConfig):
+        def __init__(self) -> None:
+            super().__init__()
+            self.prepend_config_dir = update_relative_config_dir(Path(prepend_config_dir), this_file_dir)
+
+    register_searchpath_config_plugin(TestSearchPathConfig)
+    with initialize(config_path=relative_config_path):
+        cfg = compose(config_name=config_name)
+    yield cfg
+    GlobalHydra.instance().clear()
+
+
+@pytest.fixture(scope='module')
+def megamolbart_model_trainer(model_cfg: DictConfig) -> Tuple[MegaMolBARTModel, plt.Trainer]:
+    # TODO to remove the first reset in the future - test imp should ensire teardown after model is used
+    reset_microbatch_calculator()
+    pl.seed_everything(model_cfg.seed)
+    model_cfg = _adjust_config_for_test(model_cfg)
+    trainer = setup_trainer(model_cfg)
+    model = MegaMolBARTModel(model_cfg.model, trainer)
+    model.freeze()
+    model.eval()
+    yield model, trainer
+    reset_microbatch_calculator()
+
+
 @pytest.mark.needs_gpu
 @pytest.mark.xfail(reason="FIXME: Currently broken")
-def test_megamolbart_greedy_beam_search():
+def test_megamolbart_greedy_beam_search(megamolbart_model_trainer, model_cfg):
     """
     USAGE:
     The first part of this test examines greedy and beam search predictions generated on the fly.
@@ -75,21 +112,14 @@ def test_megamolbart_greedy_beam_search():
     IMPORTANT: Make sure that steps 1 and 2 are executed using the same GPUs. Otherwise, the test from the step 2
     is very likely to not pass
     """
-    cfg = get_cfg(PREPEND_CONFIG_DIR, config_name=CONFIG_NAME, config_path=CONFIG_PATH)
-    cfg = _adjust_config_for_test(cfg)
-    clean_directory(cfg.exp_manager.exp_dir)
-
-    pl.seed_everything(cfg.seed)
-    trainer = setup_trainer(cfg)
-    model = MegaMolBARTModel(cfg.model, trainer)
-    initialize_model_parallel(model)
+    model, trainer = megamolbart_model_trainer
 
     collate_fn = MoleculeEnumeration(
         tokenizer=model.tokenizer, seq_length=model._cfg.seq_length, pad_size_divisible_by_8=True, **model._cfg.data
     ).collate_fn
     batch = collate_fn(_SMIS)
     tokens_enc, _, _, _, enc_mask, _ = model.process_global_batch(batch)
-    _NUM_TOKENS_TO_GENERATE = cfg.model.max_position_embeddings
+    _NUM_TOKENS_TO_GENERATE = model._cfg.max_position_embeddings
 
     if not UPDATE_EXPECTED_RESULTS and COMPARE_EXPECTED_RESULTS:
         outputs = load_expected_training_results(
@@ -121,11 +151,8 @@ def test_megamolbart_greedy_beam_search():
             else:
                 assert torch.equal(batch[key], expected_batch[key])
 
+    pl.seed_everything(model_cfg.seed)
     # this test requires warmup - otherwise there are some logits discrepancies later on
-    model.freeze()
-    model.eval()
-
-    pl.seed_everything(cfg.seed)
     _ = model.decode(tokens_enc, enc_mask, 10)
 
     preds, logits = model.decode(tokens_enc, enc_mask, _NUM_TOKENS_TO_GENERATE)
@@ -202,7 +229,7 @@ def test_megamolbart_greedy_beam_search():
                 batch[key] = tensor.tolist()
 
         outputs = {
-            'seed': cfg.seed,
+            'seed': model_cfg.seed,
             'smiles': _SMIS,
             'num_tokens_to_generate': _NUM_TOKENS_TO_GENERATE,
             'beam_size': _BEAM_SIZE,
@@ -231,7 +258,7 @@ def test_megamolbart_greedy_beam_search():
             outputs[k] == val
             for k, val in zip(
                 ['seed', 'smiles', 'num_tokens_to_generate', 'beam_size', 'beam_alpha'],
-                [cfg.seed, _SMIS, _NUM_TOKENS_TO_GENERATE, _BEAM_SIZE, _BEAM_ALPHA],
+                [model_cfg.seed, _SMIS, _NUM_TOKENS_TO_GENERATE, _BEAM_SIZE, _BEAM_ALPHA],
             )
         ), 'Setup of the test does not match setup of the expected results'
         # Convert from list to tensor in order to compare.

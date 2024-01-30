@@ -33,14 +33,14 @@ TRAIN_VAL_TEST_HASHES = {
 ##############
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def tmp_directory(tmp_path_factory, root_directory=ROOT_DIR):
     """Create tmp directory"""
     tmp_path_factory.mktemp(root_directory)
     return tmp_path_factory.getbasetemp()
 
 
-@pytest.fixture()
+@pytest.fixture(scope="module")
 def download_directory(tmp_directory):
     """Create the temporary directory for testing and the download directory"""
     # TODO mock a download when preprocessing code is refactored
@@ -49,7 +49,7 @@ def download_directory(tmp_directory):
     return download_directory
 
 
-@pytest.fixture()
+@pytest.fixture(scope="module")
 def mock_url(download_directory, sample_data=SAMPLE_DATA):
     """Preprocessing expects a url with 'fasta.gz' extension, must mimic that for local file"""
     dest_path = os.path.join(download_directory, os.path.basename(sample_data))

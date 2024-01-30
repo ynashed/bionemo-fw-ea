@@ -43,6 +43,9 @@ PREPEND_CONFIG_DIR = os.path.join(THIS_FILE_DIR, '../examples/protein/equidock/c
 torch.use_deterministic_algorithms(False)
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
+torch.backends.cuda.matmul.allow_tf32 = False
+torch.backends.cuda.allow_tf32 = False
+torch.backends.cudnn.enabled = False
 
 
 def extract_to_dir(zipfile, dir):

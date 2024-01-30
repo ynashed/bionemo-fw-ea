@@ -75,22 +75,22 @@ class PerfLoggingCallback(Callback):
     def _should_log(self):
         return (self.step + self.step_val) > self.warmup_steps
 
-    def on_train_batch_start(self, trainer, pl_module, batch, batch_idx, unused: int = 0):
+    def on_train_batch_start(self, trainer, pl_module, batch, batch_idx):
         self.update(phase="start")
 
-    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, unused: int = 0):
+    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
         self.update(phase="end")
 
-    def on_validation_batch_start(self, trainer, pl_module, outputs, batch, batch_idx):
+    def on_validation_batch_start(self, trainer, pl_module, batch, batch_idx, dataloader_idx=0):
         self.update(phase="start", val_batch=True)
 
-    def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx):
+    def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0):
         self.update(phase="end", val_batch=True)
 
-    def on_predict_batch_start(self, trainer, pl_module, batch, batch_idx, dataloader_idx):
+    def on_predict_batch_start(self, trainer, pl_module, batch, batch_idx, dataloader_idx=0):
         self.update(phase="start")
 
-    def on_predict_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx):
+    def on_predict_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0):
         self.update(phase="end")
 
     def _calculate_performance_stats(self, timestamps: Dict[str, List[float]]):

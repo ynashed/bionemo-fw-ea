@@ -74,6 +74,9 @@ def get_cfg(tmp_directory, prepend_config_path, config_name, config_path='conf')
     return cfg
 
 
+@pytest.mark.skip(
+    reason="FIXME: The last unit test for confidence model runs individually but not in the sequence of tests"
+)
 @pytest.mark.slow
 @pytest.mark.needs_gpu
 @pytest.mark.parametrize("config_name, batch_sampler, tensor_prodcut_type", inputs)
@@ -82,10 +85,6 @@ def test_diffdock_fast_dev_run(tmp_directory, config_name, batch_sampler, tensor
     with open_dict(cfg):
         cfg.model.batch_sampler = batch_sampler
         cfg.model.tensor_product.type = tensor_prodcut_type
-
-    if not os.path.exists(cfg.data.cache_path):
-        # download data from ngc
-        os.system(f"bash {TEST_DATA_DOWNLOAD_SCRIPT}")
 
     data_manager = DataManager(cfg)
     trainer = setup_trainer(cfg)

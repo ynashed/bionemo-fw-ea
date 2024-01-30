@@ -271,7 +271,7 @@ trainer:
   logger: false
   enable_checkpointing: false
   gradient_clip_val: 0.1
-  replace_sampler_ddp: false
+  use_distributed_sampler: false
 exp_manager:
   name: initial-training
   exp_dir: ${oc.env:BIONEMO_HOME}/test_results/nemo_experiments/openfold/

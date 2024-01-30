@@ -176,7 +176,7 @@ The tests in JET should be simple and short training or testing commands similar
 such as different
 * number of nodes: 1, 4
 * number of gpus: 1, 8
-* precisions: 16, 32
+* precisions: 16-mixed, bf16-mixed, 32
 * batch sizes: two model-specific batch sizes ie 32, 64
 
 that are supplied to the python command. Therefore, by default, each python command for training or testing is run across `2^4` combinations of these parameters that results in `2^4` tested cases of a python training command.

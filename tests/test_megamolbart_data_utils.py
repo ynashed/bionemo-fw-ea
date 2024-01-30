@@ -1,9 +1,15 @@
 import os
+import pathlib
+from typing import List
 
 import pytest
 import pytorch_lightning as pl
 import torch
+from hydra import compose, initialize
+from hydra.core.global_hydra import GlobalHydra
 from nemo.collections.common.tokenizers.regex_tokenizer import RegExTokenizer
+from nemo.core import Dataset
+from omegaconf import DictConfig
 
 from bionemo.data.molecule.augment import MoleculeEnumeration, MoleculeInputTargetEnumeration
 from bionemo.data.molecule.megamolbart_utils import (
@@ -11,14 +17,15 @@ from bionemo.data.molecule.megamolbart_utils import (
     megamolbart_retro_build_train_valid_test_datasets,
 )
 from bionemo.model.utils import initialize_distributed_parallel_state
-from tests.test_megamolbart_inference import get_cfg
+from bionemo.utils.tests import (
+    BioNemoSearchPathConfig,
+    register_searchpath_config_plugin,
+    reset_microbatch_calculator,
+    update_relative_config_dir,
+)
 
 
 BIONEMO_HOME = os.getenv("BIONEMO_HOME")
-PREPEND_DIR = "../examples/tests/"  # Hydra config paths must be relative
-CONFIG_PATH = os.path.join(PREPEND_DIR, 'conf')
-PREPEND_CONFIG_DIR = os.path.join(BIONEMO_HOME, 'examples/molecule/megamolbart/conf')
-
 TOKENIZER_MODEL = os.path.join(BIONEMO_HOME, 'tokenizers/molecule/megamolbart/vocab/megamolbart.model')
 TOKENIZER_VOCAB = os.path.join(BIONEMO_HOME, 'tokenizers/molecule/megamolbart/vocab/megamolbart.vocab')
 SEQ_LEN = 512
@@ -28,14 +35,52 @@ TOKENIZER = RegExTokenizer().load_tokenizer(regex_file=TOKENIZER_MODEL, vocab_fi
 NUM_SAMPLES = {'train': 5, 'val': 5, 'test': 5}
 
 
-@pytest.mark.needs_gpu
-def test_megamolbart_build_train_valid_test_datasets():
-    cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='megamolbart_test', config_path=CONFIG_PATH)
+@pytest.fixture(scope='module')
+def training_cfg(request) -> DictConfig:
+    config_path = "examples/tests/conf"
+    config_name = request.param
+    prepend_config_dir = os.path.join(os.getenv("BIONEMO_HOME"), "examples/molecule/megamolbart/conf")
+    this_file_dir = pathlib.Path(pathlib.Path(os.path.abspath(__file__)).parent)
+    absolute_config_path = os.path.join(os.getenv("BIONEMO_HOME"), config_path)
+    relative_config_path = os.path.relpath(absolute_config_path, this_file_dir)
 
+    class TestSearchPathConfig(BioNemoSearchPathConfig):
+        def __init__(self) -> None:
+            super().__init__()
+            self.prepend_config_dir = update_relative_config_dir(pathlib.Path(prepend_config_dir), this_file_dir)
+
+    register_searchpath_config_plugin(TestSearchPathConfig)
+    with initialize(config_path=relative_config_path):
+        cfg = compose(config_name=config_name)
+    yield cfg
+    GlobalHydra.instance().clear()
+
+
+@pytest.fixture(scope='module')
+def megamolbart_datasets(training_cfg) -> List[Dataset]:
     initialize_distributed_parallel_state()
     train_ds, val_ds, test_ds = megamolbart_build_train_valid_test_datasets(
-        cfg=cfg.model.data, train_valid_test_num_samples=NUM_SAMPLES
+        cfg=training_cfg.model.data, train_valid_test_num_samples=NUM_SAMPLES
     )
+    yield train_ds, val_ds, test_ds
+    reset_microbatch_calculator()
+
+
+@pytest.fixture(scope='module')
+def megamolbart_retro_datasets(training_cfg) -> List[Dataset]:
+    initialize_distributed_parallel_state()
+    train_ds, val_ds, test_ds = megamolbart_retro_build_train_valid_test_datasets(
+        cfg=training_cfg.model.data, train_valid_test_num_samples=NUM_SAMPLES
+    )
+    yield train_ds, val_ds, test_ds
+    reset_microbatch_calculator()
+
+
+@pytest.mark.needs_gpu
+@pytest.mark.parametrize("training_cfg", ["megamolbart_test"], indirect=True)
+def test_megamolbart_build_train_valid_test_datasets(megamolbart_datasets):
+    train_ds, val_ds, test_ds = megamolbart_datasets
+
     assert (
         len(train_ds) == NUM_SAMPLES['train']
         and len(val_ds) == NUM_SAMPLES['val']
@@ -48,21 +93,17 @@ def test_megamolbart_build_train_valid_test_datasets():
 
 
 @pytest.mark.needs_gpu
-def test_megamolbart_retro_build_train_valid_test_datasets():
-    cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='megamolbart_downstream_retro_test', config_path=CONFIG_PATH)
-
-    initialize_distributed_parallel_state()
-    train_ds, val_ds, test_ds = megamolbart_retro_build_train_valid_test_datasets(
-        cfg=cfg.model.data, train_valid_test_num_samples=NUM_SAMPLES
-    )
+@pytest.mark.parametrize("training_cfg", ["megamolbart_downstream_retro_test"], indirect=True)
+def test_megamolbart_retro_build_train_valid_test_datasets(training_cfg, megamolbart_retro_datasets):
+    train_ds, val_ds, test_ds = megamolbart_retro_datasets
     assert (
         len(train_ds) == NUM_SAMPLES['train']
         and len(val_ds) == NUM_SAMPLES['val']
         and len(test_ds) == NUM_SAMPLES['test']
     )
 
-    input_name = cfg.model.data.input_name
-    target_name = cfg.model.data.target_name
+    input_name = training_cfg.model.data.input_name
+    target_name = training_cfg.model.data.target_name
     assert input_name in train_ds[0].keys() and target_name in train_ds[0].keys()
 
     assert train_ds[3] == {
@@ -1341,11 +1382,14 @@ def test_molecule_input_target_enumeration_collate_fn():
     ]
 
 
-def test_megamolbart_retro_collate_fn_masking_config():
+@pytest.mark.parametrize("training_cfg", ["megamolbart_downstream_retro_test"], indirect=True)
+def test_megamolbart_retro_collate_fn_masking_config(training_cfg):
     pl.seed_everything(SEED)
-    cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='megamolbart_downstream_retro_test', config_path=CONFIG_PATH)
     collate_fn = MoleculeInputTargetEnumeration(
-        tokenizer=TOKENIZER, seq_length=cfg.model.data.max_seq_length, pad_size_divisible_by_8=True, **cfg.model.data
+        tokenizer=TOKENIZER,
+        seq_length=training_cfg.model.data.max_seq_length,
+        pad_size_divisible_by_8=True,
+        **training_cfg.model.data,
     ).collate_fn
     batch = [{'products': 'CCc1cc(N)c(N)cc1Cl', 'reactants': 'CCc1cc([N+](=O)[O-])c(N)cc1Cl'}]
 

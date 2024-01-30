@@ -13,6 +13,8 @@ import os
 from typing import Dict, List, Optional, Union
 
 import torch
+from megatron.core import parallel_state
+from nemo.collections.nlp.data.language_modeling.megatron.data_samplers import MegatronPretrainingSampler
 from nemo.collections.nlp.modules.common.megatron.utils import (
     average_losses_across_data_parallel_group,
 )
@@ -117,11 +119,6 @@ class ESM1nvModel(ESMnvMegatronBertModel):
             f'Only the Megatron sequential ("single") sampler is currently supported. {self._cfg.data.dataloader_type} was chosen.'
         )
 
-        from megatron.core import parallel_state
-        from nemo.collections.nlp.data.language_modeling.megatron.data_samplers import (
-            MegatronPretrainingSampler,
-        )
-
         # NOTE (SKH) this was taken directly from megatron, this is the 'single' dataloader type.
         batch_sampler = MegatronPretrainingSampler(
             total_samples=len(dataset),
@@ -212,7 +209,7 @@ class ESM1nvModel(ESMnvMegatronBertModel):
         self._test_ds = test
         return self._train_ds, self._validation_ds, self._test_ds
 
-    def validation_epoch_end(self, outputs: List[Dict[str, torch.Tensor]]) -> None:
+    def on_validation_epoch_end(self) -> None:
         """The function computes and logs three scores:
             - The average cross entropy loss over the validation data
             - The exponential of the averaged loss
@@ -224,6 +221,7 @@ class ESM1nvModel(ESMnvMegatronBertModel):
             outputs: A list of dictionaries, where each dictionary represents the output of a validation step.
             The computed values are logged using the Lightning logger.
         """
+        outputs = self.validation_step_outputs
         if not outputs:
             return
         averaged_loss = torch.stack(outputs).mean()
@@ -232,6 +230,7 @@ class ESM1nvModel(ESMnvMegatronBertModel):
         self.log('val_perplexity', average_perplexity)
         self.log('val_loss_ECE', pow(2, averaged_loss))  # calculate exponential cross entropy loss for logs
         self.log('consumed_samples', self.compute_consumed_samples(self.trainer.global_step - self.init_global_step))
+        self.validation_step_outputs.clear()
 
     def encode(self, tokens_enc, enc_mask):
         # FIXME this autocast shouldn't be needed
@@ -241,7 +240,7 @@ class ESM1nvModel(ESMnvMegatronBertModel):
                 hidden_states = hidden_states[0]
         return hidden_states
 
-    def test_epoch_end(self, outputs: List[Dict[str, torch.Tensor]]) -> None:
+    def on_test_epoch_end(self) -> None:
         """
         The function computes and logs three scores:
             - the average cross-entropy loss over the test data,
@@ -255,10 +254,11 @@ class ESM1nvModel(ESMnvMegatronBertModel):
             outputs: A list of dictionaries, where each dictionary represents the output of a validation step.
             The computed values are logged using the NeMo logger.
         """
-        averaged_loss = average_losses_across_data_parallel_group(outputs)
+        averaged_loss = average_losses_across_data_parallel_group(self.test_step_outputs)
         logging.info(f'test_loss: {averaged_loss[0]}')
         logging.info(f'test_loss_ECE: {pow(2, averaged_loss[0])}')
         logging.info(f'test_perplexity: {averaged_loss[0].exp()}')
+        self.test_step_outputs.clear()
 
     @property
     def input_names(self):

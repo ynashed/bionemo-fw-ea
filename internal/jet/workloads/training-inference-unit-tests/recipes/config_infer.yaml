@@ -63,7 +63,7 @@ spec:
 products:
   - nodes: [1]
     gpus: [8]
-    precision: [32, bf16]
+    precision: [32, bf16-mixed]
     variant: [infer]
     products:
       - domain: [molecule]

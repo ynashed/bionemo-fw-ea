@@ -6,6 +6,7 @@ import shutil
 from collections import OrderedDict
 from typing import List, Optional, Union
 
+import apex
 import numpy as np
 import torch
 import yaml
@@ -173,3 +174,11 @@ def list_to_tensor(data_list: List[Union[float, int]]) -> torch.Tensor:
         return torch.stack(converted)
 
     return converted
+
+
+def reset_microbatch_calculator():
+    """
+    `Resets _GLOBAL_NUM_MICROBATCHES_CALCULATOR in apex which is used in NeMo to initilised model parallel in
+    nemo.collections.nlp.modules.common.megatron.megatron_init.initialize_model_parallel_for_nemo
+    """
+    apex.transformer.pipeline_parallel.utils._GLOBAL_NUM_MICROBATCHES_CALCULATOR = None

@@ -49,7 +49,7 @@ def test_model_exists():
     check_model_exists(CHECKPOINT_PATH[0]) and check_model_exists(CHECKPOINT_PATH[1])
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def tmp_directory(tmp_path_factory, root_directory=ROOT_DIR):
     """Create tmp directory"""
     tmp_path_factory.mktemp(root_directory)

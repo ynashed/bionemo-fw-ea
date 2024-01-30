@@ -26,7 +26,6 @@ model:
     num_workers: 10
 
   dwnstr_task_validation:
-    enabled: False
     dataset:
       emb_batch_size: 32
       batch_size: ${.emb_batch_size}

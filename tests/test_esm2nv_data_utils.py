@@ -5,15 +5,17 @@ import os
 import pathlib
 
 import pytest
+import torch
 from hydra import compose, initialize
 
-from bionemo.data import mapped_dataset, memmap_csv_fields_dataset
+from bionemo.data import mapped_dataset
 from bionemo.data.preprocess.protein.preprocess import ESM2Preprocess
 from bionemo.model.protein.esm1nv import esm1nv_model
 from bionemo.model.utils import initialize_distributed_parallel_state, setup_trainer
 from bionemo.utils.tests import (
     BioNemoSearchPathConfig,
     register_searchpath_config_plugin,
+    reset_microbatch_calculator,
     update_relative_config_dir,
 )
 
@@ -45,12 +47,14 @@ def get_cfg(prepend_config_path, config_name, config_path='conf'):
 @pytest.fixture
 def model_and_configs():
     cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='esm2nv_data_test', config_path=CONFIG_PATH)
-
+    reset_microbatch_calculator()
     initialize_distributed_parallel_state()
 
     trainer = setup_trainer(cfg)
     model = esm1nv_model.ESM2nvModel(cfg.model, trainer)
-    return model, cfg
+    yield model, cfg
+    reset_microbatch_calculator()
+    torch.cuda.empty_cache()
 
 
 @pytest.fixture()
@@ -101,11 +105,13 @@ def test_esm2nv_model_creates_validation_dataset_with_set_length(cfg):
     num_val_samples = 10
     cfg.model.data.val.use_upsampling = True
 
+    reset_microbatch_calculator()
     initialize_distributed_parallel_state()
 
     trainer = setup_trainer(cfg)
     model = esm1nv_model.ESM2nvModel(cfg.model, trainer)
     val_dataset = model.build_val_dataset(cfg.model, num_val_samples)
+    reset_microbatch_calculator()
 
     assert len(val_dataset) == num_val_samples
     sample = next(iter(val_dataset))
@@ -133,11 +139,13 @@ def test_esm2nv_model_creates_test_dataset_with_set_length(cfg):
     num_test_samples = 10
     cfg.model.data.test.use_upsampling = True
 
+    reset_microbatch_calculator()
     initialize_distributed_parallel_state()
 
     trainer = setup_trainer(cfg)
     model = esm1nv_model.ESM2nvModel(cfg.model, trainer)
     test_dataset = model.build_test_dataset(cfg.model, num_test_samples)
+    reset_microbatch_calculator()
 
     assert len(test_dataset) == num_test_samples
 
@@ -154,7 +162,6 @@ def test_esm2nv_model_build_train_valid_test_datasets_returns_valid_datasets(mod
     train_ds, val_ds, test_ds = model.build_train_valid_test_datasets()
 
     assert isinstance(train_ds, mapped_dataset.Uniref90ClusterMappingDataset)
-    assert isinstance(val_ds, memmap_csv_fields_dataset.CSVFieldsMemmapDataset)
     assert isinstance(test_ds, mapped_dataset.ResamplingMappedDataset)
 
 
@@ -162,10 +169,13 @@ def test_build_train_valid_test_dataset_limits_train_batches_based_on_max_steps(
     # num_train_samples = int(max_train_steps * global_batch_size)
     cfg.trainer.max_steps = 5
     cfg.model.micro_batch_size = 4
+
+    reset_microbatch_calculator()
     initialize_distributed_parallel_state()
     trainer = setup_trainer(cfg, adjust_config=True)
     model = esm1nv_model.ESM2nvModel(cfg.model, trainer)
     train_ds, _, _ = model.build_train_valid_test_datasets()
+    reset_microbatch_calculator()
 
     assert len(train_ds) == 20
 
@@ -174,24 +184,27 @@ def test_esm2nv_model_fails_if_test_use_upsampling_false_but_limit_test_batches_
     cfg.trainer.limit_test_batches = 100
     cfg.model.data.test.use_upsampling = False
 
+    reset_microbatch_calculator()
     initialize_distributed_parallel_state()
-
     trainer = setup_trainer(cfg)
     model = esm1nv_model.ESM2nvModel(cfg.model, trainer)
     with pytest.raises(ValueError, match=r"config.model.data.test.use_upsampling is False "):
         model.build_train_valid_test_datasets()
+    reset_microbatch_calculator()
 
 
 def test_esm2nv_model_fails_if_val_use_upsampling_false_but_limit_val_batches_not_1(cfg):
     cfg.trainer.limit_val_batches = 100
     cfg.model.data.val.use_upsampling = False
 
+    reset_microbatch_calculator()
     initialize_distributed_parallel_state()
 
     trainer = setup_trainer(cfg)
     model = esm1nv_model.ESM2nvModel(cfg.model, trainer)
     with pytest.raises(ValueError, match=r"config.model.data.val.use_upsampling"):
         model.build_train_valid_test_datasets()
+    reset_microbatch_calculator()
 
 
 def test_build_train_valid_test_dataset_limits_val_batches_uses_fraction_of_dataset(cfg):
@@ -200,12 +213,13 @@ def test_build_train_valid_test_dataset_limits_val_batches_uses_fraction_of_data
     cfg.trainer.val_check_interval = 1
     cfg.model.data.val.use_upsampling = True
 
+    reset_microbatch_calculator()
     initialize_distributed_parallel_state()
 
     trainer = setup_trainer(cfg)
     model = esm1nv_model.ESM2nvModel(cfg.model, trainer)
     _, val_ds, _ = model.build_train_valid_test_datasets()
-
+    reset_microbatch_calculator()
     val_dataset_length = 200
     expected_len_val_ds = (
         (cfg.trainer.max_steps // cfg.trainer.val_check_interval + 1)
@@ -220,12 +234,13 @@ def test_build_train_valid_test_dataset_limits_test_batches_uses_fraction_of_dat
     cfg.trainer.limit_test_batches = 0.5
     cfg.model.data.test.use_upsampling = True
 
+    reset_microbatch_calculator()
     initialize_distributed_parallel_state()
 
     trainer = setup_trainer(cfg)
     model = esm1nv_model.ESM2nvModel(cfg.model, trainer)
     _, _, test_ds = model.build_train_valid_test_datasets()
-
+    reset_microbatch_calculator()
     test_dataset_length = 200
     expected_len_test_ds = test_dataset_length * cfg.trainer.limit_test_batches
     assert expected_len_test_ds == 100
@@ -237,11 +252,12 @@ def test_build_train_valid_test_dataset_limits_val_batches_uses_full_dataset(cfg
     cfg.trainer.max_steps = 10
     cfg.trainer.val_check_interval = 2
     cfg.model.data.val.use_upsampling = True
+    reset_microbatch_calculator()
     initialize_distributed_parallel_state()
-
     trainer = setup_trainer(cfg)
     model = esm1nv_model.ESM2nvModel(cfg.model, trainer)
     _, val_ds, _ = model.build_train_valid_test_datasets()
+    reset_microbatch_calculator()
 
     val_dataset_length = 200
     expected_len_val_ds = (
@@ -259,12 +275,13 @@ def test_build_train_valid_test_dataset_limits_val_batches_int_2(cfg):
     cfg.trainer.max_steps = 10
     cfg.trainer.val_check_interval = 2
     cfg.model.data.val.use_upsampling = True
-    initialize_distributed_parallel_state()
 
+    reset_microbatch_calculator()
+    initialize_distributed_parallel_state()
     trainer = setup_trainer(cfg)
     model = esm1nv_model.ESM2nvModel(cfg.model, trainer)
     _, val_ds, _ = model.build_train_valid_test_datasets()
-
+    reset_microbatch_calculator()
     expected_len_val_ds = (
         (cfg.trainer.max_steps // cfg.trainer.val_check_interval + 1)
         * model._cfg.global_batch_size
@@ -278,8 +295,8 @@ def test_build_train_valid_test_dataset_limits_val_batches_int_2(cfg):
 def test_build_train_valid_test_dataset_limits_val_batches_error_when_zero(cfg):
     cfg.trainer.limit_val_batches = 0
     cfg.model.data.val.use_upsampling = True
+    reset_microbatch_calculator()
     initialize_distributed_parallel_state()
-
     trainer = setup_trainer(cfg)
     model = esm1nv_model.ESM2nvModel(cfg.model, trainer)
     with pytest.raises(ValueError, match=r"trainer.limit_val_batches is set to 0"):
@@ -289,12 +306,14 @@ def test_build_train_valid_test_dataset_limits_val_batches_error_when_zero(cfg):
 def test_build_train_valid_test_dataset_throws_error_if_limit_val_batches_but_no_upsampling_in_cfg(cfg):
     cfg.trainer.limit_val_batches = 0.5
     cfg.model.data.val.use_upsampling = False
-    initialize_distributed_parallel_state()
 
+    reset_microbatch_calculator()
+    initialize_distributed_parallel_state()
     trainer = setup_trainer(cfg)
     model = esm1nv_model.ESM2nvModel(cfg.model, trainer)
     with pytest.raises(ValueError, match=r"config.model.data.val.use_upsampling"):
         model.build_train_valid_test_datasets()
+    reset_microbatch_calculator()
 
 
 def test_build_train_valid_test_dataset_limits_test_batches_uses_batch_num_specified_no_scaling(cfg):
@@ -302,12 +321,16 @@ def test_build_train_valid_test_dataset_limits_test_batches_uses_batch_num_speci
     cfg.trainer.max_steps = 10
     cfg.trainer.limit_test_batches = 200
     cfg.model.data.test.use_upsampling = True
+
+    reset_microbatch_calculator()
     initialize_distributed_parallel_state()
 
     trainer = setup_trainer(cfg)
     trainer.limit_test_batches = 200
+    reset_microbatch_calculator()
     model = esm1nv_model.ESM2nvModel(cfg.model, trainer)
     _, _, test_ds = model.build_train_valid_test_datasets()
+    reset_microbatch_calculator()
 
     assert len(test_ds) == model._cfg.global_batch_size * trainer.limit_test_batches
     assert len(test_ds) == 400

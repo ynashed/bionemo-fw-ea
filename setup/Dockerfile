@@ -14,7 +14,7 @@
 #   - libstdcxx-ng=11.1.0=h56837e0_8
 #   - pycairo=1.20.1=py38hf61ee4a_0
 
-ARG BASE_IMAGE=nvcr.io/nvidia/nemo:23.06
+ARG BASE_IMAGE=nvcr.io/nvidia/nemo:23.10
 FROM ${BASE_IMAGE}
 
 ENV TERM=xterm
@@ -93,21 +93,16 @@ ENV BIONEMO_HOME=${BIONEMO_HOME}
 RUN mkdir -p ${BIONEMO_HOME}
 
 
-### Patching dependencies.
-# TODO(trvachov): Remove after NeMo is upgraded to 1.21
-COPY ./setup/nemo-v-1.20-fix-for-esm2.patch /nemo-v-1.20-fix-for-esm2.patch
-RUN patch -p1 /usr/local/lib/python3.10/dist-packages/nemo/collections/nlp/data/language_modeling/megatron/dataset_utils.py /nemo-v-1.20-fix-for-esm2.patch \
-    && rm /nemo-v-1.20-fix-for-esm2.patch
-
 # NOTE: This is to support the MegaMolBart LM model compatability with Jupyter notebooks and ipdb.
 #       This is exposed through the `iteractive=True` constructor parameter.
 #       In MegaMolBart, specifically, this patch adds support for recongifure_minibatch as a flag
 #       in its decode method.
 # TODO [mgreaves] Upstream this patch and then remove here when we can upgrade our nemo dependency.
 #                 https://jirasw.nvidia.com/browse/CDISCOVERY-2146
-COPY ./setup/nemo-v-1.20-support_interactive_megamolbart_lm-decode_reconfigure_minibatch.patch /nemo-v-1.20-support_interactive_megamolbart_lm-decode_reconfigure_minibatch.patch
-RUN patch -p1 /usr/local/lib/python3.10/dist-packages/nemo/collections/nlp/models/language_modeling/megatron_lm_encoder_decoder_model.py /nemo-v-1.20-support_interactive_megamolbart_lm-decode_reconfigure_minibatch.patch \
-    && rm /nemo-v-1.20-support_interactive_megamolbart_lm-decode_reconfigure_minibatch.patch
+COPY ./setup/nemo-v-1.22-support_interactive_megamolbart_lm-decode_reconfigure_minibatch.patch /nemo-v-1.22-support_interactive_megamolbart_lm-decode_reconfigure_minibatch.patch
+RUN patch -p1 $(python -c "import os.path; import nemo; print(os.path.dirname(os.path.abspath(nemo.__file__)))")/collections/nlp/models/language_modeling/megatron_lm_encoder_decoder_model.py \
+     /nemo-v-1.22-support_interactive_megamolbart_lm-decode_reconfigure_minibatch.patch \
+    && rm /nemo-v-1.22-support_interactive_megamolbart_lm-decode_reconfigure_minibatch.patch
 
 
 ### Copy the bionemo repo contents for distribution

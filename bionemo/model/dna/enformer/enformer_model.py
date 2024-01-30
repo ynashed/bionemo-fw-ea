@@ -315,7 +315,7 @@ class Enformer(ModelPT):
         metric = getattr(self, f"rpearson_{head}")
         metric.update(preds=preds, target=batch['target'])
 
-    def validation_epoch_end(self, outputs):
+    def on_validation_epoch_end(self):
         for organism in self.cfg.metrics.organisms.keys():
             metric = getattr(self, f'rpearson_{organism}')
             self.log(
@@ -332,8 +332,8 @@ class Enformer(ModelPT):
     def test_step(self, batch, batch_idx, dataset_idx=None):
         self.validation_step(batch, batch_idx)
 
-    def test_epoch_end(self, outputs):
-        self.validation_epoch_end(outputs)
+    def on_test_epoch_end(self):
+        self.on_validation_epoch_end()
 
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
         return {'name': batch['name'], 'pred': self(x=batch['seq'], head='human')}

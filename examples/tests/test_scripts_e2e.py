@@ -5,6 +5,8 @@ from glob import glob
 import pytest
 import torch
 
+from bionemo.utils.tests import reset_microbatch_calculator
+
 
 BIONEMO_HOME = os.getenv('BIONEMO_HOME')
 TEST_DATA_DIR = os.path.join(BIONEMO_HOME, "examples/tests/test_data")
@@ -159,6 +161,7 @@ def get_train_args_overrides(script_or_cfg_path, train_args):
         # do not use kalign as it requires third-party-download and it not essential for testing
         train_args['model.data.realign_when_required'] = False
     elif model == "diffdock":
+        pytest.skip(reason="FIXME: CI infrastructure is too limiting and awaiting MR")
         # Use size aware batch sampler, and set the size control to default
         train_args['model.micro_batch_size'] = 2
         train_args['model.estimate_memory_usage.maximal'] = 'null'
@@ -182,6 +185,8 @@ def test_train_scripts(script_path, train_args, data_args, tmp_path):
     print(cmd)
     process_handle = subprocess.run(cmd, shell=True, capture_output=True)
     error_out = process_handle.stderr.decode('utf-8')
+    reset_microbatch_calculator()
+    torch.cuda.empty_cache()
     assert process_handle.returncode == 0, f"Command failed:\n{cmd}\n Error log:\n{error_out}"
 
 
@@ -226,4 +231,6 @@ def test_infer_script(config_path, tmp_path):
     cmd += get_data_overrides(config_path)
     process_handle = subprocess.run(cmd, shell=True, capture_output=True)
     error_out = process_handle.stderr.decode('utf-8')
+    reset_microbatch_calculator()
+    torch.cuda.empty_cache()
     assert process_handle.returncode == 0, f"Command failed:\n{cmd}\n Error log:\n{error_out}"

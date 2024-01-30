@@ -12,6 +12,10 @@ from abc import ABC, abstractmethod
 from functools import lru_cache
 
 import torch
+from megatron.core import parallel_state
+from nemo.collections.nlp.data.language_modeling.megatron.data_samplers import (
+    MegatronPretrainingSampler,
+)
 from nemo.collections.nlp.models.language_modeling.megatron_bert_model import MegatronBertModel
 from nemo.utils import logging
 
@@ -264,11 +268,6 @@ class BioNeMoBertModel(MegatronBertModel):
 
         assert self._cfg.data.dataloader_type == 'single', AssertionError(
             f'Only the Megatron sequential ("single") sampler is currently supported. {self._cfg.data.dataloader_type} was chosen.'
-        )
-
-        from megatron.core import parallel_state
-        from nemo.collections.nlp.data.language_modeling.megatron.data_samplers import (
-            MegatronPretrainingSampler,
         )
 
         # NOTE (SKH) this was taken directly from megatron, this is the 'single' dataloader type.

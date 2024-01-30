@@ -23,6 +23,7 @@ import pytest
 import torch
 from hydra import compose, initialize
 from hydra.core.global_hydra import GlobalHydra
+from nemo.core.optim.lr_scheduler import register_scheduler
 from omegaconf import OmegaConf
 from pytorch_lightning import seed_everything
 
@@ -40,6 +41,7 @@ from bionemo.model.molecule.megamolbart import FineTuneMegaMolBART, MegaMolBARTM
 from bionemo.model.protein.downstream import FineTuneProteinModel
 from bionemo.model.protein.equidock.equidock_model import EquiDock
 from bionemo.model.protein.esm1nv import ESM1nvModel, ESM2nvModel
+from bionemo.model.protein.openfold.lr_scheduler import AlphaFoldLRScheduler
 from bionemo.model.protein.openfold.openfold_model import AlphaFold
 from bionemo.model.protein.prott5nv import ProtT5nvModel
 from bionemo.model.utils import setup_trainer
@@ -51,6 +53,7 @@ from bionemo.utils.tests import (
     clean_directory,
     load_expected_training_results,
     register_searchpath_config_plugin,
+    reset_microbatch_calculator,
     resolve_cfg,
     save_expected_training_results,
     update_relative_config_dir,
@@ -233,7 +236,6 @@ def test_model_size(prepend_config_path, config_name, model_class, model_paramet
 
     cfg = get_cfg(prepend_config_path, config_name)
     callbacks = setup_dwnstr_task_validation_callbacks(cfg)
-
     trainer = setup_trainer(cfg, callbacks=callbacks)
     if model_class == FineTuneProteinModel or model_class == FineTuneMegaMolBART:
         model = model_class(cfg, trainer)
@@ -248,6 +250,8 @@ def test_model_size(prepend_config_path, config_name, model_class, model_paramet
 
     else:
         model = model_class(cfg.model, trainer)
+    reset_microbatch_calculator()
+    torch.cuda.empty_cache()
     assert model.num_weights == model_parameters
 
 
@@ -263,7 +267,11 @@ def test_model_training(prepend_config_path, config_name, model_class, correct_r
     cfg = get_cfg(prepend_config_path, config_name)
     clean_directory(cfg.exp_manager.exp_dir)
     callbacks = setup_dwnstr_task_validation_callbacks(cfg)
+    reset_microbatch_calculator()
     trainer = setup_trainer(cfg, callbacks=callbacks)
+
+    if model_class == AlphaFold:
+        register_scheduler(name='AlphaFoldLRScheduler', scheduler=AlphaFoldLRScheduler, scheduler_params=None)
 
     if model_class == MegaMolBARTRetroModel:
         pretrain_model_path = cfg.get('restore_from_path', None)
@@ -290,6 +298,8 @@ def test_model_training(prepend_config_path, config_name, model_class, correct_r
         else:
             model = model_class(cfg.model, trainer)
     trainer.fit(model)
+    reset_microbatch_calculator()
+    torch.cuda.empty_cache()
 
     results_comparison_dir = os.path.abspath(os.path.join(THIS_FILE_DIR, 'expected_results'))
     trainer_results = trainer.logged_metrics
@@ -297,18 +307,8 @@ def test_model_training(prepend_config_path, config_name, model_class, correct_r
         # update only the keys that are in the current results
         msg = f'Updating expected results in {results_comparison_dir}/{correct_results}'
         logger.warning(msg)
-
-        try:
-            expected_results_keys = load_expected_training_results(results_comparison_dir, correct_results).keys()
-
-        except FileNotFoundError:
-            # if expected results are not found and UPDATE_EXPECTED_RESULTS is True,
-            # the script generates expected results
-            logger.warning('Expected results not found. Saving all training metrics')
-            expected_results_keys = trainer_results.keys()
-
         save_expected_training_results(
-            results_comparison_dir, correct_results, {k: trainer_results[k].item() for k in expected_results_keys}
+            results_comparison_dir, correct_results, {k: trainer_results[k].item() for k in trainer_results.keys()}
         )
         assert False, msg
 

@@ -80,7 +80,7 @@ trainer:
   logger: False
   enable_checkpointing: False # checkpointing is done by NeMo exp_manager
   gradient_clip_val: 0.1
-  replace_sampler_ddp: False
+  use_distributed_sampler: False
 
 exp_manager:
   name: fine-tuning

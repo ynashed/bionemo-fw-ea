@@ -20,7 +20,7 @@ Below, hyperparameters and recommendations for their adjustment are provided. Th
 
 ### Precision
 
-* Configure with: `trainer.precision=bf16` if available, otherwise use`trainer.precision=16`.
+* Configure with: `trainer.precision=bf16-mixed` if available, otherwise use`trainer.precision=16-mixed`.
 * Switch to `trainer.precision=32` if training is unstable with bf16 or 16-bit.
 
 ### Gradient Clipping

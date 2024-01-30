@@ -10,7 +10,7 @@ trainer:
   devices: 1
   num_nodes: 1
   accelerator: gpu
-  precision: 16
+  precision: 16-mixed
   max_steps: 200 # consumed_samples = global_step * micro_batch_size * data_parallel_size * accumulate_grad_batches
   val_check_interval: 200
   limit_val_batches: 1

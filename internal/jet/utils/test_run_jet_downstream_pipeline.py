@@ -38,7 +38,7 @@ VARIANT = 'variant_tmp'
 BATCH_SIZE = [2, 4]
 NODES = [1, 4]
 GPUS = [1, 8]
-PRECISIONS = [16, 32]
+PRECISIONS = ["16-mixed", 32]
 SETUP_JET_CI = False
 DRY_RUN = True
 

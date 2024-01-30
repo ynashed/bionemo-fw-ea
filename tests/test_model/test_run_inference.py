@@ -17,6 +17,7 @@ import pytest
 
 from bionemo.model import run_inference
 from bionemo.triton.utils import load_model_config
+from bionemo.utils.tests import reset_microbatch_calculator
 
 
 _TEST_DATA: List[Tuple[str, int]] = [
@@ -52,3 +53,4 @@ def test_model_inference(bionemo_home: Path, config_name: str, hidden_size: int)
             assert emb["hiddens"].shape == (len(emb["sequence"]), hidden_size)
         if "embeddings" in dict_keys:
             assert emb["embeddings"].shape == (hidden_size,)
+    reset_microbatch_calculator()

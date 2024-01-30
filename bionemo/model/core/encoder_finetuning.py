@@ -11,6 +11,8 @@
 from abc import ABC, abstractmethod
 
 import torch
+from apex.transformer.pipeline_parallel.utils import _reconfigure_microbatch_calculator
+from megatron.core import parallel_state
 from nemo.collections.nlp.data.language_modeling.megatron.data_samplers import (
     MegatronPretrainingRandomSampler,
     MegatronPretrainingSampler,
@@ -27,17 +29,6 @@ from bionemo.model.utils import (
     compute_consumed_samples,
     extract_consumed_samples_from_ckpt,
 )
-
-
-try:
-    from apex.transformer.pipeline_parallel.utils import (
-        _reconfigure_microbatch_calculator,
-    )
-    from megatron.core import parallel_state
-
-    HAVE_APEX = True
-except (ImportError, ModuleNotFoundError):
-    HAVE_APEX = False
 
 
 class EncoderFineTuning(ModelPT, Exportable, ABC):
@@ -126,7 +117,7 @@ class EncoderFineTuning(ModelPT, Exportable, ABC):
     # It is also nice to do the data setup here because the data are not
     # initialized unless this module specifically is trained
     def setup(self, *args, **kwargs):
-        resume_checkpoint_path = self.trainer._checkpoint_connector.resume_from_checkpoint_fit_path
+        resume_checkpoint_path = self.trainer._checkpoint_connector._ckpt_path
 
         if resume_checkpoint_path:
             init_consumed_samples = extract_consumed_samples_from_ckpt(resume_checkpoint_path)
@@ -244,10 +235,10 @@ class EncoderFineTuning(ModelPT, Exportable, ABC):
         return result
 
     def validation_step(self, batch, batch_idx):
-        return self._step(batch, batch_idx, subset="val")
+        self.validation_step_outputs.append(self._step(batch, batch_idx, subset="val"))
 
     def test_step(self, batch, batch_idx):
-        return self._step(batch, batch_idx, subset="test")
+        self.test_step_outputs.append(self._step(batch, batch_idx, subset="test"))
 
     def _epoch_end(self, outputs, subset):
         if len(outputs) > 0:
@@ -256,11 +247,13 @@ class EncoderFineTuning(ModelPT, Exportable, ABC):
                 averaged_value = torch.stack(batch_value).mean()
                 self.log(name, averaged_value)
 
-    def validation_epoch_end(self, outputs):
-        self._epoch_end(outputs, subset="val")
+    def on_validation_epoch_end(self):
+        self._epoch_end(self.validation_step_outputs, subset="val")
+        self.validation_step_outputs.clear()
 
-    def test_epoch_end(self, outputs):
-        self._epoch_end(outputs, subset="test")
+    def on_test_epoch_end(self):
+        self._epoch_end(self.test_step_outputs, subset="test")
+        self.test_step_outputs.clear()
 
     def setup_training_data(self, cfg):
         if hasattr(self, '_train_ds'):

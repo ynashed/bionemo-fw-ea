@@ -16,5 +16,3 @@ model:
     data_impl_kwargs:
       csv_mmap:
         data_col: 1
-  dwnstr_task_validation:
-    enabled: True
