@@ -18,8 +18,6 @@ Some of the key features of BioNeMo Framework are:
 * Model training recipes that can be readily implemented on DGX compute infrastructure.
 * Logging with Tensorboard and Weights and Biases to monitor the model training process.
 
-## Prerequisites
-Please follow the instructions on the [pre-requisites documentation](./pre-reqs.md) page.
 
 ## BioNeMo Models: Overview
 
