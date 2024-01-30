@@ -3,19 +3,12 @@
 This section will use the pre-trained BioNeMo checkpoints to demonstrate [NVIDIA Triton Inference Server](https://github.com/triton-inference-server/server).
 BioNeMo uses [PyTriton](https://github.com/triton-inference-server/pytriton), which provides utilities that simplify Triton configuration and local deployment in Python environments. 
 
+Sections:
 - [Start Inference Server](#start-inference-server)
 - [Perform Inference as a Client](#perform-inference-as-a-client)
 - [Detailed Example of PyTriton Inference](#detailed-example-of-pytriton-inference)
 
-
-## Prerequisites
-
-* Linux OS
-* Pascal, Volta, Turing, or an NVIDIA Ampere architecture-based GPU.
-* NVIDIA Driver
-* CUDA toolkit installed
-* Docker
-
+**Before diving in, ensure you have all [necessary prerequisites](./pre-reqs.md).**
 
 ## Start Inference Server
 

@@ -6,6 +6,7 @@
 
 index
 quickstart-fw
+pre-reqs
 quickstart-bcp
 tutorials-fw
 known-issues-fw

@@ -19,6 +19,8 @@ If you’re new to BioNeMo, the best way to get started is to take a look at the
 Finally, some advanced steps related to using BioNeMo on NVIDIA's Base Command Platform (BCP) are also provided. Refer to [Running BCP jobs](./bcp-specific-commands-fw.md).
 
 
+**Before using BioNeMo, make sure you have satisfied all the [pre-requisites](./pre-reqs.md).**
+
 ## Setup
 ### Accessing BioNeMo Framework
 
