@@ -18,6 +18,8 @@ from typing import Any, Callable, Optional, Sequence, Tuple
 import numpy as np
 import torch
 
+import bionemo.model.protein.openfold.inductor as inductor
+
 
 def rot_matmul(
     a: torch.Tensor,
@@ -81,6 +83,9 @@ def rot_vec_mul(
         ],
         dim=-1,
     )
+
+
+rot_vec_mul_jit = torch.compile(rot_vec_mul)
 
 
 @lru_cache(maxsize=None)
@@ -275,6 +280,17 @@ def quat_multiply_by_vec(quat, vec):
     )
 
 
+@torch.compile
+def rigid_compose_q_update_vec_jit(q_update_vec, quats, mat):
+    q_vec, t_vec = q_update_vec[..., :3], q_update_vec[..., 3:]
+    reshaped_mat = mat.view((1,) * len(quats.shape[:-1]) + mat.shape)
+    new_quats = quats + torch.sum(
+        reshaped_mat * quats[..., :, None, None] * q_vec[..., None, :, None],
+        dim=(-3, -2),
+    )
+    return new_quats, t_vec
+
+
 def invert_rot_mat(rot_mat: torch.Tensor):
     return rot_mat.transpose(-1, -2)
 
@@ -284,6 +300,13 @@ def invert_quat(quat: torch.Tensor):
     quat_prime[..., 1:] *= -1
     inv = quat_prime / torch.sum(quat**2, dim=-1, keepdim=True)
     return inv
+
+
+invert_quat_jit = torch.compile(invert_quat)
+
+
+def _map_tensor(fn, x):
+    return torch.stack(list(map(fn, torch.unbind(x, dim=-1))), dim=-1)
 
 
 class Rotation:
@@ -634,6 +657,13 @@ class Rotation:
         rot_mats = self.get_rot_mats()
         return rot_vec_mul(rot_mats, pts)
 
+    def apply_jit(self, pts):
+        if inductor.is_enabled():
+            rot_mats = self.get_rot_mats()
+            return rot_vec_mul_jit(rot_mats, pts)
+        else:
+            return self.apply(pts)
+
     def invert_apply(self, pts: torch.Tensor) -> torch.Tensor:
         """
         The inverse of the apply() method.
@@ -648,6 +678,13 @@ class Rotation:
         inv_rot_mats = invert_rot_mat(rot_mats)
         return rot_vec_mul(inv_rot_mats, pts)
 
+    def invert_apply_jit(self, pts):
+        if inductor.is_enabled():
+            rot_mats = self.get_rot_mats()
+            return rotation_invert_apply_jit(rot_mats, pts)
+        else:
+            return self.invert_apply(pts)
+
     def invert(self) -> Rotation:
         """
         Returns the inverse of the current Rotation.
@@ -661,13 +698,33 @@ class Rotation:
                 quats=None,
             )
         elif self._quats is not None:
+            quats = invert_quat(self._quats)
             return Rotation(
                 rot_mats=None,
-                quats=invert_quat(self._quats),
+                quats=quats,
                 normalize_quats=False,
             )
         else:
             raise ValueError("Both rotations are None")
+
+    def invert_jit(self):
+        if inductor.is_enabled():
+            if self._rot_mats is not None:
+                return Rotation(
+                    rot_mats=invert_rot_mat(self._rot_mats),
+                    quats=None,
+                )
+            elif self._quats is not None:
+                quats = invert_quat_jit(self._quats)
+                return Rotation(
+                    rot_mats=None,
+                    quats=quats,
+                    normalize_quats=False,
+                )
+            else:
+                raise ValueError("Both rotations are None")
+        else:
+            return self.invert()
 
     # "Tensor" stuff
 
@@ -730,11 +787,11 @@ class Rotation:
         """
         if self._rot_mats is not None:
             rot_mats = self._rot_mats.view(self._rot_mats.shape[:-2] + (9,))
-            rot_mats = torch.stack(list(map(fn, torch.unbind(rot_mats, dim=-1))), dim=-1)
+            rot_mats = _map_tensor(fn, rot_mats)
             rot_mats = rot_mats.view(rot_mats.shape[:-1] + (3, 3))
             return Rotation(rot_mats=rot_mats, quats=None)
         elif self._quats is not None:
-            quats = torch.stack(list(map(fn, torch.unbind(self._quats, dim=-1))), dim=-1)
+            quats = _map_tensor(fn, self._quats)
             return Rotation(rot_mats=None, quats=quats, normalize_quats=False)
         else:
             raise ValueError("Both rotations are None")
@@ -1010,11 +1067,25 @@ class Rigid:
         """
         q_vec, t_vec = q_update_vec[..., :3], q_update_vec[..., 3:]
         new_rots = self._rots.compose_q_update_vec(q_vec)
-
         trans_update = self._rots.apply(t_vec)
         new_translation = self._trans + trans_update
-
         return Rigid(new_rots, new_translation)
+
+    def compose_q_update_vec_jit(self, q_update_vec):
+        if inductor.is_enabled():
+            quats = self._rots.get_quats()
+            mat = _get_quat("_QUAT_MULTIPLY_BY_VEC", dtype=quats.dtype, device=quats.device)
+            new_quats, t_vec = rigid_compose_q_update_vec_jit(q_update_vec, quats, mat)
+            new_rots = Rotation(
+                rot_mats=None,
+                quats=new_quats,
+                normalize_quats=True,
+            )
+            trans_update = self._rots.apply_jit(t_vec)
+            new_translation = self._trans + trans_update
+            return Rigid(new_rots, new_translation)
+        else:
+            return self.compose_q_update_vec(q_update_vec)
 
     def compose(self, r: Rigid) -> Rigid:
         """
@@ -1029,6 +1100,15 @@ class Rigid:
         new_rot = self._rots.compose_r(r._rots)
         new_trans = self._rots.apply(r._trans) + self._trans
         return Rigid(new_rot, new_trans)
+
+    def compose_jit(self, r: Rigid) -> Rigid:
+        if inductor.is_enabled():
+            new_rot_mats, new_trans = rigid_compose(
+                self._rots.get_rot_mats(), r._rots.get_rot_mats(), r._trans, self._trans
+            )
+            return Rigid(Rotation(rot_mats=new_rot_mats, quats=None), new_trans)
+        else:
+            return self.compose(r)
 
     def apply(self, pts: torch.Tensor) -> torch.Tensor:
         """
@@ -1054,6 +1134,13 @@ class Rigid:
         pts = pts - self._trans
         return self._rots.invert_apply(pts)
 
+    def invert_apply_jit(self, pts):
+        if inductor.is_enabled_on_hopper_and_autograd_off() or inductor.is_enabled_on_ampere():
+            rot_mats = self._rots.get_rot_mats()
+            return rigid_invert_apply_jit(rot_mats, pts, self._trans)
+        else:
+            return self.invert_apply(pts)
+
     def invert(self) -> Rigid:
         """
         Inverts the transformation.
@@ -1063,8 +1150,15 @@ class Rigid:
         """
         rot_inv = self._rots.invert()
         trn_inv = rot_inv.apply(self._trans)
-
         return Rigid(rot_inv, -1 * trn_inv)
+
+    def invert_jit(self):
+        if inductor.is_enabled():
+            rot_inv = self._rots.invert_jit()
+            trn_inv = rot_inv.apply_jit(self._trans)
+            return Rigid(rot_inv, -1 * trn_inv)
+        else:
+            return self.invert()
 
     def map_tensor_fn(self, fn: Callable[[torch.Tensor], torch.Tensor]) -> Rigid:
         """
@@ -1169,6 +1263,7 @@ class Rigid:
         Returns:
             A transformation object of shape [*]
         """
+
         p_neg_x_axis = torch.unbind(p_neg_x_axis, dim=-1)
         origin = torch.unbind(origin, dim=-1)
         p_xy_plane = torch.unbind(p_xy_plane, dim=-1)
@@ -1351,6 +1446,11 @@ class Rigid:
 
         return Rigid(rot_obj, translation)
 
+    @staticmethod
+    @torch.compile
+    def make_transform_from_reference_jit(n_xyz, ca_xyz, c_xyz, eps=1e-20):
+        return Rigid.make_transform_from_reference(n_xyz, ca_xyz, c_xyz, eps=eps)
+
     def cuda(self) -> Rigid:
         """
         Moves the transformation object to GPU memory
@@ -1359,3 +1459,24 @@ class Rigid:
             A version of the transformation on GPU
         """
         return Rigid(self._rots.cuda(), self._trans.cuda())
+
+
+@torch.compile
+def rigid_compose(t1, t2, t3, t4):
+    r1 = rot_matmul(t1, t2)
+    r2 = rot_vec_mul(t1, t3) + t4
+    return r1, r2
+
+
+@torch.compile
+def rotation_invert_apply_jit(rot_mats, pts):
+    inv_rot_mats = invert_rot_mat(rot_mats)
+    return rot_vec_mul(inv_rot_mats, pts)
+
+
+@torch.compile
+def rigid_invert_apply_jit(rot_mats, pts, trans):
+    pts = pts - trans
+    inv_rot_mats = invert_rot_mat(rot_mats)
+    res = rot_vec_mul(inv_rot_mats, pts)
+    return res

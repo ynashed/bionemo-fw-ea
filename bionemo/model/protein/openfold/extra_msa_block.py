@@ -125,8 +125,11 @@ class ExtraMSABlock(nn.Module):
             z: [batch, N_res, N_res, c_z] updated pair representation
 
         """
-        m = m + self.msa_dropout_rowwise(self.msa_att_row(m=m, z=z, mask=msa_mask))
-        m = m + self.msa_att_col(m=m, mask=msa_mask)
+        m = self.msa_dropout_rowwise(
+            self.msa_att_row(m=m, z=z, mask=msa_mask),
+            add_output_to=m,
+        )
+        m = self.msa_att_col(m=m, mask=msa_mask)
         m, z = self.core(
             m=m,
             z=z,

@@ -12,7 +12,9 @@
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
+import bionemo.model.protein.openfold.inductor as inductor
 from bionemo.model.protein.openfold.linear import Linear
 
 
@@ -50,4 +52,26 @@ class ExtraMSAEmbedder(nn.Module):
             extra_msa_embedding: [batch, N_extra_seq, N_res, c_e]
 
         """
-        return self.linear(extra_msa_feat)
+        # TODO: [optim-hub] re-check condition: can we safely ignore dap / do we take into account hopper
+        if inductor.is_enabled_on_hopper():  # and dap.size() == 2:
+            forward_fn = _forward_jit
+        elif inductor.is_enabled_on_ampere_and_autograd_off():
+            forward_fn = _forward_jit
+        else:
+            forward_fn = _forward_eager
+        return forward_fn(
+            extra_msa_feat,
+            self.linear.weight,
+            self.linear.bias,
+        )
+
+
+def _forward_eager(
+    x: torch.Tensor,
+    w: torch.Tensor,
+    b: torch.Tensor,
+) -> torch.Tensor:
+    return F.linear(x, w, b)
+
+
+_forward_jit = torch.compile(_forward_eager)

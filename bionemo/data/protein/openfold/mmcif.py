@@ -99,8 +99,7 @@ def load_mmcif_chains_df(
     )
     if verbose:
         logging.debug(
-            f"{pprefix}mmcif_chains_df {mmcif_chains_df.shape}"
-            f" loaded from {repr(mmcif_chains_filepath)} successfully!"
+            f"{pprefix}mmcif_chains_df {mmcif_chains_df.shape} loaded from {mmcif_chains_filepath} successfully!"
         )
     return mmcif_chains_df
 

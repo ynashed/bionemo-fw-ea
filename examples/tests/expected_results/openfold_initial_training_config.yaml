@@ -243,12 +243,21 @@ model:
         preprocess_pdb_alignments: true
         preprocess_uniclust30_alignments: true
         preprocess_uniclust30_targets: true
+      create_sample: false
+      sample:
+        num_shards: 3
+        output_root_path: null
+        sample_variant: processed_sample
+        source_variant: ${model.data.dataset_variant}
+        force: false
+      sample_pdb_chain_ids: null
     use_only_pdb_chain_ids: null
     filter_by_alignments: true
   train_ds:
     train_max_pdb_release_date: '2021-09-16'
     num_workers: 14
     realign_when_required: ${model.data.realign_when_required}
+    threading_enabled: false
     defer_setup: true
   validation_ds:
     val_min_cameo_submission_date: '1997-01-01'
@@ -257,6 +266,7 @@ model:
     val_max_sequence_length: 700
     realign_when_required: ${model.data.realign_when_required}
     defer_setup: true
+  optimisations: []
 do_preprocess: false
 do_training: true
 do_validation: false

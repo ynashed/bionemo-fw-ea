@@ -23,7 +23,7 @@ model:
     # Common options: single, msa, pair and sm_single.
 
   stage: finetuning
-  precision: tf32 # TODO: this should be merged with trainer precision
+  precision: tf32
   seed: 44
   micro_batch_size: 1
   tensor_model_parallel_size: 1

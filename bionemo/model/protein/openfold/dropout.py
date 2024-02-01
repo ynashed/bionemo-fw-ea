@@ -16,6 +16,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+import bionemo.model.protein.openfold.inductor as inductor
+
 
 class Dropout(nn.Module):
     """Dropout module.
@@ -50,10 +52,15 @@ class Dropout(nn.Module):
         self.share_dim = share_dim
         self.inplace = inplace
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(
+        self,
+        x: torch.Tensor,
+        add_output_to: torch.Tensor,
+    ) -> torch.Tensor:
         shape = list(x.shape)
         for d in self.share_dim:
             shape[d] = 1
+
         mask = x.new_ones(shape)
         mask = F.dropout(
             input=mask,
@@ -61,7 +68,7 @@ class Dropout(nn.Module):
             training=self.training,
             inplace=self.inplace,
         )
-        x *= mask
+        x = _mul_add(x, mask, add_output_to)
         return x
 
 
@@ -77,3 +84,28 @@ class DropoutColumnwise(Dropout):
 
     def __init__(self, p: float) -> None:
         super(DropoutColumnwise, self).__init__(p=p, share_dim=-2)
+
+
+def _mul_add_eager(
+    x: torch.Tensor,
+    mask: torch.Tensor,
+    y: torch.Tensor,
+) -> torch.Tensor:
+    return y + x * mask
+
+
+_mul_add_jit = torch.compile(_mul_add_eager)
+
+
+def _mul_add(
+    x: torch.Tensor,
+    mask: torch.Tensor,
+    y: torch.Tensor,
+) -> torch.Tensor:
+    if inductor.is_enabled_on_hopper():
+        mul_add_fn = _mul_add_jit
+    elif inductor.is_enabled_on_ampere():
+        mul_add_fn = _mul_add_jit
+    else:
+        mul_add_fn = _mul_add_eager
+    return mul_add_fn(x, mask, y)

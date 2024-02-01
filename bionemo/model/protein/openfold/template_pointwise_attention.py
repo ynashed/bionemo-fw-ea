@@ -15,7 +15,8 @@ from typing import Optional
 import torch
 import torch.nn as nn
 
-from bionemo.model.protein.openfold.attention import Attention
+from bionemo.model.protein.openfold.attention import Attention, CrossAttentionNoGate
+from bionemo.model.protein.openfold.optim_hub import OptimHub
 
 
 class TemplatePointwiseAttention(nn.Module):
@@ -43,16 +44,26 @@ class TemplatePointwiseAttention(nn.Module):
         chunk_size: Optional[int],
     ) -> None:
         super(TemplatePointwiseAttention, self).__init__()
-        self.mha = Attention(
-            c_q=c_z,
-            c_k=c_t,
-            c_v=c_t,
-            c_hidden=c_hidden,
-            num_heads=num_heads,
-            gating=False,
-            inf=inf,
-            chunk_size=chunk_size,
-        )
+        if OptimHub.config('mha_fused_gemm'):  # [optim-hub]
+            self.mha = CrossAttentionNoGate(
+                c_q=c_z,
+                c_kv=c_t,
+                c_hidden=c_hidden,
+                num_heads=num_heads,
+                inf=inf,
+                chunk_size=chunk_size,
+            )
+        else:
+            self.mha = Attention(
+                c_q=c_z,
+                c_k=c_t,
+                c_v=c_t,
+                c_hidden=c_hidden,
+                num_heads=num_heads,
+                gating=False,
+                inf=inf,
+                chunk_size=chunk_size,
+            )
 
     def forward(
         self,
@@ -81,13 +92,21 @@ class TemplatePointwiseAttention(nn.Module):
         template_mask = template_mask.unsqueeze(-2).unsqueeze(-3).unsqueeze(-4).unsqueeze(-5)
         # template_mask: [batch, 1, 1, 1, 1, N_templ]
 
-        z = self.mha(
-            input_q=z,
-            input_k=t,
-            input_v=t,
-            mask=template_mask,
-            bias=None,
-        )
+        if OptimHub.config('mha_fused_gemm'):
+            z = self.mha(
+                input_q=z,
+                input_kv=t,
+                mask=template_mask,
+                bias=None,
+            )
+        else:
+            z = self.mha(
+                input_q=z,
+                input_k=t,
+                input_v=t,
+                mask=template_mask,
+                bias=None,
+            )
         # z: [batch, N_res, N_res, 1, c_z]
 
         z = z.squeeze(-2)

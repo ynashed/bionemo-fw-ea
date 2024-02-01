@@ -95,6 +95,18 @@ model:
         preprocess_uniclust30_alignments: true
         preprocess_uniclust30_targets: true
 
+      create_sample: False
+
+      sample:
+        num_shards: 3
+        output_root_path: null
+        sample_variant: processed_sample
+        source_variant: ${model.data.dataset_variant}
+        force: False
+
+      sample_pdb_chain_ids: null # list of pdb ids that are part of training data and should be included in training sample
+
+
     use_only_pdb_chain_ids: null # Optional list of pdb chain ids for intersection with train and val datasets.
     filter_by_alignments: true
 
@@ -102,6 +114,7 @@ model:
     train_max_pdb_release_date: "2021-09-16"
     num_workers: 14
     realign_when_required: ${model.data.realign_when_required}
+    threading_enabled: False # TODO: explain
 
   validation_ds:
     val_min_cameo_submission_date: "2021-09-17"
@@ -110,6 +123,15 @@ model:
     val_max_sequence_length: 700
     realign_when_required: ${model.data.realign_when_required}
 
+  # List of optimisations to be applied to OpenFold (initial-training only).
+  # The following optimisations are available:
+  #      - mha_fused_gemm (Fused HEMM in Multi-Headed-Attention)
+  #      - mha_triton (Tritonimplementation of  Multi-Headed-Attention)
+  #      - layernorm_triton  (takes precedence before layernorm_inductor if both enabled)
+  #      - layernorm_inductor
+  #      - inductor_global (jitting turned on globally for all modules)
+  #      - dataloader_pq (DataLoader with a priority queue)
+  optimisations: []
 
 trainer:
   # the effective batch size should be 128

@@ -16,7 +16,7 @@ results_path: ${oc.env:BIONEMO_HOME}/test_results/openfold_benchmark # a directo
 
 model:
   stage: finetuning
-  precision: tf32 # TODO: this should be merged with trainer precision
+  precision: tf32
   seed: 44
   micro_batch_size: 1
   tensor_model_parallel_size: 1

@@ -11,12 +11,15 @@ import torch
 from triton.runtime.autotuner import Autotuner, Heuristics
 from triton.runtime.jit import JITFunction
 
+from bionemo.data.protein.openfold.helpers import is_ampere_arch, is_hopper_arch
 from bionemo.model.protein.openfold.triton._layer_norm_backward_kernels import (
     _layer_norm_backward_dw_db_partial,
     _layer_norm_backward_dw_db_partial_strided,
     _layer_norm_backward_dx,
     _layer_norm_backward_dx_strided,
 )
+from bionemo.model.protein.openfold.triton._layer_norm_config_ampere import _auto_tuned_config_ampere
+from bionemo.model.protein.openfold.triton._layer_norm_config_hopper import _auto_tuned_config_hopper
 from bionemo.model.protein.openfold.triton._layer_norm_forward_kernels import (
     _layer_norm_forward,
     _layer_norm_forward_strided,
@@ -88,6 +91,29 @@ def _load_triton_auto_tune_cache(f: BinaryIO, strict: bool = True, verbose: bool
         _tuneable_triton_kernels[func_name].cache = cache
     if verbose:
         print(f"Triton kernel auto-tuning caches loaded from {f}")
+
+
+def load_triton_auto_tuned_cache_params(dap_size: int, arch_type: str = None, verbose: bool = True) -> None:
+    if arch_type is None:
+        if is_hopper_arch():
+            arch_type = "hopper"
+        elif is_ampere_arch():
+            arch_type = "ampere"
+        else:
+            arch_type = "hopper"
+    if arch_type not in ("hopper", "ampere"):
+        raise ValueError(f"Unknown arch type {repr(arch_type)}")
+    if verbose:
+        print(f"Loading auto-tuned Triton configs for DAP={dap_size} and arch_type={arch_type}...")
+    auto_tuned_config = {
+        "hopper": _auto_tuned_config_hopper,
+        "ampere": _auto_tuned_config_ampere,
+    }[arch_type]
+    config_for_current_dap = auto_tuned_config[dap_size]
+    for func_name, cache in config_for_current_dap.items():
+        _tuneable_triton_kernels[func_name].cache = cache
+    if verbose:
+        print("Loaded auto-tuned Triton configs successfully!")
 
 
 def sync_triton_auto_tune_cache_across_gpus() -> None:

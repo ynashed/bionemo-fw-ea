@@ -29,6 +29,11 @@ from bionemo.model.protein.openfold.writer import PredictionPDBWriter
 from bionemo.model.utils import setup_trainer
 
 
+# The following benchmark inference script is used to infer over CAMEO targets
+# as structured in BioNeMo Service Benchmarking
+# https://gitlab-master.nvidia.com/clara-discovery/bionemo-service-benchmarking
+
+
 def read_benchmarking_data(benchmark_dir_path: str, allow_missing_msa: bool) -> pd.DataFrame:
     meta = pd.read_csv(os.path.join(benchmark_dir_path, 'meta.csv'), names=['pdb_id', 'length', 'seq'])
     msa_path = os.path.join(benchmark_dir_path, 'msa')

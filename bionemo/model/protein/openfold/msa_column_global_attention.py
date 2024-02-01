@@ -70,17 +70,22 @@ class MSAColumnGlobalAttention(nn.Module):
             m_update: [batch, N_extra_seq, N_res, c_e] extra MSA representation update
 
         """
-        m = m.transpose(-2, -3)
-        # m: [batch, N_res, N_extra_seq, c_e]
+        # TODO: [optim-hub] this is probably the only non-conditioned module
+        m_transposed = m.transpose(-2, -3)
+        # m_transposed: [batch, N_res, N_extra_seq, c_e]
 
         mask = mask.transpose(-1, -2)
         # mask: [batch, N_res, N_extra_seq]
 
-        m = self.layer_norm_m(m)
-        m = self.global_attention(m=m, mask=mask)
+        m_transposed_normalized = self.layer_norm_m(m_transposed)
+        m = self.global_attention(
+            m=m_transposed_normalized,
+            mask=mask,
+            add_transposed_output_to=m,
+        )
         # m: [batch, N_res, N_extra_seq, c_e]
 
-        m = m.transpose(-2, -3)
+        # m = m.transpose(-2, -3) # TODO: [optim-hub] this has been moved inside global attention?
         # m: [batch, N_extra_seq, N_res, c_e]
 
         return m

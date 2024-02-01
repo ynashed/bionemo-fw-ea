@@ -482,13 +482,13 @@ class SelfDistillationDataset(Dataset):
         pprefix: str = "",
     ) -> Dict[str, dict]:
         if verbose:
-            logging.debug(f"{pprefix}Loading {repr(targets_super_index_filepath)}...")
+            logging.debug(f"{pprefix}Loading {targets_super_index_filepath}...")
         with open(targets_super_index_filepath) as f:
             targets_super_index = json.load(f)
         if verbose:
             logging.debug(
                 f"{pprefix}targets_super_index ({len(targets_super_index)})"
-                f" loaded from {repr(targets_super_index_filepath)} successfully!"
+                f" loaded from {targets_super_index_filepath} successfully!"
             )
         return targets_super_index
 

@@ -15,9 +15,10 @@ from typing import Optional
 import torch
 import torch.nn as nn
 
-from bionemo.model.protein.openfold.attention import Attention
+from bionemo.model.protein.openfold.attention import Attention, SelfAttentionWithGate
 from bionemo.model.protein.openfold.layer_norm import LayerNorm
 from bionemo.model.protein.openfold.linear import Linear
+from bionemo.model.protein.openfold.optim_hub import OptimHub
 
 
 class TriangleAttention(nn.Module):
@@ -48,16 +49,25 @@ class TriangleAttention(nn.Module):
         self._is_starting = {"starting": True, "ending": False}[ta_type]
         self.layer_norm = LayerNorm(c_z)
         self.linear = Linear(c_z, num_heads, bias=False, init="normal")
-        self.mha = Attention(
-            c_q=c_z,
-            c_k=c_z,
-            c_v=c_z,
-            c_hidden=c_hidden,
-            num_heads=num_heads,
-            gating=True,
-            inf=inf,
-            chunk_size=chunk_size,
-        )
+        if OptimHub.config('mha_fused_gemm'):  # [optim-hub]
+            self.mha = SelfAttentionWithGate(
+                c_qkv=c_z,
+                c_hidden=c_hidden,
+                num_heads=num_heads,
+                inf=inf,
+                chunk_size=chunk_size,
+            )
+        else:
+            self.mha = Attention(
+                c_q=c_z,
+                c_k=c_z,
+                c_v=c_z,
+                c_hidden=c_hidden,
+                num_heads=num_heads,
+                gating=True,
+                inf=inf,
+                chunk_size=chunk_size,
+            )
 
     def forward(
         self,
@@ -92,14 +102,27 @@ class TriangleAttention(nn.Module):
         triangle_bias = triangle_bias.unsqueeze(-4)
         # triangle_bias: [batch, 1, num_heads, N_res, N_res]
 
-        z = self.mha(
-            input_q=z,
-            input_k=z,
-            input_v=z,
-            mask=mask,
-            bias=triangle_bias,
-        )
-        # z: [batch, N_res, N_res, c_z]
+        if OptimHub.config('mha_fused_gemm'):
+            triangle_bias = self.linear(z).movedim(-1, -3).unsqueeze(-4).contiguous()
+            z = self.mha(
+                input_qkv=z,
+                mask=mask,
+                bias=triangle_bias,
+            )
+        else:
+            triangle_bias = self.linear(z).movedim(z.ndim - 1, z.ndim - 3)
+            # triangle_bias: [batch, num_heads, N_res, N_res]
+
+            triangle_bias = triangle_bias.unsqueeze(-4)
+            # triangle_bias: [batch, 1, num_heads, N_res, N_res]
+
+            z = self.mha(
+                input_q=z,
+                input_k=z,
+                input_v=z,
+                mask=mask,
+                bias=triangle_bias,
+            )
 
         if not self._is_starting:
             z = z.transpose(-2, -3)

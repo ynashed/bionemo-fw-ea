@@ -15,8 +15,9 @@ from typing import Optional
 import torch
 import torch.nn as nn
 
-from bionemo.model.protein.openfold.attention import Attention
+from bionemo.model.protein.openfold.attention import Attention, SelfAttentionWithGate
 from bionemo.model.protein.openfold.layer_norm import LayerNorm
+from bionemo.model.protein.openfold.optim_hub import OptimHub
 
 
 class MSAColumnAttention(nn.Module):
@@ -43,16 +44,25 @@ class MSAColumnAttention(nn.Module):
     ) -> None:
         super(MSAColumnAttention, self).__init__()
         self.layer_norm_m = LayerNorm(c_m)
-        self.mha = Attention(
-            c_q=c_m,
-            c_k=c_m,
-            c_v=c_m,
-            c_hidden=c_hidden,
-            num_heads=num_heads,
-            gating=True,
-            inf=inf,
-            chunk_size=chunk_size,
-        )
+        if OptimHub.config('mha_fused_gemm'):  # [optim-hub]
+            self.mha = SelfAttentionWithGate(
+                c_qkv=c_m,
+                c_hidden=c_hidden,
+                num_heads=num_heads,
+                inf=inf,
+                chunk_size=chunk_size,
+            )
+        else:
+            self.mha = Attention(
+                c_q=c_m,
+                c_k=c_m,
+                c_v=c_m,
+                c_hidden=c_hidden,
+                num_heads=num_heads,
+                gating=True,
+                inf=inf,
+                chunk_size=chunk_size,
+            )
 
     def forward(
         self,
@@ -69,7 +79,7 @@ class MSAColumnAttention(nn.Module):
             m_update: [batch, N_seq, N_res, c_m] MSA representation update
 
         """
-        m = m.transpose(-2, -3)
+        m_transposed = m.transpose(-2, -3)
         # m: [batch, N_res, N_seq, c_m]
 
         mask = mask.transpose(-1, -2)
@@ -78,17 +88,23 @@ class MSAColumnAttention(nn.Module):
         mask = mask.unsqueeze(-2).unsqueeze(-3)
         # mask: [batch, N_res, 1, 1, N_seq]
 
-        m = self.layer_norm_m(m)
-        m = self.mha(
-            input_q=m,
-            input_k=m,
-            input_v=m,
-            mask=mask,
-            bias=None,
-        )
-        # m: [batch, N_res, N_seq, c_m]
-
-        m = m.transpose(-2, -3)
+        m_transposed_normalized = self.layer_norm_m(m_transposed)
+        if OptimHub.config('mha_fused_gemm'):
+            m = self.mha(
+                input_qkv=m_transposed_normalized,
+                mask=mask,
+                bias=None,
+                add_transposed_output_to=m,
+            )
+        else:
+            m = self.mha(
+                input_q=m_transposed_normalized,
+                input_k=m_transposed_normalized,
+                input_v=m_transposed_normalized,
+                mask=mask,
+                bias=None,
+            )
+            m = m.transpose(-2, -3)
         # m: [batch, N_seq, N_res, c_m]
 
         return m

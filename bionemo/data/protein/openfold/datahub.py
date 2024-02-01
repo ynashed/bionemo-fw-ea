@@ -6,9 +6,10 @@ from torch.utils.data import DataLoader
 
 from bionemo.data.protein.openfold.dataloaders import (
     FinetuningDataloader,
-    InitialTrainingDataloader,
+    InitialTrainingDataloaderPT,
     ValidationDataloader,
 )
+from bionemo.data.protein.openfold.dataloaders_pq import InitialTrainingDataloaderPQ
 from bionemo.data.protein.openfold.datasets import (
     FinetuningDataset,
     InitialTrainingDataset,
@@ -16,6 +17,10 @@ from bionemo.data.protein.openfold.datasets import (
     ValidationDataset,
 )
 from bionemo.data.protein.openfold.samplers import FinetuningSampler, InitialTrainingSampler, ValidationSampler
+from bionemo.model.protein.openfold.optim_hub import OptimHub
+
+
+# TODO: dataloaders should inlcude gradient checkpoint as this is probably a stanard across bionemo models
 
 
 def get_structured_paths(data_cfg) -> DictConfig:
@@ -67,6 +72,7 @@ def get_initial_training_dl(
     model_cfg: Union[DictConfig, Dict], train_session_cfg: Union[DictConfig, Dict], ds_cfg: Union[DictConfig, Dict]
 ) -> DataLoader:
     ds_paths = get_structured_paths(model_cfg.data)
+
     initial_training_dataset = InitialTrainingDataset(
         pdb_mmcif_chains_filepath=ds_paths.mmcif_chains,
         pdb_mmcif_dicts_dirpath=ds_paths.mmcif_dicts,
@@ -91,14 +97,23 @@ def get_initial_training_dl(
         world_size=train_session_cfg.world_size,
         num_prev_iters=train_session_cfg.iteration,
     )
+
+    # initial_training_dataset = InitialTrainingDataset(
+    if OptimHub.config('dataloader_pq'):
+        InitialTrainingDataloader = InitialTrainingDataloaderPQ
+    else:
+        InitialTrainingDataloader = InitialTrainingDataloaderPT
+
     initial_training_dataloader = InitialTrainingDataloader(
         dataset=initial_training_dataset,
         sampler=initial_training_sampler,
-        device_batch_size=model_cfg.micro_batch_size,
+        local_batch_size=model_cfg.micro_batch_size,
         num_workers=ds_cfg.num_workers,
         seed=model_cfg.seed,
         uniform_recycling_iters=list(range(0, model_cfg.num_recycling_iters + 1)),
         num_prev_iters=train_session_cfg.iteration,
+        use_threading=ds_cfg.threading_enabled,
+        prefetch_factor=2,
     )
 
     return initial_training_dataloader

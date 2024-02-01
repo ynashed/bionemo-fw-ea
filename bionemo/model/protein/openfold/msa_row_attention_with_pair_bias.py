@@ -15,9 +15,10 @@ from typing import Optional
 import torch
 import torch.nn as nn
 
-from bionemo.model.protein.openfold.attention import Attention
+from bionemo.model.protein.openfold.attention import Attention, SelfAttentionWithGate
 from bionemo.model.protein.openfold.layer_norm import LayerNorm
 from bionemo.model.protein.openfold.linear import Linear
+from bionemo.model.protein.openfold.optim_hub import OptimHub
 
 
 class MSARowAttentionWithPairBias(nn.Module):
@@ -48,16 +49,25 @@ class MSARowAttentionWithPairBias(nn.Module):
         self.layer_norm_m = LayerNorm(c_m)
         self.layer_norm_z = LayerNorm(c_z)
         self.linear_z = Linear(c_z, num_heads, bias=False, init="normal")
-        self.mha = Attention(
-            c_q=c_m,
-            c_k=c_m,
-            c_v=c_m,
-            c_hidden=c_hidden,
-            num_heads=num_heads,
-            gating=True,
-            inf=inf,
-            chunk_size=chunk_size,
-        )
+        if OptimHub.config('mha_fused_gemm'):  # [optim-hub]
+            self.mha = SelfAttentionWithGate(
+                c_qkv=c_m,
+                c_hidden=c_hidden,
+                num_heads=num_heads,
+                inf=inf,
+                chunk_size=chunk_size,
+            )
+        else:
+            self.mha = Attention(
+                c_q=c_m,
+                c_k=c_m,
+                c_v=c_m,
+                c_hidden=c_hidden,
+                num_heads=num_heads,
+                gating=True,
+                inf=inf,
+                chunk_size=chunk_size,
+            )
 
     def forward(
         self,
@@ -88,13 +98,20 @@ class MSARowAttentionWithPairBias(nn.Module):
         # z: [batch, 1, num_heads, N_res, N_res]
 
         m = self.layer_norm_m(m)
-        m = self.mha(
-            input_q=m,
-            input_k=m,
-            input_v=m,
-            mask=mask,
-            bias=z,
-        )
+        if OptimHub.config('mha_fused_gemm'):
+            m = self.mha(
+                input_qkv=m,
+                mask=mask,
+                bias=z,
+            )
+        else:
+            m = self.mha(
+                input_q=m,
+                input_k=m,
+                input_v=m,
+                mask=mask,
+                bias=z,
+            )
         # m: [batch, N_seq, N_res, c_m]
 
         return m

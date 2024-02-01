@@ -25,11 +25,11 @@ from bionemo.model.protein.openfold.evoformer_stack import EvoformerStack
 from bionemo.model.protein.openfold.extra_msa_embedder import ExtraMSAEmbedder
 from bionemo.model.protein.openfold.extra_msa_stack import ExtraMSAStack
 from bionemo.model.protein.openfold.feature_building import (
+    _apply_template_mask,
     _atom14_to_atom37,
     _build_extra_msa_feat,
     _build_template_angle_feat,
-    _build_template_pair_feat,
-    _pseudo_beta_fn,
+    _pseudo_beta,
 )
 from bionemo.model.protein.openfold.input_embedder import InputEmbedder
 from bionemo.model.protein.openfold.loss import AlphaFoldLoss
@@ -101,7 +101,7 @@ class AlphaFold(ModelPT):
 
     def forward(self, batch: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         # Initialize previous recycling embeddings:
-        prevs = {}
+        prevs = self._initialize_prevs(batch)
 
         # Forward iterations with autograd disabled:
         num_recycling_iters = batch["aatype"].shape[-1] - 1
@@ -129,6 +129,11 @@ class AlphaFold(ModelPT):
         del prevs
 
         # Run auxiliary heads:
+
+        outputs["msa"] = outputs["msa"].to(dtype=torch.float32)
+        outputs["pair"] = outputs["pair"].to(dtype=torch.float32)
+        outputs["single"] = outputs["single"].to(dtype=torch.float32)
+
         aux_outputs = self.auxiliary_heads(outputs)
         outputs.update(aux_outputs)
 
@@ -142,8 +147,6 @@ class AlphaFold(ModelPT):
     ) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
         outputs = {}
 
-        batch_size = feats["aatype"].shape[0]
-        N_res = feats["aatype"].shape[1]
         N_clust = feats["msa_feat"].shape[1]
 
         seq_mask = feats["seq_mask"]
@@ -169,23 +172,15 @@ class AlphaFold(ModelPT):
         z_prev = prevs.pop("z_prev", None)
         x_prev = prevs.pop("x_prev", None)
 
-        # Initialize recycling representations if needed:
-        if m0_prev is None:
-            m0_prev = torch.zeros_like(m[:, 0], requires_grad=False)
-        if z_prev is None:
-            z_prev = torch.zeros_like(z, requires_grad=False)
-        if x_prev is None:
-            x_prev = z.new_zeros(
-                size=(batch_size, N_res, rc.ATOM_TYPE_NUM, 3),
-                requires_grad=False,
-            )
-
-        x_prev = _pseudo_beta_fn(
+        x_prev = _pseudo_beta(
             aatype=feats["aatype"],
             all_atom_positions=x_prev,
-        ).to(dtype=z.dtype)
+            dtype=z.dtype,
+        )
 
-        m0_prev_emb, z_prev_emb = self.recycling_embedder(
+        m, z = self.recycling_embedder(
+            m=m,
+            z=z,
             m0_prev=m0_prev,
             z_prev=z_prev,
             x_prev=x_prev,
@@ -193,10 +188,7 @@ class AlphaFold(ModelPT):
         # m0_prev_emb: [batch, N_res, c_m]
         # z_prev_emb: [batch, N_res, N_res, c_z]
 
-        m[:, 0] += m0_prev_emb
-        z = z + z_prev_emb
-
-        del m0_prev, z_prev, x_prev, m0_prev_emb, z_prev_emb
+        del m0_prev, z_prev, x_prev
 
         # Embed templates and merge with MSA/pair representation:
         if self.cfg.templates_enabled:
@@ -259,10 +251,10 @@ class AlphaFold(ModelPT):
 
         # Predict 3D structure:
         sm_outputs = self.structure_module(
-            s=outputs["single"],
-            z=outputs["pair"],
-            aatype=feats["aatype"],
+            s=outputs["single"].to(dtype=torch.float32),
+            z=outputs["pair"].to(dtype=torch.float32),
             mask=feats["seq_mask"].to(dtype=s.dtype),
+            aatype=feats["aatype"],
         )
         outputs.update(sm_outputs)
         outputs["final_atom_positions"] = _atom14_to_atom37(
@@ -270,7 +262,9 @@ class AlphaFold(ModelPT):
             residx_atom37_to_atom14=feats["residx_atom37_to_atom14"],
             atom37_atom_exists=feats["atom37_atom_exists"],
         )
-        outputs["final_atom_mask"] = feats["atom37_atom_exists"]
+
+        # TODO: [optim-hub] why do we need to align dtypes?
+        outputs["final_atom_mask"] = feats["atom37_atom_exists"].to(dtype=outputs["final_atom_positions"].dtype)
         outputs["final_affine_tensor"] = outputs["sm_frames"][:, -1]
 
         # Save embeddings for next recycling iteration:
@@ -293,7 +287,7 @@ class AlphaFold(ModelPT):
         N_templ = feats["template_aatype"].shape[1]
         for i in range(N_templ):
             single_template_feats = map_tensor_tree(fn=lambda t: t[:, i], tree=feats)
-            t = _build_template_pair_feat(
+            t = self.template_pair_embedder.build_template_pair_feat(
                 feats=single_template_feats,
                 min_bin=self.cfg.template_pair_feat_distogram_min_bin,
                 max_bin=self.cfg.template_pair_feat_distogram_max_bin,
@@ -301,7 +295,8 @@ class AlphaFold(ModelPT):
                 use_unit_vector=self.cfg.template_pair_feat_use_unit_vector,
                 inf=self.cfg.template_pair_feat_inf,
                 eps=self.cfg.template_pair_feat_eps,
-            ).to(dtype=z.dtype)
+                dtype=z.dtype,
+            )
             t = self.template_pair_embedder(t)
             # t: [batch, N_res, N_res, c_t]
             pair_embeds.append(t)
@@ -325,9 +320,7 @@ class AlphaFold(ModelPT):
         )
         # t: [batch, N_res, N_res, c_z]
 
-        t_mask = (torch.sum(feats["template_mask"], dim=1) > 0).to(dtype=t.dtype)
-        t_mask = t_mask.unsqueeze(1).unsqueeze(2).unsqueeze(3)
-        t = t * t_mask
+        t = _apply_template_mask(t=t, template_mask=feats["template_mask"])
         # t: [batch, N_res, N_res, c_z]
 
         template_embeds = {}
@@ -340,6 +333,34 @@ class AlphaFold(ModelPT):
             template_embeds["template_angle_embedding"] = a
 
         return template_embeds
+
+    def _initialize_prevs(
+        self,
+        batch: Dict[str, torch.Tensor],
+    ) -> Dict[str, torch.Tensor]:
+        prevs = {}
+        batch_size = batch["aatype"].shape[0]
+        N_res = batch["aatype"].shape[1]
+        c_m = self.input_embedder.c_m
+        c_z = self.input_embedder.c_z
+        device = batch["msa_feat"].device
+        dtype = batch["msa_feat"].dtype
+        prevs["m0_prev"] = torch.zeros(
+            size=[batch_size, N_res, c_m],
+            device=device,
+            dtype=dtype,
+        )
+        prevs["z_prev"] = torch.zeros(
+            size=[batch_size, N_res, N_res, c_z],
+            device=device,
+            dtype=dtype,
+        )
+        prevs["x_prev"] = torch.zeros(
+            size=[batch_size, N_res, rc.ATOM_TYPE_NUM, 3],
+            device=device,
+            dtype=torch.float32,
+        )
+        return prevs
 
     def get_checkpoint_step(self) -> int:
         """In DDP, checkpoints are loaded after data setup. This means information about

@@ -14,6 +14,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from bionemo.model.protein.openfold.optim_hub import OptimHub
+from bionemo.model.protein.openfold.triton.layer_norm import LayerNormSmallShapeOptImpl
+
 
 class LayerNorm(nn.Module):
     """Layer Normalization module.
@@ -36,12 +39,32 @@ class LayerNorm(nn.Module):
         self.eps = eps
         self.weight = nn.Parameter(torch.ones(in_channels))
         self.bias = nn.Parameter(torch.zeros(in_channels))
+        self._ln_eager_func = F.layer_norm
+        self._ln_inductor_func = torch.compile(F.layer_norm)
+        self._ln_triton_func = LayerNormSmallShapeOptImpl.apply
+
+    def _should_use_triton_kernels(self, x: torch.Tensor) -> bool:
+        # These two most common layer-norm shapes in open-fold are well handled by Triton kernels.
+        # Applying Triton kernels to other shapes will mysteriously degrade convergence.
+        # TODO(@davidli): Look back for convergence issue if need to be.
+        ln_triton_shapes = (
+            (256, 128),
+            (256, 256),
+        )
+        ln_triton_dim = 4
+        return (
+            OptimHub.config('layernorm_triton')
+            and self.training
+            and x.dim() == ln_triton_dim
+            and x.shape[-2:] in ln_triton_shapes
+        )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return F.layer_norm(
-            input=x,
-            normalized_shape=self.normalized_shape,
-            weight=self.weight,
-            bias=self.bias,
-            eps=self.eps,
-        )
+        # TODO: [optim-hub] by default triton kernels take precedence, so if both triton
+        # and inductor are turn on, inductor gets ignored. This might be resolved more graciously
+        if self._should_use_triton_kernels(x):
+            return self._ln_triton_func(x, self.normalized_shape, self.weight, self.bias, self.eps)
+        elif self.training and OptimHub.config('layernorm_inductor'):
+            return self._ln_inductor_func(x, self.normalized_shape, self.weight, self.bias, self.eps)
+        else:
+            return self._ln_eager_func(x, self.normalized_shape, self.weight, self.bias, self.eps)

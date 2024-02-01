@@ -12,7 +12,9 @@
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
+import bionemo.model.protein.openfold.inductor as inductor
 from bionemo.model.protein.openfold.layer_norm import LayerNorm
 from bionemo.model.protein.openfold.linear import Linear
 
@@ -50,12 +52,41 @@ class MSATransition(nn.Module):
             mask: [batch, N_seq, N_res] MSA mask
 
         Returns:
-            m_update: [batch, N_seq, N_res, c_m] MSA representation update
+            m: [batch, N_seq, N_res, c_m] updated MSA representation
 
         """
         # DeepMind forgets to apply the MSA mask here.
-        m = self.layer_norm(m)
-        m = self.linear_1(m)
-        m = torch.relu(m)
-        m = self.linear_2(m)
-        return m
+        # todo(jxin): open fwd when dap >= 1?
+        # TODO: [optim-hub] re-check conditions on dap
+        if inductor.is_enabled_on_ampere():
+            forward_fn = _forward_jit
+        elif inductor.is_enabled_on_hopper_and_autograd_off():
+            forward_fn = _forward_jit
+        else:
+            forward_fn = _forward_eager
+        return forward_fn(
+            self.layer_norm(m),
+            self.linear_1.weight,
+            self.linear_1.bias,
+            self.linear_2.weight,
+            self.linear_2.bias,
+            m,
+        )
+
+
+def _forward_eager(
+    m: torch.Tensor,
+    w1: torch.Tensor,
+    b1: torch.Tensor,
+    w2: torch.Tensor,
+    b2: torch.Tensor,
+    out: torch.Tensor,
+) -> torch.Tensor:
+    m = F.linear(m, w1, b1)
+    m = torch.relu(m)
+    m = F.linear(m, w2, b2)
+    m = out + m
+    return m
+
+
+_forward_jit = torch.compile(_forward_eager)

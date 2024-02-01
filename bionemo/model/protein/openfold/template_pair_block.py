@@ -116,11 +116,23 @@ class TemplatePairBlock(nn.Module):
         for i in range(N_templ):
             t = t_list[i]
             # t: [batch, N_res, N_res, c_t]
-            t = t + self.tasn_dropout_rowwise(self.tri_att_start(z=t, mask=mask))
-            t = t + self.taen_dropout_columnwise(self.tri_att_end(z=t, mask=mask))
-            t = t + self.tmo_dropout_rowwise(self.tri_mul_out(z=t, mask=mask))
-            t = t + self.tmi_dropout_rowwise(self.tri_mul_in(z=t, mask=mask))
-            t = t + self.pair_transition(z=t, mask=mask)
+            t = self.tasn_dropout_rowwise(
+                self.tri_att_start(z=t, mask=mask),
+                add_output_to=t,
+            )
+            t = self.taen_dropout_columnwise(
+                self.tri_att_end(z=t, mask=mask),
+                add_output_to=t,
+            )
+            t = self.tmo_dropout_rowwise(
+                self.tri_mul_out(z=t, mask=mask),
+                add_output_to=t,
+            )
+            t = self.tmi_dropout_rowwise(
+                self.tri_mul_in(z=t, mask=mask),
+                add_output_to=t,
+            )
+            t = self.pair_transition(z=t, mask=mask)
             t_list[i] = t
         t = torch.stack(t_list, dim=-4)
         # t: [batch, N_templ, N_res, N_res, c_t]

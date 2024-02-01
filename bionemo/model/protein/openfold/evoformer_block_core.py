@@ -50,8 +50,10 @@ class EvoformerBlockCore(nn.Module):
         pair_dropout: Dropout rate for pair activations.
         inf: Safe infinity value.
         eps_opm: Epsilon to prevent division by zero in outer product mean.
-        chunk_size_opm: Optional chunk size for a batch-like dimension in outer product mean.
-        chunk_size_tri_att: Optional chunk size for a batch-like dimension in triangular attention.
+        chunk_size_opm: Optional chunk size for a batch-like dimension
+            in outer product mean.
+        chunk_size_tri_att: Optional chunk size for a batch-like dimension
+            in triangular attention.
 
     """
 
@@ -141,11 +143,33 @@ class EvoformerBlockCore(nn.Module):
             z: [batch, N_res, N_res, c_z] updated pair representation
 
         """
-        m = m + self.msa_transition(m=m, mask=msa_mask)
-        z = z + self.outer_product_mean(m=m, mask=msa_mask)
-        z = z + self.tmo_dropout_rowwise(self.tri_mul_out(z=z, mask=pair_mask))
-        z = z + self.tmi_dropout_rowwise(self.tri_mul_in(z=z, mask=pair_mask))
-        z = z + self.tasn_dropout_rowwise(self.tri_att_start(z=z, mask=pair_mask))
-        z = z + self.taen_dropout_columnwise(self.tri_att_end(z=z, mask=pair_mask))
-        z = z + self.pair_transition(z, mask=pair_mask)
+        m, z = self._forward(m=m, z=z, msa_mask=msa_mask, pair_mask=pair_mask)
+        return m, z
+
+    def _forward(
+        self,
+        m: torch.Tensor,
+        z: torch.Tensor,
+        msa_mask: torch.Tensor,
+        pair_mask: torch.Tensor,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        m = self.msa_transition(m=m, mask=msa_mask)
+        z = self.outer_product_mean(m=m, mask=msa_mask, add_output_to=z)
+        z = self.tmo_dropout_rowwise(
+            self.tri_mul_out(z=z, mask=pair_mask),
+            add_output_to=z,
+        )
+        z = self.tmi_dropout_rowwise(
+            self.tri_mul_in(z=z, mask=pair_mask),
+            add_output_to=z,
+        )
+        z = self.tasn_dropout_rowwise(
+            self.tri_att_start(z=z, mask=pair_mask),
+            add_output_to=z,
+        )
+        z = self.taen_dropout_columnwise(
+            self.tri_att_end(z=z, mask=pair_mask),
+            add_output_to=z,
+        )
+        z = self.pair_transition(z, mask=pair_mask)
         return m, z

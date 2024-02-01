@@ -166,5 +166,5 @@ class EvoformerStack(nn.Module):
             for block in self.blocks
         ]
         for block in blocks:
-            m, z = gradient_checkpointing_fn(block, m, z)
+            m, z = gradient_checkpointing_fn(block, m, z, use_reentrant=True)
         return m, z

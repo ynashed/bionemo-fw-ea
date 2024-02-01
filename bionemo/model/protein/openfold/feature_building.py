@@ -16,12 +16,13 @@ import torch
 import torch.nn.functional as F
 
 import bionemo.data.protein.openfold.residue_constants as rc
-from bionemo.model.protein.openfold.utils.rigid_utils import Rigid
+import bionemo.model.protein.openfold.inductor as inductor
 
 
-def _pseudo_beta_fn(
+def _pseudo_beta_eager(
     aatype: torch.Tensor,
     all_atom_positions: torch.Tensor,
+    dtype: torch.dtype,
 ) -> torch.Tensor:
     is_gly = torch.eq(aatype, rc.RESTYPE_ORDER["G"])
     ca_idx = rc.ATOM_ORDER["CA"]
@@ -31,91 +32,57 @@ def _pseudo_beta_fn(
         all_atom_positions[..., ca_idx, :],
         all_atom_positions[..., cb_idx, :],
     )
-    return pseudo_beta
+    return pseudo_beta.to(dtype=dtype)
 
 
-def _build_extra_msa_feat(feats: Dict[str, torch.Tensor]) -> torch.Tensor:
-    msa_1hot = F.one_hot(input=feats["extra_msa"], num_classes=23)
+_pseudo_beta_jit = torch.compile(_pseudo_beta_eager)
+
+
+def _pseudo_beta(
+    aatype: torch.Tensor,
+    all_atom_positions: torch.Tensor,
+    dtype,
+) -> torch.Tensor:
+    if inductor.is_enabled():
+        pseudo_beta_fn = _pseudo_beta_jit
+    else:
+        pseudo_beta_fn = _pseudo_beta_eager
+    return pseudo_beta_fn(
+        aatype,
+        all_atom_positions,
+        dtype,
+    )
+
+
+def _build_extra_msa_feat_eager(
+    extra_msa: torch.Tensor,
+    extra_has_deletion: torch.Tensor,
+    extra_deletion_value: torch.Tensor,
+    num_classes: int,
+) -> torch.Tensor:
+    msa_1hot = F.one_hot(input=extra_msa, num_classes=num_classes)
     msa_feat = [
         msa_1hot,
-        feats["extra_has_deletion"].unsqueeze(-1),
-        feats["extra_deletion_value"].unsqueeze(-1),
+        extra_has_deletion.unsqueeze(-1),
+        extra_deletion_value.unsqueeze(-1),
     ]
     return torch.cat(msa_feat, dim=-1)
 
 
-def _build_template_pair_feat(
-    feats: Dict[str, torch.Tensor],
-    min_bin: int,
-    max_bin: int,
-    num_bins: int,
-    use_unit_vector: bool,
-    inf: float,
-    eps: float,
-) -> torch.Tensor:
-    template_mask = feats["template_pseudo_beta_mask"]
-    template_mask_2d = template_mask.unsqueeze(-1) * template_mask.unsqueeze(-2)
+_build_extra_msa_feat_jit = torch.compile(_build_extra_msa_feat_eager)
 
-    # Compute distogram (this seems to differ slightly from Alg. 5)
-    tpb = feats["template_pseudo_beta"]
-    dgram = torch.sum(
-        input=(tpb.unsqueeze(-2) - tpb.unsqueeze(-3)) ** 2,
-        dim=-1,
-        keepdim=True,
+
+def _build_extra_msa_feat(feats: Dict[str, torch.Tensor]) -> torch.Tensor:
+    if inductor.is_enabled():
+        build_extra_msa_feat_fn = _build_extra_msa_feat_jit
+    else:
+        build_extra_msa_feat_fn = _build_extra_msa_feat_eager
+    return build_extra_msa_feat_fn(
+        extra_msa=feats["extra_msa"],
+        extra_has_deletion=feats["extra_has_deletion"],
+        extra_deletion_value=feats["extra_deletion_value"],
+        num_classes=23,
     )
-    lower = (
-        torch.linspace(
-            start=min_bin,
-            end=max_bin,
-            steps=num_bins,
-            device=tpb.device,
-        )
-        ** 2
-    )
-    upper = torch.cat([lower[1:], lower.new_tensor([inf])], dim=-1)
-    dgram = ((dgram > lower) * (dgram < upper)).to(dtype=dgram.dtype)
-
-    to_concat = [dgram, template_mask_2d.unsqueeze(-1)]
-
-    aatype_one_hot = F.one_hot(
-        input=feats["template_aatype"],
-        num_classes=(rc.RESTYPE_NUM + 2),
-    )
-
-    N_res = feats["template_aatype"].shape[-1]
-
-    to_concat.append(aatype_one_hot.unsqueeze(-3).expand(*aatype_one_hot.shape[:-2], N_res, -1, -1))
-    to_concat.append(aatype_one_hot.unsqueeze(-2).expand(*aatype_one_hot.shape[:-2], -1, N_res, -1))
-
-    n, ca, c = [rc.ATOM_ORDER[a] for a in ["N", "CA", "C"]]
-    rigids = Rigid.make_transform_from_reference(
-        n_xyz=feats["template_all_atom_positions"][..., n, :],
-        ca_xyz=feats["template_all_atom_positions"][..., ca, :],
-        c_xyz=feats["template_all_atom_positions"][..., c, :],
-        eps=eps,
-    )
-    points = rigids.get_trans().unsqueeze(-3)
-    rigid_vec = rigids.unsqueeze(-1).invert_apply(points)
-
-    inv_distance_scalar = torch.rsqrt(eps + torch.sum(rigid_vec**2, dim=-1))
-
-    t_aa_masks = feats["template_all_atom_mask"]
-    template_mask = t_aa_masks[..., n] * t_aa_masks[..., ca] * t_aa_masks[..., c]
-    template_mask_2d = template_mask.unsqueeze(-1) * template_mask.unsqueeze(-2)
-
-    inv_distance_scalar = inv_distance_scalar * template_mask_2d
-    unit_vector = rigid_vec * inv_distance_scalar.unsqueeze(-1)
-
-    if not use_unit_vector:
-        unit_vector = unit_vector * 0.0
-
-    to_concat.extend(torch.unbind(unit_vector.unsqueeze(-2), dim=-1))
-    to_concat.append(template_mask_2d.unsqueeze(-1))
-
-    t = torch.cat(to_concat, dim=-1)
-    t = t * template_mask_2d.unsqueeze(-1)
-
-    return t
 
 
 def _build_template_angle_feat(feats: Dict[str, torch.Tensor]) -> torch.Tensor:
@@ -159,3 +126,21 @@ def _atom14_to_atom37(
     # atom37_positions: [batch, N_res, 37, 3]
 
     return atom37_positions
+
+
+def _apply_template_mask_eager(t: torch.Tensor, template_mask: torch.Tensor) -> torch.Tensor:
+    t_mask = (torch.sum(template_mask, dim=1) > 0).to(dtype=t.dtype)
+    t_mask = t_mask.unsqueeze(1).unsqueeze(2).unsqueeze(3)
+    t = t * t_mask
+    return t
+
+
+_apply_template_mask_jit = torch.compile(_apply_template_mask_eager)
+
+
+def _apply_template_mask(t: torch.Tensor, template_mask: torch.Tensor) -> torch.Tensor:
+    if inductor.is_enabled():
+        apply_template_mask_fn = _apply_template_mask_jit
+    else:
+        apply_template_mask_fn = _apply_template_mask_eager
+    return apply_template_mask_fn(t, template_mask)

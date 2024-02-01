@@ -12,7 +12,9 @@
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
+import bionemo.model.protein.openfold.inductor as inductor
 from bionemo.model.protein.openfold.layer_norm import LayerNorm
 from bionemo.model.protein.openfold.linear import Linear
 
@@ -50,12 +52,51 @@ class PairTransition(nn.Module):
             mask: [batch, N_res, N_res] pair mask
 
         Returns:
-            z_update: [batch, N_res, N_res, c_z] pair representation update
+            z: [batch, N_res, N_res, c_z] updated pair representation
 
         """
-        # DeepMind forgets to apply the MSA mask here.
+        # DeepMind forgets to apply the pair mask here.
+        input_z = z
+
         z = self.layer_norm(z)
-        z = self.linear_1(z)
-        z = torch.relu(z)
-        z = self.linear_2(z)
+
+        # make inductor happy - but why? what is the problem with original shape?
+        original_shape = z.shape
+        z = z.view(-1, z.shape[-1])
+
+        if inductor.is_enabled_on_ampere():
+            linear_relu_fn = _linear_relu_jit
+        if inductor.is_enabled_on_hopper():
+            linear_relu_fn = _linear_relu_jit
+        else:
+            linear_relu_fn = _linear_relu_eager
+        z = linear_relu_fn(z, self.linear_1.weight, self.linear_1.bias)
+
+        # TODO: [optim-hub] This can be jitted if dap is incorporated and dap size >= 2
+        z = _linear_view_add_eager(z, self.linear_2.weight, self.linear_2.bias, input_z)
+
+        z = z.view(original_shape)
         return z
+
+
+def _linear_relu_eager(
+    x: torch.Tensor,
+    w: torch.Tensor,
+    b: torch.Tensor,
+) -> torch.Tensor:
+    return torch.relu(F.linear(x, w, b))
+
+
+_linear_relu_jit = torch.compile(_linear_relu_eager)
+
+
+def _linear_view_add_eager(
+    z: torch.Tensor,
+    w: torch.Tensor,
+    b: torch.Tensor,
+    out: torch.Tensor,
+) -> torch.Tensor:
+    z = F.linear(z, w, b)
+    z = z.view(out.shape)
+    z = out + z
+    return z
