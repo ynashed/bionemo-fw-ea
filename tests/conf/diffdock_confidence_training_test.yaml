@@ -1,14 +1,14 @@
 defaults:
-  - train_score
+  - train_confidence
 
 hydra:
   searchpath:
      - ${oc.env:BIONEMO_HOME}/examples/molecule/diffdock/conf
 
-tmp_directory: ???
+tmp_path: ???
 
 
-name: diffdock_score_training_test
+name: diffdock_confidence_training_test
 
 data:
   split_train: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/splits/split_train # Path of file defining the split.
@@ -22,11 +22,7 @@ trainer:
 
 model:
   micro_batch_size: 2
-  max_total_size: null
-  estimate_memory_usage:
-    maximal: null
-  val_denoising_inference_freq: 1
 
 exp_manager:
   create_wandb_logger: False
-  exp_dir: ${tmp_directory}/result/${name}
+  exp_dir: ${tmp_path}/result/${name}
