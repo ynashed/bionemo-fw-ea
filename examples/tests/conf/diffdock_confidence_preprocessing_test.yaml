@@ -5,7 +5,7 @@ hydra:
   searchpath:
      - ${oc.env:BIONEMO_HOME}/examples/molecule/diffdock/conf
 
-tmp_directory: ???
+tmp_path: ???
 
 seed: 42
 
@@ -16,10 +16,10 @@ training_data:
 
 model:
   train_ds:
-    num_workers: 2
+    num_workers: 1
     chunk_size: 1
     split_train: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/preprocessing_test/train_split
-    cache_path: ${tmp_directory}/data_cache
+    cache_path: ${tmp_path}/data_cache
 
 
 

@@ -39,6 +39,9 @@ from bionemo.utils.tests import (
 e3nn.set_optimization_defaults(optimize_einsums=False)
 torch.use_deterministic_algorithms(True, warn_only=True)
 torch.backends.cudnn.benchmark = False
+torch.backends.cuda.matmul.allow_tf32 = False
+torch.backends.cuda.allow_tf32 = False
+torch.backends.cudnn.enabled = False
 
 
 THIS_FILE_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -46,14 +49,7 @@ PREPEND_CONFIG_DIR = os.path.join(THIS_FILE_DIR, './conf')
 ROOT_DIR = 'diffdock'
 
 
-@pytest.fixture(scope="session")
-def tmp_directory(tmp_path_factory, root_directory=ROOT_DIR):
-    """Create tmp directory"""
-    tmp_path_factory.mktemp(root_directory)
-    return tmp_path_factory.getbasetemp()
-
-
-def get_cfg(tmp_directory, prepend_config_path, config_name, config_path='conf'):
+def get_cfg(tmp_path, prepend_config_path, config_name, config_path='conf'):
     prepend_config_path = pathlib.Path(prepend_config_path)
 
     class TestSearchPathConfig(BioNemoSearchPathConfig):
@@ -66,15 +62,15 @@ def get_cfg(tmp_directory, prepend_config_path, config_name, config_path='conf')
         cfg = compose(config_name=config_name)
 
     with open_dict(cfg):
-        cfg.tmp_directory = tmp_directory
+        cfg.tmp_path = tmp_path
 
     return cfg
 
 
-@pytest.mark.skip(reason="FIXME: Hardware dependent tests which are flaky")
+@pytest.mark.needs_gpu
 @pytest.mark.parametrize('config_name', ['diffdock_embedding_test'])
-def test_diffdock_embedding_preprocessing(tmp_directory, config_name):
-    cfg = get_cfg(tmp_directory, PREPEND_CONFIG_DIR, config_name)
+def test_diffdock_embedding_preprocessing(tmp_path, config_name):
+    cfg = get_cfg(tmp_path, PREPEND_CONFIG_DIR, config_name)
 
     prep_embedding(cfg.training_data)
     fasta = {rec.id: str(rec.seq) for rec in SeqIO.parse(cfg.training_data.output_fasta_file, 'fasta')}
@@ -92,11 +88,10 @@ def test_diffdock_embedding_preprocessing(tmp_directory, config_name):
         assert torch.allclose(embedding, ref_embedding)
 
 
-@pytest.mark.skip(reason="FIXME: Hardware dependent tests which are flaky")
 @pytest.mark.slow
 @pytest.mark.parametrize('config_name', ['diffdock_score_preprocessing_test'])
-def test_diffdock_prepare_score_dataset(tmp_directory, config_name):
-    cfg = get_cfg(tmp_directory, PREPEND_CONFIG_DIR, config_name)
+def test_diffdock_prepare_score_dataset(tmp_path, config_name):
+    cfg = get_cfg(tmp_path, PREPEND_CONFIG_DIR, config_name)
 
     t_to_sigma = partial(t_to_sigma_compl, cfg=cfg.model)
 
@@ -135,14 +130,12 @@ def test_diffdock_prepare_score_dataset(tmp_directory, config_name):
                 ), f"{key}.{attr} is wrong"
 
 
-@pytest.mark.skip(reason="FIXME: Hardware dependent tests which are flaky")
 @pytest.mark.slow
 @pytest.mark.needs_gpu
 @pytest.mark.needs_checkpoint
 @pytest.mark.parametrize('config_name', ['diffdock_confidence_preprocessing_test'])
-@pytest.mark.skip(reason="FIXME: Test is flaky across different hardwares")
-def test_diffdock_prepare_confidence_dataset(tmp_directory, config_name):
-    cfg = get_cfg(tmp_directory, PREPEND_CONFIG_DIR, config_name)
+def test_diffdock_prepare_confidence_dataset(tmp_path, config_name):
+    cfg = get_cfg(tmp_path, PREPEND_CONFIG_DIR, config_name)
     seed_everything(cfg.seed)
 
     dataset = diffdock_confidence_dataset(cfg.model.train_ds, mode="train")

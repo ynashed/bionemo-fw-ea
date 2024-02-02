@@ -54,7 +54,7 @@ else
 fi
 
 VERSION_PROCESSED_SAMPLE=processed_sample_01082024
-VERSION_PREPROCESSING_TEST=preprocessing_test_01082024
+VERSION_PREPROCESSING_TEST=preprocessing_test_01312024
 
 if [ -n "$PBSS" ]; then
     echo "Downloading from PBSS to $DATA_PATH"
