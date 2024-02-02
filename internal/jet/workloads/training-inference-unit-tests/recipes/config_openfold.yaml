@@ -15,6 +15,10 @@ key_segments:
 launchers:
   type:slurm:
     ntasks_per_node: '{gpus}'
+  name:dgxa100_dracooci:
+    mounts:
+      /workspace/bionemo/models: /lustre/fsw/portfolios/convai/projects/convai_bionemo_training/jet/models
+      /workspace/bionemo/examples/tests/test_data/openfold_data: /lustre/fsw/portfolios/convai/projects/convai_bionemo_training/jet/data/test_data/openfold_data
 spec:
   build: bionemo
   scope: perf-train
@@ -30,11 +34,7 @@ spec:
   extra_overwrites: ""
   script: |-
     cd {BIONEMO_HOME}
-    export NGC_CLI_ORG={NGC_CLI_ORG} 
-    export NGC_CLI_TEAM={NGC_CLI_TEAM} 
-    export NGC_CLI_FORMAT_TYPE={NGC_CLI_FORMAT_TYPE} 
     if [ "$SLURM_LOCALID" = "0" ]; then
-      source examples/protein/openfold/scripts/download_data_sample.sh;
       if [ "{kalignu}" = "True" ]; then
         bash examples/protein/openfold/scripts/install_third_party.sh;
       fi

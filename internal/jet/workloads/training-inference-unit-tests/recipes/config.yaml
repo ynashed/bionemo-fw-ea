@@ -16,6 +16,9 @@ key_segments:
 launchers:
   type:slurm:
     ntasks_per_node: '{gpus}'
+  name:dgxa100_dracooci:
+    mounts:
+      /workspace/bionemo/models: /lustre/fsw/portfolios/convai/projects/convai_bionemo_training/jet/models
 spec:
   build: bionemo
   scope: perf-train
@@ -35,9 +38,6 @@ spec:
     export NGC_CLI_TEAM={NGC_CLI_TEAM}
     export NGC_CLI_FORMAT_TYPE={NGC_CLI_FORMAT_TYPE}
     if [ "$SLURM_LOCALID" = "0" ]; then
-      if [ "{model}" = "megamolbart" ]; then
-        python download_models.py {model} --download_dir {MODEL_PATH} --verbose;
-      fi
       if [ "{model}" = "esm2nv" ]; then
         unzip examples/tests/test_data/uniref202104_esm2_qc_test200_val200.zip -d examples/tests/test_data/;
       fi
