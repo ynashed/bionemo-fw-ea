@@ -40,6 +40,8 @@ model:
     num_workers: 24
     dataloader_type: single
     dataset_format: fasta
+    dynamic_padding: false # If True, each batch is padded to the maximum sequence length within that batch.
+        #    Set it to False when model.pipeline_model_parallel_size > 1, as pipeline parallelism requires fixed-length padding.
   megatron_amp_O2: False # Set to True to go fast
   precision: bf16-mixed
 exp_manager:

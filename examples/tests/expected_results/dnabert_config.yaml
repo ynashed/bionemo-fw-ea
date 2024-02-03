@@ -1,6 +1,6 @@
 name: dnabert_base_config
 restore_from_path: null
-do_training: ???
+do_training: true
 trainer:
   devices: 1
   num_nodes: 1
@@ -96,6 +96,7 @@ model:
     seq_length: ${model.seq_length}
     k: ${model.tokenizer.k}
     seed: ${model.seed}
+    dynamic_padding: true
     micro_batch_size: ${model.micro_batch_size}
     dataset_format: fasta
   optim:

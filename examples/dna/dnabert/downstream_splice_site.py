@@ -8,6 +8,7 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
+import os
 from pathlib import PosixPath
 
 import numpy as np
@@ -69,6 +70,7 @@ def main(cfg):
     if do_prediction:
         if (predictions_file := cfg.get("predictions_output_file")) is None:
             raise ValueError("predictions_output_file must be specified if do_prediction=True")
+        predictions_file = os.path.join(cfg.exp_manager.exp_dir, predictions_file)
 
     seed = cfg.model.seed
     np.random.seed(seed)
@@ -97,6 +99,7 @@ def main(cfg):
         dataset = model.predict_dataset
         predictions = reformat_predictions(predictions, dataset)
         pd.DataFrame(predictions).to_csv(predictions_file)
+        logging.info(f"Predictions written to {predictions_file}!")
 
 
 def reformat_predictions(predictions, dataset):

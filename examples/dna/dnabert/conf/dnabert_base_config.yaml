@@ -1,7 +1,7 @@
 name: dnabert_base_config
 restore_from_path: null # used when starting from a .nemo file
 
-do_training: ??? # set to true to train a model
+do_training: true # set to true to train a model
 
 trainer:
   devices: 2
@@ -113,6 +113,8 @@ model:
     seq_length: ${model.seq_length}
     k: ${model.tokenizer.k}
     seed: ${model.seed}
+    dynamic_padding: false # If True, each batch is padded to the maximum sequence length within that batch.
+        #    Set it to False when model.pipeline_model_parallel_size > 1, as pipeline parallelism requires fixed-length padding.
 
   optim:
     name: fused_adam

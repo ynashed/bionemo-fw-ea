@@ -8,6 +8,7 @@ do_training: true
 do_predict: false
 
 restore_from_path: ??? # Restores from an existing downstream-task model nemo file.
+predictions_output_file: preds.txt
 
 trainer:
   devices: 1
@@ -22,6 +23,7 @@ model:
   # Controls task head
   n_outputs: 3
   hidden_layer_size: 64
+  global_batch_size: null # if null will be computed automatically
 
   micro_batch_size: 64
   data:

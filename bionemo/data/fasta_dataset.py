@@ -641,6 +641,7 @@ class DNABERTDataModule(BioNeMoDataModule):
                 span_length=model._cfg.tokenizer.k,
             ),
             transform_sentences=sentence_transform,
+            dynamic_padding=self.cfg.dynamic_padding,
         ).collate_fn
 
     def _setup_eval_dataloader(self, model, dataloader):

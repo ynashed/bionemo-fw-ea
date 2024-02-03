@@ -369,6 +369,7 @@ class KmerBertCollate(BertCollate):
         perturb_percent: float = 0.5,
         masking_strategy: Optional[Callable] = None,
         transform_sentences: Optional[Callable] = None,
+        dynamic_padding: bool = False,
     ):
         """
         A BertCollate function for k-mer based tokenization. This collate function
@@ -433,6 +434,7 @@ class KmerBertCollate(BertCollate):
             seq_length=seq_length,
             pad_size_divisible_by_8=pad_size_divisible_by_8,
             masking_strategy=masking_strategy,
+            dynamic_padding=dynamic_padding,
         )
 
     def tokenize(self, sentences):
