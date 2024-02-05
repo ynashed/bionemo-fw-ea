@@ -176,7 +176,7 @@ def test_samplings_triton(server) -> None:
 
     assert GENERATED in result, f"Expecting {GENERATED} but found {result.keys()=}"
     generated: np.ndarray = result[GENERATED]
-    _validate_generated(generated, expected_shape=(2, 10))
+    _validate_generated(generated, expected_shape=(2, 1))
 
 
 #### Direct inference-based
@@ -231,8 +231,6 @@ def test_hidden_to_seqs_direct(model) -> None:
 def test_samplings_direct(model) -> None:
     infer_fn = triton_sampling_infer_fn(model)
     result = infer_fn([{SEQUENCES: encode_str_batch(SMILES)}])[0]
-
     assert GENERATED in result, f"Expecting {GENERATED} but found {result.keys()=}"
     generated = result[GENERATED]
-
-    _validate_generated(generated, expected_shape=(2, 10))
+    _validate_generated(generated, expected_shape=(2, 1))

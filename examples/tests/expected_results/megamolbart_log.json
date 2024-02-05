@@ -1,10 +1,15 @@
 {
-    "consumed_samples": 1996.0,
+    "consumed_samples": 2000.0,
     "global_step": 500.0,
-    "reduced_train_loss": 2.2226500511169434,
-    "val_character_accuracy": 0.4252873659133911,
-    "val_loss": 0.8661726713180542,
+    "grad_norm": 5.640624523162842,
+    "loss_scale": 65536.0,
+    "lr": 4.175158028374426e-05,
+    "reduced_train_loss": 2.2046093940734863,
+    "train_backward_timing in s": 3.147125244140625e-05,
+    "train_step_timing in s": 0.04375267028808594,
+    "val_character_accuracy": 0.4065934121608734,
+    "val_loss": 1.9895427227020264,
     "val_molecular_accuracy": 0.0,
     "val_percent_invalid": 1.0,
-    "val_reduced_loss": 2.0394034385681152
+    "validation_step_timing in s": 0.0001468658447265625
 }

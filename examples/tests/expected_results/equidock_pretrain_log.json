@@ -2,7 +2,6 @@
     "lr": 0.00019999999494757503,
     "train_L_epoch": 2086.8818359375,
     "train_L_step": 2086.8818359375,
-    "train_backward_timing": 0.06526422500610352,
     "train_complex_rmsd_mean": 19.636444091796875,
     "train_complex_rmsd_median": 16.47658348083496,
     "train_complex_rmsd_std": 4.468716144561768,
@@ -17,7 +16,6 @@
     "train_receptor_rmsd_median": 0.0,
     "train_receptor_rmsd_std": 0.0,
     "train_shape": 2.0,
-    "train_step_timing": 0.2799074649810791,
     "val_L": 2511.504150390625,
     "val_complex_rmsd_mean": 19.5771541595459,
     "val_complex_rmsd_median": 20.765697479248047,
@@ -30,6 +28,5 @@
     "val_receptor_rmsd_mean": 0.0,
     "val_receptor_rmsd_median": 0.0,
     "val_receptor_rmsd_std": 0.0,
-    "val_shape": 7.0,
-    "validation_step_timing": 0.0934762954711914
+    "val_shape": 7.0
 }

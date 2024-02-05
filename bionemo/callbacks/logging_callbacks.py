@@ -93,12 +93,38 @@ class PerfLoggingCallback(Callback):
     def on_predict_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0):
         self.update(phase="end")
 
-    def _calculate_performance_stats(self, timestamps: Dict[str, List[float]]):
+    def _calculate_performance_stats(self, timestamps: Dict[str, List[float]]) -> Dict[str, float]:
+        """Given a set of timestamps stored in a dictionary of `{start, end}` -> [timestamps...]
+            return a dictionary of timing statistics.
+
+        Args:
+            timestamps (Dict[str, List[float]]): Named disctionary of timestamps. Typically the keys are
+                "start" or "end".
+
+        Notes:
+            Due to an issue with lightning >=2.0,<2.1 and/or no workaround
+                in NeMo, we somtimes do not call a final on_*_batch_end since we use the dataloader_iter
+                and do not always handle StopIteration properly https://github.com/Lightning-AI/pytorch-lightning/issues/17612
+                We currently handle these off by one len(start) == len(end)+1 issues with a warning rather than raising
+                an exception.
+        """
+
         def _round3(val):
             return round(val, 3)
 
-        elapsed_times = np.subtract(timestamps["end"], timestamps["start"])
-        elapsed_times_total = np.diff(timestamps["end"])
+        end_ts = np.array(timestamps["end"])
+        start_ts = np.array(timestamps["start"])
+        if (len(start_ts) - len(end_ts)) == 1:
+            logging.warning(
+                "Start-end timestamp lengths are off by 1, last batch was likely never hit with the on_*_batch_end() callbacks."
+            )
+            start_ts = start_ts[:-1]
+        if abs(len(start_ts) - len(end_ts)) > 1:
+            raise ValueError(
+                f"There is a large difference between start and end timesteps, please debug: {len(start_ts)}, {len(end_ts)}"
+            )
+        elapsed_times = end_ts - start_ts
+        elapsed_times_total = np.diff(end_ts)
 
         throughput = _round3(self.global_batch_size / np.mean(elapsed_times))
         throughput_total = _round3(self.global_batch_size / np.mean(elapsed_times_total))

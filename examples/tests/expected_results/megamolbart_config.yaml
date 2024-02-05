@@ -34,7 +34,7 @@ model:
   pre_process: true
   post_process: true
   megatron_amp_O2: false
-  seq_length: 512
+  seq_length: 128
   max_position_embeddings: ${.seq_length}
   num_layers: 2
   hidden_size: 256
@@ -166,7 +166,7 @@ exp_manager:
     mode: max
     save_last: true
     always_save_nemo: true
-    filename: ${name}-${model.name}--{val_molecular_accuracy:.2f}-{val_reduced_loss:.2f}-{step}-{consumed_samples}
+    filename: ${name}-${model.name}--{val_molecular_accuracy:.2f}-{val_loss:.2f}-{step}-{consumed_samples}
     model_parallel_size: ${multiply:${model.tensor_model_parallel_size}, ${model.pipeline_model_parallel_size}}
   exp_dir: ${oc.env:BIONEMO_HOME}/test_results/nemo_experiments/megamolbart_pretrain
   explicit_log_dir: ${.exp_dir}

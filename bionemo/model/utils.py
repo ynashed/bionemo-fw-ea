@@ -51,6 +51,28 @@ except (ImportError, ModuleNotFoundError):
     HAVE_APEX = False
 
 
+def get_from_encoder_or_model(model_cfg, key):
+    """Returns key from encoder or from model (allows backward compatibility)"""
+    if "encoder" in model_cfg and key in model_cfg.encoder:
+        return getattr(model_cfg.encoder, key)
+    if key in model_cfg:
+        return getattr(model_cfg, key)
+
+    raise ValueError(f"Either model_cfg.encoder.{key} or model_cfg.{key} must be provided")
+
+
+def get_from_decoder_encoder_or_model(model_cfg, key):
+    """Returns key from decoder or from model (allows backward compatibility)"""
+    if "decoder" in model_cfg and key in model_cfg.decoder:
+        return getattr(model_cfg.decoder, key)
+    if "encoder" in model_cfg and key in model_cfg.encoder:
+        return getattr(model_cfg.encoder, key)
+    if key in model_cfg:
+        return getattr(model_cfg, key)
+
+    raise ValueError(f"Either model_cfg.decoder.{key} or model_cfg.{key} must be provided")
+
+
 def set_cfg_key(key, value, cfg_section, msg=""):
     """Adds a value to a config if it is missing
 

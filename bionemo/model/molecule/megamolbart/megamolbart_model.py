@@ -12,8 +12,9 @@ from typing import Dict
 # Disable logging of invalid SMILES moloecules
 from rdkit import RDLogger
 
-from bionemo.data.molecule import MoleculeEnumeration, megamolbart_build_train_valid_test_datasets
-from bionemo.model.molecule.megamolbart.megamolbart_model_base import MegaMolBARTModelBase
+from bionemo.data.molecule import MoleculeEnumeration
+from bionemo.data.molecule.megamolbart_utils import megamolbart_build_train_valid_test_datasets
+from bionemo.model.molecule.mol_enc_dec_model_base import MolEncDecModelBase
 
 
 lg = RDLogger.logger()
@@ -22,7 +23,7 @@ lg.setLevel(RDLogger.CRITICAL)
 __all__ = ["MegaMolBARTModel"]
 
 
-class MegaMolBARTModel(MegaMolBARTModelBase):
+class MegaMolBARTModel(MolEncDecModelBase):
     """
     MegaMolBART pretraining
     """

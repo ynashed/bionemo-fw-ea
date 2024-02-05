@@ -8,9 +8,10 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
-from typing import Any, Dict, List, Optional, Sequence, Tuple, TypedDict, TypeVar, Union
+from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple, TypedDict, TypeVar, Union
 
 import torch
+from nemo.utils import logging
 from omegaconf import ListConfig
 from pandas import DataFrame, Series
 from pytorch_lightning.core import LightningModule
@@ -28,11 +29,13 @@ try:
 except (ImportError, ModuleNotFoundError):
     HAVE_APEX = False
 
-
 __all__: Sequence[str] = (
+    "SamplingMethods",
+    "BaseEncoderInference",
     "BaseEncoderDecoderInference",
     "M",
     "SeqsOrBatch",
+    "BatchOfSamples",
     "Forward",
     "Inference",
     "to_sequences_ids",
@@ -40,6 +43,8 @@ __all__: Sequence[str] = (
 )
 
 SeqsOrBatch = Union[List[str], List[List[str]]]
+BatchOfSamples = List[SeqsOrBatch]
+SamplingMethods = Literal["greedy-perturbate", "topkp-perturbate", "beam-search-perturbate"]
 
 
 class IdedSeqs(TypedDict):
@@ -75,11 +80,41 @@ class Inference(InferenceBase, total=False):
     id: List[int]
 
 
+def centered_linspace(
+    n_points: int,
+    dtype: Optional[torch.dtype] = None,
+    device: Optional[torch.device] = None,
+    requires_grad: bool = False,
+):
+    """Like linspace, but return centered points. For example if requesting one point it will return [0.5] rather than [0]. This version
+        always returns points on [0,1].
+
+    Args:
+        n_points (int): number of points
+        dtype: dtype for output tensor
+        device: device to send output tensor to
+        requires_grad: does the output require grad.
+
+    Returns:
+        1d tensor of points from the middle of the range.
+    """
+    # Handle the case where only one point is requested.
+    if n_points == 1:
+        return torch.tensor([0.5], dtype=dtype, device=device, requires_grad=requires_grad)
+
+    # Calculate the step size.
+    step = 1 / (n_points + 1)
+
+    # Generate points starting from 1 step to n_points steps.
+    points = torch.linspace(step, 1 - step, n_points, dtype=dtype, device=device, requires_grad=requires_grad)
+    return points
+
+
 # FIXME: add mask for all non-special tokens (add hiddens_tokens_only)
 # TODO: add model-specific prepare_for_inference and release_from_inference methods
-class BaseEncoderDecoderInference(LightningModule):
+class BaseEncoderInference(LightningModule):
     '''
-    Base class for inference.
+    Base class for inference of models with encoder.
     '''
 
     def __init__(
@@ -120,6 +155,35 @@ class BaseEncoderDecoderInference(LightningModule):
                 "Provide a valid configuration that has this value under model.data.data_fields_map.id."
             )
             self.k_id = None
+
+    def __call__(self, sequences: Union[Series, Dict, List[str]]) -> torch.Tensor:
+        """
+        Computes embeddings for a list of sequences.
+        Embeddings are detached from model.
+
+        Params
+            sequences: Pandas Series containing a list of strings or or a list of strings (e.g., SMILES, AA sequences, etc)
+
+        Returns
+            embeddings
+        """
+        ids = None
+        if isinstance(sequences, Series):
+            sequences = sequences.tolist()
+        if isinstance(sequences, Dict):
+            ids = sequences["id"]
+            sequences = sequences["sequence"]
+        result_dict = {}
+        hiddens, enc_mask = self.seq_to_hiddens(sequences)
+        embeddings = self.hiddens_to_embedding(hiddens, enc_mask)
+        result_dict["embeddings"] = embeddings.float().detach().clone()
+        result_dict["hiddens"] = hiddens.float().detach().clone()
+        result_dict["mask"] = enc_mask.detach().clone()
+        result_dict["sequence"] = sequences
+        if ids is not None:
+            result_dict["id"] = ids
+
+        return result_dict
 
     def load_model(self, cfg, model: Optional[Any] = None, restore_path: Optional[str] = None) -> Any:
         """Load saved model checkpoint
@@ -294,17 +358,17 @@ class BaseEncoderDecoderInference(LightningModule):
             sequences (list[str]): list of sequences
 
         Returns:
-            hidden_states (torch.Tensor, float):
+            hiddens (torch.Tensor, float):
             enc_mask (torch.Tensor, long): boolean mask for padded sections
         '''
         raise NotImplementedError("Please implement in child class")
 
     def hiddens_to_embedding(self, hidden_states: torch.Tensor, enc_mask: torch.Tensor) -> torch.Tensor:
         '''
-        Transforms hidden_states into embedding.
+        Transforms hiddens into embedding.
 
         Args:
-            hidden_states (torch.Tensor, float): hidden states
+            hiddens (torch.Tensor, float): hidden states
             enc_mask (torch.Tensor, long): boolean mask for padded sections
 
         Returns:
@@ -335,7 +399,7 @@ class BaseEncoderDecoderInference(LightningModule):
 
         return embeddings
 
-    def hiddens_to_seq(self, hidden_states: torch.Tensor, enc_mask: torch.Tensor, **kwargs) -> SeqsOrBatch:
+    def hiddens_to_seq(self, hiddens: torch.Tensor, enc_mask: torch.Tensor, **kwargs) -> SeqsOrBatch:
         """
         Transforms hidden state into sequences (i.e., sampling in most cases).
         This class should be implemented in a child class, since it is model specific.
@@ -343,13 +407,133 @@ class BaseEncoderDecoderInference(LightningModule):
          <BOS> and <EOS> tokens, if used.
 
         Args:
-            hidden_states (torch.Tensor, float):
+            hiddens (torch.Tensor, float):
+            enc_mask (torch.Tensor, long): boolean mask for padded sections
+
+        Returns:
+            sequences (list[str] or list[list[str]]): list of sequences
+        """
+        raise NotImplementedError("Encoder only models do not support decoding")
+
+    def sample(
+        self,
+        num_samples: Optional[int] = 10,
+        return_embedding: bool = False,
+        sampling_method: str = "greedy-perturbate",
+        **sampling_kwarg,
+    ) -> BatchOfSamples:
+        """
+        Sample from the model given sampling_method.
+
+        Args:
+            num_samples (int): number of samples to generate (depends on sampling method)
+            return_embedding (bool): return embeddings corresponding to each of the samples in addition to the samples
+            sampling_method (str): sampling method to use. Should be replaced with default sampling method in child class
+            sampling_kwarg (dict): kwargs for sampling method. Depends on the sampling method.
+        """
+        raise NotImplementedError("Encoder only models do not support decoding")
+
+
+class BaseEncoderDecoderInference(BaseEncoderInference):
+    '''
+    Base class for inference of models with encoder and decoder.
+    '''
+
+    def __init__(
+        self,
+        cfg,
+        model=None,
+        freeze=True,
+        restore_path=None,
+        training=False,
+        adjust_config=True,
+        interactive: bool = False,
+    ):
+        super().__init__(
+            cfg=cfg,
+            model=model,
+            freeze=freeze,
+            restore_path=restore_path,
+            training=training,
+            adjust_config=adjust_config,
+            interactive=interactive,
+        )
+
+    def hiddens_to_seq(self, hiddens: torch.Tensor, enc_mask: torch.Tensor, **kwargs) -> SeqsOrBatch:
+        """
+        Transforms hidden state into sequences (i.e., sampling in most cases).
+        This class should be implemented in a child class, since it is model specific.
+        This class should return the sequence with special tokens such as
+         <BOS> and <EOS> tokens, if used.
+
+        Args:
+            hiddens (torch.Tensor, float):
             enc_mask (torch.Tensor, long): boolean mask for padded sections
 
         Returns:
             sequences (list[str] or list[list[str]]): list of sequences
         """
         raise NotImplementedError("Please implement in child class")
+
+    def interpolate_samples(
+        self,
+        sample1: torch.Tensor,
+        sample2: torch.Tensor,
+        num_interpolations: int = 11,
+        num_samples: int = 1,
+        return_embedding: bool = False,
+        hiddens_to_seq_kwargs: Dict[str, Any] = {},
+        sampling_method: str = "greedy-perturbate",
+        sampling_kwarg: Dict[str, Any] = {"scaled_radius": 0},
+    ) -> BatchOfSamples:
+        """
+        Interpolate between samples.
+        Args:
+            sample1, sample2 (str): starting and ending samples
+            num_interpolations (int): number of interpolations between each pair of samples. The mixture ratios between sample1 and sample2
+                are drawn by taking evenly spaced points in [0,1]. For example if you request 1 interpolation
+                then the one interpolative result would be 0.5. For two you would get [1/3, 2/3] and for 3 you would get
+                [1/4, 1/2, 3/4], etc. In general odd lengths include 0.5 while even lengths do not.
+            # below are sampling parameters
+            num_samples (int): number of samples to generate (depends on sampling method). If you want to draw multiple
+                samples from each interpolative point, then increase "scaled_radius" to something greater than zero to
+                get non-deterministic draws, and increase num_samples.
+            return_embedding (bool): return embeddings corresponding to each of the samples in addition to the samples
+            sampling_method (str): sampling method to use. Should be replaced with default sampling method in child class, if desired.
+                Recommended options to try are `greedy-perturbate` which should be fastest, or `beam-search-perturbate` which should
+                be more accurate.
+            sampling_kwarg (dict): kwargs for sampling method. Depends on the sampling method.
+
+        Returns:
+            interpolations (list[List[str]]): list of samples from each interpolative mixture (or [(samples, embs)] if return_embedding is True)
+        """
+        # encode samples
+        hiddens, enc_mask = self.seq_to_hiddens([sample1, sample2])
+        # TODO: enable by default + warning
+        # NOTE: do we want to expose this method to the user for non-bottleneck models?
+        # validate that the samples are of the same length
+        if enc_mask.sum(dim=1).unique().shape[0] != 1 and self.model.cfg.encoder.arch != "perceiver":
+            logging.warning(
+                'Interpolation may have unexpected behavior when samples have different length, unless you use a Perceiver encoder'
+            )
+
+        # interpolate between hiddens
+        alpha = centered_linspace(num_interpolations, device=hiddens.device, dtype=hiddens.dtype)
+        interp_hiddens = torch.lerp(hiddens[[0]], hiddens[[1]], alpha[:, None, None])
+
+        # store interpolated hiddens in sampling_kwarg
+        sampling_kwarg = sampling_kwarg.copy()
+        sampling_kwarg["hiddens"] = interp_hiddens
+        sampling_kwarg["enc_masks"] = enc_mask[0:1].repeat_interleave(num_interpolations, 0)
+
+        # return samples
+        return self.sample(
+            num_samples=num_samples,
+            return_embedding=return_embedding,
+            sampling_method=sampling_method,
+            hiddens_to_seq_kwargs=hiddens_to_seq_kwargs,
+            **sampling_kwarg,
+        )
 
     @property
     def supported_sampling_methods(self) -> List[str]:
@@ -364,41 +548,224 @@ class BaseEncoderDecoderInference(LightningModule):
     def default_sampling_kwargs(self) -> Dict[str, Dict[str, Any]]:
         """
         Returns a dict of default sampling kwargs per sampling method.
-        Example:
-            {
-                "greedy-perturbate": {"scaled_radius": 1, "smis": []},
-                "beam-search": {"beam_size": 5, "beam_alpha": 0.6, "smis": []},
-            }
-
-        Should be overridden in child class if sampling is supported.
         """
-        return {}
+        return {
+            # seqs - a list of Sequence strings to perturbate num_samples times each (could be SMILE, protein AA, etc)
+            "greedy-perturbate": {"scaled_radius": 1, "seqs": [], "hiddens": None, "enc_masks": None},
+            # top-k limits maximum number of token candidtaes, top-p can further reduce to accumulate top-p probability mass
+            "topkp-perturbate": {
+                "scaled_radius": 1,
+                "seqs": [],
+                "top_k": 0,
+                "top_p": 0.9,
+                "temperature": 1.0,
+                "hiddens": None,
+                "enc_masks": None,
+            },
+            # Beam search perturbate works the same way as `greedy-perturbate` but is more likely to find the global optima
+            #  of argmax_sequence P(sequence|hiddens). The best result is returned greedily, but the search is less biased
+            #  by the best tokens at prior states.
+            "beam-search-perturbate": {
+                "scaled_radius": 1,
+                "seqs": [],
+                "beam_size": 5,  # This strategy uses the same perturb hiddens then decode process, so beam_size is independent now
+                "keep_only_best_tokens": True,  # Now we only return the best result, greedily, from beam-search.
+                "beam_alpha": 0,
+                "hiddens": None,
+                "enc_masks": None,
+            },
+            # beam search single sample, "beam_size" is number of the best sequences at each decode iteration to be left per target
+            # and "beam_alpha" is the parameter of length penalty applied to predicted sequences.
+            # NOTE with this method we only draw one gaussian sample of the hidden state, and then use beam search to return the
+            #  top num_samples results. You probably want to use `beam-search-perturbate`.
+            "beam-search-single-sample": {
+                "scaled_radius": 1,
+                "seqs": [],
+                "beam_size": 1,  # will be set to num_samples in code. If left as 1 this is basically greedy-search
+                "beam_alpha": 0,
+                "keep_only_best_tokens": False,  # this strategy returns all of the beam search internal top_k results
+                "hiddens": None,
+                "enc_masks": None,
+            },
+            # beam search perturbate sample, "beam_size" is number of the best sequences at each decode iteration to be left per target
+            # and "beam_alpha" is the parameter of length penalty applied to predicted sequences.
+            # NOTE with this method we only draw one gaussian sample of the hidden state, and then use beam search to return the
+            #  top num_samples results. You probably want to use `beam-search-perturbate`.
+            "beam-search-perturbate-sample": {
+                "scaled_radius": 1,
+                "seqs": [],
+                "beam_size": 5,  # this is the number of top samples to return for each num_sample hidden.
+                "beam_alpha": 0,
+                "keep_only_best_tokens": False,  # this strategy returns all of the beam search internal top_k results
+                "hiddens": None,
+                "enc_masks": None,
+            },
+        }
 
     def sample(
         self,
         num_samples: int = 1,
         return_embedding: bool = False,
         sampling_method: Optional[str] = None,
+        hiddens_to_seq_kwargs: Dict[str, Any] = {},
         **sampling_kwarg,
-    ) -> Union[SeqsOrBatch, Tuple[SeqsOrBatch, torch.Tensor]]:
+    ) -> Union[BatchOfSamples, Tuple[BatchOfSamples, torch.Tensor]]:
         """
         Sample from the model given sampling_method.
 
         Args:
             num_samples (int): number of samples to generate (depends on sampling method)
             return_embedding (bool): return embeddings corresponding to each of the samples in addition to the samples
-            sampling_method (str): sampling method to use. Should be replaced with default sampling method in child class
-            sampling_kwarg (dict): kwargs for sampling method. Depends on the sampling method.
+            sampling_method (str): sampling method to use. Options:
+                - "greedy-perturbate": Sample the best sequence for each of our perturbed hiddens, using greedy-search (per token)
+                    to find the best result.
+                - "topkp-perturbate": Sample the best sequence for each of our perturbed hiddens, using `topkp-sampling` to
+                    find the best result.
+                - "beam-search-perturbate": Sample the best sequence for each of our perturbed hiddens,
+                    using beam-search to find the best result.
+                - "beam-search-single-sample": Sample the top num_samples sequences using beam-search (rather than single best) given our
+                    single perturbed hidden.
+                - "beam-search-perturbate-sample": Sample the top beam_size (default 5) sequences using beam-search
+                    for each of our `num_samples` purturbed hiddens. This will return a `beam_size * num_samples` set of results.
+            sampling_kwarg (dict): kwargs for sampling method. Depends on the sampling method. Defaults are defined in
+                this class per sampling method name.
+        Returns:
+            Returns a structured list of sequences, the first dimension is the input batch (either hiddens or seqs that were provided). The second dimension are the
+                samples per item in the batch. Note that in the case of "beam-search-perturbate-sample" there is a third dimension which are the beam_size samples
+                per num_samples gaussian perturbations.
         """
-        raise NotImplementedError(f"Sampling is not supported in this class ({self.__class__.__name__})")
+        # get sampling kwargs
+        default_sampling_kwarg = self.default_sampling_kwargs
+        if sampling_method not in default_sampling_kwarg:
+            raise ValueError(
+                f'Invalid samping method {sampling_method}, supported sampling methods are {default_sampling_kwarg.keys()}'
+            )
 
+        cur_sampling_kwarg = default_sampling_kwarg[sampling_method].copy()
+        cur_sampling_kwarg.update(sampling_kwarg)
+        sampling_kwarg = cur_sampling_kwarg
+
+        # execute selected sampling method
+        assert (
+            sampling_method in default_sampling_kwarg.keys()
+        ), f'Invalid sampling method {sampling_method}, supported sampling methods are {list(default_sampling_kwarg.keys())}'
+
+        # accept hidden states directly or via sequences
+        hiddens = sampling_kwarg.pop("hiddens")
+        enc_masks = sampling_kwarg.pop("enc_masks")
+        seqs = sampling_kwarg.pop("seqs")
+        if hiddens is not None or enc_masks is not None:
+            if len(seqs):
+                raise ValueError(
+                    'Both hiddens and Seqs strings provided for sampling via "seqs" argument, please provide only one'
+                )
+
+            # we enforce providing both hidden states and enc_masks or neither
+            if hiddens is None or enc_masks is None:
+                raise ValueError('Either both hiddens and enc_masks should be provided or neither')
+        else:
+            if not len(seqs):
+                raise ValueError('No sequences provided for sampling via "seqs" argument')
+
+            hiddens, enc_masks = self.seq_to_hiddens(seqs)
+        batch_size: int = len(hiddens)  # Make sure to do this before we explode into num_samples
+
+        if sampling_method == "beam-search-single-sample":
+            # With this strategy, the top num_samples results are returned from beam search rather than the single best one.
+            sample_masks = enc_masks.clone()
+            perturbed_hiddens = hiddens.clone()
+        else:
+            # Our normal case, we use gaussian sampling to grab `num_samples` different points in hidden space
+            #  so repeat over the batch axis.
+            sample_masks = enc_masks.repeat_interleave(num_samples, 0)
+            perturbed_hiddens = hiddens.repeat_interleave(num_samples, 0)
+
+        # Apply gaussian noise of the desired `scaled_radius` to the hidden states.
+        scaled_radius = sampling_kwarg.pop('scaled_radius')
+        perturbed_hiddens = perturbed_hiddens + (
+            scaled_radius * torch.randn(perturbed_hiddens.shape).to(perturbed_hiddens.device)
+        )
+
+        # Get the sequences from our various search method options.
+        if sampling_method == 'greedy-perturbate':
+            # Sample the best sequence for each of our perturbed hiddens, using greedy-search (per token) to find the best result.
+            samples = self.hiddens_to_seq(
+                perturbed_hiddens,
+                sample_masks,
+                sampling_method="greedy-search",
+                sampling_kwargs={},
+                **hiddens_to_seq_kwargs,
+            )
+        elif sampling_method == 'topkp-perturbate':
+            # Sample the best sequence for each of our perturbed hiddens, using `topkp-sampling` to find the best result.
+            samples = self.hiddens_to_seq(
+                perturbed_hiddens,
+                sample_masks,
+                sampling_method="topkp-sampling",
+                sampling_kwargs=sampling_kwarg,
+                **hiddens_to_seq_kwargs,
+            )
+        elif sampling_method == 'beam-search-perturbate':
+            # Sample the best sequence for each of our perturbed hiddens, using beam-search to find the best result.
+            assert sampling_kwarg[
+                "keep_only_best_tokens"
+            ], "`beam-search-perturbate` is incompatible with returning top k results from beam search. Maybe you meant to use `beam-search-sample`?"
+            samples = self.hiddens_to_seq(
+                perturbed_hiddens,
+                sample_masks,
+                sampling_method="beam-search",
+                sampling_kwargs=sampling_kwarg,
+                **hiddens_to_seq_kwargs,
+            )
+        elif sampling_method == 'beam-search-single-sample':
+            # Sample the top num_hiddens sequences given our single perturbed hidden.
+            if num_samples is not None:
+                sampling_kwarg['beam_size'] = num_samples
+            samples = self.hiddens_to_seq(
+                perturbed_hiddens,
+                sample_masks,
+                sampling_method="beam-search",
+                sampling_kwargs=sampling_kwarg,
+                **hiddens_to_seq_kwargs,
+            )
+        elif sampling_method == 'beam-search-perturbate-sample':
+            # Sample the top beam_size sequences given each of our perturbed hiddens
+            samples = self.hiddens_to_seq(
+                perturbed_hiddens,
+                sample_masks,
+                sampling_method="beam-search",
+                sampling_kwargs=sampling_kwarg,
+                **hiddens_to_seq_kwargs,
+            )
+        else:
+            raise NotImplementedError(f"Sampling method {sampling_method} has not been implemented.")
+
+        if sampling_method != "beam-search-single-sample":
+            # "beam-search-single-sample" already returns batch x num_samples samples, so nothing to be done here.
+
+            # Reshape interleaved samples, putting the original batch first
+            samples_tmp: List[List[Union[List[str], str]]] = []
+            for i in range(batch_size):
+                samples_tmp.append([])
+                for j in range(num_samples):
+                    idx = i * num_samples + j
+                    samples_tmp[i].append(samples[idx])
+            samples = samples_tmp
+
+        if return_embedding:
+            embs = self.hiddens_to_embedding(perturbed_hiddens, sample_masks)
+            return samples, embs
+        else:
+            return samples
+
+    # TODO: we might want to return embeddings only in some cases, why always return hiddens + embeddings? (commented for now, need to fix ir just use parent implementation)
     def __call__(self, sequences: Union[Series, IdedSeqs, List[str]]) -> Inference:
         """
         Computes embeddings for a list of sequences.
         Embeddings are detached from model.
 
         Params
-            sequences: Pandas Series containing a list of strings or or a list of strings (e.g., SMILES)
+            sequences: Pandas Series containing a list of strings or or a list of strings (e.g., SMILES, AA sequences, etc)
 
         Returns
             embeddings
@@ -434,7 +801,7 @@ def to_sequences_ids(
         - Pandas Series containing a list of strings
         - A dictionary with `id` and `sequence`, int IDs along with each string sequence, respectively
         - A DataFrame with columns `id` and `sequence`
-        - a list of strings (e.g., SMILES)
+        - a list of strings (e.g., SMILES, AA sequences, etc)
 
     The returned output will be a copy of the sequences and their accompanying IDs. If there are no IDs,
     then the returned IDs value is `None`.

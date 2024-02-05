@@ -1,5 +1,10 @@
 defaults:
   - downstream_retro_uspto50k
+  - _self_
+
+hydra:
+  searchpath:
+     - file://${oc.env:BIONEMO_HOME}/examples/molecule/megamolbart/conf/
 
 trainer:
   devices: 1
@@ -11,6 +16,8 @@ trainer:
   accumulate_grad_batches: 1
     
 model:
+  seq_length: 512 # maximum sequence length allowed. Set to 512 for backwards compatibililty with the checkpoint
+  max_position_embeddings: ${.seq_length}
   micro_batch_size: 4
   global_batch_size: null
   data:

@@ -1,5 +1,10 @@
 defaults:
   - pretrain_xsmall_span_aug
+  - _self_
+
+hydra:
+  searchpath:
+     - file://${oc.env:BIONEMO_HOME}/examples/molecule/megamolbart/conf/
 
 trainer:
   devices: 1

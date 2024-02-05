@@ -39,6 +39,8 @@ _SMIS = [
     'COc1cc2nc(N3CCN(C(=O)c4ccco4)CC3)nc(N)c2cc1OC',
 ]
 
+MAX_GEN_LEN: int = 64
+
 
 @pytest.fixture(scope='module')
 def infer_cfg() -> DictConfig:
@@ -80,8 +82,11 @@ def test_model_exists():
 def test_smis_to_hiddens(inferer: MegaMolBARTInference):
     hidden_state, pad_masks = inferer.seq_to_hiddens(_SMIS)
     assert hidden_state is not None
+    # Shape should be batch, position (max of input batch here), hidden_size
+    assert len(hidden_state.shape) == 3
     assert hidden_state.shape[0] == len(_SMIS)
-    assert hidden_state.shape[2] == inferer.model.cfg.max_position_embeddings
+    assert hidden_state.shape[1] == max([len(s) for s in _SMIS])
+    assert hidden_state.shape[2] == inferer.model.cfg.encoder.hidden_size
     assert pad_masks is not None
 
 
@@ -91,8 +96,10 @@ def test_smis_to_hiddens(inferer: MegaMolBARTInference):
 def test_smis_to_embedding(inferer: MegaMolBARTInference):
     embedding = inferer.seq_to_embeddings(_SMIS)
     assert embedding is not None
+    # Shape should be batch, hidden_size (Embeddings pool out the position axis of hiddens by some means)
     assert embedding.shape[0] == len(_SMIS)
-    assert embedding.shape[1] == inferer.model.cfg.max_position_embeddings
+    assert embedding.shape[1] == inferer.model.cfg.encoder.hidden_size
+    assert len(embedding.shape) == 2
 
 
 @pytest.mark.needs_gpu
@@ -100,7 +107,7 @@ def test_smis_to_embedding(inferer: MegaMolBARTInference):
 @pytest.mark.skip_if_no_file(CHECKPOINT_PATH)
 def test_hidden_to_smis(inferer: MegaMolBARTInference):
     hidden_state, pad_masks = inferer.seq_to_hiddens(_SMIS)
-    infered_smis = inferer.hiddens_to_seq(hidden_state, pad_masks)
+    infered_smis = inferer.hiddens_to_seq(hidden_state, pad_masks, override_generate_num_tokens=MAX_GEN_LEN)
     log.info(f'Input SMILES and Infered: {_SMIS}, {infered_smis}')
 
     assert len(infered_smis) == len(_SMIS)
@@ -126,13 +133,16 @@ def test_sample_greedy(inferer: MegaMolBARTInference):
         num_samples=3,
         sampling_method="greedy-perturbate",
         scaled_radius=1,
-        smis=_SMIS,
+        seqs=_SMIS,
+        hiddens_to_seq_kwargs={"override_generate_num_tokens": MAX_GEN_LEN},
     )
-    samples = set(samples)
-    log.info('\n'.join(_SMIS))
-    log.info('\n'.join(samples))
+    nl = "\n"
+    for smi_i, samples_i in zip(_SMIS, samples):
+        log.info(f"INPUT: \n{smi_i}\n")
+        log.info(f"SAMPLES: \n{nl.join(samples_i)}\n")
+    samples_flat = [item for sublist in samples for item in sublist]
     valid_molecules = []
-    for smi in set(samples):
+    for smi in set(samples_flat):
         isvalid = False
         mol = Chem.MolFromSmiles(smi)
         if mol:
@@ -141,7 +151,9 @@ def test_sample_greedy(inferer: MegaMolBARTInference):
         log.info(f'Sample: {smi},  {isvalid}')
 
     log.info('Valid Molecules' + "\n".join(valid_molecules))
-    log.info(f'Total samples = {len(samples)} unique samples {len(set(samples))}  valids {len(valid_molecules)}')
+    log.info(
+        f'Total samples = {len(samples_flat)} unique samples {len(set(samples_flat))}  valids {len(valid_molecules)}'
+    )
 
     if len(valid_molecules) < len(samples) * 0.3:
         log.warning("TOO FEW VALID SAMPLES")
@@ -159,13 +171,16 @@ def test_sample_topk(inferer: MegaMolBARTInference):
         topk=4,
         temperature=2,
         topp=0.0,
-        smis=_SMIS,
+        seqs=_SMIS,
+        hiddens_to_seq_kwargs={"override_generate_num_tokens": MAX_GEN_LEN},
     )
     nl = "\n"
-    log.info(f"INPUTS: \n{nl.join(_SMIS)}\n")
-    log.info(f"SAMPLES: \n{nl.join(samples)}\n")
+    for smi_i, samples_i in zip(_SMIS, samples):
+        log.info(f"INPUT: \n{smi_i}\n")
+        log.info(f"SAMPLES: \n{nl.join(samples_i)}\n")
+    samples_flat = [item for sublist in samples for item in sublist]
     valid_molecules = []
-    for smi in set(samples):
+    for smi in set(samples_flat):
         isvalid = False
         mol = Chem.MolFromSmiles(smi)
         if mol:
@@ -174,9 +189,11 @@ def test_sample_topk(inferer: MegaMolBARTInference):
         log.info(f'Sample: {smi},  {isvalid}')
 
     log.info('Valid Molecules' + "\n".join(valid_molecules))
-    log.info(f'Total samples = {len(samples)} unique samples {len(set(samples))}  valids {len(valid_molecules)}')
+    log.info(
+        f'Total samples = {len(samples_flat)} unique samples {len(set(samples_flat))}  valids {len(valid_molecules)}'
+    )
 
-    if len(valid_molecules) < len(samples) * 0.3:
+    if len(valid_molecules) < len(samples_flat) * 0.3:
         log.warning("TOO FEW VALID SAMPLES")
     assert len(valid_molecules) != 0
 
@@ -192,14 +209,16 @@ def test_sample_topp(inferer: MegaMolBARTInference):
         topk=0,
         temperature=2,
         topp=0.9,
-        smis=_SMIS,
+        seqs=_SMIS,
+        hiddens_to_seq_kwargs={"override_generate_num_tokens": MAX_GEN_LEN},
     )
-    # samples = set(samples)
     nl = "\n"
-    log.info(f"INPUTS: \n{nl.join(_SMIS)}\n")
-    log.info(f"SAMPLES: \n{nl.join(samples)}\n")
+    for smi_i, samples_i in zip(_SMIS, samples):
+        log.info(f"INPUT: \n{smi_i}\n")
+        log.info(f"SAMPLES: \n{nl.join(samples_i)}\n")
     valid_molecules = []
-    for smi in set(samples):
+    samples_flat = [item for sublist in samples for item in sublist]
+    for smi in set(samples_flat):
         isvalid = False
         mol = Chem.MolFromSmiles(smi)
         if mol:
@@ -208,9 +227,11 @@ def test_sample_topp(inferer: MegaMolBARTInference):
         log.info(f'Sample: {smi},  {isvalid}')
 
     log.info('Valid Molecules' + "\n".join(valid_molecules))
-    log.info(f'Total samples = {len(samples)} unique samples {len(set(samples))}  valids {len(valid_molecules)}')
+    log.info(
+        f'Total samples = {len(samples_flat)} unique samples {len(set(samples_flat))}  valids {len(valid_molecules)}'
+    )
 
-    if len(valid_molecules) < len(samples) * 0.3:
+    if len(valid_molecules) < len(samples_flat) * 0.3:
         log.warning("TOO FEW VALID SAMPLES")
     assert len(valid_molecules) != 0
 
@@ -218,16 +239,20 @@ def test_sample_topp(inferer: MegaMolBARTInference):
 @pytest.mark.needs_gpu
 @pytest.mark.needs_checkpoint
 @pytest.mark.skip_if_no_file(CHECKPOINT_PATH)
-def test_beam_search(inferer: MegaMolBARTInference):
+@pytest.mark.parametrize("beam_search_method", ["beam-search-perturbate", "beam-search-single-sample"])
+def test_beam_search(inferer: MegaMolBARTInference, beam_search_method: str):
+    num_samples = 3
     beam_size = 5
     samples = inferer.sample(
-        num_samples=beam_size,
-        sampling_method="beam-search-perturbate",
+        num_samples=num_samples,
+        beam_size=beam_size,  # internally beam_size will be set to num_samples
+        sampling_method=beam_search_method,
         beam_alpha=0,
-        smis=_SMIS,
+        seqs=_SMIS,
+        hiddens_to_seq_kwargs={"override_generate_num_tokens": MAX_GEN_LEN},
     )
     assert len(samples) == len(_SMIS)
-    assert len(samples[0]) == beam_size
+    assert len(samples[0]) == num_samples
 
     nl = "\n"
     for smi_i, samples_i in zip(_SMIS, samples):
@@ -253,4 +278,77 @@ def test_beam_search(inferer: MegaMolBARTInference):
 
     if len(valid_molecules) < len(samples_flat) * 0.3:
         log.warning("TOO FEW VALID SAMPLES")
+    if beam_search_method != "beam-search-single-sample":
+        # "beam-search-single-sample" is not very good, only one gaussian is sampled and top beam_size are sampled from that.
+        # otherwise test that we get at least one valid molecule.
+        assert len(valid_molecules) != 0
+
+
+@pytest.mark.needs_gpu
+@pytest.mark.needs_checkpoint
+@pytest.mark.skip_if_no_file(CHECKPOINT_PATH)
+def test_beam_search_product(inferer: MegaMolBARTInference):
+    num_samples = 3
+    beam_size = 2
+    samples = inferer.sample(
+        num_samples=num_samples,
+        beam_size=beam_size,
+        sampling_method="beam-search-perturbate-sample",
+        beam_alpha=0,
+        seqs=_SMIS,
+        hiddens_to_seq_kwargs={"override_generate_num_tokens": MAX_GEN_LEN},
+    )
+    # Samples shoudl be batch (original) x num_samples x beam_size for this sampler
+    assert len(samples) == len(_SMIS)
+    assert len(samples[0]) == num_samples
+    assert len(samples[0][0]) == beam_size
+
+    nl = "\n"
+    for smi_i, ssamples_i in zip(_SMIS, samples):
+        log.info(f"INPUT: \n{smi_i}\n")
+        log.info(f"SAMPLES: \n{nl.join([nl.join(samples_i) for samples_i in ssamples_i])}\n")
+
+    samples_flat = [item for subsublist in samples for sublist in subsublist for item in sublist]
+    valid_molecules = []
+    for smi in set(samples_flat):
+        isvalid = False
+        mol = Chem.MolFromSmiles(smi)
+        if mol:
+            isvalid = True
+            valid_molecules.append(smi)
+        log.info(f'Sample: {smi},  {isvalid}')
+
+    log.info('Valid Molecules' + "\n".join(valid_molecules))
+
+    log.info(
+        f'Total samples = {len(samples_flat)} unique samples {len(set(samples_flat))} '
+        f'valids {len(valid_molecules)}'
+    )
+
+    if len(valid_molecules) < len(samples_flat) * 0.3:
+        log.warning("TOO FEW VALID SAMPLES")
     assert len(valid_molecules) != 0
+
+
+@pytest.mark.needs_gpu
+@pytest.mark.needs_checkpoint
+@pytest.mark.skip_if_no_file(CHECKPOINT_PATH)
+@pytest.mark.parametrize(
+    "sampling_method",
+    [
+        'greedy-perturbate',
+        'topkp-perturbate',
+        'beam-search-perturbate',
+        'beam-search-perturbate-sample',
+        'beam-search-single-sample',
+    ],
+)
+def test_interpolate(inferer: MegaMolBARTInference, sampling_method: str):
+    interpolations = inferer.interpolate_samples(
+        sample1=_SMIS[0],
+        sample2=_SMIS[1],
+        num_interpolations=3,
+        sampling_method=sampling_method,
+        hiddens_to_seq_kwargs={"override_generate_num_tokens": MAX_GEN_LEN},
+    )
+    assert len(interpolations) == 3

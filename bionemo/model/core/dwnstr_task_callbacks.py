@@ -23,6 +23,7 @@ from bionemo.data.datasets import PerTokenValueDataModule, SingleValueDataModule
 from bionemo.model.core.cnn import ConvNet, PerTokenMaskedCrossEntropyLoss
 from bionemo.model.core.dwnstr_task_trainer import ValidationTrainer
 from bionemo.model.core.mlp_model import MLPModel
+from bionemo.model.utils import get_from_decoder_encoder_or_model
 
 
 class DownstreamValidationCallback(Callback):
@@ -86,7 +87,7 @@ class DownstreamValidationCallback(Callback):
         train_dataloader.dataset.free_memory()
         test_dataloader.dataset.free_memory()
         torch.distributed.barrier()
-        self.log_dict(results, rank_zero_only=True)
+        self.log_dict(results, rank_zero_only=True, batch_size=self.valid_cfg.batch_size)
         for key, value in results.items():
             logging.info("{}: {}".format(key, value))
         main_model = self._release_model(main_model, args)
@@ -112,7 +113,7 @@ class PerTokenPredictionCallback(DownstreamValidationCallback):
                         self.valid_cfg.task_type
                     )
                 )
-        pretrain_model_hidden_size = self.cfg.model.hidden_size
+        pretrain_model_hidden_size = get_from_decoder_encoder_or_model(self.cfg.model, 'hidden_size')
         output_sizes = self.valid_cfg.target_sizes
         self.dwnstr_model = ConvNet(pretrain_model_hidden_size, output_sizes=output_sizes).to("cuda")
         self.loss_fn = PerTokenMaskedCrossEntropyLoss()
@@ -138,4 +139,6 @@ class SingleValuePredictionCallback(DownstreamValidationCallback):
             num_heads = 1
         else:
             raise ValueError("Invalid task_type was provided {}".format(self.valid_cfg.task_type))
-        self.dwnstr_model = MLPModel(layer_sizes=[parent_cfg.model.hidden_size, 256, 128, num_heads]).to("cuda")
+        self.dwnstr_model = MLPModel(
+            layer_sizes=[get_from_decoder_encoder_or_model(parent_cfg.model, "hidden_size"), 256, 128, num_heads]
+        ).to("cuda")

@@ -11,13 +11,13 @@ from typing import List, Optional, Sequence, Tuple
 
 import torch
 
-from bionemo.model.core.infer import BaseEncoderDecoderInference
+from bionemo.model.core.infer import BaseEncoderInference
 
 
 __all__: Sequence[str] = ("ESM1nvInference",)
 
 
-class ESM1nvInference(BaseEncoderDecoderInference):
+class ESM1nvInference(BaseEncoderInference):
     '''
     All inference functions
     '''

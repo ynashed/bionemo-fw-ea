@@ -1,4 +1,3 @@
-# Copyright (c) 2022, NVIDIA CORPORATION.
 # SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: LicenseRef-NvidiaProprietary
 #
@@ -14,35 +13,30 @@ from copy import deepcopy
 from typing import Dict, List, Tuple
 
 import torch
-from apex.transformer.pipeline_parallel.utils import get_num_microbatches
-from megatron.core import parallel_state
+from apex.transformer.pipeline_parallel.utils import get_micro_batch_size, get_num_microbatches
 from megatron.core.pipeline_parallel.schedules import get_forward_backward_func
-from nemo.collections.nlp.data.language_modeling.megatron.data_samplers import (
-    MegatronPretrainingSampler,
-)
 from nemo.collections.nlp.models.language_modeling.megatron_lm_encoder_decoder_model import (
     MegatronLMEncoderDecoderModel,
 )
-from nemo.collections.nlp.modules.common.megatron.utils import average_losses_across_data_parallel_group
 from nemo.utils import logging
 from omegaconf.dictconfig import DictConfig
 from pytorch_lightning.trainer.trainer import Trainer
 from rdkit import Chem, RDLogger
 
 from bionemo.data import DatasetTypes
-from bionemo.utils import flatten_dict
+from bionemo.model.utils import get_from_encoder_or_model
 
 
 # Disable logging of invalid SMILES moloecules
 lg = RDLogger.logger()
 lg.setLevel(RDLogger.CRITICAL)
 
-__all__ = ["MegaMolBARTModelBase"]
+__all__ = ["MolEncDecModelBase"]
 
 
-class MegaMolBARTModelBase(MegatronLMEncoderDecoderModel, ABC):
+class MolEncDecModelBase(MegatronLMEncoderDecoderModel, ABC):
     """
-    MegaMolBART base models with abstract methods to be implemented:
+    Base class for encoder-decoder molecule models with abstract methods to be implemented:
     - _setup_collate
     - _load_train_valid_test_datasets
     """
@@ -50,14 +44,23 @@ class MegaMolBARTModelBase(MegatronLMEncoderDecoderModel, ABC):
     def __init__(self, cfg: DictConfig, trainer: Trainer):
         self._check_scheduler(cfg)
         super().__init__(cfg, trainer=trainer)
-        pad_size_divisible_by_8 = True if self._cfg.masked_softmax_fusion else False
+        pad_size_divisible_by_8 = True if get_from_encoder_or_model(self._cfg, "masked_softmax_fusion") else False
         self._collate_fn = self._setup_collate(pad_size_divisible_by_8)
-        self._val_output_list = None
+        self.sequence_search_method = getattr(self._cfg.decoder, "sequence_sampling_method", "greedy-search")
+        # NOTE: if using 'beam-search' make sure you also set some kwargs in your config
+        #   the defaults for beam_search are to have beam_size=1 which is very similar to greedy-search.
+        #  model:
+        #    decoder:
+        #      sequence_sampling_method: "beam-search"
+        #      sequence_sampling_kwargs:
+        #        beam_size: 3 # larger numbers will be slower, but will return closer to the global maximum P(seq|hidden)
+        #        keep_only_best_tokens: True # Set this so that only the best result is returned.
+        self.sequence_search_kwargs = getattr(self._cfg.decoder, "sequence_sampling_kwargs", {})
 
     @abstractmethod
     def _setup_collate(self, pad_size_divisible_by_8: bool):
         """
-        Sets up collate fn that is required by dataloader used to finetune MegaMolBART
+        Sets up collate fn that is required by dataloader used to finetune MolMIM
         Args:
             pad_size_divisible_by_8: should torch.Tensors be padded to sizes divisible by 8?
         Returns:
@@ -111,7 +114,7 @@ class MegaMolBARTModelBase(MegatronLMEncoderDecoderModel, ABC):
         return train_valid_test_num_samples
 
     def build_train_valid_test_datasets(self):
-        logging.info('Building MegaMolBART datasets.')
+        logging.info(f'Building datasets for {type(self).__name__}')
 
         if self._cfg.data.get('dataset_type', None) is not None:
             dataset_types = DatasetTypes.__members__
@@ -139,53 +142,15 @@ class MegaMolBARTModelBase(MegatronLMEncoderDecoderModel, ABC):
         return self._train_ds, self._validation_ds, self._test_ds
 
     def build_pretraining_data_loader(self, dataset, consumed_samples, num_workers=None):
-        """Build dataloader given an input dataset."""
-        if dataset is None:
-            return None
+        """Build dataloader given an input dataset. You can try setting model.data.dataloader_type to one of [single, cyclic] for different sampling procedures."""
 
-        assert self._cfg.data.dataloader_type == 'single', AssertionError(
-            f'Only the Megatron sequential ("single") sampler is currently supported. {self._cfg.data.dataloader_type} was chosen.'
-        )
-
-        # NOTE (SKH) this was taken directly from megatron, this is the 'single' dataloader type.
-        batch_sampler = MegatronPretrainingSampler(
-            total_samples=len(dataset),
-            consumed_samples=consumed_samples,
-            micro_batch_size=self.cfg.micro_batch_size,
-            global_batch_size=self.cfg.global_batch_size,
-            data_parallel_rank=parallel_state.get_data_parallel_rank(),
-            data_parallel_size=parallel_state.get_data_parallel_world_size(),
-            drop_last=self.cfg.get('drop_last', True),
-        )
-
-        if num_workers is None:
-            num_workers = self.cfg.data.num_workers
-        # Torch dataloader.
-        dataloader = torch.utils.data.DataLoader(
-            dataset,
-            batch_sampler=batch_sampler,
-            num_workers=num_workers,  # Needs to be set to zero.
-            pin_memory=True,
-            persistent_workers=True if num_workers > 0 else False,
-        )
-        dataloader.collate_fn = self._collate_fn
+        dataloader = super().build_pretraining_data_loader(dataset, consumed_samples, num_workers)
+        if dataloader is not None:
+            # set to our custom colate function
+            dataloader.collate_fn = self._collate_fn
         return dataloader
 
-    def setup_validation_data(self, cfg):
-        if hasattr(self, '_validation_ds'):
-            consumed_samples = 0
-            self._validation_dl = self.build_pretraining_data_loader(
-                self._validation_ds, consumed_samples, num_workers=0
-            )
-
-    def setup_test_data(self, cfg):
-        if hasattr(self, '_test_ds'):
-            consumed_samples = 0
-            self._test_dl = self.build_pretraining_data_loader(self._test_ds, consumed_samples, num_workers=0)
-
     def process_global_batch(self, global_batch):
-        # FIXME: move to device correctly
-        # FIXME: move to precission correctly (fails with 16)
         tokens_enc, tokens_dec, loss_mask, labels, enc_mask, dec_mask = (
             global_batch["text_enc"],
             global_batch["text_dec"],
@@ -195,40 +160,13 @@ class MegaMolBARTModelBase(MegatronLMEncoderDecoderModel, ABC):
             global_batch["dec_mask"],
         )
 
-        device = next(self.parameters()).device
         tokens_enc, tokens_dec, loss_mask, labels, enc_mask, dec_mask = [
-            t.to(device) for t in (tokens_enc, tokens_dec, loss_mask, labels, enc_mask, dec_mask)
+            t.to(self.device) for t in (tokens_enc, tokens_dec, loss_mask, labels, enc_mask, dec_mask)
         ]
 
         return (tokens_enc, tokens_dec, loss_mask, labels, enc_mask, dec_mask)
 
-    def _inference_epoch_end(self, outputs, mode):
-        results_dict = flatten_dict(outputs)
-
-        # Calculate metric averages
-        # TODO this reduces all metrics across all data parallel groups
-        # if too slow, can only reduce loss instead
-        averaged_results = {}
-        for metric_name, metric_list in results_dict.items():
-            reduced_metric = average_losses_across_data_parallel_group(metric_list)
-            logged_name = 'reduced_loss' if metric_name == 'loss' else metric_name
-            averaged_results[logged_name] = reduced_metric.cpu().detach().numpy().mean()
-
-        # Log results
-        log_list = []
-        for metric_name, metric_val in averaged_results.items():
-            metric_name = metric_name.replace('_', ' ').title()
-            log_list.append(f'{metric_name}: {metric_val:.2f}')
-        logging.info(f'{mode.title()} Results: ' + ', '.join(log_list))
-
-        # Prepend val/test tag to metric for Tensorboard / WandB
-        logged_results = {}
-        for metric_name, metric_val in averaged_results.items():
-            logged_results[f'{mode}_{metric_name}'] = metric_val
-
-        self.log_dict(logged_results, prog_bar=True)
-
-    def validation_step_logits(self, batch, batch_idx):
+    def get_step_logits(self, batch, batch_idx):
         arg_names = ['enc_input_ids', 'enc_attn_mask', 'dec_input_ids', 'dec_attn_mask']
         (
             encoder_input_ids,
@@ -242,6 +180,8 @@ class MegaMolBARTModelBase(MegatronLMEncoderDecoderModel, ABC):
         forward_step_func = self._get_forward_output_only_func(arg_names=arg_names, output_name="logits")
         fwd_bwd_function = get_forward_backward_func()
 
+        encoder_seq_length = encoder_input_ids.size(1)
+
         output_tensor = fwd_bwd_function(
             forward_step_func=forward_step_func,
             data_iterator=iter(
@@ -250,16 +190,15 @@ class MegaMolBARTModelBase(MegatronLMEncoderDecoderModel, ABC):
                 ]
             ),
             model=[self.enc_dec_model],
-            num_microbatches=get_num_microbatches(),
-            seq_length=self.max_encoder_seq_length,
-            micro_batch_size=self.cfg.micro_batch_size,
-            decoder_seq_length=self.max_decoder_seq_length,
             forward_only=True,
-            collect_non_loss_data=False,
+            num_microbatches=get_num_microbatches(),
+            seq_length=encoder_seq_length,
+            decoder_seq_length=encoder_seq_length,
+            micro_batch_size=get_micro_batch_size(),
         )
 
         if output_tensor:
-            # average across micro batches
+            # collect across micro batches
             logits_tensors_list = [o['logits'] for o in output_tensor]
             logits_tensor = torch.concat(logits_tensors_list)
         else:
@@ -268,21 +207,23 @@ class MegaMolBARTModelBase(MegatronLMEncoderDecoderModel, ABC):
 
         return logits_tensor
 
-    def on_validation_epoch_start(self) -> None:
-        super().on_validation_epoch_start()
-        self._val_output_list = []
-        return
+    def _test_validation_step(self, step_outputs, dataloader_iter, batch_idx, dataloader_idx=0):
+        """
+        Shared code for validation and test step. See parent NeMo class for how this gets called by def validation_step() along with
+            any other nemo specific optimizations that may happen outside.
+        """
+        # check if the dataloader is exhausted
+        dataloader_iter, done = self._val_iterator_done(dataloader_iter)
+        if done:
+            # NeMo expects us to return None once we are beyond the last batch.
+            return
+        batch = next(dataloader_iter)
+        dataloader_iter = iter([batch])
+        # store the outputs of the forward pass in last element of step_outputs
+        loss_dict = super()._test_validation_step(step_outputs, dataloader_iter, batch_idx, dataloader_idx)
 
-    def validation_step(self, batch, batch_idx):
-        logs = super().validation_step(
-            iter(
-                [
-                    batch,
-                ]
-            ),
-            batch_idx,
-        )
-        token_logits = self.validation_step_logits(batch, batch_idx)
+        # update loss_dict
+        token_logits = self.get_step_logits(batch, batch_idx)
         tokens_enc, tokens_dec, loss_mask, labels, enc_mask, dec_mask = self.process_global_batch(batch)
 
         target_smiles = batch['target_smiles']
@@ -302,30 +243,29 @@ class MegaMolBARTModelBase(MegatronLMEncoderDecoderModel, ABC):
             log_mol=log_mol,
         )
 
-        for metric_name, metric_value in metrics.items():
-            logs[metric_name] = metric_value
+        # add metrics to loss_dict
+        loss_dict.update(metrics)
 
-        # return loss_mean
-        self._val_output_list.append(logs)
+        # store back in last element of step_outputs
+        step_outputs[-1] = loss_dict
 
-    def on_validation_epoch_end(self):
-        outputs = self._val_output_list
-        if len(outputs) == 0:
-            return
+        return loss_dict
 
-        logging.info('Finishing validation epoch')
-        self.validation_step_outputs = [{'loss': o['loss']} for o in outputs]
-        super().on_validation_epoch_end()
+    def _test_validation_epoch_end(self, step_outputs, prefix):
+        """
+        Shared logging for validation and test
+        """
+        logging.info(f'Finishing {prefix} epoch')
+        averaged_loss = super()._test_validation_epoch_end(step_outputs, prefix)
 
-        self._inference_epoch_end(outputs, mode='val')
-        self._val_output_list.clear()
+        # Log results
+        log_list = []
+        for metric_name, metric_val in averaged_loss.items():
+            metric_name = metric_name.replace('_', ' ').title()
+            log_list.append(f'{metric_name}: {metric_val:.2f}')
+        logging.info(f'{prefix.title()} Results: ' + ', '.join(log_list))
 
-    def on_test_epoch_end(self):
-        logging.info('Finishing test epoch')
-        outputs = self.test_step_outputs[:]
-        super().on_test_epoch_end()
-        self._inference_epoch_end(outputs, mode='test')
-        self.test_step_outputs.clear()
+        return averaged_loss
 
     def sample_molecules(
         self,
@@ -341,10 +281,12 @@ class MegaMolBARTModelBase(MegatronLMEncoderDecoderModel, ABC):
             tokens_enc (torch.Tensor, long): token ID values for samples
             enc_mask (torch.Tensor, long): boolean mask for padded sections
             sampling_method (str): a sampling method to use in the decoding iterations
-            sampling_kwargs (dict): dict with arguments to be passed to the sampling function
-
-            Please refer to the method get_sampling_token_fn in NeMO to see which arguments are required
-            for a chosen sampling_method.
+            sampling_kwargs (dict): dict with arguments to be passed to the sampling function. If
+                using `sampling_method="beam-search"` make sure to pass
+                `sampling_kwargs={"beam_size": 5, "keep_only_best_tokens": True}`
+                so that the single best result from beam search is returned given some desired memory.
+                Please refer to the method get_sampling_token_fn in NeMO to see which arguments are relevant
+                for a chosen sampling_method.
         Returns:
             sampled_smiles (list[str]): a list of sampled SMILES strings
         """
@@ -444,7 +386,12 @@ class MegaMolBARTModelBase(MegatronLMEncoderDecoderModel, ABC):
         Returns:
             float, float: molecular accuracy and percent invalid
         """
-        sampled_smiles = self.sample_molecules(tokens_enc, enc_mask)
+        sampled_smiles = self.sample_molecules(
+            tokens_enc,
+            enc_mask,
+            sampling_method=self.sequence_search_method,
+            sampling_kwargs=self.sequence_search_kwargs,
+        )
         sampled_mols = [Chem.MolFromSmiles(smi) for smi in sampled_smiles]
 
         invalid = [mol is None for mol in sampled_mols]

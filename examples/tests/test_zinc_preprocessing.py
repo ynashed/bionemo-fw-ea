@@ -1,3 +1,13 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+#
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
+
 import glob
 import os
 import pathlib
@@ -142,6 +152,11 @@ def test_filtering(tmp_path, download_directory, url, max_smiles_length, **kwarg
     with open(os.path.join(TEST_DATA_DIR, data_filename), 'r') as fh:
         mocker.get(url, text=fh.read())
 
+    print(f'url: {url}')
+    print(f'max_smiles_length: {max_smiles_length}')
+    print(f'TEST_DATA_DIR: {TEST_DATA_DIR}')
+    print(f'data_filename: {data_filename}')
+    print(f'download_directory: {download_directory}')
     preproc = Zinc15Preprocess(root_directory=str(tmp_path))
     preproc._process_file(url, download_directory, max_smiles_length)
     filtered_data = pd.read_csv(download_directory / data_filename)

@@ -1,6 +1,12 @@
 defaults:
   - pretrain_small_span_aug
+  - _self_
 
+hydra:
+  searchpath:
+     - file://${oc.env:BIONEMO_HOME}/examples/molecule/megamolbart/conf/
+
+#  TODO when retraining this checkpoint, make seq_length: 128 for sampling speed.
 restore_from_path: ${oc.env:BIONEMO_HOME}/models/molecule/megamolbart/megamolbart.nemo # used when starting from a .nemo file
 trainer:
   devices: 1

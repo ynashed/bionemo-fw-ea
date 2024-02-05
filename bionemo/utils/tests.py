@@ -1,10 +1,20 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+#
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
+
 import hashlib
 import json
 import os
 import pathlib
 import shutil
 from collections import OrderedDict
-from typing import List, Optional, Union
+from typing import Dict, List, Optional, Union
 
 import apex
 import numpy as np
@@ -118,7 +128,11 @@ def save_expected_training_results(results_comparison_dir: str, correct_results:
 
 
 def check_expected_training_results(
-    trainer_results: dict, expected_results: dict, tol: float = 1.0e-4, err_msg: str = ""
+    trainer_results: dict,
+    expected_results: dict,
+    tol: float = 1.0e-4,
+    test_tolerance_overrides: Dict[str, float] = {},
+    err_msg: str = "",
 ):
     """Compare expected training results
 
@@ -126,12 +140,18 @@ def check_expected_training_results(
         trainer (dict): PyTorch Lightning Trainer results
         expected_results (dict): expected training metrics
         tol (float, optional): float comparison tolerance. Defaults to 1.0e-4.
+        test_tolerance_overrides (Dict[str, float]): Tolerance for override keys that match `override_key in key`.
     """
     mismatched_results = []
     for key in expected_results:
         expected_value = expected_results[key]
         actual_value = trainer_results[key].cpu().numpy().item()
-        if not np.allclose(expected_value, actual_value, atol=tol):
+        test_tol = tol
+        # See if the user wants to set any key specific tolerance overrides
+        for override_key, override_tol in test_tolerance_overrides.items():
+            if override_key in key:
+                test_tol = override_tol
+        if not np.allclose(expected_value, actual_value, atol=test_tol):
             mismatched_results.append(f"Expected {key} = {expected_value}, got {actual_value}.")
 
     assert len(mismatched_results) == 0, f"Training results mismatched: {mismatched_results}{err_msg}"

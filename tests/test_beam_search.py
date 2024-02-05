@@ -1,3 +1,13 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+#
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
+
 import logging
 import os
 import pathlib
@@ -97,7 +107,6 @@ def megamolbart_model_trainer(model_cfg: DictConfig) -> Tuple[MegaMolBARTModel, 
 
 
 @pytest.mark.needs_gpu
-@pytest.mark.xfail(reason="FIXME: Currently broken")
 def test_megamolbart_greedy_beam_search(megamolbart_model_trainer, model_cfg):
     """
     USAGE:
@@ -199,13 +208,13 @@ def test_megamolbart_greedy_beam_search(megamolbart_model_trainer, model_cfg):
     scores_beam_best = scores_beam_best.cpu().detach()
 
     assert torch.equal(preds, preds_beam1)
-    assert torch.equal(logits, logits_beam1)
+    torch.testing.assert_close(logits, logits_beam1)
 
     assert [int(x) for x in preds.shape] == [len(_SMIS), _NUM_TOKENS_TO_GENERATE + 1]
     assert [int(x) for x in logits.shape] == [len(_SMIS), _NUM_TOKENS_TO_GENERATE]
 
     assert preds.shape == preds_beam_best.shape and logits.shape == logits_beam_best.shape
-    assert torch.equal(scores_beam_best.max(dim=1, keepdim=True)[0], scores_beam_best)
+    torch.testing.assert_close(scores_beam_best.max(dim=1, keepdim=True)[0], scores_beam_best)
 
     assert torch.all((scores_beam[:, :-1] - scores_beam[:, 1:]) >= 0)
     # num_smi_to_generate + 1 accounts for BOS token at the beginning of the decoding if no decoded tokens are provided

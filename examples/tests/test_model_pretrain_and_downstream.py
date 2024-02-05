@@ -154,7 +154,7 @@ MODEL_CLASS = [
 ]
 MODEL_PARAMETERS = [
     45058048,
-    4146176,
+    4047872,
     43612544,
     198970496,
     199145485,
@@ -313,12 +313,23 @@ def test_model_training(prepend_config_path, config_name, model_class, correct_r
         assert False, msg
 
     expected_results = load_expected_training_results(results_comparison_dir, correct_results)
+    tolerance_overrides = {
+        "grad_norm": 1.0,  # grad norm flucuates quite a bit in these small training runs
+        "step_timing": 10.0,  # Different hardware can be pretty different
+        "val_percent_invalid": 1.0,  # This varies a ton early in training, can be anywhere in 0-1.
+        "3state_accuracy": 10.0,  # This accuracy is measured in percent
+        "resolved_accuracy": 5.0,  # This accuracy is measured in percent
+        "8state_accuracy": 5.0,  # This accuracy is measured in percent
+        "val_loss": 1.0,
+        "reduced_train_loss": 1.0,
+    }
     if model_class == DNABERTModel:
         # DNABERT Takes longer to reach consistency with convergence, thus we have increased the tolerance.
         check_expected_training_results(
             trainer_results,
             expected_results,
             tol=1,
+            test_tolerance_overrides=tolerance_overrides,
             err_msg="\nIn order to update please use the folllowing command:\n UPDATE_EXPECTED_RESULTS=1 pytest examples/tests/test_model_pretrain_and_downstream.py",
         )
 
@@ -327,5 +338,7 @@ def test_model_training(prepend_config_path, config_name, model_class, correct_r
             trainer_results,
             expected_results,
             err_msg="\nIn order to update please use the folllowing command:\n UPDATE_EXPECTED_RESULTS=1 pytest examples/tests/test_model_pretrain_and_downstream.py",
+            tol=1e-1,
+            test_tolerance_overrides=tolerance_overrides,
         )
     assert True

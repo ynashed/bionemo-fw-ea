@@ -15,6 +15,7 @@ model:
     vocab_path: ${oc.env:BIONEMO_HOME}/tokenizers/molecule/megamolbart/vocab/megamolbart.vocab
     model_path: ${oc.env:BIONEMO_HOME}/tokenizers/molecule/megamolbart/vocab/megamolbart.model
   downstream_task:
+    #  TODO when retraining this checkpoint, make seq_length: 128 next time for better molecule sampling speed.
     restore_from_path: ${oc.env:BIONEMO_HOME}/models/molecule/megamolbart/megamolbart.nemo
     outputs: [embeddings] # Which outputs to extract per sample (a value or list). Possible values: hiddens, embeddings.
   data:

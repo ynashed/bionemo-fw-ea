@@ -41,7 +41,7 @@ model:
 
   megatron_amp_O2: False # use AMP with O2 style mixed precision instead of native amp on-the-fly weight autocasting.
 
-  seq_length: 512 # maximum sequence length allowed
+  seq_length: 128 # maximum sequence length allowed, note that 128 was longer than all 1.8B molecules in the zinc drug-like DB. This will speed up generation.
   max_position_embeddings: ${.seq_length}
   num_layers: 3
   hidden_size: 768
@@ -182,7 +182,7 @@ exp_manager:
     mode: max # use min or max of monitored metric to select best checkpoints
     save_last: True # always save last checkpoint
     always_save_nemo: True # not implemented for model parallel, additionally save NeMo-style checkpoint during validation, set to False if checkpoint saving is time consuming
-    filename: '${name}-${model.name}--{val_molecular_accuracy:.2f}-{val_reduced_loss:.2f}-{step}-{consumed_samples}'
+    filename: '${name}-${model.name}--{val_molecular_accuracy:.2f}-{val_loss:.2f}-{step}-{consumed_samples}'
     model_parallel_size: ${multiply:${model.tensor_model_parallel_size}, ${model.pipeline_model_parallel_size}}
 
   # logging

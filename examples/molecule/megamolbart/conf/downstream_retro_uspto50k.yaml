@@ -22,6 +22,8 @@ trainer:
 
 model:
   name: ${name}
+  seq_length: 512 # TODO make a checkpoint with this set to 128. Maximum sequence length allowed. Set to 512 for backwards compatibililty with the checkpoint.
+  max_position_embeddings: ${.seq_length}
   micro_batch_size: 256
   num_layers: 6
   hidden_size: 512
@@ -66,7 +68,7 @@ model:
 
 exp_manager:
   checkpoint_callback_params:
-    monitor: val_reduced_loss
+    monitor: val_loss
     mode: min
   wandb_logger_kwargs:
     project: ${model.name}

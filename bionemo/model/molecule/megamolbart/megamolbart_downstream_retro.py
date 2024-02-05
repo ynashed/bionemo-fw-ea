@@ -1,3 +1,13 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+#
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
+
 from typing import Callable, Dict, List, Optional
 
 import torch
@@ -5,13 +15,13 @@ from omegaconf import DictConfig
 
 from bionemo.data import megamolbart_retro_build_train_valid_test_datasets
 from bionemo.data.molecule.augment import MoleculeInputTargetEnumeration
-from bionemo.model.molecule.megamolbart.megamolbart_model_base import MegaMolBARTModelBase
+from bionemo.model.molecule.mol_enc_dec_model_base import MolEncDecModelBase
 
 
 __all__ = ["MegaMolBARTRetroModel"]
 
 
-class MegaMolBARTRetroModel(MegaMolBARTModelBase):
+class MegaMolBARTRetroModel(MolEncDecModelBase):
     """
     MegaMolBARTRetro model for the retrosynthesis downstream task
     """

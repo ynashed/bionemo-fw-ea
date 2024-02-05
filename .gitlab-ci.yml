@@ -106,6 +106,7 @@ build-bionemo-image:
     - if: $CI_COMMIT_BRANCH == "main"
     - if: $CI_COMMIT_BRANCH == "bionemo-rc2306-v1"
   script:
+    - df -h
     - if [[ $NIGHTLY = true ]]; then
       base="--build-arg BASE_IMAGE=$NEMO_NIGHTLY_TAG";
       else
@@ -116,6 +117,7 @@ build-bionemo-image:
       --label com.nvidia.bionemo.git_hash=${CI_COMMIT_SHORT_SHA}
       --secret id=GITLAB_TOKEN,env=RO_API_TOKEN
       -t $PIPELINE_TAG  -f setup/Dockerfile .
+    - df -h
     - docker push $PIPELINE_TAG
     # FIXME [mgreaves] See note in internal/Dockerfile-devel about this (it is commented as another 'FIXME').
     #                  tl;dr Secuirty leak: passing in CI_JOB_TOKEN as a build-arg persists its value in the image!
@@ -133,6 +135,7 @@ build-bionemo-image:
     - docker build --network host --no-cache --build-arg BIONEMO_IMAGE="$PIPELINE_TAG"
       --build-arg TPL_REPO=https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab-master.nvidia.com/dl/gwe/torch_performance_linter
       -t $PIPELINE_TAG-devel -f internal/Dockerfile-devel .
+    - df -h
     - docker push $PIPELINE_TAG-devel
 
 build-docs-image:

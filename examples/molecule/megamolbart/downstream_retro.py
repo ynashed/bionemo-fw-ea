@@ -13,7 +13,7 @@ from omegaconf.omegaconf import OmegaConf
 
 from bionemo.data.preprocess.molecule.uspto50k_preprocess import USPTO50KPreprocess
 from bionemo.model.molecule.megamolbart import MegaMolBARTRetroModel
-from bionemo.model.utils import setup_trainer
+from bionemo.model.utils import get_from_decoder_encoder_or_model, setup_trainer
 from bionemo.utils.connectors import BioNeMoSaveRestoreConnector
 
 
@@ -41,7 +41,9 @@ def main(cfg):
 
         assert model._cfg.precision == cfg.trainer.precision
         assert model._cfg.data.max_seq_length == cfg.model.seq_length
-        assert model._cfg.hidden_dropout == cfg.model.hidden_dropout
+        assert get_from_decoder_encoder_or_model(model._cfg, "hidden_dropout") == get_from_decoder_encoder_or_model(
+            cfg.model, "hidden_dropout"
+        )
         assert model._cfg.data.encoder_augment == cfg.model.data.encoder_augment
         assert model._cfg.data.decoder_augment == cfg.model.data.decoder_augment
         # double check that masking is disabled
