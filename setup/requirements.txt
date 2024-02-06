@@ -50,3 +50,5 @@ py3Dmol==2.0.4
 pyarrow==14.0.1
 transformers==4.36.0
 triton==2.1.0
+# Property guided molecule generation
+bionemo-controlled-generation==0.3.0
