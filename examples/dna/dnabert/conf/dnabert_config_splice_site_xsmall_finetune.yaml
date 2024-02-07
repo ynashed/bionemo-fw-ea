@@ -5,7 +5,7 @@ target: bionemo.model.dna.dnabert.dnabert_model.DNABERTModel # path to model cla
 infer_target: bionemo.model.dna.dnabert.infer.DNABERTInference  # path to inferende class to load
 
 do_training: true
-do_predict: false
+do_prediction: false
 
 restore_from_path: ??? # Restores from an existing downstream-task model nemo file.
 predictions_output_file: preds.txt
