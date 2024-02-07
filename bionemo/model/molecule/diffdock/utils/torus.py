@@ -76,8 +76,12 @@ def p(x, sigma):
     return p_[sigma, x]
 
 
-def sample(sigma):
-    out = sigma * np.random.randn(*sigma.shape)
+def sample(sigma, seed=None):
+    if seed is None:
+        out = sigma * np.random.randn(*sigma.shape)
+    else:
+        rng = np.random.default_rng(seed)
+        out = sigma * rng.normal(size=sigma.shape)
     out = (out + np.pi) % (2 * np.pi) - np.pi
     return out
 
@@ -85,10 +89,10 @@ def sample(sigma):
 class TorusScoreNorm:
     _score_norm = None
 
-    def __init__(self):
+    def __init__(self, seed=None):
         if TorusScoreNorm._score_norm is None:
             _score_norm = score(
-                sample(sigma[None].repeat(10000, 0).flatten()), sigma[None].repeat(10000, 0).flatten()
+                sample(sigma[None].repeat(10000, 0).flatten(), seed=seed), sigma[None].repeat(10000, 0).flatten()
             ).reshape(10000, -1)
             TorusScoreNorm._score_norm = (_score_norm**2).mean(0)
 

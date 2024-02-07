@@ -28,7 +28,7 @@ from omegaconf import OmegaConf
 from pytorch_lightning import seed_everything
 
 from bionemo.callbacks import setup_dwnstr_task_validation_callbacks
-from bionemo.data.diffdock.data_manager import DataManager as DiffdockDataManagers
+from bionemo.data.diffdock.data_manager import DataManager as DiffdockDataManager
 from bionemo.data.equidock import DataManager
 from bionemo.model.dna.dnabert.dnabert_model import DNABERTModel
 from bionemo.model.molecule.diffdock.models.nemo_model import (
@@ -240,7 +240,7 @@ def test_model_size(prepend_config_path, config_name, model_class, model_paramet
     if model_class == FineTuneProteinModel or model_class == FineTuneMegaMolBART:
         model = model_class(cfg, trainer)
     elif model_class == DiffdockScoreModel or model_class == DiffdockConfidenceModel:
-        data_manager = DiffdockDataManagers(cfg)
+        data_manager = DiffdockDataManager(cfg)
         model = model_class(cfg=cfg, trainer=trainer, data_manager=data_manager)
     elif model_class == EquiDock:
         data_manager = DataManager(cfg)
@@ -285,7 +285,11 @@ def test_model_training(prepend_config_path, config_name, model_class, correct_r
     elif model_class == DiffdockScoreModel or model_class == DiffdockConfidenceModel:
         torch.use_deterministic_algorithms(True, warn_only=True)
         torch.backends.cudnn.benchmark = False
-        data_manager = DiffdockDataManagers(cfg)
+        torch.backends.cuda.matmul.allow_tf32 = False
+        torch.backends.cuda.allow_tf32 = False
+        torch.backends.cudnn.enabled = False
+        DiffdockDataManager.reset_instances()
+        data_manager = DiffdockDataManager(cfg)
         model = model_class(cfg=cfg, trainer=trainer, data_manager=data_manager)
     elif model_class == EquiDock:
         data_manager = DataManager(cfg)

@@ -5,10 +5,10 @@ hydra:
   searchpath:
      - ${oc.env:BIONEMO_HOME}/examples/molecule/diffdock/conf
 
-tmp_directory: ???
+tmp_path: ???
 
 seed: 42
-out_dir: ${tmp_directory}
+out_dir: ${tmp_path}
 samples_per_complex: 4
 
 confidence_infer:

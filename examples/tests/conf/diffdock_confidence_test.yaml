@@ -24,6 +24,7 @@ trainer:
 
 model:
   micro_batch_size: 5
+  optimize_einsums: False
 
 exp_manager:
   create_wandb_logger: False

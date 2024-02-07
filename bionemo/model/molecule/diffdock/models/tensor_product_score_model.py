@@ -282,7 +282,8 @@ class TensorProductScoreModel(torch.nn.Module):
                     nn.Dropout(dropout),
                     nn.Linear(ns, 1, bias=False),
                 )
-        self.torus_score_norm = torus.TorusScoreNorm()
+
+            self.torus_score_norm = torus.TorusScoreNorm(cfg.seed)
 
     def forward(self, data):
         if not self.confidence_mode:

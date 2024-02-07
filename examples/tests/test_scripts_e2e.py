@@ -104,9 +104,9 @@ def get_data_overrides(script_or_cfg_path: str) -> str:
     elif model == 'diffdock':
         return (
             f' ++data.split_train={TEST_DATA_DIR}/molecule/diffdock/splits/split_train'
-            + f' ++data.split_val={TEST_DATA_DIR}/molecule/diffdock/splits/split_val'
-            + f' ++data.split_test={TEST_DATA_DIR}/molecule/diffdock/splits/split_test'
-            + f' ++data.cache_path={TEST_DATA_DIR}/molecule/diffdock/data_cache'
+            f' ++data.split_val={TEST_DATA_DIR}/molecule/diffdock/splits/split_val'
+            f' ++data.split_test={TEST_DATA_DIR}/molecule/diffdock/splits/split_test'
+            f' ++data.cache_path={TEST_DATA_DIR}/molecule/diffdock/data_cache'
         )
     elif 'downstream' in script:
         if model == 'dnabert':
@@ -161,7 +161,6 @@ def get_train_args_overrides(script_or_cfg_path, train_args):
         # do not use kalign as it requires third-party-download and it not essential for testing
         train_args['model.data.realign_when_required'] = False
     elif model == "diffdock":
-        pytest.skip(reason="FIXME: CI infrastructure is too limiting and awaiting MR")
         # Use size aware batch sampler, and set the size control to default
         train_args['model.micro_batch_size'] = 2
         train_args['model.estimate_memory_usage.maximal'] = 'null'
