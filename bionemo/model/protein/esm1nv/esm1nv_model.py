@@ -226,10 +226,16 @@ class ESM1nvModel(ESMnvMegatronBertModel):
             return
         averaged_loss = torch.stack(outputs).mean()
         average_perplexity = averaged_loss.exp()
-        self.log('val_loss', averaged_loss, prog_bar=True)
-        self.log('val_perplexity', average_perplexity)
-        self.log('val_loss_ECE', pow(2, averaged_loss))  # calculate exponential cross entropy loss for logs
-        self.log('consumed_samples', self.compute_consumed_samples(self.trainer.global_step - self.init_global_step))
+        self.log('val_loss', averaged_loss, prog_bar=True, batch_size=1)
+        self.log('val_perplexity', average_perplexity, batch_size=1)
+        self.log(
+            'val_loss_ECE', pow(2, averaged_loss), batch_size=1
+        )  # calculate exponential cross entropy loss for logs
+        self.log(
+            'consumed_samples',
+            self.compute_consumed_samples(self.trainer.global_step - self.init_global_step),
+            batch_size=1,
+        )
         self.validation_step_outputs.clear()
 
     def encode(self, tokens_enc, enc_mask):

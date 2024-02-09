@@ -92,8 +92,6 @@ model:
   num_self_attention_per_cross_attention: 1
   share_token_embeddings: true
   share_decoder_tokens_head_embeddings: true
-  cnn_dim: 32
-  dropout_rate: 0.25
   tokenizer:
     library: sentencepiece
     type: null
@@ -216,6 +214,8 @@ model:
           warmup_ratio: 0.01
           max_steps: 1000
   encoder_frozen: false
+  cnn_dim: 32
+  dropout_rate: 0.25
   finetuning_optim:
     name: adam
     lr: 0.0001

@@ -68,8 +68,6 @@ model:
   bert_binary_head: false
   resume_from_checkpoint: null
   masked_softmax_fusion: true
-  cnn_dim: 32
-  dropout_rate: 0.25
   tokenizer:
     library: sentencepiece
     type: null
@@ -192,6 +190,8 @@ model:
           max_steps: 1000
   encoder_frozen: false
   global_batch_size: null
+  cnn_dim: 32
+  dropout_rate: 0.25
   finetuning_optim:
     name: adam
     lr: 0.0001
