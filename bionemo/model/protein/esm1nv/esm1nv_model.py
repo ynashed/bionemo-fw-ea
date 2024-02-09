@@ -9,6 +9,8 @@
 # its affiliates is strictly prohibited.
 
 import copy
+import functools
+import inspect
 import os
 from typing import Dict, List, Optional, Union
 
@@ -21,16 +23,36 @@ from nemo.collections.nlp.modules.common.megatron.utils import (
 from nemo.collections.nlp.modules.common.tokenizer_utils import get_nmt_tokenizer
 from nemo.core import Dataset
 from nemo.core.neural_types import NeuralType
-from nemo.utils import logging
+from nemo.utils import AppState, logging
 from omegaconf.dictconfig import DictConfig
 from pytorch_lightning.trainer.trainer import Trainer
-from torch.cuda.amp import autocast
 
 from bionemo.data.dataloader import ProteinBertCollate
 from bionemo.data.dataloader.protein_collate import ESM2BertCollate
 from bionemo.data.dataset_builder_utils import build_typed_dataset
 from bionemo.data.mapped_dataset import Uniref90ClusterMappingDataset
 from bionemo.model.protein.esm1nv.base import ESMnvMegatronBertModel
+
+
+try:
+    from apex.transformer.pipeline_parallel.utils import (
+        _reconfigure_microbatch_calculator,
+        get_micro_batch_size,
+        get_num_microbatches,
+    )
+
+    HAVE_APEX = True
+
+except (ImportError, ModuleNotFoundError):
+    HAVE_APEX = False
+
+try:
+    from megatron.core.pipeline_parallel.schedules import get_forward_backward_func
+
+    HAVE_MEGATRON_CORE = True
+
+except (ImportError, ModuleNotFoundError):
+    HAVE_MEGATRON_CORE = False
 
 
 __all__ = ["ESM1nvModel", "ESM2nvModel"]
@@ -238,13 +260,210 @@ class ESM1nvModel(ESMnvMegatronBertModel):
         )
         self.validation_step_outputs.clear()
 
-    def encode(self, tokens_enc, enc_mask):
-        # FIXME this autocast shouldn't be needed
-        with autocast(enabled=self.enable_autocast):
-            hidden_states = self(tokens_enc, enc_mask, None)
-            if self.model.post_process:
-                hidden_states = hidden_states[0]
-        return hidden_states
+    def encode(
+        self, tokens_enc: torch.Tensor, enc_mask: torch.Tensor, reconfigure_microbatch: bool = True
+    ) -> torch.Tensor:
+        """
+        Encodes input tokens and return the model's hidden embeddings, supporting different parallel processing modes.
+
+        Parameters:
+        - tokens_enc: The encoder input tokens ids, expected to be in the shape of [batch_size, sequence_length].
+        - enc_mask: The attention mask associated with the input tokens.
+        - reconfigure_microbatch (bool): Flag to reconfigure the micro-batch size for pipeline parallel mode. When running inference
+            as an interactive session, you should set it to False.
+
+        Returns:
+        - torch.Tensor: The output embeddings of shape [batch_size, sequence_length, hidden_size].
+        """
+        # TODO: upstream the `encode` function to NeMo as the current BERT class does not have one
+
+        # Check whether the DDP is initialized. This is needed when running inference outside of the training loop.
+        if parallel_state.is_unitialized():
+
+            def dummy():
+                return
+
+            if self.trainer.strategy.launcher is not None:
+                self.trainer.strategy.launcher.launch(dummy, trainer=self.trainer)
+            self.trainer.strategy.setup_environment()
+
+            # Reconfigure microbatch sizes here because on model restore, this will contain the micro/global batch configuration used while training.
+            if reconfigure_microbatch:
+                _reconfigure_microbatch_calculator(
+                    rank=0,  # This doesn't matter since it is only used for logging
+                    rampup_batch_size=None,
+                    global_batch_size=1,
+                    micro_batch_size=1,  # Make sure that there is no "grad acc" while encoding.
+                    data_parallel_size=1,  # We check above to make sure that dataparallel size is always 1 at inference.
+                )
+
+        app_state = AppState()
+
+        global_batch_per_gpu = tokens_enc.size(0)
+        encoder_seq_length = tokens_enc.size(1)
+
+        num_micro_batches_before_encode = get_num_microbatches()
+        # Reconfigure microbatch calculator here to set num microbatches as expected by the encoding step.
+        if reconfigure_microbatch:
+            _reconfigure_microbatch_calculator(
+                rank=app_state.global_rank,
+                rampup_batch_size=None,
+                global_batch_size=global_batch_per_gpu * parallel_state.get_data_parallel_world_size(),
+                micro_batch_size=global_batch_per_gpu,  # Make sure that there is no "grad acc" while encoding.
+                data_parallel_size=parallel_state.get_data_parallel_world_size(),
+            )
+        tensor_shape = [
+            encoder_seq_length,
+            global_batch_per_gpu,
+            self.cfg.hidden_size,
+        ]  # expected output shape from the encoder
+
+        # build input arguments description as expected by the encoder's forward method
+        batch_for_pipeline = [tokens_enc, enc_mask]
+        arg_names = ['bert_model_input', 'attention_mask']
+
+        forward_step_func = self._get_forward_output_only_func(
+            arg_names=arg_names,
+            output_name="hiddens",  # Set the name of the encoder's outputs
+        )
+
+        fwd_bwd_func = (
+            get_forward_backward_func()
+        )  # Use Megatron's util function to get the correct output tensor in pipeline parallel mode
+
+        output_tensor = fwd_bwd_func(
+            forward_step_func=forward_step_func,
+            data_iterator=iter(
+                [
+                    batch_for_pipeline,
+                ]
+            ),
+            model=[self.model],  # Use the encoder module of ESM to get the hidden representations
+            forward_only=True,
+            num_microbatches=1,
+            seq_length=encoder_seq_length,
+            micro_batch_size=get_micro_batch_size(),
+        )
+
+        if output_tensor:
+            output_tensor = output_tensor[0]['hiddens']
+        else:
+            # Only the last pipeline stage has the actual output_tensor, for all other model-parallel ranks the output_tensor is None.
+            output_tensor = torch.zeros(tensor_shape, dtype=self.autocast_dtype).cuda()
+
+        if self.cfg.get('pipeline_model_parallel_size', 1) > 1:
+            # Broadcast the output_tensor from the last pipeline stage to all other model-parallel ranks.
+            torch.distributed.broadcast(
+                output_tensor,
+                parallel_state.get_pipeline_model_parallel_last_rank(),
+                group=parallel_state.get_pipeline_model_parallel_group(),
+            )
+
+        # Reset microbatch calculator to what it was before encoding. This adjustment is necessary during pre-training with validation-in-loop,
+        # as the main ESM model and the downstream task model have differing batch sizes.
+        if reconfigure_microbatch:
+            _reconfigure_microbatch_calculator(
+                rank=app_state.global_rank,
+                rampup_batch_size=None,
+                global_batch_size=global_batch_per_gpu * parallel_state.get_data_parallel_world_size(),
+                micro_batch_size=global_batch_per_gpu // num_micro_batches_before_encode,
+                data_parallel_size=parallel_state.get_data_parallel_world_size(),
+            )
+
+        # Return the output tensor of the encoder and transpose from [seq_len, batch, hidden] to [batch, seq_len, hidden]
+        return output_tensor.transpose(1, 0)
+
+    def _get_forward_output_only_func(self, arg_names: List[str], output_name: str, **kwargs):
+        """
+        Creates a function that prepare the batches in the order expected by model's forward signature and returns
+        its output.
+
+        Parameters:
+        ----------
+            arg_names: A list of argument names that maps the batch inputs to the positons of arguments expected by the forward method.
+            output_name (str): The name of the output to be extracted.
+            kwargs - shared arguments (non tensors)
+
+        Returns:
+        --------
+            function: A function that takes a dataloader iterator and a model as inputs, processes the next batch from the
+                    dataloader through the model, and returns the specified output along with a function that return tensor identity.
+                    this format is expected by the Megatron's util function `get_forward_backward_func`
+        """
+
+        def fwd_output_only_func(dataloader_iter, model):
+            batch = next(dataloader_iter)
+            batch = [x.cuda(non_blocking=True) if torch.is_tensor(x) else x for x in batch]
+
+            # map the batch and shared args into forward's positional arguments
+            args = self._build_forward_args_from_kwargs(args_name=arg_names, args=batch, **kwargs)
+            output = model(*args).contiguous()
+
+            def id_func(output_tensor):
+                if isinstance(output_tensor, dict):
+                    # handle loss of hidden transformations ("output" is the default output)
+                    output_tensor = output_tensor["output"]
+
+                return output_tensor, {output_name: output_tensor}
+
+            return output, id_func
+
+        return fwd_output_only_func
+
+    def _build_forward_args_from_kwargs(self, args_name: List[str], args: List, **kwargs):
+        """
+        A helper method that converts arguments into positional arguments (by name)
+
+        Parameters:
+        -----------
+            args: A list of positional arguments, typically tensors, that are passed to self.model.
+            args_name: A list of names corresponding to each positional argument. These names are used to
+                match against the allowed 'kwargs' and to order the final argument list.
+            kwargs: A dict of {arg name: arg value} (used for non-tensor values).
+
+        Returns:
+        --------
+            List: Ordered list of arguments, as expected by the self.model's forward method
+        """
+        # sanity checks
+        if len(args) != len(args_name):
+            raise ValueError(f"Mismatch between length in args_name ({len(args_name)}) and args ({len(args)})")
+        if any(n in kwargs for n in args_name):
+            raise ValueError(f"args_name = {args_name} cannot overlap kwargs = {list(kwargs.keys())}")
+
+        # get mapping of kwarg names to arg index based on the self.model.forward's signature
+        kwargs_to_arg_idx = self._kwargs_to_arg_idx()
+
+        # collect all arguments
+        all_args_name = args_name[:]
+        all_args = args[:]
+        for k, v in kwargs.items():
+            all_args_name.append(k)
+            all_args.append(v)
+
+        args_idx = [kwargs_to_arg_idx[n] for n in all_args_name]
+
+        # construct args ordered by name (with None as place-holder)
+        forward_args = [None] * (max(args_idx) + 1)
+        for i, v in zip(args_idx, all_args):
+            forward_args[i] = v
+
+        return forward_args
+
+    @functools.lru_cache(maxsize=None)
+    def _kwargs_to_arg_idx(self):
+        """
+        Returns a dict {kwarg name: arg index} to be used when mapping
+        kwargs into a list of args.
+
+        Computed on first call, and then cached.
+        """
+        # build mapping of kwargs to arg index at first run
+        module = self.model.forward
+        args_name = inspect.getfullargspec(module)[0][1:]
+        kwargs_to_arg_idx = dict(zip(args_name, range(len(args_name))))
+
+        return kwargs_to_arg_idx
 
     def on_test_epoch_end(self) -> None:
         """

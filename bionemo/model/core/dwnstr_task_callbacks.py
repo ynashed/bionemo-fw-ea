@@ -61,7 +61,6 @@ class DownstreamValidationCallback(Callback):
         return main_model
 
     def on_validation_epoch_end(self, trainer, main_model):
-        torch.manual_seed(self.valid_cfg.random_seed)
         main_model, args = self._prepare_model(main_model)
         infer_class = import_class_by_path(self.valid_cfg.infer_target)
         inference_wrapper = infer_class(self.cfg, main_model)

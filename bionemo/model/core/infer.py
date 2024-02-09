@@ -288,10 +288,16 @@ class BaseEncoderInference(LightningModule):
         if any(len(t) > self.model.cfg.seq_length for t in token_ids):
             raise ValueError(f'One or more sequence exceeds max length({self.model.cfg.seq_length}).')
 
+        # Set fixed padding when dynamic padding is disabled
+        if self.model.cfg.data.get("dynamic_padding") is False:
+            padding_length = self.model.cfg.seq_length
+        else:
+            padding_length = None
         # Pad token ids (1/True = Active, 0/False = Inactive)
         token_ids, mask = pad_token_ids(
             token_ids,
             padding_value=self.tokenizer.pad_id,
+            padding_len=padding_length,
             device=self.device,
         )
 

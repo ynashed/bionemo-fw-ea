@@ -70,7 +70,7 @@ class ESM1nvInference(BaseEncoderInference):
             enc_mask (torch.Tensor, long): boolean mask for special tokens (<BOS> and <EOS>) and padded sections
         '''
         token_ids, enc_mask = self.tokenize(sequences)
-        hidden_states = self.model.encode(token_ids, enc_mask)
+        hidden_states = self.model.encode(token_ids, enc_mask, reconfigure_microbatch=not self.interactive)
 
         # ignore <BOS> and <EOS> tokens
         enc_mask[:, 0:2] = 0
