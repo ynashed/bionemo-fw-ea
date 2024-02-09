@@ -4,8 +4,6 @@ Before you begin using the BioNeMo framework, ensure the following prerequisites
 
 1. Access to [BioNeMo Framework](https://www.nvidia.com/en-us/gpu-cloud/bionemo/) from NVIDIA.
 2. Access to NVIDIA DGX compute infrastructure ([DGX-Cloud](https://www.nvidia.com/en-us/data-center/dgx-cloud/) or [DGX-Pod](https://www.nvidia.com/en-us/data-center/dgx-basepod/)).
-3. Followed the instructions on the [framework quickstart documentation](./quickstart-fw.md) page.
-4. Followed the instructions on the [BCP quickstart documentation](./quickstart-bcp.md) page.
 
 Additionally, if you're using BioNeMo locally in a container, ensure that you're using the following:
 * Linux OS

@@ -71,6 +71,3 @@ BioNeMo creates a number of log files during training in the results directory:
 Checkpoints are stored in the `checkpoints` directory. The latest checkpoint is automatically reloaded from the `checkpoints` directory when resuming training. A `*.nemo` checkpoint could also be saved which has the optimizer states removed and can be used for inference or fine-tuning tasks.
 
 BioNeMo supports optional logging with Tensorboard and Weights and Biases. Tensorboard logging will create the standard `events.out.tfevents.....` file, while Weights and Biases logs are stored in a directory called `wandb`. Weights and Biases logging can be done offline if cluster restrictions do not allow upload of files during training. To enable offline logging and upload the contents after training, follow the directions for [offline sync](https://docs.wandb.ai/guides/technical-faq/setup#can-i-run-wandb-offline).
-
-## Large Scale Training / Inference
-Inorder to run training / inference jobs at scale, checkout [Getting Started with BCP](./quickstart-bcp.md)

@@ -5,11 +5,10 @@
 :caption: GETTING STARTED
 
 index
-quickstart-fw
 pre-reqs
+quickstart-fw
 quickstart-bcp
 tutorials-fw
-known-issues-fw
 ```
 
 ```{toctree}
@@ -21,14 +20,6 @@ data-module-fw
 dwnstr-task-validation
 inference-triton-fw
 deep-dive-esm1-pytriton-inference
-```
-
-```{toctree}
-:maxdepth: 3
-:caption: BioNeMo ON NVIDIA DGX-CLOUD
-
-overview-of-dgxc-fw
-bcp-specific-commands-fw
 ```
 
 ```{toctree}
