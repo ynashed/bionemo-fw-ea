@@ -150,6 +150,7 @@ model:
     # Below is the configuration for UF90 resampling.
     # TODO(@jomitchell) Can remove this??
     force_regen_sample_mapping: false # When true, will always generate a new uf90 resampling. otherwise, change the seed.
+    index_mapping_dir: ${oc.env:BIONEMO_HOME}/data/uniref202104_esm2/
     preprocessing:
       num_preprocess_workers: 16
     train:
@@ -183,13 +184,14 @@ model:
               sequence: 3
               sequence_id: 1
         index_mapping_dir: ${model.data.index_mapping_dir}
+      index_mapping_dir: ${model.data.index_mapping_dir}
       max_seq_length: ${model.seq_length} # Maximum input sequence length. Longer sequences are truncated
       seed: ${model.seed} # Random seed
     val:
       use_upsampling: False
       range: x[000..049]
       uf50_datapath: '${oc.env:BIONEMO_HOME}/data/dataqc/uniref50_train_filt.fasta'
-      dataset_path: ${oc.env:BIONEMO_HOME}/data/dataqc/uf50 # holds validation data.
+      dataset_path: ${oc.env:BIONEMO_HOME}/data/uniref202104_esm2/uf50 # holds validation data.
       data_impl: 'csv_fields_mmap'
       num_workers: ${model.data.num_workers}
       data_impl_kwargs:
@@ -202,14 +204,14 @@ model:
           data_fields:
             sequence: 3
             sequence_id: 1
-        index_mapping_dir: ${model.data.index_mapping_dir}
+      index_mapping_dir: ${model.data.index_mapping_dir}
       max_seq_length: ${model.seq_length} # Maximum input sequence length. Longer sequences are truncated
       seed: ${model.seed} # Random seed
     test:
       use_upsampling: False
       range: x[000..049]
       uf50_datapath: '${oc.env:BIONEMO_HOME}/data/uniref202104_esm2/uniref50_train_filt.fasta'
-      dataset_path: ${oc.env:BIONEMO_HOME}/data/dataqc/uf50 # holds testing data.
+      dataset_path: ${oc.env:BIONEMO_HOME}/data/uniref202104_esm2/uf50 # holds testing data.
       data_impl: 'csv_fields_mmap'
       num_workers: ${model.data.num_workers}
       data_impl_kwargs:
@@ -222,7 +224,7 @@ model:
           data_fields:
             sequence: 3
             sequence_id: 1
-        index_mapping_dir: ${model.data.index_mapping_dir}
+      index_mapping_dir: ${model.data.index_mapping_dir}
       max_seq_length: ${model.seq_length} # Maximum input sequence length. Longer sequences are truncated
       seed: ${model.seed} # Random seed
 
@@ -230,7 +232,6 @@ model:
     
     modify_percent: 0.1 # Percentage of characters in a protein sequence to modify. (Modification means replacing with another amino acid or with a mask token)
     perturb_percent: 0.5 # Of the modify_percent, what percentage of characters are to be replaced with another amino acid.
-    index_mapping_dir: ${oc.env:BIONEMO_HOME}/data/uniref202104_esm2/
 
   
   dwnstr_task_validation:
