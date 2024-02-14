@@ -19,3 +19,11 @@ Database of Interacting Protein Structures ([DIPS](https://github.com/drorlab/DI
 DIPS is built by mining the Protein Data Bank (PDB) for pairs of interacting proteins, yielding a dataset of 42,826 binary complexes. To ensure data quality, complexes are selected based on specific criteria, including a buried surface area of ≥ 500 Å2, solved using X-ray crystallography or cryo-electron microscopy at better than 3.5 Å resolution, containing protein chains longer than 50 amino acids, and being the first model in a structure.
 
 Sequence-based pruning is applied to prevent cross-contamination between the DIPS and Docking Benchmark 5 (DB5) datasets. Any complex with individual proteins having over 30% sequence identity with any protein in DB5 is excluded. This pruning process, along with sequence-level exclusion, results in a dataset over two orders of magnitude larger than DB5.
+
+## Continuous Automated Model EvaluatiOn (CAMEO) {cite:p}`robin2023automated`
+
+Continuous Automated Model EvaluatiOn ([CAMEO](https://cameo3d.org/)) {cite:p}`robin2023automated` is a community-led project for continuous quality assessment for biomolecular structure prediction, including monomeric and multimeric proteins, nucleic acids and small molecule liagnds. It operates by issuing weekly challenges in predicting protein structures soon to be released publicly at Protein Data Bank. Structure prediction from participating servers are evaluated in metrics such as Local Distance Difference Test (lDDT). CAMEO is considered a more frequent evaluation compared to the gold standard - the biannual Critical Assessment of protein Structure Prediction (CASP).
+
+## Derivative datasets in OpenFold training {cite:p}`Ahdritz2022.11.20.517210`
+
+OpenFold is trained on protein structures released before 2021-09-16 in PDB dataset as the training set and CAMEO structures from 2021-09-17 to 2021-12-11 as the validation set in the initial training phase. In the fine-tuning phase, a self-distillation dataset composes of structure predictions from initial-training model on Unclust30 sequences further augments the training set and help stabilize the learning.
