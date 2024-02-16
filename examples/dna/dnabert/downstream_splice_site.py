@@ -47,6 +47,9 @@ def main(cfg):
 
     if not do_training:
         logging.info("************** Starting Preprocessing ***********")
+        logging.warning(
+            "For each dataset a user elects to use, the user is responsible for checking if the dataset license is fit for the intended purpose."
+        )
         preprocessor = GRCh38Ensembl99GFF3ResourcePreprocessor(
             dest_directory=cfg.model.data.dataset_path,  # Set to $BIONEMO_HOME/data
             root_directory=cfg.model.data.root_directory,

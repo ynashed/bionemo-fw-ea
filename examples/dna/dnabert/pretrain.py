@@ -42,6 +42,9 @@ def main(cfg) -> None:
         logging.info("*************** Finish Training ************")
     else:
         logging.info("************** Starting Preprocessing ***********")
+        logging.warning(
+            "For each dataset a user elects to use, the user is responsible for checking if the dataset license is fit for the intended purpose."
+        )
 
         preprocessor = DNABERTPreprocess(
             cfg.model.data.dataset_path,
