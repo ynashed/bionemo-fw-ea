@@ -43,7 +43,7 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y \
         python3-setuptools python3-dev swig \
-        wget git unzip tmux vim tree xterm && \
+        wget git unzip tmux vim emacs-nox tree xterm && \
     rm -rf /var/lib/apt/lists/*
 
 # Optional: Install code-server to enable easy remote development on a container
