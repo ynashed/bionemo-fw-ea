@@ -130,13 +130,8 @@ RUN rm -rf /usr/local/nvm
 RUN /bin/bash -c "sed -i '/NVM/d' /root/.bashrc && sed -i '/nvm.sh/d' /etc/bash.bashrc"
 # Remove OpenCV: We do not use it and it adds a security vulnerability which no current fix:
 # https://nvd.nist.gov/vuln/detail/CVE-2023-2617
-RUN pip uninstall -y opencv-python
-RUN pip uninstall -y opencv
-RUN rm -rf /usr/local/lib/python3.10/dist-packages/cv2
-RUN rm -rf /usr/local/include/opencv4
-RUN rm -rf /usr/local/share/opencv4
-RUN rm -rf /usr/local/lib/cmake/opencv4
-RUN rm -rf /usr/local/bin/opencv*
+RUN pip uninstall -y opencv-python opencv
+RUN rm -rf /usr/local/lib/python3.10/dist-packages/cv2 /usr/local/include/opencv4 /usr/local/share/opencv4 /usr/local/lib/cmake/opencv4 /usr/local/bin/opencv*
 # Remove Slurm: The BioNeMo FW Container can certainly be deployed to Slurm clusters, however having Slurm
 # installed *inside* the container does not typically have a use case. Slurm introduces vulnerabilities
 # into our container.
