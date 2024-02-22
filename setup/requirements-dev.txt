@@ -12,3 +12,5 @@ jupyterlab==3.6.7
 aiohttp==3.9.0
 setuptools==65.5.1
 mpmath==1.3.0
+GitPython==3.1.41
+certifi==2023.7.22

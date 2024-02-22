@@ -136,6 +136,8 @@ RUN rm -rf /usr/local/lib/python3.10/dist-packages/cv2 /usr/local/include/opencv
 # installed *inside* the container does not typically have a use case. Slurm introduces vulnerabilities
 # into our container.
 RUN DEBIAN_FRONTEND=noninteractive apt remove -y libslurm37 libpmi2-0
+# Remove fonttool: We do not use it and it adds a security vulnerability: https://github.com/advisories/GHSA-6673-4983-2vx5
+RUN pip uninstall -y fonttools
 
 
 # FIXME: If BIONEMO_HOME _is not_ /workspace/bionemo, then this ENTRYPOINT is invalid!
