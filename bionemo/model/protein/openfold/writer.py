@@ -8,7 +8,6 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
-
 import pickle
 from pathlib import PosixPath
 from typing import List, Optional
