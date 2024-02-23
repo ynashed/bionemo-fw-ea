@@ -1,6 +1,10 @@
 defaults:
   - pretrain
 
+hydra:
+  searchpath:
+     - ${oc.env:BIONEMO_HOME}/examples/protein/equidock/conf
+
 data:
   data_name: dips # Train first over this dataset, [db5, dips] for now only train on db5
   cache_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/protein/equidock # Folder from where to load/restore cached dataset

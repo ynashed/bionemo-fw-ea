@@ -180,6 +180,7 @@ examples/*/wandb
 examples/*/data
 wandb
 dump.py
+slurm_logs/
 
 docs/sources/source/test_build/
 

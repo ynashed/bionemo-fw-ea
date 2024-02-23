@@ -47,7 +47,7 @@ protein_sequences = [
 
 def get_tokenizer_model_paths():
     tokenizer_dir = os.path.join(
-        os.getenv("BIONEMO_HOME"), 'tokenizers/protein/*/vocab/protein_sequence_sentencepiece.model'
+        os.environ["BIONEMO_HOME"], 'tokenizers/protein/*/vocab/protein_sequence_sentencepiece.model'
     )
     file_list = glob.glob(tokenizer_dir)
     file_list = [str(x) for x in file_list]

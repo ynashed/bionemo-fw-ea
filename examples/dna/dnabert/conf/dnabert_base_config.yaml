@@ -2,6 +2,7 @@ name: dnabert_base_config
 restore_from_path: null # used when starting from a .nemo file
 
 do_training: true # set to true to train a model
+do_prediction: false
 
 trainer:
   devices: 2

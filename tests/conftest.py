@@ -159,3 +159,8 @@ def bionemo_home() -> Path:
         raise ValueError("Need to set BIONEMO_HOME in order to run unit tests! See docs for instructions.")
     else:
         yield Path(x).absolute()
+
+
+@pytest.fixture(scope="session")
+def config_path_for_tests(bionemo_home) -> str:
+    yield str(bionemo_home / "examples" / "tests" / "conf")

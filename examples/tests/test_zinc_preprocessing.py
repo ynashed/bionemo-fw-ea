@@ -10,7 +10,6 @@
 
 import glob
 import os
-import pathlib
 
 import pandas as pd
 import pytest
@@ -45,20 +44,20 @@ MAX_LENGTH_URLS = [
 ]  # large mols
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture()
 def download_directory(tmp_path):
     """Create the temporary directory for testing and the download directory"""
-    download_directory = pathlib.Path(os.path.join(tmp_path, 'raw'))
+    download_directory = tmp_path / 'raw'
     download_directory.mkdir(parents=True, exist_ok=True)
     return download_directory
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture()
 def output_directory(tmp_path):
     """Create the directory for processed data"""
-    download_dir = pathlib.Path(os.path.join(tmp_path, 'processed'))
-    download_dir.mkdir(parents=True, exist_ok=True)
-    return download_dir
+    output_dir = tmp_path / 'processed'
+    output_dir.mkdir(parents=True, exist_ok=True)
+    return output_dir
 
 
 # TODO mocker could probably be made into a fixture
@@ -75,7 +74,7 @@ def test_process_files(tmp_path, download_directory, config, **kwargs):
             with open(os.path.join(TEST_DATA_DIR, data_filename), 'r') as fh:
                 mocker.get(url, text=fh.read())
 
-    preproc = Zinc15Preprocess(root_directory=tmp_path)
+    preproc = Zinc15Preprocess(root_directory=str(tmp_path))
     preproc.process_files(
         links_file=cfg.links_file,
         download_dir=download_directory,
@@ -151,12 +150,6 @@ def test_filtering(tmp_path, download_directory, url, max_smiles_length, **kwarg
     mocker = kwargs['mocker']
     with open(os.path.join(TEST_DATA_DIR, data_filename), 'r') as fh:
         mocker.get(url, text=fh.read())
-
-    print(f'url: {url}')
-    print(f'max_smiles_length: {max_smiles_length}')
-    print(f'TEST_DATA_DIR: {TEST_DATA_DIR}')
-    print(f'data_filename: {data_filename}')
-    print(f'download_directory: {download_directory}')
     preproc = Zinc15Preprocess(root_directory=str(tmp_path))
     preproc._process_file(url, download_directory, max_smiles_length)
     filtered_data = pd.read_csv(download_directory / data_filename)

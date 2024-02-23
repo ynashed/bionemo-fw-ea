@@ -10,33 +10,21 @@
 
 
 import os
-import pathlib
+from pathlib import Path
 
 import pytest
-from hydra import compose, initialize
+from pytorch_lightning import LightningModule
 
 from bionemo.callbacks import setup_dwnstr_task_validation_callbacks
 from bionemo.model.molecule.megamolbart import MegaMolBARTModel
 from bionemo.model.protein.downstream import FineTuneProteinModel
 from bionemo.model.protein.esm1nv import ESM1nvModel
 from bionemo.model.protein.prott5nv import ProtT5nvModel
-from bionemo.model.utils import setup_trainer
-from bionemo.utils.tests import (
-    BioNemoSearchPathConfig,
-    register_searchpath_config_plugin,
-    reset_microbatch_calculator,
-    update_relative_config_dir,
-)
+from bionemo.model.utils import initialize_distributed_parallel_state, setup_trainer
+from bionemo.utils.hydra import load_model_config
+from bionemo.utils.tests import teardown_apex_megatron_cuda
 
 
-PREPEND_CONFIG_DIR = [
-    '../protein/esm1nv/conf',
-    '../protein/esm1nv/conf',
-    '../protein/prott5nv/conf',
-    '../protein/prott5nv/conf',
-    '../molecule/megamolbart/conf',
-    '../molecule/megamolbart/conf',
-]
 CONFIG_NAME = [
     'esm1nv_test_seqlen256',
     'esm1nv_test_seqlen1024',
@@ -46,6 +34,7 @@ CONFIG_NAME = [
     'megamolbart_test_seqlen256',
 ]
 MODEL_CLASS = [ESM1nvModel, ESM1nvModel, ProtT5nvModel, ProtT5nvModel, MegaMolBARTModel, MegaMolBARTModel]
+
 MODEL_PARAMETERS = [
     43415936,
     44005760,
@@ -55,38 +44,36 @@ MODEL_PARAMETERS = [
     44926976,
 ]
 
-THIS_FILE_DIR = pathlib.Path(os.path.abspath(__file__)).parent
+
+@pytest.fixture(scope='module')
+def bionemo_home() -> Path:
+    try:
+        x = os.environ['BIONEMO_HOME']
+    except KeyError:
+        raise ValueError("Need to set BIONEMO_HOME in order to run unit tests! See docs for instructions.")
+    else:
+        yield Path(x).absolute()
 
 
-def get_cfg(prepend_config_path, config_name, config_path='conf'):
-    prepend_config_path = pathlib.Path(prepend_config_path)
-
-    class TestSearchPathConfig(BioNemoSearchPathConfig):
-        def __init__(self) -> None:
-            super().__init__()
-            self.prepend_config_dir = update_relative_config_dir(prepend_config_path, THIS_FILE_DIR)
-
-    register_searchpath_config_plugin(TestSearchPathConfig)
-    with initialize(config_path=config_path):
-        cfg = compose(config_name=config_name)
-
-    return cfg
+@pytest.fixture(scope="module")
+def config_path_for_tests(bionemo_home) -> str:
+    yield str(bionemo_home / "examples" / "tests" / "conf")
 
 
 @pytest.mark.needs_gpu
 @pytest.mark.parametrize(
-    'prepend_config_path, config_name, model_class, model_parameters',
-    list(zip(PREPEND_CONFIG_DIR, CONFIG_NAME, MODEL_CLASS, MODEL_PARAMETERS)),
+    'config_name, model_class, model_parameters',
+    list(zip(CONFIG_NAME, MODEL_CLASS, MODEL_PARAMETERS)),
 )
-def test_model_size(prepend_config_path, config_name, model_class, model_parameters):
+def test_model_size(config_name: str, model_class: LightningModule, model_parameters: int, config_path_for_tests):
     '''Check that number of model weights are correct'''
-
-    cfg = get_cfg(prepend_config_path, config_name)
+    cfg = load_model_config(config_name=config_name, config_path=config_path_for_tests)
+    initialize_distributed_parallel_state()
     callbacks = setup_dwnstr_task_validation_callbacks(cfg)
-    reset_microbatch_calculator()
     trainer = setup_trainer(cfg, callbacks=callbacks)
     if model_class == FineTuneProteinModel:
         model = model_class(cfg, trainer)
     else:
         model = model_class(cfg.model, trainer)
+    teardown_apex_megatron_cuda()
     assert model.num_weights == model_parameters

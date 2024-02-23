@@ -70,7 +70,7 @@ def test_too_small_batch_size(dataset_size, max_total_size):
     sizes = np.random.randint(max_total_size + 1, max_total_size + 100, dataset_size)
 
     with pytest.raises(RuntimeError) as excinfo:
-        sampler = SizeAwareBatchSampler(
+        SizeAwareBatchSampler(
             sampler, max_total_size, sizes, batch_size=max_total_size, num_batches=dataset_size // max_total_size
         )
 
@@ -85,14 +85,11 @@ def test_too_small_batch_size_callable(dataset_size, max_total_size):
     sampler = RandomSampler(dataset)
     sizes = np.random.randint(max_total_size + 1, max_total_size + 100, dataset_size)
 
-    def yield_sizes(x):
-        return x
-
     with pytest.raises(RuntimeError) as excinfo:
         sampler = SizeAwareBatchSampler(
             sampler, max_total_size, sizes, batch_size=max_total_size, num_batches=dataset_size // max_total_size
         )
-        for x in sampler:
+        for _ in sampler:
             pass
 
     assert "No samples can be generated" in str(excinfo.value)

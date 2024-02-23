@@ -10,7 +10,7 @@ from bionemo.data.dataset_builder_utils import (
 )
 from bionemo.data.mapped_dataset import ResamplingMappedDataset
 from bionemo.model.utils import initialize_distributed_parallel_state
-from bionemo.utils.tests import reset_microbatch_calculator
+from bionemo.utils.tests import teardown_apex_megatron_cuda
 
 
 def test_dataset_builder_fasta_fields():
@@ -128,7 +128,7 @@ def test_dataset_builder_upsampling():
     dataset = build_typed_dataset(
         dataset_paths=filepath, data_impl=data_impl, use_upsampling=True, cfg=cfg, num_samples=num_samples
     )
-    reset_microbatch_calculator()
+    teardown_apex_megatron_cuda()
     assert len(dataset) == num_samples and len(dataset._dataset) == 10
 
     assert isinstance(dataset, ResamplingMappedDataset) and isinstance(

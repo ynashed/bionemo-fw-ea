@@ -17,15 +17,14 @@ UPDATE_EXPECTED_CFG=1 pytest examples/tests/test_model_pretrain_and_downstream.p
 
 import logging
 import os
-import pathlib
+import shutil
+import subprocess
+from pathlib import Path
+from typing import List, Type, TypedDict
 
 import pytest
-import torch
-from hydra import compose, initialize
-from hydra.core.global_hydra import GlobalHydra
-from nemo.core.optim.lr_scheduler import register_scheduler
 from omegaconf import OmegaConf
-from pytorch_lightning import seed_everything
+from pytorch_lightning import LightningModule
 
 from bionemo.callbacks import setup_dwnstr_task_validation_callbacks
 from bionemo.data.diffdock.data_manager import DataManager as DiffdockDataManager
@@ -41,22 +40,15 @@ from bionemo.model.molecule.megamolbart import FineTuneMegaMolBART, MegaMolBARTM
 from bionemo.model.protein.downstream import FineTuneProteinModel
 from bionemo.model.protein.equidock.equidock_model import EquiDock
 from bionemo.model.protein.esm1nv import ESM1nvModel, ESM2nvModel
-from bionemo.model.protein.openfold.lr_scheduler import AlphaFoldLRScheduler
 from bionemo.model.protein.openfold.openfold_model import AlphaFold
 from bionemo.model.protein.prott5nv import ProtT5nvModel
-from bionemo.model.utils import setup_trainer
-from bionemo.utils.connectors import BioNeMoSaveRestoreConnector
+from bionemo.model.utils import initialize_distributed_parallel_state, setup_trainer
+from bionemo.utils.hydra import load_model_config
 from bionemo.utils.tests import (
-    BioNemoSearchPathConfig,
     check_expected_training_results,
-    check_model_exists,
-    clean_directory,
     load_expected_training_results,
-    register_searchpath_config_plugin,
-    reset_microbatch_calculator,
     resolve_cfg,
-    save_expected_training_results,
-    update_relative_config_dir,
+    teardown_apex_megatron_cuda,
 )
 
 
@@ -64,177 +56,176 @@ from bionemo.utils.tests import (
 logging.getLogger('nemo_logger').setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
+
+@pytest.fixture(scope='session')
+def bionemo_home() -> Path:
+    try:
+        x = os.environ['BIONEMO_HOME']
+    except KeyError:
+        raise ValueError("Need to set BIONEMO_HOME in order to run unit tests! See docs for instructions.")
+    else:
+        yield Path(x).absolute()
+
+
+@pytest.fixture(scope="session")
+def config_path_for_tests(bionemo_home) -> str:
+    yield str((bionemo_home / "examples" / "tests" / "conf").absolute())
+
+
 # Pretraining, encoder finetuning and secondary structure validation-in-the-loop tests
-PREPEND_CONFIG_DIR = [
-    '../molecule/megamolbart/conf',
-    '../molecule/megamolbart/conf',
-    '../protein/esm1nv/conf',
-    '../protein/prott5nv/conf',
-    '../protein/prott5nv/conf',
-    '../protein/esm1nv/conf',
-    '../protein/prott5nv/conf',
-    '../molecule/megamolbart/conf',
-    '../molecule/diffdock/conf',
-    '../molecule/diffdock/conf',
-    '../protein/equidock/conf',
-    '../protein/equidock/conf',
-    '../protein/openfold/conf',
-    '../protein/esm2nv/conf',
-    '../dna/dnabert/conf',
-]
-CONFIG_NAME = [
-    'megamolbart_downstream_retro_test',
-    'megamolbart_test',
-    'esm1nv_test',
-    'prott5nv_test',
-    'prott5nv_encoder_finetune_test',
-    'esm1nv_encoder_finetune_test',
-    'prott5nv_sec_str_val_test',
-    'megamolbart_physchem_test',
-    'diffdock_score_test',
-    'diffdock_confidence_test',
-    'equidock_pretrain_test',
-    'equidock_finetune_test',
-    'openfold_initial_training_test',
-    'esm2nv_8M_test',
-    'dnabert_test',
-]
+class TrainingTestParams(TypedDict):
+    config_name: str
+    script_path: str
+    model_cls: Type[LightningModule]
+    model_size: int
 
 
-CORRECT_CONFIG = [
-    'megamolbart_retro_config',
-    'megamolbart_config',
-    'esm1nv_config',
-    'prott5nv_config',
-    'prott5nv_encoder_finetune_config',
-    'esm1nv_encoder_finetune_config',
-    'prott5nv_sec_str_val_config',
-    'megamolbart_physchem_config',
-    'diffdock_score_config',
-    'diffdock_confidence_config',
-    'equidock_pretrain_config',
-    'equidock_finetune_config',
-    'openfold_initial_training_config',
-    'esm2nv_8M_config',
-    'dnabert_config',
-]
-CORRECT_RESULTS = [
-    'megamolbart_retro_log.json',
-    'megamolbart_log.json',
-    'esm1nv_log.json',
-    'prott5nv_log.json',
-    'prott5nv_encoder_finetune_log.json',
-    'esm1nv_encoder_finetune_log.json',
-    'prott5nv_sec_str_val_log.json',
-    'megamolbart_physchem_log.json',
-    'diffdock_score_log.json',
-    'diffdock_confidence_log.json',
-    'equidock_pretrain_log.json',
-    'equidock_finetune_log.json',
-    'openfold_initial_training_log.json',
-    'esm2nv_8M_log.json',
-    'dnabert_log.json',
-]
-MODEL_CLASS = [
-    MegaMolBARTRetroModel,
-    MegaMolBARTModel,
-    ESM1nvModel,
-    ProtT5nvModel,
-    FineTuneProteinModel,
-    FineTuneProteinModel,
-    ProtT5nvModel,
-    FineTuneMegaMolBART,
-    DiffdockScoreModel,
-    DiffdockConfidenceModel,
-    EquiDock,
-    EquiDock,
-    AlphaFold,
-    ESM2nvModel,
-    DNABERTModel,
-]
-MODEL_PARAMETERS = [
-    45058048,
-    4047872,
-    43612544,
-    198970496,
-    199145485,
-    43787533,
-    198970496,
-    66817,
-    20248214,
-    4769636,
-    525671,
-    684074,
-    93229082,
-    7542848,
-    8121216,
+TEST_PARAMS: List[TrainingTestParams] = [
+    {
+        "config_name": 'megamolbart_test',
+        "script_path": "examples/molecule/megamolbart/pretrain.py",
+        "model_cls": MegaMolBARTModel,
+        "model_size": 4047872,
+    },
+    {
+        "config_name": 'megamolbart_downstream_retro_test',
+        "script_path": "examples/molecule/megamolbart/downstream_retro.py",
+        "model_cls": MegaMolBARTRetroModel,
+        "model_size": 45058048,
+    },
+    {
+        "config_name": 'megamolbart_physchem_test',
+        "script_path": "examples/molecule/megamolbart/downstream_physchem.py",
+        "model_cls": FineTuneMegaMolBART,
+        "model_size": 66817,
+    },
+    {
+        "config_name": 'esm1nv_test',
+        "script_path": "examples/protein/esm1nv/pretrain.py",
+        "model_cls": ESM1nvModel,
+        "model_size": 43612544,
+    },
+    {
+        "config_name": 'esm2nv_8M_test',
+        "script_path": "examples/protein/esm2nv/pretrain.py",
+        "model_cls": ESM2nvModel,
+        "model_size": 7542848,
+    },
+    {
+        "config_name": 'prott5nv_sec_str_val_test',
+        "script_path": "examples/protein/prott5nv/pretrain.py",
+        "model_cls": ProtT5nvModel,
+        "model_size": 198970496,
+    },
+    {
+        "config_name": 'prott5nv_test',
+        "script_path": "examples/protein/prott5nv/pretrain.py",
+        "model_cls": ProtT5nvModel,
+        "model_size": 198970496,
+    },
+    {
+        "config_name": 'prott5nv_encoder_finetune_test',
+        "script_path": "examples/protein/downstream/downstream_flip.py",
+        "model_cls": FineTuneProteinModel,
+        "model_size": 199145485,
+    },
+    {
+        "config_name": 'esm1nv_encoder_finetune_test',
+        "script_path": "examples/protein/downstream/downstream_flip.py",
+        "model_cls": FineTuneProteinModel,
+        "model_size": 43787533,
+    },
+    {
+        "config_name": 'diffdock_score_test',
+        "script_path": "examples/molecule/diffdock/train.py",
+        "model_cls": DiffdockScoreModel,
+        "model_size": 20248214,
+    },
+    {
+        "config_name": 'diffdock_confidence_test',
+        "script_path": "examples/molecule/diffdock/train.py",
+        "model_cls": DiffdockConfidenceModel,
+        "model_size": 4769636,
+    },
+    {
+        "config_name": 'equidock_pretrain_test',
+        "script_path": "examples/protein/equidock/pretrain.py",
+        "model_cls": EquiDock,
+        "model_size": 525671,
+    },
+    {
+        "config_name": 'equidock_finetune_test',
+        "script_path": "examples/protein/equidock/pretrain.py",
+        "model_cls": EquiDock,
+        "model_size": 684074,
+    },
+    {
+        "config_name": 'openfold_initial_training_test',
+        "script_path": "examples/protein/openfold/train.py",
+        "model_cls": AlphaFold,
+        "model_size": 93229082,
+    },
+    {
+        "config_name": 'dnabert_test',
+        "script_path": "examples/dna/dnabert/pretrain.py",
+        "model_cls": DNABERTModel,
+        "model_size": 8121216,
+    },
 ]
 
-
-THIS_FILE_DIR = pathlib.Path(os.path.abspath(__file__)).parent
-
-
-def get_cfg(prepend_config_path, config_name, config_path='conf'):
-    prepend_config_path = pathlib.Path(prepend_config_path)
-
-    class TestSearchPathConfig(BioNemoSearchPathConfig):
-        def __init__(self) -> None:
-            super().__init__()
-            self.prepend_config_dir = update_relative_config_dir(prepend_config_path, THIS_FILE_DIR)
-
-    register_searchpath_config_plugin(TestSearchPathConfig)
-
-    if GlobalHydra.instance().is_initialized():
-        # in case another hydra is running
-        GlobalHydra.instance().clear()
-
-    with initialize(config_path=config_path):
-        cfg = compose(config_name=config_name)
-
-    return cfg
+CONFIG_NAME = [params["config_name"] for params in TEST_PARAMS]
+TRAINING_SCRIPT_PATH = [params["script_path"] for params in TEST_PARAMS]
+MODEL_CLASS = [params["model_cls"] for params in TEST_PARAMS]
+MODEL_PARAMETERS = [params["model_size"] for params in TEST_PARAMS]
 
 
-@pytest.mark.parametrize('prepend_config_path', PREPEND_CONFIG_DIR)
-def test_relative_param_config_path(prepend_config_path):
-    '''Ensure the relative config path required by hydra is resolving correctly'''
+@pytest.fixture(scope="module")
+def expected_training_logs_path(bionemo_home) -> str:
+    expected_logs_path = bionemo_home / "examples" / "tests" / "expected_results" / "trainer_logs"
+    if not expected_logs_path.exists():
+        expected_logs_path.mkdir(exist_ok=True)
+    return str(expected_logs_path)
 
-    updated_prepend_config_dir = update_relative_config_dir(prepend_config_path, THIS_FILE_DIR)
-    assert os.path.exists(updated_prepend_config_dir)
+
+@pytest.fixture(scope="module")
+def expected_configs_path(bionemo_home) -> str:
+    expected_configs_path = bionemo_home / "examples" / "tests" / "expected_results" / "configs"
+    if not expected_configs_path.exists():
+        expected_configs_path.mkdir(exist_ok=True)
+    return str(expected_configs_path)
 
 
-@pytest.mark.parametrize(
-    'prepend_config_path, config_name, correct_config', list(zip(PREPEND_CONFIG_DIR, CONFIG_NAME, CORRECT_CONFIG))
-)
-def test_config_parameters(prepend_config_path, config_name, correct_config):
+@pytest.mark.parametrize('config_name', CONFIG_NAME)
+def test_config_parameters(config_name: str, expected_configs_path: str, config_path_for_tests):
     '''Load the config parameters and ensure they're identical to previous'''
-
-    cfg = get_cfg(prepend_config_path, config_name)
-    results_comparison_dir = os.path.abspath(os.path.join(THIS_FILE_DIR, 'expected_results'))
-
+    cfg = load_model_config(config_name=config_name, config_path=config_path_for_tests)
+    expected_cfg_name = config_name + "-expected"
     if os.environ.get('UPDATE_EXPECTED_CFG', False):
-        msg = f'Updating expected config in {results_comparison_dir}/{correct_config}'
+        msg = f'Updating expected config in {expected_configs_path}/{expected_cfg_name}'
         logger.warning(msg)
         # will create a new comparison config
-        OmegaConf.save(cfg, os.path.join(results_comparison_dir, f"{correct_config}.yaml"))
+        OmegaConf.save(cfg, os.path.join(expected_configs_path, expected_cfg_name + ".yaml"))
         assert False, msg
 
-    original_cfg_dict = resolve_cfg(get_cfg(results_comparison_dir, correct_config))
-    new_cfg_dict = resolve_cfg(cfg)
-    assert (
-        original_cfg_dict == new_cfg_dict
-    ), f"Mismatch in config {results_comparison_dir}/{correct_config}.\nIn order to update please use the folllowing command:\n UPDATE_EXPECTED_CFG=1 pytest examples/tests/test_model_pretrain_and_downstream.py"
+    expected_cfg = load_model_config(config_name=expected_cfg_name, config_path=expected_configs_path)
+
+    assert resolve_cfg(expected_cfg) == resolve_cfg(cfg), (
+        f"Mismatch in config {expected_configs_path}/{expected_cfg_name}."
+        f"\nIn order to update please use the folllowing command:\n UPDATE_EXPECTED_CFG=1 pytest examples/tests/test_model_pretrain_and_downstream.py"
+    )
 
 
 @pytest.mark.needs_gpu
 @pytest.mark.needs_checkpoint
 @pytest.mark.parametrize(
-    'prepend_config_path, config_name, model_class, model_parameters',
-    list(zip(PREPEND_CONFIG_DIR, CONFIG_NAME, MODEL_CLASS, MODEL_PARAMETERS)),
+    'config_name, model_class, model_parameters',
+    list(zip(CONFIG_NAME, MODEL_CLASS, MODEL_PARAMETERS)),
 )
-def test_model_size(prepend_config_path, config_name, model_class, model_parameters):
+def test_model_size(config_name: str, model_class: LightningModule, model_parameters: int, config_path_for_tests):
     '''Check that number of model weights are correct'''
 
-    cfg = get_cfg(prepend_config_path, config_name)
+    cfg = load_model_config(config_name=config_name, config_path=config_path_for_tests)
+    initialize_distributed_parallel_state()
     callbacks = setup_dwnstr_task_validation_callbacks(cfg)
     trainer = setup_trainer(cfg, callbacks=callbacks)
     if model_class == FineTuneProteinModel or model_class == FineTuneMegaMolBART:
@@ -250,99 +241,62 @@ def test_model_size(prepend_config_path, config_name, model_class, model_paramet
 
     else:
         model = model_class(cfg.model, trainer)
-    reset_microbatch_calculator()
-    torch.cuda.empty_cache()
+    teardown_apex_megatron_cuda()
     assert model.num_weights == model_parameters
 
 
 @pytest.mark.slow
 @pytest.mark.needs_gpu
 @pytest.mark.parametrize(
-    'prepend_config_path, config_name, model_class, correct_results',
-    list(zip(PREPEND_CONFIG_DIR, CONFIG_NAME, MODEL_CLASS, CORRECT_RESULTS)),
+    'config_name, script_path',
+    list(zip(CONFIG_NAME, TRAINING_SCRIPT_PATH)),
 )
-def test_model_training(prepend_config_path, config_name, model_class, correct_results):
-    '''Run short model training and ensure key metrics are identical'''
-    seed_everything(0, workers=True)
-    cfg = get_cfg(prepend_config_path, config_name)
-    clean_directory(cfg.exp_manager.exp_dir)
-    callbacks = setup_dwnstr_task_validation_callbacks(cfg)
-    reset_microbatch_calculator()
-    trainer = setup_trainer(cfg, callbacks=callbacks)
+def test_model_training(
+    config_name: str, script_path: str, tmp_path: Path, expected_training_logs_path: str, config_path_for_tests
+):
+    """
+    Run short model training and ensure key metrics are identical
+    """
+    cmd = (
+        f'python {script_path}  --config-path {config_path_for_tests} --config-name {config_name} '
+        f'++exp_manager.exp_dir={tmp_path} '
+        f'++create_trainer_metric_callback=True ++trainer_metric_callback_kwargs.log_path={tmp_path}'
+    )
+    print(cmd)
+    process_handle = subprocess.run(cmd, shell=True, capture_output=True)
+    teardown_apex_megatron_cuda()
+    # check if training was successful
+    error_out = process_handle.stderr.decode('utf-8')
+    assert process_handle.returncode == 0, f"Command failed:\n{cmd}\n Error log:\n{error_out}"
 
-    if model_class == AlphaFold:
-        register_scheduler(name='AlphaFoldLRScheduler', scheduler=AlphaFoldLRScheduler, scheduler_params=None)
-
-    if model_class == MegaMolBARTRetroModel:
-        pretrain_model_path = cfg.get('restore_from_path', None)
-        check_model_exists(pretrain_model_path)
-        model = model_class.restore_from(
-            restore_path=pretrain_model_path,
-            trainer=trainer,
-            save_restore_connector=BioNeMoSaveRestoreConnector(),
-            override_config_path=cfg,
-        )
-    elif model_class == DiffdockScoreModel or model_class == DiffdockConfidenceModel:
-        torch.use_deterministic_algorithms(True, warn_only=True)
-        torch.backends.cudnn.benchmark = False
-        torch.backends.cuda.matmul.allow_tf32 = False
-        torch.backends.cuda.allow_tf32 = False
-        torch.backends.cudnn.enabled = False
-        DiffdockDataManager.reset_instances()
-        data_manager = DiffdockDataManager(cfg)
-        model = model_class(cfg=cfg, trainer=trainer, data_manager=data_manager)
-    elif model_class == EquiDock:
-        data_manager = DataManager(cfg)
-        cfg.model.input_edge_feats_dim = data_manager.train_ds[0][0].edata['he'].shape[1]
-        trainer = setup_trainer(cfg, callbacks=callbacks)
-        model = EquiDock(cfg=cfg, trainer=trainer, data_manager=data_manager)
-    else:
-        if model_class == FineTuneProteinModel or model_class == FineTuneMegaMolBART:
-            model = model_class(cfg, trainer)
-        else:
-            model = model_class(cfg.model, trainer)
-    trainer.fit(model)
-    reset_microbatch_calculator()
-    torch.cuda.empty_cache()
-
-    results_comparison_dir = os.path.abspath(os.path.join(THIS_FILE_DIR, 'expected_results'))
-    trainer_results = trainer.logged_metrics
+    # Comparing training results with expected training results.
+    # SaveTrainerFinalMetricCallback saves training metrics to "{log_path}/trainer_logs.json" at the end of training
+    trainer_logs_name = "trainer_logs.json"
+    expected_logs_name = config_name + "-log.json"
+    trainer_results = load_expected_training_results(str(tmp_path), trainer_logs_name)
     if os.environ.get('UPDATE_EXPECTED_RESULTS', False):
-        # update only the keys that are in the current results
-        msg = f'Updating expected results in {results_comparison_dir}/{correct_results}'
-        logger.warning(msg)
-        save_expected_training_results(
-            results_comparison_dir, correct_results, {k: trainer_results[k].item() for k in trainer_results.keys()}
-        )
+        # Updating expected trainer results
+        expected_logs_path = f"{expected_training_logs_path}/{expected_logs_name}"
+        msg = f'Updating expected training results in {expected_logs_path}'
+        shutil.copy(f"{tmp_path}/{trainer_logs_name}", expected_logs_path)
         assert False, msg
 
-    expected_results = load_expected_training_results(results_comparison_dir, correct_results)
-    tolerance_overrides = {
-        "grad_norm": 1.0,  # grad norm flucuates quite a bit in these small training runs
-        "step_timing": 10.0,  # Different hardware can be pretty different
-        "val_percent_invalid": 1.0,  # This varies a ton early in training, can be anywhere in 0-1.
-        "3state_accuracy": 10.0,  # This accuracy is measured in percent
-        "resolved_accuracy": 5.0,  # This accuracy is measured in percent
-        "8state_accuracy": 5.0,  # This accuracy is measured in percent
-        "val_loss": 1.0,
-        "reduced_train_loss": 1.0,
-    }
-    if model_class == DNABERTModel:
-        # DNABERT Takes longer to reach consistency with convergence, thus we have increased the tolerance.
-        check_expected_training_results(
-            trainer_results,
-            expected_results,
-            tol=1,
-            test_tolerance_overrides=tolerance_overrides,
-            err_msg="\nIn order to update please use the folllowing command:\n UPDATE_EXPECTED_RESULTS=1 pytest examples/tests/test_model_pretrain_and_downstream.py",
-        )
+    expected_results = load_expected_training_results(expected_training_logs_path, expected_logs_name)
 
-    else:
-        check_expected_training_results(
-            trainer_results,
-            expected_results,
-            err_msg="\nIn order to update please use the folllowing command:\n UPDATE_EXPECTED_RESULTS=1 pytest examples/tests/test_model_pretrain_and_downstream.py",
-            tol=1e-1,
-            test_tolerance_overrides=tolerance_overrides,
-        )
-    assert True
+    tolerance_overrides = {
+        "grad_norm": 0.5,  # grad norm flucuates quite a bit in these small training runs
+        "val_percent_invalid": 1.0,  # This varies a ton early in training, can be anywhere in 0-1.
+        # "3state_accuracy": 0.10,  # This accuracy is measured in percent
+        # "resolved_accuracy": 0.05,  # This accuracy is measured in percent
+        # "8state_accuracy": 0.05.0,  # This accuracy is measured in percent
+        # "val_loss": 1.0,
+        # "reduced_train_loss": 1.0,
+    }
+
+    check_expected_training_results(
+        trainer_results,
+        expected_results,
+        rel_tol=0.2,
+        err_msg="\nIn order to update please use the folllowing command:\n UPDATE_EXPECTED_RESULTS=1 pytest examples/tests/test_model_pretrain_and_downstream.py",
+        test_rel_tol_overrides=tolerance_overrides,
+    )

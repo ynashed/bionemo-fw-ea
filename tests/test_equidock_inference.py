@@ -9,8 +9,8 @@
 # its affiliates is strictly prohibited.
 
 import os
-import pathlib
 import tempfile
+from typing import Tuple
 from zipfile import ZipFile
 
 import numpy as np
@@ -18,7 +18,7 @@ import pytest
 import scipy.spatial as spa
 import torch
 from biopandas.pdb import PandasPdb
-from hydra import compose, initialize
+from omegaconf import DictConfig
 
 from bionemo.data.equidock.protein_utils import (
     get_coords,
@@ -28,17 +28,9 @@ from bionemo.model.protein.equidock.loss_metrics.eval import (
     Meter_Unbound_Bound,
 )
 from bionemo.model.protein.equidock.utils.train_utils import batchify_and_create_hetero_graphs_inference
-from bionemo.utils.tests import (
-    BioNemoSearchPathConfig,
-    check_model_exists,
-    register_searchpath_config_plugin,
-    update_relative_config_dir,
-)
+from bionemo.utils.hydra import load_model_config
+from bionemo.utils.tests import check_model_exists, teardown_apex_megatron_cuda
 
-
-DATA_NAMES = ["dips", "db5"]
-THIS_FILE_DIR = os.path.dirname(os.path.realpath(__file__))
-PREPEND_CONFIG_DIR = os.path.join(THIS_FILE_DIR, '../examples/protein/equidock/conf')
 
 torch.use_deterministic_algorithms(False)
 torch.backends.cudnn.deterministic = True
@@ -54,48 +46,53 @@ def extract_to_dir(zipfile, dir):
         zipper.extractall(dir)
 
 
-def get_cfg(prepend_config_path, config_name, config_path='conf'):
-    prepend_config_path = pathlib.Path(prepend_config_path)
-
-    class TestSearchPathConfig(BioNemoSearchPathConfig):
-        def __init__(self) -> None:
-            super().__init__()
-            self.prepend_config_dir = update_relative_config_dir(prepend_config_path, THIS_FILE_DIR)
-
-    register_searchpath_config_plugin(TestSearchPathConfig)
-    with initialize(config_path=config_path):
-        cfg = compose(config_name=config_name)
-
-    return cfg
+@pytest.fixture(scope="module")
+def config_path(bionemo_home) -> str:
+    path = bionemo_home / "examples" / "protein" / "equidock" / "conf"
+    return str(path)
 
 
-@pytest.mark.parametrize("data_name", DATA_NAMES)
-def test_model_exists(data_name):
-    cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='infer')
-    cfg.data.data_name = data_name
-    check_model_exists(cfg.model.restore_from_path)
+@pytest.fixture(scope="module")
+def equidock_data_path(bionemo_home) -> str:
+    path = bionemo_home / "tests" / "equidock_test_data"
+    return str(path)
 
 
-@pytest.mark.needs_gpu
-@pytest.mark.parametrize("data_name", DATA_NAMES)
-def test_rmsds(data_name):
-    method_name = 'equidock'
-
-    cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='infer')
+@pytest.fixture(scope="module", params=["dips", "db5"])
+def equidock_infer_cfg(request, config_path) -> Tuple[DictConfig, str]:
+    data_name = request.param
+    cfg = load_model_config(config_name="infer", config_path=config_path)
     cfg.data.data_name = data_name
     # Set number of devices to 1 to be compatible with testing infra
     cfg.trainer.devices = 1
     cfg.exp_manager.exp_dir = None
+    return cfg, data_name
 
+
+@pytest.fixture(scope="function")
+def equidock_infer_model(equidock_infer_cfg):
+    cfg, _ = equidock_infer_cfg
     model = EquiDockInference(cfg=cfg)
     model.eval()
+    yield model
+    teardown_apex_megatron_cuda()
 
+
+def test_model_exists(equidock_infer_cfg):
+    cfg, _ = equidock_infer_cfg
+    check_model_exists(cfg.model.restore_from_path)
+
+
+@pytest.mark.needs_gpu
+def test_rmsds(equidock_infer_model, equidock_infer_cfg, equidock_data_path):
+    method_name = 'equidock'
+    cfg, data_name = equidock_infer_cfg
     # test data
     data_dir = os.path.join(
-        THIS_FILE_DIR, 'equidock_test_data/test_sets_pdb/', f'{data_name}_test_random_transformed/random_transformed'
+        equidock_data_path, "test_sets_pdb", f'{data_name}_test_random_transformed/random_transformed'
     )
     ground_truth_data_dir = os.path.join(
-        THIS_FILE_DIR, 'equidock_test_data/test_sets_pdb/', f'{data_name}_test_random_transformed/complexes'
+        equidock_data_path, "test_sets_pdb", f'{data_name}_test_random_transformed/complexes'
     )
 
     with tempfile.TemporaryDirectory() as temp_dir, tempfile.TemporaryDirectory() as ground_truth_temp_dir, tempfile.TemporaryDirectory() as random_transformed_temp_dir:
@@ -136,19 +133,21 @@ def test_rmsds(data_name):
                 receptor_graph,
                 bound_ligand_repres_nodes_loc_clean_array,
                 _,
-            ) = model.model.create_ligand_receptor_graphs_arrays(ligand_filename, receptor_filename, cfg.data)
+            ) = equidock_infer_model.model.create_ligand_receptor_graphs_arrays(
+                ligand_filename, receptor_filename, cfg.data
+            )
 
             # Create a batch of a single DGL graph
             batch_hetero_graph = batchify_and_create_hetero_graphs_inference(ligand_graph, receptor_graph)
 
-            batch_hetero_graph = batch_hetero_graph.to(model.device)
+            batch_hetero_graph = batch_hetero_graph.to(equidock_infer_model.device)
             (
                 model_ligand_coors_deform_list,
                 model_keypts_ligand_list,
                 model_keypts_receptor_list,
                 all_rotation_list,
                 all_translation_list,
-            ) = model(batch_hetero_graph)
+            ) = equidock_infer_model(batch_hetero_graph)
 
             rotation = all_rotation_list[0].detach().cpu().numpy()
             translation = all_translation_list[0].detach().cpu().numpy()
@@ -232,7 +231,7 @@ def test_rmsds(data_name):
             all_crmsd.append(crmsd)
             all_irmsd.append(irmsd)
 
-        expected_rmsd = np.load(os.path.join(THIS_FILE_DIR, f'equidock_test_data/expected_{data_name}_equidock.npz'))
+        expected_rmsd = np.load(os.path.join(equidock_data_path, f'expected_{data_name}_equidock.npz'))
         all_crmsd = np.array(all_crmsd)
         all_irmsd = np.array(all_irmsd)
 

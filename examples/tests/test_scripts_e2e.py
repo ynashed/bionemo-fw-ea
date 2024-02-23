@@ -16,10 +16,10 @@ from glob import glob
 import pytest
 import torch
 
-from bionemo.utils.tests import reset_microbatch_calculator
+from bionemo.utils.tests import teardown_apex_megatron_cuda
 
 
-BIONEMO_HOME = os.getenv('BIONEMO_HOME')
+BIONEMO_HOME = os.environ["BIONEMO_HOME"]
 TEST_DATA_DIR = os.path.join(BIONEMO_HOME, "examples/tests/test_data")
 
 
@@ -139,7 +139,6 @@ def get_data_overrides(script_or_cfg_path: str) -> str:
             f"++model.data.dataset_path={DNABERT_TEST_DATA_DIR} "
             "++model.data.dataset.train=chr1-trim-train.fna "
             "++model.data.dataset.val=chr1-trim-val.fna "
-            "++do_training=True "
             "++model.data.dataset.test=chr1-trim-test.fna "
         )
         return dnabert_overrides
@@ -195,8 +194,7 @@ def test_train_scripts(script_path, train_args, data_args, tmp_path):
     print(cmd)
     process_handle = subprocess.run(cmd, shell=True, capture_output=True)
     error_out = process_handle.stderr.decode('utf-8')
-    reset_microbatch_calculator()
-    torch.cuda.empty_cache()
+    teardown_apex_megatron_cuda()
     assert process_handle.returncode == 0, f"Command failed:\n{cmd}\n Error log:\n{error_out}"
 
     if "esm" in script_path and train_args['trainer.devices'] > 1:
@@ -249,6 +247,5 @@ def test_infer_script(config_path, tmp_path):
     cmd += get_data_overrides(config_path)
     process_handle = subprocess.run(cmd, shell=True, capture_output=True)
     error_out = process_handle.stderr.decode('utf-8')
-    reset_microbatch_calculator()
-    torch.cuda.empty_cache()
+    teardown_apex_megatron_cuda()
     assert process_handle.returncode == 0, f"Command failed:\n{cmd}\n Error log:\n{error_out}"

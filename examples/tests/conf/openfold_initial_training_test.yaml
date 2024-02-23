@@ -2,11 +2,16 @@ defaults:
   - openfold_initial_training
   - _self_
 
+hydra:
+  searchpath:
+     - ${oc.env:BIONEMO_HOME}/examples/protein/openfold/conf
+
 model:
-  num_train_iters: 100
+  num_train_iters: 30 # originally 100
   data:
     dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/openfold_data # only if downloaded
     filter_by_alignments: true
+    realign_when_required: false # set to true to use kalignu package which improves performance of training
   train_ds:
     defer_setup: true
   validation_ds:
@@ -16,7 +21,7 @@ model:
 trainer:
   num_nodes: 1
   devices: 1
-  val_check_interval: 20
+  val_check_interval: 30
 
 exp_manager:
   exp_dir: ${oc.env:BIONEMO_HOME}/test_results/nemo_experiments/openfold/

@@ -27,6 +27,7 @@ import torch
 from bionemo.model.protein.openfold.checkpoint_utils import load_pt_checkpoint
 from bionemo.model.protein.openfold.openfold_model import AlphaFold
 from bionemo.model.protein.openfold.optim_hub import OptimHub
+from bionemo.utils.tests import check_model_exists
 
 
 BIONEMO_HOME = os.getenv("BIONEMO_HOME")
@@ -34,10 +35,10 @@ CHECKPOINT_PATH = os.path.join(BIONEMO_HOME, "models/protein/openfold/initial_tr
 
 
 @pytest.fixture(scope="module")
-def base_config():
+def base_config(bionemo_home):
     # base config is enough. It contains architectural details for initial-training without
     # training hyperparameters
-    return omegaconf.OmegaConf.load(os.path.join(BIONEMO_HOME, "examples/protein/openfold/conf/base_config.yaml"))
+    return omegaconf.OmegaConf.load(os.path.join(bionemo_home, "examples/protein/openfold/conf/base_config.yaml"))
 
 
 @pytest.fixture(scope="function")
@@ -45,6 +46,12 @@ def alphafold_model(base_config, request):
     if hasattr(request, 'param'):
         OptimHub.enable_multiple(request.param)
     return AlphaFold(base_config.model, None)
+
+
+@pytest.mark.xfail(reason="FIXME: Missing checkpoint")
+@pytest.mark.needs_checkpoint
+def test_model_exists():
+    check_model_exists(CHECKPOINT_PATH)
 
 
 @pytest.mark.needs_checkpoint

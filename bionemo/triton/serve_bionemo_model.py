@@ -34,7 +34,6 @@ from bionemo.triton.types_constants import (
     StrInferFn,
 )
 from bionemo.triton.utils import (
-    load_model_config,
     load_model_for_inference,
     load_nav_package_for_model,
     load_navigated_model_for_inference,
@@ -42,6 +41,7 @@ from bionemo.triton.utils import (
     register_masked_decode_infer_fn,
     register_str_embedding_infer_fn,
 )
+from bionemo.utils.hydra import load_model_config
 
 
 __all_: Sequence[str] = (
@@ -119,8 +119,7 @@ def main(
     hidden: Optional[str] = None,
     allow_override_name: bool = False,
 ) -> None:
-    cp = Path(config_path)
-    config_file = cp / config_name
+    config_file = Path(config_path) / config_name
     print(f"Loading config from:             {str(config_file)}")
     print(f"Using model navigator runtimes?: {nav}")
     print(f"Starting embedding inference?:   {embedding}")
@@ -140,7 +139,7 @@ def main(
             f"--config-path={config_path} and --config-name={config_name} do not exist at {config_file.absolute()}"
         )
 
-    cfg: DictConfig = load_model_config(cp, config_name, logger=logging)
+    cfg: DictConfig = load_model_config(config_name=config_name, config_path=config_path, logger=logging)
 
     if sum(models_to_enable) > 1:
         print(f"Loading model once and re-using for the {sum(models_to_enable)} .bind() calls.")

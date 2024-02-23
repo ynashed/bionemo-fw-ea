@@ -12,6 +12,8 @@ key_segments:
   config_path: False
   default_overwrites: False
   extra_overwrites: False
+  max_steps: max_steps
+  val_check_interval: val_check
 launchers:
   type:slurm:
     ntasks_per_node: '{gpus}'
@@ -30,6 +32,8 @@ spec:
   config_path: "examples/tests/conf/"
   kalignu: None
   warmup: 0
+  max_steps: 30
+  val_check_interval: 30
   default_overwrites: "++exp_manager.create_wandb_logger=False ++exp_manager.create_tensorboard_logger=False ++exp_manager.exp_dir=/tmp/nemo_experiments/ ++exp_manager.create_checkpoint_callback=False ++exp_manager.resume_if_exists=False"
   extra_overwrites: ""
   script: |-
@@ -46,7 +50,7 @@ spec:
     fi
     python examples/{domain}/{model}/{variant}.py --config-path {BIONEMO_HOME}/{config_path} --config-name {config_name} \
     trainer.num_nodes={nodes} trainer.devices={gpus} trainer.precision={precision} model.micro_batch_size={batch_size} \
-    model.num_train_iters=30 trainer.val_check_interval=30 ++trainer.limit_val_batches=1 \
+    model.num_train_iters={max_steps} trainer.val_check_interval={val_check_interval} ++trainer.limit_val_batches=1 \
     ++model.data.realign_when_required={kalignu} \
     {default_overwrites} {extra_overwrites} \
     hydra.searchpath=[file://{BIONEMO_HOME}/examples/{domain}/{model}/conf] \

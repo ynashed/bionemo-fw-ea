@@ -179,7 +179,6 @@ model:
           data_fields:
             sequence: 3
             sequence_id: 1
-        index_mapping_dir: ${model.data.index_mapping_dir}
       index_mapping_dir: ${model.data.index_mapping_dir}
       max_seq_length: ${model.seq_length}
       seed: ${model.seed}
@@ -200,7 +199,6 @@ model:
           data_fields:
             sequence: 3
             sequence_id: 1
-        index_mapping_dir: ${model.data.index_mapping_dir}
       index_mapping_dir: ${model.data.index_mapping_dir}
       max_seq_length: ${model.seq_length}
       seed: ${model.seed}

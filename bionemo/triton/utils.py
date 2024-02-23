@@ -9,7 +9,6 @@
 # its affiliates is strictly prohibited.
 
 from contextlib import ExitStack
-from logging import Logger
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Callable, Generic, List, Optional, Sequence, Tuple, Union
@@ -17,14 +16,11 @@ from typing import Callable, Generic, List, Optional, Sequence, Tuple, Union
 import model_navigator
 import numpy as np
 import torch
-from hydra import compose, initialize_config_dir
-from hydra.core.config_search_path import ConfigSearchPath
-from hydra.plugins.search_path_plugin import SearchPathPlugin
 from model_navigator.package.package import Package
 from model_navigator.runtime_analyzer.strategy import RuntimeSearchStrategy
 from nemo.utils import logging
 from nemo.utils.model_utils import import_class_by_path
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig
 from pytriton.model_config import ModelConfig, Tensor
 from pytriton.triton import Triton
 
@@ -39,7 +35,6 @@ from bionemo.triton.types_constants import (
     SeqsOrBatch,
     StrInferFn,
 )
-from bionemo.utils.tests import register_searchpath_config_plugin
 
 
 __all__: Sequence[str] = (
@@ -47,7 +42,6 @@ __all__: Sequence[str] = (
     "register_str_embedding_infer_fn",
     "register_masked_decode_infer_fn",
     # loading a model's configuration object
-    "load_model_config",
     # loading a base encode-decode model for inference, w/ or w/o model navigator support
     "load_model_for_inference",
     "load_nav_package_for_model",
@@ -153,26 +147,6 @@ def register_masked_decode_infer_fn(
         ],
         config=ModelConfig(max_batch_size=max_batch_size),
     )
-
-
-def load_model_config(
-    config_path: Union[Path, str], config_name: str, *, logger: Optional[Logger] = None
-) -> DictConfig:
-    class C(SearchPathPlugin):
-        def __init__(self) -> None:
-            super().__init__()
-
-        def manipulate_search_path(self, search_path: ConfigSearchPath) -> None:
-            search_path.prepend(provider="bionemo-searchpath-plugin", path="file:///workspace/bionemo/examples/conf")
-
-    register_searchpath_config_plugin(C)
-
-    with initialize_config_dir(version_base=None, config_dir=str(config_path)):
-        cfg = compose(config_name=config_name.replace('.yaml', ''))
-    if logger is not None:
-        logger.info("\n\n************** Experiment configuration ***********")
-        logger.info(f'\n{OmegaConf.to_yaml(cfg)}')
-    return cfg
 
 
 def load_model_for_inference(cfg: DictConfig, *, interactive: bool = False) -> M:

@@ -214,7 +214,7 @@ pytest:
     - bash ./examples/protein/openfold/scripts/download_data_sample.sh -data_path $BIONEMO_HOME/examples/tests/test_data/ -pbss
     - ls examples/tests/test_data/uniref202104_esm2_qc_test200_val200
     - rm -rf ./.pytest_cache/
-    #pytest -m "not internal" -v --durations=0 --cov=bionemo --cov-report term --cov-report xml:coverage.xml -k "not test_model_training"
+    #- pytest -m "not internal" -v --durations=0 --cov=bionemo --cov-report term --cov-report xml:coverage.xml -k "not test_model_training and not test_scripts_e2e"
     - bash internal/run_pytest.sh
     - df -Thl
   coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
@@ -223,6 +223,7 @@ pytest:
       coverage_report:
         coverage_format: cobertura
         path: coverage.xml
+
 
 pytest-e2e:
   image:

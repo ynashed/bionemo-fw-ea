@@ -4,7 +4,7 @@ defaults:
 
 hydra:
   searchpath:
-     - file://${oc.env:BIONEMO_HOME}/examples/molecule/megamolbart/conf/
+     - ${oc.env:BIONEMO_HOME}/examples/molecule/megamolbart/conf
 
 #  TODO when retraining this checkpoint, make seq_length: 128 for sampling speed.
 restore_from_path: ${oc.env:BIONEMO_HOME}/models/molecule/megamolbart/megamolbart.nemo # used when starting from a .nemo file
@@ -12,8 +12,8 @@ trainer:
   devices: 1
   num_nodes: 1
   max_epochs: 1 # PTL default. In practice we don't usually train for more than 1 epoch.
-  max_steps: 500 # consumed_samples = global_step * micro_batch_size * data_parallel_size * accumulate_grad_batches
-  val_check_interval: 50
+  max_steps: 100 # consumed_samples = global_step * micro_batch_size * data_parallel_size * accumulate_grad_batches
+  val_check_interval: 1.0
   limit_val_batches: 1
   accumulate_grad_batches: 1
 

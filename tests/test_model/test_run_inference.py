@@ -16,8 +16,9 @@ from typing import List, Tuple
 import pytest
 
 from bionemo.model import run_inference
-from bionemo.triton.utils import load_model_config
-from bionemo.utils.tests import reset_microbatch_calculator
+from bionemo.model.utils import initialize_distributed_parallel_state
+from bionemo.utils.hydra import load_model_config
+from bionemo.utils.tests import teardown_apex_megatron_cuda
 
 
 _TEST_DATA: List[Tuple[str, int]] = [
@@ -31,15 +32,13 @@ _TEST_DATA: List[Tuple[str, int]] = [
 @pytest.mark.needs_gpu
 @pytest.mark.needs_checkpoint
 @pytest.mark.parametrize('config_name, hidden_size', _TEST_DATA)
-def test_model_inference(bionemo_home: Path, config_name: str, hidden_size: int):
+def test_model_inference(bionemo_home: Path, config_name: str, hidden_size: int, config_path_for_tests):
     """Verify that inference with each model produces the correct size for hidden weights."""
 
-    config_path = bionemo_home / "examples" / "tests" / "conf"
-
-    cfg = load_model_config(config_path, config_name)
-
+    cfg = load_model_config(config_name=config_name, config_path=str(config_path_for_tests))
+    initialize_distributed_parallel_state()
     with NamedTemporaryFile() as tempfi:
-        run_inference.main(config_path, config_name, output_override=tempfi.name, overwrite=True)
+        run_inference.main(config_path_for_tests, config_name, output_override=tempfi.name, overwrite=True)
 
         with open(tempfi.name, 'rb') as rb:
             embeddings = pickle.load(rb)
@@ -53,4 +52,4 @@ def test_model_inference(bionemo_home: Path, config_name: str, hidden_size: int)
             assert emb["hiddens"].shape == (len(emb["sequence"]), hidden_size)
         if "embeddings" in dict_keys:
             assert emb["embeddings"].shape == (hidden_size,)
-    reset_microbatch_calculator()
+    teardown_apex_megatron_cuda()

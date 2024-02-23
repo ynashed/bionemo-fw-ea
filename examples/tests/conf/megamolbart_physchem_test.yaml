@@ -1,11 +1,12 @@
 name: mmb_physchem
 defaults:
   - pretrain_small_span_aug
-  - _self_
+
 
 hydra:
   searchpath:
-     - file://${oc.env:BIONEMO_HOME}/examples/molecule/megamolbart/conf/
+     - ${oc.env:BIONEMO_HOME}/examples/molecule/megamolbart/conf/
+
 
 do_training: True # set to false if data preprocessing steps must be completed
 do_testing: True # set to true to run evaluation on test data after training, requires test_dataset section

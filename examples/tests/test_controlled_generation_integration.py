@@ -8,9 +8,10 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
+import os
+from pathlib import Path
 from typing import List, Type
 
-import hydra
 import numpy as np
 import pytest
 from guided_molecule_gen.optimizer import MoleculeGenerationOptimizer
@@ -19,11 +20,29 @@ from guided_molecule_gen.oracles import molmim_qed_with_similarity, qed
 from bionemo.model.core.controlled_generation import ControlledGenerationPerceiverEncoderInferenceWrapper
 from bionemo.model.core.infer import BaseEncoderDecoderInference
 from bionemo.model.molecule.megamolbart import MegaMolBARTInference
+from bionemo.model.utils import initialize_distributed_parallel_state
+from bionemo.utils.hydra import load_model_config
+from bionemo.utils.tests import teardown_apex_megatron_cuda
 
 
 def scoring_function(smis: List[str], reference: str, **kwargs) -> np.ndarray:
     scores = molmim_qed_with_similarity(smis, reference)
     return -1 * scores
+
+
+@pytest.fixture(scope='session')
+def bionemo_home() -> Path:
+    try:
+        x = os.environ['BIONEMO_HOME']
+    except KeyError:
+        raise ValueError("Need to set BIONEMO_HOME in order to run unit tests! See docs for instructions.")
+    else:
+        yield Path(x).absolute()
+
+
+@pytest.fixture(scope="session")
+def config_path_for_tests(bionemo_home) -> str:
+    yield str(bionemo_home / "examples" / "tests" / "conf")
 
 
 # Inside of examples/tests/conf
@@ -48,11 +67,13 @@ example_smis = [
 @pytest.mark.needs_gpu
 @pytest.mark.parametrize("model_infer_config_path,model_cls", list(zip(INFERENCE_CONFIGS, MODEL_CLASSES)))
 def test_property_guided_optimization_of_inference_model(
-    model_infer_config_path: str, model_cls: Type[BaseEncoderDecoderInference], pop_size: int = 2
+    model_infer_config_path: str,
+    model_cls: Type[BaseEncoderDecoderInference],
+    config_path_for_tests: str,
+    pop_size: int = 2,
 ):
-    # config_path relative to this script, so examples/test
-    with hydra.initialize(config_path="conf"):
-        cfg = hydra.compose(config_name=model_infer_config_path)
+    cfg = load_model_config(config_name=model_infer_config_path, config_path=config_path_for_tests)
+    initialize_distributed_parallel_state()
     inf_model = model_cls(cfg=cfg)
     controlled_gen_kwargs = {
         "additional_decode_kwargs": {"override_generate_num_tokens": 128},  # speed up sampling for this test
@@ -81,6 +102,7 @@ def test_property_guided_optimization_of_inference_model(
     )
     starting_qeds = qed(example_smis)
     optimizer.step()  # one step of optimization
+    teardown_apex_megatron_cuda()
     opt_generated_smiles = optimizer.generated_smis
     assert len(opt_generated_smiles) == len(example_smis)
     assert all(len(pops) == pop_size for pops in opt_generated_smiles)

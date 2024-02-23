@@ -10,30 +10,24 @@
 
 import logging
 import os
-import pathlib
-from pathlib import Path
 from typing import Tuple
 
 import pytest
 import pytorch_lightning as pl
 import pytorch_lightning as plt
 import torch
-from hydra import compose, initialize
-from hydra.core.global_hydra import GlobalHydra
 from omegaconf import DictConfig
-from omegaconf.omegaconf import OmegaConf, open_dict
+from omegaconf.omegaconf import open_dict
 
 from bionemo.data.molecule import MoleculeEnumeration
 from bionemo.model.molecule.megamolbart.megamolbart_model import MegaMolBARTModel
 from bionemo.model.utils import setup_trainer
+from bionemo.utils.hydra import load_model_config
 from bionemo.utils.tests import (
-    BioNemoSearchPathConfig,
     list_to_tensor,
     load_expected_training_results,
-    register_searchpath_config_plugin,
-    reset_microbatch_calculator,
     save_expected_training_results,
-    update_relative_config_dir,
+    teardown_apex_megatron_cuda,
 )
 
 
@@ -55,7 +49,7 @@ UPDATE_EXPECTED_RESULTS = os.environ.get('UPDATE_EXPECTED_RESULTS', False)
 COMPARE_EXPECTED_RESULTS = os.environ.get('COMPARE_EXPECTED_RESULTS', False)
 
 
-def _adjust_config_for_test(cfg: OmegaConf) -> OmegaConf:
+def _adjust_config_for_test(cfg: DictConfig) -> DictConfig:
     with open_dict(cfg):
         cfg.exp_manager.resume_if_exists = False
         cfg.model.micro_batch_size = len(_SMIS)
@@ -70,32 +64,8 @@ def _adjust_config_for_test(cfg: OmegaConf) -> OmegaConf:
 
 
 @pytest.fixture(scope='module')
-def model_cfg() -> DictConfig:
-    # TODO(dorotat): Figure out how to import this method from with correctly setup paths, especially this_file_dir
-    config_path = "examples/tests/conf"
-    config_name = "megamolbart_test"
-    prepend_config_dir = os.path.join(os.getenv("BIONEMO_HOME"), "examples/molecule/megamolbart/conf")
-    this_file_dir = pathlib.Path(pathlib.Path(os.path.abspath(__file__)).parent)
-    absolute_config_path = os.path.join(os.getenv("BIONEMO_HOME"), config_path)
-    relative_config_path = os.path.relpath(absolute_config_path, this_file_dir)
-
-    # TODO(dorotat): figure out more elegant way which can be be externalise to add search path to hydra
-    class TestSearchPathConfig(BioNemoSearchPathConfig):
-        def __init__(self) -> None:
-            super().__init__()
-            self.prepend_config_dir = update_relative_config_dir(Path(prepend_config_dir), this_file_dir)
-
-    register_searchpath_config_plugin(TestSearchPathConfig)
-    with initialize(config_path=relative_config_path):
-        cfg = compose(config_name=config_name)
-    yield cfg
-    GlobalHydra.instance().clear()
-
-
-@pytest.fixture(scope='module')
 def megamolbart_model_trainer(model_cfg: DictConfig) -> Tuple[MegaMolBARTModel, plt.Trainer]:
     # TODO to remove the first reset in the future - test imp should ensire teardown after model is used
-    reset_microbatch_calculator()
     pl.seed_everything(model_cfg.seed)
     model_cfg = _adjust_config_for_test(model_cfg)
     trainer = setup_trainer(model_cfg)
@@ -103,7 +73,14 @@ def megamolbart_model_trainer(model_cfg: DictConfig) -> Tuple[MegaMolBARTModel, 
     model.freeze()
     model.eval()
     yield model, trainer
-    reset_microbatch_calculator()
+    teardown_apex_megatron_cuda()
+
+
+@pytest.fixture(scope="module")
+def model_cfg(config_path_for_tests) -> DictConfig:
+    cfg = load_model_config(config_name="megamolbart_test", config_path=config_path_for_tests)
+    cfg = _adjust_config_for_test(cfg)
+    return cfg
 
 
 @pytest.mark.needs_gpu
@@ -122,7 +99,6 @@ def test_megamolbart_greedy_beam_search(megamolbart_model_trainer, model_cfg):
     is very likely to not pass
     """
     model, trainer = megamolbart_model_trainer
-
     collate_fn = MoleculeEnumeration(
         tokenizer=model.tokenizer, seq_length=model._cfg.seq_length, pad_size_divisible_by_8=True, **model._cfg.data
     ).collate_fn

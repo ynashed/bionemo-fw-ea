@@ -5,12 +5,8 @@ hydra:
   searchpath:
      - ${oc.env:BIONEMO_HOME}/examples/molecule/diffdock/conf
 
-tmp_path: ???
-
 ref_fasta_file: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/preprocessing_test/ref/pdb_sequences.fasta
 ref_esm_embeddings_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/preprocessing_test/ref/esm2_embeddings.sqlite3
 
 training_data:
   protein_data_dir:  ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/preprocessing_test/posebusters_benchmark_subset
-  output_fasta_file: ${tmp_path}/pdb_sequences.fasta
-  esm_embeddings_path: ${tmp_path}/esm2_embeddings.sqlite3

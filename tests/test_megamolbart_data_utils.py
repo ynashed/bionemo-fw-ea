@@ -1,12 +1,8 @@
-import os
-import pathlib
-from typing import List
+from typing import Dict, List
 
 import pytest
 import pytorch_lightning as pl
 import torch
-from hydra import compose, initialize
-from hydra.core.global_hydra import GlobalHydra
 from nemo.collections.common.tokenizers.regex_tokenizer import RegExTokenizer
 from nemo.core import Dataset
 from omegaconf import DictConfig
@@ -17,74 +13,82 @@ from bionemo.data.molecule.megamolbart_utils import (
     megamolbart_retro_build_train_valid_test_datasets,
 )
 from bionemo.model.utils import initialize_distributed_parallel_state
-from bionemo.utils.tests import (
-    BioNemoSearchPathConfig,
-    register_searchpath_config_plugin,
-    reset_microbatch_calculator,
-    update_relative_config_dir,
-)
+from bionemo.utils.hydra import load_model_config
+from bionemo.utils.tests import teardown_apex_megatron_cuda
 
 
-BIONEMO_HOME = os.getenv("BIONEMO_HOME")
-TOKENIZER_MODEL = os.path.join(BIONEMO_HOME, 'tokenizers/molecule/megamolbart/vocab/megamolbart.model')
-TOKENIZER_VOCAB = os.path.join(BIONEMO_HOME, 'tokenizers/molecule/megamolbart/vocab/megamolbart.vocab')
-SEQ_LEN = 512
-SEED = 42
-
-TOKENIZER = RegExTokenizer().load_tokenizer(regex_file=TOKENIZER_MODEL, vocab_file=TOKENIZER_VOCAB)
-NUM_SAMPLES = {'train': 5, 'val': 5, 'test': 5}
+@pytest.fixture(scope="module")
+def num_samples() -> Dict[str, int]:
+    return {'train': 5, 'val': 5, 'test': 5}
 
 
-@pytest.fixture(scope='module')
-def training_cfg(request) -> DictConfig:
-    config_path = "examples/tests/conf"
-    config_name = request.param
-    prepend_config_dir = os.path.join(os.getenv("BIONEMO_HOME"), "examples/molecule/megamolbart/conf")
-    this_file_dir = pathlib.Path(pathlib.Path(os.path.abspath(__file__)).parent)
-    absolute_config_path = os.path.join(os.getenv("BIONEMO_HOME"), config_path)
-    relative_config_path = os.path.relpath(absolute_config_path, this_file_dir)
+@pytest.fixture(scope="module")
+def tokenizer(bionemo_home) -> RegExTokenizer:
+    tokenizer_path = bionemo_home / "tokenizers" / "molecule" / "megamolbart" / "vocab"
+    model = str(tokenizer_path / 'megamolbart.model')
+    vocab = str(tokenizer_path / 'megamolbart.vocab')
+    tokenizer = RegExTokenizer().load_tokenizer(regex_file=model, vocab_file=vocab)
+    return tokenizer
 
-    class TestSearchPathConfig(BioNemoSearchPathConfig):
-        def __init__(self) -> None:
-            super().__init__()
-            self.prepend_config_dir = update_relative_config_dir(pathlib.Path(prepend_config_dir), this_file_dir)
 
-    register_searchpath_config_plugin(TestSearchPathConfig)
-    with initialize(config_path=relative_config_path):
-        cfg = compose(config_name=config_name)
-    yield cfg
-    GlobalHydra.instance().clear()
+@pytest.fixture(scope="module")
+def training_cfg(config_path_for_tests) -> DictConfig:
+    cfg = load_model_config(config_name="megamolbart_test", config_path=config_path_for_tests)
+    return cfg
+
+
+@pytest.fixture(scope="module")
+def training_retro_cfg(config_path_for_tests) -> DictConfig:
+    cfg = load_model_config(config_name='megamolbart_downstream_retro_test', config_path=config_path_for_tests)
+    return cfg
 
 
 @pytest.fixture(scope='module')
-def megamolbart_datasets(training_cfg) -> List[Dataset]:
+def megamolbart_datasets(training_cfg, num_samples) -> List[Dataset]:
     initialize_distributed_parallel_state()
     train_ds, val_ds, test_ds = megamolbart_build_train_valid_test_datasets(
-        cfg=training_cfg.model.data, train_valid_test_num_samples=NUM_SAMPLES
+        cfg=training_cfg.model.data, train_valid_test_num_samples=num_samples
     )
     yield train_ds, val_ds, test_ds
-    reset_microbatch_calculator()
+    teardown_apex_megatron_cuda()
 
 
 @pytest.fixture(scope='module')
-def megamolbart_retro_datasets(training_cfg) -> List[Dataset]:
+def megamolbart_retro_datasets(training_retro_cfg, num_samples) -> List[Dataset]:
     initialize_distributed_parallel_state()
     train_ds, val_ds, test_ds = megamolbart_retro_build_train_valid_test_datasets(
-        cfg=training_cfg.model.data, train_valid_test_num_samples=NUM_SAMPLES
+        cfg=training_retro_cfg.model.data, train_valid_test_num_samples=num_samples
     )
     yield train_ds, val_ds, test_ds
-    reset_microbatch_calculator()
+    teardown_apex_megatron_cuda()
+
+
+@pytest.fixture(scope="module")
+def batch() -> List[str]:
+    batch = ['CO[C@H](C[C@@H]1CCC[C@H]1O)c1ccccc1', 'COC[C@H](O)CCNC(=O)CCC[C@@H](C)N', 'CC[C@](C)(Nc1cnnn1C)C1CC1']
+    return batch
+
+
+@pytest.fixture(scope="module")
+def batch_retro() -> List[Dict[str, str]]:
+    batch = [
+        {'products': 'CCc1cc(N)c(N)cc1Cl', 'reactants': 'CCc1cc([N+](=O)[O-])c(N)cc1Cl'},
+        {
+            'products': 'CC(C)(C)c1ccc(CN(CCc2ccc(Cl)c(C(F)(F)F)c2)C(=O)c2cc(Cl)cc3cc[nH]c23)cc1',
+            'reactants': 'CC(C)(C)c1ccc(CNCCc2ccc(Cl)c(C(F)(F)F)c2)cc1.O=C(O)c1cc(Cl)cc2cc[nH]c12',
+        },
+    ]
+    return batch
 
 
 @pytest.mark.needs_gpu
-@pytest.mark.parametrize("training_cfg", ["megamolbart_test"], indirect=True)
-def test_megamolbart_build_train_valid_test_datasets(megamolbart_datasets):
+def test_megamolbart_build_train_valid_test_datasets(megamolbart_datasets, num_samples):
     train_ds, val_ds, test_ds = megamolbart_datasets
 
     assert (
-        len(train_ds) == NUM_SAMPLES['train']
-        and len(val_ds) == NUM_SAMPLES['val']
-        and len(test_ds) == NUM_SAMPLES['test']
+        len(train_ds) == num_samples['train']
+        and len(val_ds) == num_samples['val']
+        and len(test_ds) == num_samples['test']
     )
 
     assert train_ds[2] == 'Cc1ccccc1CCON'
@@ -92,18 +96,18 @@ def test_megamolbart_build_train_valid_test_datasets(megamolbart_datasets):
     assert test_ds[4] == 'O[C@H]1COCCN(CCn2cccn2)C1'
 
 
-@pytest.mark.needs_gpu
-@pytest.mark.parametrize("training_cfg", ["megamolbart_downstream_retro_test"], indirect=True)
-def test_megamolbart_retro_build_train_valid_test_datasets(training_cfg, megamolbart_retro_datasets):
+def test_megamolbart_retro_build_train_valid_test_datasets(
+    training_retro_cfg, megamolbart_retro_datasets, num_samples
+):
     train_ds, val_ds, test_ds = megamolbart_retro_datasets
     assert (
-        len(train_ds) == NUM_SAMPLES['train']
-        and len(val_ds) == NUM_SAMPLES['val']
-        and len(test_ds) == NUM_SAMPLES['test']
+        len(train_ds) == num_samples['train']
+        and len(val_ds) == num_samples['val']
+        and len(test_ds) == num_samples['test']
     )
 
-    input_name = training_cfg.model.data.input_name
-    target_name = training_cfg.model.data.target_name
+    input_name = training_retro_cfg.model.data.input_name
+    target_name = training_retro_cfg.model.data.target_name
     assert input_name in train_ds[0].keys() and target_name in train_ds[0].keys()
 
     assert train_ds[3] == {
@@ -117,11 +121,12 @@ def test_megamolbart_retro_build_train_valid_test_datasets(training_cfg, megamol
     }
 
 
-def test_molecule_enumeration_collate_fn():
-    pl.seed_everything(SEED)
+def test_molecule_enumeration_collate_fn_no_mask(tokenizer, training_cfg, batch):
+    pl.seed_everything(training_cfg.seed)
+    seq_len = training_cfg.model.data.max_seq_length
     collate_fn = MoleculeEnumeration(
-        tokenizer=TOKENIZER,
-        seq_length=SEQ_LEN,
+        tokenizer=tokenizer,
+        seq_length=seq_len,
         pad_size_divisible_by_8=True,
         encoder_mask=False,
         decoder_mask=False,
@@ -130,16 +135,14 @@ def test_molecule_enumeration_collate_fn():
         canonicalize_input=False,
     ).collate_fn
 
-    batch = ['CO[C@H](C[C@@H]1CCC[C@H]1O)c1ccccc1', 'COC[C@H](O)CCNC(=O)CCC[C@@H](C)N', 'CC[C@](C)(Nc1cnnn1C)C1CC1']
-
     output = collate_fn(batch)
     expected_keys = ['text_enc', 'enc_mask', 'text_dec', 'dec_mask', 'labels', 'loss_mask', 'target_smiles']
     assert all(k in expected_keys for k in output.keys())
     assert len(output['target_smiles']) == output['text_enc'].shape[0] and output['text_enc'].shape[0] == len(batch)
     assert output['text_enc'].shape[1] % 8 == 0
 
-    assert not (TOKENIZER.mask_id in output['text_enc'] and TOKENIZER.mask_id in output['text_dec'])
-    assert all(output['text_dec'][i][0] == TOKENIZER.bos_id for i in range(len(batch)))
+    assert not (tokenizer.mask_id in output['text_enc'] and tokenizer.mask_id in output['text_dec'])
+    assert all(output['text_dec'][i][0] == tokenizer.bos_id for i in range(len(batch)))
     assert all(target_smi == smi for target_smi, smi in zip(output['target_smiles'], batch))
 
     for i in range(len(batch)):
@@ -150,12 +153,17 @@ def test_molecule_enumeration_collate_fn():
         mask_enc = output['enc_mask'][i]
         enc_ids = output['text_enc'][i][mask_enc == 1].cpu().detach().numpy().tolist()
 
-        assert TOKENIZER.ids_to_text([dec_ids])[0] == batch[i] and TOKENIZER.ids_to_text([enc_ids])[0] == batch[i]
+        assert tokenizer.ids_to_text([dec_ids])[0] == batch[i] and tokenizer.ids_to_text([enc_ids])[0] == batch[i]
+
+
+def test_molecule_enumeration_collate_fn_mask(tokenizer, training_cfg, batch):
+    pl.seed_everything(training_cfg.seed)
+    seq_len = training_cfg.model.data.max_seq_length
 
     # double-checking masking
     collate_fn = MoleculeEnumeration(
-        tokenizer=TOKENIZER,
-        seq_length=SEQ_LEN,
+        tokenizer=tokenizer,
+        seq_length=seq_len,
         pad_size_divisible_by_8=True,
         encoder_mask=True,
         decoder_mask=True,
@@ -166,7 +174,7 @@ def test_molecule_enumeration_collate_fn():
         span_lambda=3.0,
     ).collate_fn
     output = collate_fn(batch)
-    assert (TOKENIZER.mask_id in output['text_enc']) and (TOKENIZER.mask_id in output['text_dec'])
+    assert (tokenizer.mask_id in output['text_enc']) and (tokenizer.mask_id in output['text_dec'])
 
     assert torch.equal(
         output['text_enc'],
@@ -391,14 +399,15 @@ def test_molecule_enumeration_collate_fn():
     ]
 
 
-def test_molecule_input_target_enumeration_collate_fn():
-    pl.seed_everything(SEED)
+def test_molecule_input_target_enumeration_collate_fn(tokenizer, training_retro_cfg, batch_retro):
+    pl.seed_everything(training_retro_cfg.seed)
+    seq_len = training_retro_cfg.model.data.max_seq_length
+    input_name = training_retro_cfg.model.data.input_name
+    target_name = training_retro_cfg.model.data.target_name
 
-    input_name = 'products'
-    target_name = 'reactants'
     collate_fn = MoleculeInputTargetEnumeration(
-        tokenizer=TOKENIZER,
-        seq_length=SEQ_LEN,
+        tokenizer=tokenizer,
+        seq_length=seq_len,
         pad_size_divisible_by_8=True,
         encoder_mask=False,
         decoder_mask=False,
@@ -408,27 +417,20 @@ def test_molecule_input_target_enumeration_collate_fn():
         input_name=input_name,
         target_name=target_name,
     ).collate_fn
-
-    batch = [
-        {'products': 'CCc1cc(N)c(N)cc1Cl', 'reactants': 'CCc1cc([N+](=O)[O-])c(N)cc1Cl'},
-        {
-            'products': 'CC(C)(C)c1ccc(CN(CCc2ccc(Cl)c(C(F)(F)F)c2)C(=O)c2cc(Cl)cc3cc[nH]c23)cc1',
-            'reactants': 'CC(C)(C)c1ccc(CNCCc2ccc(Cl)c(C(F)(F)F)c2)cc1.O=C(O)c1cc(Cl)cc2cc[nH]c12',
-        },
-    ]
-
-    output = collate_fn(batch)
+    output = collate_fn(batch_retro)
     expected_keys = ['text_enc', 'enc_mask', 'text_dec', 'dec_mask', 'labels', 'loss_mask', 'target_smiles']
     assert all(k in expected_keys for k in output.keys())
-    assert len(output['target_smiles']) == output['text_enc'].shape[0] and output['text_enc'].shape[0] == len(batch)
+    assert len(output['target_smiles']) == output['text_enc'].shape[0] and output['text_enc'].shape[0] == len(
+        batch_retro
+    )
     assert output['text_enc'].shape[1] % 8 == 0
 
-    assert (TOKENIZER.mask_id not in output['text_enc']) and (TOKENIZER.mask_id not in output['text_dec'])
-    assert all(output['text_dec'][i][0] == TOKENIZER.bos_id for i in range(len(batch)))
+    assert (tokenizer.mask_id not in output['text_enc']) and (tokenizer.mask_id not in output['text_dec'])
+    assert all(output['text_dec'][i][0] == tokenizer.bos_id for i in range(len(batch_retro)))
 
-    assert all(target_smi == smi['reactants'] for target_smi, smi in zip(output['target_smiles'], batch))
+    assert all(target_smi == smi['reactants'] for target_smi, smi in zip(output['target_smiles'], batch_retro))
 
-    for i in range(len(batch)):
+    for i in range(len(batch_retro)):
         mask_dec = output['dec_mask'][i].clone()
         mask_dec[0] = 0
         dec_ids = output['text_dec'][i][mask_dec == 1].cpu().detach().numpy().tolist()
@@ -437,8 +439,8 @@ def test_molecule_input_target_enumeration_collate_fn():
         enc_ids = output['text_enc'][i][mask_enc == 1].cpu().detach().numpy().tolist()
 
         assert (
-            TOKENIZER.ids_to_text([dec_ids])[0] == batch[i]['reactants']
-            and TOKENIZER.ids_to_text([enc_ids])[0] == batch[i]['products']
+            tokenizer.ids_to_text([dec_ids])[0] == batch_retro[i]['reactants']
+            and tokenizer.ids_to_text([enc_ids])[0] == batch_retro[i]['products']
         )
 
     assert torch.equal(
@@ -1382,16 +1384,16 @@ def test_molecule_input_target_enumeration_collate_fn():
     ]
 
 
-@pytest.mark.parametrize("training_cfg", ["megamolbart_downstream_retro_test"], indirect=True)
-def test_megamolbart_retro_collate_fn_masking_config(training_cfg):
-    pl.seed_everything(SEED)
+def test_megamolbart_retro_collate_fn_masking_config(tokenizer, training_retro_cfg, batch_retro):
+    pl.seed_everything(training_retro_cfg.seed)
+    seq_len = training_retro_cfg.model.data.max_seq_length
     collate_fn = MoleculeInputTargetEnumeration(
-        tokenizer=TOKENIZER,
-        seq_length=training_cfg.model.data.max_seq_length,
+        tokenizer=tokenizer,
+        seq_length=seq_len,
         pad_size_divisible_by_8=True,
-        **training_cfg.model.data,
+        **training_retro_cfg.model.data,
     ).collate_fn
-    batch = [{'products': 'CCc1cc(N)c(N)cc1Cl', 'reactants': 'CCc1cc([N+](=O)[O-])c(N)cc1Cl'}]
+    batch = [batch_retro[0]]
 
     output = collate_fn(batch)
-    assert (TOKENIZER.mask_id not in output['text_enc']) and (TOKENIZER.mask_id not in output['text_dec'])
+    assert (tokenizer.mask_id not in output['text_enc']) and (tokenizer.mask_id not in output['text_dec'])

@@ -1,6 +1,7 @@
 name: dnabert_base_config
 restore_from_path: null
 do_training: true
+do_prediction: false
 trainer:
   devices: 1
   num_nodes: 1

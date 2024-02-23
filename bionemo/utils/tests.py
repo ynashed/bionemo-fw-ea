@@ -23,6 +23,7 @@ import yaml
 from hydra.core.config_search_path import ConfigSearchPath
 from hydra.core.plugins import Plugins
 from hydra.plugins.search_path_plugin import SearchPathPlugin
+from megatron.core.parallel_state import destroy_model_parallel
 from nemo.utils import logging
 from omegaconf import OmegaConf, open_dict
 from omegaconf.dictconfig import DictConfig
@@ -130,8 +131,8 @@ def save_expected_training_results(results_comparison_dir: str, correct_results:
 def check_expected_training_results(
     trainer_results: dict,
     expected_results: dict,
-    tol: float = 1.0e-4,
-    test_tolerance_overrides: Dict[str, float] = {},
+    rel_tol: float = 0,
+    test_rel_tol_overrides: Dict[str, float] = {},
     err_msg: str = "",
 ):
     """Compare expected training results
@@ -139,19 +140,24 @@ def check_expected_training_results(
     Args:
         trainer (dict): PyTorch Lightning Trainer results
         expected_results (dict): expected training metrics
-        tol (float, optional): float comparison tolerance. Defaults to 1.0e-4.
-        test_tolerance_overrides (Dict[str, float]): Tolerance for override keys that match `override_key in key`.
+        rel_tol float: comparison relative tolerance, defaults to 0 which means that results are expected to be identical
+        test_rel_tol_overrides (Dict[str, float]): Tolerance for override keys that match `override_key in key`.
     """
     mismatched_results = []
+    assert 0 <= rel_tol <= 1, "Relative tolerance has to be in [0, 1]"
     for key in expected_results:
+        if "timing" in key:
+            # stats with this postfix are very hardware dependent, skipping them
+            continue
         expected_value = expected_results[key]
-        actual_value = trainer_results[key].cpu().numpy().item()
-        test_tol = tol
-        # See if the user wants to set any key specific tolerance overrides
-        for override_key, override_tol in test_tolerance_overrides.items():
+        actual_value = trainer_results[key]
+        if isinstance(actual_value, torch.Tensor):
+            actual_value = actual_value.cpu().numpy().item()
+        tol_key = rel_tol * expected_value
+        for override_key, override_tol in test_rel_tol_overrides.items():
             if override_key in key:
-                test_tol = override_tol
-        if not np.allclose(expected_value, actual_value, atol=test_tol):
+                tol_key = override_tol * expected_value
+        if not np.allclose(expected_value, actual_value, atol=tol_key):
             mismatched_results.append(f"Expected {key} = {expected_value}, got {actual_value}.")
 
     assert len(mismatched_results) == 0, f"Training results mismatched: {mismatched_results}{err_msg}"
@@ -198,7 +204,18 @@ def list_to_tensor(data_list: List[Union[float, int]]) -> torch.Tensor:
 
 def reset_microbatch_calculator():
     """
-    `Resets _GLOBAL_NUM_MICROBATCHES_CALCULATOR in apex which is used in NeMo to initilised model parallel in
+    Resets _GLOBAL_NUM_MICROBATCHES_CALCULATOR in apex which is used in NeMo to initilised model parallel in
     nemo.collections.nlp.modules.common.megatron.megatron_init.initialize_model_parallel_for_nemo
     """
     apex.transformer.pipeline_parallel.utils._GLOBAL_NUM_MICROBATCHES_CALCULATOR = None
+
+
+def teardown_apex_megatron_cuda():
+    """
+    Cleans GPU allocation and model and data parallel settings after usage of a model:
+    - sets the global variables related to model and data parallelism to None in Apex and Megatron:.
+    - releases all unoccupied cached GPU memory currently held by the caching CUDA allocator, see torch.cuda.empty_cache
+    """
+    torch.cuda.empty_cache()
+    reset_microbatch_calculator()
+    destroy_model_parallel()

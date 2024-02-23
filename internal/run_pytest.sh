@@ -10,7 +10,7 @@ status=0
 for testfile in "${test_files[@]}"; do
   rm -rf ./.pytest_cache/
   set -x
-  echo "Running test ${counter} / ${n_test_files}"
+  echo "Running test ${counter} / ${n_test_files} : ${testfile}"
   pytest -m "not internal" -vv --cov-append --cov=bionemo -k "not test_model_training and not test_scripts_e2e" ${testfile}
   test_status=$?
   # Exit code 5 means no tests were collected: https://docs.pytest.org/en/stable/reference/exit-codes.html

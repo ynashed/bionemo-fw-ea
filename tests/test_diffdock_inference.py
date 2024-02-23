@@ -9,25 +9,19 @@
 # its affiliates is strictly prohibited.
 
 import os
-import pathlib
 
 import e3nn
 import numpy as np
 import pytest
 import torch
-from hydra import compose, initialize
-from omegaconf import open_dict
+from omegaconf import DictConfig
 from pytorch_lightning import seed_everything
 from rdkit import Chem
 
 from bionemo.data.diffdock.inference import build_inference_datasets
 from bionemo.model.molecule.diffdock.infer import DiffDockModelInference, do_inference_sampling
-from bionemo.utils.tests import (
-    BioNemoSearchPathConfig,
-    check_model_exists,
-    register_searchpath_config_plugin,
-    update_relative_config_dir,
-)
+from bionemo.utils.hydra import load_model_config
+from bionemo.utils.tests import check_model_exists, teardown_apex_megatron_cuda
 
 
 e3nn.set_optimization_defaults(optimize_einsums=False)
@@ -37,14 +31,20 @@ torch.backends.cuda.matmul.allow_tf32 = False
 torch.backends.cuda.allow_tf32 = False
 torch.backends.cudnn.enabled = False
 
-BIONEMO_HOME = os.getenv("BIONEMO_HOME")
-THIS_FILE_DIR = os.path.dirname(os.path.realpath(__file__))
-PREPEND_CONFIG_DIR = os.path.join(THIS_FILE_DIR, './conf')
-ROOT_DIR = 'diffdock'
+
+BIONEMO_HOME = os.environ["BIONEMO_HOME"]
 CHECKPOINT_PATH = [
     os.path.join(BIONEMO_HOME, "models/molecule/diffdock/diffdock_score.nemo"),
     os.path.join(BIONEMO_HOME, "models/molecule/diffdock/diffdock_confidence.nemo"),
 ]
+
+
+@pytest.fixture(scope="function")
+def cfg(config_path_for_tests, tmp_path) -> DictConfig:
+    cfg = load_model_config(config_name="diffdock_infer_test", config_path=config_path_for_tests)
+    cfg.out_dir = tmp_path
+    yield cfg
+    teardown_apex_megatron_cuda()
 
 
 @pytest.mark.needs_checkpoint
@@ -52,32 +52,17 @@ def test_model_exists():
     check_model_exists(CHECKPOINT_PATH[0]) and check_model_exists(CHECKPOINT_PATH[1])
 
 
-def get_cfg(tmp_path, prepend_config_path, config_name, config_path='conf'):
-    prepend_config_path = pathlib.Path(prepend_config_path)
-
-    class TestSearchPathConfig(BioNemoSearchPathConfig):
-        def __init__(self) -> None:
-            super().__init__()
-            self.prepend_config_dir = update_relative_config_dir(prepend_config_path, THIS_FILE_DIR)
-
-    register_searchpath_config_plugin(TestSearchPathConfig)
-    with initialize(config_path=config_path):
-        cfg = compose(config_name=config_name)
-
-    with open_dict(cfg):
-        cfg.tmp_path = tmp_path
-
-    return cfg
-
-
 @pytest.mark.slow
 @pytest.mark.needs_gpu
 @pytest.mark.needs_checkpoint
 @pytest.mark.skip_if_no_file(CHECKPOINT_PATH[0])
 @pytest.mark.skip_if_no_file(CHECKPOINT_PATH[1])
-def test_diffdock_inference(tmp_path):
-    cfg = get_cfg(tmp_path, PREPEND_CONFIG_DIR, "diffdock_infer_test")
-    seed_everything(42, workers=True)
+def test_diffdock_inference(cfg):
+    """
+    WARNING: this unit tests is sensitive to the order of the operations. If the models are initiated before
+    build_inference_datasets is executed, the test fails
+    """
+    seed_everything(cfg.seed, workers=True)
 
     # process input and build inference datasets for score model, and confidence model, build dataloader
     complex_name_list, test_dataset, confidence_test_dataset, test_loader = build_inference_datasets(cfg)

@@ -9,16 +9,15 @@
 # its affiliates is strictly prohibited.
 
 import os
-import pathlib
 import pickle
 from functools import partial
+from pathlib import Path
 
 import e3nn
+import numpy as np
 import pytest
 import torch
 from Bio import SeqIO
-from hydra import compose, initialize
-from omegaconf import open_dict
 from pytorch_lightning import seed_everything
 
 from bionemo.data.diffdock.confidence_dataset import diffdock_confidence_dataset
@@ -29,11 +28,8 @@ from bionemo.data.diffdock.embedding_store import EmbeddingStore
 from bionemo.data.diffdock.heterograph_store import HeterographStore
 from bionemo.model.molecule.diffdock.infer import DiffDockModelInference
 from bionemo.model.molecule.diffdock.utils.diffusion import t_to_sigma as t_to_sigma_compl
-from bionemo.utils.tests import (
-    BioNemoSearchPathConfig,
-    register_searchpath_config_plugin,
-    update_relative_config_dir,
-)
+from bionemo.utils.hydra import load_model_config
+from bionemo.utils.tests import teardown_apex_megatron_cuda
 
 
 e3nn.set_optimization_defaults(optimize_einsums=False)
@@ -44,33 +40,26 @@ torch.backends.cuda.allow_tf32 = False
 torch.backends.cudnn.enabled = False
 
 
-THIS_FILE_DIR = os.path.dirname(os.path.realpath(__file__))
-PREPEND_CONFIG_DIR = os.path.join(THIS_FILE_DIR, './conf')
-ROOT_DIR = 'diffdock'
+@pytest.fixture(scope='session')
+def bionemo_home() -> Path:
+    try:
+        x = os.environ['BIONEMO_HOME']
+    except KeyError:
+        raise ValueError("Need to set BIONEMO_HOME in order to run unit tests! See docs for instructions.")
+    else:
+        yield Path(x).absolute()
 
 
-def get_cfg(tmp_path, prepend_config_path, config_name, config_path='conf'):
-    prepend_config_path = pathlib.Path(prepend_config_path)
-
-    class TestSearchPathConfig(BioNemoSearchPathConfig):
-        def __init__(self) -> None:
-            super().__init__()
-            self.prepend_config_dir = update_relative_config_dir(prepend_config_path, THIS_FILE_DIR)
-
-    register_searchpath_config_plugin(TestSearchPathConfig)
-    with initialize(config_path=config_path):
-        cfg = compose(config_name=config_name)
-
-    with open_dict(cfg):
-        cfg.tmp_path = tmp_path
-
-    return cfg
+@pytest.fixture(scope="session")
+def config_path_for_tests(bionemo_home) -> str:
+    yield str(bionemo_home / "examples" / "tests" / "conf")
 
 
 @pytest.mark.needs_gpu
-@pytest.mark.parametrize('config_name', ['diffdock_embedding_test'])
-def test_diffdock_embedding_preprocessing(tmp_path, config_name):
-    cfg = get_cfg(tmp_path, PREPEND_CONFIG_DIR, config_name)
+def test_diffdock_embedding_preprocessing(tmp_path, config_path_for_tests):
+    cfg = load_model_config(config_name="diffdock_embedding_test", config_path=config_path_for_tests)
+    cfg.training_data.output_fasta_file = str(tmp_path / "pdb_sequences.fasta")
+    cfg.training_data.esm_embeddings_path = str(tmp_path / "esm2_embeddings.sqlite3")
 
     prep_embedding(cfg.training_data)
     fasta = {rec.id: str(rec.seq) for rec in SeqIO.parse(cfg.training_data.output_fasta_file, 'fasta')}
@@ -89,10 +78,9 @@ def test_diffdock_embedding_preprocessing(tmp_path, config_name):
 
 
 @pytest.mark.slow
-@pytest.mark.parametrize('config_name', ['diffdock_score_preprocessing_test'])
-def test_diffdock_prepare_score_dataset(tmp_path, config_name):
-    cfg = get_cfg(tmp_path, PREPEND_CONFIG_DIR, config_name)
-
+def test_diffdock_prepare_score_dataset(config_path_for_tests, tmp_path):
+    cfg = load_model_config(config_name="diffdock_score_preprocessing_test", config_path=config_path_for_tests)
+    cfg.model.train_ds.cache_path = str(tmp_path / "data_cache")
     t_to_sigma = partial(t_to_sigma_compl, cfg=cfg.model)
 
     dataset = diffdock_build_dataset(cfg.model.train_ds, t_to_sigma, _num_conformers=True, mode="train")
@@ -133,9 +121,9 @@ def test_diffdock_prepare_score_dataset(tmp_path, config_name):
 @pytest.mark.slow
 @pytest.mark.needs_gpu
 @pytest.mark.needs_checkpoint
-@pytest.mark.parametrize('config_name', ['diffdock_confidence_preprocessing_test'])
-def test_diffdock_prepare_confidence_dataset(tmp_path, config_name):
-    cfg = get_cfg(tmp_path, PREPEND_CONFIG_DIR, config_name)
+def test_diffdock_prepare_confidence_dataset(tmp_path, config_path_for_tests):
+    cfg = load_model_config(config_name="diffdock_confidence_preprocessing_test", config_path=config_path_for_tests)
+    cfg.model.train_ds.cache_path = str(tmp_path / "data_cache")
     seed_everything(cfg.seed)
 
     dataset = diffdock_confidence_dataset(cfg.model.train_ds, mode="train")
@@ -178,6 +166,7 @@ def test_diffdock_prepare_confidence_dataset(tmp_path, config_name):
     score_model = DiffDockModelInference(cfg.score_infer)
     score_model.eval()
     dataset.build_confidence_dataset(score_model)
+    teardown_apex_megatron_cuda()
 
     assert os.path.isfile(
         os.path.join(cfg.model.train_ds.cache_path, cfg.ligand_pose_folder_name, 'confidence_cache_id_base.sqlite3')
@@ -192,9 +181,8 @@ def test_diffdock_prepare_confidence_dataset(tmp_path, config_name):
     for idx in range(2):
         sample = ligand_poses[idx]
         ref_sample = ref_ligand_poses[0] if sample[0] == ref_ligand_poses[0][0] else ref_ligand_poses[1]
-
         # ligand positions
-        assert torch.allclose(torch.from_numpy(sample[1]), torch.from_numpy(ref_sample[1]), atol=0.01)
+        assert np.allclose(sample[1], ref_sample[1], atol=0.01)
 
         # RMSD
-        assert torch.allclose(torch.from_numpy(sample[2]), torch.from_numpy(ref_sample[2]), atol=0.01)
+        assert np.allclose(sample[2], ref_sample[2], atol=0.01)

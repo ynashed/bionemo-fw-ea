@@ -10,14 +10,9 @@
 
 import os
 import tempfile
-from typing import Tuple
 
 import pytest
-import pytorch_lightning as plt
 import torch
-from hydra import compose, initialize
-from hydra.core.global_hydra import GlobalHydra
-from omegaconf import DictConfig
 from torch.utils.data import DataLoader
 
 from bionemo.data.protein.openfold.datahub import get_structured_paths
@@ -26,13 +21,11 @@ from bionemo.data.protein.openfold.helpers import collate
 from bionemo.model.protein.openfold.openfold_model import AlphaFold
 from bionemo.model.protein.openfold.writer import PredictionFeatureWriter
 from bionemo.model.utils import setup_trainer
+from bionemo.utils.hydra import load_model_config
+from bionemo.utils.tests import teardown_apex_megatron_cuda
 
 
-MSA_DIR = os.path.join(
-    os.path.dirname(os.path.realpath(__file__)), '../examples/tests/test_data/openfold_data/inference/msas'
-)
-
-
+MSA_DIR = os.path.join(os.environ["BIONEMO_HOME"], 'examples/tests/test_data/openfold_data/inference/msas')
 MSAS = [
     ['7YVT_B_mgnify_alignment.a3m', '7YVT_B_smallbfd_alignment.a3m', '7YVT_B_uniref90_alignment.a3m'],
     ['7ZHL_A_mgnify_alignment.a3m', '7ZHL_A_smallbfd_alignment.a3m', '7ZHL_A_uniref90_alignment.a3m'],
@@ -40,32 +33,16 @@ MSAS = [
 MSAS = [[os.path.join(MSA_DIR, msa) for msa in msas] for msas in MSAS]
 
 
-@pytest.fixture(scope='module')
-def infer_cfg() -> DictConfig:
-    this_file_dir = os.path.dirname(os.path.realpath(__file__))
-    config_path = "examples/protein/openfold/conf"
-    config_name = "infer"
-    absolute_config_path = os.path.join(os.getenv("BIONEMO_HOME"), config_path)
-    relative_config_path = os.path.relpath(absolute_config_path, this_file_dir)
-    with initialize(config_path=relative_config_path):
-        cfg = compose(config_name=config_name)
-    yield cfg
-    GlobalHydra.instance().clear()
+@pytest.fixture(scope="module")
+def config_path(bionemo_home) -> str:
+    path = bionemo_home / "examples" / "protein" / "openfold" / "conf"
+    return str(path)
 
 
-@pytest.fixture(scope='function')
-def alphafold_cfg(request, infer_cfg) -> DictConfig:
-    msa_a3m_filepaths, generate_templates_if_missing = request.param
-    infer_cfg.model.data.msa_a3m_filepaths = msa_a3m_filepaths
-    infer_cfg.model.data.generate_templates_if_missing = generate_templates_if_missing
+@pytest.fixture(scope="module")
+def infer_cfg(config_path) -> str:
+    infer_cfg = load_model_config(config_name="infer", config_path=config_path)
     return infer_cfg
-
-
-@pytest.fixture(scope='function')
-def alphafold_model_trainer(alphafold_cfg) -> Tuple[AlphaFold, plt.Trainer]:
-    trainer = setup_trainer(alphafold_cfg, callbacks=[])
-    alphafold = AlphaFold(cfg=alphafold_cfg.model, trainer=trainer)
-    return alphafold, trainer
 
 
 @pytest.mark.parametrize(
@@ -102,26 +79,26 @@ def test_prediction_pdb_writer(infer_cfg, outputs):
         )
 
 
-def get_predict_dataset(cfg):
-    ds_paths = get_structured_paths(cfg.model.data)
+def get_predict_dataset(infer_cfg):
+    ds_paths = get_structured_paths(infer_cfg.model.data)
     ds = PredictDataset(
-        sequences=cfg.sequences,
-        seq_names=cfg.seq_names,
+        sequences=infer_cfg.sequences,
+        seq_names=infer_cfg.seq_names,
         pdb_mmcif_chains_filepath=ds_paths.mmcif_chains,
         pdb_mmcif_dicts_dirpath=ds_paths.mmcif_dicts,
         pdb_obsolete_filepath=ds_paths.obsolete_filepath,
-        template_hhr_filepaths=cfg.model.data.template_hhr_filepaths,
-        msa_a3m_filepaths=cfg.model.data.msa_a3m_filepaths,
-        generate_templates_if_missing=cfg.model.data.generate_templates_if_missing,
-        pdb70_database_path=cfg.model.data.pdb70_database_path,
-        cfg=cfg.model,
+        template_hhr_filepaths=infer_cfg.model.data.template_hhr_filepaths,
+        msa_a3m_filepaths=infer_cfg.model.data.msa_a3m_filepaths,
+        generate_templates_if_missing=infer_cfg.model.data.generate_templates_if_missing,
+        pdb70_database_path=infer_cfg.model.data.pdb70_database_path,
+        cfg=infer_cfg.model,
     )
     return ds
 
 
 @pytest.mark.needs_gpu
 @pytest.mark.parametrize(
-    "alphafold_cfg",
+    "msa_a3m_filepaths,generate_templates_if_missing",
     [
         (
             [
@@ -133,21 +110,25 @@ def get_predict_dataset(cfg):
         (MSAS, False),  # sequence-and-msa inference without template
         (MSAS, True),  # inference with template but no template dataset given
     ],
-    indirect=True,
 )
-def test_openfold_inference(alphafold_cfg, alphafold_model_trainer):
+def test_openfold_inference(config_path, msa_a3m_filepaths, generate_templates_if_missing):
+    # setup config
+    cfg = load_model_config(config_name="infer", config_path=config_path)
+    cfg.model.data.msa_a3m_filepaths = msa_a3m_filepaths
+    cfg.model.data.generate_templates_if_missing = generate_templates_if_missing
+
     # setup for inference
-    if alphafold_cfg.model.data.generate_templates_if_missing:
+    if generate_templates_if_missing:
         with pytest.raises(ValueError):  # raise error if generate template without template database
-            ds = get_predict_dataset(alphafold_cfg)
+            ds = get_predict_dataset(cfg)
     else:
-        alphafold_model, trainer = alphafold_model_trainer
-        ds = get_predict_dataset(alphafold_cfg)
+        trainer = setup_trainer(cfg, callbacks=[])
+        alphafold = AlphaFold(cfg=cfg.model, trainer=trainer)  # TODO reduce model size in unittest
+        ds = get_predict_dataset(cfg)
         dl = DataLoader(
-            ds,
-            batch_size=alphafold_cfg.model.micro_batch_size,
-            num_workers=alphafold_cfg.model.data.num_workers,
-            collate_fn=collate,
+            ds, batch_size=cfg.model.micro_batch_size, num_workers=cfg.model.data.num_workers, collate_fn=collate
         )
+
         # inference
-        trainer.predict(alphafold_model, dl, return_predictions=False)
+        trainer.predict(alphafold, dl, return_predictions=False)
+        teardown_apex_megatron_cuda()

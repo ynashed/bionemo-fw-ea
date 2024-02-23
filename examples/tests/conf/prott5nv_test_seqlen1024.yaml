@@ -1,6 +1,11 @@
 defaults:
   - base_config
 
+hydra:
+  searchpath:
+     - ${oc.env:BIONEMO_HOME}/examples/protein/prott5nv/conf
+
+
 name: prott5nv_model
 do_training: True # set to false if data preprocessing steps must be completed
 do_testing: False # set to true to run evaluation on test data after training, requires test_dataset section
@@ -11,8 +16,8 @@ trainer:
   num_nodes: 1
   accelerator: gpu
   precision: 16-mixed
-  max_steps: 200 # consumed_samples = global_step * micro_batch_size * data_parallel_size * accumulate_grad_batches
-  val_check_interval: 200
+  max_steps: 100 # consumed_samples = global_step * micro_batch_size * data_parallel_size * accumulate_grad_batches
+  val_check_interval: 1.0
   limit_val_batches: 1
   accumulate_grad_batches: 1
 

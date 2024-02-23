@@ -1,6 +1,11 @@
 defaults:
   - base_config
 
+hydra:
+  searchpath:
+     - ${oc.env:BIONEMO_HOME}/examples/protein/prott5nv/conf
+
+
 name: prott5nv_model
 do_training: True # set to false if data preprocessing steps must be completed
 do_testing: False # set to true to run evaluation on test data after training, requires test_dataset section

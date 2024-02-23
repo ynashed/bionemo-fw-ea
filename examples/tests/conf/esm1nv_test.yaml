@@ -1,6 +1,10 @@
 defaults:
   - base_config
 
+hydra:
+  searchpath:
+     - ${oc.env:BIONEMO_HOME}/examples/protein/esm1nv/conf
+
 trainer:
   devices: 1
   num_nodes: 1

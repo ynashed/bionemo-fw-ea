@@ -10,54 +10,35 @@
 
 import logging
 import os
-import pathlib
-from pathlib import Path
 
 import pytest
-from hydra import compose, initialize
-from hydra.core.global_hydra import GlobalHydra
-from omegaconf import DictConfig
 
 from bionemo.model.protein.prott5nv import ProtT5nvInference
-from bionemo.utils.tests import (
-    BioNemoSearchPathConfig,
-    check_model_exists,
-    register_searchpath_config_plugin,
-    reset_microbatch_calculator,
-    update_relative_config_dir,
-)
+from bionemo.model.utils import initialize_distributed_parallel_state
+from bionemo.utils.hydra import load_model_config
+from bionemo.utils.tests import check_model_exists, teardown_apex_megatron_cuda
 
 
 log = logging.getLogger(__name__)
 
-CHECKPOINT_PATH = os.path.join(os.getenv("BIONEMO_HOME"), "models/protein/prott5nv/prott5nv.nemo")
+CHECKPOINT_PATH = os.path.join(os.environ["BIONEMO_HOME"], "models/protein/prott5nv/prott5nv.nemo")
 
 
-@pytest.fixture(scope='module')
-def infer_cfg() -> DictConfig:
-    config_path = "examples/protein/prott5nv/conf"
-    config_name = "infer"
-    prepend_config_dir = os.path.join(os.getenv("BIONEMO_HOME"), "examples/conf")
-    this_file_dir = pathlib.Path(pathlib.Path(os.path.abspath(__file__)).parent)
-    absolute_config_path = os.path.join(os.getenv("BIONEMO_HOME"), config_path)
-    relative_config_path = os.path.relpath(absolute_config_path, this_file_dir)
-
-    class TestSearchPathConfig(BioNemoSearchPathConfig):
-        def __init__(self) -> None:
-            super().__init__()
-            self.prepend_config_dir = update_relative_config_dir(Path(prepend_config_dir), this_file_dir)
-
-    register_searchpath_config_plugin(TestSearchPathConfig)
-    with initialize(config_path=relative_config_path):
-        cfg = compose(config_name=config_name)
-    yield cfg
-    GlobalHydra.instance().clear()
+@pytest.fixture(scope="module")
+def config_path(bionemo_home) -> str:
+    path = bionemo_home / "examples" / "protein" / "prott5nv" / "conf"
+    return str(path)
 
 
-@pytest.fixture(scope='module')
-def inferer(infer_cfg: DictConfig) -> ProtT5nvInference:
-    yield ProtT5nvInference(infer_cfg)
-    reset_microbatch_calculator()
+@pytest.fixture(scope="module")
+def inference_model(config_path) -> ProtT5nvInference:
+    cfg = load_model_config(config_name="infer", config_path=config_path)
+    initialize_distributed_parallel_state()
+    # load score model
+    model = ProtT5nvInference(cfg)
+    model.eval()
+    yield model
+    teardown_apex_megatron_cuda()
 
 
 @pytest.mark.needs_checkpoint
@@ -68,12 +49,12 @@ def test_model_exists():
 @pytest.mark.needs_gpu
 @pytest.mark.needs_checkpoint
 @pytest.mark.skip_if_no_file(CHECKPOINT_PATH)
-def test_seq_to_embedding(inferer: ProtT5nvInference):
+def test_seq_to_embedding(inference_model: ProtT5nvInference):
     seqs = [
         'MSLKRKNIALIPAAGIGVRFGADKPKQYVEIGSKTVLEHVLGIFERHEAVDLTVVVVSPEDTFADKVQTAFPQVRVWKNGGQTRAETVRNGVAKLLETGLAAETDNILVHDAARCCLPSEALARLIEQAGNAAEGGILAVPVADTLKRAESGQISATVDRSGLWQAQTPQLFQAGLLHRALAAENLGGITDEASAVEKLGVRPLLIQGDARNLKLTQPQDAYIVRLLLDAV',
         'MIQSQINRNIRLDLADAILLSKAKKDLSFAEIADGTGLAEAFVTAALLGQQALPADAARLVGAKLDLDEDSILLLQMIPLRGCIDDRIPTDPTMYRFYEMLQVYGTTLKALVHEKFGDGIISAINFKLDVKKVADPEGGERAVITLDGKYLPTKPF',
     ]
-    embedding = inferer.seq_to_embeddings(seqs)
+    embedding = inference_model.seq_to_embeddings(seqs)
     assert embedding is not None
 
     assert embedding.shape[0] == len(seqs)
@@ -83,16 +64,15 @@ def test_seq_to_embedding(inferer: ProtT5nvInference):
 @pytest.mark.needs_gpu
 @pytest.mark.needs_checkpoint
 @pytest.mark.skip_if_no_file(CHECKPOINT_PATH)
-def test_long_seq_to_embedding(inferer: ProtT5nvInference):
+def test_long_seq_to_embedding(inference_model):
     long_seq = 'MIQSQINRNIRLDLADAILLSKAKKDLSFAEIADGTGLAEAFVTAALLGQQALPADAARLVGAKLDLDEDSILLLQMIPLRGCIDDRIPTDPTMYRFYEMLQVYGTTLKALVHEKFGDGIISAINFKLDVKKVADPEGGERAVITLDGKYLPTKPF'
     long_seq = long_seq * 10
-    reset_microbatch_calculator()
     seqs = [
         'MSLKRKNIALIPAAGIGVRFGADKPKQYVEIGSKTVLEHVLGIFERHEAVDLTVVVVSPEDTFADKVQTAFPQVRVWKNGGQTRAETVRNGVAKLLETGLAAETDNILVHDAARCCLPSEALARLIEQAGNAAEGGILAVPVADTLKRAESGQISATVDRSGLWQAQTPQLFQAGLLHRALAAENLGGITDEASAVEKLGVRPLLIQGDARNLKLTQPQDAYIVRLLLDAV',
         long_seq,
     ]
     try:
-        inferer.seq_to_hiddens(seqs)
+        inference_model.seq_to_hiddens(seqs)
         assert False
     except Exception:
         pass
