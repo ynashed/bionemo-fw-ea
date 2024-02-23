@@ -1,16 +1,13 @@
 # OpenFold Model Overview
 
 ## Description:
-This is an OpenFold implementation under BioNeMo framework with MLPerf acceleration, derived from public OpenFold and DeepMind AlphaFold-2. This checkpoint was fine-tuned on the initial training checkpoint from the public OpenFold team.
+This is an OpenFold implementation under BioNeMo framework, derived from public OpenFold and DeepMind AlphaFold-2. This checkpoint was fine-tuned on the initial training checkpoint from the public OpenFold team.
 
 OpenFold predicts protein structures from protein sequence inputs and optional multiple sequence alignments (MSAs) and template(s). This implementation supports initial training, fine-tuning and inference under BioNeMo framework. Detailed examples can be found under `examples/protein/openfold` within BioNeMo framework repository.
 
 Users are advised to read the licensing terms under [public OpenFold](https://github.com/aqlaboratory/openfold) and [DeepMind AlphaFold-2](https://github.com/google-deepmind/alphafold) repositories as well as our copyright text.
 
 This model is ready for commercial use. <br>
-
-## Third-Party Community Consideration
-This model is not owned or developed by NVIDIA. This model has been developed and built to a third-party’s requirements for this application and use case; see link to Non-NVIDIA Model Card.
 
 ## References:
 To cite OpenFold:
@@ -87,28 +84,27 @@ OpenFold under BioNeMo framework  <br>
 # Training & Evaluation:
 
 ## Training Dataset:
-
 **Link:**  [PDB-mmCIF dataset](https://www.rcsb.org), [OpenProteinSet](https://arxiv.org/abs/2308.05326)  <br>
-** Data Collection Method by dataset <br>
+**Data Collection Method by dataset** <br>
 * PDB-mmCIF dataset: [Automatic] and [Human] <br>
 * OpenProteinSet: [Automatic] <br>
 
-** Labeling Method by dataset <br>
+**Labeling Method by dataset** <br>
 * [Not Applicable] <br>
 
-**Properties (Quantity, Dataset Descriptions, Sensor(s)):** PDB-mmCIF dataset: 200k samples of experimental protein structures. OpenProteinSet: 269k samples on sequence alignments. <br>
+**Properties:** PDB-mmCIF dataset: 200k samples of experimental protein structures. OpenProteinSet: 269k samples on sequence alignments. <br>
 **Dataset License(s):** PDB-mmCIF dataset: [CC0 1.0 Universal](https://www.rcsb.org/pages/usage-policy). OpenProteinSet: [CC BY 4.0](https://registry.opendata.aws/openfold/).
 
 ## Evaluation Dataset:
 **Link:**  [PDB-mmCIF dataset](https://www.rcsb.org), [OpenProteinSet](https://arxiv.org/abs/2308.05326)  <br>
-** Data Collection Method by dataset <br>
+**Data Collection Method by dataset** <br>
 * PDB-mmCIF dataset: [Automatic] and [Human] <br>
 * OpenProteinSet: [Automatic] <br>
 
-** Labeling Method by dataset <br>
+**Labeling Method by dataset** <br>
 * [Not Applicable] <br>
 
-**Properties (Quantity, Dataset Descriptions, Sensor(s)):** PDB-mmCIF dataset: 200k samples of experimental protein structures. OpenProteinSet: 269k samples on sequence alignments. <br>
+**Properties:** PDB-mmCIF dataset: 200k samples of experimental protein structures. OpenProteinSet: 269k samples on sequence alignments. <br>
 **Dataset License(s):** PDB-mmCIF dataset: [CC0 1.0 Universal](https://www.rcsb.org/pages/usage-policy). OpenProteinSet: [CC BY 4.0](https://registry.opendata.aws/openfold/).
 
 ## Inference:
@@ -116,6 +112,12 @@ OpenFold under BioNeMo framework  <br>
 **Test Hardware:** <br>
 * [Ampere] <br>
 * [Hopper] <br>
+
+## Accuracy Benchmarks
+TBD
+
+## Performance Benchmarks
+TBD
 
 ## Ethical Considerations:
 NVIDIA believes Trustworthy AI is a shared responsibility and we have established policies and practices to enable development for a wide array of AI applications.  When downloaded or used in accordance with our terms of service, developers should work with their supporting model team to ensure this model meets requirements for the relevant industry and use case and addresses unforeseen product misuse.  For more detailed information on ethical considerations for this model, please see the Model Card++ Explainability, Bias, Safety & Security, and Privacy Subcards.  Please report security vulnerabilities or NVIDIA AI Concerns [here](https://www.nvidia.com/en-us/support/submit-security-vulnerability/).

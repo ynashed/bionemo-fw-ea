@@ -7,7 +7,6 @@ DNABERT generates a dense representation of a genome sequence by identifying con
 
 
 ## References:
-[Provide list of reference(s), link(s) to the publication/paper/article, associated works, and lineage where relevant.]  <br> 
 First masked language model approach for genomics: Gene2vec: distributed representation of genes based on co-expression | BMC Genomics | Full Text (biomedcentral.com)
 
 DNABERT: DNABERT: pre-trained Bidirectional Encoder Representations from Transformers model for DNA-language in genome | bioRxiv
@@ -56,25 +55,23 @@ dnabert-86M.nemo, version 1.0  <br>
 # Training & Evaluation: 
 
 ## Training Dataset:
-
-
 **Link:** Homo sapiens genome assembly GRCh38.p13 - NCBI - NLM (nih.gov) <br>
 ** Data Collection Method by dataset <br>
 * [Human] <br>
 ** Labeling Method by dataset <br>
 * [Not Applicable] <br>
 
-**Properties (Quantity, Dataset Descriptions, Sensor(s)):** 3.2 Billion nucleotides of the human genome sequence.. <br>
+**Properties:** 3.2 Billion nucleotides of the human genome sequence.. <br>
 
 **Dataset License(s):** N/A, no license for human genome <br>
 
 ## Evaluation Dataset:
 **Link:** Ensembl release 99 http://ftp.ensembl.org/pub/release-99/gff3/homo_sapiens/ <br>
-** Data Collection Method by dataset <br>
+**Data Collection Method by dataset** <br>
 * [Human] <br>
-** Labeling Method by dataset <br>
+**Labeling Method by dataset** <br>
 * [Hybrid: Automated, Human review] <br>
-**Properties (Quantity, Dataset Descriptions, Sensor(s)):**There are ~80,000 unique gene isoforms with a varying amount of exons and thus spice sites. 30,000 splice-sites with full gene annotations are sampled for evaluation. Genes, or gene bodies, are the genomic body in which RNA transcripts are produced. This is a sequence of nucleotides. Within this gene body, there are constructs known as exons- non-contiguous chunks of DNA that are concatenated by cellular machinery into a complete RNA, known as a transcript. A specific arrangement of exons are known as an ‘isoform.’ Splice-sites are nucleotide sites within the gene body that are junctions, where transcription starts and ends for different exons where exons are ‘spliced’ from the gene body into a RNA sequence. <br>
+**Properties:** There are ~80,000 unique gene isoforms with a varying amount of exons and thus spice sites. 30,000 splice-sites with full gene annotations are sampled for evaluation. Genes, or gene bodies, are the genomic body in which RNA transcripts are produced. This is a sequence of nucleotides. Within this gene body, there are constructs known as exons- non-contiguous chunks of DNA that are concatenated by cellular machinery into a complete RNA, known as a transcript. A specific arrangement of exons are known as an ‘isoform.’ Splice-sites are nucleotide sites within the gene body that are junctions, where transcription starts and ends for different exons where exons are ‘spliced’ from the gene body into a RNA sequence. <br>
 **Dataset License(s):** Apache 2.0 <br>
 
 ## Inference:
@@ -83,12 +80,6 @@ dnabert-86M.nemo, version 1.0  <br>
 * [Ampere] <br>
 * [Hopper] <br>
 * [Volta]  <br>
-
-
-*Additional description content may be included here
-
-## Ethical Considerations:
-NVIDIA believes Trustworthy AI is a shared responsibility and we have established policies and practices to enable development for a wide array of AI applications.  When downloaded or used in accordance with our terms of service, developers should work with their supporting model team to ensure this model meets requirements for the relevant industry and use case and addresses unforeseen product misuse.  For more detailed information on ethical considerations for this model, please see the Model Card++ Explainability, Bias, Safety & Security, and Privacy Subcards [Insert Link to Model Card++ here].  Please report security vulnerabilities or NVIDIA AI Concerns [here](https://www.nvidia.com/en-us/support/submit-security-vulnerability/).
 
 ## Accuracy Benchmarks
 
@@ -111,3 +102,8 @@ To evaluate our implementation of DNABERT, we pre-trained the model for 400,000 
 | avg_mcc       | 0.8837  |
 | avg_f1        | 0.9432  |
 
+## Performance Benchmarks
+TBD
+
+## Ethical Considerations:
+NVIDIA believes Trustworthy AI is a shared responsibility and we have established policies and practices to enable development for a wide array of AI applications.  When downloaded or used in accordance with our terms of service, developers should work with their supporting model team to ensure this model meets requirements for the relevant industry and use case and addresses unforeseen product misuse.  For more detailed information on ethical considerations for this model, please see the Model Card++ Explainability, Bias, Safety & Security, and Privacy Subcards [Insert Link to Model Card++ here].  Please report security vulnerabilities or NVIDIA AI Concerns [here](https://www.nvidia.com/en-us/support/submit-security-vulnerability/).
