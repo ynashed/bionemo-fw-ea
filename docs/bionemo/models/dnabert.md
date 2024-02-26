@@ -103,7 +103,11 @@ To evaluate our implementation of DNABERT, we pre-trained the model for 400,000 
 | avg_f1        | 0.9432  |
 
 ## Performance Benchmarks
-TBD
+Training performance benchmarks were performed on systems with 1xA100 80GB and 8xA100 80GB. Performance was compared against the reference pre-training code provided in the DNABERT github repository (https://github.com/jerryji1993/DNABERT).
+
+![DNABERT 1xA100 benchmarks](../../readme-images/dnabert1xa100.png)
+![DNABERT 8xA100 benchmarks](../../readme-images/dnabert8xa100.png)
+
 
 ## Ethical Considerations:
 NVIDIA believes Trustworthy AI is a shared responsibility and we have established policies and practices to enable development for a wide array of AI applications.  When downloaded or used in accordance with our terms of service, developers should work with their supporting model team to ensure this model meets requirements for the relevant industry and use case and addresses unforeseen product misuse.  For more detailed information on ethical considerations for this model, please see the Model Card++ Explainability, Bias, Safety & Security, and Privacy Subcards [Insert Link to Model Card++ here].  Please report security vulnerabilities or NVIDIA AI Concerns [here](https://www.nvidia.com/en-us/support/submit-security-vulnerability/).
