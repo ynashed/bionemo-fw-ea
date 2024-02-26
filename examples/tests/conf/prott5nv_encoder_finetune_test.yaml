@@ -18,7 +18,7 @@ trainer:
   num_nodes: 1 
   max_epochs: 1 # # use max_steps instead with NeMo Megatron model
   max_steps: 10 # consumed_samples = global_step * micro_batch_size * data_parallel_size * accumulate_grad_batches
-  val_check_interval: 1.0
+  val_check_interval: 10
   limit_val_batches: 1 # number of batches in validation step, use fraction for fraction of data
   limit_test_batches: 1 # number of batches in test step, use fraction for fraction of data
   num_sanity_val_steps: 0
