@@ -52,6 +52,7 @@ def test_model_exists():
     check_model_exists(CHECKPOINT_PATH[0]) and check_model_exists(CHECKPOINT_PATH[1])
 
 
+@pytest.mark.needs_fork
 @pytest.mark.slow
 @pytest.mark.needs_gpu
 @pytest.mark.needs_checkpoint

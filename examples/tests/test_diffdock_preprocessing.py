@@ -118,6 +118,7 @@ def test_diffdock_prepare_score_dataset(config_path_for_tests, tmp_path):
                 ), f"{key}.{attr} is wrong"
 
 
+@pytest.mark.needs_fork
 @pytest.mark.slow
 @pytest.mark.needs_gpu
 @pytest.mark.needs_checkpoint

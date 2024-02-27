@@ -1,17 +1,17 @@
 #!/bin/bash
 
-
-test_files=($(find tests/ examples/tests -type f -name "test_*.py" ))
-n_test_files=${#test_files[@]}
+test_tag="needs_fork"
+test_files=$(pytest --collect-only -m "${test_tag}" -q |  grep "test_" | awk -F '::' '{print $1}' | sort | uniq)
+n_test_files=$(echo "$test_files" | wc -l)
 counter=1
-# the overall test status collected from all pytest commands
+# the overall test status collected from all pytest commands with test_tag
 status=0
 
-for testfile in "${test_files[@]}"; do
+for testfile in $test_files; do
   rm -rf ./.pytest_cache/
   set -x
   echo "Running test ${counter} / ${n_test_files} : ${testfile}"
-  pytest -m "not internal" -vv --cov-append --cov=bionemo -k "not test_model_training and not test_scripts_e2e" ${testfile}
+  pytest -m "${test_tag}" -vv --durations=0 --cov-append --cov=bionemo ${testfile}
   test_status=$?
   # Exit code 5 means no tests were collected: https://docs.pytest.org/en/stable/reference/exit-codes.html
   test_status=$(($test_status == 5 ? 0 : $test_status))

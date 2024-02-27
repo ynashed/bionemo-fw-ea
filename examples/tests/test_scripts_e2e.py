@@ -180,6 +180,7 @@ def get_train_args_overrides(script_or_cfg_path, train_args):
     return train_args
 
 
+@pytest.mark.needs_fork
 @pytest.mark.needs_gpu
 @pytest.mark.parametrize('script_path', TRAIN_SCRIPTS)
 def test_train_scripts(script_path, train_args, data_args, tmp_path):
@@ -222,6 +223,7 @@ def get_infer_args_overrides(config_path, tmp_path):
     return {}
 
 
+@pytest.mark.needs_fork
 @pytest.mark.needs_checkpoint
 @pytest.mark.needs_gpu
 @pytest.mark.parametrize('config_path', INFERENCE_CONFIGS)

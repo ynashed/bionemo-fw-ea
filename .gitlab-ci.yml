@@ -214,8 +214,7 @@ pytest:
     - bash ./examples/protein/openfold/scripts/download_data_sample.sh -data_path $BIONEMO_HOME/examples/tests/test_data/ -pbss
     - ls examples/tests/test_data/uniref202104_esm2_qc_test200_val200
     - rm -rf ./.pytest_cache/
-    #- pytest -m "not internal" -v --durations=0 --cov=bionemo --cov-report term --cov-report xml:coverage.xml -k "not test_model_training and not test_scripts_e2e"
-    - bash internal/run_pytest.sh
+    - pytest -m "not internal and not needs_fork" -vv --durations=0 --cov=bionemo --cov-report term --cov-report xml:coverage.xml -k "not test_model_training"
     - df -Thl
   coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
   artifacts:
@@ -225,7 +224,7 @@ pytest:
         path: coverage.xml
 
 
-pytest-e2e:
+pytest-fork:
   image:
     name: "$PIPELINE_TAG-devel"
     entrypoint: [ "" ]
@@ -258,8 +257,8 @@ pytest-e2e:
     - unzip examples/tests/test_data/uniref202104_esm2_qc_test200_val200.zip -d examples/tests/test_data/
     - bash ./examples/molecule/diffdock/scripts/download_data_sample.sh -data_path $BIONEMO_HOME/examples/tests/test_data/molecule/diffdock/ -pbss
     - bash ./examples/protein/openfold/scripts/download_data_sample.sh -data_path $BIONEMO_HOME/examples/tests/test_data/ -pbss
-    - rm -rf ./.pytest_cache/
-    - pytest -v --durations=0 --cov=bionemo --cov-report term --cov-report xml:coverage.xml examples/tests/test_scripts_e2e.py
+    # unit tests which need to be run in a separate process
+    - bash internal/run_pytest_fork.sh
     - df -Thl
 
 

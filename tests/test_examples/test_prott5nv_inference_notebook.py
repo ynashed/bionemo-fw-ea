@@ -47,6 +47,7 @@ def notebook_path(bionemo_home: Path) -> Path:
     return (bionemo_home / "examples" / "protein" / MODEL_NAME / "nbs" / "Inference.ipynb").absolute()
 
 
+@pytest.mark.needs_fork
 @pytest.mark.needs_checkpoint
 @pytest.mark.needs_gpu
 def test_example_notebook(server: Popen, notebook_path: Path):
