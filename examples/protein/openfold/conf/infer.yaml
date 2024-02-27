@@ -6,7 +6,7 @@ defaults:
 # dynamically, but this require additional software (HH-suite)
 
 force: false  # overwrite inference output
-restore_from_path: ${oc.env:BIONEMO_HOME}/models/protein/openfold/openfold.nemo  # user must provide a checkpoint to load
+restore_from_path: ${oc.env:BIONEMO_HOME}/models/protein/openfold/openfold_finetuning_inhouse_checkpoint.nemo  # user must provide a checkpoint to load
 results_path: ${oc.env:BIONEMO_HOME}/test_results/openfold_inference # a directory where all predictions are stored
 # either a list of sequences or a path to a FASTA file
 sequences:

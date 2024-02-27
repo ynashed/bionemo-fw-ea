@@ -208,7 +208,7 @@ pytest:
     - export AWS_ENDPOINT_URL=https://pbss.s8k.io
     - export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
     - export MODEL_PATH=${BIONEMO_HOME}/models
-    - python download_models.py openfold_inh_finetuned esm2nv_3b esm2nv_650m diffdock_confidence diffdock_score equidock_db5 equidock_dips megamolbart prott5nv esm1nv dnabert --source pbss --download_dir $MODEL_PATH --verbose
+    - python download_models.py openfold_initial_training_public openfold_finetuning_4_public openfold_initial_training_inhouse openfold_finetuning_inhouse esm2nv_3b esm2nv_650m diffdock_confidence diffdock_score equidock_db5 equidock_dips megamolbart prott5nv esm1nv dnabert --source pbss --download_dir $MODEL_PATH --verbose
     - unzip examples/tests/test_data/uniref202104_esm2_qc_test200_val200.zip -d examples/tests/test_data/
     - bash ./examples/molecule/diffdock/scripts/download_data_sample.sh -data_path $BIONEMO_HOME/examples/tests/test_data/molecule/diffdock/ -pbss
     - bash ./examples/protein/openfold/scripts/download_data_sample.sh -data_path $BIONEMO_HOME/examples/tests/test_data/ -pbss
@@ -253,7 +253,7 @@ pytest-fork:
     - export AWS_ENDPOINT_URL=https://pbss.s8k.io
     - export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
     - export MODEL_PATH=${BIONEMO_HOME}/models
-    - python download_models.py openfold_inh_finetuned esm2nv_3b esm2nv_650m diffdock_confidence diffdock_score equidock_db5 equidock_dips megamolbart prott5nv esm1nv dnabert --source pbss --download_dir $MODEL_PATH --verbose
+    - python download_models.py openfold_finetuning_inhouse esm2nv_3b esm2nv_650m diffdock_confidence diffdock_score equidock_db5 equidock_dips megamolbart prott5nv esm1nv dnabert --source pbss --download_dir $MODEL_PATH --verbose
     - unzip examples/tests/test_data/uniref202104_esm2_qc_test200_val200.zip -d examples/tests/test_data/
     - bash ./examples/molecule/diffdock/scripts/download_data_sample.sh -data_path $BIONEMO_HOME/examples/tests/test_data/molecule/diffdock/ -pbss
     - bash ./examples/protein/openfold/scripts/download_data_sample.sh -data_path $BIONEMO_HOME/examples/tests/test_data/ -pbss

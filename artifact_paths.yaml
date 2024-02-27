@@ -69,13 +69,30 @@ models:
         symlink:
             source: "../../esm2nv_3B_converted.nemo"
             target: "protein/esm2nv/esm2nv_3B_converted.nemo"
-    openfold_inh_finetuned:
-        #TODO: update path when model is released
-        ngc: "nvidian/cvai_bnmo_trng/openfold:finetuning_pub_0.1.1"
-        pbss: "s3://bionemo-ci/models/openfold.nemo"
+    openfold_initial_training_public: # DO NOT RELEASE
+        ngc: "nvidian/cvai_bnmo_trng/openfold:openfold_initial_training_public_checkpoint"
+        pbss: "s3://bionemo-ci/models/openfold_initial_training_public_checkpoint.nemo"
         symlink:
-            source: "../../openfold.nemo"
-            target: "protein/openfold/openfold.nemo"
+            source: "../../openfold_initial_training_public_checkpoint.nemo"
+            target: "protein/openfold/openfold_initial_training_public_checkpoint.nemo"
+    openfold_finetuning_4_public: # DO NOT RELEASE
+        ngc: "nvidian/cvai_bnmo_trng/openfold:openfold_finetuning_4_public_checkpoint"
+        pbss: "s3://bionemo-ci/models/openfold_finetuning_4_public_checkpoint.nemo"
+        symlink:
+            source: "../../openfold_finetuning_4_public_checkpoint.nemo"
+            target: "protein/openfold/openfold_finetuning_4_public_checkpoint.nemo"
+    openfold_initial_training_inhouse: # DO NOT RELEASE
+        ngc: "nvidian/cvai_bnmo_trng/openfold:openfold_initial_training_inhouse_checkpoint"
+        pbss: "s3://bionemo-ci/models/openfold_initial_training_inhouse_checkpoint.nemo"
+        symlink:
+            source: "../../openfold_initial_training_inhouse_checkpoint.nemo"
+            target: "protein/openfold/openfold_initial_training_inhouse_checkpoint.nemo"
+    openfold_finetuning_inhouse:
+        ngc: "nvidian/cvai_bnmo_trng/openfold:openfold_finetuning_inhouse_checkpoint"
+        pbss: "s3://bionemo-ci/models/openfold_finetuning_inhouse_checkpoint.nemo"
+        symlink:
+            source: "../../openfold_finetuning_inhouse_checkpoint.nemo"
+            target: "protein/openfold/openfold_finetuning_inhouse_checkpoint.nemo"
     esm2_650m_huggingface:
         pbss: "s3://bionemo-ci/models/esm2-650M-huggingface"
         relative_download_dir: "protein/esm2nv/esm2-650M-huggingface"
