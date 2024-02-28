@@ -75,6 +75,20 @@ Training speed was tested on DGX-A100 and DGX-H100 systems, on GPUs with 80GB of
 
 ![ESM2 benchmarks](../../readme-images/esm2_days_to_train.png)
 
+
+Model TFLOPS were collected for trainings of different model sizes of ESM-2nv on DGX-A100 and DGX-H100.  
+Two comparisions were made: 1) single-node training using 1 node (8 GPUs), and 2) multi-node training using 8 nodes (64 GPUs).
+While the implementation of EMS2 in BioNeMo FW makes use of dynamic padding, we keep fixed sequence length of 1024. 
+All models were trained using tensor model parallel of 1 and accumulated gradient of 32, but batch sizes and pipeline model parallel depend on model size:
+* ESM-2nv 650M: 650M parameter model, batch size of 16, pipeline parallel 1
+* ESM-2nv 3B: 3B parameters model, batch size of 4, pipeline parallel 4
+* ESM-2nv 15B: 15B parameter model, batch size of 2, pipeline parallel 8
+* ESM-2nv 20B: 20B parameters model, batch size of 1, pipeline parallel 8
+
+
+![ESM2 benchmarks_tflops](../../readme-images/esm2_perf_accumulate32_bionemo_tflops.png)
+
+
 ## License
 
 ESM-2nv is as provided under the {{model_license_slug}}.
