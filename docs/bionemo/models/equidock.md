@@ -1,34 +1,88 @@
 # EquiDock
 
-## Model Overview
+# Model Overview
 
-EquiDock {cite:p}`ganea2021independent` is an SE(3)-equivariant model that can predict protein-protein complex formation from two invidual proteins. EquiDock treats both the proteins as rigid bodies and assumes no conformation change during the formation of the complex.
+## Description:
+EquiDock [1] predicts protein-protein complex formation from two individual proteins.
+EquiDock is an SE(3)-equivariant model that treats both the proteins as rigid bodies and assumes no conformational change during the formation of the complex.  This model is ready for commercial use. <br>
 
-## Intended Use
+## Third-Party Community Consideration 
+The original model was not owned or developed by NVIDIA. This model has been developed and built to a third-party’s requirements for this application and use case; see [GitHub](https://github.com/octavian-ganea/equidock_public) for more.
 
-Almost all biological processes involve proteins interacting with each other. Prediction of protein complexes can be used to understand disease progression and also in the design of novel proteins that can preferentially interact with other proteins of choice.
+## References:
+1. Ganea, Octavian-Eugen, Xinyuan Huang, Charlotte Bunne, Yatao Bian, Regina Barzilay, Tommi Jaakkola, and Andreas Krause. "Independent SE(3)-equivariant models for end-to-end rigid protein docking." arXiv preprint arXiv:2111.07786 (2021). <br>
+2. Kabsch, Wolfgang. "A solution for the best rotation to relate two sets of vectors." Acta Crystallographica Section A: Crystal Physics, Diffraction, Theoretical and General Crystallography 32, no. 5 (1976): 922-923. <br>
+3. Vreven, Thom, Iain H. Moal, Anna Vangone, Brian G. Pierce, Panagiotis L. Kastritis, Mieczyslaw Torchala, Raphael Chaleil et al. "Updates to the integrated protein–protein interaction benchmarks: docking benchmark version 5 and affinity benchmark version 2." Journal of molecular biology 427, no. 19 (2015): 3031-3041. <br>
+4. Townshend, Raphael, Rishi Bedi, Patricia Suriana, and Ron Dror. "End-to-end learning on 3d protein structure for interface prediction." Advances in Neural Information Processing Systems 32 (2019). <br>
 
-## Model Architecture
+## Model Architecture: 
+**Architecture Type:** Graph Neural Network (GNN) <br>
+**Network Architecture:** Independent SE(3)-Equivariant Graph Matching Network (IEGMN) <br>
 
-EquiDock was implemented using the BioNeMo framework. EquiDock uses Independent E(3)-Equivariant Graph Matching Network (IEGMN) that performs graph feature embedding updates in addition to E(3)-equivariant coordinate updates. EquiDock uses a novel attention-based selection of keypoints to represent binding pocket of each protein via a differentiable variant of the Kabsch algortihm {cite:p}`kabsch1976solution`. In addition, the EquiDock architecture also gaurantees commutativity ie., docking protein 1 with respect to protein 2 gives identical results as docking protein 2 with respect to protein 1.
+## Input:
+**Input Type(s):** Text (Geometric Protein Structure)  <br>
+**Input Format(s):** Binary File <br>
+**Other Properties Related to Input:** Text represented as integers and floating point 32, and alphabetical representations for the residue name. Maximum number of residues is 400 per protein and maximum number of atoms is 4000 per protein <br>
 
-## Limitations
+## Output:
+**Output Types:** Text (Geometric Protein Structure) <br>
+**Output Format(s):** Protein Data Bank (PDB) <br>
+**Other Properties Related to Output:** [ Text represented as integers, floating point 32, and alphabetical representations for the residue name.] <br> 
 
-EquiDock is designed to treat proteins as rigid bodies and would not work well with proteins that undergo significant change in conformation upon binding.
+## Software Integration:
+**Runtime Engine(s):** 
+* BioNeMo, NeMo 1.2 <br>
 
-## Training
+**Supported Hardware Microarchitecture Compatibility:** <br>
+* [Ampere] <br>
+* [Hopper] <br>
 
-### Dataset
+**[Preferred/Supported] Operating System(s):** <br>
+* [Linux] <br>
 
-The EquiDock model leverages two primary datasets: Docking Benchmark 5.5 (DB5.5) {cite:p}`vreven2015updates` and the Database of Interacting Protein Structures (DIPS) {cite:p}`townshend2019end`. DB5.5, considered a gold standard dataset for data quality, consists of 253 structures. On the other hand, DIPS is a larger dataset of protein complex structures obtained from the Protein Data Bank (PDB), specifically tailored for rigid body docking. It's noted that DIPS contains only bound structures, making it suitable for rigid docking, while DB5.5 includes unbound protein structures, mostly displaying rigid structures.
+## Model Version(s): 
+dips.23.10 <br>
+db5.23.10 <br>
 
-Training involves initially training models on the training part of DIPS using the Adam optimizer with a learning rate of 2e-4. Early stopping is employed with a patience of 30 epochs. The best validation model is determined based on Ligand RMSD on the DIPS validation set.
+# Training & Evaluation: 
 
-For DB5.5, the DIPS pre-trained model is fine-tuned on the DB5.5 training set using a learning rate of 1e-4 and early stopping with 150 epochs patience. During training, roles of ligand and receptor are randomly assigned, and both ligand rotation and translation are randomly applied, even though the model is invariant to these operations.
+## Training Dataset:
 
-### Infrastructure and Configuration
+**Link:** https://zlab.umassmed.edu/benchmark/ and https://github.com/drorlab/DIPS <br>
+**Data Collection Method by dataset** <br>
+* [Automatic/Sensors] <br>
+**Labeling Method by dataset** <br>
+* [Not Applicable] <br>
+**Properties:** <br>
+DB5.5 dataset consists of 253 protein structures  built by mining the Protein Data Bank (PDB) for pairs of interacting proteins
+The Database for Interacting Proteins Structures (DIPS) has 41,876 binary complexes containing bound structures with rigid body docking, while DB5.5 includes unbound protein structures. 
+Datasets are then randomly partitioned in training, validation, and testing datasets The training and validation are used during training. DB5.5 includes 203/25 training and validation data points respectively. DIPS includes 39,937/974 training and validation data points respectively. <br>
 
-The EquiDock model can be trained from scratch with the code and datasets provided. The `equidock_dips.nemo` and `equidock_db5.nemo` model checkpoints provided here were adapted from the public chekpoints available on [GitHub](https://github.com/octavian-ganea/equidock_public/tree/main/checkpts).
+**Dataset License(s):** [https://jirasw.nvidia.com/browse/DGPTT-1300, https://jirasw.nvidia.com/browse/DGPTT-1301] **INTERNAL ONLY** <br>
+
+## Evaluation Dataset:
+**Link:** https://zlab.umassmed.edu/benchmark/ and https://github.com/drorlab/DIPS  <br>
+**Data Collection Method by dataset** <br>
+* [Automatic/Sensors] <br>
+**Labeling Method by dataset** <br>
+* [Not Applicable] <br>
+**Properties:** 
+
+DB5.5 dataset consists of 253 protein structures  built by mining the Protein Data Bank (PDB) for pairs of interacting proteins
+The Database for Interacting Proteins Structures (DIPS) has 41,876 binary complexes containing bound structures with rigid body docking, while DB5.5 includes unbound protein structures. 
+
+Datasets are then randomly partitioned in training, validation, and testing datasets The training and validation are used during training. DB5.5 and DIPS testing datasets include 25 and 965 testing data points respectively.
+ <br> 
+
+**Dataset License(s):** [https://jirasw.nvidia.com/browse/DGPTT-1300, https://jirasw.nvidia.com/browse/DGPTT-1301] **INTERNAL ONLY** <br>
+
+## Inference:
+**Engine:** BioNeMo, NeMo, Triton <br>
+**Test Hardware:** <br>
+* Ampere <br>
+
+## Ethical Considerations:
+NVIDIA believes Trustworthy AI is a shared responsibility and we have established policies and practices to enable development for a wide array of AI applications.  When downloaded or used in accordance with our terms of service, developers should work with their team to ensure this model meets requirements for the relevant industry and use case and addresses unforeseen product misuse.  For more detailed information on ethical considerations for this model, please see the Model Card++ Explainability, Bias, Safety & Security, and Privacy Subcards [Insert Link to Model Card++ here].  Please report security vulnerabilities or NVIDIA AI Concerns [here](https://www.nvidia.com/en-us/support/submit-security-vulnerability/).
 
 
 ## Benchmarks
@@ -65,3 +119,4 @@ Training speed was tested on DGX-A100 systems with 8 IEGM layers over DIPS datas
 ## License
 
 EquiDock is provided under the {{model_license_slug}}.
+
