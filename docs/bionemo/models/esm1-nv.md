@@ -1,35 +1,89 @@
 # ESM-1nv
+# Model Overview
 
-## Model Overview
+## Description:
 
-ESM-1nv is a model that has been trained on protein sequences. The embeddings from its encoder can be used as features for predictive models.
+ESM-1nv is a protein language model that provides numerical embeddings for each amino acid in a protein sequence. It is developed using the BioNeMo Framework. The model uses an architecture called Bidirectional Encoder Representations from Transformers (BERT) and is based on the ESM-1 model [1]. Pre-norm layer normalization and GELU activation are used throughout. The model has six layers, 12 attention heads, a hidden space dimension of 768, and contains 44M parameters. The embeddings from its encoder can be used as features for predictive models. This model is ready for commercial use. <br>
 
-## Intended Use
 
-Compute embeddings from input protein sequences. Embeddings are created for each amino acid in the protein sequence. Embeddings can then be used for downstream tasks such as prediction of secondary structure, subcellular localization, or others, as detailed by the FLIP benchmark tasks {cite:p}`dallago2021flip`.
+## References:
+[Provide list of reference(s), link(s) to the publication/paper/article, associated works, and lineage where relevant.]  <br> 
+[1] Rives, Alexander, Joshua Meier, Tom Sercu, Siddharth Goyal, Zeming Lin, Jason Liu, Demi Guo et al. "Biological structure and function emerge from scaling unsupervised learning to 250 million protein sequences." Proceedings of the National Academy of Sciences 118, no. 15 (2021): e2016239118.
+[2] "UniProt: the universal protein knowledgebase in 2021." Nucleic acids research 49, no. D1 (2021): D480-D489.
 
-## Model Architecture
+## Model Architecture: 
+**Architecture Type:** BERT <br>
+**Network Architecture:** ESM-1 <br>
 
-ESM-1nv was developed using the BioNeMo framework. The model uses an architecture called Bidirectional Encoder Representations from Transformers (BERT) and is based on the ESM-1 model {cite:p}`rives2021esm,devlin2018bert`. Pre-norm layer normalization and GELU activation are used throughout. The model has six layers, 12 attention heads, a hidden space dimension of 768, and contains 44M parameters.
+## Input: (Enter "None" As Needed)
+**Input Type(s):** Text (Protein Sequences) <br>
+**Input Parameters:** 1D <br>
+**Other Properties Related to Input:** Protein sequence represented as a string of canonical amino acids, of maximum length 512. Longer sequences are automatically truncated to this length. <br>
 
-## Limitations
+## Output: (Enter "None" As Needed)
+**Output Type(s):** Text (Protein Sequences) <br>
+**Output Parameters:** 1D <br>
+**Other Properties Related to Output:** Numeric vector with one float-point value corresponding to each amino acid in the input protein sequence. Maximum output length is 512 embeddings - one embedding vector per amino acid. <br> 
 
-Input sequence length is limited to 512 amino acids.
+## Software Integration:
+**Runtime Engine(s):** 
+* BioNeMo, NeMo 1.2 <br>
 
-## Training
+**Supported Hardware Microarchitecture Compatibility:** <br>
+* [Ampere] <br>
+* [Hopper] <br>
+* [Volta] <br>
 
-### Dataset and Processing
+**[Preferred/Supported] Operating System(s):** <br>
+* [Linux] <br>
 
-UniRef50 (release 05/2022) was used for training {cite:p}`uniprot2021`. The reference sequence for each cluster was selected, resulting in approximately 52M protein sequences. The sequences were randomly split with 5K sequences in validation, 1M sequences in test, and the remaining in train. Truncation of protein sequences longer than 1024 amino acids and data masking was performed as described previously {cite:p}`devlin2018bert`. The input tokens were randomly masked at a rate of 15% with the masked tokens being predicted. During training by minimizing a cross-entropy categorical loss in order to predict the masked tokens {cite:p}`devlin2018bert`.
+## Model Version(s): 
+esm1nv.nemo, version 1.0  <br>
 
-### Infrastructure and Configuration
+# Training & Evaluation: 
 
-ESM-1nv was trained with data parallelism on 176 A100 GPUs for 420 epochs (approximately 349500 iterations) using a micro batch size of 370 sequences per GPU. Cosine annealing was used, with a minimum learning rate of 2.0e-05, 500 warmup steps, and 50000 constant steps. Fused Adam optimization was used with parameters β1 = 0.9, β2 = 0.98, and weight decay = 0.01. Dropout was set to 0.1 during training. The model training was then continued on 144 A100 GPUs for an additional 600 epochs, resulting in a total of 957610 iterations. The weights of the last 47 checkpoints were averaged to produce the final model.
+## Training Dataset:
 
-## Suggested Reading
+**Link:**  [UniRef50](https://ftp.uniprot.org/pub/databases/uniprot/uniref/uniref50) <br>
 
-Learn more about ESM-1nv [here](https://developer.nvidia.com/blog/predict-protein-structures-and-properties-with-biomolecular-large-language-models-2/).
+** Data Collection Method by dataset <br>
+* [Human] <br>
 
-## License
+**Properties (Quantity, Dataset Descriptions, Sensor(s)):** UniRef50 (release 05/2022) was used for training [2]. The reference sequence for each cluster was selected, with sequences longer than the maximum sequence length of 512 removed, resulting in approximately 46M protein sequences with maximum length of 512 amino acids. The sequences were randomly split with 4.35K sequences for validation loss calculation during training, 875K sequences in testing, and 45.1M sequences used exclusively in training . <br>
 
-ESM-1nv is as provided under the {{model_license_slug}}.
+## Evaluation Dataset:
+**Link:** [FLIP – secondary structure, conservation,subcellular localization, meltome, GB1 activity](http://data.bioembeddings.com/public/FLIP/fasta/)  <br>
+** Data Collection Method by dataset <br>
+* [Human] <br>
+* [Automatic/Sensors] <br>
+
+** Labeling Method by dataset <br>
+* [Experimentally Measured] <br>
+* [Hybrid: Human & Automated] <br>
+
+**Properties (Quantity, Dataset Descriptions, Sensor(s)):** 
+The FLIP datasets evaluate the performance of the model on five specific downstream tasks for proteins. It provides pre-defined splits for fine-tuning a pretrained model using task-specific train and validation examples, and subsequently evaluating it on a task-specific test split. 
+
+The secondary structure FLIP dataset contains experimental secondary structures, with 9712 proteins for model finetuning, 1080 proteins for validation, and 648 proteins for testing. 
+
+The Conservation dataset contains conservation scores of the residues of protein sequences with 9392 proteins for training, 555 proteins for validation, and 519 proteins for testing. 
+
+The Subcellular localization dataset contains protein subcellular locations with 9503 proteins for training, 1678 proteins for validation, and 2768 proteins for testing. 
+
+The Meltome dataset contains experimental melting temperatures for proteins, with 22335 proteins for training, 2482 proteins for validation, and 3134 proteins for testing. 
+
+The GB1 activity dataset contains experimental binding affinities of GB1 protein variants with variation at four sites (V39, D40, G41 and V54) measured in a binding assay, with 6289 proteins for training, 699 proteins for validation, and 1745 proteins for testing. <br>
+
+License Data:
+**Dataset License(s):** [AFL-3](https://opensource.org/license/afl-3-0-php/) <br>
+
+## Inference:
+**Engine:** BioNeMo, NeMo <br>
+**Test Hardware:** <br>
+* [Ampere] <br>
+* [Hopper] <br>
+* [Volta]  <br>
+
+## Ethical Considerations:
+NVIDIA believes Trustworthy AI is a shared responsibility and we have established policies and practices to enable development for a wide array of AI applications.  When downloaded or used in accordance with our terms of service, developers should work with their team to ensure this model meets requirements for the relevant industry and use case and addresses unforeseen product misuse.  For more detailed information on ethical considerations for this model, please see the Model Card++ Explainability, Bias, Safety & Security, and Privacy Subcards [Insert Link to Model Card++ here].  Please report security vulnerabilities or NVIDIA AI Concerns [here](https://www.nvidia.com/en-us/support/submit-security-vulnerability/).
+

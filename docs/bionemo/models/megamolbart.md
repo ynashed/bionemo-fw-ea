@@ -1,4 +1,5 @@
 # MegaMolBART 
+# Model Overview
 
 ## Description:
 MegaMolBART molecular sequence, based upon known molecular sequences,is an autoencoder trained on small molecules in the form of SMILES that can be used for molecular representation tasks, molecule generation, and retrosynthesis. It was developed using the BioNeMo framework. MegaMolBART has eight layers, four attention heads, a hidden space dimension of 256, and contains 45M parameters. This model is ready for commercial/non-commercial use. <br>
@@ -56,8 +57,6 @@ Megamolbart.nemo, version 23.06  <br>
 
 **Properties:** 1.54B molecules with molecular weight <= 500 Daltons, LogP <= 5, with reactivity levels rated as  “reactive” and purchasability “annotated.” The compounds were filtered to ensure a maximum length of 512 characters. The final dataset contained 1.54 Billion molecules. <br>
 
-**Dataset License(s):** [JIRA Ticket](https://jirasw.nvidia.com/projects/DGPTT/issues/DGPTT-1209) **INTERNAL ONLY** <br>
-
 ## Evaluation Dataset:
 **Link:** [MoleculeNet - Lipophilicity, FreeSolv, ESOL](https://moleculenet.org/datasets-1) <br>
 
@@ -69,8 +68,6 @@ Megamolbart.nemo, version 23.06  <br>
 * [Hybrid: Human & Automated] <br>
 
 **Properties:** Contains 4,200 experimentally measured octanol/water distribution coefficients (logD at pH 7.4)randomly split for evaluation;  642 experimental and calculated hydration free energy of small molecules in water randomly split for evaluation; and1,128 experimentally measured water solubility data (log solubility in mols per liter) for common organic small molecules randomly split for evaluation. <br>
-
-**Dataset License(s):** [MIT](https://github.com/deepchem/moleculenet/blob/master/LICENSE) **INTERNAL ONLY** <br>
 
 ## Inference:
 **Engine:** NeMo <br>
