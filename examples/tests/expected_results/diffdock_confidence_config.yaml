@@ -235,6 +235,7 @@ model:
     cache_creation_id: ${data.cache_creation_id}
     cache_ids_to_combine: ${data.cache_ids_to_combine}
     score_model_name: ${data.score_model_name}
+  optimize_einsums: false
 exp_manager:
   name: ${name}
   resume_if_exists: true

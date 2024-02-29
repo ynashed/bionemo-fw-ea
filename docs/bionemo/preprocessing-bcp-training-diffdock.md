@@ -136,13 +136,13 @@ export DIFFDOCK_SCORE_MODEL=models/small_score_model.nemo
 
 we can do the data preprocessing for confidence model:
 ```bash
-ngc batch run --name "DiffDock_Complex_Graph_Preprocessing_Confidence" --priority NORMAL --preempt RUNONCE --ace nv-us-east-2 --instance dgxa100.80g.2.norm --commandline "ln -s /bionemo_diffdock/data \\${BIONEMO_HOME}/data; bcprun --debug --nnodes=1 --npernode=1 -w /workspace/bionemo --cmd 'export USE_FAST_TP=1; python examples/molecule/diffdock/train.py --config-name=train_confidence do_preprocessing=True do_training=False data.num_workers=20 score_infer.restore_from_path=/workspace/bionemo/${DIFFDOCK_SCORE_MODEL} '" --result /results --image ${BIONEMO_IMAGE} --org ${NGC_CLI_ORG} --team ${NGC_CLI_TEAM} --workspace ${WKSP_ID}:/bionemo_diffdock:RW --label ml__bionemo
+ngc batch run --name "DiffDock_Complex_Graph_Preprocessing_Confidence" --priority NORMAL --preempt RUNONCE --ace nv-us-east-2 --instance dgxa100.80g.2.norm --commandline "ln -s /bionemo_diffdock/data \\${BIONEMO_HOME}/data; bcprun --debug --nnodes=1 --npernode=1 -w /workspace/bionemo --cmd 'python examples/molecule/diffdock/train.py --config-name=train_confidence do_preprocessing=True do_training=False data.num_workers=20 score_infer.restore_from_path=/workspace/bionemo/${DIFFDOCK_SCORE_MODEL} ++score_infer.model.tensor_product.type=fast_tp '" --result /results --image ${BIONEMO_IMAGE} --org ${NGC_CLI_ORG} --team ${NGC_CLI_TEAM} --workspace ${WKSP_ID}:/bionemo_diffdock:RW --label ml__bionemo
 ```
 
 If you want to use the score model checkpoint converted from [public diffdock](https://github.com/gcorso/DiffDock/tree/main/workdir/paper_score_model), replace the setting of small score model with following commands:
 ```bash
-ngc registry model download-version nvidia/clara/diffdock_score:1.1 --dest  ~/
-cp ~/diffdock_score_v1.1/diffdock_score.nemo ~/diffdock_data/models/
+ngc registry model download-version nvidian/clara-lifesciences/diffdock:paper_score.23.08 --dest  ~/
+cp ~/diffdock_vpaper_score.23.08/diffdock_score.nemo ~/diffdock_data/models/
 export DIFFDOCK_SCORE_MODEL=models/diffdock_score.nemo
 ```
 And use the same ```ngc batch run``` command above

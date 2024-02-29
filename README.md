@@ -2,7 +2,7 @@
 
 ## Introduction
 
-NVIDIA BioNeMo is a framework for training and deploying large biomolecular language models at supercomputing scale for the discovery and development of therapeutics. The large language model (LLM) framework currently has models for small molecules (SMILES) and protein sequences. More information about the models and their training is available in the [model guides](https://docs.nvidia.com/bionemo-framework/latest/).
+NVIDIA BioNeMo is a framework for training and deploying large biomolecular language models at supercomputing scale for the discovery and development of therapeutics. The large language model (LLM) framework currently has models for small molecules (SMILES) and protein sequences. More information about the models and their training is available in the [model guides](https://docs.nvidia.com/bionemo-framework/latest/models/esm2-nv.html).
 
 BioNeMo relies on [NeMo](https://github.com/NVIDIA/NeMo). NeMo provides a robust environment for developing, training, and deploying deep learning models, including Megatron models. NeMo provides enhancements to [PyTorch Lighting](https://lightning.ai/) such as hyperparameter configurability with YAML files and checkpoint management. It also enables the development and training of large transformer models using NVIDIA's [Megatron](https://github.com/NVIDIA/Megatron-LM) framework, which makes multi-GPU, multi-node training with data parallelism, model parallelism, and mixed precision easily configurable. The [NeMo User Guide](https://docs.nvidia.com/deeplearning/nemo/user-guide/docs/en/main/) contains more information about all of these features. It is highly suggested to review at least the [NeMo Fundamentals](https://docs.nvidia.com/deeplearning/nemo/user-guide/docs/en/stable/starthere/tutorials.html) tutorial to understand how to configure jobs.
 
@@ -31,7 +31,7 @@ NGC_CLI_TEAM= # Your team name
 NGC_CLI_ORG= # Your organization name
 
 # Pull the latest BioNeMo image:
-#   Time estimate: 5min  
+#   Time estimate: 5min
 ./launch.sh pull
 
 # Download all pretrained checkpoints from NGC:
@@ -44,9 +44,9 @@ NGC_CLI_ORG= # Your organization name
 
 Once the container is running, you can run the training and inference examples, see [BioNeMo Framework Tutorials](https://docs.nvidia.com/bionemo-framework/latest/tutorials-fw.html), or develop and test your own code.
 
-As an example, For ESM1-nv, ESM2-nv, and ProtT5-nv, we provide an `infer.sh` script under `examples/protein/<MODEL_NAME>`, to run inference in offline mode (without running a remote inference client).
+As an example, For ESM1-nv, ESM2-nv, and ProtT5-nv, we provide the `bionemo.model.infer` module to run inference in offline mode (without running a remote inference client).
 Users must specify an input CSV file with sequence data, and a CONFIG file with model specifics and data paths. Example config files are provided at  `examples/protein/<MODEL_NAME>/conf`. Example input data file is provided at `examples/tests/test_data/protein/test/x000.csv`.
-The following is an example use of `infer.sh` to run inference on ESM2-nv using a csv file with sequence data. We use the `infer.yaml` config available at `examples/protein/esm2nv/conf/infer.yaml`. This config contains the `model.data.dataset` variable that can also be used to set the input file - in our example we override this default to point to an example file we include in the BioNeMo Framework codebase.
+The following is an example use of the `bionemo.model.infer` module to run inference on ESM2-nv using a csv file with sequence data. We use the `infer.yaml` config available at `examples/protein/esm2nv/conf/infer.yaml`. This config contains the `model.data.dataset` variable that can also be used to set the input file - in our example we override this default to point to an example file we include in the BioNeMo Framework codebase.
 The set of commands below generates a pickle file with the embeddings of all sequences, at `$BIONEMO_HOME/data/bionemo_esm2_example.pkl`, specified by `model.data.output_fname`.
 
 ```bash
@@ -57,13 +57,17 @@ cd $BIONEMO_HOME
 # It will use your NGC credentials stored in $BIONEMO_HOME/.env (Company specific).
 # And download all model checkpoints to the 'LOCAL_MODELS_PATH' or 'DOCKER_MODELS_PATH' variable in the .env file (default: $BIONEMO_HOME/models)
 ./launch.sh download
-# Next we navigate to the location of infer.sh and set up the required variables.
-cd $BIONEMO_HOME/examples/protein/esm2nv/
+# Next we set up the required variables.
 example_file=$BIONEMO_HOME/examples/tests/test_data/protein/test/x000.csv
-config_name='infer.yaml'
 restore_from_path=$BIONEMO_HOME/models/protein/esm2nv/esm2nv_650M_converted.nemo
 outfile=$BIONEMO_HOME/data/bionemo_esm2_example.pkl
-./infer.sh --config-name "$config_name" ++model.data.output_fname="$outfile" ++model.data.dataset_path="$example_file" ++model.downstream_task.restore_from_path="$restore_from_path"
+# And use them to run the inference command
+python -m bionemo.model.infer \
+  --config-dir  examples/protein/esm2nv/conf
+  --config-name infer.yaml \
+  ++model.data.output_fname="${outfile}" \
+  ++model.data.dataset_path="${example_file}" \
+  ++model.downstream_task.restore_from_path="${restore_from_path}"
 ```
 A successful execution of this command will result in command-line output similar to
 ```
@@ -79,7 +83,7 @@ BioNeMo containers and pre-trained models are delivered via [NVIDIA GPU Cloud (N
 Additional requirement for this quickstart:
 1. **'sudo-less' docker commands** The script launch.sh executed docker commands without a sudo prefix, so your environment's username must be added to the docker group, see Step 2 at [docker-on-ubuntu-22-04](https://www.digitalocean.com/community/tutorials/how-to-install-and-use-docker-on-ubuntu-22-04).
 
-2. [Installing the NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). If the the 'nvidia container toolkit' is not installed, you may see an error like
+2. [Installing the NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html). If the 'nvidia container toolkit' is not installed, you may see an error like
 ```
 docker: Error response from daemon: could not select device driver "" with capabilities: [[gpu]].
 ```
@@ -89,7 +93,7 @@ See related discussion at [could-not-select-device-driver-with-capabilities-gpu]
 ```
 docker cp some_file_with_aliases_or_env_vars:/workspace/some_file_with_aliases_or_env_vars
 ```
-For example `some_file_with_aliases_or_env_vars` could be `.bash_aliases`.  Second, from the running container execute `source /workspace/some_file_with_aliases_or_env_vars`.  The aliases and env variables will be added to the current shell. 
+For example `some_file_with_aliases_or_env_vars` could be `.bash_aliases`.  Second, from the running container execute `source /workspace/some_file_with_aliases_or_env_vars`.  The aliases and env variables will be added to the current shell.
 
 ## Implemented Models
 
@@ -147,7 +151,7 @@ System Requirements:
 
 ### Dockerized Install
 
-The supported method of code development is using a prebuilt BioNeMo container which is [available via the NGC registry](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/clara/containers/bionemo-framework). This container can be pulled via the registry directly `docker pull nvcr.io/nvidia/clara/bionemo-framework:1.1` or via the launch script, `./launch.sh pull`. `./launch.sh dev` will start an interactive shell inside the container.
+The supported method of code development is using a prebuilt BioNeMo container which is [available via the NGC registry](https://registry.ngc.nvidia.com/orgs/nvidian/teams/cvai_bnmo_trng/containers/bionemo-rc-v1.0). This container can be pulled via the registry directly `docker pull nvcr.io/nvidian/cvai_bnmo_trng/bionemo-rc-v1.0:latest` or via the launch script, `./launch.sh pull`. `./launch.sh dev` will start an interactive shell inside the container.
 
 Optionally, after the container is started, you can attach to the running container via the VSCode [Docker](https://code.visualstudio.com/docs/containers/overview) and [VSCode Dev Container](https://code.visualstudio.com/docs/devcontainers/containers) extensions.
 
@@ -224,47 +228,9 @@ pre-commit install
 ```
 
 To push a commit on a branch with a merge request, the CI pipeline trigger can be avoided by including [skip ci] in the commit message.
-**Warning**  If the [skip ci] tag is used for some commits on a branch with an MR, 
-we ask that the final commit before merge should omit this tag, so that all 
+**Warning**  If the [skip ci] tag is used for some commits on a branch with an MR,
+we ask that the final commit before merge should omit this tag, so that all
 continuous integration steps are triggered before the merge is attempted.
-
-### VSCode into DGX Cloud
-[Visual Studio Code](https://code.visualstudio.com/) is an extremely useful IDE for development and debugging. If you want to run a workload on NGC and develop with VSCode you can now do that seemlessly on our platform.
-
-To startup a VSCode server, you must replace the `--command` portion of your `ngc base-command` command with
-```bash
---commandline "\
-PASSWORD=mypass code-server --auth password --bind-addr 0.0.0.0:8899 /workspace & \
-sleep infinity"
-```
-This will tell DGX Cloud to sleep and wait for you to attach via the VSCode environment. Then you can run all your jobs through VSCode.
-
-
-#### Sample command:
-```bash
-ngc base-command job run \
---name "myjobnamedummy" \
---priority HIGH \
---order 1 \
---preempt RUNONCE \
---min-timeslice 0s \
---ace nv-us-east-2 \
---org nvidia \
---team clara \
---instance  dgxa100.80g.8.norm \
---image "nvcr.io/nvidia/clara/bionemo-framework:1.1" \
---port 8888 \
---port 8899 \
---total-runtime 8h  \
---result \results \
---commandline "\
-PASSWORD=mypass code-server --auth password --bind-addr 0.0.0.0:8899 /workspace & \
-sleep infinity"
-```
-
-Once that is done, take a look at the ngc [jobs](https://bc.ngc.nvidia.com/jobs) page and find your job. Under the `Service Mapped Ports` section, click
-on the top port `8899` and you should be taken to a VSCode server.
-
 
 ### Build and Start Container from Source
 

@@ -1,12 +1,18 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
 #
-# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
-# property and proprietary rights in and to this material, related
-# documentation and any modifications thereto. Any use, reproduction,
-# disclosure or distribution of this material and related documentation
-# without an express license agreement from NVIDIA CORPORATION or
-# its affiliates is strictly prohibited.
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+import os
 
 from nemo.core.config import hydra_runner
 from nemo.utils import logging
@@ -42,18 +48,71 @@ def main(cfg) -> None:
     else:
         logging.info("************** Starting Preprocessing ***********")
         preprocessor = ESM2Preprocess()
-        # NOTE: Having issues? check that all the lock files are removed in the directories below.
-        preprocessor.prepare_dataset(
-            uf50_datapath=cfg.model.data.uf50_datapath,
-            uf90_datapath=cfg.model.data.uf90_datapath,
-            cluster_mapping_tsv=cfg.model.data.cluster_mapping_tsv,
-            uf50_output_dir=cfg.model.data.dataset_path,
-            uf90_output_dir=cfg.model.data.uf90.uniref90_path,
-            val_size=cfg.model.data.val_size,
-            test_size=cfg.model.data.test_size,
-            sort_fastas=cfg.model.data.sort_fastas,
-        )
 
+        if not os.path.exists(cfg.model.data.train.uf50_datapath):
+            raise FileNotFoundError(
+                "input argument ++cfg.model.data.train.uf50_datapath: {cfg.model.data.train.uf50_datapath} is not found."
+            )
+        if not os.path.exists(cfg.model.data.train.uf90_datapath):
+            raise FileNotFoundError(
+                "input argument ++cfg.model.data.train.uf90_datapath: {cfg.model.data.train.uf90_datapath} is not found."
+            )
+        if not os.path.exists(cfg.model.data.train.cluster_mapping_tsv):
+            raise FileNotFoundError(
+                "input argument ++cfg.model.data.train.cluster_mapping_tsv: {cfg.model.data.train.cluster_mapping_tsv} is not found."
+            )
+
+        preprocessor.prepare_dataset(
+            uf50_datapath=cfg.model.data.train.uf50_datapath,
+            uf90_datapath=cfg.model.data.train.uf90_datapath,
+            cluster_mapping_tsv=cfg.model.data.train.cluster_mapping_tsv,
+            uf50_output_dir=cfg.model.data.train.dataset_path,
+            uf90_output_dir=cfg.model.data.train.uf90.uniref90_path,
+            sort_fastas=cfg.model.data.train.sort_fastas,
+            mode="train",
+            num_preprocess_workers=cfg.model.data.preprocessing.num_preprocess_workers,
+        )
+        # Make sure the dataset was created.
+        if not os.path.isdir(cfg.model.data.train.dataset_path):
+            raise ValueError(
+                "Attempted to create a dataset output directory: {cfg.model.data.train.dataset_path} but it failed and was not created."
+            )
+        # Check input arguments for val run.
+        if not os.path.exists(cfg.model.data.val.uf50_datapath):
+            raise FileNotFoundError(
+                "input argument ++cfg.model.data.val.uf50_datapath: {cfg.model.data.val.uf50_datapath} is not found."
+            )
+        preprocessor.prepare_dataset(
+            uf50_datapath=cfg.model.data.val.uf50_datapath,
+            uf50_output_dir=cfg.model.data.val.dataset_path,
+            sort_fastas=False,
+            mode="val",
+        )
+        # Make sure the dataset was created.
+        if not os.path.isdir(cfg.model.data.val.dataset_path):
+            raise ValueError(
+                "Attempted to create a dataset output directory: {cfg.model.data.val.dataset_path} but it failed and was not created."
+            )
+
+        # Check input arguments for test.
+        if not os.path.exists(cfg.model.data.test.uf50_datapath):
+            raise FileNotFoundError(
+                "input argument ++cfg.model.data.test.uf50_datapath: {cfg.model.data.test.uf50_datapath} is not found."
+            )
+
+        preprocessor.prepare_dataset(
+            uf50_datapath=cfg.model.data.test.uf50_datapath,
+            uf50_output_dir=cfg.model.data.test.dataset_path,
+            sort_fastas=False,
+            mode="test",
+        )
+        # Make sure the dataset was created.
+        if not os.path.isdir(cfg.model.data.test.dataset_path):
+            raise ValueError(
+                "Attempted to create a dataset output directory: {cfg.model.data.test.dataset_path} but it failed and was not created."
+            )
+
+        # Downloading and preprocessing data for downstream task validation
         if cfg.model.dwnstr_task_validation.enabled:
             flip_preprocessor = FLIPPreprocess()
             if "task_name" not in cfg.model.dwnstr_task_validation.dataset:

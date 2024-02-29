@@ -134,9 +134,9 @@ An example of `SingleValuePredictionCallback` can be found in `/workspace/bionem
 
 * `sequence_col` defines the name of a column in train and test files containing input sequences.
 
-* `labels_col` defines the list with names of columns in train and test files containing class labels for each classification task. 
+* `target_column` defines the list with names of columns in train and test files containing class labels for each classification task. 
 
-* `labels_size` defines the list with the number of classes for each classification task. 
+* `target_sizes` defines the list with the number of classes for each classification task. 
 
 * `mask_col` defines the list with names of columns in train and test files used as masks for each classification task. Should be set to `null`` for any classification task where masking is not needed.
 

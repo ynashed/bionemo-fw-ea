@@ -9,4 +9,5 @@
 # its affiliates is strictly prohibited.
 
 from .collate import *
+from .kmer_collate import *
 from .protein_collate import *

@@ -1,0 +1,118 @@
+defaults:
+  - pretrain_esm2_8M
+
+hydra:
+  searchpath:
+    - file:///workspace/bionemo/examples/protein/esm2nv/conf
+
+trainer:
+  devices: 1
+  num_nodes: 1
+  max_epochs: 1 # PTL default. In practice we don't usually train for more than 1 epoch.
+  max_steps: 500 # consumed_samples = global_step * micro_batch_size * data_parallel_size * accumulate_grad_batches
+  limit_val_batches: 1.0  # Number of batches in the validation step. Use 0 for no batches, 1 for full dataset, and 0<x<1 for fractional data.
+  limit_test_batches: 20 # Number of batches in the test set. Use 0 for no batches, or 0<x<1 for fractional data. Do not use 1.
+  val_check_interval: 1.0
+  check_val_every_n_epoch: 1
+  accumulate_grad_batches: 1
+
+model:
+  data:
+    index_mapping_dir: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/uniref202104_esm2_qc_test200_val200/
+    preprocessing:
+      num_preprocess_workers: 16
+    train:
+      data_impl: "csv_mmap"
+      data_impl_kwargs:
+        csv_mmap:
+          data_col: 1 # 0-based
+          header_lines: 1
+      use_upsampling: True # if the data should be upsampled to max number of steps in the training
+      range: x[000..049]
+      sample_from_map: True # TODO: Use uf90_datapath and cluster_mapping_tsv to create resampled dataset for training with uf50_datapath. If False, only uf50_datapath is used for training. 
+      uf50_datapath: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/uniref202104_esm2_qc_test200_val200/uniref50_train_filt.fasta
+      uf90_datapath: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/uniref202104_esm2_qc_test200_val200/ur90_ur50_sampler.fasta
+      cluster_mapping_tsv: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/uniref202104_esm2_qc_test200_val200/mapping.tsv
+      dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/uniref202104_esm2_qc_test200_val200/uf50
+      sort_fastas: True # If true, assumes the input files are not sorted, and sorts them before creating the cluster mapping. Unsorted fastas will break the cluster map.
+      num_workers: ${model.data.num_workers}
+      uf90:
+        uniref90_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/uniref202104_esm2_qc_test200_val200/uf90/
+        dataset: 
+          uf90_csvs: x[000..049] # created and populated by preprocessing, this key is a directory inside uniref90_path
+        data_impl: 'csv_fields_mmap'
+        data_impl_kwargs:
+          csv_fields_mmap:
+            header_lines: 1
+            newline_int: 10 # byte-value of newline
+            workers: ${model.data.train.num_workers} # number of workers when creating missing index files (null defaults to cpu_num // 2)
+            sort_dataset_paths: True # if True datasets will be sorted by name
+            data_sep: ',' # string to split text into columns
+            data_fields:
+              sequence: 3
+              sequence_id: 1
+        index_mapping_dir: ${model.data.index_mapping_dir}
+      max_seq_length: ${model.seq_length} # Maximum input sequence length. Longer sequences are truncated
+      seed: ${model.seed} # Random seed
+    val:
+      use_upsampling: False
+      range: x[000..049]
+      uf50_datapath: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/uniref202104_esm2_qc_test200_val200/uniref50_valid_reduced.fasta
+      dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/uniref202104_esm2_qc_test200_val200/uf50
+      data_impl: 'csv_fields_mmap'
+      num_workers: ${model.data.num_workers}
+      data_impl_kwargs:
+        csv_fields_mmap:
+          header_lines: 1
+          newline_int: 10 # byte-value of newline
+          workers: ${model.data.val.num_workers} # number of workers when creating missing index files (null defaults to cpu_num // 2)
+          sort_dataset_paths: True # if True datasets will be sorted by name
+          data_sep: ',' # string to split text into columns
+          data_fields:
+            sequence: 3
+            sequence_id: 1
+        index_mapping_dir: ${model.data.index_mapping_dir}
+      max_seq_length: ${model.seq_length} # Maximum input sequence length. Longer sequences are truncated
+      seed: ${model.seed} # Random seed
+      
+    test:
+      use_upsampling: True
+      range: x[000..049]
+      # TODO(@jomitchell): Get the test fasta file.
+      uf50_datapath: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/uniref202104_esm2_qc_test200_val200/uniref50_valid_reduced.fasta
+      dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/uniref202104_esm2_qc_test200_val200/uf50
+      data_impl: 'csv_fields_mmap'
+      num_workers: ${model.data.num_workers}
+      data_impl_kwargs:
+        csv_fields_mmap:
+          header_lines: 1
+          newline_int: 10 # byte-value of newline
+          workers: ${model.data.test.num_workers} # number of workers when creating missing index files (null defaults to cpu_num // 2)
+          sort_dataset_paths: True # if True datasets will be sorted by name
+          data_sep: ',' # string to split text into columns
+          data_fields:
+            sequence: 3
+            sequence_id: 1
+        index_mapping_dir: ${model.data.index_mapping_dir}
+      max_seq_length: ${model.seq_length} # Maximum input sequence length. Longer sequences are truncated
+      seed: ${model.seed} # Random seed
+
+  dwnstr_task_validation:
+    enabled: False
+    dataset:
+      emb_batch_size: 24
+      batch_size: ${.emb_batch_size}
+      num_epochs: 1
+      task_name: downstream
+      dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/protein/downstream
+
+
+
+exp_manager:
+  exp_dir: /tmp/nemo_experiments/esm2nv_pretrain
+  create_wandb_logger: False
+  create_tensorboard_logger: False
+  create_checkpoint_callback: False
+  resume_if_exists: False
+  wandb_logger_kwargs:
+    offline: True

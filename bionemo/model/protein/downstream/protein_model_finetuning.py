@@ -29,6 +29,10 @@ class FineTuneProteinModel(EncoderFineTuning):
         self.full_cfg = cfg
         self.encoder_frozen = self.full_cfg.model.encoder_frozen
         self.task_type = self.full_cfg.model.data.task_type
+
+        if self.encoder_frozen and self.full_cfg.get('use_peft', False):
+            raise ValueError("Using PEFT requires encoder_frozen: False for training")
+
         super().__init__(cfg.model, trainer=trainer)
 
     def configure_optimizers(self):
@@ -56,14 +60,20 @@ class FineTuneProteinModel(EncoderFineTuning):
                     self.cfg.hidden_layer_size,
                     self.cfg.data.target_sizes[0],
                 ],
-                dropout=0.1,
+                dropout=self.cfg.model.dropout_rate,
             )
 
         elif self.task_type == 'token-level-classification':
-            task_head = ConvNet(self.full_cfg.model.hidden_size, output_sizes=self.cfg.data.target_sizes)
+            task_head = ConvNet(
+                self.full_cfg.model.hidden_size,
+                output_sizes=self.cfg.data.target_sizes,
+                bottleneck_dim=self.full_cfg.model.cnn_dim,
+                dropout_rate=self.full_cfg.model.dropout_rate,
+            )
         return task_head
 
     def setup_encoder_model(self, cfg, trainer):
+        # Uses PEFT flag to determine whether to load enconder +/- adapters
         infer_class = import_class_by_path(self.full_cfg.infer_target)
         pretrained_model = infer_class(
             self.full_cfg,
@@ -76,6 +86,7 @@ class FineTuneProteinModel(EncoderFineTuning):
 
     @lru_cache
     def data_setup(self):
+        # TODO: address behavior for when we want peft
         if self.encoder_frozen:
             model = self.encoder_model
         else:
@@ -96,11 +107,19 @@ class FineTuneProteinModel(EncoderFineTuning):
         self._test_ds = self.data_module.get_sampled_test_dataset()
 
     def encoder_forward(self, protein_model, batch: dict):
+        '''
+        Params:
+            batch: Dictionary that conatains
+                "embeddings": this is a sequence of amino acids when `encoder_frozen` is False.
+        '''
         if self.encoder_frozen:
+            # If encoder is frozen, the Dataset returns the embedding directly
             enc_output = batch["embeddings"]
         elif self.task_type in ['regression', 'classification']:
+            # contains a sequence, not an embedding
             enc_output = protein_model.seq_to_embeddings(batch["embeddings"])  # (B, D)
         else:
+            # contains a sequence, not an embedding
             enc_output, _ = protein_model.seq_to_hiddens(batch["embeddings"])  # (B, S, D)
             batch_size, seq_len, emb_dim = enc_output.size()
             enc_output = torch.cat(
@@ -152,3 +171,11 @@ class FineTuneProteinModel(EncoderFineTuning):
             target = self.get_target_from_batch(batch)
         loss = self.loss_fn(output_tensor, target)
         return loss, output_tensor, target
+
+    def state_dict(self, destination=None, prefix=None, keep_vars=False):
+        custom_state_dict = super(FineTuneProteinModel, self).state_dict()
+
+        if self.full_cfg.get('use_peft', False):  # skipped if use_peft is false or not present in config
+            custom_state_dict.update(self.encoder_model.model.state_dict())
+
+        return custom_state_dict

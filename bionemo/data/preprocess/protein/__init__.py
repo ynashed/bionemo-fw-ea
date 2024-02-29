@@ -9,4 +9,6 @@
 # its affiliates is strictly prohibited.
 
 from .flip_preprocess import *
+from .open_protein_set import *
+from .pdb_mmcif import *
 from .preprocess import *

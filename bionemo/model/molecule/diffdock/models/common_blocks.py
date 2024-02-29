@@ -8,7 +8,6 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
-import os
 from typing import Literal
 
 import torch
@@ -101,7 +100,7 @@ class TensorProductAPI(nn.Module):
 
     @staticmethod
     def setup(in_irreps, sh_irreps, out_irreps, tp_type, tp_param, dtype):
-        if "USE_FAST_TP" in os.environ:
+        if tp_type == "fast_tp":
             tp = FastTP(str(in_irreps), str(sh_irreps), str(out_irreps), dtype=dtype)
         elif tp_type == "marta":
             tp = torch.jit.script(CUSTOM_TP_MAPPING[tp_param]())
@@ -168,9 +167,9 @@ class TensorProductConvLayer(NeuralModule):
         self.sh_irreps = sh_irreps
         self.residual = residual
         self.batch_norm_with_shift = batch_norm_with_shift
+        self.tp_type = tp_type
         if hidden_features is None:
             hidden_features = n_edge_features
-
         self.tp = TensorProductAPI(in_irreps, sh_irreps, out_irreps, tp_type, tp_param, dtype=dtype)
 
         self.fc = nn.Sequential(
@@ -185,7 +184,7 @@ class TensorProductConvLayer(NeuralModule):
         edge_src, edge_dst = edge_index
         edge_attr = self.fc(edge_attr)
 
-        if "USE_FAST_TP" in os.environ:
+        if self.tp_type == "fast_tp":
             tp = self.tp(node_attr[edge_dst], edge_sh, edge_attr)
         else:
             with autocast(enabled=False):

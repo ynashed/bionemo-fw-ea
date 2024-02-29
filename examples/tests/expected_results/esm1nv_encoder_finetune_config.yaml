@@ -2,6 +2,7 @@ name: esm1nv_sec_str
 do_training: true
 do_testing: false
 restore_from_path: ${oc.env:BIONEMO_HOME}/models/protein/esm1nv/esm1nv.nemo
+use_peft: false
 trainer:
   devices: 1
   num_nodes: 1
@@ -67,6 +68,8 @@ model:
   bert_binary_head: false
   resume_from_checkpoint: null
   masked_softmax_fusion: true
+  cnn_dim: 32
+  dropout_rate: 0.25
   tokenizer:
     library: sentencepiece
     type: null
@@ -109,6 +112,7 @@ model:
     use_upsampling: true
     seed: ${model.seed}
     max_seq_length: ${model.seq_length}
+    dynamic_padding: false
     dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/protein/downstream
     dataset:
       train: x000
@@ -119,7 +123,6 @@ model:
     perturb_percent: 0.5
     task_type: token-level-classification
     emb_batch_size: ${model.micro_batch_size}
-    dynamic_padding: "false"
     sequence_column: sequence
     target_column:
     - 3state

@@ -36,28 +36,17 @@ e3nn.set_optimization_defaults(optimize_einsums=True)
 
 THIS_FILE_DIR = os.path.dirname(os.path.realpath(__file__))
 PREPEND_CONFIG_DIR = os.path.join(THIS_FILE_DIR, './conf')
-TEST_DATA_DOWNLOAD_SCRIPT = os.path.join(
-    os.environ["BIONEMO_HOME"], 'examples/molecule/diffdock/scripts/download_data_sample.sh'
-)
 ROOT_DIR = 'diffdock'
 
 inputs = [
-    ('diffdock_score_training_test', None, 'USE_FAST_TP'),
-    ('diffdock_score_training_test', None, 'marta'),
-    ('diffdock_score_training_test', 'SizeAwareBatchSampler', 'USE_FAST_TP'),
+    ('diffdock_score_training_test', None, 'fast_tp'),
+    ('diffdock_score_training_test', 'SizeAwareBatchSampler', 'fast_tp'),
     ('diffdock_score_training_test', 'SizeAwareBatchSampler', 'marta'),
-    ('diffdock_confidence_training_test', None, 'USE_FAST_TP'),
+    ('diffdock_confidence_training_test', None, 'fast_tp'),
 ]
 
 
-@pytest.fixture(scope="session")
-def tmp_directory(tmp_path_factory, root_directory=ROOT_DIR):
-    """Create tmp directory"""
-    tmp_path_factory.mktemp(root_directory)
-    return tmp_path_factory.getbasetemp()
-
-
-def get_cfg(tmp_directory, prepend_config_path, config_name, config_path='conf'):
+def get_cfg(tmp_path, prepend_config_path, config_name, config_path='conf'):
     prepend_config_path = pathlib.Path(prepend_config_path)
 
     class TestSearchPathConfig(BioNemoSearchPathConfig):
@@ -70,7 +59,7 @@ def get_cfg(tmp_directory, prepend_config_path, config_name, config_path='conf')
         cfg = compose(config_name=config_name)
 
     with open_dict(cfg):
-        cfg.tmp_directory = tmp_directory
+        cfg.tmp_path = tmp_path
 
     return cfg
 
@@ -78,22 +67,13 @@ def get_cfg(tmp_directory, prepend_config_path, config_name, config_path='conf')
 @pytest.mark.slow
 @pytest.mark.needs_gpu
 @pytest.mark.parametrize("config_name, batch_sampler, tensor_prodcut_type", inputs)
-def test_diffdock_fast_dev_run(tmp_directory, config_name, batch_sampler, tensor_prodcut_type):
-    cfg = get_cfg(tmp_directory, PREPEND_CONFIG_DIR, config_name)
+def test_diffdock_fast_dev_run(tmp_path, config_name, batch_sampler, tensor_prodcut_type):
+    cfg = get_cfg(tmp_path, PREPEND_CONFIG_DIR, config_name)
     with open_dict(cfg):
         cfg.model.batch_sampler = batch_sampler
-    if tensor_prodcut_type == 'USE_FAST_TP':
-        os.environ['USE_FAST_TP'] = '1'
-    else:
-        if 'USE_FAST_TP' in os.environ:
-            del os.environ['USE_FAST_TP']
-        with open_dict(cfg):
-            cfg.model.tensor_product.type = tensor_prodcut_type
+        cfg.model.tensor_product.type = tensor_prodcut_type
 
-    if not os.path.exists(cfg.data.cache_path):
-        # download data from ngc
-        os.system(f"bash {TEST_DATA_DOWNLOAD_SCRIPT}")
-
+    DataManager.reset_instances()
     data_manager = DataManager(cfg)
     trainer = setup_trainer(cfg)
     if "all_atoms" in cfg.data and cfg.data.all_atoms:
@@ -102,5 +82,4 @@ def test_diffdock_fast_dev_run(tmp_directory, config_name, batch_sampler, tensor
         model = CGScoreModel(cfg=cfg, trainer=trainer, data_manager=data_manager)
 
     trainer.fit(model)
-    if 'USE_FAST_TP' in os.environ:
-        del os.environ['USE_FAST_TP']
+    DataManager.reset_instances()

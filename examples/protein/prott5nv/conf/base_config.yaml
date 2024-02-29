@@ -3,6 +3,7 @@ desc: Base parameters for ProtT5nv model
 do_training: True # set to false if data preprocessing steps must be completed
 do_testing: False # set to true to run evaluation on test data after training, requires test_dataset section
 restore_from_path: null # used when starting from a .nemo file
+use_peft: False # indicates whether we intend to use PEFT technique; not implemented for this model
 
 trainer:
   devices: 2 # number of GPUs or CPUs

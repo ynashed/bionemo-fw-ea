@@ -1,0 +1,56 @@
+defaults:
+  - dnabert_base_config
+
+# 2 devices 
+trainer:
+  devices: 2
+  val_check_interval: 10000
+
+  # Custom settings to reduce time spent in validation
+  log_every_n_steps: 1000
+  limit_val_batches: 8 # number of batches in validation step, use fraction for fraction of data, 0 to disable
+  limit_test_batches: 500 # number of batches in test step, use fraction for fraction of data, 0 to disable
+
+  # DNABERT publication uses 120k steps with a batch size of 2000 = 240,000,000 samples
+  max_steps: 400000 # consumed_samples = global_step * micro_batch_size * data_parallel_size * accumulate_grad_batches
+  # 400k * 16 * 2 = 12,800,000
+  # 400k * 32 * 2 = 12,800,000 (* 2)
+  # 400k * 64 * 2 = 12,800,000 (* 2 * 2)
+  # 400k * 128 * 2 = 12,800,000 (*8) = ~102,400,000 steps
+  precision: bf16
+
+model:
+  num_layers: 12
+  micro_batch_size: 128
+  pre_process: True # add embedding
+  post_process: True # add pooler
+  bert_binary_head: False # BERT binary head
+  tokenizer:
+    type: 'kmer'
+    k: 3
+    model: ${oc.env:BIONEMO_HOME}/tokenizers/dna/dnabert/vocab/dnabert${.k}.model
+    vocab_file: ${oc.env:BIONEMO_HOME}/tokenizers/dna/dnabert/vocab/dnabert${.k}.vocab
+  data:
+    dataset_path: ${oc.env:BIONEMO_HOME}/data/GRCh38.p13 # contains train / val / test folders
+    dataset: # inclusive range of data files to load or can load a single file, e.g. x000.csv
+      train: chr[1..19].fna.gz.chunked.fa
+      test: chr21.fna.gz.chunked.fa
+      val: chr20.fna.gz.chunked.fa
+    micro_batch_size: ${model.micro_batch_size}
+    num_workers: 24
+    dataloader_type: single
+    dataset_format: fasta
+    dynamic_padding: false # If True, each batch is padded to the maximum sequence length within that batch.
+        #    Set it to False when model.pipeline_model_parallel_size > 1, as pipeline parallelism requires fixed-length padding.
+  megatron_amp_O2: False # Set to True to go fast
+  precision: bf16
+exp_manager:
+  explicit_log_dir: null
+  exp_dir: ${oc.env:BIONEMO_HOME}/results/nemo_experiments/${.name}/${.wandb_logger_kwargs.name}
+  name: dnabert
+  create_wandb_logger: True
+  wandb_logger_kwargs:
+    project: null
+    name: dnabert-pretraining
+    offline: False
+  resume_if_exists: True

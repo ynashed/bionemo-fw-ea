@@ -40,13 +40,13 @@ done
 
 # All variables with default values must be defined in this section
 #=========================
-BIONEMO_IMAGE="nvcr.io/nvidia/clara/bionemo-framework:1.1"
-STORAGE_ROOT="/lustre/fsw/convai_bionemo_training/<user>/cache" # Add dataset path
+BIONEMO_IMAGE="nvcr.io/nvidian/clara-lifesciences/bionemo_equidock:0.1.0"
+STORAGE_ROOT="/lustre/fsw/convai_bionemo_training/amoradzadeh/cache" # Add dataset path (download possible through ngc dataset: processed DATASETID: 1610980, raw DATASETID: 1611195)
 WANDB_API_KEY= # Add WANDB API KEY
 MICRO_BATCH_SIZE=32 # Please check GPU mem size. 256 is recommended for A100 with 80 GB mem.
 JOB_TYPE='nemo-bionemo'
 EXP_NAME_PREFIX='bionemo'
-EXP_DIR="/home/<user>/result/"
+EXP_DIR="/home/amoradzadeh/result/"
 #=========================
 
 set -e

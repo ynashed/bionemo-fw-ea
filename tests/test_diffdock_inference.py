@@ -33,6 +33,9 @@ from bionemo.utils.tests import (
 e3nn.set_optimization_defaults(optimize_einsums=False)
 torch.use_deterministic_algorithms(True, warn_only=True)
 torch.backends.cudnn.benchmark = False
+torch.backends.cuda.matmul.allow_tf32 = False
+torch.backends.cuda.allow_tf32 = False
+torch.backends.cudnn.enabled = False
 
 BIONEMO_HOME = os.getenv("BIONEMO_HOME")
 THIS_FILE_DIR = os.path.dirname(os.path.realpath(__file__))
@@ -49,14 +52,7 @@ def test_model_exists():
     check_model_exists(CHECKPOINT_PATH[0]) and check_model_exists(CHECKPOINT_PATH[1])
 
 
-@pytest.fixture(scope="session")
-def tmp_directory(tmp_path_factory, root_directory=ROOT_DIR):
-    """Create tmp directory"""
-    tmp_path_factory.mktemp(root_directory)
-    return tmp_path_factory.getbasetemp()
-
-
-def get_cfg(tmp_directory, prepend_config_path, config_name, config_path='conf'):
+def get_cfg(tmp_path, prepend_config_path, config_name, config_path='conf'):
     prepend_config_path = pathlib.Path(prepend_config_path)
 
     class TestSearchPathConfig(BioNemoSearchPathConfig):
@@ -69,7 +65,7 @@ def get_cfg(tmp_directory, prepend_config_path, config_name, config_path='conf')
         cfg = compose(config_name=config_name)
 
     with open_dict(cfg):
-        cfg.tmp_directory = tmp_directory
+        cfg.tmp_path = tmp_path
 
     return cfg
 
@@ -79,8 +75,8 @@ def get_cfg(tmp_directory, prepend_config_path, config_name, config_path='conf')
 @pytest.mark.needs_checkpoint
 @pytest.mark.skip_if_no_file(CHECKPOINT_PATH[0])
 @pytest.mark.skip_if_no_file(CHECKPOINT_PATH[1])
-def test_dffdock_inference(tmp_directory):
-    cfg = get_cfg(tmp_directory, PREPEND_CONFIG_DIR, "diffdock_infer_test")
+def test_diffdock_inference(tmp_path):
+    cfg = get_cfg(tmp_path, PREPEND_CONFIG_DIR, "diffdock_infer_test")
     seed_everything(42, workers=True)
 
     # process input and build inference datasets for score model, and confidence model, build dataloader
@@ -116,5 +112,5 @@ def test_dffdock_inference(tmp_directory):
 
     ref_ligand = np.load(os.path.join(os.path.dirname(cfg.protein_path), "ref_ligand.npz"))
 
-    assert np.allclose(ligand_pos, ref_ligand['ref_ligand_pos'], atol=1.0e-2)
+    assert np.allclose(ligand_pos, ref_ligand['ref_ligand_pos'])
     assert np.allclose(confidence, ref_ligand['ref_confidence'])

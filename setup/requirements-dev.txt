@@ -2,3 +2,15 @@ ruff==0.0.292
 black==23.1.0
 pre-commit==3.4.0
 ipdb==0.13.11
+# For container security fixes
+# These must be last because they may override prior versions
+pyarrow==14.0.1
+transformers==4.36.0
+triton==2.1.0
+pillow==10.2.0
+jupyterlab==3.6.7
+aiohttp==3.9.0
+setuptools==65.5.1
+mpmath==1.3.0
+GitPython==3.1.41
+certifi==2023.7.22

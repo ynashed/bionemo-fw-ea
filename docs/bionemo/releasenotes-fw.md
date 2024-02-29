@@ -1,4 +1,26 @@
 # Release Notes
+## BioNeMo Framework v1.2
+## New Models
+* OpenFold implementation under BioNeMo framework, derived from public OpenFold and DeepMind AlphaFold-2.
+* DNABERT implementation for computing embeddings for each nucleotide in the input DNA sequence.
+
+### New Features
+* Training recipes for DNABERT and OpenFold, including automated data processing and full configuration for training.
+* Example tutorials for running inference using OpenFold.
+* Splice Prediction downstream task example for DNABERT.
+* Wrapper scripts for DNABERT and OpenFold to launch jobs on BCP.
+
+### Bug fixes and Improvements
+* Interface changes for ESM2 data ingestion and pre-processing: To allow useage of separate datasets for train/validation/test datasets,  `config.model.data.dataset_path` has been deprecated and replaced with `config.model.data.train.dataset_path`, `config.model.data.val.dataset_path` and `config.model.data.test.dataset_path`.
+
+### Experimental Code
+* There is an enformer model that is currently work in progress in `bionemo/model/dna/enformer` and `examples/dna/enformer`.
+
+### Known Issues
+* OpenFold training speed does not yet include [MLPerf optimizations](https://blogs.nvidia.com/blog/scaling-ai-training-mlperf/), and these will be released in the subsequent release.
+* The container contains a [known vulnerability](https://github.com/advisories/GHSA-w596-4wvx-j9j6) which is exposed when using Apache Subversion (SVN).
+* The container contains five other high risk vulnerabilities associated with the NGC CLI which is used to download models from the NGC Registry. The BioNeMo Framework container is a means of shipping a functional development environment, not as a production service container. [A full vulnerability report can always be found on the NGC Registry](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/clara/containers/bionemo-framework/security).
+
 ## BioNeMo Framework v1.1
 ## New Models
 * EquiDock for protein-protein docking pose prediction
@@ -19,9 +41,9 @@
 
 ### Security Notice
 
-SchedMD Slurm in the release container is shipped with a security vulnerability, [CVE-2022-29501](https://ubuntu.com/security/CVE-2022-29501), and therefore this version of Slurm should not be used to run a Slurm cluster (specifically, the processes `slurmdbd`, `slurmctld`, and `slurmd`).
+SchedMD Slurm in the release container is shipped with a security vulnerability, [CVE-2022-29501](https://ubuntu.com/security/CVE-2022-29501), and therefore this version of Slurm should not be used to run a Slurm cluster (specifically, the processes `slurmdbd`, `slurmctld`, and `slurmd`.
 
-In general, the BioNeMo Framework container is designed to ship code and an environment that would be executed on local workstations, or deployed on clusters for large scale training jobs. This container is not designed to run as a service with public facing APIs. A full summary of security vulnerabilities can be found [here](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/clara/containers/bionemo-framework/security).
+In general, the BioNeMo Framework release is designed to ship code and an environment that would be executed on local workstations, or deployed on clusters for large scale training jobs. This container is not designed to run as a service with public facing APIs. A full summary of security vulnerabilities can be found [here](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/clara/containers/bionemo-framework/security).
 
 ## BioNeMo Framework v1.0
 ## New Models

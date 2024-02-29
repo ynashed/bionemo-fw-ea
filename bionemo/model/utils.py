@@ -18,6 +18,7 @@ from nemo.collections.nlp.parts.nlp_overrides import (
     MegatronHalfPrecisionPlugin,
     NLPDDPStrategy,
     NLPSaveRestoreConnector,
+    PEFTSaveRestoreConnector,
     PipelineMixedPrecisionPlugin,
 )
 from nemo.utils import logging
@@ -119,6 +120,10 @@ class TrainerBuilder:
         n_nodes = cfg.trainer.num_nodes
         acc_grad_batches = cfg.trainer.get("accumulate_grad_batches", 1)
 
+        # Note: NeMo framework allows users to specify the global batch size and it infers the accumulate grad batches
+        # and other parameters. In NeMo you need to have accumulate grad batches = 1. In BioNemo, we want to directly
+        # change and manipulate these values, which BioNemo allows. However, this function below enables us to
+        # convert that back into the NeMo compatible methods.
         global_batch_size = infer_global_batch_size(
             micro_batch_size=micro_batch_size,
             n_devices=n_devices,
@@ -302,11 +307,24 @@ def restore_model(
             cfg.model = OmegaConf.merge(cfg.model, restore_cfg)
         cfg.model.precision = trainer.precision
 
+    if cfg.get('use_peft', False):  # skipped if use_peft is false or not present in config
+        if cfg.model.resume_from_checkpoint is not None:
+            resume_from_checkpoint = cfg.model.resume_from_checkpoint
+        else:
+            resume_from_checkpoint = trainer._checkpoint_connector.resume_from_checkpoint_fit_path
+        logging.info(f'Resuming training from checkpoint: {resume_from_checkpoint}')
+
+        save_restore_connector = PEFTSaveRestoreConnector(
+            peft_model_nemo_path=cfg.model.peft.restore_from_path, peft_model_ckpt_path=resume_from_checkpoint
+        )
+    else:
+        save_restore_connector = NLPSaveRestoreConnector()
+
     model = model_cls.restore_from(
         restore_path=restore_path,
         trainer=trainer,
         override_config_path=cfg,
-        save_restore_connector=NLPSaveRestoreConnector(),
+        save_restore_connector=save_restore_connector,
         strict=strict,
     )
     if cfg.get('load_from_checkpoint') is not None:

@@ -34,6 +34,9 @@ class Singleton(type):
             cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
         return cls._instances[cls]
 
+    def reset_instances(cls):
+        cls._instances = {}
+
 
 class DataManager(metaclass=Singleton):
     def __init__(self, cfg) -> None:

@@ -16,6 +16,8 @@ from diffdock.TensorProduct import FullyConnectedTPFunction
 from nemo.utils import logging
 from torch.nn.modules.module import T
 
+from bionemo.utils.logging import warn_once
+
 
 class FullyConnectedTP(torch.nn.Module):
     def __init__(
@@ -210,5 +212,5 @@ class FullyConnectedTP(torch.nn.Module):
         Returns:
             Module: self
         """
-        logging.warning("FullyConnectedTP can only be used with cuda device, as such .cpu() is doing nothing here")
+        warn_once("FullyConnectedTP can only be used with cuda device, as such .cpu() is doing nothing here")
         return self

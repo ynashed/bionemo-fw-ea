@@ -1,0 +1,24 @@
+defaults:
+  - openfold_initial_training
+  - _self_
+
+model:
+  num_train_iters: 100
+  data:
+    dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/openfold_data # only if downloaded
+    filter_by_alignments: true
+  train_ds:
+    defer_setup: true
+  validation_ds:
+    defer_setup: true
+    val_min_cameo_submission_date: "1997-01-01"
+
+trainer:
+  num_nodes: 1
+  devices: 1
+  val_check_interval: 20
+
+exp_manager:
+  exp_dir: ${oc.env:BIONEMO_HOME}/test_results/nemo_experiments/openfold/
+  wandb_logger_kwargs:
+    offline: True

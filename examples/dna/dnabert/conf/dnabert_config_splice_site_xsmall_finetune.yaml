@@ -1,0 +1,58 @@
+defaults:
+  - dnabert_xsmall
+
+target: bionemo.model.dna.dnabert.dnabert_model.DNABERTModel # path to model class to load
+infer_target: bionemo.model.dna.dnabert.infer.DNABERTInference  # path to inferende class to load
+
+do_training: true
+do_prediction: false
+
+restore_from_path: ??? # Restores from an existing downstream-task model nemo file.
+predictions_output_file: preds.txt
+
+trainer:
+  devices: 1
+  val_check_interval: 100
+  max_steps: 6000
+
+model:
+  restore_encoder_path: null # Points to a .nemo file containing the pretrained xsmall DNABERT
+  encoder_frozen: False # encoder trainable or frozen
+  target_name: 'target'
+
+  # Controls task head
+  n_outputs: 3
+  hidden_layer_size: 64
+  global_batch_size: null # if null will be computed automatically
+
+  micro_batch_size: 64
+  data:
+    root_directory: ${oc.env:BIONEMO_HOME}/data
+    dataset_path: ${oc.env:BIONEMO_HOME}/examples/dna/data/splice-site-prediction/sampled-data-30k/
+    # Get these paths by running the GRCh38Ensembl99GFF3ResourcePreprocessor in bionemo/data/preprocess/dna/preprocess.py
+    train_file: ${oc.env:BIONEMO_HOME}/examples/dna/data/splice-site-prediction/sampled-data-30k/train.csv
+    val_file: ${oc.env:BIONEMO_HOME}/examples/dna/data/splice-site-prediction/sampled-data-30k/val.csv
+    predict_file: ${oc.env:BIONEMO_HOME}/examples/dna/data/splice-site-prediction/sampled-data-30k/test.csv
+    # Ensure the fasta files are the same used to create the GFFs which generate the csvs.
+    fasta_directory: ${oc.env:BIONEMO_HOME}/examples/dna/data/splice-site-prediction/GRCh38.ensembl.99
+    fasta_pattern: Homo_sapiens.GRCh38.dna.chromosome.{}.fa.gz
+    num_sites_to_include: 30000
+
+    train_perc: .8
+    val_perc: .1
+    test_perc: .1
+
+  finetuning_optim: # optimizer parameters for downstream task model
+    name: adam
+    lr: 0.0001
+
+exp_manager:
+  explicit_log_dir: null
+  exp_dir: ${oc.env:BIONEMO_HOME}/results/nemo_experiments/${.name}/${.wandb_logger_kwargs.name}
+  name: dnabert-splicesite
+  create_wandb_logger: True
+  wandb_logger_kwargs:
+    project: null
+    name: dnabert-splicesite
+    offline: False
+  resume_if_exists: False

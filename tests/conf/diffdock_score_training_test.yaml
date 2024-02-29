@@ -5,7 +5,7 @@ hydra:
   searchpath:
      - ${oc.env:BIONEMO_HOME}/examples/molecule/diffdock/conf
 
-tmp_directory: ???
+tmp_path: ???
 
 
 name: diffdock_score_training_test
@@ -29,4 +29,4 @@ model:
 
 exp_manager:
   create_wandb_logger: False
-  exp_dir: ${tmp_directory}/result/${name}
+  exp_dir: ${tmp_path}/result/${name}

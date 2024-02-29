@@ -27,8 +27,9 @@ from omegaconf import OmegaConf
 from pytorch_lightning import seed_everything
 
 from bionemo.callbacks import setup_dwnstr_task_validation_callbacks
-from bionemo.data.diffdock.data_manager import DataManager as DiffdockDataManagers
+from bionemo.data.diffdock.data_manager import DataManager as DiffdockDataManager
 from bionemo.data.equidock import DataManager
+from bionemo.model.dna.dnabert.dnabert_model import DNABERTModel
 from bionemo.model.molecule.diffdock.models.nemo_model import (
     DiffdockTensorProductScoreModel as DiffdockScoreModel,
 )
@@ -39,6 +40,7 @@ from bionemo.model.molecule.megamolbart import FineTuneMegaMolBART, MegaMolBARTM
 from bionemo.model.protein.downstream import FineTuneProteinModel
 from bionemo.model.protein.equidock.equidock_model import EquiDock
 from bionemo.model.protein.esm1nv import ESM1nvModel, ESM2nvModel
+from bionemo.model.protein.openfold.openfold_model import AlphaFold
 from bionemo.model.protein.prott5nv import ProtT5nvModel
 from bionemo.model.utils import setup_trainer
 from bionemo.utils.connectors import BioNeMoSaveRestoreConnector
@@ -60,7 +62,6 @@ logging.getLogger('nemo_logger').setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 # Pretraining, encoder finetuning and secondary structure validation-in-the-loop tests
-
 PREPEND_CONFIG_DIR = [
     '../molecule/megamolbart/conf',
     '../molecule/megamolbart/conf',
@@ -74,7 +75,9 @@ PREPEND_CONFIG_DIR = [
     '../molecule/diffdock/conf',
     '../protein/equidock/conf',
     '../protein/equidock/conf',
+    '../protein/openfold/conf',
     '../protein/esm2nv/conf',
+    '../dna/dnabert/conf',
 ]
 CONFIG_NAME = [
     'megamolbart_downstream_retro_test',
@@ -89,8 +92,12 @@ CONFIG_NAME = [
     'diffdock_confidence_test',
     'equidock_pretrain_test',
     'equidock_finetune_test',
+    'openfold_initial_training_test',
     'esm2nv_8M_test',
+    'dnabert_test',
 ]
+
+
 CORRECT_CONFIG = [
     'megamolbart_retro_config',
     'megamolbart_config',
@@ -104,7 +111,9 @@ CORRECT_CONFIG = [
     'diffdock_confidence_config',
     'equidock_pretrain_config',
     'equidock_finetune_config',
+    'openfold_initial_training_config',
     'esm2nv_8M_config',
+    'dnabert_config',
 ]
 CORRECT_RESULTS = [
     'megamolbart_retro_log.json',
@@ -119,7 +128,9 @@ CORRECT_RESULTS = [
     'diffdock_confidence_log.json',
     'equidock_pretrain_log.json',
     'equidock_finetune_log.json',
+    'openfold_initial_training_log.json',
     'esm2nv_8M_log.json',
+    'dnabert_log.json',
 ]
 MODEL_CLASS = [
     MegaMolBARTRetroModel,
@@ -134,7 +145,9 @@ MODEL_CLASS = [
     DiffdockConfidenceModel,
     EquiDock,
     EquiDock,
+    AlphaFold,
     ESM2nvModel,
+    DNABERTModel,
 ]
 MODEL_PARAMETERS = [
     45058048,
@@ -149,7 +162,9 @@ MODEL_PARAMETERS = [
     4769636,
     525671,
     684074,
+    93229082,
     7542848,
+    8121216,
 ]
 
 
@@ -223,7 +238,7 @@ def test_model_size(prepend_config_path, config_name, model_class, model_paramet
     if model_class == FineTuneProteinModel or model_class == FineTuneMegaMolBART:
         model = model_class(cfg, trainer)
     elif model_class == DiffdockScoreModel or model_class == DiffdockConfidenceModel:
-        data_manager = DiffdockDataManagers(cfg)
+        data_manager = DiffdockDataManager(cfg)
         model = model_class(cfg=cfg, trainer=trainer, data_manager=data_manager)
     elif model_class == EquiDock:
         data_manager = DataManager(cfg)
@@ -260,11 +275,13 @@ def test_model_training(prepend_config_path, config_name, model_class, correct_r
             override_config_path=cfg,
         )
     elif model_class == DiffdockScoreModel or model_class == DiffdockConfidenceModel:
-        if 'USE_FAST_TP' in os.environ:
-            del os.environ['USE_FAST_TP']
         torch.use_deterministic_algorithms(True, warn_only=True)
         torch.backends.cudnn.benchmark = False
-        data_manager = DiffdockDataManagers(cfg)
+        torch.backends.cuda.matmul.allow_tf32 = False
+        torch.backends.cuda.allow_tf32 = False
+        torch.backends.cudnn.enabled = False
+        DiffdockDataManager.reset_instances()
+        data_manager = DiffdockDataManager(cfg)
         model = model_class(cfg=cfg, trainer=trainer, data_manager=data_manager)
     elif model_class == EquiDock:
         data_manager = DataManager(cfg)
@@ -300,10 +317,19 @@ def test_model_training(prepend_config_path, config_name, model_class, correct_r
         assert False, msg
 
     expected_results = load_expected_training_results(results_comparison_dir, correct_results)
+    if model_class == DNABERTModel:
+        # DNABERT Takes longer to reach consistency with convergence, thus we have increased the tolerance.
+        check_expected_training_results(
+            trainer_results,
+            expected_results,
+            tol=1,
+            err_msg="\nIn order to update please use the folllowing command:\n UPDATE_EXPECTED_RESULTS=1 pytest examples/tests/test_model_pretrain_and_downstream.py",
+        )
 
-    check_expected_training_results(
-        trainer_results,
-        expected_results,
-        err_msg="\nIn order to update please use the folllowing command:\n UPDATE_EXPECTED_RESULTS=1 pytest examples/tests/test_model_pretrain_and_downstream.py",
-    )
+    else:
+        check_expected_training_results(
+            trainer_results,
+            expected_results,
+            err_msg="\nIn order to update please use the folllowing command:\n UPDATE_EXPECTED_RESULTS=1 pytest examples/tests/test_model_pretrain_and_downstream.py",
+        )
     assert True

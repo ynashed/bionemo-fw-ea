@@ -18,7 +18,9 @@ def train_args():
         'trainer.max_steps': 20,
         'trainer.val_check_interval': 10,
         'trainer.limit_val_batches': 2,
+        'model.data.val.use_upsampling': True,
         'trainer.limit_test_batches': 1,
+        'model.data.test.use_upsampling': True,
         'exp_manager.create_wandb_logger': False,
         'exp_manager.create_tensorboard_logger': False,
         'model.micro_batch_size': 2,
@@ -42,6 +44,8 @@ DIRS_TO_TEST = [
     'examples/protein/esm1nv/',
     'examples/protein/esm2nv/',
     'examples/protein/prott5nv/',
+    'examples/protein/openfold/',
+    'examples/dna/dnabert/',
     'examples/molecule/diffdock/',
 ]
 
@@ -74,52 +78,92 @@ def get_data_overrides(script_or_cfg_path: str) -> str:
         'esm2nv',
         'prott5nv',
         'downstream',
+        'openfold',
+        'dnabert',
         'diffdock',
     ), 'update this function, patterns might be wrong'
 
     task = {
         'molecule': 'physchem/SAMPL',
         'protein': 'downstream',
+        'dna': 'downstream',
     }
 
     if conf == ['conf']:
-        if model in ('megamolbart'):
+        if model in ('megamolbart', 'openfold'):
             return ''
         else:
             return MAIN % f'{domain}/{task[domain]}/test/x000'
 
     if 'retro' in script:
         return MAIN % 'reaction'
+    elif model == 'openfold':
+        return MAIN % 'openfold_data'
     elif model == 'diffdock':
         return (
             f' ++data.split_train={TEST_DATA_DIR}/molecule/diffdock/splits/split_train'
-            + f' ++data.split_val={TEST_DATA_DIR}/molecule/diffdock/splits/split_val'
-            + f' ++data.split_test={TEST_DATA_DIR}/molecule/diffdock/splits/split_test'
-            + f' ++data.cache_path={TEST_DATA_DIR}/molecule/diffdock/data_cache'
+            f' ++data.split_val={TEST_DATA_DIR}/molecule/diffdock/splits/split_val'
+            f' ++data.split_test={TEST_DATA_DIR}/molecule/diffdock/splits/split_test'
+            f' ++data.cache_path={TEST_DATA_DIR}/molecule/diffdock/data_cache'
         )
     elif 'downstream' in script:
-        return MAIN % f'{domain}/{task[domain]}'
+        if model == 'dnabert':
+            fasta_directory = os.path.join(TEST_DATA_DIR, 'dna/downstream')
+            fasta_pattern = fasta_directory + '/test-chr1.fa'
+            splicesite_overrides = (
+                f"++model.data.fasta_directory={fasta_directory} "
+                "++model.data.fasta_pattern=" + fasta_pattern + " "
+                f"++model.data.train_file={fasta_directory}/train.csv "
+                f"++model.data.val_file={fasta_directory}/val.csv "
+                f"++model.data.predict_file={fasta_directory}/test.csv "
+            )
+            return splicesite_overrides
+        else:
+            return MAIN % f'{domain}/{task[domain]}'
+    elif model == 'dnabert':
+        DNABERT_TEST_DATA_DIR = os.path.join(BIONEMO_HOME, 'examples/dna/dnabert/data/small-example')
+        dnabert_overrides = (
+            f"++model.data.dataset_path={DNABERT_TEST_DATA_DIR} "
+            "++model.data.dataset.train=chr1-trim-train.fna "
+            "++model.data.dataset.val=chr1-trim-val.fna "
+            "++do_training=True "
+            "++model.data.dataset.test=chr1-trim-test.fna "
+        )
+        return dnabert_overrides
     elif model == 'esm2nv' and "infer" not in script:
         # TODO(dorotat) Simplify this case when data-related utils for ESM2 are refactored
         UNIREF_FOLDER = "uniref202104_esm2_qc_test200_val200"
+        MAIN = f'{DATA}.train.dataset_path={TEST_DATA_DIR}/%s'
         esm2_overwrites = (
-            MAIN % f'{UNIREF_FOLDER}/uf50' + f"{DATA}.cluster_mapping_tsv={TEST_DATA_DIR}/{UNIREF_FOLDER}/mapping.tsv"
-            f"{DATA}.index_mapping_dir={TEST_DATA_DIR}/{UNIREF_FOLDER}"
-            f"{DATA}.uf90.uniref90_path={TEST_DATA_DIR}/{UNIREF_FOLDER}/uf90/"
-            + DOWNSTREAM % f'{domain}/{task[domain]}'
+            MAIN % f'{UNIREF_FOLDER}/uf50'
+            + f"{DATA}.train.cluster_mapping_tsv={TEST_DATA_DIR}/{UNIREF_FOLDER}/mapping.tsv"
+            f"{DATA}.train.index_mapping_dir={TEST_DATA_DIR}/{UNIREF_FOLDER}"
+            f"{DATA}.train.uf90.uniref90_path={TEST_DATA_DIR}/{UNIREF_FOLDER}/uf90/"
+            f"{DATA}.val.dataset_path={TEST_DATA_DIR}/{UNIREF_FOLDER}/uf50/"
+            f"{DATA}.test.dataset_path={TEST_DATA_DIR}/{UNIREF_FOLDER}/uf50/" + DOWNSTREAM % f'{domain}/{task[domain]}'
         )
         return esm2_overwrites
+
     else:
         return (MAIN + DOWNSTREAM) % (domain, f'{domain}/{task[domain]}')
 
 
 def get_train_args_overrides(script_or_cfg_path, train_args):
     root, domain, model, *conf, script = script_or_cfg_path.split('/')
-    if model == "diffdock":
+    if model == "openfold":
+        # FIXME: provide even smaller data sample or do not generate MSA features
+        pytest.skip(reason="CI infrastructure is too limiting")
+        train_args['model.micro_batch_size'] = 1
+        train_args['model.train_ds.num_workers'] = 1
+        train_args['model.train_sequence_crop_size'] = 32
+        # do not use kalign as it requires third-party-download and it not essential for testing
+        train_args['model.data.realign_when_required'] = False
+    elif model == "diffdock":
         # Use size aware batch sampler, and set the size control to default
         train_args['model.micro_batch_size'] = 2
         train_args['model.estimate_memory_usage.maximal'] = 'null'
         train_args['model.max_total_size'] = 'null'
+        train_args['model.tensor_product.type'] = 'fast_tp'
 
     return train_args
 
@@ -133,7 +177,7 @@ def test_train_scripts(script_path, train_args, data_args, tmp_path):
         f'++{k}={v}' for k, v in train_args.items()
     )
     # TODO(dorotat) Trye to simplify  when data-related utils for ESM2 are refactored
-    if "esm2" not in script_path:
+    if "esm2" not in script_path and "dnabert" not in script_path:
         cmd += ' ' + ' '.join(f'++{k}={v}' for k, v in data_args.items())
     print(cmd)
     process_handle = subprocess.run(cmd, shell=True, capture_output=True)
@@ -142,6 +186,13 @@ def test_train_scripts(script_path, train_args, data_args, tmp_path):
 
 
 def get_infer_args_overrides(config_path, tmp_path):
+    if 'openfold' in config_path:
+        return {
+            # cropped 7YVT_B  # cropped 7ZHL
+            # predicting on longer sequences will result in CUDA OOM.
+            # TODO: if preparing MSA is to be tested, the model has to be further scaled down
+            'sequences': r"\['GASTATVGRWMGPAEYQQMLDTGTVVQSSTGTTHVAYPAD','MTDSIKTLSAHRSFGGVQHFHEHASREIGLPMRFAAYLPP'\]"
+        }
     if 'diffdock' in config_path:
         return {
             # save the inference results to tmp_path.
@@ -154,6 +205,9 @@ def get_infer_args_overrides(config_path, tmp_path):
 @pytest.mark.needs_gpu
 @pytest.mark.parametrize('config_path', INFERENCE_CONFIGS)
 def test_infer_script(config_path, tmp_path):
+    if 'dnabert' in config_path:
+        # Inference scripts make assumptions that are not met for DNABERT.
+        return
     config_dir, config_name = os.path.split(config_path)
     script_path = os.path.join(os.path.dirname(config_dir), 'infer.py')
     infer_args = get_infer_args_overrides(config_path, tmp_path)
@@ -168,6 +222,7 @@ def test_infer_script(config_path, tmp_path):
     if 'retro' in config_path:
         model_checkpoint_path = os.path.join(BIONEMO_HOME, "models/molecule/megamolbart/megamolbart.nemo")
         cmd += f" model.downstream_task.restore_from_path={model_checkpoint_path}"
+
     cmd += get_data_overrides(config_path)
     process_handle = subprocess.run(cmd, shell=True, capture_output=True)
     error_out = process_handle.stderr.decode('utf-8')

@@ -72,7 +72,7 @@ model:
                       # if using other batch_sampler, this will be the exact mirco batch size
   global_batch_size: null # this will be set automatically by the `setup_trainer(cfg)`
   batch_sampler: SizeAwareBatchSampler # null, SizeAwareBatchSampler
-  max_total_size: 70000.0 # only used for batch_sampler is SizeAwareBatchSampler, upper bound of memory usage, unit MiB
+  max_total_size: null    # only used for batch_sampler is SizeAwareBatchSampler, upper bound of memory usage, unit MiB
                           # as memory usage changes as diffusion step changes, so in the SizeAwareBatchSampler, 
                           # we use a upper bound for maximal memory usage when generating each batch of samples
                           # this can be slightly larger than model.estimate_memory_usage.maximal, 1.1 ~ 1.15 * model.estimate_memory_usage.maximal
@@ -91,7 +91,7 @@ model:
     coeff_receptor_num_edges: 0.11
     coeff_num_cross_edges: 0.25
     bias: 435.0
-    maximal: 60000.0 # skip the batch if estimated memory is lager than this number, unit MiB 
+    maximal: null    # skip the batch if estimated memory is lager than this number, unit MiB 
                      # in the forward call of the score model, forward diffusion is done, we can get an accurate estimation of memory usage
                      # so here we have a much tighter memory threshold, if memory is over maximal, most likely it will lead to crash due to OOM
                      # 37000 on A6000, 60000 on A100, 17000 on RTX3090
@@ -130,7 +130,7 @@ model:
                                # batch norm makes the prediction more stable rather than go wildly and lead to nan values
   tensor_product:
     use_second_order_repr: False
-    type: "e3nn" # choose from ["e3nn" (default), "marta"]
+    type: "e3nn" # choose from ["e3nn" (default), "marta", "fast_tp"] NOTE: if use_second_order_repr is True, it must be e3nn at this time
   cross_max_distance: 80.0
   dynamic_max_cross: True
   dropout: 0.1

@@ -1,4 +1,3 @@
-
 # Preparing Workspace and Data for Pre-training
 
 This section outlines the steps to 
@@ -21,6 +20,8 @@ tutorial.
 The commands below expect that you have the NGC CLI [installed](https://docs.nvidia.com/base-command-platform/user-guide/latest/index.html#installing-ngc-cli) and [configured](https://docs.nvidia.com/base-command-platform/user-guide/latest/#configuring-the-cli-for-your-use)
 on your machine.  All of the commands below can then be run outside of a BioNeMo Docker 
 container.  Your machine serves as a terminal for submitting NGC commands.
+
+NOTE: If this is your first time, make sure to follow the instructions on the [pre-requisites documentation](./pre-reqs.md) page!
 
 ## Part 1: Create a Workspace
 ### Step 1.1: Add Variables to Your Environment
@@ -53,7 +54,7 @@ replace `my_ngc_workspace` with your desired workspace name.
 ```bash
 # shell on your machine
 NGC_WORKSPACE_NAME=my_ngc_workspace
-ngc workspace create --name "${NGC_WORKSPACE_NAME}" --ace "${ACE}"
+ngc workspace create --name "${NGC_WORKSPACE_NAME}" --ace "${ACE}" --org nvidian
 ```
 
 Store the workspace ID provided after creating the workspace in a location 
@@ -70,7 +71,7 @@ Mount the NGC workspace to a directory on your machine using the following
 command.  
 ```bash
 mkdir ~/ngc_workspace_mount
-ngc workspace mount "${WKSP_ID}" ~/ngc_workspace_mount --mode RW
+ngc workspace mount "${WKSP_ID}" ~/ngc_workspace_mount --mode RW --org nvidian
 ```
 Note:
 1. Data transfer between the NGC workspace and your machine's hard-drive can be 
@@ -117,7 +118,7 @@ If successfull, you will see output like
 ```
 Store the `Id` to a shell variable
 ```bash
-JOB_ID=job-id-with-7-digits
+export JOB_ID=job-id-with-7-digits
 ```
 In a separate shell instance, submit a request to NGC to start a 
 shell in the NGC-hosted container

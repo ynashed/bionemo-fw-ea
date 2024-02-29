@@ -42,7 +42,7 @@ launch.sh [command]
 
     pull               - pull an existing container
     download           - download pre-trained models
-    download_test_data - download data necessary for diffdock tests.
+    download_test_data - download data necessary for openfold, diffdock tests.
     download_all       - download_test_data and download pretrained models.
     build              - build a container, only recommended if customization is needed
     run                - launch the docker container in non-dev mode. Code is cloned from git and installed.
@@ -101,25 +101,35 @@ EOF
 }
 
 # Defaults for `.env` file
-BIONEMO_IMAGE=${BIONEMO_IMAGE:=nvcr.io/nvidian/cvai_bnmo_trng/bionemo:dev}
-LOCAL_REPO_PATH=$(pwd)
-DOCKER_REPO_PATH=${DOCKER_REPO_PATH:=/workspace/bionemo}
-LOCAL_RESULTS_PATH=${LOCAL_RESULTS_PATH:=${LOCAL_REPO_PATH}/results}
-DOCKER_RESULTS_PATH=${DOCKER_RESULTS_PATH:=${DOCKER_REPO_PATH}/results}
-LOCAL_DATA_PATH=${LOCAL_DATA_PATH:=${LOCAL_REPO_PATH}/data}
-DOCKER_DATA_PATH=${DOCKER_DATA_PATH:=${DOCKER_REPO_PATH}/data}
-LOCAL_MODELS_PATH=${LOCAL_MODELS_PATH:=${LOCAL_REPO_PATH}/models}
-DOCKER_MODELS_PATH=${DOCKER_MODELS_PATH:=${DOCKER_REPO_PATH}/models}
-WANDB_API_KEY=${WANDB_API_KEY:=NotSpecified}
-JUPYTER_PORT=${JUPYTER_PORT:=8888}
-REGISTRY=${REGISTRY:=nvcr.io}
-REGISTRY_USER=${REGISTRY_USER:='$oauthtoken'}
-DEV_CONT_NAME=${DEV_CONT_NAME:=bionemo}
-NGC_CLI_API_KEY=${NGC_CLI_API_KEY:=NotSpecified}
-NGC_CLI_ORG=${NGC_CLI_ORG:=nvidian}
-NGC_CLI_TEAM=${NGC_CLI_TEAM:=NotSpecified}
-NGC_CLI_FORMAT_TYPE=${NGC_CLI_FORMAT_TYPE:=ascii}
-GITLAB_TOKEN=${GITLAB_TOKEN:=NotSpecified}
+# export BIONEMO_IMAGE=${BIONEMO_IMAGE:=nvcr.io/nvidian/cvai_bnmo_trng/bionemo:dev}
+export BIONEMO_IMAGE=${BIONEMO_IMAGE:=nvcr.io/nvidia/clara/bionemo-framework:1.2}
+export LOCAL_REPO_PATH=$(pwd)
+export DOCKER_REPO_PATH=${DOCKER_REPO_PATH:=/workspace/bionemo}
+export LOCAL_RESULTS_PATH=${LOCAL_RESULTS_PATH:=${LOCAL_REPO_PATH}/results}
+export DOCKER_RESULTS_PATH=${DOCKER_RESULTS_PATH:=${DOCKER_REPO_PATH}/results}
+export LOCAL_DATA_PATH=${LOCAL_DATA_PATH:=${LOCAL_REPO_PATH}/data}
+export DOCKER_DATA_PATH=${DOCKER_DATA_PATH:=${DOCKER_REPO_PATH}/data}
+export LOCAL_MODELS_PATH=${LOCAL_MODELS_PATH:=${LOCAL_REPO_PATH}/models}
+export DOCKER_MODELS_PATH=${DOCKER_MODELS_PATH:=${DOCKER_REPO_PATH}/models}
+export WANDB_API_KEY=${WANDB_API_KEY:=NotSpecified}
+export JUPYTER_PORT=${JUPYTER_PORT:=8888}
+export REGISTRY=${REGISTRY:=nvcr.io}
+export REGISTRY_USER=${REGISTRY_USER:='$oauthtoken'}
+export DEV_CONT_NAME=${DEV_CONT_NAME:=bionemo}
+export NGC_CLI_API_KEY=${NGC_CLI_API_KEY:=NotSpecified}
+export NGC_CLI_ORG=${NGC_CLI_ORG:=nvidian}
+export NGC_CLI_TEAM=${NGC_CLI_TEAM:=NotSpecified}
+export NGC_CLI_FORMAT_TYPE=${NGC_CLI_FORMAT_TYPE:=ascii}
+export GITLAB_TOKEN=${GITLAB_TOKEN:=NotSpecified}
+# NOTE: Some variables need to be present in the environment of processes this script kicks off.
+#       Most notably, `docker build` requires the GITLAB_TOKEN env var. Otherwise, building fails.
+#
+#       For uniformity of behavior between externally setting an environment variable before
+#       executing this script and using the .env file, we make sure to explicitly `export` every
+#       environment variable that we use and may define in the .env file.
+#
+#       This way, all of these variables and their values will always guarenteed to be present
+#       in the environment of all processes forked from this script's.
 
 
 # if $LOCAL_ENV file exists, source it to specify my environment
@@ -216,7 +226,7 @@ fi
 #         -- an environment variable
 #         -- a file
 #       Into a docker build process. This includes passing in an env var via --build-args.
-#       
+#
 #       This is to ensure that the secret's value is never leaked: doing any of the above means
 #       that the secret value will be **persisted in the image**. Thus, when a user creates a container
 #       from the image, they will have access to this secret value (if it's a file or ENV). Or, they will
@@ -234,11 +244,18 @@ DOCKER_BUILD_CMD="docker build --network host \
 
 
 download() {
+    if [ $(pip list | grep -F "pydantic" | wc -l) -eq 0 ]; then
+        read -p 'Pydantic module (Python) not found. Install in current environment? (y/N):' confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] || exit 1
+        pip install $(cat setup/requirements.txt | grep pydantic)
+    fi
     mkdir -p ${MODEL_PATH}
     python download_models.py all --source ngc --download_dir ${MODEL_PATH} --verbose
 }
 
 download_test_data() {
+    echo 'Downloading test data for openfold...'
+    source $BIONEMO_HOME/examples/protein/openfold/scripts/download_data_sample.sh
+    echo 'Openfold data download complete.'
     echo 'Downloading test data for diffdock...'
     source $BIONEMO_HOME/examples/molecule/diffdock/scripts/download_data_sample.sh
     echo 'Diffdock data download complete.'

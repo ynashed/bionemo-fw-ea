@@ -1,0 +1,58 @@
+defaults:
+  - dnabert_xsmall
+
+# 2 devices 
+trainer:
+  devices: 1
+  # Custom settings to reduce time spent in validation
+  max_steps: 500
+  log_every_n_steps: 1000
+  val_check_interval: 1.0 #check every n steps, 1.0= only check at the end
+  limit_val_batches: 1
+  limit_test_batches: 500
+  accumulate_grad_batches: 1
+  gradient_clip_val: 1.0
+  benchmark: false
+model:
+  micro_batch_size: 2
+  hidden_dropout: 0.0
+  attention_dropout: 0.0
+  pre_process: True # add embedding
+  post_process: True # add pooler
+  bert_binary_head: False # BERT binary head
+  tokenizer:
+    type: 'kmer'
+    k: 3
+    model: ${oc.env:BIONEMO_HOME}/tokenizers/dna/dnabert/vocab/dnabert${.k}.model
+    vocab_file: ${oc.env:BIONEMO_HOME}/tokenizers/dna/dnabert/vocab/dnabert${.k}.vocab
+  data:
+    dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/dna/
+    dataset: # inclusive range of data files to load or can load a single file, e.g. x000.csv
+      train: chr1-test.fa
+      test: chr1-test.fa
+      val: chr1-test.fa
+    micro_batch_size: ${model.micro_batch_size}
+    num_workers: 1
+    dataloader_type: single
+    dataset_format: fasta
+
+  optim:
+    name: fused_adam
+    lr: 2e-3
+    weight_decay: 0.00
+    betas:
+    - 0.9
+    - 0.98
+    sched:
+      name: CosineAnnealing
+      warmup_steps: 5
+      constant_steps: 50000
+      min_lr: 1e-5
+
+exp_manager:
+  exp_dir: ${oc.env:BIONEMO_HOME}/test_results/nemo_experiments/dnabert_pretrain
+  create_wandb_logger: False
+  create_tensorboard_logger: False
+  wandb_logger_kwargs:
+    offline: True
+  resume_if_exists: False

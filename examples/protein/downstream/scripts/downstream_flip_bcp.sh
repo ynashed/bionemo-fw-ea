@@ -36,8 +36,8 @@ REPLICAS=1  # equal to the number of nodes
 ACE=nv-us-west-2
 INSTANCE="dgx1v.32g.2.norm"
 NGC_CLI_API_KEY=??
-NGC_CLI_ORG=nvidian #replace with your ngc org
-NGC_CLI_TEAM=cvai_bnmo_trng #replace with your ngc team
+NGC_CLI_ORG=nvidian
+NGC_CLI_TEAM=cvai_bnmo_trng
 
 LABEL=ml__bionemo
 WL_LABEL=wl___other___bionemo

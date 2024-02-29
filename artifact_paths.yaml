@@ -69,6 +69,12 @@ models:
         symlink:
             source: "../../esm2nv_3B_converted.nemo"
             target: "protein/esm2nv/esm2nv_3B_converted.nemo"
+    openfold_finetuning_inhouse:
+        ngc: "nvidia/clara/openfold:finetuned_1.2"
+        pbss: "s3://bionemo-ci/models/openfold_finetuning_inhouse_checkpoint.nemo"
+        symlink:
+            source: "../../openfold_finetuning_inhouse_checkpoint.nemo"
+            target: "protein/openfold/openfold_finetuning_inhouse_checkpoint.nemo"
     esm2_650m_huggingface:
         pbss: "s3://bionemo-ci/models/esm2-650M-huggingface"
         relative_download_dir: "protein/esm2nv/esm2-650M-huggingface"
@@ -81,3 +87,9 @@ models:
         # Hugging face models are multiple files in a directory, so the recursive
         # flag is used to download everything in the dir.
         extra_args: "--recursive"
+    dnabert:
+        pbss: "s3://bionemo-ci/models/dnabert-86M.nemo"
+        ngc: "nvidia/clara/dnabert:1.2"
+        symlink:
+            source: "../../dnabert-86M.nemo"
+            target: "dna/dnabert/dnabert-86M.nemo"

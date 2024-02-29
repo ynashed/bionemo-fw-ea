@@ -46,7 +46,7 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
         wget git unzip tmux vim tree xterm && \
     rm -rf /var/lib/apt/lists/*
 
-# Install code-server to enable easy remote development on a container
+# Optional: Install code-server to enable easy remote development on a container
 # More info about code-server be found here: https://coder.com/docs/code-server/v4.4.0
 # ADD https://github.com/coder/code-server/releases/download/v4.4.0/code-server_4.4.0_amd64.deb code-server_4.4.0_amd64.deb
 # RUN dpkg -i ./code-server_4.4.0_amd64.deb && rm -f code-server_4.4.0_amd64.deb
@@ -72,7 +72,7 @@ COPY setup/aws-config-swiftstack $HOME/.aws/config
 ## Install NGC cli in container for artifact download
 ENV NGC_CLI_INSTALL_PREFIX=/usr/local/bin
 RUN wget -O /tmp/ngccli_linux.zip --content-disposition \
-    "https://api.ngc.nvidia.com/v2/resources/nvidia/ngc-apps/ngc_cli/versions/3.30.1/files/ngccli_linux.zip" && \
+    "https://api.ngc.nvidia.com/v2/resources/nvidia/ngc-apps/ngc_cli/versions/3.38.0/files/ngccli_linux.zip" && \
     unzip /tmp/ngccli_linux.zip -d ${NGC_CLI_INSTALL_PREFIX} && \
     chmod u+x ${NGC_CLI_INSTALL_PREFIX}/ngc-cli/ngc && \
     ln -fns  ${NGC_CLI_INSTALL_PREFIX}/ngc-cli/ngc ${NGC_CLI_INSTALL_PREFIX}/ngc && \
@@ -130,7 +130,25 @@ RUN pip install --no-deps -e .
 
 # Remove nvm as it's not expected users will need this, and it introduces unfixable vulnerabilties:
 # https://nvd.nist.gov/vuln/detail/CVE-2023-32002
+RUN /bin/bash -c "source /usr/local/nvm/nvm.sh && nvm deactivate && nvm unload && sed -i '/NVM/d' /root/.bashrc"
 RUN rm -rf /usr/local/nvm
+RUN /bin/bash -c "sed -i '/NVM/d' /root/.bashrc && sed -i '/nvm.sh/d' /etc/bash.bashrc"
+# Remove OpenCV: We do not use it and it adds a security vulnerability which no current fix:
+# https://nvd.nist.gov/vuln/detail/CVE-2023-2617
+RUN pip uninstall -y opencv-python
+RUN pip uninstall -y opencv
+RUN rm -rf /usr/local/lib/python3.10/dist-packages/cv2
+RUN rm -rf /usr/local/include/opencv4
+RUN rm -rf /usr/local/share/opencv4
+RUN rm -rf /usr/local/lib/cmake/opencv4
+RUN rm -rf /usr/local/bin/opencv*
+# Remove Slurm: The BioNeMo FW Container can certainly be deployed to Slurm clusters, however having Slurm
+# installed *inside* the container does not typically have a use case. Slurm introduces vulnerabilities
+# into our container.
+RUN DEBIAN_FRONTEND=noninteractive apt remove -y libslurm37 libpmi2-0
+# Remove fonttool: We do not use it and it adds a security vulnerability: https://github.com/advisories/GHSA-6673-4983-2vx5
+RUN pip uninstall -y fonttools
+
 
 # FIXME: If BIONEMO_HOME _is not_ /workspace/bionemo, then this ENTRYPOINT is invalid!
 ENTRYPOINT ["/workspace/bionemo/setup/startup.sh"]

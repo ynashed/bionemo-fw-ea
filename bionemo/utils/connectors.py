@@ -59,7 +59,7 @@ class BioNeMoSaveRestoreConnector(NLPSaveRestoreConnector):
                     f"Restored model is not the same class as the model invoked. restored: {obj['target']}, invoked: {calling_cls}"
                 )
         else:
-            logging.warn(
+            logging.warning(
                 f"No 'target' field in {restore_path=}, cannot guarantee the correct model is restored. Use a newer .nemo file or proceed at your own risk."
             )
         return super().restore_from(

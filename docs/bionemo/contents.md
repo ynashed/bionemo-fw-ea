@@ -5,10 +5,10 @@
 :caption: GETTING STARTED
 
 index
+pre-reqs
 quickstart-fw
 quickstart-bcp
 tutorials-fw
-known-issues-fw
 ```
 
 ```{toctree}
@@ -20,14 +20,6 @@ data-module-fw
 dwnstr-task-validation
 inference-triton-fw
 deep-dive-esm1-pytriton-inference
-```
-
-```{toctree}
-:maxdepth: 3
-:caption: BioNeMo ON NVIDIA DGX-CLOUD
-
-overview-of-dgxc-fw
-bcp-specific-commands-fw
 ```
 
 ```{toctree}
@@ -48,6 +40,8 @@ models/prott5nv
 models/megamolbart
 models/equidock
 models/diffdock
+models/dnabert
+models/openfold
 models/model-benchmarks
 ```
 
@@ -58,6 +52,8 @@ models/model-benchmarks
 datasets/uniprot
 datasets/zinc15
 datasets/pdb
+datasets/GRCh38.p13.md
+datasets/openproteinset.md
 ```
 
 ```{toctree}

@@ -53,8 +53,8 @@ else
     exit 1
 fi
 
-VERSION_PROCESSED_SAMPLE=1.1
-VERSION_PREPROCESSING_TEST=1.1
+VERSION_PROCESSED_SAMPLE=processed_sample_01082024
+VERSION_PREPROCESSING_TEST=preprocessing_test_02142024
 
 if [ -n "$PBSS" ]; then
     echo "Downloading from PBSS to $DATA_PATH"
@@ -63,10 +63,10 @@ if [ -n "$PBSS" ]; then
     # Add actions for pbss
 else
     echo "Downloading from NGC to $DATA_PATH"
-    ngc registry resource download-version nvidia/clara/posebusters_diffdock_processed_sample:${VERSION_PROCESSED_SAMPLE}
-    tar -xvf posebusters_diffdock_processed_sample_v${VERSION_PROCESSED_SAMPLE}/diffdock_processsed_sample.tar.gz -C $DATA_PATH
-    rm -r posebusters_diffdock_processed_sample_v${VERSION_PROCESSED_SAMPLE}/
-    ngc registry resource download-version nvidia/clara/posebusters_diffdock_preprocessing_test:${VERSION_PREPROCESSING_TEST}
-    tar -xvf posebusters_diffdock_preprocessing_test_v${VERSION_PREPROCESSING_TEST}//preprocessing_test.tar.gz -C $DATA_PATH
-    rm -r posebusters_diffdock_preprocessing_test_v${VERSION_PREPROCESSING_TEST}/
+    ngc registry resource download-version nvidian/clara-lifesciences/diffdock:${VERSION_PROCESSED_SAMPLE}
+    tar -xvf diffdock_v${VERSION_PROCESSED_SAMPLE}/diffdock_processsed_sample.tar.gz -C $DATA_PATH
+    rm -r diffdock_v${VERSION_PROCESSED_SAMPLE}/
+    ngc registry resource download-version nvidian/clara-lifesciences/diffdock:${VERSION_PREPROCESSING_TEST}
+    tar -xvf diffdock_v${VERSION_PREPROCESSING_TEST}//preprocessing_test.tar.gz -C $DATA_PATH
+    rm -r diffdock_v${VERSION_PREPROCESSING_TEST}/
 fi

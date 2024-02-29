@@ -1,0 +1,117 @@
+defaults:
+  - base_config
+  - _self_
+
+do_training: true
+
+# User must provide a checkpoint which will be fine-tuned. restore_from_path is intended to load .nemo checkpoint
+# Alternatively, user can provide `torch_restore` which points to .pt checkpoint.
+restore_from_path: null
+
+model:
+  stage: finetuning
+  precision: tf32 # TODO: this should be merged with trainer precision
+  seed: 44
+  micro_batch_size: 1
+  tensor_model_parallel_size: 1
+  pipeline_model_parallel_size: 1
+  resume_from_checkpoint: null
+  num_train_iters: 12000 # TODO: merge with trainer's max steps?
+  metrics:
+  - lddt_ca
+
+  # override from basic config
+  train_sequence_crop_size: 384
+  max_msa_clusters: 508
+  max_extra_msa: 5120
+
+  loss_config:
+    experimentally_resolved_loss_config:
+      weight: 0.01
+    violation_loss_config:
+      weight: 1.0
+
+  extra_msa_stack_config:
+    chunk_size_msa_att: 1024
+    chunk_size_opm: 128
+
+  optim:
+    name: fused_adam
+    lr: 5e-4
+    eps: 1e-6
+    sched:
+      name: AlphaFoldLRScheduler
+      base_lr: 0.
+      max_lr: 0.0005
+      warmup_no_steps: 1
+      start_decay_after_n_steps: 8000
+      decay_every_n_steps: 8000
+      decay_factor: 0.95
+
+  data:
+    dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/openfold_data
+    dataset_variant: processed
+    realign_when_required: True
+    use_only_pdb_chain_ids: null # Optional list of pdb chain ids for intersection with train and val datasets.
+    filter_by_alignments: True # Whether to filter out mmcif chains with no alignments.
+
+    prepare:
+      create_sample: False
+
+
+  train_ds:
+    train_max_pdb_release_date: "2021-09-16"
+    num_workers: 14
+    realign_when_required: ${model.data.realign_when_required}
+
+  validation_ds:
+    val_min_cameo_submission_date: "2021-09-17"
+    val_max_cameo_submission_date: "2021-12-11"
+    num_workers: 2
+    val_max_sequence_length: 700
+    realign_when_required: ${model.data.realign_when_required}
+
+
+trainer:
+  # the effective batch size should be 128
+  devices: 1
+  accelerator : gpu
+  precision: 32 # has been only trained with 32 precision
+  num_nodes: 1
+  max_steps : 12000
+  max_epochs: 1 # step-based training
+  val_check_interval: 100
+  logger: False
+  enable_checkpointing: False # checkpointing is done by NeMo exp_manager
+  gradient_clip_val: 0.1
+  replace_sampler_ddp: False
+
+exp_manager:
+  name: fine-tuning
+  exp_dir: ${oc.env:BIONEMO_HOME}/results/nemo_experiments/${.name}/${.wandb_logger_kwargs.name}
+  explicit_log_dir: ${.exp_dir}
+  version: base
+  resume_if_exists: True
+  resume_ignore_no_checkpoint: True
+  checkpoint_callback_params:
+    always_save_nemo: True
+    save_top_k : 2
+    monitor: val_lddt_ca
+    mode: max
+    # filename must contain step information in arbitrary position
+    # step information is used furing
+    filename: '{step}--{${exp_manager.checkpoint_callback_params.monitor}:.3f}'
+  create_wandb_logger: False
+  wandb_logger_kwargs:
+    offline: False # set to True if there are issues uploading to WandB during training
+    project: ${name}-fine-tuning
+    name: ${name}-fine-tuning
+    group: ${name}
+    notes: "date: ${now:%y%m%d-%H%M%S}"
+    job_type: Localhost_nodes_${trainer.num_nodes}_gpus_${trainer.devices}
+    tags:
+      - ${name}
+
+
+  ema:
+    enable: True
