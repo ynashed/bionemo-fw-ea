@@ -1,5 +1,5 @@
 {
-    "train_loss_epoch": 0.9468496441841125,
-    "train_loss_step": 0.9007365107536316,
-    "val_loss": 0.712324321269989
+    "train_loss_epoch": 0.915919303894043,
+    "train_loss_step": 0.9494491815567017,
+    "val_loss": 0.710789144039154
 }
