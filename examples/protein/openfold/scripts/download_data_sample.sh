@@ -55,14 +55,15 @@ fi
 
 if [ -n "$PBSS" ]; then
     echo "Downloading from PBSS to $DATA_PATH"
-    aws s3 cp s3://bionemo-ci/test-data/openfold/openfold_vprocessed_sample $DATA_PATH --endpoint-url https://pbss.s8k.io --recursive
-    # Add actions for pbss
+    aws s3 cp s3://bionemo-ci/test-data/openfold/openfold_vprocessed_sample_cif_pt/openfold_sample_data.tar.gz $DATA_PATH --endpoint-url https://pbss.s8k.io
+    tar -xvf $DATA_PATH/openfold_sample_data.tar.gz -C $DATA_PATH
 else
     echo "Downloading from NGC to $DATA_PATH"
-    ngc registry resource download-version nvidian/cvai_bnmo_trng/openfold:processed_sample
-    tar -xvf openfold_vprocessed_sample/openfold_sample_data.tar.gz -C $DATA_PATH
-    rm -r openfold_vprocessed_sample/
+    ngc registry resource download-version nvidian/cvai_bnmo_trng/openfold:processed_sample_cif_pt
+    tar -xvf openfold_vprocessed_sample_cif_pt/openfold_sample_data.tar.gz -C $DATA_PATH
+    rm -r openfold_vprocessed_sample_cif_pt/
 fi
+
 
 
 
