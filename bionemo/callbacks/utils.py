@@ -8,7 +8,8 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
-from typing import Any, List, Optional, Sequence
+from copy import deepcopy
+from typing import Any, Dict, List, Optional, Sequence
 
 from nemo.utils.model_utils import import_class_by_path
 from omegaconf import DictConfig
@@ -18,7 +19,7 @@ from bionemo.callbacks.logging_callbacks import PerfLoggingCallback, SaveTrainer
 from bionemo.utils.dllogger import DLLogger
 
 
-__all__: Sequence[str] = ("add_test_callbacks", "setup_dwnstr_task_validation_callbacks")
+__all__: Sequence[str] = ("add_test_callbacks", "add_training_callbacks", "setup_dwnstr_task_validation_callbacks")
 
 
 def add_test_callbacks(cfg: DictConfig, callbacks: List[Callback], mode: str = "train"):
@@ -86,4 +87,23 @@ def setup_dwnstr_task_validation_callbacks(cfg: DictConfig, plugins: Optional[Li
     callbacks = [
         import_class_by_path(callback_cfg['class'])(callback_cfg, cfg, plugins) for callback_cfg in callbacks_cfg
     ]
+    return callbacks
+
+
+def add_training_callbacks(cfg: DictConfig, callbacks: List[Callback]) -> List[Callback]:
+    """
+    Sets up callbacks for training loop.
+    The configuration of callbacks is taken from the main training config.
+
+    Params
+        cfg: Dict
+        plugins: Optional plugins to be passed to callbacks
+
+    """
+    if 'model' in cfg and 'training_callbacks' in cfg.model:
+        callbacks_cfg: List[Dict[str, Any]] = cfg.model.training_callbacks
+        for callback_cfg in callbacks_cfg:
+            callback_kwargs = dict(deepcopy(callback_cfg))
+            callback_cls = callback_kwargs.pop('class')
+            callbacks.append(import_class_by_path(callback_cls)(**callback_kwargs))
     return callbacks

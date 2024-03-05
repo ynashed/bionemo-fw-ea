@@ -76,9 +76,12 @@ model:
       train: x[000..186]
       test: x[000..186]
       val: x[000..186]
-    encoder_augment: true
+    canonicalize_target_smile: true
+    canonicalize_encoder_input: false
+    canonicalize_decoder_output: false
+    encoder_augment: false
+    decoder_independent_augment: false
     encoder_mask: false
-    decoder_augment: true
     decoder_mask: false
     mask_prob: 0.1
     span_lambda: 3.0

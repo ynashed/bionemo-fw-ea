@@ -59,10 +59,15 @@ products:
     variant: [infer]
     products:
       - domain: [molecule]
-        model: [megamolbart]
-        config_name: [megamolbart_infer]
-        batch_size: [4]
-        checkpoint_name: [megamolbart]
+        products:
+          - model: [molmim]
+            config_name: [molmim_infer]
+            batch_size: [4]
+            checkpoint_name: [molmim_test]
+          - model: [megamolbart]
+            config_name: [megamolbart_infer]
+            batch_size: [4]
+            checkpoint_name: [megamolbart]
       - domain: [protein]
         products:
           - model: [esm1nv]

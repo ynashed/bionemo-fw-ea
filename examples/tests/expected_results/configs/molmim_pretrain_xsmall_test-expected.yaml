@@ -1,0 +1,263 @@
+model:
+  encoder:
+    num_layers: 2
+    hidden_size: 256
+    ffn_hidden_size: ${multiply:${.hidden_size}, 4}
+    num_attention_heads: 4
+    init_method_std: 0.02
+    hidden_dropout: 0.1
+    attention_dropout: 0.1
+    ffn_dropout: 0.0
+    position_embedding_type: learned_absolute
+    relative_attention_num_buckets: 32
+    relative_attention_max_distance: 128
+    relative_position_bias_self_attention_only: true
+    kv_channels: null
+    apply_query_key_layer_scaling: false
+    layernorm_epsilon: 1.0e-05
+    persist_layer_norm: true
+    bias_activation_fusion: true
+    grad_div_ar_fusion: true
+    masked_softmax_fusion: true
+    bias_dropout_add_fusion: true
+    bias: true
+    normalization: layernorm
+    arch: perceiver
+    activation: gelu
+    headscale: false
+    transformer_block_type: pre_ln
+    hidden_steps: 1
+    num_self_attention_per_cross_attention: 1
+    openai_gelu: false
+    onnx_safe: false
+    fp32_residual_connection: false
+    activations_checkpoint_method: null
+    activations_checkpoint_num_layers: 1
+    activations_checkpoint_granularity: null
+    megatron_legacy: false
+    normalize_attention_scores: true
+    num_moe_experts: 1
+    moe_frequency: 1
+    moe_dropout: 0.0
+    use_flash_attention: false
+  decoder:
+    num_layers: ${model.encoder.num_layers}
+    hidden_size: ${model.encoder.hidden_size}
+    ffn_hidden_size: ${model.encoder.ffn_hidden_size}
+    num_attention_heads: ${model.encoder.num_attention_heads}
+    init_method_std: 0.02
+    hidden_dropout: 0.1
+    attention_dropout: 0.1
+    ffn_dropout: 0.0
+    position_embedding_type: learned_absolute
+    relative_attention_num_buckets: 32
+    relative_attention_max_distance: 128
+    relative_position_bias_self_attention_only: true
+    kv_channels: null
+    apply_query_key_layer_scaling: false
+    layernorm_epsilon: 1.0e-05
+    persist_layer_norm: true
+    bias_activation_fusion: true
+    grad_div_ar_fusion: true
+    masked_softmax_fusion: true
+    bias_dropout_add_fusion: true
+    bias: true
+    normalization: layernorm
+    arch: transformer
+    activation: gelu
+    headscale: false
+    transformer_block_type: pre_ln
+    hidden_steps: 32
+    num_self_attention_per_cross_attention: 1
+    openai_gelu: false
+    onnx_safe: false
+    fp32_residual_connection: false
+    activations_checkpoint_method: null
+    activations_checkpoint_num_layers: 1
+    activations_checkpoint_granularity: null
+    megatron_legacy: false
+    normalize_attention_scores: true
+    num_moe_experts: 1
+    moe_frequency: 1
+    moe_dropout: 0.0
+    use_flash_attention: false
+  name: ${name}-united-token_head
+  micro_batch_size: 32
+  global_batch_size: null
+  tensor_model_parallel_size: 1
+  pipeline_model_parallel_size: 1
+  resume_from_checkpoint: null
+  pipeline_model_parallel_split_rank: 0
+  make_vocab_size_divisible_by: 128
+  pre_process: true
+  post_process: true
+  megatron_amp_O2: false
+  seq_length: 128
+  max_position_embeddings: ${.seq_length}
+  gradient_as_bucket_view: true
+  bias_gelu_fusion: true
+  share_token_embeddings: true
+  share_decoder_tokens_head_embeddings: false
+  hidden_size: ${model.encoder.hidden_size}
+  training_callbacks:
+  - class: bionemo.callbacks.scheduling_callbacks.ParameterMultiplicativeScheduler
+    factor: 0.0001
+    min_multiplier: 0.0
+    max_multiplier: 1.0
+    module_parameter_path: enc_dec_model.enc_dec_model.hiddens_module.hidden_loss_transforms.0.loss_weight
+  hiddens:
+    enc_output_name: z
+    enc_inference_output_name: z_mean
+    token_aggregation_method: mean
+    hidden_aggregation_method: mean
+    transform:
+      q_z_given_x:
+        cls_name: sampled_var_cond_gaussian
+        min_logvar: -6.0
+        max_logvar: 0.0
+        map_var_to_hiddens: true
+        hidden_size: ${model.encoder.hidden_size}
+    loss:
+      mim:
+        cls_name: a_mim
+        loss_weight: 1.0
+  tokenizer:
+    library: regex
+    type: null
+    model: ${oc.env:BIONEMO_HOME}/tokenizers/molecule/molmim/vocab/molmim.model
+    vocab_file: ${oc.env:BIONEMO_HOME}/tokenizers/molecule/molmim/vocab/molmim.vocab
+    merge_file: null
+  data:
+    links_file: ${oc.env:BIONEMO_HOME}/examples/molecule/megamolbart/dataset/ZINC-downloader.txt
+    dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/
+    dataset:
+      train: x[000..001]
+      test: x[000..001]
+      val: x[000..001]
+    canonicalize_target_smile: true
+    canonicalize_encoder_input: false
+    canonicalize_decoder_output: false
+    encoder_augment: true
+    decoder_independent_augment: false
+    encoder_mask: false
+    decoder_mask: false
+    mask_prob: 0.0
+    span_lambda: 3.0
+    micro_batch_size: ${model.micro_batch_size}
+    num_workers: 10
+    dataloader_type: single
+    max_seq_length: ${model.seq_length}
+    seed: ${seed}
+    skip_lines: 0
+    drop_last: false
+    pin_memory: false
+    data_impl: csv_mmap
+    index_mapping_type: online
+    data_impl_kwargs:
+      csv_mmap:
+        newline_int: 10
+        header_lines: 1
+        workers: ${model.data.num_workers}
+        sort_dataset_paths: true
+        data_sep: ','
+        data_col: 1
+    use_upsampling: true
+  optim:
+    name: fused_adam
+    lr: 1.0
+    betas:
+    - 0.9
+    - 0.999
+    eps: 1.0e-08
+    weight_decay: 0.01
+    sched:
+      name: NoamAnnealing
+      d_model: ${model.encoder.hidden_size}
+      warmup_steps: 8000
+      warmup_ratio: null
+      max_steps: 1000000
+      min_lr: 1.0e-05
+  dwnstr_task_validation:
+    enabled: false
+    dataset:
+      class: bionemo.model.core.dwnstr_task_callbacks.SingleValuePredictionCallback
+      task_type: regression
+      infer_target: bionemo.model.molecule.molmim.infer.MolMIMInference
+      max_seq_length: ${model.seq_length}
+      emb_batch_size: 32
+      batch_size: ${.emb_batch_size}
+      num_epochs: 1
+      shuffle: true
+      num_workers: 8
+      dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/physchem/SAMPL
+      task_name: SAMPL
+      dataset:
+        train: x000
+        test: x000
+      sequence_column: smiles
+      target_column: expt
+      random_seed: 1234
+      optim:
+        name: adam
+        lr: 0.0001
+        betas:
+        - 0.9
+        - 0.999
+        eps: 1.0e-08
+        weight_decay: 0.01
+        sched:
+          name: WarmupAnnealing
+          min_lr: 1.0e-05
+          last_epoch: -1
+          warmup_ratio: 0.01
+          max_steps: 1000
+name: MolMIM
+do_training: true
+do_testing: false
+seed: 42
+restore_from_path: null
+trainer:
+  devices: 1
+  num_nodes: 1
+  precision: 16-mixed
+  accelerator: gpu
+  max_epochs: null
+  max_steps: 10
+  log_every_n_steps: 10
+  val_check_interval: 1
+  num_sanity_val_steps: 1
+  limit_train_batches: 1
+  limit_val_batches: 1
+  limit_test_batches: 0
+  accumulate_grad_batches: 1
+  gradient_clip_val: 1.0
+  logger: false
+  enable_checkpointing: false
+  use_distributed_sampler: false
+exp_manager:
+  name: ${name}
+  exp_dir: ${oc.env:BIONEMO_HOME}/test_results/nemo_experiments/molmim_pretrain_xsmall
+  resume_if_exists: false
+  resume_ignore_no_checkpoint: true
+  create_checkpoint_callback: true
+  checkpoint_callback_params:
+    save_top_k: 3
+    monitor: val_molecular_accuracy
+    mode: max
+    save_last: true
+    always_save_nemo: true
+    filename: ${name}-${model.name}--{val_molecular_accuracy:.2f}-{val_loss:.2f}-{step}-{consumed_samples}
+    model_parallel_size: ${multiply:${model.tensor_model_parallel_size}, ${model.pipeline_model_parallel_size}}
+  explicit_log_dir: ${.exp_dir}
+  create_wandb_logger: false
+  create_tensorboard_logger: false
+  wandb_logger_kwargs:
+    project: ${model.name}_pretraining
+    name: ${model.name}_pretraining
+    group: ${model.name}
+    job_type: Localhost_nodes_${trainer.num_nodes}_gpus_${trainer.devices}
+    notes: 'date: ${now:%y%m%d-%H%M%S}'
+    tags:
+    - ${name}
+    - ${model.name}
+    offline: true

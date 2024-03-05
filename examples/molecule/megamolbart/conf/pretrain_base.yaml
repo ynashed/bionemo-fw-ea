@@ -87,9 +87,17 @@ model:
       train: x[000..186] # Range is for full dataset
       test: x[000..186]
       val: x[000..186]
-    encoder_augment: True # always True
+    # The following should probably always be True, unless you want to explore the unchanged input data. 
+    #  Changing will impact val/test metrics since canonicalization is done to model outputs but not 
+    #  targets (assuming it is done here).
+    canonicalize_target_smile: True
+    # The following four settings will result in randomized augmentation of SMILES for input, and matched output.
+    #  this is the equivarant model case.
+    canonicalize_encoder_input: False
+    canonicalize_decoder_output: False
+    encoder_augment: True
+    decoder_independent_augment: False
     encoder_mask: True # task = mask(span)_aug
-    decoder_augment: True # task = mask(span)_aug
     decoder_mask: False # always False
     mask_prob: 0.1 # mask probability
     span_lambda: 3.0 # max size of poisson distribution for

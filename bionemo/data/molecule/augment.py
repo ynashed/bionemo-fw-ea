@@ -34,9 +34,11 @@ class MoleculeEnumeration:
         seq_length: int,
         encoder_augment: bool,
         encoder_mask: bool,
-        decoder_augment: bool,
+        decoder_independent_augment: bool,
         decoder_mask: bool,
-        canonicalize_input: bool,
+        canonicalize_target_smile: bool,
+        canonicalize_decoder_output: bool,
+        canonicalize_encoder_input: bool,
         pad_size_divisible_by_8: bool,
         mask_prob: Optional[float] = None,
         span_lambda: Optional[float] = None,
@@ -48,21 +50,60 @@ class MoleculeEnumeration:
             seq_length: maximum sequence length of SMILES in a batch
             encoder_augment: should smiles for the encoder input be augmented?
             encoder_mask: should tokens for the encoder input be masked?
-            decoder_augment: should smiles for the decoder input be augmented?
             decoder_mask: should tokens for the decoder input be masked?
-            canonicalize_input: should target smiles be canonicalized?
+            decoder_independent_augment: should smiles for the decoder input be augmented independently of the encoder input? If false, the encoder augmentation is used for the decoder.
+            canonicalize_encoder_input: should encoder input smiles be canonicalized? This would be for models that always operate in the sapce of canonicalized molecules.
+            canonicalize_target_smile: should target smiles be canonicalized? This should be True for the molecular accuracy computation. Set to False to
+                instead use the unprocessed input dataset.
+            canonicalize_decoder_output: should we ask the decoder to predict canonicalized output?
             pad_size_divisible_by_8: should sequences of ids be padded to be divisible by 8?
             mask_prob: a probability of masking single token, should be between 0 and 1
             span_lambda: masking parameter, used in mask_scheme="span"
             kwargs: other kwargs
+
+        Notes:
+            Common use cases and their respective config settings are as follows, to be set under the model.data block:
+                1. canonicalized input and output to the model.
+                    canonicalize_encoder_input: True
+                    canonicalize_decoder_output: True
+                    canonicalize_target_smile: True
+                    encoder_augment: False
+                    decoder_independent_augment: False
+                2. augmented input with matched output from the model.
+                    canonicalize_encoder_input: False
+                    canonicalize_decoder_output: False
+                    canonicalize_target_smile: True
+                    encoder_augment: True
+                    decoder_independent_augment: False
+                3. augmented input with canonicalized output from the model.
+                    canonicalize_encoder_input: False
+                    canonicalize_decoder_output: True
+                    canonicalize_target_smile: True
+                    encoder_augment: True
+                    decoder_independent_augment: False
+                4. Uncommon option: independent augmentation of input and output from the model.
+                    canonicalize_encoder_input: False
+                    canonicalize_decoder_output: False
+                    canonicalize_target_smile: True
+                    encoder_augment: True
+                    decoder_independent_augment: True
         """
         self.tokenizer = tokenizer
         self.seq_length = seq_length
         self.pad_size_divisible_by_8 = pad_size_divisible_by_8  # workaround for CUDA alignment bug
         self.encoder_augment = encoder_augment
-        self.decoder_augment = decoder_augment
-        self.get_canonicalized_decoder_input = False
-        self.get_canonicalized_encoder_input = canonicalize_input
+        self.decoder_independent_augment = decoder_independent_augment
+        if canonicalize_encoder_input:
+            assert (
+                not encoder_augment
+            ), "Augmentation of encoder input and canonicalization of encoder input are mutually exclusive"
+        if canonicalize_decoder_output:
+            assert (
+                not decoder_independent_augment
+            ), "Independent augmentation of decoder output and canonicalization of decoder output are mutually exclusive"
+        self.canonicalize_decoder_input = canonicalize_decoder_output
+        self.canonicalize_encoder_input = canonicalize_encoder_input
+        self.canonicalize_target_smile = canonicalize_target_smile
 
         self.encoder_mask = encoder_mask
         self.decoder_mask = decoder_mask
@@ -82,11 +123,11 @@ class MoleculeEnumeration:
         otherwise input SMILES
 
         Args:
-            smiles: str representation of molecules
-            augment_data: should smiles be augmented/randomised?
-            canonicalize_input: should canonicalized smiles be returned?
+            smiles: str representation of molecules to possibly be canonicalized or augmented
+            augment_data: should smiles be augmented/randomised in x[0]? Otherwise x[0] has the input_smiles as they appeared in the dataset
+            canonicalize_input: should canonicalized smiles be returned in x[1]? Otherwise x[1] has the input_smiles as they appeared in the dataset
         Returns:
-            (str, str) Augmented smiles and canonicalized smiles if requested
+            (str, str) Augmented smiles and canonicalized smiles if requested, otherwise x[0] and x[1] could just be copies of smiles.
         """
 
         mol = Chem.MolFromSmiles(smiles)
@@ -284,7 +325,7 @@ class MoleculeEnumeration:
 
     def _get_encoder_decoder_input_smiles(self, batch: List[str]) -> Tuple[List[str], List[str], List[str]]:
         """
-        Helper method to prepare input smiles to be tokenized for encoder and decoder layers
+        Helper method to prepare input smiles to be tokenized for encoder and decoder layers.
         Args:
             batch: list with SMILES
         Returns:
@@ -292,24 +333,45 @@ class MoleculeEnumeration:
         """
         encoder_smiles_list = [
             self._smiles_augmeter_func(
-                smiles, augment_data=self.encoder_augment, canonicalize_input=self.get_canonicalized_encoder_input
+                smiles,
+                augment_data=self.encoder_augment,
+                canonicalize_input=self.canonicalize_encoder_input
+                or self.canonicalize_target_smile
+                or self.canonicalize_decoder_input,
             )
             for smiles in batch
         ]
-
-        encoder_smiles = [x[0] for x in encoder_smiles_list]
-        # target smiles are canonised or not encoder input smiles
-        target_smiles = [x[1] for x in encoder_smiles_list]
-        if self.decoder_augment:
+        if self.canonicalize_encoder_input:
+            # If we want to canonicalize the input to the encoder, then we use the x[1] position from encoder_smiles_list
+            encoder_idx = 1
+        else:
+            encoder_idx = 0
+        if self.canonicalize_target_smile:
+            target_idx = 1
+        else:
+            target_idx = 0
+        encoder_smiles = [x[encoder_idx] for x in encoder_smiles_list]
+        # target smiles are canonised or not encoder input smiles, they are used for visual inspection and debugging. The decoder
+        #  smiles/labels are what are fed into the loss etc as the target.
+        target_smiles = [x[target_idx] for x in encoder_smiles_list]
+        if self.decoder_independent_augment:
             decoder_smiles_list = [
                 self._smiles_augmeter_func(
-                    smiles, augment_data=self.decoder_augment, canonicalize_input=self.get_canonicalized_decoder_input
+                    smiles,
+                    augment_data=self.decoder_independent_augment,
+                    canonicalize_input=False,  # Skip canonicalization since this idx is not used
                 )
                 for smiles in encoder_smiles
             ]
+            # We want the independently augmented decoder smiles, rather than the encoder matched smiles
             decoder_smiles = [x[0] for x in decoder_smiles_list]
         else:
-            decoder_smiles = encoder_smiles
+            # Which idx do we want?
+            if self.canonicalize_decoder_input:
+                decoder_idx = 1
+            else:
+                decoder_idx = 0
+            decoder_smiles = [x[decoder_idx] for x in encoder_smiles_list]
         return encoder_smiles, decoder_smiles, target_smiles
 
     def collate_fn(self, batch: List[str], label_pad: int = -1) -> dict:
@@ -357,9 +419,11 @@ class MoleculeInputTargetEnumeration(MoleculeEnumeration):
         seq_length: int,
         encoder_augment: bool,
         encoder_mask: bool,
-        decoder_augment: bool,
+        decoder_independent_augment: bool,
         decoder_mask: bool,
-        canonicalize_input: bool,
+        canonicalize_target_smile: bool,
+        canonicalize_decoder_output: bool,
+        canonicalize_encoder_input: bool,
         pad_size_divisible_by_8: bool,
         input_name: str,
         target_name: str,
@@ -372,9 +436,11 @@ class MoleculeInputTargetEnumeration(MoleculeEnumeration):
             seq_length,
             encoder_augment,
             encoder_mask,
-            decoder_augment,
+            decoder_independent_augment,
             decoder_mask,
-            canonicalize_input,
+            canonicalize_target_smile,
+            canonicalize_decoder_output,
+            canonicalize_encoder_input,
             pad_size_divisible_by_8,
             mask_prob,
             span_lambda,
@@ -389,7 +455,7 @@ class MoleculeInputTargetEnumeration(MoleculeEnumeration):
 
         self.input_name = input_name
         self.target_name = target_name
-        self.get_canonicalized_decoder_input = canonicalize_input
+        self.get_canonicalized_decoder_input = canonicalize_encoder_input
         self.get_canonicalized_encoder_input = False
 
     def _get_encoder_decoder_input_smiles(self, batch: List[Dict[str, str]]) -> Tuple[List[str], List[str], List[str]]:
@@ -404,7 +470,7 @@ class MoleculeInputTargetEnumeration(MoleculeEnumeration):
             self._smiles_augmeter_func(
                 react[self.input_name],
                 augment_data=self.encoder_augment,
-                canonicalize_input=self.get_canonicalized_encoder_input,
+                canonicalize_input=self.canonicalize_encoder_input,
             )
             for react in batch
         ]
@@ -412,12 +478,15 @@ class MoleculeInputTargetEnumeration(MoleculeEnumeration):
         decoder_smiles_list = [
             self._smiles_augmeter_func(
                 react[self.target_name],
-                augment_data=self.decoder_augment,
-                canonicalize_input=self.get_canonicalized_decoder_input,
+                augment_data=self.decoder_independent_augment,
+                canonicalize_input=self.canonicalize_target_smile or self.canonicalize_decoder_input,
             )
             for react in batch
         ]
-        encoder_smiles = [x[0] for x in encoder_smiles_list]
-        decoder_smiles = [x[0] for x in decoder_smiles_list]
-        target_smiles = [x[1] for x in decoder_smiles_list]
+        encoder_idx = 1 if self.canonicalize_encoder_input else 0
+        decoder_idx = 1 if self.canonicalize_decoder_input else 0
+        target_idx = 1 if self.canonicalize_target_smile else 0
+        encoder_smiles = [x[encoder_idx] for x in encoder_smiles_list]
+        decoder_smiles = [x[decoder_idx] for x in decoder_smiles_list]
+        target_smiles = [x[target_idx] for x in decoder_smiles_list]
         return encoder_smiles, decoder_smiles, target_smiles

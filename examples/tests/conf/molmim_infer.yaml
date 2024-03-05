@@ -1,0 +1,41 @@
+defaults:
+  - base_infer_config
+  - .@infer_config: infer
+  # allow this config to override defaults
+  - _self_
+
+hydra:
+  searchpath:
+     - file://${oc.env:BIONEMO_HOME}/examples/conf/
+     - file://${oc.env:BIONEMO_HOME}/examples/molecule/molmim/conf/
+
+name: MolMIM_Inference
+desc: Minimum configuration for initializing a MolMIM model for inference.
+
+infer_config:
+  desc: "Store the infer config in this block so we can pull the model path from it later."
+
+model:
+  training_callbacks: []  # Disable training callbacks if any at inference time. Some, like ParameterMultiplicativeScheduler will refer to objects that are no longer at the same path.
+  tokenizer:
+    vocab_path: ${oc.env:BIONEMO_HOME}/tokenizers/molecule/molmim/vocab/molmim.vocab
+    model_path: ${oc.env:BIONEMO_HOME}/tokenizers/molecule/molmim/vocab/molmim.model
+  downstream_task:
+    restore_from_path: ${infer_config.model.downstream_task.restore_from_path} # path to model checkpoint to load, use the one in our infer test
+    outputs: [embeddings] # Which outputs to extract per sample (a value or list). Possible values: hiddens, embeddings.
+  data:
+    data_fields_map: # name which data_fields shoud be used for sequence/id (dataset dependant)
+      sequence: "smiles"
+      id: "iupac"
+    dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/physchem/SAMPL/test/x000 # full path to dataset (can include range or a list)
+    output_fname: ${oc.env:BIONEMO_HOME}/test_results/nemo_experiments/molmim_infer/x000.pkl
+
+target: bionemo.model.molecule.molmim.molmim_model.MolMIMModel # path to model class to load
+infer_target: bionemo.model.molecule.molmim.infer.MolMIMInference # path to inferende class to load
+
+exp_manager:
+  exp_dir: ${oc.env:BIONEMO_HOME}/test_results/nemo_experiments/molmim_infer
+  create_wandb_logger: False
+  create_tensorboard_logger: False
+  wandb_logger_kwargs:
+    offline: True

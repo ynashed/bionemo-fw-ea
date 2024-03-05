@@ -84,14 +84,10 @@ RUN NEMO_PATH=$(python -c 'import nemo; print(nemo.__path__[0])') && \
    make
 
 #########################################################################################
-# BioNeMo Build
+# Apply NeMo patches for key upstream changes between releases
+#  TODO whenever we upgrade nemo see which can be removed.
 #########################################################################################
-
-### The location of the installed library in the container. Set BIONEMO_HOME env to change this for development purposes.
-ARG BIONEMO_HOME=/workspace/bionemo
-ENV BIONEMO_HOME=${BIONEMO_HOME}
-RUN mkdir -p ${BIONEMO_HOME}
-
+# 1. Setting the workdir to the base nemo directory for all nemo patches
 
 # NOTE: This is to support the MegaMolBart LM model compatability with Jupyter notebooks and ipdb.
 #       This is exposed through the `iteractive=True` constructor parameter.
@@ -99,12 +95,35 @@ RUN mkdir -p ${BIONEMO_HOME}
 #       in its decode method.
 # TODO [mgreaves] Upstream this patch and then remove here when we can upgrade our nemo dependency.
 #                 https://jirasw.nvidia.com/browse/CDISCOVERY-2146
-COPY ./setup/nemo-v-1.22-support_interactive_megamolbart_lm-decode_reconfigure_minibatch.patch /nemo-v-1.22-support_interactive_megamolbart_lm-decode_reconfigure_minibatch.patch
-RUN patch -p1 $(python -c "import os.path; import nemo; print(os.path.dirname(os.path.abspath(nemo.__file__)))")/collections/nlp/models/language_modeling/megatron_lm_encoder_decoder_model.py \
-     /nemo-v-1.22-support_interactive_megamolbart_lm-decode_reconfigure_minibatch.patch \
-    && rm /nemo-v-1.22-support_interactive_megamolbart_lm-decode_reconfigure_minibatch.patch
+COPY ./setup/nemo-v-1.22-support_interactive_megamolbart_lm-decode_reconfigure_minibatch.patch ./
+RUN NEMO_INST_DIR=$(python -c 'import nemo; from pathlib import Path; print(Path(nemo.__path__[0]).parent)') && \
+    patch -p1 -d $NEMO_INST_DIR -i $PWD/nemo-v-1.22-support_interactive_megamolbart_lm-decode_reconfigure_minibatch.patch && \
+    rm nemo-v-1.22-support_interactive_megamolbart_lm-decode_reconfigure_minibatch.patch
+
+# NOTE: hiddens_support_train_v_inf_outputs.patch applies the patch from https://github.com/NVIDIA/NeMo/pull/8466 which fixes an issue
+#        where training uses the same hiddens key for inference (eg always the gaussian noised z rather than z_mean).
+COPY ./setup/hiddens_support_train_v_inf_outputs.patch ./
+RUN NEMO_INST_DIR=$(python -c 'import nemo; from pathlib import Path; print(Path(nemo.__path__[0]).parent)') && \
+    patch -p1 -d $NEMO_INST_DIR -i $PWD/hiddens_support_train_v_inf_outputs.patch && \
+    rm hiddens_support_train_v_inf_outputs.patch
+
+# NOTE: hiddens_support_train_v_inf_outputs.patch applies the patch from https://github.com/NVIDIA/NeMo/pull/8576 which fixes an issue
+#        where you restart a run after an epoch.
+COPY ./setup/data_sampler_constant_len.patch ./
+RUN NEMO_INST_DIR=$(python -c 'import nemo; from pathlib import Path; print(Path(nemo.__path__[0]).parent)') && \
+    patch -p1 -d $NEMO_INST_DIR -i $PWD/data_sampler_constant_len.patch && \
+    rm data_sampler_constant_len.patch
 
 
+#########################################################################################
+# BioNeMo Build
+#########################################################################################
+
+### The location of the installed library in the container. Set BIONEMO_HOME env to change this for development purposes.
+ARG BIONEMO_HOME=/workspace/bionemo
+ENV BIONEMO_HOME=${BIONEMO_HOME}
+RUN mkdir -p ${BIONEMO_HOME}
+WORKDIR ${BIONEMO_HOME}
 ### Copy the bionemo repo contents for distribution
 COPY LICENSE README.md artifact_paths.yaml download_models.py launch.sh setup.py pyproject.toml ${BIONEMO_HOME}/
 COPY setup ${BIONEMO_HOME}/setup

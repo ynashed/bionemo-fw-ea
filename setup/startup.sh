@@ -112,6 +112,10 @@ elif [[ "$MODEL" == "megamolbart" ]]; then
     
     run_server_kill_on_exit_start_notebook "${EXAMPLE_BASE}/molecule/megamolbart"
 
+elif [[ "$MODEL" == "molmim" ]]; then
+    
+    run_server_kill_on_exit_start_notebook "${EXAMPLE_BASE}/molecule/molmim"
+
 elif [[ "$MODEL" == "bash" ]]; then
     # In the case user runs bash for an interactive terminal, add a tag
     # to terminal prompt for ease of use.

@@ -44,8 +44,7 @@ def main(cfg):
         assert get_from_decoder_encoder_or_model(model._cfg, "hidden_dropout") == get_from_decoder_encoder_or_model(
             cfg.model, "hidden_dropout"
         )
-        assert model._cfg.data.encoder_augment == cfg.model.data.encoder_augment
-        assert model._cfg.data.decoder_augment == cfg.model.data.decoder_augment
+
         # double check that masking is disabled
         assert not model._cfg.data.encoder_mask
         assert not model._cfg.data.decoder_mask

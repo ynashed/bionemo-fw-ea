@@ -60,6 +60,7 @@ DIRS_TO_TEST = [
     'examples/protein/openfold/',
     'examples/dna/dnabert/',
     'examples/molecule/diffdock/',
+    'examples/molecule/molmim/',
 ]
 
 TRAIN_SCRIPTS = []
@@ -94,6 +95,7 @@ def get_data_overrides(script_or_cfg_path: str) -> str:
         'openfold',
         'dnabert',
         'diffdock',
+        'molmim',
     ), 'update this function, patterns might be wrong'
 
     task = {
@@ -103,7 +105,7 @@ def get_data_overrides(script_or_cfg_path: str) -> str:
     }
 
     if conf == ['conf']:
-        if model in ('megamolbart', 'openfold'):
+        if model in ('megamolbart', 'openfold', 'molmim'):
             return ''
         else:
             return MAIN % f'{domain}/{task[domain]}/test/x000'

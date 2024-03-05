@@ -1,0 +1,19 @@
+defaults:
+  - pretrain_base_canonicalized
+  - _self_
+
+# Extra small model
+trainer:
+  devices: 1
+  num_nodes: 1
+
+model:
+  name: MolMIM-xsmall
+  # model architecture
+  encoder:
+    num_layers: 2
+    num_attention_heads: 4
+    hidden_size: 256
+
+  dwnstr_task_validation:
+    enabled: True

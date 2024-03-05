@@ -1,0 +1,30 @@
+defaults:
+  - base_infer_config
+  # allow this config to override defaults
+  - _self_
+
+hydra:
+  searchpath:
+     - file://${oc.env:BIONEMO_HOME}/examples/conf/
+
+name: MolMIM_Inference
+desc: Minimum configuration for initializing a MolMIM model for inference.
+
+model:
+  training_callbacks: []  # Disable training callbacks if any at inference time. Some, like ParameterMultiplicativeScheduler will refer to objects that are no longer at the same path.
+  tokenizer:
+    vocab_path: ${oc.env:BIONEMO_HOME}/tokenizers/molecule/molmim/vocab/molmim.vocab
+    model_path: ${oc.env:BIONEMO_HOME}/tokenizers/molecule/molmim/vocab/molmim.model
+  downstream_task:
+    # FIXME first train/save a checkpoint, then you can run this. Change to our shared checkpoint once ready.
+    # python examples/molecule/molmim/pretrain.py --config-path /workspace/bionemo/examples/tests/conf/ --config-name molmim_pretrain_xsmall_test ++trainer.max_steps=5000 ++trainer.val_check_interval=2500 ++trainer.num_nodes=1 ++trainer.devices=1 ++trainer.precision=16-mixed ++model.micro_batch_size=32 ++model.dwnstr_task_validation.enabled=False ++exp_manager.create_wandb_logger=False ++exp_manager.create_tensorboard_logger=False  ++exp_manager.create_checkpoint_callback=True ++exp_manager.resume_if_exists=True  ++create_dllogger_callbacks=True ++create_trainer_metric_callback=True ++dllogger_callbacks_kwargs.use_existing_dllogger=True ++dllogger_callbacks_kwargs.warmup=0 ++dllogger_callbacks_kwargs.json_file=dlloger.json
+    restore_from_path: ${oc.env:BIONEMO_HOME}/models/molecule/molmim/MolMIM-70M-gaus-hiddens-70k_136bd7cac_test_only.nemo
+    outputs: [embeddings] # Which outputs to extract per sample (a value or list). Possible values: hiddens, embeddings.
+  data:
+    data_fields_map: # name which data_fields shoud be used for sequence/id (dataset dependant)
+      sequence: "smiles"
+      id: "iupac"
+    dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/physchem/SAMPL/test/x000 # full path to dataset (can include range or a list)
+
+target: bionemo.model.molecule.molmim.molmim_model.MolMIMModel # path to model class to load
+infer_target: bionemo.model.molecule.molmim.infer.MolMIMInference # path to inferende class to load

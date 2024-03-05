@@ -19,6 +19,17 @@ model:
     restore_from_path: ${oc.env:BIONEMO_HOME}/models/molecule/megamolbart/megamolbart.nemo
     outputs: [embeddings] # Which outputs to extract per sample (a value or list). Possible values: hiddens, embeddings.
   data:
+    # FIXME the following block (before data_fields_map) can be deleted if we train a new megamolbart.nemo model that uses these settings
+    # The following should probably always be True, unless you want to explore the unchanged input data. 
+    #  Changing will impact val/test metrics since canonicalization is done to model outputs but not 
+    #  targets (assuming it is done here).
+    canonicalize_target_smile: True
+    # The following four settings will result in randomized augmentation of SMILES for input, and matched output.
+    #  this is the equivarant model case.
+    canonicalize_encoder_input: False
+    canonicalize_decoder_output: False
+    encoder_augment: True
+    decoder_independent_augment: False
     data_fields_map: # name which data_fields shoud be used for sequence/id (dataset dependant)
       sequence: "smiles"
       id: "iupac"

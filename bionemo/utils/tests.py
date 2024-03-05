@@ -14,6 +14,7 @@ import os
 import pathlib
 import shutil
 from collections import OrderedDict
+from contextlib import contextmanager
 from typing import Dict, List, Optional, Union
 
 import apex
@@ -153,12 +154,15 @@ def check_expected_training_results(
         actual_value = trainer_results[key]
         if isinstance(actual_value, torch.Tensor):
             actual_value = actual_value.cpu().numpy().item()
-        tol_key = rel_tol * expected_value
+        this_rel_tol = rel_tol
         for override_key, override_tol in test_rel_tol_overrides.items():
             if override_key in key:
-                tol_key = override_tol * expected_value
+                this_rel_tol = override_tol
+        tol_key = abs(this_rel_tol * expected_value)  # absolute tolerance from expected value
         if not np.allclose(expected_value, actual_value, atol=tol_key):
-            mismatched_results.append(f"Expected {key} = {expected_value}, got {actual_value}.")
+            mismatched_results.append(
+                f"Expected {key} = {expected_value}, got {actual_value} not within abs tol of {tol_key} from rel tol of {this_rel_tol}."
+            )
 
     assert len(mismatched_results) == 0, f"Training results mismatched: {mismatched_results}{err_msg}"
 
@@ -219,3 +223,20 @@ def teardown_apex_megatron_cuda():
     torch.cuda.empty_cache()
     reset_microbatch_calculator()
     destroy_model_parallel()
+
+
+@contextmanager
+def distributed_model_parallel_state():
+    """Context manager for handling creating and cleaning up distributed model parallel state for tests.
+    Use like:
+    with distributed_model_parallel_state():
+        # your test code here
+    # After the block your state is cleaned up.
+    """
+    from bionemo.model.utils import initialize_distributed_parallel_state  # here to avoid circular import
+
+    try:
+        initialize_distributed_parallel_state()
+        yield
+    finally:
+        teardown_apex_megatron_cuda()

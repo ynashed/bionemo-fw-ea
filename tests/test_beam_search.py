@@ -21,7 +21,7 @@ from omegaconf.omegaconf import open_dict
 
 from bionemo.data.molecule import MoleculeEnumeration
 from bionemo.model.molecule.megamolbart.megamolbart_model import MegaMolBARTModel
-from bionemo.model.utils import setup_trainer
+from bionemo.model.utils import pad_preds_after_first_eos, setup_trainer
 from bionemo.utils.hydra import load_model_config
 from bionemo.utils.tests import (
     list_to_tensor,
@@ -55,7 +55,10 @@ def _adjust_config_for_test(cfg: DictConfig) -> DictConfig:
         cfg.model.micro_batch_size = len(_SMIS)
         cfg.model.global_batch_size = len(_SMIS)
         cfg.model.data.encoder_augment = False
-        cfg.model.data.decoder_augment = False
+        cfg.model.data.decoder_independent_augment = False
+        cfg.model.data.canonicalize_target_smile = True
+        cfg.model.data.canonicalize_decoder_output = False
+        cfg.model.data.canonicalize_encoder_input = False
         cfg.model.data.encoder_mask = False
         cfg.model.data.decoder_mask = False
         cfg.precision = 32
@@ -137,31 +140,38 @@ def test_megamolbart_greedy_beam_search(megamolbart_model_trainer, model_cfg):
                 assert torch.equal(batch[key], expected_batch[key])
 
     pl.seed_everything(model_cfg.seed)
+    assert not model.training
     # this test requires warmup - otherwise there are some logits discrepancies later on
-    _ = model.decode(tokens_enc, enc_mask, 10)
+    _ = model.decode(tokens_enc.clone(), enc_mask.clone(), 10)
 
-    preds, logits = model.decode(tokens_enc, enc_mask, _NUM_TOKENS_TO_GENERATE)
-
+    preds_ori, logits = model.decode(tokens_enc, enc_mask, _NUM_TOKENS_TO_GENERATE)
+    # Make sure that greedy decoded preds are properly padded for equality comparison with beam search
+    preds, greedy_pad_mask = pad_preds_after_first_eos(
+        preds_ori.clone(), eos_id=model.tokenizer.eos_id, pad_id=model.tokenizer.pad_id
+    )
     sampling_method = 'beam-search'
     preds_beam1, logits_beam1 = model.decode(
-        tokens_enc,
-        enc_mask,
+        tokens_enc.clone(),
+        enc_mask.clone(),
         _NUM_TOKENS_TO_GENERATE,
         sampling_method=sampling_method,
-        sampling_kwargs={'beam_size': 1, 'beam_alpha': 0},
+        sampling_kwargs={'beam_size': 1, 'beam_alpha': 0, 'keep_only_best_tokens': True},
+    )
+    _, beam1_pad_mask = pad_preds_after_first_eos(
+        preds_beam1.clone(), eos_id=model.tokenizer.eos_id, pad_id=model.tokenizer.pad_id
     )
 
     preds_beam, logits_beam, scores_beam = model.decode(
-        tokens_enc,
-        enc_mask,
+        tokens_enc.clone(),
+        enc_mask.clone(),
         _NUM_TOKENS_TO_GENERATE,
         sampling_method=sampling_method,
         sampling_kwargs={'beam_size': _BEAM_SIZE, 'beam_alpha': _BEAM_ALPHA, 'return_scores': True},
     )
 
     preds_beam_best, logits_beam_best, scores_beam_best = model.decode(
-        tokens_enc,
-        enc_mask,
+        tokens_enc.clone(),
+        enc_mask.clone(),
         _NUM_TOKENS_TO_GENERATE,
         sampling_method=sampling_method,
         sampling_kwargs={
@@ -174,8 +184,10 @@ def test_megamolbart_greedy_beam_search(megamolbart_model_trainer, model_cfg):
 
     preds = preds.cpu().detach()
     logits = logits.cpu().detach()
+    greedy_pad_mask = greedy_pad_mask.cpu().detach()
     preds_beam1 = preds_beam1.cpu().detach()
     logits_beam1 = logits_beam1.cpu().detach()
+    beam1_pad_mask = beam1_pad_mask.cpu().detach()
     preds_beam = preds_beam.cpu().detach()
     logits_beam = logits_beam.cpu().detach()
     scores_beam = scores_beam.cpu().detach()
@@ -184,13 +196,13 @@ def test_megamolbart_greedy_beam_search(megamolbart_model_trainer, model_cfg):
     scores_beam_best = scores_beam_best.cpu().detach()
 
     assert torch.equal(preds, preds_beam1)
-    torch.testing.assert_close(logits, logits_beam1)
+    torch.testing.assert_close(logits * (~greedy_pad_mask[:, 1:]), logits_beam1 * (~beam1_pad_mask[:, 1:]))
 
     assert [int(x) for x in preds.shape] == [len(_SMIS), _NUM_TOKENS_TO_GENERATE + 1]
     assert [int(x) for x in logits.shape] == [len(_SMIS), _NUM_TOKENS_TO_GENERATE]
 
     assert preds.shape == preds_beam_best.shape and logits.shape == logits_beam_best.shape
-    torch.testing.assert_close(scores_beam_best.max(dim=1, keepdim=True)[0], scores_beam_best)
+    torch.testing.assert_close(scores_beam.max(dim=1, keepdim=True)[0], scores_beam_best)
 
     assert torch.all((scores_beam[:, :-1] - scores_beam[:, 1:]) >= 0)
     # num_smi_to_generate + 1 accounts for BOS token at the beginning of the decoding if no decoded tokens are provided
@@ -256,4 +268,8 @@ def test_megamolbart_greedy_beam_search(megamolbart_model_trainer, model_cfg):
 
 
 if __name__ == '__main__':
-    test_megamolbart_greedy_beam_search()
+    # To get into a pdb and set an external breakpoint, run:
+    # python -m pdb tests/test_beam_search.py
+    # then in the session, you can now set breakpoints, eg:
+    #  b /usr/local/lib/python3.10/dist-packages/nemo/collections/nlp/models/language_modeling/megatron_lm_encoder_decoder_model.py:1309
+    pytest.main([__file__, "-s"])

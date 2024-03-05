@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Any, Dict, Generator, List, Tuple
 
 import pytest
 import pytorch_lightning as pl
@@ -44,7 +44,7 @@ def training_retro_cfg(config_path_for_tests) -> DictConfig:
 
 
 @pytest.fixture(scope='module')
-def megamolbart_datasets(training_cfg, num_samples) -> List[Dataset]:
+def megamolbart_datasets(training_cfg, num_samples) -> Generator[Any, Any, Tuple[Dataset, Dataset, Dataset]]:
     initialize_distributed_parallel_state()
     train_ds, val_ds, test_ds = megamolbart_build_train_valid_test_datasets(
         cfg=training_cfg.model.data, train_valid_test_num_samples=num_samples
@@ -54,7 +54,9 @@ def megamolbart_datasets(training_cfg, num_samples) -> List[Dataset]:
 
 
 @pytest.fixture(scope='module')
-def megamolbart_retro_datasets(training_retro_cfg, num_samples) -> List[Dataset]:
+def megamolbart_retro_datasets(
+    training_retro_cfg, num_samples
+) -> Generator[Any, Any, Tuple[Dataset, Dataset, Dataset]]:
     initialize_distributed_parallel_state()
     train_ds, val_ds, test_ds = megamolbart_retro_build_train_valid_test_datasets(
         cfg=training_retro_cfg.model.data, train_valid_test_num_samples=num_samples
@@ -131,8 +133,10 @@ def test_molecule_enumeration_collate_fn_no_mask(tokenizer, training_cfg, batch)
         encoder_mask=False,
         decoder_mask=False,
         encoder_augment=False,
-        decoder_augment=False,
-        canonicalize_input=False,
+        decoder_independent_augment=False,
+        canonicalize_target_smile=False,
+        canonicalize_decoder_output=False,
+        canonicalize_encoder_input=False,
     ).collate_fn
 
     output = collate_fn(batch)
@@ -168,8 +172,10 @@ def test_molecule_enumeration_collate_fn_mask(tokenizer, training_cfg, batch):
         encoder_mask=True,
         decoder_mask=True,
         encoder_augment=False,
-        decoder_augment=False,
-        canonicalize_input=False,
+        decoder_independent_augment=False,
+        canonicalize_target_smile=False,
+        canonicalize_decoder_output=False,
+        canonicalize_encoder_input=False,
         mask_prob=0.1,
         span_lambda=3.0,
     ).collate_fn
@@ -392,11 +398,82 @@ def test_molecule_enumeration_collate_fn_mask(tokenizer, training_cfg, batch):
         ),
     )
 
-    assert output['target_smiles'] == [
-        'CO[C@H](C[C@@H]1CCC[C@H]1O)c1ccccc1',
-        'COC[C@H](O)CCNC(=O)CCC[C@@H](C)N',
-        'CC[C@](C)(Nc1cnnn1C)C1CC1',
-    ]
+    assert output['target_smiles'] == batch
+
+
+@pytest.mark.parametrize(
+    "encoder_augment, decoder_independent_augment, canonicalize_decoder_output, canonicalize_encoder_input, test_desc",
+    [
+        (False, False, False, False, "as_is"),  # leave as is with input
+        (True, False, False, False, "equivariant"),  # augmented encoder, matched decoder
+        (True, False, True, False, "invariant"),  # augmented encoder canonical decoder
+        (False, False, True, True, "canonical"),  # canonical encoder canonical decoder
+    ],
+)
+def test_molecule_enumeration_collate_function_options(
+    tokenizer,
+    training_cfg,
+    batch,
+    encoder_augment: bool,
+    decoder_independent_augment: bool,
+    canonicalize_decoder_output: bool,
+    canonicalize_encoder_input: bool,
+    test_desc: str,
+):
+    pl.seed_everything(training_cfg.seed)
+    seq_len = training_cfg.model.data.max_seq_length
+    collate_fn = MoleculeEnumeration(
+        tokenizer=tokenizer,
+        seq_length=seq_len,
+        pad_size_divisible_by_8=True,
+        encoder_mask=False,
+        decoder_mask=False,
+        encoder_augment=encoder_augment,
+        decoder_independent_augment=decoder_independent_augment,
+        canonicalize_target_smile=True,
+        canonicalize_decoder_output=canonicalize_decoder_output,
+        canonicalize_encoder_input=canonicalize_encoder_input,
+    ).collate_fn
+
+    output = collate_fn(batch)
+    expected_keys = ['text_enc', 'enc_mask', 'text_dec', 'dec_mask', 'labels', 'loss_mask', 'target_smiles']
+    assert all(k in expected_keys for k in output.keys())
+    assert len(output['target_smiles']) == output['text_enc'].shape[0] and output['text_enc'].shape[0] == len(batch)
+    assert output['text_enc'].shape[1] % 8 == 0
+
+    assert not (tokenizer.mask_id in output['text_enc'] and tokenizer.mask_id in output['text_dec'])
+    assert all(output['text_dec'][i][0] == tokenizer.bos_id for i in range(len(batch)))
+    assert all(target_smi == smi for target_smi, smi in zip(output['target_smiles'], batch))
+
+    for i in range(len(batch)):
+        mask_dec = output['dec_mask'][i]
+        mask_dec[0] = 0
+        dec_ids = output['text_dec'][i][mask_dec == 1].cpu().detach().numpy().tolist()
+
+        mask_enc = output['enc_mask'][i]
+        enc_ids = output['text_enc'][i][mask_enc == 1].cpu().detach().numpy().tolist()
+        if test_desc == "as_is" or test_desc == "canonical":
+            # # batch is canonical so we can use this.
+            assert tokenizer.ids_to_text([dec_ids])[0] == batch[i] and tokenizer.ids_to_text([enc_ids])[0] == batch[i]
+        elif test_desc == "equivariant":
+            assert tokenizer.ids_to_text([dec_ids])[0] == tokenizer.ids_to_text([enc_ids])[0]
+            assert tokenizer.ids_to_text([dec_ids])[0] != batch[i]
+        elif test_desc == "invariant":
+            assert tokenizer.ids_to_text([dec_ids])[0] != tokenizer.ids_to_text([enc_ids])[0]
+            assert tokenizer.ids_to_text([dec_ids])[0] == batch[i]  # batch is canonical so we can use this.
+        else:
+            assert False, test_desc + " is not a valid test description"
+
+    assert output['target_smiles'] == batch
+
+    if test_desc != "invariant":
+        assert torch.equal(
+            output['text_enc'][:, :-1], output['text_dec'][:, 1:]
+        )  # other than BOS token, we should have equality
+    else:
+        assert not torch.equal(
+            output['text_enc'][:, :-1], output['text_dec'][:, 1:]
+        )  # other than BOS token, we should not have equality
 
 
 def test_molecule_input_target_enumeration_collate_fn(tokenizer, training_retro_cfg, batch_retro):
@@ -412,8 +489,10 @@ def test_molecule_input_target_enumeration_collate_fn(tokenizer, training_retro_
         encoder_mask=False,
         decoder_mask=False,
         encoder_augment=False,
-        decoder_augment=False,
-        canonicalize_input=False,
+        decoder_independent_augment=False,
+        canonicalize_encoder_input=False,
+        canonicalize_decoder_output=False,
+        canonicalize_target_smile=False,
         input_name=input_name,
         target_name=target_name,
     ).collate_fn
@@ -1378,10 +1457,7 @@ def test_molecule_input_target_enumeration_collate_fn(tokenizer, training_retro_
         ),
     )
 
-    assert output['target_smiles'] == [
-        'CCc1cc([N+](=O)[O-])c(N)cc1Cl',
-        'CC(C)(C)c1ccc(CNCCc2ccc(Cl)c(C(F)(F)F)c2)cc1.O=C(O)c1cc(Cl)cc2cc[nH]c12',
-    ]
+    assert output['target_smiles'] == [b[target_name] for b in batch_retro]
 
 
 def test_megamolbart_retro_collate_fn_masking_config(tokenizer, training_retro_cfg, batch_retro):

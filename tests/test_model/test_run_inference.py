@@ -25,6 +25,7 @@ _TEST_DATA: List[Tuple[str, int]] = [
     ('prott5nv_infer.yaml', 768),
     ('esm1nv_infer.yaml', 768),
     ('megamolbart_infer.yaml', 512),
+    ('molmim_infer.yaml', 512),
 ]
 """(config filename, hidden embedding dimensionality)"""
 

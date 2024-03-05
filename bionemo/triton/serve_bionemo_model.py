@@ -198,7 +198,12 @@ def bind_sampling(
 
 
 def bind_decode(
-    triton: Triton, cfg: DictConfig, preloaded_model: Optional[M], nav: bool, triton_model_name: str
+    triton: Triton,
+    cfg: DictConfig,
+    preloaded_model: Optional[M],
+    nav: bool,
+    triton_model_name: str,
+    in_shape=(-1, 512),
 ) -> None:
     in_name = HIDDENS
     out = SEQUENCES
@@ -209,7 +214,7 @@ def bind_decode(
         infer_fn,
         triton_model_name,
         in_name=in_name,
-        in_shape=(-1, 512),
+        in_shape=in_shape,
         out=out,
         verbose=True,
     )

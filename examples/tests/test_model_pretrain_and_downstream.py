@@ -37,15 +37,17 @@ from bionemo.model.molecule.diffdock.models.nemo_model import (
     DiffdockTensorProductScoreModelAllAtom as DiffdockConfidenceModel,
 )
 from bionemo.model.molecule.megamolbart import FineTuneMegaMolBART, MegaMolBARTModel, MegaMolBARTRetroModel
+from bionemo.model.molecule.molmim import MolMIMModel
 from bionemo.model.protein.downstream import FineTuneProteinModel
 from bionemo.model.protein.equidock.equidock_model import EquiDock
 from bionemo.model.protein.esm1nv import ESM1nvModel, ESM2nvModel
 from bionemo.model.protein.openfold.openfold_model import AlphaFold
 from bionemo.model.protein.prott5nv import ProtT5nvModel
-from bionemo.model.utils import initialize_distributed_parallel_state, setup_trainer
+from bionemo.model.utils import setup_trainer
 from bionemo.utils.hydra import load_model_config
 from bionemo.utils.tests import (
     check_expected_training_results,
+    distributed_model_parallel_state,
     load_expected_training_results,
     resolve_cfg,
     teardown_apex_megatron_cuda,
@@ -171,6 +173,18 @@ TEST_PARAMS: List[TrainingTestParams] = [
         "model_cls": DNABERTModel,
         "model_size": 8121216,
     },
+    {
+        "config_name": 'molmim_pretrain_xsmall_test',
+        "script_path": "examples/molecule/molmim/pretrain.py",
+        "model_cls": MolMIMModel,
+        "model_size": 6288002,
+    },
+    {
+        "config_name": 'molmim_pretrain_continue_small_test',
+        "script_path": "examples/molecule/molmim/pretrain.py",
+        "model_cls": MolMIMModel,
+        "model_size": 70612096,
+    },
 ]
 
 CONFIG_NAME = [params["config_name"] for params in TEST_PARAMS]
@@ -225,24 +239,23 @@ def test_model_size(config_name: str, model_class: LightningModule, model_parame
     '''Check that number of model weights are correct'''
 
     cfg = load_model_config(config_name=config_name, config_path=config_path_for_tests)
-    initialize_distributed_parallel_state()
-    callbacks = setup_dwnstr_task_validation_callbacks(cfg)
-    trainer = setup_trainer(cfg, callbacks=callbacks)
-    if model_class == FineTuneProteinModel or model_class == FineTuneMegaMolBART:
-        model = model_class(cfg, trainer)
-    elif model_class == DiffdockScoreModel or model_class == DiffdockConfidenceModel:
-        data_manager = DiffdockDataManager(cfg)
-        model = model_class(cfg=cfg, trainer=trainer, data_manager=data_manager)
-    elif model_class == EquiDock:
-        data_manager = DataManager(cfg)
-        cfg.model.input_edge_feats_dim = data_manager.train_ds[0][0].edata['he'].shape[1]
+    with distributed_model_parallel_state():
+        callbacks = setup_dwnstr_task_validation_callbacks(cfg)
         trainer = setup_trainer(cfg, callbacks=callbacks)
-        model = EquiDock(cfg=cfg, trainer=trainer, data_manager=data_manager)
+        if model_class == FineTuneProteinModel or model_class == FineTuneMegaMolBART:
+            model = model_class(cfg, trainer)
+        elif model_class == DiffdockScoreModel or model_class == DiffdockConfidenceModel:
+            data_manager = DiffdockDataManager(cfg)
+            model = model_class(cfg=cfg, trainer=trainer, data_manager=data_manager)
+        elif model_class == EquiDock:
+            data_manager = DataManager(cfg)
+            cfg.model.input_edge_feats_dim = data_manager.train_ds[0][0].edata['he'].shape[1]
+            trainer = setup_trainer(cfg, callbacks=callbacks)
+            model = EquiDock(cfg=cfg, trainer=trainer, data_manager=data_manager)
 
-    else:
-        model = model_class(cfg.model, trainer)
-    teardown_apex_megatron_cuda()
-    assert model.num_weights == model_parameters
+        else:
+            model = model_class(cfg.model, trainer)
+        assert model.num_weights == model_parameters
 
 
 @pytest.mark.slow
@@ -286,6 +299,7 @@ def test_model_training(
     tolerance_overrides = {
         "grad_norm": 0.5,  # grad norm flucuates quite a bit in these small training runs
         "val_percent_invalid": 1.0,  # This varies a ton early in training, can be anywhere in 0-1.
+        "val_character_accuracy": 0.5,  # This accuracy varries wildly early in training
         # "3state_accuracy": 0.10,  # This accuracy is measured in percent
         # "resolved_accuracy": 0.05,  # This accuracy is measured in percent
         # "8state_accuracy": 0.05.0,  # This accuracy is measured in percent

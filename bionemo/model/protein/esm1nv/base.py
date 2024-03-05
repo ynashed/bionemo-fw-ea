@@ -533,9 +533,9 @@ class ESMnvTransformerLanguageModel(TransformerLanguageModel):
                 set_inference_key_value_memory=set_inference_key_value_memory,
                 inference_max_sequence_len=inference_max_sequence_len,
                 checkpoint_activations_all_layers=checkpoint_activations_all_layers,
-                rotary_pos_emb=(rotary_pos_emb, None, None)
-                if rotary_pos_emb is not None
-                else None,  # This assumes that this being used as a GPT/BERT model only (no cross-attention)
+                rotary_pos_emb=(
+                    (rotary_pos_emb, None, None) if rotary_pos_emb is not None else None
+                ),  # This assumes that this being used as a GPT/BERT model only (no cross-attention)
                 self_attention_relative_position_bias=encoder_self_attention_relative_position_bias,
             )
         else:

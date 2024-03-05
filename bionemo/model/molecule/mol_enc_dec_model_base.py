@@ -159,7 +159,6 @@ class MolEncDecModelBase(MegatronLMEncoderDecoderModel, ABC):
             global_batch["enc_mask"],
             global_batch["dec_mask"],
         )
-
         tokens_enc, tokens_dec, loss_mask, labels, enc_mask, dec_mask = [
             t.to(self.device) for t in (tokens_enc, tokens_dec, loss_mask, labels, enc_mask, dec_mask)
         ]
@@ -167,6 +166,7 @@ class MolEncDecModelBase(MegatronLMEncoderDecoderModel, ABC):
         return (tokens_enc, tokens_dec, loss_mask, labels, enc_mask, dec_mask)
 
     def get_step_logits(self, batch, batch_idx):
+        """Teacher forcing"""
         arg_names = ['enc_input_ids', 'enc_attn_mask', 'dec_input_ids', 'dec_attn_mask']
         (
             encoder_input_ids,
@@ -176,8 +176,14 @@ class MolEncDecModelBase(MegatronLMEncoderDecoderModel, ABC):
             encoder_attn_mask,
             decoder_attn_mask,
         ) = self.process_global_batch(batch)
-        batch_for_pipeline = [encoder_input_ids, encoder_attn_mask, decoder_input_ids, decoder_attn_mask]
-        forward_step_func = self._get_forward_output_only_func(arg_names=arg_names, output_name="logits")
+
+        batch_for_pipeline = [
+            encoder_input_ids,
+            encoder_attn_mask,
+            decoder_input_ids,
+            decoder_attn_mask,
+        ]
+        forward_step_func = self._get_forward_output_only_func(arg_names=arg_names, output_name="token_logits")
         fwd_bwd_function = get_forward_backward_func()
 
         encoder_seq_length = encoder_input_ids.size(1)
@@ -199,7 +205,7 @@ class MolEncDecModelBase(MegatronLMEncoderDecoderModel, ABC):
 
         if output_tensor:
             # collect across micro batches
-            logits_tensors_list = [o['logits'] for o in output_tensor]
+            logits_tensors_list = [o['token_logits'] for o in output_tensor]
             logits_tensor = torch.concat(logits_tensors_list)
         else:
             # we're not on the last pipeline stage so no output
@@ -222,9 +228,16 @@ class MolEncDecModelBase(MegatronLMEncoderDecoderModel, ABC):
         # store the outputs of the forward pass in last element of step_outputs
         loss_dict = super()._test_validation_step(step_outputs, dataloader_iter, batch_idx, dataloader_idx)
 
-        # update loss_dict
+        # update loss_dict, these are the logits given teacher forcing, eg given the target sample.
         token_logits = self.get_step_logits(batch, batch_idx)
-        tokens_enc, tokens_dec, loss_mask, labels, enc_mask, dec_mask = self.process_global_batch(batch)
+        (
+            tokens_enc,
+            tokens_dec,
+            loss_mask,
+            labels,
+            enc_mask,
+            dec_mask,
+        ) = self.process_global_batch(batch)
 
         target_smiles = batch['target_smiles']
         token_logits[:, :, self.tokenizer.vocab_size :] = -float('Inf')  # never pick padded tokens
@@ -267,6 +280,10 @@ class MolEncDecModelBase(MegatronLMEncoderDecoderModel, ABC):
 
         return averaged_loss
 
+    def get_hiddens_mask(self, enc_attn_mask: torch.Tensor, *args, **kwargs) -> torch.Tensor:
+        """Convenience function for getting the perceiver aware hiddenes mask given a token based hiddens mask"""
+        return self.enc_dec_model.enc_dec_model.get_hiddens_mask(enc_attn_mask, *args, **kwargs)
+
     def sample_molecules(
         self,
         tokens_enc,
@@ -275,7 +292,7 @@ class MolEncDecModelBase(MegatronLMEncoderDecoderModel, ABC):
         sampling_method: str = "greedy-search",
         sampling_kwargs: dict = {},
     ):
-        """Autoregressively sample SMILES molecules from encoder hidden state
+        """Autoregressively sample SMILES molecules from encoder hidden state, if provided, or encode tokens_enc into a hidden state and sample that.
 
         Args:
             tokens_enc (torch.Tensor, long): token ID values for samples
@@ -293,7 +310,6 @@ class MolEncDecModelBase(MegatronLMEncoderDecoderModel, ABC):
 
         self.freeze()
 
-        # Decode encoder hidden state to tokens
         predicted_tokens_ids, log_probs = self.decode(
             tokens_enc,
             enc_mask,
@@ -302,6 +318,7 @@ class MolEncDecModelBase(MegatronLMEncoderDecoderModel, ABC):
             sampling_method=sampling_method,
             sampling_kwargs=sampling_kwargs,
         )
+
         supported_dims = [2, 3]
         tensor_dim = len(predicted_tokens_ids.size())
         predicted_tokens_ids = predicted_tokens_ids.cpu().detach().numpy().tolist()
@@ -340,13 +357,12 @@ class MolEncDecModelBase(MegatronLMEncoderDecoderModel, ABC):
             else:
                 # NB: this is slightly different from previous version in that pad tokens can be in the middle of sequence
                 predicted_tokens_ids[item] = [id for id in predicted_tokens_ if id != self.tokenizer.pad_id]
-
         predicted_tokens_text = self.tokenizer.ids_to_tokens(predicted_tokens_ids)
         sampled_smiles = self.tokenizer.tokens_to_text(predicted_tokens_text)
         return sampled_smiles, predicted_tokens_ids
 
     def calculate_character_accuracy(self, token_logits, loss_mask, labels, batch_idx=None, log=False):
-        """Character (token) level accuracy
+        """Character (token) level accuracy when model forward has been guided by the true tokens at the i-1 positions.
 
         Args:
             token_logits (torch.Tensor, float): softmax values for all tokens
@@ -386,6 +402,7 @@ class MolEncDecModelBase(MegatronLMEncoderDecoderModel, ABC):
         Returns:
             float, float: molecular accuracy and percent invalid
         """
+
         sampled_smiles = self.sample_molecules(
             tokens_enc,
             enc_mask,
@@ -395,9 +412,18 @@ class MolEncDecModelBase(MegatronLMEncoderDecoderModel, ABC):
         sampled_mols = [Chem.MolFromSmiles(smi) for smi in sampled_smiles]
 
         invalid = [mol is None for mol in sampled_mols]
-        canonical_smiles = [
-            "Unknown" if mol is None else Chem.MolToSmiles(mol, canonical=True) for mol in sampled_mols
-        ]
+
+        invalid_mol_str = "Unknown"
+
+        def try_canonicalize(mol) -> str:
+            if mol is None:
+                return invalid_mol_str
+            try:
+                return Chem.MolToSmiles(mol, canonical=True)
+            except Exception:
+                return invalid_mol_str
+
+        canonical_smiles = [try_canonicalize(mol) for mol in sampled_mols]
         correct_smiles = [target_smiles[idx] == smi for idx, smi in enumerate(canonical_smiles)]
 
         num_correct = sum(correct_smiles)

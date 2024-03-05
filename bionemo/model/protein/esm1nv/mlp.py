@@ -124,9 +124,9 @@ class ESMnvParallelMLP(ParallelMLP):
         # Project to 4h.
         self.dense_h_to_4h = tensor_parallel.ColumnParallelLinear(
             hidden_size,
-            ffn_hidden_size * 2
-            if self.fast_glu_activation
-            else ffn_hidden_size,  # NOTE: When using geglu, divide ffn dim by 2/3 to keep overall params the same.
+            (
+                ffn_hidden_size * 2 if self.fast_glu_activation else ffn_hidden_size
+            ),  # NOTE: When using geglu, divide ffn dim by 2/3 to keep overall params the same.
             config=config,
             gather_output=False,
             init_method=init_method,
