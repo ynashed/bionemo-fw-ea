@@ -146,11 +146,11 @@ model:
     pin_memory: False
     dynamic_padding: False # If True, each batch is padded to the maximum sequence length within that batch. 
               #    Set it to False when model.pipeline_model_parallel_size > 1, as pipeline parallelism requires fixed-length padding.
-
     # Below is the configuration for UF90 resampling.
     # TODO(@jomitchell) Can remove this??
     force_regen_sample_mapping: false # When true, will always generate a new uf90 resampling. otherwise, change the seed.
-    index_mapping_dir: ${oc.env:BIONEMO_HOME}/data/uniref202104_esm2/
+    dataset_path: ${oc.env:BIONEMO_HOME}/data/uniref202104_esm2 # an optional parameter, helpful when users want to switch between different root folders keeping the same structure of data files required by ESM2nv training
+    index_mapping_dir: ${model.data.dataset_path}
     preprocessing:
       num_preprocess_workers: 16
     train:
@@ -162,14 +162,14 @@ model:
       use_upsampling: True # if the data should be upsampled to max number of steps in the training
       range: x[000..049]
       sample_from_map: True # TODO: Use uf90_datapath and cluster_mapping_tsv to create resampled dataset for training with uf50_datapath. If False, only uf50_datapath is used for training. 
-      uf50_datapath: '${oc.env:BIONEMO_HOME}/data/uniref202104_esm2/uniref50_train_filt.fasta'
-      uf90_datapath: '${oc.env:BIONEMO_HOME}/data/uniref202104_esm2/uniref90membersandreps_ur50trainfiltreps.fasta'
-      cluster_mapping_tsv: '${oc.env:BIONEMO_HOME}/data/uniref202104_esm2/uniref50_mapper_to_uniref90clustermembers_andselfuniref50.tsv'
-      dataset_path: ${oc.env:BIONEMO_HOME}/data/uniref202104_esm2/uf50 # parent directory for data, contains  train folder. Requires write for for index creation.
+      uf50_datapath: ${model.data.dataset_path}/uniref50_train_filt.fasta
+      uf90_datapath: ${model.data.dataset_path}/uniref90membersandreps_ur50trainfiltreps.fasta
+      cluster_mapping_tsv: ${model.data.dataset_path}/uniref50_mapper_to_uniref90clustermembers_andselfuniref50.tsv
+      dataset_path: ${model.data.dataset_path}/uf50 # parent directory for data, contains  train folder. Requires write for for index creation.
       sort_fastas: True # If true, assumes the input files are not sorted, and sorts them before creating the cluster mapping. Unsorted fastas will break the cluster map.
       num_workers: ${model.data.num_workers}
       uf90:
-        uniref90_path: ${oc.env:BIONEMO_HOME}/data/uniref202104_esm2/uf90/ # created and populated my preprocessing
+        uniref90_path: ${model.data.dataset_path}/uf90 # created and populated my preprocessing
         dataset: 
           uf90_csvs: x[000..049] # created and populated by preprocessing, this key is a directory inside uniref90_path
         data_impl: 'csv_fields_mmap'
@@ -190,8 +190,8 @@ model:
     val:
       use_upsampling: False
       range: x[000..049]
-      uf50_datapath: '${oc.env:BIONEMO_HOME}/data/dataqc/uniref50_train_filt.fasta'
-      dataset_path: ${oc.env:BIONEMO_HOME}/data/uniref202104_esm2/uf50 # holds validation data.
+      uf50_datapath: ${model.data.dataset_path}/uniref50_train_filt.fasta
+      dataset_path: ${model.data.dataset_path}/uf50 # holds validation data.
       data_impl: 'csv_fields_mmap'
       num_workers: ${model.data.num_workers}
       data_impl_kwargs:
@@ -210,8 +210,8 @@ model:
     test:
       use_upsampling: False
       range: x[000..049]
-      uf50_datapath: '${oc.env:BIONEMO_HOME}/data/uniref202104_esm2/uniref50_train_filt.fasta'
-      dataset_path: ${oc.env:BIONEMO_HOME}/data/uniref202104_esm2/uf50 # holds testing data.
+      uf50_datapath: ${model.data.dataset_path}/uniref50_train_filt.fasta
+      dataset_path: ${model.data.dataset_path}/uf50 # holds testing data.
       data_impl: 'csv_fields_mmap'
       num_workers: ${model.data.num_workers}
       data_impl_kwargs:
@@ -233,7 +233,6 @@ model:
     modify_percent: 0.1 # Percentage of characters in a protein sequence to modify. (Modification means replacing with another amino acid or with a mask token)
     perturb_percent: 0.5 # Of the modify_percent, what percentage of characters are to be replaced with another amino acid.
 
-  
   dwnstr_task_validation:
     enabled: False 
     dataset:

@@ -125,7 +125,8 @@ model:
     pin_memory: false
     dynamic_padding: false
     force_regen_sample_mapping: false
-    index_mapping_dir: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/uniref202104_esm2_qc_test200_val200
+    dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/uniref202104_esm2_qc_test200_val200
+    index_mapping_dir: ${model.data.dataset_path}
     preprocessing:
       num_preprocess_workers: 16
     train:
@@ -137,14 +138,14 @@ model:
       use_upsampling: true
       range: x[000..049]
       sample_from_map: true
-      uf50_datapath: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/uniref202104_esm2_qc_test200_val200/uniref50_train_filt.fasta
-      uf90_datapath: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/uniref202104_esm2_qc_test200_val200/ur90_ur50_sampler.fasta
-      cluster_mapping_tsv: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/uniref202104_esm2_qc_test200_val200/mapping.tsv
-      dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/uniref202104_esm2_qc_test200_val200/uf50
+      uf50_datapath: ${model.data.dataset_path}/uniref50_train_filt.fasta
+      uf90_datapath: ${model.data.dataset_path}/ur90_ur50_sampler.fasta
+      cluster_mapping_tsv: ${model.data.dataset_path}/mapping.tsv
+      dataset_path: ${model.data.dataset_path}/uf50
       sort_fastas: true
       num_workers: ${model.data.num_workers}
       uf90:
-        uniref90_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/uniref202104_esm2_qc_test200_val200/uf90
+        uniref90_path: ${model.data.dataset_path}/uf90
         dataset:
           uf90_csvs: x[000..049]
         data_impl: csv_fields_mmap
@@ -165,8 +166,8 @@ model:
     val:
       use_upsampling: false
       range: x[000..049]
-      uf50_datapath: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/uniref202104_esm2_qc_test200_val200/uniref50_train_filt.fasta
-      dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/uniref202104_esm2_qc_test200_val200/uf50
+      uf50_datapath: ${model.data.dataset_path}/uniref50_train_filt.fasta
+      dataset_path: ${model.data.dataset_path}/uf50
       data_impl: csv_fields_mmap
       num_workers: ${model.data.num_workers}
       data_impl_kwargs:
@@ -185,8 +186,8 @@ model:
     test:
       use_upsampling: false
       range: x[000..049]
-      uf50_datapath: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/uniref202104_esm2_qc_test200_val200/uniref50_train_filt.fasta
-      dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/uniref202104_esm2_qc_test200_val200/uf50
+      uf50_datapath: ${model.data.dataset_path}/uniref50_train_filt.fasta
+      dataset_path: ${model.data.dataset_path}/uf50
       data_impl: csv_fields_mmap
       num_workers: ${model.data.num_workers}
       data_impl_kwargs:

@@ -17,21 +17,10 @@ trainer:
 
 model:
   data:
-    index_mapping_dir: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/uniref202104_esm2_qc_test200_val200
+    dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/uniref202104_esm2_qc_test200_val200
     train:
-      uf50_datapath: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/uniref202104_esm2_qc_test200_val200/uniref50_train_filt.fasta
-      uf90_datapath: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/uniref202104_esm2_qc_test200_val200/ur90_ur50_sampler.fasta
-      cluster_mapping_tsv: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/uniref202104_esm2_qc_test200_val200/mapping.tsv
-      dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/uniref202104_esm2_qc_test200_val200/uf50
-      uf90:
-        uniref90_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/uniref202104_esm2_qc_test200_val200/uf90
-    val:
-      uf50_datapath: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/uniref202104_esm2_qc_test200_val200/uniref50_train_filt.fasta
-      dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/uniref202104_esm2_qc_test200_val200/uf50
-    test:
-      uf50_datapath: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/uniref202104_esm2_qc_test200_val200/uniref50_train_filt.fasta
-      dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/uniref202104_esm2_qc_test200_val200/uf50
-
+      uf90_datapath: ${model.data.dataset_path}/ur90_ur50_sampler.fasta
+      cluster_mapping_tsv: ${model.data.dataset_path}/mapping.tsv
   dwnstr_task_validation:
     dataset:
       emb_batch_size: 24
