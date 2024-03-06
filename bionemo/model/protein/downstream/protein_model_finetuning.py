@@ -60,7 +60,7 @@ class FineTuneProteinModel(EncoderFineTuning):
                     self.cfg.hidden_layer_size,
                     self.cfg.data.target_sizes[0],
                 ],
-                dropout=self.cfg.model.dropout_rate,
+                dropout=self.cfg.dropout_rate,
             )
 
         elif self.task_type == 'token-level-classification':

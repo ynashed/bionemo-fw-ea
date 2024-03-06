@@ -225,13 +225,10 @@ model:
       sequence_column: sequence
       target_column:
       - 3state
-      - resolved
       target_sizes:
       - 3
-      - 2
       mask_column:
       - resolved
-      - null
       random_seed: 1234
       optim:
         name: adam

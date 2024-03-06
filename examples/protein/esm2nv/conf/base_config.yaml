@@ -251,9 +251,9 @@ model:
         train: x000
         test: x000
       sequence_column: "sequence" # name of column with protein sequence in csv file
-      target_column: [ "3state", "resolved" ] # names of label columns in csv file
-      target_sizes: [ 3, 2 ] # number of classes in each label
-      mask_column: [ "resolved", null ] # names of mask columns in csv file, masks must be 0 or 1
+      target_column: ["3state"] # names of label columns in csv file
+      target_sizes: [3] # number of classes in each label
+      mask_column: ["resolved"] # names of mask columns in csv file, masks must be 0 or 1
       random_seed: 1234
       optim:
         name: adam
