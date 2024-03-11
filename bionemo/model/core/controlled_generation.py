@@ -25,12 +25,8 @@ class ControlledGenerationPerceiverEncoderInferenceWrapper:
         to_cpu: bool = True,
         batch_second: bool = True,
         additional_decode_kwargs: Optional[Dict[str, Any]] = None,
-        sampling_kwarg_overrides: Optional[Dict[str, Any]] = {
-            "beam_size": 5,
-            "keep_only_best_tokens": True,
-            "return_scores": False,
-        },
-        sampling_method: str = "beam-search",
+        sampling_kwarg_overrides: Optional[Dict[str, Any]] = None,
+        sampling_method: str = "greedy-search",
     ):
         """A wrapper that you can put over your inference model (if it uses a perceiver encoder) to get a new model that's compatible with
         the IO expectations of the bionemo-controlled-generation package.

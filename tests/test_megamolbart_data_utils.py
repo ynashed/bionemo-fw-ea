@@ -18,8 +18,8 @@ from bionemo.utils.tests import teardown_apex_megatron_cuda
 
 
 @pytest.fixture(scope="module")
-def num_samples() -> Dict[str, int]:
-    return {'train': 5, 'val': 5, 'test': 5}
+def num_train_samples() -> int:
+    return 5
 
 
 @pytest.fixture(scope="module")
@@ -44,10 +44,10 @@ def training_retro_cfg(config_path_for_tests) -> DictConfig:
 
 
 @pytest.fixture(scope='module')
-def megamolbart_datasets(training_cfg, num_samples) -> Generator[Any, Any, Tuple[Dataset, Dataset, Dataset]]:
+def megamolbart_datasets(training_cfg, num_train_samples) -> Generator[Any, Any, Tuple[Dataset, Dataset, Dataset]]:
     initialize_distributed_parallel_state()
     train_ds, val_ds, test_ds = megamolbart_build_train_valid_test_datasets(
-        cfg=training_cfg.model.data, train_valid_test_num_samples=num_samples
+        cfg=training_cfg.model.data, train_n_samples=num_train_samples
     )
     yield train_ds, val_ds, test_ds
     teardown_apex_megatron_cuda()
@@ -55,11 +55,11 @@ def megamolbart_datasets(training_cfg, num_samples) -> Generator[Any, Any, Tuple
 
 @pytest.fixture(scope='module')
 def megamolbart_retro_datasets(
-    training_retro_cfg, num_samples
+    training_retro_cfg, num_train_samples
 ) -> Generator[Any, Any, Tuple[Dataset, Dataset, Dataset]]:
     initialize_distributed_parallel_state()
     train_ds, val_ds, test_ds = megamolbart_retro_build_train_valid_test_datasets(
-        cfg=training_retro_cfg.model.data, train_valid_test_num_samples=num_samples
+        cfg=training_retro_cfg.model.data, train_n_samples=num_train_samples
     )
     yield train_ds, val_ds, test_ds
     teardown_apex_megatron_cuda()
@@ -84,29 +84,21 @@ def batch_retro() -> List[Dict[str, str]]:
 
 
 @pytest.mark.needs_gpu
-def test_megamolbart_build_train_valid_test_datasets(megamolbart_datasets, num_samples):
+def test_megamolbart_build_train_valid_test_datasets(megamolbart_datasets, num_train_samples):
     train_ds, val_ds, test_ds = megamolbart_datasets
 
-    assert (
-        len(train_ds) == num_samples['train']
-        and len(val_ds) == num_samples['val']
-        and len(test_ds) == num_samples['test']
-    )
+    assert len(train_ds) == num_train_samples
 
     assert train_ds[2] == 'Cc1ccccc1CCON'
-    assert val_ds[0] == 'C#CCNC(=O)COC[C@@H](N)C#C'
-    assert test_ds[4] == 'O[C@H]1COCCN(CCn2cccn2)C1'
+    assert val_ds[0] == 'O=C[C@H](O)[C@H](O)[C@@H](O)[C@H](S)CO'
+    assert test_ds[4] == 'Cn1cnc(NC(=O)[C@@H](CN)CO)n1'
 
 
 def test_megamolbart_retro_build_train_valid_test_datasets(
-    training_retro_cfg, megamolbart_retro_datasets, num_samples
+    training_retro_cfg, megamolbart_retro_datasets, num_train_samples
 ):
     train_ds, val_ds, test_ds = megamolbart_retro_datasets
-    assert (
-        len(train_ds) == num_samples['train']
-        and len(val_ds) == num_samples['val']
-        and len(test_ds) == num_samples['test']
-    )
+    len(train_ds) == num_train_samples
 
     input_name = training_retro_cfg.model.data.input_name
     target_name = training_retro_cfg.model.data.target_name
@@ -118,8 +110,8 @@ def test_megamolbart_retro_build_train_valid_test_datasets(
     }
 
     assert val_ds[2] == {
-        'products': 'CC(=O)NCC(=O)N(C)c1ccc(Cl)c(COc2cccc3ccc(C)nc23)c1Cl',
-        'reactants': 'CC(=O)OC(C)=O.Cc1ccc2cccc(OCc3c(Cl)ccc(N(C)C(=O)CN)c3Cl)c2n1',
+        'products': 'CC(=O)Nc1cccc(C(O)CN(C)Cc2sc3c(=O)c(C(=O)NCc4ccc(Cl)cc4)cn(C)c3c2C)c1',
+        'reactants': 'CNCC(O)c1cccc(NC(C)=O)c1.Cc1c(CCl)sc2c(=O)c(C(=O)NCc3ccc(Cl)cc3)cn(C)c12',
     }
 
 

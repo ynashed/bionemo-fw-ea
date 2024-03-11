@@ -10,7 +10,7 @@
 
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Dict, List, Tuple
+from typing import List, Optional, Tuple
 
 import torch
 from apex.transformer.pipeline_parallel.utils import get_micro_batch_size, get_num_microbatches
@@ -69,11 +69,11 @@ class MolEncDecModelBase(MegatronLMEncoderDecoderModel, ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def _load_train_valid_test_datasets(self, train_valid_test_num_samples: Dict[str, int]):
+    def _load_train_valid_test_datasets(self, train_n_samples: Optional[int] = None):
         """
         Helper method that sets instance variables corresponding to train, val and test datasets
         Args:
-            train_valid_test_num_samples: dicts with number of samples needed for train, val and test steps
+            train_n_samples: number of samples to limit training set to, if defined. Validation/Test sets should be controlled with trainer.limit_val_batches and trainer.limit_test_batches
         """
         raise NotImplementedError
 
@@ -93,7 +93,7 @@ class MolEncDecModelBase(MegatronLMEncoderDecoderModel, ABC):
                 )
         return
 
-    def _get_dataset_num_samples(self) -> Dict[str, int]:
+    def _get_train_num_samples(self) -> int:
         """
         Helper method that calculates number of samples needed for train, val and test steps
         based on training length (max_steps, limited batches or number), batch size and number of devises used
@@ -104,14 +104,7 @@ class MolEncDecModelBase(MegatronLMEncoderDecoderModel, ABC):
         global_batch_size = (
             self.trainer.world_size * self._cfg.micro_batch_size / tensor_model_parallel_size
         ) * self.trainer.limit_train_batches
-        eval_iters = (self.trainer.max_steps // self.trainer.val_check_interval + 1) * self.trainer.limit_val_batches
-        test_iters = self.trainer.limit_test_batches
-        train_valid_test_num_samples = {
-            'train': int(self.trainer.max_steps * global_batch_size),
-            'val': int(eval_iters * global_batch_size),
-            'test': int(test_iters * global_batch_size),
-        }
-        return train_valid_test_num_samples
+        return int(self.trainer.max_steps * global_batch_size)
 
     def build_train_valid_test_datasets(self):
         logging.info(f'Building datasets for {type(self).__name__}')
@@ -123,8 +116,8 @@ class MolEncDecModelBase(MegatronLMEncoderDecoderModel, ABC):
                     f"dataset_type must be in {dataset_types}. Found {self._cfg.data.get('dataset_type')}"
                 )
 
-        train_valid_test_num_samples = self._get_dataset_num_samples()
-        self._load_train_valid_test_datasets(train_valid_test_num_samples=train_valid_test_num_samples)
+        train_n_samples = self._get_train_num_samples()
+        self._load_train_valid_test_datasets(train_n_samples=train_n_samples)
 
         if self._train_ds is not None:
             logging.info(f'Length of train dataset: {len(self._train_ds)}')

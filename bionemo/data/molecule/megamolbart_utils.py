@@ -10,17 +10,23 @@
 
 import os
 from copy import deepcopy
-from typing import Dict, List, Optional, Union
+from typing import List, Optional, Union
 
 from nemo.core import Dataset
+from nemo.utils import logging
 from omegaconf import DictConfig, OmegaConf
 
 from bionemo.data.dataset_builder_utils import build_typed_dataset
 from bionemo.data.preprocess.molecule.uspto50k_preprocess import USPTO50KPreprocess
 
 
+TRAIN_SPLIT: str = "train"  # Name of train split in train_valid_test_num_samples
+SPLITS: List[str] = [TRAIN_SPLIT, 'val', 'test']
+
+
 def megamolbart_build_train_valid_test_datasets(
-    cfg: DictConfig, train_valid_test_num_samples: Dict[str, Optional[int]]
+    cfg: DictConfig,
+    train_n_samples: Optional[int] = None,
 ) -> List[Dataset]:
     """
     Build train, validation and test for pretraining of MegaMolBartModel.
@@ -39,15 +45,10 @@ def megamolbart_build_train_valid_test_datasets(
     dataset_path: str = cfg.get('dataset_path', None)
     assert dataset_path is not None, 'Config "cfg" should contain field "cfg.dataset_path"'
 
-    assert all(
-        split in ['train', 'val', 'test'] for split in train_valid_test_num_samples.keys()
-    ), 'Incorrect key in train_valid_test_num_samples!'
-
     datasets = []
     # Build individual datasets.
-    for split in train_valid_test_num_samples.keys():
-        num_samples = train_valid_test_num_samples[split]
-        print(f'{split}:{num_samples}')
+    for split in SPLITS:
+        num_samples: Optional[int] = train_n_samples if split == TRAIN_SPLIT else None
         if num_samples is None or num_samples > 0:
             ds_name: Optional[Union[str, List[Union[int, str]]]] = cfg.dataset.get(split, None)
             assert ds_name is not None, (
@@ -58,19 +59,22 @@ def megamolbart_build_train_valid_test_datasets(
             dataset = build_typed_dataset(
                 dataset_paths=filepath,
                 data_impl=data_impl,
-                use_upsampling=use_upsampling,
+                use_upsampling=use_upsampling if split == TRAIN_SPLIT else False,
                 cfg=cfg,
                 num_samples=num_samples,
             )
+            logging.info(f'{split}:{len(dataset)}')
         else:
             dataset = None
+            logging.info(f"{split} dataset is None")
         datasets.append(dataset)
 
     return datasets
 
 
 def megamolbart_retro_build_train_valid_test_datasets(
-    cfg: OmegaConf, train_valid_test_num_samples: Dict[str, Optional[int]]
+    cfg: OmegaConf,
+    train_n_samples: Optional[int] = None,
 ) -> List[Optional[Dataset]]:
     """
     Build train, validation and test reaction dataset for MegaMolBartRetro model.
@@ -83,29 +87,27 @@ def megamolbart_retro_build_train_valid_test_datasets(
     cfg = deepcopy(cfg)
     use_upsampling = cfg.get('use_upsampling', True)
     data_preprocessor = USPTO50KPreprocess(max_smiles_length=cfg.max_seq_length, data_dir=cfg.dataset_path)
-    assert all(
-        split in data_preprocessor.splits for split in train_valid_test_num_samples.keys()
-    ), 'Incorrect key in train_valid_test_num_samples!'
 
     data_impl = cfg.get('data_impl', None)
     assert data_impl is not None, 'Argument data_impl must be specified!'
 
     datasets = []
 
-    for split in train_valid_test_num_samples.keys():
-        num_samples = train_valid_test_num_samples[split]
-        print(f'{split}:{num_samples}')
+    for split in SPLITS:
+        num_samples = train_n_samples if split == TRAIN_SPLIT else None
         if num_samples is None or num_samples > 0:
             filepath = os.path.join(data_preprocessor.get_split_dir(split), data_preprocessor.data_file)
             dataset = build_typed_dataset(
                 dataset_paths=filepath,
                 data_impl=data_impl,
-                use_upsampling=use_upsampling,
+                use_upsampling=use_upsampling if split == TRAIN_SPLIT else False,
                 cfg=cfg,
                 num_samples=num_samples,
             )
+            logging.info(f'{split}:{len(dataset)}')
         else:
             dataset = None
+            logging.info(f"{split} dataset is None")
         datasets.append(dataset)
 
     return datasets

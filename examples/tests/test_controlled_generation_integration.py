@@ -58,7 +58,7 @@ MODEL_CLASSES: List[Type[BaseEncoderDecoderInference]] = [
 
 ENFORCE_IMPROVEMENT: List[bool] = [
     True,
-    False,  # FIXME once we update the inference config for molmim with a better one, set this to True
+    True,
 ]
 
 
@@ -86,19 +86,14 @@ def test_property_guided_optimization_of_inference_model(
     enforce_improvement: bool,
     config_path_for_tests: str,
     example_smis: List[str],
-    pop_size: int = 2,
+    pop_size: int = 10,
 ):
     cfg = load_model_config(config_name=model_infer_config_path, config_path=config_path_for_tests)
     with distributed_model_parallel_state():
         inf_model = model_cls(cfg=cfg)
+        assert not inf_model.training
         controlled_gen_kwargs = {
             "additional_decode_kwargs": {"override_generate_num_tokens": 128},  # speed up sampling for this test
-            "sampling_method": "beam-search",
-            "sampling_kwarg_overrides": {
-                "beam_size": 3,
-                "keep_only_best_tokens": True,  # only return the best sequence from beam search. MoleculeGenerationOptimizer needs only one sample.
-                "return_scores": False,  # Do not return extra things that will confuse the MoleculeGenerationOptimizer
-            },
         }
         if model_cls == MegaMolBARTInference:
             # This assumes that MegaMolBART does not user a perceiver encoder. If we want to start using
@@ -109,16 +104,18 @@ def test_property_guided_optimization_of_inference_model(
             model = ControlledGenerationPerceiverEncoderInferenceWrapper(
                 inf_model, enforce_perceiver=False, hidden_steps=token_ids.shape[1], **controlled_gen_kwargs
             )  # just flatten the position for this.
+            sigma = 1.0
         else:
             model = ControlledGenerationPerceiverEncoderInferenceWrapper(
                 inf_model, **controlled_gen_kwargs
             )  # everything is inferred from the perciever config
+            sigma = 0.1  # this model needs smaller steps to avoid divergence
         optimizer = MoleculeGenerationOptimizer(
             model,
             scoring_function,
             example_smis,
             popsize=pop_size,
-            optimizer_args={"sigma": 1.0},
+            optimizer_args={"sigma": sigma},
         )
         starting_qeds = qed(example_smis)
         optimizer.step()  # one step of optimization

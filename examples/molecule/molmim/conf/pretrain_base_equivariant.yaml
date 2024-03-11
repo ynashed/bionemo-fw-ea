@@ -86,15 +86,15 @@ model:
     transform:
       q_z_given_x:
         # #  The baseline MIM loss configuration is a conditional Gaussian with a minimum variance of 1e-6.
-        # cls_name: cond_gaussian
-        # hidden_size: ${model.encoder.hidden_size}
-        # min_logvar: -6.0
-        # # The following config block is an example of "log variance sampling"
-        cls_name: sampled_var_cond_gaussian
-        min_logvar: -6.0
-        max_logvar: 0.0   # variance is sampled from uniform distribution between min and max in log space
-        map_var_to_hiddens: False  # If True, z_mean is a function (partially) of the sampled log variance. Also try setting to False.
+        cls_name: cond_gaussian
         hidden_size: ${model.encoder.hidden_size}
+        min_logvar: -6.0
+        # # The following config block is an example of "log variance sampling"
+        # cls_name: sampled_var_cond_gaussian
+        # min_logvar: -6.0
+        # max_logvar: 0.0   # variance is sampled from uniform distribution between min and max in log space
+        # map_var_to_hiddens: False  # If True, z_mean is a function (partially) of the sampled log variance. Also try setting to False.
+        # hidden_size: ${model.encoder.hidden_size}
         # # The following config block is an example of "log variance interpolation" between the model estimate and a unit gaussian
         # cls_name: interp_var_cond_gaussian
         # min_logvar: -6.0
@@ -152,7 +152,7 @@ model:
         data_sep: ',' # string to split text into columns
         # column number of csv to take values from
         data_col: 1
-    use_upsampling: False # if the data should be upsampled to max number of steps in the training
+    use_upsampling: True # if the data should be upsampled to max number of steps in the training
 
   optim:
     name: fused_adam

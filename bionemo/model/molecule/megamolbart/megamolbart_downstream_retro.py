@@ -8,7 +8,7 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
-from typing import Callable, Dict, List, Optional
+from typing import Callable, List, Optional
 
 import torch
 from omegaconf import DictConfig
@@ -41,14 +41,14 @@ class MegaMolBARTRetroModel(MolEncDecModelBase):
             **self._cfg.data,
         ).collate_fn
 
-    def _load_train_valid_test_datasets(self, train_valid_test_num_samples: Dict[str, int]):
+    def _load_train_valid_test_datasets(self, train_n_samples: Optional[int] = None):
         """
         Helper method that sets instance variables corresponding to train, val and test datasets
         Args:
-            train_valid_test_num_samples: dicts with number of samples needed for train, val and test steps
+            train_n_samples: number of samples to limit training set to, if defined. Validation/Test sets should be controlled with trainer.limit_val_batches and trainer.limit_test_batches
         """
         self._train_ds, self._validation_ds, self._test_ds = megamolbart_retro_build_train_valid_test_datasets(
-            self._cfg.data, train_valid_test_num_samples
+            self._cfg.data, train_n_samples=train_n_samples
         )
 
     def build_data_loader(self, dataset, consumed_samples, num_workers):

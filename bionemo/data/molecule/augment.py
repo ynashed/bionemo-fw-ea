@@ -12,12 +12,13 @@ import math
 import random
 from typing import Dict, List, Optional, Tuple, Union
 
-import numpy as np
 import torch
 from nemo.collections.common.tokenizers.char_tokenizer import TokenizerSpec
 from nemo.utils import logging
 from rdkit import Chem
 
+
+MAX_HEXADECIMAL = 2_147_483_647
 
 __all__ = ['MoleculeEnumeration', 'MoleculeInputTargetEnumeration']
 
@@ -42,6 +43,7 @@ class MoleculeEnumeration:
         pad_size_divisible_by_8: bool,
         mask_prob: Optional[float] = None,
         span_lambda: Optional[float] = None,
+        augmentation_prob: float = 1.0,
         **kwargs,
     ):
         """
@@ -58,6 +60,7 @@ class MoleculeEnumeration:
             canonicalize_decoder_output: should we ask the decoder to predict canonicalized output?
             pad_size_divisible_by_8: should sequences of ids be padded to be divisible by 8?
             mask_prob: a probability of masking single token, should be between 0 and 1
+            augmentation_prob: a probability of augmenting single token, should be between 0 and 1. Only applies if one of encoder_augment/decoder_independent_augment is True
             span_lambda: masking parameter, used in mask_scheme="span"
             kwargs: other kwargs
 
@@ -88,6 +91,8 @@ class MoleculeEnumeration:
                     encoder_augment: True
                     decoder_independent_augment: True
         """
+        assert 0 <= augmentation_prob <= 1, 'Augmentation probability should belong to [0, 1] '
+        self.augmentation_prob = augmentation_prob
         self.tokenizer = tokenizer
         self.seq_length = seq_length
         self.pad_size_divisible_by_8 = pad_size_divisible_by_8  # workaround for CUDA alignment bug
@@ -123,7 +128,7 @@ class MoleculeEnumeration:
         otherwise input SMILES
 
         Args:
-            smiles: str representation of molecules to possibly be canonicalized or augmented
+            smiles: str representation of molecule to possibly be canonicalized or augmented
             augment_data: should smiles be augmented/randomised in x[0]? Otherwise x[0] has the input_smiles as they appeared in the dataset
             canonicalize_input: should canonicalized smiles be returned in x[1]? Otherwise x[1] has the input_smiles as they appeared in the dataset
         Returns:
@@ -132,23 +137,19 @@ class MoleculeEnumeration:
 
         mol = Chem.MolFromSmiles(smiles)
         canon_smiles = Chem.MolToSmiles(mol, canonical=True) if canonicalize_input else smiles
-
-        if augment_data:
-            # aug_mol = self.aug(mol)
-            atom_order = list(range(mol.GetNumAtoms()))
-            np.random.shuffle(atom_order)
-            aug_mol = Chem.RenumberAtoms(mol, atom_order)  # TODO how to use PySMILESutils for this
-
-            # There is a very rare possibility that RDKit will not be able to generate
-            # the SMILES for the augmented mol. In this case we just use the canonical
-            # mol to generate the SMILES
+        # If we want to augment the data, and additionally if the augmentation probability is greater than 1 or the random number is less than the augmentation probability
+        #  then we augment the data. Otherwise we just return the canonicalized smiles. The or clause is to skip the random check if the augmentation probability is 1.
+        if augment_data and (self.augmentation_prob >= 1 or self.augmentation_prob >= torch.rand(1).item()):
             try:
-                aug_smiles = Chem.MolToSmiles(aug_mol, canonical=False)
+                # See example in https://www.rdkit.org/docs/Cookbook.html#enumerate-smiles
+                #  set the global torch seed if you want to reproducible sequences
+                rand_int = torch.randint(low=0, high=MAX_HEXADECIMAL, size=(1,)).item()
+                aug_smiles = Chem.MolToRandomSmilesVect(mol, 1, randomSeed=rand_int)[0]
             except RuntimeError:
                 logging.info(f'Could not generate smiles for {smiles} after augmenting. Forcing canonicalization')
                 aug_smiles = canon_smiles if canonicalize_input else Chem.MolToSmiles(mol, canonical=True)
         else:
-            aug_smiles = Chem.MolToSmiles(mol, canonical=False)
+            aug_smiles = Chem.MolToSmiles(mol, doRandom=False, canonical=False)
 
         assert len(aug_smiles) > 0, AssertionError('Augmented SMILES string is empty')
         assert len(canon_smiles) > 0, AssertionError('Canonical SMILES string is empty')
@@ -429,21 +430,23 @@ class MoleculeInputTargetEnumeration(MoleculeEnumeration):
         target_name: str,
         mask_prob: Optional[float] = None,
         span_lambda: Optional[float] = None,
+        augmentation_prob: float = 1.0,
         **kwargs,
     ):
         super().__init__(
-            tokenizer,
-            seq_length,
-            encoder_augment,
-            encoder_mask,
-            decoder_independent_augment,
-            decoder_mask,
-            canonicalize_target_smile,
-            canonicalize_decoder_output,
-            canonicalize_encoder_input,
-            pad_size_divisible_by_8,
-            mask_prob,
-            span_lambda,
+            tokenizer=tokenizer,
+            seq_length=seq_length,
+            encoder_augment=encoder_augment,
+            encoder_mask=encoder_mask,
+            decoder_independent_augment=decoder_independent_augment,
+            decoder_mask=decoder_mask,
+            canonicalize_target_smile=canonicalize_target_smile,
+            canonicalize_decoder_output=canonicalize_decoder_output,
+            canonicalize_encoder_input=canonicalize_encoder_input,
+            pad_size_divisible_by_8=pad_size_divisible_by_8,
+            mask_prob=mask_prob,
+            span_lambda=span_lambda,
+            augmentation_prob=augmentation_prob,
             **kwargs,
         )
         """
