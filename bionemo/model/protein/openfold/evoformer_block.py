@@ -139,7 +139,7 @@ class EvoformerBlock(nn.Module):
             self.msa_att_row(m=m, z=z, mask=msa_mask),
             add_output_to=m,
         )
-        m = self.msa_att_col(m=m, mask=msa_mask)
+        m = m + self.msa_att_col(m=m, mask=msa_mask)
         m, z = self.core(
             m=m,
             z=z,

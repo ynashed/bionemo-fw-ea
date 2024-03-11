@@ -73,6 +73,7 @@ def example_smis() -> List[str]:
     ]
 
 
+@pytest.mark.skip(reason="Skipping this test, it causes OOM on CI runners")
 @pytest.mark.slow
 @pytest.mark.needs_gpu
 @pytest.mark.parametrize(

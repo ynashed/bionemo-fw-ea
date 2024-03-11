@@ -50,7 +50,7 @@ PT_PATHS = [Path(os.path.join(PT_DIR, pt)) for pt in PT_NAMES]
 
 @pytest.fixture(scope='module')
 def infer_cfg() -> Iterator[DictConfig]:
-    """Setting up the general inference config object.
+    """Setting up the general inference config object..
 
     Yields:
         Iterator[DictConfig]: Inference Config object containing path and name
@@ -227,7 +227,6 @@ def test_openfold_inference_no_output_check(
         trainer.predict(alphafold_model, dl, return_predictions=False)
 
 
-@pytest.mark.xfail(reason="Missing MLPerf fix that is due to be merged")
 @pytest.mark.needs_gpu
 @pytest.mark.parametrize(
     "alphafold_cfg",
