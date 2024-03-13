@@ -31,46 +31,71 @@ variables:
   NGC_TAG: "$NGC_REGISTRY_IMAGE:$CI_COMMIT_BRANCH"
   RC_NGC_TAG_PREFIX: "nvcr.io/nv-drug-discovery-dev/bionemo"
   NEMO_NIGHTLY_TAG: "nvcr.io/nvidian/nemo-nightly:latest-nightly-main"
-  NIGHTLY:
-    value: "false"
-    options:
-      - "false"
-      - "true"
-    description: "Wether to use nightly NeMo docker image as base. Set to 'false' by default."
   NGC_CLI_FORMAT_TYPE: ascii
   NGC_CLI_ORG: nvidian
   # TODO(dorotat): change to cvai_bnmo_trng when we move data and checkpoints
   NGC_CLI_TEAM: clara-lifesciences
   JET_WORKLOADS_REF_MAIN: "bionemo/training-unit-tests"
   JET_WORKLOADS_DIR: "internal/jet/workloads/training-inference-unit-tests"
-  JET_WORKLOADS_: "internal/jet/workloads/training-inference-unit-tests"
-  SKIP_CI_MR: "false"
-  SKIP_CI_MR_JET: "false"
-  # For DIND volume mounting
+  ### variables excluding stages of the CI pipeline
+  EXCLUDE_DOCKER_IMAGE_BUILD: "false"
+  EXCLUDE_DOCS_BUILD: "false"
+  EXCLUDE_PYTEST: "false"
+  EXCLUDE_JET: "false"
+  EXCLUDE_DEPLOY: "true"
+  ### variables allowed to be modified when creating pipelines in web Gitlab GUI via Build -> Pipelines -> Run pipeline button
+  ### ie when $CI_PIPELINE_SOURCE == "web"
+  PYTEST:
+    value: "true"
+    options:
+      - "false"
+      - "true"
+    description: "a flag that determines whether to run pytest stages. Set to 'true' by default."
+  JET:
+    value: "true"
+    options:
+      - "false"
+      - "true"
+    description: "a flag that determines whether to run tests in JET. Set to 'true' by default."
+  NIGHTLY:
+    value: "false"
+    options:
+      - "false"
+      - "true"
+    description: "a flag that determines whether to use nightly NeMo docker image as base. Set to 'false' by default."
+
+
+
 
 # TODO(dorotat) solution with SKIP_CI flag is error-prone and should be replaced with better logic!!!!
 workflow:
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_LABELS =~ /SKIP_CI/
       variables:
-        SKIP_CI_MR: "true"
-        SKIP_CI_MR_JET: "true"
+        EXCLUDE_DOCKER_IMAGE_BUILD: "true"
+        EXCLUDE_DOCS_BUILD: "true"
+        EXCLUDE_PYTEST: "true"
+        EXCLUDE_JET: "true"
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_LABELS =~ /JET_NOT_REQUIRED/
       variables:
-        SKIP_CI_MR_JET: "true"
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_LABELS !~ /SKIP_CI/ && $CI_MERGE_REQUEST_LABELS !~ /JET_NOT_REQUIRED/
-    - if: $CI_COMMIT_BRANCH == "dev"
-    - if: $CI_COMMIT_BRANCH == "dev-next"
-    - if: $CI_COMMIT_BRANCH == "main"
-    - if: $CI_COMMIT_BRANCH == "bionemo-rc2306-v1"
-
-skip_ci:
-  tags:
-    - generic
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $SKIP_CI_MR == "true"
-  script:
-    - echo "Flag SKIP_CI is set. Skipping MR CI pipeline "
+        EXCLUDE_JET: "true"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "schedule") && $PYTEST != "true" && $JET == "true"
+      variables:
+        EXCLUDE_PYTEST: "true"
+        EXCLUDE_DOCS_BUILD: "true"
+    - if: ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "schedule") &&  $PYTEST == "true" && $JET != "true"
+      variables:
+        EXCLUDE_JET: "true"
+    - if: ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "schedule") &&  $PYTEST != "true" && $JET != "true"
+      variables:
+        EXCLUDE_PYTEST: "true"
+        EXCLUDE_DOCS_BUILD: "true"
+        EXCLUDE_JET: "true"
+    - if: ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "schedule") &&  $PYTEST == "true" && $JET == "true"
+    - if: $CI_COMMIT_BRANCH == "dev" && $CI_PIPELINE_SOURCE == "push"
+      variables:
+        EXCLUDE_DEPLOY: "false"
 
 
 .docker-setup:
@@ -93,19 +118,14 @@ code_format:
   tags:
    - generic
 
-# TODO(dorotat): consider splitting this into build-base and build-devel
 build-bionemo-image:
   extends:
     - .docker-setup
   stage: build
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $SKIP_CI_MR == "true"
+    - if: $EXCLUDE_DOCKER_IMAGE_BUILD == "true"
       when: never
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $SKIP_CI_MR != "true"
-    - if: $CI_COMMIT_BRANCH == "dev"
-    - if: $CI_COMMIT_BRANCH == "dev-next"
-    - if: $CI_COMMIT_BRANCH == "main"
-    - if: $CI_COMMIT_BRANCH == "bionemo-rc2306-v1"
+    - when: on_success
   script:
     - df -h
     - if [[ $NIGHTLY = true ]]; then
@@ -142,6 +162,10 @@ build-bionemo-image:
 build-docs-image:
   extends:
     - .docker-setup
+  rules:
+    - if: $EXCLUDE_DOCS_BUILD == "true"
+      when: never
+    - when: on_success
   stage: build
   script:
     - if [[ $NIGHTLY = true ]]; then
@@ -170,6 +194,9 @@ build-docs:
   variables:
     GIT_STRATEGY: none
     GIT_CHECKOUT: "false"
+  rules:
+    - if: $EXCLUDE_DOCS_BUILD == "true"
+      when: never
   script:
     # Build the docs, store as artifact
     - mkdir -p /builds/clara-discovery/bionemo/docs_build
@@ -182,11 +209,11 @@ build-docs:
 
 pytest:
   image:
-    name: "$PIPELINE_TAG-devel"
+    name: "$PIPELINE_TAG"
     entrypoint: [ "" ]
   stage: test
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $SKIP_CI_MR == "true"
+    - if: $EXCLUDE_PYTEST == "true"
       when: never
     - when: on_success
   tags:
@@ -231,7 +258,7 @@ pytest-fork:
     entrypoint: [ "" ]
   stage: test
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $SKIP_CI_MR == "true"
+    - if: $EXCLUDE_PYTEST == "true"
       when: never
     - when: on_success
   tags:
@@ -265,12 +292,12 @@ pytest-fork:
 
 pytest-internal:
   image:
-    name: "$PIPELINE_TAG-devel"
+    name: "$PIPELINE_TAG"
     entrypoint: [ "" ]
   stage: test
   allow_failure: false
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $SKIP_CI_MR == "true"
+    - if: $EXCLUDE_PYTEST == "true"
       when: never
     - when: on_success
   tags:
@@ -303,6 +330,10 @@ pytest-internal:
   stage: jet
   tags:
     - generic
+  needs:
+    - job: build-bionemo-image
+    - job: pytest
+      optional: true
   after_script:
     - echo "JET_WORKLOADS_PROJECT=$CI_PROJECT_ID" >> jet.env
     - echo "JET_WORKLOADS_JOB=$CI_JOB_ID" >> jet.env
@@ -316,16 +347,16 @@ jet-configure:
   artifacts:
     paths:
       - $JET_WORKLOADS_DIR
+  variables:
+    JET_WORKLOADS_REF: "bionemo/${CI_COMMIT_BRANCH}"
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $SKIP_CI_MR_JET == "true"
+    - if: $EXCLUDE_JET == "true"
       when: never
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $SKIP_CI_MR_JET != "true"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $EXCLUDE_JET != "true"
       when: manual
       variables:
         JET_WORKLOADS_REF: "bionemo/merge_request_event"
-    - if: $CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "dev-next" || $CI_COMMIT_BRANCH == "main"
-      variables:
-        JET_WORKLOADS_REF: "bionemo/${CI_COMMIT_BRANCH}"
+    - when: on_success
   before_script:
     - apk update && apk add git yq
   script:
@@ -358,36 +389,25 @@ jet-trigger:
   extends: [.jet-trigger-template]
   inherit:
     variables:
-      - CI_PIPELINE_ID
-      - CI_COMMIT_BRANCH
-      - SKIP_CI_MR_JET
+      - EXCLUDE_JET
   rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $SKIP_CI_MR_JET == "true"
+    - if: $EXCLUDE_JET == "true"
       when: never
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $SKIP_CI_MR_JET != "true"
-      variables:
-        JET_WORKLOADS_REF: "ephemeral/bionemo/${CI_PIPELINE_ID}"
-    - if: $CI_COMMIT_BRANCH == "dev" || $CI_COMMIT_BRANCH == "dev-next" || $CI_COMMIT_BRANCH == "main"
-      variables:
-        JET_WORKLOADS_REF: "ephemeral/bionemo/${CI_COMMIT_BRANCH}/${CI_PIPELINE_ID}"
+    - when: on_success
 
 
 jet-test:
   needs: [jet-trigger]
+  rules:
+    - if: $EXCLUDE_JET == "true"
+      when: never
+    - when: on_success
   image:
     name: gitlab-master.nvidia.com:5005/dl/jet/api:latest
     entrypoint: [ "" ]
   tags:
     - generic
   stage: jet
-  when: on_success
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $SKIP_CI_MR_JET == "true"
-      when: never
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $SKIP_CI_MR_JET != "true"
-    - if: $CI_COMMIT_BRANCH == "dev"
-    - if: $CI_COMMIT_BRANCH == "dev-next"
-    - if: $CI_COMMIT_BRANCH == "main"
   before_script:
     - export RO_API_TOKEN CI_PROJECT_ID CI_PIPELINE_ID GITLAB_USER_LOGIN CI_JOB_JWT
     - jet secrets jwt-login jwt/nvidia/gitlab-master bionemo-ci $CI_JOB_JWT
@@ -403,9 +423,9 @@ dev-deploy:
   stage: deploy
   dependencies: [ ]
   rules:
-    - if: $CI_COMMIT_BRANCH == "dev" && $NIGHTLY != "true"
-    - if: $CI_COMMIT_BRANCH == "main" && $NIGHTLY != "true"
-    - if: $CI_COMMIT_BRANCH == "bionemo-rc2306-v1" && $NIGHTLY != "true"
+    - if: $EXCLUDE_DEPLOY == "true"
+      when: never
+    - when: on_success
   before_script:
     - !reference [ .docker-setup, before_script ]
     - apk update && apk add curl
