@@ -8,7 +8,7 @@ trainer:
   devices: 1 # number of GPUs or CPUs
   num_nodes: 1 
   accelerator: gpu #gpu or cpu
-  precision: 16-mixed # 16-mixed, bf16-mixed or 32
+  precision: 16-mixed # 16-mixed, bf16-mixed or 32. Note USE 32
   logger: False # logger is provided by NeMo exp_manager
   enable_checkpointing: False # checkpointing is done by NeMo exp_manager
   use_distributed_sampler: False # use NeMo Megatron samplers

@@ -533,6 +533,10 @@ class ESM2nvModel(ESM1nvModel):
     def __init__(self, cfg: DictConfig, trainer: Trainer):
         super().__init__(cfg, trainer)
 
+    def forward(self, *args, **kwargs):
+        output_tensor = super().forward(*args, **kwargs)
+        return output_tensor
+
     def build_train_dataset(
         self,
         model_cfg: DictConfig,

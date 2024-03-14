@@ -14,7 +14,8 @@ import os
 import pathlib
 import shutil
 from collections import OrderedDict
-from contextlib import contextmanager
+from contextlib import AbstractContextManager, contextmanager
+from dataclasses import dataclass
 from typing import Dict, List, Optional, Union
 
 import apex
@@ -28,6 +29,7 @@ from megatron.core.parallel_state import destroy_model_parallel
 from nemo.utils import logging
 from omegaconf import OmegaConf, open_dict
 from omegaconf.dictconfig import DictConfig
+from pytorch_lightning import seed_everything
 
 
 class BioNemoSearchPathConfig(SearchPathPlugin):
@@ -236,7 +238,38 @@ def distributed_model_parallel_state():
     from bionemo.model.utils import initialize_distributed_parallel_state  # here to avoid circular import
 
     try:
+        teardown_apex_megatron_cuda()
         initialize_distributed_parallel_state()
         yield
     finally:
         teardown_apex_megatron_cuda()
+
+
+@dataclass
+class Deterministic(AbstractContextManager):
+    cudnn_deterministic: Optional[bool] = None
+    cudnn_benchmark: Optional[bool] = None
+    cudnn_deterministic: Optional[bool] = None
+    cuda_matmul_allow_tf32: Optional[bool] = None
+    cudnn_enabled: Optional[bool] = None
+
+    def __enter__(self):
+        self.cudnn_deterministic = torch.backends.cudnn.deterministic
+        self.cudnn_benchmark = torch.backends.cudnn.benchmark
+        self.cuda_matmul_allow_tf32 = torch.backends.cuda.matmul.allow_tf32
+        self.cudnn_enabled = torch.backends.cudnn.enabled
+        seed_everything(123)
+        torch.use_deterministic_algorithms(False)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+        torch.backends.cuda.matmul.allow_tf32 = False
+        torch.backends.cuda.allow_tf32 = False
+        torch.backends.cudnn.enabled = False
+
+    def __exit__(self, *exit_state):
+        torch.use_deterministic_algorithms(False)
+        torch.backends.cudnn.deterministic = self.cudnn_deterministic
+        torch.backends.cudnn.benchmark = self.cudnn_benchmark
+        torch.backends.cuda.matmul.allow_tf32 = self.cuda_matmul_allow_tf32
+        torch.backends.cuda.allow_tf32 = True
+        torch.backends.cudnn.enabled = self.cudnn_enabled

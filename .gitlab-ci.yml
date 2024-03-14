@@ -243,7 +243,9 @@ pytest:
     - bash ./examples/protein/openfold/scripts/download_data_sample.sh -data_path $BIONEMO_HOME/examples/tests/test_data/ -pbss
     - ls examples/tests/test_data/uniref202104_esm2_qc_test200_val200
     - rm -rf ./.pytest_cache/
+    - mkdir -p /builds/clara-discovery/bionemo/heatmaps
     - pytest -m "not internal and not needs_fork" -vv --durations=0 --cov=bionemo --cov-report term --cov-report xml:coverage.xml -k "not test_model_training"
+    - cp -rv /workspace/bionemo/tests/data/esm2_golden_values/heatmaps /builds/clara-discovery/bionemo/heatmaps
     - df -Thl
   coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
   artifacts:
@@ -251,6 +253,9 @@ pytest:
       coverage_report:
         coverage_format: cobertura
         path: coverage.xml
+    paths:
+      - heatmaps
+    
 
 
 pytest-fork:

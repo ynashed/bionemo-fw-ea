@@ -1,3 +1,15 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+#
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
+
+from typing import Callable, Optional, Union
+
 import torch
 from einops import rearrange
 from nemo.collections.nlp.modules.common.megatron.adapters.parallel_adapters import (
@@ -177,6 +189,49 @@ class ESMnvCoreAttention(CoreAttention):
             )
         return context_layer
 
+    def esm2_scale_mask_softmax(
+        self,
+        input: torch.Tensor,
+        mask: Optional[torch.Tensor] = None,
+        scale: Optional[Union[float, int]] = None,
+        mask_func: Optional[Callable] = None,
+    ) -> torch.Tensor:
+        """Scale Mask Softmax function.
+
+        Args:
+            input: Tensor of shape (Batch, NP, SK, SQ). The input may or may not have already
+                had a mask applied to it.
+            mask: If a mask is to be applied, it will go here.
+            scale: A scale factor that will be applied before the softmax.
+            mask_func: An optional function to apply to the mask. If None, it is assumed that
+                the input already had the mask applied to it.
+
+        Returns:
+            probs: Tensor of normalized probabilities after the softmax has been applied,
+                of shape (Batch, NP, SK, SQ).
+        """
+        if self.attn_mask_type.name != "padding":
+            raise ValueError(
+                f"self.attn_mask_type: {self.attn_mask_type} is not 'padding'. Only 'padding' type is supported currently."
+            )
+
+        original_dtype = input.dtype  # Store original dtype
+        if (original_dtype == torch.float16 or original_dtype == torch.bfloat16) and self.attention_softmax_in_fp32:
+            input = input.float()  # Convert to float32 for softmax
+
+        if scale is not None:
+            input = input * scale  # Apply scaling
+
+        if mask is not None and mask_func is not None:
+            input = mask_func(input, mask)  # Apply mask function if provided
+
+        probs = torch.nn.functional.softmax(input, dim=-1)  # Apply softmax
+
+        if self.attention_softmax_in_fp32 and original_dtype in (torch.float16, torch.bfloat16):
+            probs = probs.to(original_dtype)  # Convert back to original dtype if necessary
+
+        return probs
+
     def torch_attention(self, query_layer, key_layer, value_layer, attention_mask, attention_bias, inference_mode):
         sq, b, np, hn = query_layer.shape
         sk = key_layer.shape[0]
@@ -190,7 +245,7 @@ class ESMnvCoreAttention(CoreAttention):
             key_layer = rearrange(key_layer, 'sk b np hn -> (b np) hn sk')
             value_layer = rearrange(value_layer, 'sv b np hn -> (b np) sv hn')
 
-        matmul_input_buffer = torch.empty(
+        matmul_input_buffer = torch.zeros(
             query_layer.shape[0],
             query_layer.shape[1],
             key_layer.shape[2],
@@ -208,17 +263,15 @@ class ESMnvCoreAttention(CoreAttention):
 
         # change view to [b, np, sq, sk]
         attention_scores = matmul_result.view(b, np, sq, sk)
-        # BIONEMO CUSTOM ATTENTION MASKING
         # TODO(srabhi, georgea): refactor the custom torch_attention module using Megatron Core when NeMo 1.21 is available
         if self.use_esm_attention:
             # NOTE: the slicing here is to make the attention_mask the same shape as the extended
             #  attention mask in ESM2. The multiplication by -3.4028e+38 is similarly motivated
             #  by ESM2's maskikng approach, which forces softmax of attention scores for
             #  masked entries to be close to 0.
-            attention_probs = self.scale_mask_softmax(
-                attention_scores + attention_mask[:, :, 0:1, :] * -3.4028e38, None
+            attention_probs = self.esm2_scale_mask_softmax(
+                attention_scores + attention_mask[:, :, 0:1, :] * -3.4028e38
             )
-        # END BIONEMO
         else:
             if attention_bias is not None:
                 attention_scores += attention_bias
