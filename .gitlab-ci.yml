@@ -197,6 +197,7 @@ build-docs:
   rules:
     - if: $EXCLUDE_DOCS_BUILD == "true"
       when: never
+    - when: on_success
   script:
     # Build the docs, store as artifact
     - mkdir -p /builds/clara-discovery/bionemo/docs_build
