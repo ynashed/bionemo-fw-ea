@@ -114,7 +114,11 @@ RUN NEMO_INST_DIR=$(python -c 'import nemo; from pathlib import Path; print(Path
     patch -p1 -d $NEMO_INST_DIR -i $PWD/data_sampler_constant_len.patch && \
     rm data_sampler_constant_len.patch
 
-
+# NOTE: Adds patch for WarmupAnnealDecayHold NeMo LR Scheduler
+COPY ./setup/nemo-lr-scheduler.patch ./
+RUN NEMO_INST_DIR=$(python -c 'import nemo; from pathlib import Path; print(Path(nemo.__path__[0]).parent)') && \
+    patch -p1 -d $NEMO_INST_DIR -i $PWD/nemo-lr-scheduler.patch && \
+    rm nemo-lr-scheduler.patch
 #########################################################################################
 # BioNeMo Build
 #########################################################################################
