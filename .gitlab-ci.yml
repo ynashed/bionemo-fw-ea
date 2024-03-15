@@ -12,25 +12,37 @@ stages:
 
 
 variables:
-  NGC_REGISTRY_IMAGE: "nvcr.io/nvidian/cvai_bnmo_trng/bionemo"
-  DOCKER_TAG_PREFIX:
-    value: "$CI_REGISTRY_IMAGE"
-    options:
-      - "$CI_REGISTRY_IMAGE"
-      - "$NGC_REGISTRY_IMAGE"
-    description: "Allows to control wether NGC or gitlab registry is used"
+  # docker build options
   DOCKER_HOST: tcp://docker:2376
   DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
   DOCKER_TLS_VERIFY: 1
   DOCKER_TLS_CERTDIR: "/certs"
   DOCKER_BUILDKIT: 1
   BUILDKIT_PROGRESS: plain
-  PIPELINE_TAG: "$DOCKER_TAG_PREFIX:pipeline-$CI_PIPELINE_ID"
-  SHA_TAG: "$DOCKER_TAG_PREFIX:$CI_COMMIT_SHORT_SHA-$CI_COMMIT_BRANCH"
-  LATEST_TAG: "$DOCKER_TAG_PREFIX:$CI_COMMIT_BRANCH-latest"
-  NGC_TAG: "$NGC_REGISTRY_IMAGE:$CI_COMMIT_BRANCH"
-  RC_NGC_TAG_PREFIX: "nvcr.io/nv-drug-discovery-dev/bionemo"
-  NEMO_NIGHTLY_TAG: "nvcr.io/nvidian/nemo-nightly:latest-nightly-main"
+  # image repositories
+  NGC_REPO_NAME: "nvcr.io/nvidian/cvai_bnmo_trng/bionemo"
+  GITLAB_REPO_NAME: "$CI_REGISTRY_IMAGE"
+  IMAGE_REPO_NAME:
+    value: "$CI_REGISTRY_IMAGE"
+    options:
+      - "$CI_REGISTRY_IMAGE"
+      - "$NGC_REPO_NAME"
+    description: "Allows to control whether NGC or Gitlab registry is used."
+  # image tags, or used therein
+  PIPELINE_TAG: "pipeline-${CI_PIPELINE_ID}"
+  IMAGE_TAG: "${CI_COMMIT_SHA}"
+  SUFFIX_DEV: "-devel"
+  SUFFIX_DOCS: "-docs"
+  DATE: "${CI_PIPELINE_CREATED_AT}"
+  # fully-qualified image names
+  IMAGE_NAME: "${IMAGE_REPO_NAME}:${IMAGE_TAG}"
+  NEMO_NIGHTLY_IMAGE: "nvcr.io/nvidian/nemo-nightly:latest-nightly-main"
+  NIGHTLY:
+    value: "false"
+    options:
+      - "false"
+      - "true"
+    description: "Whether or not to use nightly NeMo docker image as base. Set to 'false' by default."
   NGC_CLI_FORMAT_TYPE: ascii
   NGC_CLI_ORG: nvidian
   # TODO(dorotat): change to cvai_bnmo_trng when we move data and checkpoints
@@ -129,17 +141,53 @@ build-bionemo-image:
   script:
     - df -h
     - if [[ $NIGHTLY = true ]]; then
-      base="--build-arg BASE_IMAGE=$NEMO_NIGHTLY_TAG";
+      base="--build-arg BASE_IMAGE=$NEMO_NIGHTLY_IMAGE";
       else
       base="";
       fi
-    - docker build
-      --network host --no-cache ${base}
-      --label com.nvidia.bionemo.git_hash=${CI_COMMIT_SHORT_SHA}
+    # maybe we built this image on a previous pipeline run -- if so, we don't need to remake it!
+    - docker pull ${IMAGE_NAME} || true
+    # or maybe we built an image for the previous commit that we can use as a layer cache
+    # TODO [mgreaves] There's no `git` in DIND :( Odd though -- how does it checkout the code!?
+    #    - >
+    #      for i in $(seq 1 10); do
+    #        docker pull "${IMAGE_REPO_NAME}:$(git rev-parse HEAD~${i})" || true
+    #      done
+    # TODO [mgreaves] This had --no-cache on it before. Why would we want this?
+    - docker build 
+      --network host ${base} 
+      --label com.nvidia.bionemo.short_git_sha=${CI_COMMIT_SHORT_SHA}
+      --label com.nvidia.bionemo.git_sha=${CI_COMMIT_SHA}
+      --label com.nvidia.bionemo.created_at=${DATE}
+      --label com.nvidia.bionemo.branch=${CI_COMMIT_BRANCH}
+      --label com.nvidia.bionemo.pipeline_id=${CI_PIPELINE_ID}
+      --label com.nvidia.bionemo.merge_request_id=${CI_MERGE_REQUEST_IID}
       --secret id=GITLAB_TOKEN,env=RO_API_TOKEN
-      -t $PIPELINE_TAG  -f setup/Dockerfile .
+      -t "${IMAGE_NAME}" 
+      -f setup/Dockerfile .
     - df -h
-    - docker push $PIPELINE_TAG
+    - docker push "${IMAGE_NAME}"
+    # tag with short commit too
+    - docker tag "${IMAGE_NAME}" "${IMAGE_REPO_NAME}:${CI_COMMIT_SHORT_SHA}"
+    - docker push "${IMAGE_REPO_NAME}:${CI_COMMIT_SHORT_SHA}"
+    # Re-tag with prior pipeline ID format for backwards compatability
+    - docker tag "${IMAGE_NAME}" "${IMAGE_REPO_NAME}:${PIPELINE_TAG}"
+    - docker push "${IMAGE_REPO_NAME}:${PIPELINE_TAG}"
+    # Also tag this image with a format that uses the date of creation:
+    #       YYYY-MM-DD--CCCCCCCC
+    # Where 'C..C' are the first 8 characters of the commit
+    - DATE_YMD="$(echo ${DATE} | cut -f1 -d'T')"
+    - TAG_DATE_SHORT_COMMIT="${CI_COMMIT_SHORT_SHA}--${DATE_YMD}"
+    - docker tag "${IMAGE_NAME}" "${IMAGE_REPO_NAME}:${TAG_DATE_SHORT_COMMIT}"
+    - docker push "${IMAGE_REPO_NAME}:${TAG_DATE_SHORT_COMMIT}"
+    # For merge request branches only, also tag the image with the merge request number:
+    #       mr--MMMM--YYYY-MM-DD--CCCCCCCC
+    # Where 'M..M' is the merge request number. Note it is variable-sized.
+    - TAG_MR="mr--${CI_MERGE_REQUEST_IID}--${TAG_DATE_SHORT}"
+    - if [[ "${CI_MERGE_REQUEST_IID}" != "" ]]; then
+      docker tag "${IMAGE_NAME}" "${IMAGE_REPO_NAME}:${TAG_MR}" && docker push "${IMAGE_REPO_NAME}:${TAG_MR}";
+      fi
+    #
     # FIXME [mgreaves] See note in internal/Dockerfile-devel about this (it is commented as another 'FIXME').
     #                  tl;dr Secuirty leak: passing in CI_JOB_TOKEN as a build-arg persists its value in the image!
     #
@@ -150,14 +198,37 @@ build-bionemo-image:
     #   --network host --no-cache
     #   --build-arg BIONEMO_IMAGE="$PIPELINE_TAG"
     #   --secret id=TPL_REPO,env=TPL_REPO
-    #   -t $PIPELINE_TAG-devel -f internal/Dockerfile-devel .
+    #   -t ${IMAGE_NAME}${SUFFIX_DEV} -f internal/Dockerfile-devel .
     #
     # As in, ensure that the CI_JOB_TOKEN makes it way via --secret, not --build-arg.
-    - docker build --network host --no-cache --build-arg BIONEMO_IMAGE="$PIPELINE_TAG"
+    #
+    # TODO [mgreaves] This had --no-cache on it before. Why would we want this?
+    - docker build 
+      --network host
+      --build-arg BIONEMO_IMAGE="$IMAGE_NAME"
       --build-arg TPL_REPO=https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab-master.nvidia.com/dl/gwe/torch_performance_linter
-      -t $PIPELINE_TAG-devel -f internal/Dockerfile-devel .
+      --label com.nvidia.bionemo.short_git_sha=${CI_COMMIT_SHORT_SHA}
+      --label com.nvidia.bionemo.git_sha=${CI_COMMIT_SHA}
+      --label com.nvidia.bionemo.created_at=${DATE}
+      --label com.nvidia.bionemo.branch=${CI_COMMIT_BRANCH}
+      --label com.nvidia.bionemo.pipeline_id=${CI_PIPELINE_ID}
+      --label com.nvidia.bionemo.merge_request_id=${CI_MERGE_REQUEST_IID}
+      -t "${IMAGE_NAME}${SUFFIX_DEV}"
+      -f internal/Dockerfile-devel .
     - df -h
-    - docker push $PIPELINE_TAG-devel
+    - docker push "${IMAGE_NAME}${SUFFIX_DEV}"
+    # tag with short commit too
+    - docker tag "${IMAGE_NAME}" "${IMAGE_REPO_NAME}:${CI_COMMIT_SHORT_SHA}${SUFFIX_DEV}"
+    - docker push "${IMAGE_REPO_NAME}:${CI_COMMIT_SHORT_SHA}${SUFFIX_DEV}"
+    # Re-tag with prior pipeline ID format for backwards compatability
+    - docker tag "${IMAGE_NAME}${SUFFIX_DEV}" "${IMAGE_REPO_NAME}:${PIPELINE_TAG}${SUFFIX_DEV}"
+    - docker push "${IMAGE_REPO_NAME}:${PIPELINE_TAG}${SUFFIX_DEV}"
+    # Re-tag with date & short commit too
+    - docker tag "${IMAGE_NAME}${SUFFIX_DEV}" "${IMAGE_REPO_NAME}:${TAG_DATE_SHORT_COMMIT}${SUFFIX_DEV}"
+    - docker push "${IMAGE_REPO_NAME}:${TAG_DATE_SHORT_COMMIT}${SUFFIX_DEV}"
+    - if [[ "${CI_MERGE_REQUEST_IID}" != "" ]]; then
+      docker tag "${IMAGE_NAME}${SUFFIX_DEV}" "${IMAGE_REPO_NAME}:${TAG_MR}${SUFFIX_DEV}" && docker push "${IMAGE_REPO_NAME}:${TAG_MR}${SUFFIX_DEV}";
+      fi
 
 build-docs-image:
   extends:
@@ -169,14 +240,36 @@ build-docs-image:
   stage: build
   script:
     - if [[ $NIGHTLY = true ]]; then
-      base="--build-arg BASE_IMAGE=$NEMO_NIGHTLY_TAG";
+      base="--build-arg BASE_IMAGE=$NEMO_NIGHTLY_IMAGE";
       else
       base="";
       fi
     - cd docs/
-    - docker build --network host --no-cache ${base} --label com.nvidia.bionemo.git_hash=${CI_COMMIT_SHORT_SHA}
-      -t $PIPELINE_TAG-docs -f Dockerfile.docs .
-    - docker push $PIPELINE_TAG-docs
+    # CANNOT use date command -- busybox doesn't support --iso-8601
+    # - DATE=$(date --iso-8601=seconds -u)
+    # Good thing we have CI_PIPELINE_CREATED_AT !
+    - DATE="${CI_PIPELINE_CREATED_AT}"
+    - TAG_DATE="$(echo ${DATE} | cut -f1 -d'T')"
+    # maybe we built this image on a previous pipeline run -- if so, we don't need to remake it!
+    - docker pull ${IMAGE_NAME}${SUFFIX_DOCS} || true
+    # or maybe we built an image for the previous commit(s) that we can use as a layer cache
+    # TODO [mgreaves] There's no `git` in DIND :( Odd though -- how does it checkout the code!?
+    #    - >
+    #      for i in $(seq 1 10); do
+    #        docker pull "${IMAGE_REPO_NAME}:$(git rev-parse HEAD~${i})${SUFFIX_DOCS}" || true
+    #      done
+    # TODO [mgreaves] This had --no-cache on it before. Why would we want this?
+    - docker build 
+      --network host ${base} 
+      --label com.nvidia.bionemo.short_git_sha=${CI_COMMIT_SHORT_SHA}
+      --label com.nvidia.bionemo.git_sha=${CI_COMMIT_SHA}
+      --label com.nvidia.bionemo.created_at=${DATE}
+      --label com.nvidia.bionemo.branch=${CI_COMMIT_BRANCH}
+      --label com.nvidia.bionemo.pipeline_id=${CI_PIPELINE_ID}
+      --label com.nvidia.bionemo.merge_request_id=${CI_MERGE_REQUEST_IID}
+      -t "${IMAGE_NAME}${SUFFIX_DOCS}" 
+      -f Dockerfile.docs .
+    - docker push "${IMAGE_NAME}${SUFFIX_DOCS}"
 # Note: It is tempting to build the docs in the same job as build-docs-image, i.e. have a
 # `docker run ... sphinx-build ...` command here, however getting the output of this build
 # is non-trivial. It is non-trivial to mount volumes to docker commands when DIND is used in
@@ -185,7 +278,7 @@ build-docs-image:
 
 build-docs:
   image:
-    name: "$PIPELINE_TAG-docs"
+    name: "${IMAGE_NAME}${SUFFIX_DOCS}"
     entrypoint: [ "" ]
   stage: build
   needs: [build-docs-image]
@@ -210,7 +303,7 @@ build-docs:
 
 pytest:
   image:
-    name: "$PIPELINE_TAG"
+    name: "${IMAGE_NAME}${SUFFIX_DEV}"
     entrypoint: [ "" ]
   stage: test
   rules:
@@ -260,7 +353,7 @@ pytest:
 
 pytest-fork:
   image:
-    name: "$PIPELINE_TAG-devel"
+    name: "${IMAGE_NAME}${SUFFIX_DEV}"
     entrypoint: [ "" ]
   stage: test
   rules:
@@ -298,7 +391,7 @@ pytest-fork:
 
 pytest-internal:
   image:
-    name: "$PIPELINE_TAG"
+    name: "${IMAGE_NAME}${SUFFIX_DEV}"
     entrypoint: [ "" ]
   stage: test
   allow_failure: false
@@ -366,7 +459,7 @@ jet-configure:
   before_script:
     - apk update && apk add git yq
   script:
-    - yq e ".spec.source.image = \"${PIPELINE_TAG}\"" -i ${JET_WORKLOADS_DIR}/builds/bionemo.yaml
+    - yq e ".spec.source.image = \"${IMAGE_NAME}\"" -i ${JET_WORKLOADS_DIR}/builds/bionemo.yaml
     - 'find "$JET_WORKLOADS_DIR" -type f -name "*.yaml" -print0 | while IFS= read -r -d "" file; do
           echo "File: $file";
           yq e ".labels.workload_ref = \"${JET_WORKLOADS_REF}\"" -i ${file};
@@ -436,22 +529,37 @@ dev-deploy:
     - !reference [ .docker-setup, before_script ]
     - apk update && apk add curl
   script:
-    - docker pull $PIPELINE_TAG
-    - docker tag $PIPELINE_TAG $SHA_TAG
-    - docker tag $PIPELINE_TAG $LATEST_TAG
-    - docker tag $PIPELINE_TAG $NGC_TAG
-    - docker push $SHA_TAG
-    - docker push $LATEST_TAG
-    - docker push $NGC_TAG
-    - docker pull $PIPELINE_TAG-devel
-    - docker tag $PIPELINE_TAG-devel $SHA_TAG-devel
-    - docker tag $PIPELINE_TAG-devel $LATEST_TAG-devel
-    - docker tag $PIPELINE_TAG-devel $NGC_TAG-devel
-    - docker push $SHA_TAG-devel
-    - docker push $LATEST_TAG-devel
-    - docker push $NGC_TAG-devel
-    - 'if [[ "$CI_COMMIT_BRANCH" == "bionemo-rc2306-v1" ]]; then
-        RC_NGC_TAG="${RC_NGC_TAG_PREFIX}:latest" &&
-        docker tag $PIPELINE_TAG $RC_NGC_TAG &&
-        docker push $RC_NGC_TAG;
-      fi'
+    # Get the images that we need to re-tag and publish on other image registries.
+    - docker pull "${IMAGE_NAME}"
+    - docker pull "${IMAGE_NAME}${SUFFIX_DEV}"
+    # NOTE: CANNOT use date command -- busybox doesn't support --iso-8601
+    # - DATE=$(date --iso-8601=seconds -u)
+    # This is why we use the gitlab CI date env var.
+    #
+    # Push FW image to NGC
+    - docker tag "${IMAGE_NAME}" "${NGC_REPO_NAME}:${IMAGE_TAG}"
+    - docker push "${NGC_REPO_NAME}:${IMAGE_TAG}"
+    # Also tag this image with a format that uses the branch & date of creation*:
+    #       BBBB--YYYY-MM-DD--CCCCCCCC
+    # Where 'C..C' are the first 8 characters of the commit
+    # Where 'B...B' is the branch name. (Note: rules filter out invalid branch names!)
+    # *NOTE: the branch name is included IFF it is "main" or "dev"
+    #        otherwise, the first part -- "BBBB---" -- is **NOT** included!
+    - DATE_YMD="$(echo ${DATE} | cut -f1 -d'T')"
+    - TAG_DATE_SHORT_COMMIT="${CI_COMMIT_SHORT_SHA}--${DATE_YMD}"
+    - docker tag "${IMAGE_NAME}" "${NGC_REPO_NAME}:${TAG_DATE_SHORT_COMMIT}"
+    - docker push "${NGC_REPO_NAME}:${TAG_DATE_SHORT_COMMIT}"
+    # Push -devel image to NGC too
+    - docker tag "${IMAGE_NAME}${SUFFIX_DEV}" "${NGC_REPO_NAME}:${CI_COMMIT_SHA}${SUFFIX_DEV}"
+    - docker push "${NGC_REPO_NAME}:${CI_COMMIT_SHA}${SUFFIX_DEV}"
+    # also, MAYBE tag w/ branch name and push
+    - >
+      if [[ "${CI_COMMIT_BRANCH}" == "main" || "${CI_COMMIT_BRANCH}" == "dev" ]]; then
+        TAG_BRANCH_DATE_SHORT_COMMIT="${CI_COMMIT_BRANCH}--${TAG_DATE_SHORT_COMMIT}"
+        # main image
+        docker tag "${IMAGE_NAME}" "${NGC_REPO_NAME}:${TAG_BRANCH_DATE_SHORT_COMMIT}"
+        docker push "${NGC_REPO_NAME}:${TAG_BRANCH_DATE_SHORT_COMMIT}"
+        # -devel image
+        docker tag "${IMAGE_NAME}${SUFFIX_DEV}" "${NGC_REPO_NAME}:${TAG_BRANCH_DATE_SHORT_COMMIT}${SUFFIX_DEV}"
+        docker push "${NGC_REPO_NAME}:${TAG_BRANCH_DATE_SHORT_COMMIT}${SUFFIX_DEV}"
+      fi
