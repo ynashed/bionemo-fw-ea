@@ -1,3 +1,13 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+#
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
+
 import datetime
 import logging
 import os
@@ -39,7 +49,7 @@ def print_table_with_results(df: pd.DataFrame) -> None:
     table_dict["JET job ID"] = df.jet_ci_job_id
     table_dict["Job Type"] = df.job_type
     table_dict["Job Key"] = df.job_key.str.split("/", expand=True)[1]
-    table_dict["Status"] = df.status
+    table_dict["Status"] = df.jet_ci_job_status
     table = tabulate(table_dict, headers=list(table_dict.keys()), tablefmt="psql")
 
     print(table)
@@ -140,7 +150,7 @@ def log_detailed_job_info(df: pd.DataFrame) -> None:
 
     for _, job_info in df.iterrows():
         msg = (
-            f'{job_info["job_key"]} with status: {job_info["status"]} '
+            f'{job_info["job_key"]} with status: {job_info["jet_ci_job_status"]} '
             f'\nJET pipeline id: {job_info["jet_ci_pipeline_id"]}, BioNeMo pipeline id: {job_info["bionemo_ci_pipeline_id"]} '
             f'JET job id: {job_info["jet_ci_job_id"]}, '
             f'job duration: {job_info["jet_ci_job_duration"]}, script duration: {job_info["script_duration"]}'
@@ -211,6 +221,7 @@ def get_job_info(job_raw_result: dict, save_dir: Optional[str]) -> dict:
     ci_info = job_raw_result.get("obj_ci", {})
     workloads_info = job_raw_result.get("obj_workloads_registry", {})
     obj_workload = job_raw_result.get("obj_workload", {})
+    obj_status = job_raw_result['obj_status']
 
     pipeline_id = str(ci_info.get("l_pipeline_id"))
 
@@ -219,7 +230,8 @@ def get_job_info(job_raw_result: dict, save_dir: Optional[str]) -> dict:
     job_info["jet_ci_job_id"] = ci_info.get("l_job_id")
     job_info["jet_ci_job_duration"] = ci_info.get("d_job_duration", None)
     job_info["jet_ci_job_name"] = ci_info.get("s_job_name")
-    job_info["jet_ci_job_status"] = ci_info.get("s_job_status")
+    job_info["jet_ci_job_status"] = obj_status.get("s_message", None)
+    job_info["jet_ci_job_status_code"] = obj_status.get("s_code", None)
     # Workload id is needed for JET test
     job_info["jet_ci_workload_id"] = job_raw_result.get("s_id", None)
 
@@ -231,7 +243,6 @@ def get_job_info(job_raw_result: dict, save_dir: Optional[str]) -> dict:
         if job_info["job_type"] == "recipe"
         else int(job_raw_result.get("b_invalid", 1))
     )
-    job_info["status"] = "SUCCESS" if (job_info["exit_code"] is not None and job_info["exit_code"] == 0) else "FAILED"
     if "recipe" in job_info["job_key"]:
         job_info["script"] = obj_workload['obj_spec'].get('s_script', None)
 
@@ -270,7 +281,8 @@ def get_results_from_jet(
     from JET Workloads Registry, its pattern, or related pipeline id in JET CI.
     If no query arguments are provided, all results run on bionemo account are returned.
 
-    By default, the basic info about the tests, their logs and related jobs in JET is printed to the console.
+    By default, the basic info about the tests, their logs and related jobs in JET is printed to the console
+    (detailed information about exit codes categories, see https://jet.nvidia.com/docs/logs/status/).
     If save_dir is provided, more detailed information is saved as csv
 
     Requires installed JET API https://gitlab-master.nvidia.com/dl/jet/api. Can be executed outside docker container.
