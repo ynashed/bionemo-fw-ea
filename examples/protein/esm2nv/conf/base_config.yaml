@@ -51,6 +51,7 @@ exp_manager:
 
 model:
   # ESM2-specific parameters
+  drop_last: True
   micro_batch_size: 2
   seq_length: 1024
   num_layers: 6

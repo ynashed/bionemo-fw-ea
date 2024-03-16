@@ -47,6 +47,7 @@ exp_manager:
     filename: megatron_bert--{val_loss:.2f}-{step}-{consumed_samples}
     model_parallel_size: ${multiply:${model.tensor_model_parallel_size}, ${model.pipeline_model_parallel_size}}
 model:
+  drop_last: true
   micro_batch_size: 2
   seq_length: 1024
   num_layers: 6
