@@ -1,10 +1,12 @@
 import os
 
 import pandas as pd
+import pytest
 
 from bionemo.data.preprocess.molecule.uspto50k_preprocess import USPTO50KPreprocess
 
 
+@pytest.mark.xfail(reason="NGC CLI might not be present in environment.")
 def test_uspto50k_preprocess(tmp_path):
     ngc_registry_target = 'uspto_50k_dataset'
     ngc_registry_version = 'v23.06'

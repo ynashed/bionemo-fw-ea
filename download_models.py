@@ -111,6 +111,38 @@ def get_available_models(config: Config, source: ModelSource) -> List[str]:
     return available_models
 
 
+def check_ngc_cli():
+    """Checks if NGC CLI is present on the system."""
+    _, _, exit_code = streamed_subprocess_call("ngc --version", stream_stdout=True)
+    if exit_code == 0:
+        return True
+    else:
+        return False
+
+
+def check_and_install_ngc_cli(ngc_install_dir="/tmp"):
+    """
+    Checks if NGC CLI is present on the system, and installs if it isn't present.
+    """
+    print(f"Installing NGC CLI to {ngc_install_dir}")
+    # Very important to run wget in quiet mode, or else an I/O deadlock happens.
+    # It's this issue, and it's not trivial to fix without breaking the streaming
+    # functionality of streamed_subprocess_call.
+    # https://stackoverflow.com/questions/39477003/python-subprocess-popen-hanging
+    INSTALL_COMMAND = (
+        f"wget -q -O /tmp/ngccli_linux.zip --content-disposition "
+        f"https://api.ngc.nvidia.com/v2/resources/nvidia/ngc-apps/ngc_cli/versions/3.38.0/files/ngccli_linux.zip && "
+        f"unzip -o /tmp/ngccli_linux.zip -d {ngc_install_dir} && "
+        f"chmod u+x {ngc_install_dir}/ngc-cli/ngc && "
+        f"rm /tmp/ngccli_linux.zip"
+    )
+    stdout, stderr, exit_code = streamed_subprocess_call(INSTALL_COMMAND, stream_stdout=True)
+    if exit_code == 0:
+        print("NGC CLI successfully installed.")
+    else:
+        raise ValueError(f"Unable to install NGC CLI: {stderr}")
+
+
 def download_models(
     config: Config, model_list: List, source: ModelSource, download_dir_base: Path, stream_stdout: bool = False
 ) -> None:
@@ -127,6 +159,13 @@ def download_models(
     """
     if len(model_list) == 0:
         raise ValueError("Must supply non-empty model list for download!")
+    if source == "ngc":
+        if check_ngc_cli():
+            ngc_call_command = "ngc"
+        else:
+            NGC_INSTALL_DIR = "/tmp"
+            check_and_install_ngc_cli(NGC_INSTALL_DIR)
+            ngc_call_command = str(os.path.join(NGC_INSTALL_DIR, "ngc-cli/ngc"))
 
     for model in model_list:
         model_source_path = getattr(config.models[model], source)
@@ -144,7 +183,7 @@ def download_models(
             # specify ourselves
             ngc_dirname = Path(os.path.split(model_source_path)[1].replace(":", "_v"))
             ngc_dirname = complete_download_dir / ngc_dirname
-            command = f"mkdir -p {str(complete_download_dir)} && ngc registry model download-version {model_source_path} --dest {str(complete_download_dir)} && mv {str(ngc_dirname)}/* {str(complete_download_dir)}/ && rm -d {str(ngc_dirname)}"
+            command = f"mkdir -p {str(complete_download_dir)} && {ngc_call_command} registry model download-version {model_source_path} --dest {str(complete_download_dir)} && mv {str(ngc_dirname)}/* {str(complete_download_dir)}/ && rm -d {str(ngc_dirname)}"
         elif source == "pbss":
             command = (
                 f"aws s3 cp {str(model_source_path)} {str(complete_download_dir)}/ --endpoint-url https://pbss.s8k.io"

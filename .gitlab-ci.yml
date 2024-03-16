@@ -154,8 +154,8 @@ build-bionemo-image:
     #        docker pull "${IMAGE_REPO_NAME}:$(git rev-parse HEAD~${i})" || true
     #      done
     # TODO [mgreaves] This had --no-cache on it before. Why would we want this?
-    - docker build 
-      --network host ${base} 
+    - docker build
+      --network host ${base}
       --label com.nvidia.bionemo.short_git_sha=${CI_COMMIT_SHORT_SHA}
       --label com.nvidia.bionemo.git_sha=${CI_COMMIT_SHA}
       --label com.nvidia.bionemo.created_at=${DATE}
@@ -163,7 +163,7 @@ build-bionemo-image:
       --label com.nvidia.bionemo.pipeline_id=${CI_PIPELINE_ID}
       --label com.nvidia.bionemo.merge_request_id=${CI_MERGE_REQUEST_IID}
       --secret id=GITLAB_TOKEN,env=RO_API_TOKEN
-      -t "${IMAGE_NAME}" 
+      -t "${IMAGE_NAME}"
       -f setup/Dockerfile .
     - df -h
     - docker push "${IMAGE_NAME}"
@@ -203,7 +203,7 @@ build-bionemo-image:
     # As in, ensure that the CI_JOB_TOKEN makes it way via --secret, not --build-arg.
     #
     # TODO [mgreaves] This had --no-cache on it before. Why would we want this?
-    - docker build 
+    - docker build
       --network host
       --build-arg BIONEMO_IMAGE="$IMAGE_NAME"
       --build-arg TPL_REPO=https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab-master.nvidia.com/dl/gwe/torch_performance_linter
@@ -259,15 +259,15 @@ build-docs-image:
     #        docker pull "${IMAGE_REPO_NAME}:$(git rev-parse HEAD~${i})${SUFFIX_DOCS}" || true
     #      done
     # TODO [mgreaves] This had --no-cache on it before. Why would we want this?
-    - docker build 
-      --network host ${base} 
+    - docker build
+      --network host ${base}
       --label com.nvidia.bionemo.short_git_sha=${CI_COMMIT_SHORT_SHA}
       --label com.nvidia.bionemo.git_sha=${CI_COMMIT_SHA}
       --label com.nvidia.bionemo.created_at=${DATE}
       --label com.nvidia.bionemo.branch=${CI_COMMIT_BRANCH}
       --label com.nvidia.bionemo.pipeline_id=${CI_PIPELINE_ID}
       --label com.nvidia.bionemo.merge_request_id=${CI_MERGE_REQUEST_IID}
-      -t "${IMAGE_NAME}${SUFFIX_DOCS}" 
+      -t "${IMAGE_NAME}${SUFFIX_DOCS}"
       -f Dockerfile.docs .
     - docker push "${IMAGE_NAME}${SUFFIX_DOCS}"
 # Note: It is tempting to build the docs in the same job as build-docs-image, i.e. have a
@@ -326,6 +326,8 @@ pytest:
     - ls -lts /
     - df -Thl
   script:
+    # TODO(trvachov): This install the NGC CLI, but this should be removed once all of our tests stop relying on data from NGC.
+    - wget --content-disposition https://api.ngc.nvidia.com/v2/resources/nvidia/ngc-apps/ngc_cli/versions/3.40.0/files/ngccli_linux.zip -O /tmp/ngccli_linux.zip && unzip /tmp/ngccli_linux.zip -d /tmp/ && export PATH=$PATH:/tmp/ngc-cli
     - export NGC_CLI_ORG NGC_CLI_TEAM NGC_CLI_FORMAT_TYPE NGC_CLI_API_KEY
     - export AWS_ENDPOINT_URL=https://pbss.s8k.io
     - export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
@@ -348,7 +350,7 @@ pytest:
         path: coverage.xml
     paths:
       - heatmaps
-    
+
 
 
 pytest-fork:

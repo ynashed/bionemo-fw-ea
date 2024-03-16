@@ -69,15 +69,6 @@ RUN pip install -r /tmp/requirements-dev.txt
 RUN mkdir $HOME/.aws
 COPY setup/aws-config-swiftstack $HOME/.aws/config
 
-## Install NGC cli in container for artifact download
-ENV NGC_CLI_INSTALL_PREFIX=/usr/local/bin
-RUN wget -O /tmp/ngccli_linux.zip --content-disposition \
-    "https://api.ngc.nvidia.com/v2/resources/nvidia/ngc-apps/ngc_cli/versions/3.38.0/files/ngccli_linux.zip" && \
-    unzip /tmp/ngccli_linux.zip -d ${NGC_CLI_INSTALL_PREFIX} && \
-    chmod u+x ${NGC_CLI_INSTALL_PREFIX}/ngc-cli/ngc && \
-    ln -fns  ${NGC_CLI_INSTALL_PREFIX}/ngc-cli/ngc ${NGC_CLI_INSTALL_PREFIX}/ngc && \
-    rm /tmp/ngccli_linux.zip
-
 # Recompile Megatron helpers -- NOTE this may need to be done before running job later
 RUN NEMO_PATH=$(python -c 'import nemo; print(nemo.__path__[0])') && \
    cd ${NEMO_PATH}/collections/nlp/data/language_modeling/megatron && \

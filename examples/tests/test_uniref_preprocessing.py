@@ -82,6 +82,7 @@ def test_process_files_uniprot(tmp_path, download_directory, mock_url):
 
 
 # TODO reconsider this test after switch to NGC resources since it can't be mocked
+@pytest.mark.xfail(reason="NGC CLI might not be present in environment")
 def test_process_files_ngc(tmp_path, sample_ngc_file: str):
     fasta_file = os.path.basename(sample_ngc_file)
     output_dir = "/".join(sample_ngc_file.split("/")[:-1])
