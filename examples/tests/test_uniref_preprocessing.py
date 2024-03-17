@@ -24,6 +24,10 @@ TRAIN_VAL_TEST_HASHES = {
 }
 
 
+# TODO(@jomitchell) JIRA-CDISCOVERY-2852 Remove this test. It's under the wrong namespace.
+os.environ["NGC_CLI_TEAM"] = "clara-lifesciences"
+
+
 @pytest.fixture(scope='session')
 def bionemo_home() -> Path:
     try:
