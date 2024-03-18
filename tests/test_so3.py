@@ -18,8 +18,8 @@ def test_density():
     N_EPS = 10
     X_N = 20
 
-    _eps_array = 10 ** np.linspace(np.log10(so3.MIN_EPS), np.log10(so3.MAX_EPS), N_EPS)
-    _omegas_array = np.linspace(0, np.pi, X_N + 1)[1:]
+    _eps_array = (10 ** np.linspace(np.log10(so3.MIN_EPS), np.log10(so3.MAX_EPS), N_EPS)).astype(np.float128)
+    _omegas_array = np.linspace(0, np.pi, X_N + 1)[1:].astype(np.float128)
 
     exp_vals = so3._expansion_vectorized(_omegas_array, _eps_array)
     exp_vals_ref = np.asarray([so3._expansion(_omegas_array, eps) for eps in _eps_array])
@@ -36,8 +36,8 @@ def test_density():
 
 def test_score():
     # compare results between two formulas on a range where both are numerically stable
-    _eps_array = 10 ** np.linspace(np.log10(0.26), np.log10(0.7), so3.N_EPS)
-    _omegas_array = np.linspace(0, np.pi, so3.X_N + 1)[1:]
+    _eps_array = (10 ** np.linspace(np.log10(0.26), np.log10(0.7), so3.N_EPS)).astype(np.float128)
+    _omegas_array = np.linspace(0, np.pi, so3.X_N + 1)[1:].astype(np.float128)
 
     exp_vals = so3._expansion_vectorized(_omegas_array, _eps_array)
 
