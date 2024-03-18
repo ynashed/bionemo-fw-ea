@@ -183,7 +183,7 @@ build-bionemo-image:
     # For merge request branches only, also tag the image with the merge request number:
     #       mr--MMMM--YYYY-MM-DD--CCCCCCCC
     # Where 'M..M' is the merge request number. Note it is variable-sized.
-    - TAG_MR="mr--${CI_MERGE_REQUEST_IID}--${TAG_DATE_SHORT}"
+    - TAG_MR="mr--${CI_MERGE_REQUEST_IID}--${TAG_DATE_SHORT_COMMIT}"
     - if [[ "${CI_MERGE_REQUEST_IID}" != "" ]]; then
       docker tag "${IMAGE_NAME}" "${IMAGE_REPO_NAME}:${TAG_MR}" && docker push "${IMAGE_REPO_NAME}:${TAG_MR}";
       fi
