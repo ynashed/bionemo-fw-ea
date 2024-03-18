@@ -53,16 +53,16 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
 #
 # # Install extensions from the marketplace
 # RUN code-server --install-extension ms-python.python
-
-
-COPY setup/requirements.txt /tmp/requirements.txt
-RUN --mount=type=secret,id=GITLAB_TOKEN GITLAB_TOKEN=$(cat /run/secrets/GITLAB_TOKEN) pip install -r /tmp/requirements.txt
 # TODO: unnecessary for main container, move test+dev dep installation to dev only & update CI to use dev image
+# moved -test and -dev up in build to resolve build errors
 COPY setup/requirements-test.txt /tmp/requirements-test.txt
 RUN pip install -r /tmp/requirements-test.txt
 COPY setup/requirements-dev.txt /tmp/requirements-dev.txt
 RUN pip install -r /tmp/requirements-dev.txt
 # end TODO
+COPY setup/requirements.txt /tmp/requirements.txt
+RUN --mount=type=secret,id=GITLAB_TOKEN GITLAB_TOKEN=$(cat /run/secrets/GITLAB_TOKEN) pip install -r /tmp/requirements.txt
+
 
 # AWS CLI is inside requirements.txt. Add config file.
 # This config file does not contain access keys.

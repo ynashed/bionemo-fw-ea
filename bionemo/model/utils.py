@@ -285,6 +285,11 @@ def setup_trainer(cfg, builder=None, callbacks=[], adjust_config=True, verbose=T
 
     trainer = Trainer(plugins=plugins, strategy=strategy, callbacks=callbacks, **cfg.trainer)
 
+    # exp_manager()
+    #   - One action done in this function is to find the 'correct' checkpoint,
+    #   which is one that matches *last.ckpt, and assigns it to trainer.ckpt_path
+    #
+    # https://github.com/NVIDIA/NeMo/blob/main/nemo/utils/exp_manager.py
     exp_manager(trainer, cfg.get("exp_manager", None))
 
     builder.resume_checkpoint(cfg, trainer)

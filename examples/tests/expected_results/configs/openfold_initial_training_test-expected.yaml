@@ -294,7 +294,12 @@ exp_manager:
     save_top_k: 2
     monitor: val_lddt_ca
     mode: max
-    filename: '{step}--{${exp_manager.checkpoint_callback_params.monitor}:.3f}'
+    # filename 
+    #   - As of 2024-03-16, the variable multisessionstep is managed within
+    #   the AlphaFold class, since behavior changed as a result of NeMo upgrade,
+    #   and the value of step written to checkpoint filename did not reflect
+    #   progress through the training dataset
+    filename: 'openfold--{multisessionstep}--{step}--{${exp_manager.checkpoint_callback_params.monitor}:.3f}'
   create_wandb_logger: false
   wandb_logger_kwargs:
     offline: true
