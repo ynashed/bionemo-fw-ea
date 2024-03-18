@@ -8,7 +8,7 @@ trainer:
   devices: 1 # number of GPUs or CPUs
   num_nodes: 1 
   accelerator: gpu #gpu or cpu
-  precision: 16-mixed # 16-mixed, bf16-mixed or 32
+  precision: 32 # 16-mixed, bf16-mixed or 32
   logger: False # logger is provided by NeMo exp_manager
   enable_checkpointing: False # checkpointing is done by NeMo exp_manager
   use_distributed_sampler: False # use NeMo Megatron samplers
@@ -88,10 +88,12 @@ model:
       - 0.9
       - 0.98
     sched:
-      name: CosineAnnealing
+      name: WarmupAnnealDecayHold
       warmup_steps: 2000
-      constant_steps: 50000
       min_lr: 4e-5
+      max_lr: 4e-4
+      max_steps: 500000
+      anneal_percentage: 0.10
 
   init_method_std: 0.02 # Standard deviation of the zero mean normal distribution used for weight initialization.')
   kv_channels: null # Projection weights dimension in multi-head attention. Set to hidden_size // num_attention_heads if null
