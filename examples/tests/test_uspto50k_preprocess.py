@@ -23,6 +23,13 @@ def test_uspto50k_preprocess(tmp_path):
     assert os.path.join(tmp_path, "processed") == data_preprocessor.processed_dir
     # reading raw data
     df_raw = pd.read_pickle(raw_data_filepath)
+    # Make sure that if the file already exists, that it can be preprocessed without ngc registry information
+    data_preprocessor2 = USPTO50KPreprocess(data_dir=str(tmp_path))
+    data_preprocessor2.prepare_dataset(force=True)
+    assert raw_data_filepath == data_preprocessor2.datapath_raw
+    assert os.path.join(tmp_path, "raw", filename) == data_preprocessor2.datapath_raw
+    assert os.listdir(data_preprocessor2.download_dir)[0] == filename
+    assert os.path.join(tmp_path, "processed") == data_preprocessor2.processed_dir
 
     assert all(folder in data_preprocessor.splits for folder in os.listdir(data_preprocessor.processed_dir))
 
