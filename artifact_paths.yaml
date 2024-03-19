@@ -31,13 +31,13 @@ models:
         symlink:
             source: "../../megamolbart.nemo"
             target: "molecule/megamolbart/megamolbart.nemo"
-    molmim_test:
-        # https://wandb.ai/clara-discovery/molmim_convergence/runs/yWZw6sqm
+    molmim_70m_24_3:
+        # https://wandb.ai/clara-discovery/molmim_convergence_prod_March2024/runs/cOLZ4Eme
         ngc: null
-        pbss: "s3://bionemo-ci/models/MolMIM-70M-gaus-hiddens-70k_136bd7cac_test_only.nemo"
+        pbss: "s3://bionemo-ci/models/molmim_70m_24_3.nemo"
         symlink:
-            source: "../../MolMIM-70M-gaus-hiddens-70k_136bd7cac_test_only.nemo"
-            target: "molecule/molmim/MolMIM-70M-gaus-hiddens-70k_136bd7cac_test_only.nemo"
+            source: "../../molmim_70m_24_3.nemo"
+            target: "molecule/molmim/molmim_70m_24_3.nemo"
     equidock_dips:
         ngc: "nvidian/clara-lifesciences/equidock:dips.23.10"
         pbss: "s3://bionemo-ci/models/equidock_dips.nemo"

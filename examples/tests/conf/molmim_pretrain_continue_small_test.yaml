@@ -16,7 +16,7 @@ do_testing: False # set to true to run evaluation on test data after training, r
 seed: 42
 
 # NOTE: this shows that we can load a model trained with canonical mode, and fine-tune with equivariant mode.
-restore_from_path: ${oc.env:BIONEMO_HOME}/models/molecule/molmim/MolMIM-70M-gaus-hiddens-70k_136bd7cac_test_only.nemo # path to model checkpoint to load, use the one in our infer test
+restore_from_path: ${oc.env:BIONEMO_HOME}/models/molecule/molmim/molmim_70m_24_3.nemo # path to model checkpoint to load, use the one in our infer test
 
 trainer:
   devices: 1 # number of GPUs or CPUs
@@ -24,12 +24,10 @@ trainer:
   precision: 16-mixed # 16-mixed, 32
   accelerator: gpu # gpu, cpu
   max_epochs: null # use max_steps instead with NeMo Megatron model
-  max_steps: 10 # consumed_samples = global_step * micro_batch_size * data_parallel_size * accumulate_grad_batches
-  log_every_n_steps: 10 # number of interations between logging
-  val_check_interval: 1 # set to integer when using steps to determine frequency of validation, use fraction with epochs
+  max_steps: 300 # consumed_samples = global_step * micro_batch_size * data_parallel_size * accumulate_grad_batches
+  log_every_n_steps: 150 # number of interations between logging
+  val_check_interval: 1.0 # set to integer when using steps to determine frequency of validation, use fraction with epochs
   num_sanity_val_steps: 1 # set to 0 or small number to test validation before training
-  limit_train_batches: 1 # number of batches in train step, use fraction for fraction of data
-  limit_val_batches: 1 # number of batches in validation step, use fraction for fraction of data, 0 to disable
   limit_test_batches: 0 # number of batches in test step, use fraction for fraction of data, 0 to disable
   accumulate_grad_batches: 1
   gradient_clip_val: 1.0
@@ -40,7 +38,7 @@ trainer:
 model:
   name: ${name}-united-token_head
   # model parallelism
-  micro_batch_size: 32
+  micro_batch_size: 9  # 1/2 of the validation batch size. If we did > 18 then we would just drop validation.
   global_batch_size: null
   tensor_model_parallel_size: 1 # model parallelism
   pipeline_model_parallel_size: 1
@@ -92,15 +90,15 @@ model:
     transform:
       q_z_given_x:
         #  The baseline MIM loss configuration is a conditional Gaussian with a minimum variance of 1e-6.
-        cls_name: cond_gaussian
-        hidden_size: ${model.encoder.hidden_size}
-        min_logvar: -6.0
-        # # The following config block is an example of "log variance sampling"
-        # cls_name: sampled_var_cond_gaussian
-        # min_logvar: -6.0
-        # max_logvar: 0.0   # variance is sampled from uniform distribution between min and max in log space
-        # map_var_to_hiddens: False  # If True, z_mean is a function (partially) of the sampled log variance. Also try setting to False.
+        # cls_name: cond_gaussian
         # hidden_size: ${model.encoder.hidden_size}
+        # min_logvar: -6.0
+        # # The following config block is an example of "log variance sampling"
+        cls_name: sampled_var_cond_gaussian
+        min_logvar: -6.0
+        max_logvar: 0.0   # variance is sampled from uniform distribution between min and max in log space
+        map_var_to_hiddens: False  # If True, z_mean is a function (partially) of the sampled log variance. Also try setting to False.
+        hidden_size: ${model.encoder.hidden_size}
         # # The following config block is an example of "log variance interpolation" between the model estimate and a unit gaussian
         # cls_name: interp_var_cond_gaussian
         # min_logvar: -6.0

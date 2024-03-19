@@ -34,6 +34,7 @@ Some of the key features of BioNeMo Framework are:
 | [ESM-1nv](./models/esm1-nv.md)                          | Protein                  | Representation Learning                       | [BioNeMo checkpoints pre-trained from scratch](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/clara/models/esm1nv)                       |
 | [ProtT5nv](./models/prott5nv.md)                        | Protein                  | Representation Learning                       | [BioNeMo checkpoints pre-trained from scratch](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/clara/models/prott5nv)                     |
 | [MegaMolBART](./models/megamolbart.md)                  | Small Molecule           | Representation Learning + Molecule Generation | [BioNeMo checkpoints pre-trained from scratch](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/clara/models/megamolbart)                  |
+| [MolMIM](./models/molmim.md)                  | Small Molecule           | Representation Learning + Molecule Generation | [BioNeMo checkpoints pre-trained from scratch](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/clara/models/molmim)                  |
 
 For more information about the models included in BioNeMo Framework, refer to the Model Cards linked in the table above or the original publications referenced in the respective model descriptions.
 

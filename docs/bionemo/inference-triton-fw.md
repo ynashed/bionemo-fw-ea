@@ -32,7 +32,7 @@ You may perform inference using either gRPC or HTTP, connecting to the [`tritons
 
 For convenince, we provide gRPC based clients that allow you to obtain inference results from the hosted models. One is [`bionemo.triton.client_encode`](../../bionemo/triton/client_encode.py), which povides access to obtaining the embeddings, hidden states, or sample inference for a model. The other is [`bionemo.triton.client_decode`](../../bionemo/triton/client_decode.py), which povides access to the decode inference for the model.
 
-NOTE: Only MegaMolBART implements decoding and sample inference. All models (MegaMolBART, esm1nv, esm2nv, prott5nv) provide access for calculating embeddings and hidden states.
+NOTE: Only MegaMolBART and MolMIM implements decoding and sample inference. All models (MegaMolBART, MolMIM, esm1nv, esm2nv, prott5nv) provide access for calculating embeddings and hidden states.
 
 See [the inference client documentation](../../bionemo/triton/README.md) for more details and examples.
 

@@ -7,8 +7,9 @@ ESM-1nv is a protein language model that provides numerical embeddings for each 
 
 
 ## References:
-[Provide list of reference(s), link(s) to the publication/paper/article, associated works, and lineage where relevant.]  <br> 
+
 [1] Rives, Alexander, Joshua Meier, Tom Sercu, Siddharth Goyal, Zeming Lin, Jason Liu, Demi Guo et al. "Biological structure and function emerge from scaling unsupervised learning to 250 million protein sequences." Proceedings of the National Academy of Sciences 118, no. 15 (2021): e2016239118.
+
 [2] "UniProt: the universal protein knowledgebase in 2021." Nucleic acids research 49, no. D1 (2021): D480-D489.
 
 ## Model Architecture: 

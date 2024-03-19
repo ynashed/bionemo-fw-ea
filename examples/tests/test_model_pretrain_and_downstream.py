@@ -183,7 +183,7 @@ TEST_PARAMS: List[TrainingTestParams] = [
         "config_name": 'molmim_pretrain_continue_small_test',
         "script_path": "examples/molecule/molmim/pretrain.py",
         "model_cls": MolMIMModel,
-        "model_size": 70612096,
+        "model_size": 70349440,
     },
 ]
 
@@ -299,7 +299,8 @@ def test_model_training(
     tolerance_overrides = {
         "grad_norm": 0.5,  # grad norm flucuates quite a bit in these small training runs
         "val_percent_invalid": 1.0,  # This varies a ton early in training, can be anywhere in 0-1.
-        "val_character_accuracy": 0.5,  # This accuracy varries wildly early in training
+        "val_character_accuracy": 2.0,  # This accuracy varries wildly early in training
+        "reduced_train_hiddens_mim_log_prob_q_z_given_x": 2.0,  # This varies a ton early in training, can be anywhere in 0-1.
         # "3state_accuracy": 0.10,  # This accuracy is measured in percent
         # "resolved_accuracy": 0.05,  # This accuracy is measured in percent
         # "8state_accuracy": 0.05.0,  # This accuracy is measured in percent

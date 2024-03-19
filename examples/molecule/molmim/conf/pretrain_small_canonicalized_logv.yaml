@@ -1,0 +1,34 @@
+defaults:
+  - pretrain_base_canonicalized
+  - _self_
+
+hydra:
+  searchpath:
+     - file://${oc.env:BIONEMO_HOME}/examples/conf/
+     - file://${oc.env:BIONEMO_HOME}/examples/molecule/molmim/conf/
+
+# Small model
+trainer:
+  devices: 8
+  num_nodes: 8
+  precision: 32 # 16-mixed, bf16-mixed, 32
+
+model: 
+  name: MolMIM-small
+  
+  # model architecture
+  encoder:
+    num_layers: 6
+    num_attention_heads: 8
+    hidden_size: 512
+
+  # Hiddens
+  hiddens:
+    transform:
+      q_z_given_x:
+        # Baseline MIM transform is cond_gaussian
+        cls_name: sampled_var_cond_gaussian
+        min_logvar: -6.0
+        max_logvar: 0.0   # variance is sampled from uniform distribution between min and max in log space
+        map_var_to_hiddens: False  # If True, z_mean is a function (partially) of the sampled log variance. Also try setting to False.
+        hidden_size: ${model.encoder.hidden_size}

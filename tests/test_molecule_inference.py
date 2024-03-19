@@ -206,12 +206,7 @@ def test_sample_topk(bionemo_home: Path, _smis: List[str], model_name: str):
 
         if len(valid_molecules) < len(samples_flat) * 0.3:
             log.warning("TOO FEW VALID SAMPLES")
-        if isinstance(inferer, MolMIMInference):
-            # FIXME remove this distinction once we have a good checkpoint
-            if len(valid_molecules) == 0:
-                log.warning("Found no valid molecules from MolMIM")
-        else:
-            assert len(valid_molecules) != 0
+        assert len(valid_molecules) != 0
 
 
 @pytest.mark.needs_fork
@@ -253,12 +248,7 @@ def test_sample_topp(bionemo_home: Path, _smis: List[str], model_name: str):
 
         if len(valid_molecules) < len(samples_flat) * 0.3:
             log.warning("TOO FEW VALID SAMPLES")
-        if isinstance(inferer, MolMIMInference):
-            # FIXME remove this distinction once we have a good checkpoint
-            if len(valid_molecules) == 0:
-                log.warning("Found no valid molecules from MolMIM")
-        else:
-            assert len(valid_molecules) != 0
+        assert len(valid_molecules) != 0
 
 
 @pytest.mark.needs_fork
@@ -307,7 +297,7 @@ def test_beam_search(bionemo_home: Path, _smis: List[str], beam_search_method: s
 
         if len(valid_molecules) < len(samples_flat) * 0.3:
             log.warning("TOO FEW VALID SAMPLES")
-        if beam_search_method != "beam-search-single-sample" and not isinstance(inferer, MolMIMInference):
+        if beam_search_method != "beam-search-single-sample":
             # "beam-search-single-sample" is not very good, only one gaussian is sampled and top beam_size are sampled from that.
             # otherwise test that we get at least one valid molecule.
             assert len(valid_molecules) != 0

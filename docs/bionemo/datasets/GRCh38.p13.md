@@ -1,4 +1,4 @@
-GRCh38.p13
+# Human Reference Genome Version GRCh38.p13
 
 We use the same reference version of the human genome as DNABERT, GRCh38.p13 downloaded from the NIH. Chromosomes are first chunked into contiguous sections (e.g. broken on Ns) to remove any 'empty' sequence from being sampled in training. Then, slices of the genome are sampled at runtime and fed to the model for training. By default, chr1-chr19 are used during training, while chr20 and chr21 are reserved as holdouts. Additionally, chr22 is held-out for further evaluation.
 

@@ -110,6 +110,7 @@ Here's a summary of each model's superclass:
 | ESM-1nv               | MegatronBertModel                |
 | ProtT5nv              | MegatronT5Model                  |
 | MegaMolBART           | MegatronLMEncoderDecoderModel    |
+| MolMIM                | MegatronLMEncoderDecoderModel    |
 
 Customizations can also vary from simple changes in the tokenizer methods to more involved changes in the model architecture, including alterations in how the forward step is computed, callbacks or data augmentation functions.
 
@@ -207,10 +208,12 @@ Typically, the config files can be found under the `conf` directory in the same 
 
 Pre-trained checkpoints are also provided based on the models described in the [Introduction](./index.md). These checkpoints will have token-size limitations.
 
-| **Model**             | **Checkpoint's Max. Length**     | **Common Tasks**                                                                                                             |
-|-----------------------|----------------------------------|------------------------------------------------------------------------------------------------------------------------------|
-| ESM-1nv & ProtT5nv    | 512 Tokens (Amino Acids)                  | Thermostability, Secondary Structure Prediction, Subcellular Localization (check [FLIP Benchmark](./models/model-benchmarks.md))         |
-| MegaMolBART           | 512 Tokens (SMILES)              | Representation Learning, Structure Prediction, Molecule Generation                                                           |
+| **Model**             | **Checkpoint's Max. Length**     | **Common Tasks**                                                                                                                                                    |
+|-----------------------|----------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| ESM-1nv & ProtT5nv    | 512 Tokens (Amino Acids)         | Thermostability, Secondary Structure Prediction, Subcellular Localization (check [FLIP Benchmark](./models/model-benchmarks.md))                                    |
+| MegaMolBART           | 512 Tokens (SMILES)              | Representation Learning, Structure Prediction, Molecule Generation                                                                                                  |
+| MolMIM                | 128 Tokens (SMILES)              | Representation Learning, Structure Prediction, Molecule Generation, Guided molecular generation (see ./notebooks/cma_es_guided_molecular_optimization_molmim.ipynb) |
+
 
 To enable support for longer sequences, customize configuration parameters to allow sequence lengths, assuming the user has the computational resources to support expansion. Taking ProtT5nv as example, several different configuration options are available in the _.yaml_ file. Under `examples/protein/prott5nv/conf/` the `base_config.yaml` file is the basis for production-level work. More information about how to use checkpoints can be found in the [Quickstart Guide](./quickstart-fw.md) and in the [Save-Restore Connectors](#save-restore-connectors) section below.
 

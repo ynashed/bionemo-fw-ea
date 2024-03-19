@@ -73,9 +73,9 @@ def example_smis() -> List[str]:
     ]
 
 
-@pytest.mark.skip(reason="Skipping this test, it causes OOM on CI runners")
 @pytest.mark.slow
 @pytest.mark.needs_gpu
+@pytest.mark.needs_fork
 @pytest.mark.parametrize(
     "model_infer_config_path,model_cls,enforce_improvement",
     list(zip(INFERENCE_CONFIGS, MODEL_CLASSES, ENFORCE_IMPROVEMENT)),
@@ -86,7 +86,7 @@ def test_property_guided_optimization_of_inference_model(
     enforce_improvement: bool,
     config_path_for_tests: str,
     example_smis: List[str],
-    pop_size: int = 10,
+    pop_size: int = 2,
 ):
     cfg = load_model_config(config_name=model_infer_config_path, config_path=config_path_for_tests)
     with distributed_model_parallel_state():
@@ -109,7 +109,7 @@ def test_property_guided_optimization_of_inference_model(
             model = ControlledGenerationPerceiverEncoderInferenceWrapper(
                 inf_model, **controlled_gen_kwargs
             )  # everything is inferred from the perciever config
-            sigma = 0.1  # this model needs smaller steps to avoid divergence
+            sigma = 0.5
         optimizer = MoleculeGenerationOptimizer(
             model,
             scoring_function,

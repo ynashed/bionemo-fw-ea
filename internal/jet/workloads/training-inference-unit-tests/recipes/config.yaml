@@ -77,7 +77,7 @@ products:
     precision: [32, bf16-mixed]
     products:
       - domain: [molecule]
-        batch_size: [32]
+        batch_size: [2]  # Small batch size because otherwise we run out of test validation samples for parallelism.
         products:
           - model: [megamolbart]
             products:

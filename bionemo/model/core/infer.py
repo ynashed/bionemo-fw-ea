@@ -614,6 +614,7 @@ class BaseEncoderDecoderInference(BaseEncoderInference):
         return_embedding: bool = False,
         sampling_method: Optional[str] = None,
         hiddens_to_seq_kwargs: Dict[str, Any] = {},
+        scaled_radius: float = 1.0,
         **sampling_kwarg,
     ) -> Union[BatchOfSamples, Tuple[BatchOfSamples, torch.Tensor]]:
         """
@@ -687,7 +688,6 @@ class BaseEncoderDecoderInference(BaseEncoderInference):
             perturbed_hiddens = hiddens.repeat_interleave(num_samples, 0)
 
         # Apply gaussian noise of the desired `scaled_radius` to the hidden states.
-        scaled_radius = sampling_kwarg.pop('scaled_radius')
         perturbed_hiddens = perturbed_hiddens + (
             scaled_radius * torch.randn(perturbed_hiddens.shape).to(perturbed_hiddens.device)
         )

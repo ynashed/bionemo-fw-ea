@@ -82,7 +82,7 @@ model:
     moe_dropout: 0.0
     use_flash_attention: false
   name: ${name}-united-token_head
-  micro_batch_size: 32
+  micro_batch_size: 9
   global_batch_size: null
   tensor_model_parallel_size: 1
   pipeline_model_parallel_size: 1
@@ -112,9 +112,11 @@ model:
     hidden_aggregation_method: mean
     transform:
       q_z_given_x:
-        cls_name: cond_gaussian
-        hidden_size: ${model.encoder.hidden_size}
+        cls_name: sampled_var_cond_gaussian
         min_logvar: -6.0
+        max_logvar: 0.0
+        map_var_to_hiddens: false
+        hidden_size: ${model.encoder.hidden_size}
     loss:
       mim:
         cls_name: a_mim
@@ -214,19 +216,17 @@ name: MolMIM
 do_training: true
 do_testing: false
 seed: 42
-restore_from_path: ${oc.env:BIONEMO_HOME}/models/molecule/molmim/MolMIM-70M-gaus-hiddens-70k_136bd7cac_test_only.nemo
+restore_from_path: ${oc.env:BIONEMO_HOME}/models/molecule/molmim/molmim_70m_24_3.nemo
 trainer:
   devices: 1
   num_nodes: 1
   precision: 16-mixed
   accelerator: gpu
   max_epochs: null
-  max_steps: 10
-  log_every_n_steps: 10
-  val_check_interval: 1
+  max_steps: 300
+  log_every_n_steps: 150
+  val_check_interval: 1.0
   num_sanity_val_steps: 1
-  limit_train_batches: 1
-  limit_val_batches: 1
   limit_test_batches: 0
   accumulate_grad_batches: 1
   gradient_clip_val: 1.0

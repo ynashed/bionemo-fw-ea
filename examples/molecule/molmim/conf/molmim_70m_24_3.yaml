@@ -1,9 +1,9 @@
 model:
   encoder:
-    num_layers: 2
-    hidden_size: 256
+    num_layers: 6
+    hidden_size: 512
     ffn_hidden_size: ${multiply:${.hidden_size}, 4}
-    num_attention_heads: 4
+    num_attention_heads: 8
     init_method_std: 0.02
     hidden_dropout: 0.1
     attention_dropout: 0.1
@@ -81,9 +81,9 @@ model:
     moe_frequency: 1
     moe_dropout: 0.0
     use_flash_attention: false
-  name: ${name}-united-token_head
-  micro_batch_size: 9
-  global_batch_size: null
+  name: MolMIM-small
+  micro_batch_size: 2048
+  global_batch_size: 65536
   tensor_model_parallel_size: 1
   pipeline_model_parallel_size: 1
   resume_from_checkpoint: null
@@ -101,7 +101,7 @@ model:
   hidden_size: ${model.encoder.hidden_size}
   training_callbacks:
   - class: bionemo.callbacks.scheduling_callbacks.ParameterMultiplicativeScheduler
-    factor: 0.0001
+    factor: 0.001
     min_multiplier: 0.0
     max_multiplier: 1.0
     module_parameter_path: enc_dec_model.enc_dec_model.hiddens_module.hidden_loss_transforms.0.loss_weight
@@ -113,10 +113,10 @@ model:
     transform:
       q_z_given_x:
         cls_name: sampled_var_cond_gaussian
+        hidden_size: ${model.encoder.hidden_size}
         min_logvar: -6.0
         max_logvar: 0.0
-        map_var_to_hiddens: true
-        hidden_size: ${model.encoder.hidden_size}
+        map_var_to_hiddens: false
     loss:
       mim:
         cls_name: a_mim
@@ -129,15 +129,15 @@ model:
     merge_file: null
   data:
     links_file: ${oc.env:BIONEMO_HOME}/examples/molecule/megamolbart/dataset/ZINC-downloader.txt
-    dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/
+    dataset_path: /data/balanced_split
     dataset:
-      train: x[000..001]
-      test: x[000..001]
-      val: x[000..001]
+      train: x_OP_000..175_CL_
+      test: x_OP_000..175_CL_
+      val: x_OP_000..004_CL_
     canonicalize_target_smile: true
-    canonicalize_encoder_input: false
-    canonicalize_decoder_output: false
-    encoder_augment: true
+    canonicalize_encoder_input: true
+    canonicalize_decoder_output: true
+    encoder_augment: false
     decoder_independent_augment: false
     encoder_mask: false
     decoder_mask: false
@@ -162,21 +162,20 @@ model:
         data_sep: ','
         data_col: 1
     use_upsampling: true
+    index_mapping_dir: /results/data_index/
   optim:
     name: fused_adam
-    lr: 1.0
+    lr: 0.0005
+    weight_decay: 0.001
     betas:
     - 0.9
     - 0.999
-    eps: 1.0e-08
-    weight_decay: 0.01
     sched:
-      name: NoamAnnealing
-      d_model: ${model.encoder.hidden_size}
-      warmup_steps: 8000
-      warmup_ratio: null
-      max_steps: 1000000
-      min_lr: 1.0e-05
+      name: CosineAnnealing
+      warmup_steps: ${multiply:${trainer.max_steps}, 0.01}
+      constant_steps: ${multiply:${trainer.max_steps}, 0.05}
+      max_steps: ${trainer.max_steps}
+      min_lr: 5.0e-05
   dwnstr_task_validation:
     enabled: false
     dataset:
@@ -184,12 +183,12 @@ model:
       task_type: regression
       infer_target: bionemo.model.molecule.molmim.infer.MolMIMInference
       max_seq_length: ${model.seq_length}
-      emb_batch_size: 32
-      batch_size: ${.emb_batch_size}
-      num_epochs: 1
+      emb_batch_size: 128
+      batch_size: 128
+      num_epochs: 10
       shuffle: true
       num_workers: 8
-      dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/physchem/SAMPL
+      dataset_path: /data/physchem/
       task_name: SAMPL
       dataset:
         train: x000
@@ -211,21 +210,24 @@ model:
           last_epoch: -1
           warmup_ratio: 0.01
           max_steps: 1000
+  precision: 32
 name: MolMIM
 do_training: true
 do_testing: false
 seed: 42
 restore_from_path: null
 trainer:
-  devices: 1
-  num_nodes: 1
-  precision: 16-mixed
+  devices: 8
+  num_nodes: 4
+  precision: 32
   accelerator: gpu
   max_epochs: null
-  max_steps: 300
-  log_every_n_steps: 150
-  val_check_interval: 1.0
-  num_sanity_val_steps: 0
+  max_steps: 1000000
+  log_every_n_steps: 100
+  val_check_interval: 2500
+  num_sanity_val_steps: 2
+  limit_train_batches: 1.0
+  limit_val_batches: 1.0
   limit_test_batches: 0
   accumulate_grad_batches: 1
   gradient_clip_val: 1.0
@@ -234,8 +236,7 @@ trainer:
   use_distributed_sampler: false
 exp_manager:
   name: ${name}
-  exp_dir: ${oc.env:BIONEMO_HOME}/test_results/nemo_experiments/molmim_pretrain_xsmall
-  resume_if_exists: false
+  resume_if_exists: true
   resume_ignore_no_checkpoint: true
   create_checkpoint_callback: true
   checkpoint_callback_params:
@@ -246,16 +247,13 @@ exp_manager:
     always_save_nemo: true
     filename: ${name}-${model.name}--{val_molecular_accuracy:.2f}-{val_loss:.2f}-{step}-{consumed_samples}
     model_parallel_size: ${multiply:${model.tensor_model_parallel_size}, ${model.pipeline_model_parallel_size}}
+  exp_dir: /results/logs/
   explicit_log_dir: ${.exp_dir}
-  create_wandb_logger: false
-  create_tensorboard_logger: false
-  wandb_logger_kwargs:
-    project: ${model.name}_pretraining
-    name: ${model.name}_pretraining
-    group: ${model.name}
-    job_type: Localhost_nodes_${trainer.num_nodes}_gpus_${trainer.devices}
-    notes: 'date: ${now:%y%m%d-%H%M%S}'
-    tags:
-    - ${name}
-    - ${model.name}
-    offline: true
+  create_wandb_logger: true
+  create_tensorboard_logger: true
+create_dllogger_callbacks: true
+create_trainer_metric_callback: true
+dllogger_callbacks_kwargs:
+  use_existing_dllogger: true
+  warmup: 0
+  json_file: dlloger.json

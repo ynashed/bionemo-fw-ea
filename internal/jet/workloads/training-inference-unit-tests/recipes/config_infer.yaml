@@ -63,7 +63,7 @@ products:
           - model: [molmim]
             config_name: [molmim_infer]
             batch_size: [4]
-            checkpoint_name: [molmim_test]
+            checkpoint_name: [molmim_70m_24_3]
           - model: [megamolbart]
             config_name: [megamolbart_infer]
             batch_size: [4]
