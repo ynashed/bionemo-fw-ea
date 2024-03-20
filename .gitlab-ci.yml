@@ -10,7 +10,6 @@ stages:
   - jet
   - deploy
 
-
 variables:
   # docker build options
   DOCKER_HOST: tcp://docker:2376
@@ -37,18 +36,13 @@ variables:
   # fully-qualified image names
   IMAGE_NAME: "${IMAGE_REPO_NAME}:${IMAGE_TAG}"
   NEMO_NIGHTLY_IMAGE: "nvcr.io/nvidian/nemo-nightly:latest-nightly-main"
-  NIGHTLY:
-    value: "false"
-    options:
-      - "false"
-      - "true"
-    description: "Whether or not to use nightly NeMo docker image as base. Set to 'false' by default."
   NGC_CLI_FORMAT_TYPE: ascii
   NGC_CLI_ORG: nvidian
   # TODO(dorotat): change to cvai_bnmo_trng when we move data and checkpoints
   NGC_CLI_TEAM: clara-lifesciences
-  JET_WORKLOADS_REF_MAIN: "bionemo/training-unit-tests"
-  JET_WORKLOADS_DIR: "internal/jet/workloads/training-inference-unit-tests"
+  # JET variables
+  JET_WORKLOAD_FOLDER: "training-inference-unit-tests"
+  JET_WORKLOADS_DIR: "internal/jet/workloads/$JET_WORKLOAD_FOLDER"
   ### variables excluding stages of the CI pipeline
   EXCLUDE_DOCKER_IMAGE_BUILD: "false"
   EXCLUDE_DOCS_BUILD: "false"
@@ -75,9 +69,12 @@ variables:
       - "false"
       - "true"
     description: "a flag that determines whether to use nightly NeMo docker image as base. Set to 'false' by default."
-
-
-
+  JET_CONV_TEST:
+    value: "false"
+    options:
+      - "false"
+      - "true"
+    description: "A flag that determines whether to run partial convergence tests in CI. Set to 'false' by default."
 
 # TODO(dorotat) solution with SKIP_CI flag is error-prone and should be replaced with better logic!!!!
 workflow:
@@ -92,6 +89,14 @@ workflow:
       variables:
         EXCLUDE_JET: "true"
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    ## NOTE: Convergence test are run using JET via CI. They can be triggered from any branch but only from the Run pipeline page
+    ## (https://gitlab-master.nvidia.com/clara-discovery/bionemo/-/pipelines) by clicking Run pipeline button and setting JET_CONV_TEST=true
+    ## Only docker built stage and jet stage using training definitions from JET_WORKLOAD_FOLDER is executed (docs build and pytest stages is disabled)
+    - if: ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "schedule") &&  $JET_CONV_TEST == "true"
+      variables:
+        EXCLUDE_DOCS_BUILD: "true"
+        EXCLUDE_PYTEST: "true"
+        JET_WORKLOAD_FOLDER: "partial-conv-trainings"
     - if: ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "schedule") && $PYTEST != "true" && $JET == "true"
       variables:
         EXCLUDE_PYTEST: "true"
@@ -124,6 +129,10 @@ workflow:
 
 code_format:
   stage: code_format
+  rules:
+    - if: $JET_CONV_TEST == "true"
+      when: never
+    - when: always
   script:
     - pre-commit run --all-files --show-diff-on-failure
   image: nvcr.io/nvidian/cvai_bnmo_trng/bionemo-linter:latest
@@ -445,11 +454,14 @@ pytest-internal:
 
 jet-configure:
   extends: [.jet-configure]
+  variables:
+    JET_WORKLOADS_REF_BASE: "bionemo"
+    JET_WORKLOADS_REF: "${JET_WORKLOADS_REF_BASE}/${CI_COMMIT_BRANCH}"
+    WANDB_PROJECT_NAME_BASE: "jet--${JET_WORKLOAD_FOLDER}"
+    WANDB_PROJECT_NAME: "${WANDB_PROJECT_NAME_BASE}--${CI_COMMIT_BRANCH}"
   artifacts:
     paths:
       - $JET_WORKLOADS_DIR
-  variables:
-    JET_WORKLOADS_REF: "bionemo/${CI_COMMIT_BRANCH}"
   rules:
     - if: $EXCLUDE_JET == "true"
       when: never
@@ -460,12 +472,25 @@ jet-configure:
     - when: on_success
   before_script:
     - apk update && apk add git yq
+    - 'if [[ $CI_PIPELINE_SOURCE == "merge_request_event" ]]; then
+      CUSTOM_BRANCH_NAME=$(echo "$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME" | tr "/" "__");
+      else
+      CUSTOM_BRANCH_NAME=$(echo "$CI_COMMIT_BRANCH" | tr "/" "__");
+      fi'
+    - export CUSTOM_BRANCH_NAME
   script:
     - yq e ".spec.source.image = \"${IMAGE_NAME}\"" -i ${JET_WORKLOADS_DIR}/builds/bionemo.yaml
     - 'find "$JET_WORKLOADS_DIR" -type f -name "*.yaml" -print0 | while IFS= read -r -d "" file; do
           echo "File: $file";
           yq e ".labels.workload_ref = \"${JET_WORKLOADS_REF}\"" -i ${file};
           yq e ".labels.bionemo_ci_pipeline_id = \"${CI_PIPELINE_ID}\"" -i ${file};
+          yq e ".labels.bionemo_commit_sha = \"${CI_COMMIT_SHORT_SHA}\"" -i ${file};
+          yq e ".spec.scope = \"${JET_WORKLOAD_FOLDER}\"" -i ${file};
+          if [[ $JET_CONV_TEST = true ]] & [[ $file == *"recipe"* ]]; then   
+            yq e ".spec.wandb_project_name = \"${WANDB_PROJECT_NAME_BASE}--${CUSTOM_BRANCH_NAME}\"" -i ${file};
+            yq e ".spec.pipeline_label = \"${CI_PIPELINE_CREATED_AT}_${CI_COMMIT_SHORT_SHA}_${CI_PIPELINE_ID}\"" -i ${file};       
+          fi;
+          cat ${file};
        done'
 
 
@@ -477,7 +502,6 @@ jet-configure:
   variables:
     JET_WORKLOADS_PROJECT: $JET_WORKLOADS_PROJECT
     JET_WORKLOADS_JOB: $JET_WORKLOADS_JOB
-    JET_WORKLOADS_REF: ""
     JET_WORKLOADS_FILTER: type == 'recipe'
     JET_BUILDS_PLATFORMS: linux/amd64
   trigger:

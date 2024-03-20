@@ -31,8 +31,6 @@ def add_test_callbacks(cfg: DictConfig, callbacks: List[Callback], mode: str = "
     """
 
     if cfg.get("create_dllogger_callbacks", False):
-        if 'batch_size' in cfg.model.data and cfg.model.data.batch_size != cfg.model.micro_batch_size:
-            raise ValueError("cfg.model.data.batch_size should be equal to cfg.model.micro_batch_size")
         dllogger_callbacks_kwargs = cfg.get("dllogger_callbacks_kwargs", {})
         json_file = dllogger_callbacks_kwargs.get("json_file", "dllogger.json")
         append_to_json = dllogger_callbacks_kwargs.get("append_to_json", True)

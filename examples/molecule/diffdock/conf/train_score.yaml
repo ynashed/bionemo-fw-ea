@@ -14,7 +14,7 @@ target: bionemo.model.molecule.diffdock.models.nemo_model.DiffdockTensorProductS
 infer_target: bionemo.model.molecule.diffdock.infer.ScoreModelInference # path to inferende class to load
 
 data:
-  num_workers: 4
+  num_workers: ${multiply:${trainer.devices}, 4}
   pin_memory: False
   limit_complexes: 0
   all_atoms: False

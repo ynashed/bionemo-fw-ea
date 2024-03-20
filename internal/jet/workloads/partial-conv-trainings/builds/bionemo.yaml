@@ -4,6 +4,8 @@ maintainers: [dorotat]
 labels:
   origin: bionemo
   workload_ref: ""
+  bionemo_ci_pipeline_id: ""
+  bionemo_commit_sha: ""
 spec:
   name: bionemo
   platforms: [linux/amd64]
