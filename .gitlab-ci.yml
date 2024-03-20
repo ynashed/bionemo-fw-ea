@@ -32,6 +32,7 @@ variables:
   IMAGE_TAG: "${CI_COMMIT_SHA}"
   SUFFIX_DEV: "-devel"
   SUFFIX_DOCS: "-docs"
+  SUFFIX_QA: "-qa"
   DATE: "${CI_PIPELINE_CREATED_AT}"
   # fully-qualified image names
   IMAGE_NAME: "${IMAGE_REPO_NAME}:${IMAGE_TAG}"
@@ -75,10 +76,30 @@ variables:
       - "false"
       - "true"
     description: "A flag that determines whether to run partial convergence tests in CI. Set to 'false' by default."
+  QA_DOCKER_DEPLOY:
+    value: "false"
+    options:
+      - "false"
+      - "true"
+    description: "a flag that determines whether to built & push a docker image for QA. Set to 'false' by default. Remark that only the docker image build and deploy is executed during this pipeline 
+    resulting in images being pushed to both GitLab and NGC repositories, each tagged with the suffix '${CI_COMMIT_BRANCH}--${DATE_YMD}--${CI_COMMIT_SHA}-qa'"
 
 # TODO(dorotat) solution with SKIP_CI flag is error-prone and should be replaced with better logic!!!!
 workflow:
   rules:
+    - if: $CI_COMMIT_BRANCH != "dev" && $QA_DOCKER_DEPLOY == "true"
+      when: never
+    - if: $NIGHTLY == "true" && $QA_DOCKER_DEPLOY == "true"
+      when: never
+    ## NOTE: QA docker image can be build (if no image on current dev) & deployed to Gitlab/NGC using CI only on dev branch.
+    ## It can be built using Run pipeline page (https://gitlab-master.nvidia.com/clara-discovery/bionemo/-/pipelines)
+    ## by clicking Run pipeline button and setting QA_DOCKER_DEPLOY=true
+    ## Only docker build-bionemo-image stage and qa-deploy are executed. Pipeline with NIGHTLY=true cannot be executed.
+    - if: $CI_COMMIT_BRANCH == "dev" && $CI_PIPELINE_SOURCE == "web" &&  $QA_DOCKER_DEPLOY == "true"
+      variables:
+        EXCLUDE_DOCS_BUILD: "true"
+        EXCLUDE_PYTEST: "true"
+        EXCLUDE_JET: "true"
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_LABELS =~ /SKIP_CI/
       variables:
         EXCLUDE_DOCKER_IMAGE_BUILD: "true"
@@ -91,7 +112,7 @@ workflow:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     ## NOTE: Convergence test are run using JET via CI. They can be triggered from any branch but only from the Run pipeline page
     ## (https://gitlab-master.nvidia.com/clara-discovery/bionemo/-/pipelines) by clicking Run pipeline button and setting JET_CONV_TEST=true
-    ## Only docker built stage and jet stage using training definitions from JET_WORKLOAD_FOLDER is executed (docs build and pytest stages is disabled)
+    ## Only docker build-bionemo-image and jet stage using training definitions from JET_WORKLOAD_FOLDER is executed (docs build and pytest stages is disabled)
     - if: ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "schedule") &&  $JET_CONV_TEST == "true"
       variables:
         EXCLUDE_DOCS_BUILD: "true"
@@ -138,6 +159,7 @@ code_format:
   image: nvcr.io/nvidian/cvai_bnmo_trng/bionemo-linter:latest
   tags:
    - generic
+
 
 build-bionemo-image:
   extends:
@@ -284,6 +306,7 @@ build-docs-image:
 # is non-trivial. It is non-trivial to mount volumes to docker commands when DIND is used in
 # gitlab-ci, therefore we split the docs image build and docs build into separate jobs,
 # where the latter doesn't require DIND.
+
 
 build-docs:
   image:
@@ -540,6 +563,28 @@ jet-test:
     - pip install tqdm
     - echo "CI_PROJECT_ID=${CI_PROJECT_ID}, CI_PIPELINE_ID=${CI_PIPELINE_ID}"
     - bash $CI_PROJECT_DIR/internal/jet/scripts/run_jet_test.sh
+
+
+qa-deploy:
+  stage: deploy
+  extends:
+    - .docker-setup
+  rules:
+    - if: $QA_DOCKER_DEPLOY == "true"
+  script:
+    - docker pull "${IMAGE_NAME}"
+    - DATE_YMD="$(echo ${DATE} | cut -f1 -d'T')"
+    # QA image tag has format that uses the branch, date of creation & :
+    #       BBBB--YYYY-MM-DD--CCCCCCCC-qa
+    # Where 'C..C' are the first 8 characters of the commit
+    # Where 'B...B' is the branch name. (Note: rules filter out invalid branch names!)
+    - IMAGE_TAG_QA="${CI_COMMIT_BRANCH}--${DATE_YMD}--${CI_COMMIT_SHA}${SUFFIX_QA}"
+    - IMAGE_NAME_QA="${IMAGE_REPO_NAME}:${IMAGE_TAG_QA}"
+    - docker tag "${IMAGE_NAME}" "${IMAGE_NAME_QA}"
+    - docker push "${IMAGE_NAME_QA}"
+    - NGC_IMAGE_NAME_QA="${NGC_REPO_NAME}:${IMAGE_TAG_QA}"
+    - docker tag "${IMAGE_NAME}" "${NGC_IMAGE_NAME_QA}"
+    - docker push "${NGC_IMAGE_NAME_QA}"
 
 
 dev-deploy:
