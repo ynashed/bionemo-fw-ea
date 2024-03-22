@@ -20,7 +20,7 @@ from torch.utils.data import DataLoader
 from bionemo.data.mapped_dataset import FilteredMappedDataset
 from bionemo.data.memmap_fasta_fields_dataset import FASTAFieldsMemmapDataset
 from bionemo.data.utils import expand_dataset_paths
-from bionemo.model.core.infer import M
+from bionemo.model.core.infer import BaseEncoderInference, M
 
 
 __all__: Sequence[str] = ("setup_inference",)
@@ -31,8 +31,12 @@ def setup_inference(cfg: DictConfig, *, interactive: bool = False) -> Tuple[M, p
     logging.info(f'\n{OmegaConf.to_yaml(cfg)}')
 
     infer_class = import_class_by_path(cfg.infer_target)
+    if isinstance(infer_class, BaseEncoderInference):
+        kwargs = {"inference_batch_size_for_warmup": cfg.model.data.batch_size}
+    else:
+        kwargs = {}
 
-    infer_model = infer_class(cfg, interactive=interactive)
+    infer_model = infer_class(cfg, interactive=interactive, **kwargs)
     trainer = infer_model.trainer
 
     logging.info("\n\n************** Restored model configuration ***********")

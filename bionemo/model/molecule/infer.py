@@ -35,6 +35,7 @@ class MolInference(BaseEncoderDecoderInference):
         training: bool = False,
         adjust_config: bool = True,
         interactive: bool = False,
+        inference_batch_size_for_warmup: Optional[int] = None,
     ):
         super().__init__(
             cfg=cfg,
@@ -44,7 +45,11 @@ class MolInference(BaseEncoderDecoderInference):
             training=training,
             adjust_config=adjust_config,
             interactive=interactive,
+            inference_batch_size_for_warmup=inference_batch_size_for_warmup,
         )
+
+    def get_example_input_sequence(self) -> str:
+        return "c1cc(C(O)=O)ccc1"  # Benzoic Acid
 
     def _tokenize(self, sequences: List[str]) -> List[int]:
         """

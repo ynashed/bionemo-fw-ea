@@ -67,7 +67,7 @@ def cfg(bionemo_home: Path) -> DictConfig:
 
 @pytest.fixture(scope='module')
 def model(cfg: DictConfig) -> MolMIMInference:
-    yield load_model_for_inference(cfg)
+    yield load_model_for_inference(cfg, inference_batch_size_for_warmup=len(SMILES))
     teardown_apex_megatron_cuda()
 
 

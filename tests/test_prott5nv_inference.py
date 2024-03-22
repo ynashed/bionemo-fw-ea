@@ -35,7 +35,7 @@ def inference_model(config_path) -> ProtT5nvInference:
     cfg = load_model_config(config_name="infer", config_path=config_path)
     initialize_distributed_parallel_state()
     # load score model
-    model = ProtT5nvInference(cfg)
+    model = ProtT5nvInference(cfg, inference_batch_size_for_warmup=2)
     model.eval()
     yield model
     teardown_apex_megatron_cuda()

@@ -126,9 +126,12 @@ class BaseEncoderInference(LightningModule):
         training: bool = False,
         adjust_config: bool = True,
         interactive: bool = False,
+        inference_batch_size_for_warmup: Optional[int] = None,
     ):
         super().__init__()
-
+        self.needs_warmup = (
+            True  # Set this to False after calling super().__init__ if you don't need warmup in your model.
+        )
         self.cfg = cfg
         self._freeze_model = freeze
         self.adjust_config = adjust_config
@@ -155,6 +158,20 @@ class BaseEncoderInference(LightningModule):
                 "Provide a valid configuration that has this value under model.data.data_fields_map.id."
             )
             self.k_id = None
+        if inference_batch_size_for_warmup is None:
+            inference_batch_size_for_warmup = self.model.cfg.get(
+                "micro_batch_size", 2
+            )  # Default value of 2, or what the user trained with if we can find it
+        # FIXME: remove the need for the following line in our idempotency tests (see CDISCOVERY-2878)
+        #   for example, remove it and see if you can still get tests/test_molecule_inference.py to pass.
+        if self.needs_warmup:
+            self.warmup(max_bs=inference_batch_size_for_warmup)
+
+    def get_example_input_sequence(self) -> str:
+        raise NotImplementedError("Please return a short example input sequence to be used for warmup.")
+
+    def warmup(self, max_bs: int):
+        self.seq_to_hiddens(sequences=[self.get_example_input_sequence()] * max_bs)  # warmup
 
     def __call__(self, sequences: Union[Series, Dict, List[str]]) -> torch.Tensor:
         """
@@ -454,6 +471,7 @@ class BaseEncoderDecoderInference(BaseEncoderInference):
         training=False,
         adjust_config=True,
         interactive: bool = False,
+        inference_batch_size_for_warmup: Optional[int] = None,
     ):
         super().__init__(
             cfg=cfg,
@@ -463,7 +481,13 @@ class BaseEncoderDecoderInference(BaseEncoderInference):
             training=training,
             adjust_config=adjust_config,
             interactive=interactive,
+            inference_batch_size_for_warmup=inference_batch_size_for_warmup,
         )
+
+    def warmup(self, max_bs: int):
+        # Override encoder only warmup to also warmup the decoder
+        hiddens, mask = self.seq_to_hiddens(sequences=[self.get_example_input_sequence()] * max_bs)  # warmup encoder
+        self.hiddens_to_seq(hiddens, mask)  # warmup decoder as well
 
     def hiddens_to_seq(self, hiddens: torch.Tensor, enc_mask: torch.Tensor, **kwargs) -> SeqsOrBatch:
         """

@@ -9,11 +9,11 @@
 # its affiliates is strictly prohibited.
 
 
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 import torch
 
-from bionemo.model.core.infer import BaseEncoderDecoderInference
+from bionemo.model.core.infer import BaseEncoderDecoderInference, BaseEncoderInference
 
 
 class ProtT5nvInference(BaseEncoderDecoderInference):
@@ -30,6 +30,7 @@ class ProtT5nvInference(BaseEncoderDecoderInference):
         training=False,
         adjust_config=True,
         interactive: bool = False,
+        inference_batch_size_for_warmup: Optional[int] = None,
     ):
         super().__init__(
             cfg=cfg,
@@ -39,7 +40,16 @@ class ProtT5nvInference(BaseEncoderDecoderInference):
             training=training,
             adjust_config=adjust_config,
             interactive=interactive,
+            inference_batch_size_for_warmup=inference_batch_size_for_warmup,
         )
+
+    def warmup(self, max_bs: int):
+        # FIXME skip the decoder warmup for ProtT5nv because no one implemented the required hiddens_to_seq!
+        #  copy/paste from the molecule implementation of hiddens_to_seq didn't work.
+        return BaseEncoderInference.warmup(self, max_bs)
+
+    def get_example_input_sequence(self) -> str:
+        return "DAEFRHDSGYEVHHQKLVFF"
 
     def _tokenize(self, sequences: List[str]) -> List[str]:
         """
