@@ -24,6 +24,8 @@ from bionemo.model.protein.openfold.checkpoint_utils import load_pt_checkpoint
 from bionemo.model.protein.openfold.lr_scheduler import AlphaFoldLRScheduler
 from bionemo.model.protein.openfold.openfold_model import AlphaFold
 from bionemo.model.protein.openfold.optim_hub import enable_mlperf_optim
+from bionemo.model.protein.openfold.utils.logging_utils import log_with_nemo_at_debug
+from bionemo.model.protein.openfold.utils.nemo_exp_manager_utils import isolate_last_checkpoint
 from bionemo.model.utils import setup_trainer
 
 
@@ -63,6 +65,14 @@ def main(cfg) -> None:
         sample_creator.prepare(cfg.model.data.prepare.sample_pdb_chain_ids)
 
     if cfg.get('do_training', False) or cfg.get('do_validation', False):
+        filenames_to_keep, filenames_to_rename = isolate_last_checkpoint(cfg)
+        log_with_nemo_at_debug(
+            f"""
+            examples/protein/openfold/train.py:main(),
+            checkpoint filenames_to_keep={filenames_to_keep}
+            checkpoint filenames_to_rename={filenames_to_rename}
+            """
+        )
         trainer = setup_trainer(cfg, callbacks=[])
         enable_mlperf_optim(cfg.model)
         if cfg.get('restore_from_path', None):

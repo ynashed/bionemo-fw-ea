@@ -533,7 +533,7 @@ class AlphaFold(ModelPT):
             multisessionstep = int(self.multisessionstep_from_checkpoint_filename) + self.global_step
 
         # (2) logging
-        #   - We tried converting multisessionstep to a tensor,
+        #   - We tried converting multisessionstep to a tensor
         #   with type torch.int32, before passing to self.log(...),
         #   but the decimal place remains in the checkpoint filenames.
         #   - Will have to overwrite this method to get integer values in filename ?
