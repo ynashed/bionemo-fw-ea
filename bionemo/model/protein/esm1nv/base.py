@@ -1,4 +1,13 @@
-# Own imports
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+#
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
+
 # Imports needed for redefinition of TransformerLanguageModel
 import torch
 from nemo.collections.nlp.models.language_modeling.megatron.bert_model import BertModel
@@ -207,7 +216,7 @@ class ESMnvTransformerLanguageModel(TransformerLanguageModel):
         position_embedding_type='learned_absolute',
         rotary_percentage=1.0,
         multi_query_attention=False,
-        share_embeddings_and_output_weights=True,
+        share_embeddings_and_output_weights=True,  # to decide whether use a new linear layer to compute final scores (False) or reuse embedding weights (True)
         persist_layer_norm=False,
         openai_gelu=False,
         onnx_safe=False,
@@ -777,7 +786,8 @@ class ESMnvBertModel(BertModel):
         megatron_legacy=False,
         sequence_parallel=False,
         position_embedding_type='learned_absolute',
-        # BIONEMO: use custom  arguments
+        # BIONEMO: use custom arguments
+        share_embeddings_and_output_weights=True,
         embedding_token_dropout=False,
         embedding_use_attention_mask=False,
         mask_token_id=None,
@@ -836,6 +846,7 @@ class ESMnvBertModel(BertModel):
             megatron_legacy=megatron_legacy,
             position_embedding_type=position_embedding_type,
             # BIONEMO: use new arguments
+            share_embeddings_and_output_weights=share_embeddings_and_output_weights,
             attention_dropout=attention_dropout,
             embedding_token_dropout=embedding_token_dropout,
             embedding_use_attention_mask=embedding_use_attention_mask,
@@ -909,6 +920,7 @@ class ESMnvMegatronBertModel(MegatronBertModel):
             megatron_legacy=cfg.get('megatron_legacy', False),
             position_embedding_type=self.cfg.get("position_embedding_type", "learned_absolute"),
             # BIONEMO: use custom flags
+            share_embeddings_and_output_weights=self.cfg.get("share_embeddings_and_output_weights", True),
             embedding_token_dropout=self.cfg.get("embedding_token_dropout", False),
             embedding_use_attention_mask=self.cfg.get("embedding_use_attention_mask", False),
             mask_token_id=self.cfg.get("mask_token_id", None),

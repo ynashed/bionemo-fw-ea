@@ -453,6 +453,7 @@ pytest-internal:
     - export AWS_ENDPOINT_URL=https://pbss.s8k.io
     - export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
     - export MODEL_PATH=${BIONEMO_HOME}/models
+    - python download_models.py esm2_650m_huggingface esm2_3b_huggingface --source pbss --download_dir $MODEL_PATH --verbose
     - echo "Checking test data contents..."
     - rm -rf ./.pytest_cache/
     - pytest -m "internal" -v --durations=0 --cov=bionemo --cov-report term --cov-report xml:coverage.xml -k "not test_model_training"
@@ -634,3 +635,4 @@ dev-deploy:
         docker tag "${IMAGE_NAME}${SUFFIX_DEV}" "${NGC_REPO_NAME}:${TAG_BRANCH_DATE_SHORT_COMMIT}${SUFFIX_DEV}"
         docker push "${NGC_REPO_NAME}:${TAG_BRANCH_DATE_SHORT_COMMIT}${SUFFIX_DEV}"
       fi
+
