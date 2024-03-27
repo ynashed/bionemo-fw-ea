@@ -35,9 +35,11 @@ def modify_conformer(data, tr_update, rot_update, torsion_updates):
         flexible_new_pos = modify_conformer_torsion_angles(
             rigid_new_pos,
             data["ligand", "ligand"].edge_index.T[data["ligand"].edge_mask],
-            data["ligand"].mask_rotate
-            if isinstance(data["ligand"].mask_rotate, np.ndarray)
-            else data["ligand"].mask_rotate[0],
+            (
+                data["ligand"].mask_rotate
+                if isinstance(data["ligand"].mask_rotate, np.ndarray)
+                else data["ligand"].mask_rotate[0]
+            ),
             torsion_updates,
         ).to(rigid_new_pos.device)
         R, t = rigid_transform_Kabsch_3D_torch(flexible_new_pos.T, rigid_new_pos.T)

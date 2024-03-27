@@ -52,7 +52,7 @@ trainer:
   gradient_clip_val: 1.0
   logger: False # logger is provided by NeMo exp_manager
   enable_checkpointing: False # checkpointing is done by NeMo exp_manager
-  replace_sampler_ddp: False # set to False if using custom sampler                                                                  >> Marta<>Pouria discussion
+  use_distributed_sampler: False # set to False if using custom sampler                                                                  >> Marta<>Pouria discussion
   reload_dataloaders_every_n_epochs: 100000 # Set to a non-negative integer to reload dataloaders every n epochs. Default: ``0``.
   accumulate_grad_batches: 1
 

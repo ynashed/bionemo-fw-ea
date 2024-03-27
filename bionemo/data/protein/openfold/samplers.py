@@ -22,6 +22,7 @@ from bionemo.data.protein.openfold.datasets import (
     ValidationDataset,
 )
 from bionemo.data.protein.openfold.helpers import get_seed_from_string
+from bionemo.model.protein.openfold.utils.logging_utils import log_with_nemo_at_debug
 
 
 class InitialTrainingSampler(Sampler[Tuple[int, int]]):
@@ -39,6 +40,12 @@ class InitialTrainingSampler(Sampler[Tuple[int, int]]):
         world_size: Optional[int],
         num_prev_iters: int,
     ) -> None:
+        log_with_nemo_at_debug(
+            f"""
+            openfold.samplers.InitialTrainingSampler.__init__(),
+            num_prev_iters={num_prev_iters}
+            """
+        )
         assert num_prev_iters <= num_train_iters
         if is_distributed:
             assert rank is not None

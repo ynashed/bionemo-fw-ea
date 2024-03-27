@@ -17,7 +17,7 @@ import re
 import shutil
 import subprocess
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import braceexpand
 import torch
@@ -416,16 +416,22 @@ def cfg_get_key(cfg, key, default=None):
         return cfg.get(key, default)
 
 
-def pad_token_ids(token_ids, padding_value=0, padding_len=None, pad_size_divisible_by=1, **convert_to_kwargs):
+def pad_token_ids(
+    token_ids: Union[List[int], List[torch.Tensor]],
+    padding_value: int = 0,
+    padding_len: int = None,
+    pad_size_divisible_by: int = 1,
+    **convert_to_kwargs,
+):
     """
     Pads token ids with padding value, and return the padded tokens and
     the corresponding mask.
 
     Args:
-        token_ids (List[int], List[Tensor]): List of token ids or tensors
-        padding_value (int, optional): Value to pad with. Defaults to 0.
-        padding_len (int, optional): Max length of the padded token ids. Defaults to None.
-        pad_size_divisible_by (int, optional): Pad the length of the token ids to be divisible by this number. Defaults to 1.
+        token_ids: List of token ids or tensors
+        padding_value: Value to pad with. Defaults to 0.
+        padding_len: Max length of the padded token ids. Defaults to None.
+        pad_size_divisible_by: Pad the length of the token ids to be divisible by this number. Defaults to 1.
         **convert_to_kwargs: Passed directly to tensor.to(**kwargs) if provided
 
     Returns:
@@ -451,6 +457,11 @@ def pad_token_ids(token_ids, padding_value=0, padding_len=None, pad_size_divisib
     if len(convert_to_kwargs):
         mask = mask.to(**convert_to_kwargs)
         masked_token_ids = masked_token_ids.to(**convert_to_kwargs)
+
+    # Further pad the sequences to the fixed maximum length, if necessary
+    if masked_token_ids.size(1) < padding_len:
+        padding_size = padding_len - masked_token_ids.size(1)
+        masked_token_ids = torch.nn.functional.pad(masked_token_ids, [0, padding_size], value=padding_value)
 
     return (masked_token_ids, mask)
 

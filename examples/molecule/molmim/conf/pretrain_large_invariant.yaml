@@ -1,0 +1,17 @@
+defaults:
+  - pretrain_base_invariant
+  - _self_
+
+# Large model
+trainer:
+  devices: 8
+  num_nodes: 8
+
+model: 
+  name: MolMIM-large
+  
+  # model architecture
+  encoder:
+    num_layers: 8
+    num_attention_heads: 16
+    hidden_size: 1024

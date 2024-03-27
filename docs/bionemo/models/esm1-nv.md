@@ -7,8 +7,9 @@ ESM-1nv is a protein language model that provides numerical embeddings for each 
 
 
 ## References:
-[Provide list of reference(s), link(s) to the publication/paper/article, associated works, and lineage where relevant.]  <br> 
+
 [1] Rives, Alexander, Joshua Meier, Tom Sercu, Siddharth Goyal, Zeming Lin, Jason Liu, Demi Guo et al. "Biological structure and function emerge from scaling unsupervised learning to 250 million protein sequences." Proceedings of the National Academy of Sciences 118, no. 15 (2021): e2016239118.
+
 [2] "UniProt: the universal protein knowledgebase in 2021." Nucleic acids research 49, no. D1 (2021): D480-D489.
 
 ## Model Architecture: 
@@ -49,7 +50,7 @@ esm1nv.nemo, version 1.0  <br>
 ** Data Collection Method by dataset <br>
 * [Human] <br>
 
-**Properties:** UniRef50 (release 05/2022) was used for training [2]. The reference sequence for each cluster was selected, with sequences longer than the maximum sequence length of 512 removed, resulting in approximately 46M protein sequences with maximum length of 512 amino acids. The sequences were randomly split with 4.35K sequences for validation loss calculation during training, 875K sequences in testing, and 45.1M sequences used exclusively in training . <br>
+**Properties (Quantity, Dataset Descriptions, Sensor(s)):** UniRef50 (release 05/2022) was used for training [2]. The reference sequence for each cluster was selected, with sequences longer than the maximum sequence length of 512 removed, resulting in approximately 46M protein sequences with maximum length of 512 amino acids. The sequences were randomly split with 4.35K sequences for validation loss calculation during training, 875K sequences in testing, and 45.1M sequences used exclusively in training . <br>
 
 ## Evaluation Dataset:
 **Link:** [FLIP – secondary structure, conservation,subcellular localization, meltome, GB1 activity](http://data.bioembeddings.com/public/FLIP/fasta/)  <br>
@@ -61,7 +62,7 @@ esm1nv.nemo, version 1.0  <br>
 * [Experimentally Measured] <br>
 * [Hybrid: Human & Automated] <br>
 
-**Properties:** 
+**Properties (Quantity, Dataset Descriptions, Sensor(s)):** 
 The FLIP datasets evaluate the performance of the model on five specific downstream tasks for proteins. It provides pre-defined splits for fine-tuning a pretrained model using task-specific train and validation examples, and subsequently evaluating it on a task-specific test split. 
 
 The secondary structure FLIP dataset contains experimental secondary structures, with 9712 proteins for model finetuning, 1080 proteins for validation, and 648 proteins for testing. 

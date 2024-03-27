@@ -1,20 +1,35 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+#
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
+
 import hashlib
 import json
 import os
 import pathlib
 import shutil
 from collections import OrderedDict
-from typing import List, Optional, Union
+from contextlib import AbstractContextManager, contextmanager
+from dataclasses import dataclass
+from typing import Dict, List, Optional, Union
 
+import apex
 import numpy as np
 import torch
 import yaml
 from hydra.core.config_search_path import ConfigSearchPath
 from hydra.core.plugins import Plugins
 from hydra.plugins.search_path_plugin import SearchPathPlugin
+from megatron.core.parallel_state import destroy_model_parallel
 from nemo.utils import logging
 from omegaconf import OmegaConf, open_dict
 from omegaconf.dictconfig import DictConfig
+from pytorch_lightning import seed_everything
 
 
 class BioNemoSearchPathConfig(SearchPathPlugin):
@@ -117,21 +132,39 @@ def save_expected_training_results(results_comparison_dir: str, correct_results:
 
 
 def check_expected_training_results(
-    trainer_results: dict, expected_results: dict, tol: float = 1.0e-4, err_msg: str = ""
+    trainer_results: dict,
+    expected_results: dict,
+    rel_tol: float = 0,
+    test_rel_tol_overrides: Dict[str, float] = {},
+    err_msg: str = "",
 ):
     """Compare expected training results
 
     Args:
         trainer (dict): PyTorch Lightning Trainer results
         expected_results (dict): expected training metrics
-        tol (float, optional): float comparison tolerance. Defaults to 1.0e-4.
+        rel_tol float: comparison relative tolerance, defaults to 0 which means that results are expected to be identical
+        test_rel_tol_overrides (Dict[str, float]): Tolerance for override keys that match `override_key in key`.
     """
     mismatched_results = []
+    assert 0 <= rel_tol <= 1, "Relative tolerance has to be in [0, 1]"
     for key in expected_results:
+        if "timing" in key:
+            # stats with this postfix are very hardware dependent, skipping them
+            continue
         expected_value = expected_results[key]
-        actual_value = trainer_results[key].cpu().numpy().item()
-        if not np.allclose(expected_value, actual_value, atol=tol):
-            mismatched_results.append(f"Expected {key} = {expected_value}, got {actual_value}.")
+        actual_value = trainer_results[key]
+        if isinstance(actual_value, torch.Tensor):
+            actual_value = actual_value.cpu().numpy().item()
+        this_rel_tol = rel_tol
+        for override_key, override_tol in test_rel_tol_overrides.items():
+            if override_key in key:
+                this_rel_tol = override_tol
+        tol_key = abs(this_rel_tol * expected_value)  # absolute tolerance from expected value
+        if not np.allclose(expected_value, actual_value, atol=tol_key):
+            mismatched_results.append(
+                f"Expected {key} = {expected_value}, got {actual_value} not within abs tol of {tol_key} from rel tol of {this_rel_tol}."
+            )
 
     assert len(mismatched_results) == 0, f"Training results mismatched: {mismatched_results}{err_msg}"
 
@@ -173,3 +206,70 @@ def list_to_tensor(data_list: List[Union[float, int]]) -> torch.Tensor:
         return torch.stack(converted)
 
     return converted
+
+
+def reset_microbatch_calculator():
+    """
+    Resets _GLOBAL_NUM_MICROBATCHES_CALCULATOR in apex which is used in NeMo to initilised model parallel in
+    nemo.collections.nlp.modules.common.megatron.megatron_init.initialize_model_parallel_for_nemo
+    """
+    apex.transformer.pipeline_parallel.utils._GLOBAL_NUM_MICROBATCHES_CALCULATOR = None
+
+
+def teardown_apex_megatron_cuda():
+    """
+    Cleans GPU allocation and model and data parallel settings after usage of a model:
+    - sets the global variables related to model and data parallelism to None in Apex and Megatron:.
+    - releases all unoccupied cached GPU memory currently held by the caching CUDA allocator, see torch.cuda.empty_cache
+    """
+    torch.cuda.empty_cache()
+    reset_microbatch_calculator()
+    destroy_model_parallel()
+
+
+@contextmanager
+def distributed_model_parallel_state():
+    """Context manager for handling creating and cleaning up distributed model parallel state for tests.
+    Use like:
+    with distributed_model_parallel_state():
+        # your test code here
+    # After the block your state is cleaned up.
+    """
+    from bionemo.model.utils import initialize_distributed_parallel_state  # here to avoid circular import
+
+    try:
+        teardown_apex_megatron_cuda()
+        initialize_distributed_parallel_state()
+        yield
+    finally:
+        teardown_apex_megatron_cuda()
+
+
+@dataclass
+class Deterministic(AbstractContextManager):
+    cudnn_deterministic: Optional[bool] = None
+    cudnn_benchmark: Optional[bool] = None
+    cudnn_deterministic: Optional[bool] = None
+    cuda_matmul_allow_tf32: Optional[bool] = None
+    cudnn_enabled: Optional[bool] = None
+
+    def __enter__(self):
+        self.cudnn_deterministic = torch.backends.cudnn.deterministic
+        self.cudnn_benchmark = torch.backends.cudnn.benchmark
+        self.cuda_matmul_allow_tf32 = torch.backends.cuda.matmul.allow_tf32
+        self.cudnn_enabled = torch.backends.cudnn.enabled
+        seed_everything(123)
+        torch.use_deterministic_algorithms(False)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+        torch.backends.cuda.matmul.allow_tf32 = False
+        torch.backends.cuda.allow_tf32 = False
+        torch.backends.cudnn.enabled = False
+
+    def __exit__(self, *exit_state):
+        torch.use_deterministic_algorithms(False)
+        torch.backends.cudnn.deterministic = self.cudnn_deterministic
+        torch.backends.cudnn.benchmark = self.cudnn_benchmark
+        torch.backends.cuda.matmul.allow_tf32 = self.cuda_matmul_allow_tf32
+        torch.backends.cuda.allow_tf32 = True
+        torch.backends.cudnn.enabled = self.cudnn_enabled

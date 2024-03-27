@@ -7,12 +7,12 @@ from bionemo.data import PhysChemPreprocess
 from bionemo.utils.tests import get_directory_hash
 
 
-BIONEMO_HOME = os.getenv("BIONEMO_HOME")
 # Physchem secondary structure benchmark dataset is small and will be fully downloaded in this test
-ROOT_DIR = 'physchem_data'
 CONFIG = {
     'url': None,
-    'links_file': os.path.join(BIONEMO_HOME, 'examples/molecule/megamolbart/dataset/PhysChem-downloader.txt'),
+    'links_file': os.path.join(
+        os.environ["BIONEMO_HOME"], 'examples/molecule/megamolbart/dataset/PhysChem-downloader.txt'
+    ),
     'test_frac': 0.15,
     'val_frac': 0.15,
 }
@@ -29,20 +29,11 @@ DATA_HASHES = {
     'SAMPL': 'd41d8cd98f00b204e9800998ecf8427e',
 }
 
-##############
-
-
-@pytest.fixture(scope="session")
-def tmp_directory(tmp_path_factory, root_directory=ROOT_DIR):
-    """Create tmp directory"""
-    tmp_path_factory.mktemp(root_directory)
-    return tmp_path_factory.getbasetemp()
-
 
 @pytest.mark.parametrize('config, header, num_entries, hash_dict', [(CONFIG, DATA_HEADERS, NUM_ENTRIES, DATA_HASHES)])
-def test_prepare_dataset(tmp_directory, config, header, num_entries, hash_dict):
+def test_prepare_dataset(tmp_path, config, header, num_entries, hash_dict):
     cfg = OmegaConf.create(config)
-    processed_directory = os.path.join(tmp_directory, 'processed')
+    processed_directory = os.path.join(tmp_path, 'processed')
     PhysChemPreprocess().prepare_dataset(links_file=cfg.links_file, output_dir=processed_directory)
 
     # Check that all three CSV files were downloaded properly

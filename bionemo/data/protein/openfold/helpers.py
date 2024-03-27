@@ -11,11 +11,16 @@
 import datetime
 import hashlib
 import multiprocessing
+import os
 import random
 from typing import Callable, Iterator, List, Optional, Tuple
 
 import torch
+from nemo.utils import logging
 from tqdm import tqdm
+
+
+_GPU_ARCH_TYPE = None
 
 
 def datetime_from_string(
@@ -162,3 +167,31 @@ def collate(samples: List[dict]) -> dict:
         if isinstance(sample0[key], torch.Tensor):
             batch[key] = torch.stack(batch[key], dim=0)
     return batch
+
+
+def _set_gpu_arch_type() -> None:
+    global _GPU_ARCH_TYPE
+    dgxsystem = os.environ.get("DGXSYSTEM", "")
+    if dgxsystem.startswith("DGXH100"):
+        _GPU_ARCH_TYPE = "hopper"
+    elif dgxsystem.startswith("DGXA100"):
+        _GPU_ARCH_TYPE = "ampere"
+    else:
+        # assume hopper if reached here:
+        # TODO: this should probably be changed to ampere; mlperf assumes hopper
+        _GPU_ARCH_TYPE = "hopper"
+        logging.warning("could not recognize GPU architecture in the current environment" " - assuming hopper")
+
+
+def is_hopper_arch() -> bool:
+    global _GPU_ARCH_TYPE
+    if _GPU_ARCH_TYPE is None:
+        _set_gpu_arch_type()
+    return _GPU_ARCH_TYPE == "hopper"
+
+
+def is_ampere_arch() -> bool:
+    global _GPU_ARCH_TYPE
+    if _GPU_ARCH_TYPE is None:
+        _set_gpu_arch_type()
+    return _GPU_ARCH_TYPE == "ampere"

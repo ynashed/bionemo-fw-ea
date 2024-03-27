@@ -5,7 +5,6 @@ hydra:
   searchpath:
      - ${oc.env:BIONEMO_HOME}/examples/molecule/diffdock/conf
 
-tmp_path: ???
 
 training_data:
   protein_data_dir:  ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/preprocessing_test/posebusters_benchmark_subset
@@ -17,7 +16,6 @@ model:
     num_workers: 1
     chunk_size: 1
     split_train: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/preprocessing_test/train_split
-    cache_path: ${tmp_path}/data_cache
     seed: 42
 
 train_graph_folder_name: torsion_limit0_INDEXtrain_split_maxLigSizeNone_H0_recRad15_recMax24_esmEmbeddings

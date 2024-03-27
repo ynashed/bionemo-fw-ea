@@ -156,7 +156,7 @@ class NeMoExtension(ModelPT):
 
         return loss
 
-    def test_epoch_end(self, outputs):
+    def on_test_epoch_end(self):
         rmsd_log = metrics_statistics(self.metrics_test, 'test')
 
         logging.info("\n")
@@ -180,7 +180,7 @@ class NeMoExtension(ModelPT):
             batch_size=self.cfg.micro_batch_size,
         )
 
-    def validation_epoch_end(self, outputs):
+    def on_validation_epoch_end(self):
         rmsd_log = metrics_statistics(self.metrics_val, 'val')
 
         logging.info("\n")

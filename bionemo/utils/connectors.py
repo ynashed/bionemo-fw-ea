@@ -85,7 +85,10 @@ class BioNeMoSaveRestoreConnector(NLPSaveRestoreConnector):
                     dims += (1,)
                 token_embeddings = token_embeddings.tile(dims=dims)
                 new_state_dict[key] = token_embeddings[: self.vocab_size]
-            elif key.endswith("embedding.position_embeddings.weight"):
+            elif (
+                key.endswith("embedding.position_embeddings.weight")
+                and conf.get("encoder", {}).get("arch", None) != "perceiver"
+            ):
                 position_embeddings = state_dict[key]
                 # allow changing the position embeddings for learned_abs
                 if ("encoder_embedding" in key) or ("language_model.embedding" in key):

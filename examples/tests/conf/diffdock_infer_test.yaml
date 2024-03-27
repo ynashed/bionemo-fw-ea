@@ -1,0 +1,17 @@
+defaults:
+  - infer
+
+hydra:
+  searchpath:
+     - ${oc.env:BIONEMO_HOME}/examples/molecule/diffdock/conf
+
+seed: 42
+samples_per_complex: 4
+
+confidence_infer:
+  trainer:
+    deterministic: warn
+
+score_infer:
+  trainer:
+    deterministic: warn

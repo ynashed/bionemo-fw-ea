@@ -2,7 +2,10 @@
 # Model Overview
 
 ## Description:
+
 DNABERT generates a dense representation of a genome sequence by identifying contextually similar sequences in the human genome. DNABert is a DNA sequence model trained on sequences from the human reference genome Hg38.p13. DNABERT computes embeddings for each nucleotide in the input sequence. The embeddings are used as features for a variety of predictive tasks. This model is ready for both commercial and non-commercial use.
+
+
 
 ## References:
 First masked language model approach for genomics: Gene2vec: distributed representation of genes based on co-expression | BMC Genomics | Full Text (biomedcentral.com)
@@ -15,17 +18,19 @@ Big-Bird: [2007.14062] Big Bird: Transformers for Longer Sequences (arxiv.org)
 
 DNABERT-2: [2306.15006] DNABERT-2: Efficient Foundation Model and Benchmark For Multi-Species Genome (arxiv.org)
 
+
+
 ## Model Architecture: 
 **Architecture Type:** BERT  <br>
 **Network Architecture:** DNABERT <br>
 
-## Input:
+## Input: (Enter "None" As Needed)
 **Input Type(s):** Plain Text of nucleotide sequences (A, C, G, T). <br>
 **Input Format(s):** Fasta Format t<br>
 **Input Parameters:** 1D <br>
 
 
-## Output:
+## Output: (Enter "None" As Needed)
 **Output Type(s):** Text predictions in the form of dense numerical embeddings. <br>
 
 **Output Parameters:** 1D <br>
@@ -47,12 +52,14 @@ DNABERT-2: [2306.15006] DNABERT-2: Efficient Foundation Model and Benchmark For 
 ## Model Version(s): 
 dnabert-86M.nemo, version 1.0  <br>
 
+
 # Training & Evaluation: 
+
 ## Training Dataset:
 **Link:** Homo sapiens genome assembly GRCh38.p13 - NCBI - NLM (nih.gov) <br>
-**Data Collection Method by dataset** <br>
+** Data Collection Method by dataset <br>
 * [Human] <br>
-**Labeling Method by dataset** <br>
+** Labeling Method by dataset <br>
 * [Not Applicable] <br>
 
 **Properties:** 3.2 Billion nucleotides of the human genome sequence.. <br>
@@ -66,6 +73,7 @@ dnabert-86M.nemo, version 1.0  <br>
 **Labeling Method by dataset** <br>
 * [Hybrid: Automated, Human review] <br>
 **Properties:** There are ~80,000 unique gene isoforms with a varying amount of exons and thus spice sites. 30,000 splice-sites with full gene annotations are sampled for evaluation. Genes, or gene bodies, are the genomic body in which RNA transcripts are produced. This is a sequence of nucleotides. Within this gene body, there are constructs known as exons- non-contiguous chunks of DNA that are concatenated by cellular machinery into a complete RNA, known as a transcript. A specific arrangement of exons are known as an ‘isoform.’ Splice-sites are nucleotide sites within the gene body that are junctions, where transcription starts and ends for different exons where exons are ‘spliced’ from the gene body into a RNA sequence. <br>
+**Dataset License(s):** Apache 2.0 <br>
 
 ## Inference:
 **Engine:** BioNeMo, NeMo <br>

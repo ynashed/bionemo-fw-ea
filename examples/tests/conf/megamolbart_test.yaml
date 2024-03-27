@@ -1,5 +1,10 @@
 defaults:
   - pretrain_xsmall_span_aug
+  - _self_
+
+hydra:
+  searchpath:
+     - ${oc.env:BIONEMO_HOME}/examples/molecule/megamolbart/conf
 
 trainer:
   devices: 1
@@ -26,7 +31,6 @@ model:
     num_workers: 10
 
   dwnstr_task_validation:
-    enabled: False
     dataset:
       emb_batch_size: 32
       batch_size: ${.emb_batch_size}

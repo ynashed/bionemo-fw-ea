@@ -58,6 +58,8 @@ DB5.5 dataset consists of 253 protein structures  built by mining the Protein Da
 The Database for Interacting Proteins Structures (DIPS) has 41,876 binary complexes containing bound structures with rigid body docking, while DB5.5 includes unbound protein structures. 
 Datasets are then randomly partitioned in training, validation, and testing datasets The training and validation are used during training. DB5.5 includes 203/25 training and validation data points respectively. DIPS includes 39,937/974 training and validation data points respectively. <br>
 
+**Dataset License(s):** [https://jirasw.nvidia.com/browse/DGPTT-1300, https://jirasw.nvidia.com/browse/DGPTT-1301] **INTERNAL ONLY** <br>
+
 ## Evaluation Dataset:
 **Link:** https://zlab.umassmed.edu/benchmark/ and https://github.com/drorlab/DIPS  <br>
 **Data Collection Method by dataset** <br>
@@ -71,6 +73,8 @@ The Database for Interacting Proteins Structures (DIPS) has 41,876 binary comple
 
 Datasets are then randomly partitioned in training, validation, and testing datasets The training and validation are used during training. DB5.5 and DIPS testing datasets include 25 and 965 testing data points respectively.
  <br> 
+
+**Dataset License(s):** [https://jirasw.nvidia.com/browse/DGPTT-1300, https://jirasw.nvidia.com/browse/DGPTT-1301] **INTERNAL ONLY** <br>
 
 ## Inference:
 **Engine:** BioNeMo, NeMo, Triton <br>
@@ -113,4 +117,6 @@ Training speed was tested on DGX-A100 systems with 8 IEGM layers over DIPS datas
 ![EquiDock benchmarks](../../readme-images/equidock_epoch_per_hour.png)
 
 ## License
+
 EquiDock is provided under the {{model_license_slug}}.
+

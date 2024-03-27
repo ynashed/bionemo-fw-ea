@@ -70,10 +70,10 @@ The accuracy of DiffDock was measured over the 428 protein complexes from the Po
 
 | Dataset     | Number of Poses Sampled | Metric                                  | BioNeMo | GitHub |
 |-------------|-------------------------|-----------------------------------------|---------|--------|
-| PoseBusters |            10           | Percentage of Top-1 RMSD<2 Å (%) &uarr; | 27.06   | 25.30  |
-| PoseBusters |            10           | Median of Top-1 RMSD (Å) &darr;         | 5.07    | 5.35   |
-| PoseBusters |            10           | Percentage of Top-5 RMSD<2 Å (%) &uarr; | 37.53   | 35.48  |
-| PoseBusters |            10           | Median of Top-5 RMSD (Å) &darr;         | 2.91    | 3.06   |
+| PoseBusters |            10           | Percentage of Top-1 RMSD<2 Å (%) &uarr; | 26.74   | 25.30  |
+| PoseBusters |            10           | Median of Top-1 RMSD (Å) &darr;         | 5.00    | 5.35   |
+| PoseBusters |            10           | Percentage of Top-5 RMSD<2 Å (%) &uarr; | 37.39   | 35.48  |
+| PoseBusters |            10           | Median of Top-5 RMSD (Å) &darr;         | 2.92    | 3.06   |
 
 
 ### Training Performance Benchmarks

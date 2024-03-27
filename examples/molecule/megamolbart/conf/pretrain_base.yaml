@@ -8,7 +8,7 @@ use_peft: False # indicates whether we intend to use PEFT technique; not impleme
 trainer:
   devices: 8 # number of GPUs or CPUs
   num_nodes: 8
-  precision: 16 # 16, 32
+  precision: 16-mixed # 16-mixed, bf16-mixed, 32
   accelerator: gpu # gpu, cpu
   max_epochs: null # use max_steps instead with NeMo Megatron model
   max_steps: 2000000 # consumed_samples = global_step * micro_batch_size * data_parallel_size * accumulate_grad_batches
@@ -22,7 +22,7 @@ trainer:
   gradient_clip_val: 1.0
   logger: False # logger is provided by NeMo exp_manager
   enable_checkpointing: False # checkpointing is done by NeMo exp_manager
-  replace_sampler_ddp: False # use NeMo Megatron samplers
+  use_distributed_sampler: False # use NeMo Megatron samplers
 
 model:
   name: ${name}-united-token_head
@@ -41,7 +41,7 @@ model:
 
   megatron_amp_O2: False # use AMP with O2 style mixed precision instead of native amp on-the-fly weight autocasting.
 
-  seq_length: 512 # maximum sequence length allowed
+  seq_length: 128 # maximum sequence length allowed, note that 128 was longer than all 1.8B molecules in the zinc drug-like DB. This will speed up generation.
   max_position_embeddings: ${.seq_length}
   num_layers: 3
   hidden_size: 768
@@ -87,9 +87,17 @@ model:
       train: x[000..186] # Range is for full dataset
       test: x[000..186]
       val: x[000..186]
-    encoder_augment: True # always True
+    # The following should probably always be True, unless you want to explore the unchanged input data. 
+    #  Changing will impact val/test metrics since canonicalization is done to model outputs but not 
+    #  targets (assuming it is done here).
+    canonicalize_target_smile: True
+    # The following four settings will result in randomized augmentation of SMILES for input, and matched output.
+    #  this is the equivarant model case.
+    canonicalize_encoder_input: False
+    canonicalize_decoder_output: False
+    encoder_augment: True
+    decoder_independent_augment: False
     encoder_mask: True # task = mask(span)_aug
-    decoder_augment: True # task = mask(span)_aug
     decoder_mask: False # always False
     mask_prob: 0.1 # mask probability
     span_lambda: 3.0 # max size of poisson distribution for
@@ -182,7 +190,7 @@ exp_manager:
     mode: max # use min or max of monitored metric to select best checkpoints
     save_last: True # always save last checkpoint
     always_save_nemo: True # not implemented for model parallel, additionally save NeMo-style checkpoint during validation, set to False if checkpoint saving is time consuming
-    filename: '${name}-${model.name}--{val_molecular_accuracy:.2f}-{val_reduced_loss:.2f}-{step}-{consumed_samples}'
+    filename: '${name}-${model.name}--{val_molecular_accuracy:.2f}-{val_loss:.2f}-{step}-{consumed_samples}'
     model_parallel_size: ${multiply:${model.tensor_model_parallel_size}, ${model.pipeline_model_parallel_size}}
 
   # logging

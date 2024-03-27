@@ -1,4 +1,4 @@
-# Preparing Workspace and Data for Pre-training
+# ESM2: Preparing Workspace and Data for Pre-training
 
 This section outlines the steps to 
 1. Create your [NGC workspace](https://bc.ngc.nvidia.com/workspaces) 

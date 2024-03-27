@@ -11,6 +11,7 @@
 
 import numpy as np
 import pytorch_lightning as pl
+import torch
 from hydra.utils import instantiate
 from nemo.core.config import hydra_runner
 from nemo.core.optim.lr_scheduler import register_scheduler
@@ -22,7 +23,12 @@ from bionemo.data.preprocess.protein.postprocess import OpenFoldSampleCreator
 from bionemo.model.protein.openfold.checkpoint_utils import load_pt_checkpoint
 from bionemo.model.protein.openfold.lr_scheduler import AlphaFoldLRScheduler
 from bionemo.model.protein.openfold.openfold_model import AlphaFold
+from bionemo.model.protein.openfold.optim_hub import enable_mlperf_optim
 from bionemo.model.utils import setup_trainer
+
+
+torch._dynamo.config.verbose = True
+torch._dynamo.config.suppress_errors = False
 
 
 @hydra_runner(config_path="conf", config_name="openfold_initial_training")
@@ -58,6 +64,7 @@ def main(cfg) -> None:
 
     if cfg.get('do_training', False) or cfg.get('do_validation', False):
         trainer = setup_trainer(cfg, callbacks=[])
+        enable_mlperf_optim(cfg.model)
         if cfg.get('restore_from_path', None):
             # TODO: consider blocking restore if stage is not 'fine-tune'
             alphafold = AlphaFold.restore_from(

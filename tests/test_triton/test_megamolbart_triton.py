@@ -38,9 +38,10 @@ from bionemo.triton.types_constants import (
 from bionemo.triton.utils import (
     decode_str_batch,
     encode_str_batch,
-    load_model_config,
     load_model_for_inference,
 )
+from bionemo.utils.hydra import load_model_config
+from bionemo.utils.tests import teardown_apex_megatron_cuda
 
 
 SMILES = ['c1ccc2ccccc2c1', 'COc1cc2nc(N3CCN(C(=O)c4ccco4)CC3)nc(N)c2cc1OC']
@@ -56,7 +57,7 @@ NAME_DECODES = complete_model_name(MODEL_NAME, DECODES)
 @pytest.fixture(scope='module')
 def cfg(bionemo_home: Path) -> DictConfig:
     return load_model_config(
-        config_path=bionemo_home / "examples" / "molecule" / MODEL_NAME / "conf",
+        config_path=str(bionemo_home / "examples" / "molecule" / MODEL_NAME / "conf"),
         config_name="infer.yaml",
         logger=None,
     )
@@ -66,7 +67,8 @@ def cfg(bionemo_home: Path) -> DictConfig:
 def model(cfg: DictConfig) -> MegaMolBARTInference:
     # TODO [mgreaves] replace with this in !553
     # model = load_model_for_inference(cfg, interactive=False)
-    return load_model_for_inference(cfg)
+    yield load_model_for_inference(cfg)
+    teardown_apex_megatron_cuda()
 
 
 @pytest.fixture(scope='module')
@@ -174,7 +176,7 @@ def test_samplings_triton(server) -> None:
 
     assert GENERATED in result, f"Expecting {GENERATED} but found {result.keys()=}"
     generated: np.ndarray = result[GENERATED]
-    _validate_generated(generated, expected_shape=(2, 10))
+    _validate_generated(generated, expected_shape=(2, 1))
 
 
 #### Direct inference-based
@@ -229,8 +231,6 @@ def test_hidden_to_seqs_direct(model) -> None:
 def test_samplings_direct(model) -> None:
     infer_fn = triton_sampling_infer_fn(model)
     result = infer_fn([{SEQUENCES: encode_str_batch(SMILES)}])[0]
-
     assert GENERATED in result, f"Expecting {GENERATED} but found {result.keys()=}"
     generated = result[GENERATED]
-
-    _validate_generated(generated, expected_shape=(2, 10))
+    _validate_generated(generated, expected_shape=(2, 1))

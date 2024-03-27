@@ -27,6 +27,8 @@ exp_manager:
   resume_if_exists: True
 
 model:
+  seq_length: 512 # TODO make a checkpoint with this set to 128. Maximum sequence length allowed. Set to 512 for backwards compatibililty with the checkpoint.
+  max_position_embeddings: ${.seq_length}
   encoder_frozen: True
   post_process: False
   micro_batch_size: 32 # NOTE: adjust to occupy ~ 90% of GPU memory

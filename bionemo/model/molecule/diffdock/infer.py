@@ -158,9 +158,11 @@ def do_inference_sampling(
                     data_list, confidence = sampling(
                         data_list=data_list,
                         model=model.model.net,
-                        denoising_inference_steps=cfg.denoising_actual_steps
-                        if cfg.denoising_actual_steps is not None
-                        else score_model_cfg.model.denoising_inference_steps,
+                        denoising_inference_steps=(
+                            cfg.denoising_actual_steps
+                            if cfg.denoising_actual_steps is not None
+                            else score_model_cfg.model.denoising_inference_steps
+                        ),
                         tr_schedule=tr_schedule,
                         rot_schedule=rot_schedule,
                         tor_schedule=tor_schedule,

@@ -1,0 +1,28 @@
+defaults:
+  - base_infer_config
+  # allow this config to override defaults
+  - _self_
+
+hydra:
+  searchpath:
+     - file://${oc.env:BIONEMO_HOME}/examples/conf/
+
+name: MolMIM_Inference
+desc: Minimum configuration for initializing a MolMIM model for inference.
+
+model:
+  training_callbacks: []  # Disable training callbacks if any at inference time. Some, like ParameterMultiplicativeScheduler will refer to objects that are no longer at the same path.
+  tokenizer:
+    vocab_path: ${oc.env:BIONEMO_HOME}/tokenizers/molecule/molmim/vocab/molmim.vocab
+    model_path: ${oc.env:BIONEMO_HOME}/tokenizers/molecule/molmim/vocab/molmim.model
+  downstream_task:
+    restore_from_path: ${oc.env:BIONEMO_HOME}/models/molecule/molmim/molmim_70m_24_3.nemo
+    outputs: [embeddings] # Which outputs to extract per sample (a value or list). Possible values: hiddens, embeddings.
+  data:
+    data_fields_map: # name which data_fields shoud be used for sequence/id (dataset dependant)
+      sequence: "smiles"
+      id: "iupac"
+    dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/physchem/SAMPL/test/x000 # full path to dataset (can include range or a list)
+
+target: bionemo.model.molecule.molmim.molmim_model.MolMIMModel # path to model class to load
+infer_target: bionemo.model.molecule.molmim.infer.MolMIMInference # path to inferende class to load

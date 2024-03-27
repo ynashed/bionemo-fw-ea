@@ -301,7 +301,6 @@ class SentencePieceTokenizerAdapter(TokenizerAdapterSpec):
 
 @dataclass
 class BertMasking:
-
     """
     Produces a callable that can be used to mask/perturb sequences of tokens.
 

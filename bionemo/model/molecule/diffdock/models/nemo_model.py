@@ -146,9 +146,11 @@ class TensorProductScoreModelBase(ModelPT):
                 num_batches = data_config.num_batches
             batch_sampler = SizeAwareBatchSampler(
                 item_sampler,
-                max_total_size=self.cfg.max_total_size
-                if self.cfg.get("max_total_size", None) is not None
-                else (0.85 * torch.cuda.get_device_properties('cuda:0').total_memory / 2**20),
+                max_total_size=(
+                    self.cfg.max_total_size
+                    if self.cfg.get("max_total_size", None) is not None
+                    else (0.85 * torch.cuda.get_device_properties('cuda:0').total_memory / 2**20)
+                ),
                 sizes=estimate_size,
                 batch_size=self.cfg.micro_batch_size,
                 num_batches=num_batches,
@@ -414,9 +416,11 @@ class TensorProductScoreModelBase(ModelPT):
         tr_weight = self.cfg.diffusion.tr_weight
         tr_sigma, rot_sigma, tor_sigma = self.net.t_to_sigma(
             *[
-                torch.cat([d.complex_t[noise_type] for d in batch])
-                if isinstance(batch, list)
-                else batch.complex_t[noise_type]
+                (
+                    torch.cat([d.complex_t[noise_type] for d in batch])
+                    if isinstance(batch, list)
+                    else batch.complex_t[noise_type]
+                )
                 for noise_type in ["tr", "rot", "tor"]
             ]
         )

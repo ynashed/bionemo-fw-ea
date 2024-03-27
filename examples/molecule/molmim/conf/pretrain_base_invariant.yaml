@@ -1,0 +1,16 @@
+defaults:
+  - pretrain_base_equivariant  # override the model.data section of pretrain_base_equivariant
+  - _self_
+
+model:
+  data:
+    # The following should probably always be True, unless you want to explore the unchanged input data. 
+    #  Changing will impact val/test metrics since canonicalization is done to model outputs but not 
+    #  targets (assuming it is done here).
+    canonicalize_target_smile: True
+    # The following four settings will result in randomized augmentation of SMILES for input, and matched output.
+    #  this is the equivarant model case.
+    canonicalize_encoder_input: False
+    canonicalize_decoder_output: True
+    encoder_augment: True
+    decoder_independent_augment: False

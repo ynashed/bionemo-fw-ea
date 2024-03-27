@@ -21,4 +21,3 @@ score_infer:
     devices: 1
     num_nodes: 1
     precision: 32 # bf16 # To activate AMP set to 16 or 'bf16'; otherwise will be float32
-

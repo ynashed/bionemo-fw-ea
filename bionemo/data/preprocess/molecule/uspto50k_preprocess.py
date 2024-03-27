@@ -9,6 +9,7 @@ from rdkit import Chem
 from bionemo.data.utils import download_registry_from_ngc, get_ngc_registry_file_list, verify_checksum_matches
 
 
+HUMAN_DOWNLOAD_PATH = "https://az.app.box.com/s/7eci3nd9vy0xplqniitpk02rbg9q2zcq/file/854847820319"
 MD5_CHECKSUM = 'd956c753c757f19c8e9d913f51cf0eed'
 
 
@@ -22,6 +23,13 @@ class USPTO50KPreprocess:
         self.data_dir = data_dir
         self.max_smiles_length = max_smiles_length
         self.download_dir = os.path.join(data_dir, 'raw')
+        output_file = 'uspto_50.pickle'
+        datapath_raw = os.path.join(self.download_dir, output_file)
+        self.checksum = checksum
+        if os.path.exists(datapath_raw) and verify_checksum_matches(datapath_raw, checksum):
+            self.datapath_raw = datapath_raw
+        else:
+            self.datapath_raw = None
         self.processed_dir = os.path.join(data_dir, 'processed')
         self.data_file = 'data.csv'
         self.splits = ['train', 'val', 'test']
@@ -29,7 +37,12 @@ class USPTO50KPreprocess:
     def get_split_dir(self, split: str) -> str:
         return os.path.join(self.processed_dir, split)
 
-    def prepare_dataset(self, ngc_registry_target: str, ngc_registry_version: str, force: bool = False):
+    def prepare_dataset(
+        self,
+        ngc_registry_target: Optional[str] = None,
+        ngc_registry_version: Optional[str] = None,
+        force: bool = False,
+    ):
         """
         Downloads reaction dataset and splits it into train, validation, and test sets.
         Args:
@@ -41,10 +54,19 @@ class USPTO50KPreprocess:
         if os.path.exists(self.processed_dir) and not force:
             logging.info(f'Path to the processed dataset {self.processed_dir} exists!')
             return
+        download_file = True
+        if self.datapath_raw is not None and os.path.exists(self.datapath_raw):
+            download_file = not verify_checksum_matches(self.datapath_raw, self.checksum)
 
-        self.datapath_raw = self.download_raw_data_file(
-            ngc_registry_target=ngc_registry_target, ngc_registry_version=ngc_registry_version
-        )
+        if download_file:
+            if ngc_registry_target is None or ngc_registry_version is None:
+                raise ValueError(
+                    'Internal Nvidia employees must provide NGC registry target and version must be defined to download the dataset, or alternatively you must first '
+                    f'manually download from {HUMAN_DOWNLOAD_PATH} and place in {self.download_dir} with the name uspto_50.pickle.'
+                )
+            self.datapath_raw = self.download_raw_data_file(
+                ngc_registry_target=ngc_registry_target, ngc_registry_version=ngc_registry_version
+            )
 
         if self.datapath_raw:
             self.train_val_test_split(datapath_raw=self.datapath_raw)

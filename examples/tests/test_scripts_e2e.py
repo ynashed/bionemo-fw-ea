@@ -1,3 +1,14 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+#
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
+
+
 import os
 import subprocess
 from glob import glob
@@ -5,8 +16,10 @@ from glob import glob
 import pytest
 import torch
 
+from bionemo.utils.tests import teardown_apex_megatron_cuda
 
-BIONEMO_HOME = os.getenv('BIONEMO_HOME')
+
+BIONEMO_HOME = os.environ["BIONEMO_HOME"]
 TEST_DATA_DIR = os.path.join(BIONEMO_HOME, "examples/tests/test_data")
 
 
@@ -47,6 +60,7 @@ DIRS_TO_TEST = [
     'examples/protein/openfold/',
     'examples/dna/dnabert/',
     'examples/molecule/diffdock/',
+    'examples/molecule/molmim/',
 ]
 
 TRAIN_SCRIPTS = []
@@ -81,6 +95,7 @@ def get_data_overrides(script_or_cfg_path: str) -> str:
         'openfold',
         'dnabert',
         'diffdock',
+        'molmim',
     ), 'update this function, patterns might be wrong'
 
     task = {
@@ -90,7 +105,7 @@ def get_data_overrides(script_or_cfg_path: str) -> str:
     }
 
     if conf == ['conf']:
-        if model in ('megamolbart', 'openfold'):
+        if model in ('megamolbart', 'openfold', 'molmim'):
             return ''
         else:
             return MAIN % f'{domain}/{task[domain]}/test/x000'
@@ -126,7 +141,6 @@ def get_data_overrides(script_or_cfg_path: str) -> str:
             f"++model.data.dataset_path={DNABERT_TEST_DATA_DIR} "
             "++model.data.dataset.train=chr1-trim-train.fna "
             "++model.data.dataset.val=chr1-trim-val.fna "
-            "++do_training=True "
             "++model.data.dataset.test=chr1-trim-test.fna "
         )
         return dnabert_overrides
@@ -168,6 +182,7 @@ def get_train_args_overrides(script_or_cfg_path, train_args):
     return train_args
 
 
+@pytest.mark.needs_fork
 @pytest.mark.needs_gpu
 @pytest.mark.parametrize('script_path', TRAIN_SCRIPTS)
 def test_train_scripts(script_path, train_args, data_args, tmp_path):
@@ -182,7 +197,16 @@ def test_train_scripts(script_path, train_args, data_args, tmp_path):
     print(cmd)
     process_handle = subprocess.run(cmd, shell=True, capture_output=True)
     error_out = process_handle.stderr.decode('utf-8')
+    teardown_apex_megatron_cuda()
     assert process_handle.returncode == 0, f"Command failed:\n{cmd}\n Error log:\n{error_out}"
+
+    if "esm" in script_path and train_args['trainer.devices'] > 1:
+        # Additional check for training an ESM model with pipeline parallel and val-in-loop
+        cmd += f" ++model.dwnstr_task_validation.enabled=True ++model.pipeline_model_parallel_size=2 ++exp_manager.exp_dir={tmp_path}-pipeline"
+        print(f"Pipeline Parallel command:\n {cmd}")
+        process_handle = subprocess.run(cmd, shell=True, capture_output=True)
+        error_out = process_handle.stderr.decode('utf-8')
+        assert process_handle.returncode == 0, f"Command failed:\n{cmd}\n Error log:\n{error_out}"
 
 
 def get_infer_args_overrides(config_path, tmp_path):
@@ -201,6 +225,7 @@ def get_infer_args_overrides(config_path, tmp_path):
     return {}
 
 
+@pytest.mark.needs_fork
 @pytest.mark.needs_checkpoint
 @pytest.mark.needs_gpu
 @pytest.mark.parametrize('config_path', INFERENCE_CONFIGS)
@@ -226,4 +251,5 @@ def test_infer_script(config_path, tmp_path):
     cmd += get_data_overrides(config_path)
     process_handle = subprocess.run(cmd, shell=True, capture_output=True)
     error_out = process_handle.stderr.decode('utf-8')
+    teardown_apex_megatron_cuda()
     assert process_handle.returncode == 0, f"Command failed:\n{cmd}\n Error log:\n{error_out}"

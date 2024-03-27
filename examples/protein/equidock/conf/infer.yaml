@@ -17,6 +17,8 @@ data:
   translation_interval: 5
   n_jobs: 0
 
+infer_target: bionemo.model.protein.equidock.infer.EquiDockInference # path to inferende class to load
+
 model:
   name: EquiDock_${data.data_name}_inference
   seed: 42
@@ -132,7 +134,7 @@ model:
 trainer:
   devices: 2
   num_nodes: 1
-  precision: 32 # To activate AMP set to 16 or 'bf16'; otherwise will be float32
+  precision: 32 # to activate AMP set to 16-mixed or 'bf16-mixed'; otherwise will be float32
   accelerator: gpu # gpu or cpu
   max_epochs: 1000 # set to null when using max_steps instead with NeMo model
   max_steps: -1

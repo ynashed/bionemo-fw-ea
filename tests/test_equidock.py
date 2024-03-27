@@ -21,6 +21,9 @@ from bionemo.model.protein.equidock.model.utils import compute_cross_attention
 torch.use_deterministic_algorithms(False)
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
+torch.backends.cuda.matmul.allow_tf32 = False
+torch.backends.cudnn.enabled = False
+torch.backends.cudnn.allow_tf32 = False
 
 
 @pytest.mark.needs_gpu

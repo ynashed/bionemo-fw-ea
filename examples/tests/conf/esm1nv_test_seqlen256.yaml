@@ -1,13 +1,17 @@
 defaults:
   - base_config
 
+hydra:
+  searchpath:
+     - ${oc.env:BIONEMO_HOME}/examples/protein/esm1nv/conf
+
 restore_from_path: ${oc.env:BIONEMO_HOME}/models/protein/esm1nv/esm1nv.nemo
 trainer:
   devices: 1
   num_nodes: 1
   max_epochs: 1 # PTL default. In practice we don't usually train for more than 1 epoch.
-  max_steps: 500 # consumed_samples = global_step * micro_batch_size * data_parallel_size * accumulate_grad_batches
-  val_check_interval: 500
+  max_steps: 100 # consumed_samples = global_step * micro_batch_size * data_parallel_size * accumulate_grad_batches
+  val_check_interval: 1.0
   limit_val_batches: 1
   accumulate_grad_batches: 1
     

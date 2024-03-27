@@ -30,6 +30,3 @@ model:
           data_col: 3 # specifies which column in the csv file contains training data, 0-based
           data_sep: ',' # string to split text into columns
     num_workers: 8
-
-  dwnstr_task_validation:
-    enabled: True

@@ -10,11 +10,32 @@ Note that this repository is in *early access*, therefore some parts are still u
 
 ## Quick Start
 
+### Using `launch.sh`
+
+#### `launch.sh` Backwards Compatability Note
+The `./launch.sh` script can be run in a backwards compatible mode using the `-s` flag for the following commands:
+- `build`
+- `dev`
+- `run`
+- `push`
+With `-s`, the program will use the tag that's specified in the `.env` file at the repository's root. This flag makes the script mirror its prior behavior.
+
+#### `launch.sh` Using Commit Hash as Image Tag
+Now, `launch.sh` will default to using the current `git` commit hash as the image tag. 
+
+This change makes it clear to the user what exact version of code is present in the image, eliminating a reoccurring 
+source of confusion for folks developing and using the BioNeMo FW image. Moreover, the `build` and `push` commands will
+fail fast if there are uncommitted changes to tracked files.
+
+This ensures that builds are reproducible given a  `git` commit hash and establishes a 1:1 mapping between codebase
+versions and their respective images.
+
+### First Time Setup
 An NGC API KEY is required for these steps.  You will need to configure [NGC](https://catalog.ngc.nvidia.com/?filters=&orderBy=weightPopularDESC&query=) with your org and team. See also Prerequisites below.
 
 ```bash
 # Login to NVIDIA docker registry:
-docker login nvcr.io # Username will be $oauthtoken, password will be NGC API KEY
+docker login nvcr.io --username '$oauthtoken' --password "${NGC_CLI_API_KEY}"
 
 # Clone repository:
 git clone https://github.com/NVIDIA/bionemo-fw-ea.git
@@ -32,14 +53,14 @@ NGC_CLI_ORG= # Your organization name
 
 # Pull the latest BioNeMo image:
 #   Time estimate: 5min
-./launch.sh pull
+./launch.sh -s pull
 
 # Download all pretrained checkpoints from NGC:
 #   Time estimate: 10min
 ./launch.sh download
 
 # Launch an interactive session inside the pulled image:
-./launch.sh dev
+./launch.sh -s dev
 ```
 
 Once the container is running, you can run the training and inference examples, see [BioNeMo Framework Tutorials](https://docs.nvidia.com/bionemo-framework/latest/tutorials-fw.html), or develop and test your own code.
@@ -74,7 +95,7 @@ A successful execution of this command will result in command-line output simila
 [NeMo I 2023-12-15 18:24:21 infer:152] Saving 9 samples to output_fname = /workspace/bionemo/data/bionemo_ems2_example.pkl
 ```
 
-For more information on inference [here.](https://docs.nvidia.com/bionemo-framework/latest/inference-triton-fw.html)
+More tutorials using ESM inference can be found [here.](https://docs.nvidia.com/bionemo-framework/latest/inference-grpc-fw.html)
 
 ## Prerequisites
 
@@ -127,7 +148,7 @@ Furthermore, we provide preset configation files for training downstream tasks o
 
 ## Documentation
 
-[BioNeMo Documentation](https://docs.nvidia.com/bionemo-framework/latest/index.html)
+[BioNeMo Documentation VDR Mirror](https://docs.nvidia.com/bionemo-framework/latest/)
 
 ## Installation
 

@@ -432,7 +432,7 @@ class TensorProductScoreModel(torch.nn.Module):
             center_edge_sh,
         ) = self.build_center_conv_graph(data)
         center_edge_attr = self.center_edge_embedding(center_edge_attr)
-        center_edge_attr = torch.cat([center_edge_attr, lig_node_attr[center_edge_index[0], : self.ns]], -1)
+        center_edge_attr = torch.cat([center_edge_attr, lig_node_attr[center_edge_index[1], : self.ns]], -1)
 
         lig_node_attr = self.clamp_value(lig_node_attr)
         center_edge_attr = self.clamp_value(center_edge_attr)

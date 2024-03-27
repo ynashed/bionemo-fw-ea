@@ -2,11 +2,11 @@ name: ???
 desc: ???
 
 trainer:
-  precision: 16
+  precision: 16-mixed
   devices: 1 # must be set to accommodate the total model parallel size
   num_nodes: 1 # must be set to accommodate the total model parallel size
   accelerator: gpu
-  logger: null
+  logger: False
 
 exp_manager:
   explicit_log_dir: null

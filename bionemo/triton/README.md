@@ -31,6 +31,7 @@ All base encoder-decoder bionemo models are supported. All Triton and Model Navi
 
 Examples of supported models are below. Use the `C` env var for compatibility with documented example commands:
 - MegaMolBART: `CONFIG_PATH="${BIONEMO_HOME}/examples/molecule/megamolbart/conf"`
+- MolMIM: `CONFIG_PATH="${BIONEMO_HOME}/examples/molecule/molmim/conf"`
 - ESM1nv: `CONFIG_PATH="${BIONEMO_HOME}/examples/protein/esm1nv/conf/"`
 - ESM2nv: `CONFIG_PATH="${BIONEMO_HOME}/examples/protein/esm2nv/conf/"`
 - ProtT5nv: `CONFIG_PATH="${BIONEMO_HOME}/examples/protein/prott5nv/conf"`
@@ -92,7 +93,7 @@ For example:
 ```bash
 python -m bionemo.triton.client_encode --sequences "CN1C=NC2=C1C(=O)N(C(=O)N2C)C" --sequences "c1ccccc1CC(O)=O"
 ```
-if you loaded MegaMolBART in the server script, or:
+if you loaded MegaMolBART or MolMIM in the server script, or:
 
 ```bash
 python -m bionemo.triton.client_encode --sequences "MTADAHWIPVPTNVAYDALNPGAPGTLAFAAANGWQHHPLVTVQPLPGVVFRDAAGRSRFTQRAGD"
@@ -133,6 +134,11 @@ You can run the conversion for MegaMolBART:
 ```bash
 python -m bionemo.triton.nav_embeddings_export --config-path /workspace/bionemo/examples/molecule/megamolbart/conf
 ```
+...MolMIM:
+```bash
+python -m bionemo.triton.nav_embeddings_export --config-path /workspace/bionemo/examples/molecule/molmim/conf
+```
+
 ...ESM1nv:
 ```bash
 python -m bionemo.triton.nav_embeddings_export --config-path /workspace/bionemo/examples/protein/esm1nv/conf

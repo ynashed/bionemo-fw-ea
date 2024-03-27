@@ -41,7 +41,7 @@ def triton_sampling_infer_fn(model: M) -> SamplingInferFn:
     def infer_fn(sequences: np.ndarray) -> SamplingResponse:
         seqs = decode_str_batch(sequences)
 
-        generated: List[str] = model.sample(smis=seqs, return_embedding=False)
+        generated: List[str] = model.sample(seqs=seqs, return_embedding=False, sampling_method="greedy-perturbate")
 
         response: SamplingResponse = {GENERATED: np.char.encode(generated, "utf-8").reshape((len(sequences), -1))}
         return response

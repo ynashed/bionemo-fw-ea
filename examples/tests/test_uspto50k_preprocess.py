@@ -6,27 +6,30 @@ import pytest
 from bionemo.data.preprocess.molecule.uspto50k_preprocess import USPTO50KPreprocess
 
 
-ROOT_DIR = 'uspto50k'
-
-
-@pytest.mark.parametrize('root_directory', [ROOT_DIR])
-def test_uspto50k_preprocess(tmp_path_factory, root_directory: str):
+@pytest.mark.xfail(reason="NGC CLI might not be present in environment.")
+def test_uspto50k_preprocess(tmp_path):
     ngc_registry_target = 'uspto_50k_dataset'
     ngc_registry_version = 'v23.06'
-    tmp_directory = tmp_path_factory.mktemp(root_directory)
     filename = "uspto_50.pickle"
-    data_preprocessor = USPTO50KPreprocess(data_dir=tmp_directory)
+    data_preprocessor = USPTO50KPreprocess(data_dir=str(tmp_path))
     data_preprocessor.prepare_dataset(
         ngc_registry_target=ngc_registry_target, ngc_registry_version=ngc_registry_version, force=True
     )
 
     raw_data_filepath = os.path.join(data_preprocessor.download_dir, filename)
     assert raw_data_filepath == data_preprocessor.datapath_raw
-    assert os.path.join(tmp_directory, "raw", filename) == data_preprocessor.datapath_raw
+    assert os.path.join(tmp_path, "raw", filename) == data_preprocessor.datapath_raw
     assert os.listdir(data_preprocessor.download_dir)[0] == filename
-    assert os.path.join(tmp_directory, "processed") == data_preprocessor.processed_dir
+    assert os.path.join(tmp_path, "processed") == data_preprocessor.processed_dir
     # reading raw data
     df_raw = pd.read_pickle(raw_data_filepath)
+    # Make sure that if the file already exists, that it can be preprocessed without ngc registry information
+    data_preprocessor2 = USPTO50KPreprocess(data_dir=str(tmp_path))
+    data_preprocessor2.prepare_dataset(force=True)
+    assert raw_data_filepath == data_preprocessor2.datapath_raw
+    assert os.path.join(tmp_path, "raw", filename) == data_preprocessor2.datapath_raw
+    assert os.listdir(data_preprocessor2.download_dir)[0] == filename
+    assert os.path.join(tmp_path, "processed") == data_preprocessor2.processed_dir
 
     assert all(folder in data_preprocessor.splits for folder in os.listdir(data_preprocessor.processed_dir))
 

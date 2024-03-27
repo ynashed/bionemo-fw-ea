@@ -24,5 +24,3 @@ model:
         data_col: 3 # 0-based
     modify_percent: 0.1 # Percentage of characters in a protein sequence to modify. (Modification means replacing with another amino acid or with a mask token)
     perturb_percent: 0.5 # Of the modify_percent, what percentage of characters are to be replaced with another amino acid.
-  dwnstr_task_validation:
-    enabled: True

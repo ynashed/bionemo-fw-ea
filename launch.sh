@@ -49,6 +49,7 @@ launch.sh [command]
     push               - push a container to a registry
     dev                - launch a new container in development mode. Local copy of the code is mounted and installed.
     attach             - attach to a running container
+    info               - see information about supported Docker image repositories
 
 
 Getting Started tl;dr
@@ -101,8 +102,7 @@ EOF
 }
 
 # Defaults for `.env` file
-# export BIONEMO_IMAGE=${BIONEMO_IMAGE:=nvcr.io/nvidian/cvai_bnmo_trng/bionemo:dev}
-export BIONEMO_IMAGE=${BIONEMO_IMAGE:=nvcr.io/nvidia/clara/bionemo-framework:1.2}
+export BIONEMO_IMAGE=${BIONEMO_IMAGE:=nvcr.io/nvidian/cvai_bnmo_trng/bionemo:dev}
 export LOCAL_REPO_PATH=$(pwd)
 export DOCKER_REPO_PATH=${DOCKER_REPO_PATH:=/workspace/bionemo}
 export LOCAL_RESULTS_PATH=${LOCAL_RESULTS_PATH:=${LOCAL_REPO_PATH}/results}
@@ -215,34 +215,6 @@ DOCKER_CMD="docker run \
     -e NUMBA_CACHE_DIR=/tmp/ "
 
 
-# add current git hash as docker image metadata
-if git rev-parse --git-dir > /dev/null 2>&1; then
-    BIONEMO_GIT_HASH=$(git rev-parse --short HEAD)
-else
-    BIONEMO_GIT_HASH="not in git repository"
-fi
-
-# NOTE: It is **extremely important** to **never** pass in a secret / password / API key as either:
-#         -- an environment variable
-#         -- a file
-#       Into a docker build process. This includes passing in an env var via --build-args.
-#
-#       This is to ensure that the secret's value is never leaked: doing any of the above means
-#       that the secret value will be **persisted in the image**. Thus, when a user creates a container
-#       from the image, they will have access to this secret value (if it's a file or ENV). Or, they will
-#       be able to `docker inspect` the image and glean the secret value from looking at the layer creations
-#       (occurs when the value is an ARG).
-#
-#       Known bionemo build-time secrets:
-#         - GITLAB_TOKEN
-#
-DOCKER_BUILD_CMD="docker build --network host \
-    -t ${BIONEMO_IMAGE} \
-    --secret id=GITLAB_TOKEN,env=GITLAB_TOKEN \
-    --label com.nvidia.bionemo.git_hash='${BIONEMO_GIT_HASH}' \
-    -f setup/Dockerfile"
-
-
 download() {
     if [ $(pip list | grep -F "pydantic" | wc -l) -eq 0 ]; then
         read -p 'Pydantic module (Python) not found. Install in current environment? (y/N):' confirm && [[ $confirm == [yY] || $confirm == [yY][eE][sS] ]] || exit 1
@@ -283,21 +255,59 @@ docker_login() {
 
 
 pull() {
+    echo "Pulling image called BIONEMO_IMAGE: ${BIONEMO_IMAGE}"
     docker_login
+    set -x
     docker pull ${BIONEMO_IMAGE}
+    set +x
     exit
 }
 
+# Returns the current git sha if the repository is clean.
+# Exits with status code 1 otherwise.
+git_sha() {
+
+    git diff-index --quiet HEAD --
+    exit_code="$?"
+
+    if [ "${exit_code}" == "128" ]; then
+        echo "ERROR: Cannot build image if not in bionemo git repository!"
+        return 1
+
+    elif [ "${exit_code}" == "1" ]; then
+        echo "ERROR: Repository is dirty! Commit all changes before building image!"
+        return 2
+
+    elif [ "${exit_code}" == "0" ]; then
+        git rev-parse HEAD
+        return 0
+
+    else
+        echo "ERROR: Unknown exit code for `git diff-index`: ${exit_code}"
+        return 1
+    fi
+}
+
+image_repo() {
+    # get the text up until the last ':''
+    # https://stackoverflow.com/a/13857951/362021
+    echo "${BIONEMO_IMAGE}" | awk 'BEGIN{FS=OFS=":"}{NF--; print}'
+}
+
+stable_image_tag() {
+    # get the text after the last ':'
+    echo "${BIONEMO_IMAGE}" | rev | cut -d':' -f1 | rev
+}
 
 build() {
-    local IMG_NAME=($(echo ${BIONEMO_IMAGE} | tr ":" "\n"))
-    local PACKAGE=0
-    local CLEAN=0
-
     if [[ "${GITLAB_TOKEN}" == "" || "${GITLAB_TOKEN}" == "NotSpecified" ]]; then
       echo "ERROR: need to set GITLAB_TOKEN to build the docker image. Please see instructions at https://confluence.nvidia.com/display/CLD/Onboarding+Guide#OnboardingGuide-GitLabDockerRegistry"
       exit 1
     fi
+    
+    local PACKAGE=0
+    local CLEAN=0
+    local use_stable_bionemo_image_name=0
 
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -314,6 +324,10 @@ build() {
                 shift
                 shift
                 ;;
+            -s|--stable)
+                shift
+                use_stable_bionemo_image_name=1
+                ;;
             *)
                 echo "Unknown option $1. Please --version to specify a version."
                 exit 1
@@ -321,12 +335,71 @@ build() {
         esac
     done
 
+    # DO NOT DO THIS:
+    # local BIONEMO_GIT_HASH=
+    # For some reason...using local X=$(cmd) throws-away the return code from the function (cmd) !
+    # https://www.shellcheck.net/wiki/SC2155
+    local BIONEMO_GIT_HASH
+    local exit_code_sha
+    BIONEMO_GIT_HASH=$(git_sha)
+    exit_code_sha="$?"
+
+    if [[ "${exit_code_sha}" != "0" ]]; then
+        # not actually the hash! an error ocurred and this is the message
+        echo "${BIONEMO_GIT_HASH}"
+
+        if [[ "${exit_code_sha}" == "2" && "${use_stable_bionemo_image_name}" == "1" ]]; then
+            # Only dirty commit state and we're not using the commit as the image tag.
+            echo "NOTICE: Ignoring dirty git repository state because using stable image tag for build."
+            BIONEMO_GIT_HASH=$(git rev-parse HEAD)
+        else
+            exit 1
+        fi
+    fi
+    # if we get the full sha then we know that the --short will work w/o fail
+    local BIONEMO_SHORT_GIT_HASH=$(git rev-parse --short HEAD)
+
+    # local IMG_NAME=($(echo ${BIONEMO_IMAGE} | tr ":" "\n"))
+    local IMAGE_NAME=$(image_repo)
+    
+    local IMAGE_TAG
+    if [[ "${use_stable_bionemo_image_name}" == "1" ]]; then
+        IMAGE_TAG=$(stable_image_tag)
+        echo "Using stable BIONEMO_IMAGE tag (${IMAGE_TAG}) instead of current git commit (${BIONEMO_GIT_HASH})"
+    else
+        echo "Using current git commit (${BIONEMO_GIT_HASH}) as tag instead of BIONEMO_IMAGE"
+        IMAGE_TAG="${BIONEMO_GIT_HASH}"
+    fi
+
     if [ ${PACKAGE} -eq 1 ]
     then
         set -e
         download
         set +e
     fi
+
+    # NOTE: It is **extremely important** to **never** pass in a secret / password / API key as either:
+    #         -- an environment variable
+    #         -- a file
+    #       Into a docker build process. This includes passing in an env var via --build-args.
+    #       
+    #       This is to ensure that the secret's value is never leaked: doing any of the above means
+    #       that the secret value will be **persisted in the image**. Thus, when a user creates a container
+    #       from the image, they will have access to this secret value (if it's a file or ENV). Or, they will
+    #       be able to `docker inspect` the image and glean the secret value from looking at the layer creations
+    #       (occurs when the value is an ARG).
+    #
+    #       Known bionemo build-time secrets:
+    #         - GITLAB_TOKEN
+    #
+    local created_at="$(date --iso-8601=seconds -u)"
+    DOCKER_BUILD_CMD="docker build --network host \
+        -t ${IMAGE_NAME}:${IMAGE_TAG} \
+        --secret id=GITLAB_TOKEN,env=GITLAB_TOKEN \
+        --label com.nvidia.bionemo.short_git_sha=${BIONEMO_SHORT_GIT_HASH} \
+        --label com.nvidia.bionemo.git_sha=${BIONEMO_GIT_HASH} \
+        --label com.nvidia.bionemo.created_at=${created_at} \
+        -f setup/Dockerfile"
 
     if [ ${CLEAN} -eq 1 ]
     then
@@ -338,17 +411,17 @@ build() {
         DOCKER_BUILD_CMD="${DOCKER_BUILD_CMD} --build-arg BASE_IMAGE=${BASE_IMAGE}"
     fi
 
-    DOCKER_BUILD_CMD="${DOCKER_BUILD_CMD} -t ${IMG_NAME[0]}:latest"
-
-    echo "Building BioNeMo training container..."
+    echo "[${created_at}] Building BioNeMo framework container..."
     set -x
     DOCKER_BUILDKIT=1 ${DOCKER_BUILD_CMD} .
     set +x
+    echo "[$(date --iso-8601=seconds -u)] Finished building ${IMAGE_NAME}:${IMAGE_TAG}"
     exit
 }
 
 
 push() {
+    local use_stable_bionemo_image_name=0
     while [[ $# -gt 0 ]]; do
         case $1 in
             -v|--version)
@@ -361,31 +434,57 @@ push() {
                 shift
                 shift
                 ;;
+            -s|--stable)
+                shift
+                use_stable_bionemo_image_name=1
+                ;;
             *)
-                echo "Unknown option $1. Please --version to specify a version."
+                echo "Unknown option $1. Please use --version to specify an additional tag image override. Or supply --additional_copies to supply a comma-delimited list of new complete image names for tagging."
                 exit 1
                 ;;
         esac
     done
 
-    local IMG_NAME=($(echo ${BIONEMO_IMAGE} | tr ":" "\n"))
+    # local IMG_NAME=($(echo ${BIONEMO_IMAGE} | tr ":" "\n"))
+    local IMAGE_NAME=$(image_repo)
+    local IMAGE_TAG
+
+    if [[ "${use_stable_bionemo_image_name}" == "1" ]]; then
+        IMAGE_TAG=$(stable_image_tag)
+    else
+        local BIONEMO_GIT_HASH
+        BIONEMO_GIT_HASH=$(git_sha)
+        if [[ "$?" != "0" ]]; then
+            # not actually the hash! an error ocurred and this is the message
+            echo "${BIONEMO_GIT_HASH}"
+            exit 1
+        fi
+        IMAGE_TAG="${BIONEMO_GIT_HASH}"
+    fi
 
     docker_login
-    docker push ${IMG_NAME[0]}:latest
-    docker push ${BIONEMO_IMAGE}
+    # docker push ${IMG_NAME[0]}:latest
+    # docker push ${BIONEMO_IMAGE}
+    echo "Pushing image: ${IMAGE_NAME}:${IMAGE_TAG}"
+    docker push "${IMAGE_NAME}:${IMAGE_TAG}"
 
     if [ ! -z "${VERSION}" ];
     then
-        docker tag ${BIONEMO_IMAGE} ${IMG_NAME[0]}:${VERSION}
-        docker push ${IMG_NAME[0]}:${VERSION}
+        echo "Tagging ${IMAGE_TAG} as ${VERSION} & pushing to ${IMAGE_NAME}"
+        # docker tag ${BIONEMO_IMAGE} ${IMG_NAME[0]}:${VERSION}
+        # docker push ${IMG_NAME[0]}:${VERSION}
+        docker tag "${IMAGE_NAME}:${IMAGE_TAG}" "${IMAGE_NAME}:${VERSION}"
+        docker push "${IMAGE_NAME}:${VERSION}"
     fi
 
     if [ ! -z "${ADDITIONAL_IMAGES}" ];
     then
         IFS=',' read -ra IMAGES <<< ${ADDITIONAL_IMAGES}
         for IMAGE in "${IMAGES[@]}"; do
-            docker tag ${BIONEMO_IMAGE} ${IMAGE}
-            docker push ${IMAGE}
+            # docker tag ${BIONEMO_IMAGE} ${IMAGE}
+            echo "Tagging ${IMAGE_NAME}:${IMAGE_TAG} as ${IMAGE} & pushing"
+            docker tag "${IMAGE_NAME}:${IMAGE_TAG}" "${IMAGE}"
+            docker push "${IMAGE}"
         done
     fi
 
@@ -401,6 +500,7 @@ setup() {
     if [ ! -z "${NEMO_HOME}" ];
     then
         # NOTE: If we change the Python version, we will have a different mount path!
+        #       The python3.X part of the path changes.
         echo "Making a volume mount for NeMo!" \
              "Mounting package (\$NEMO_HOME/nemo) in Python environment (/usr/local/lib/python3.10/dist-packages/nemo)" \
              "and NEMO_HOME (${NEMO_HOME}) to /workspace/nemo"
@@ -436,7 +536,44 @@ setup() {
 }
 
 
+image_to_run() {
+    # note: `>&2 echo`  means "write to STDERR"
+    # https://stackoverflow.com/a/23550347/362021
+
+    local use_stable_bionemo_image_name="${1}"
+
+    local IMAGE_TO_RUN
+    if [[ "${use_stable_bionemo_image_name}" == "1" ]]; then
+        >&2 echo "Start development container for BIONEMO_IMAGE: ${BIONEMO_IMAGE}"
+        IMAGE_TO_RUN="${BIONEMO_IMAGE}"
+
+    elif [[ "${use_stable_bionemo_image_name}" == "0" ]]; then 
+        local COMMIT=$(git rev-parse HEAD)
+        >&2 echo "Starting development container from latest working code ${COMMIT}"
+        
+        git diff-index --quiet HEAD --
+        if [[ "$?" != "0" ]]; then
+            >&2 echo "WARNING! Dirty git repository detected! Image will be out-of-sync. " \
+                 "Volume mount of local code files (${LOCAL_REPO_PATH}) will keep _most_ things up to date.\n" \
+                 "Rebuild the image with './launch.sh build' if you encounter bugs due to other things being out-of-sync."
+        fi
+
+        IMAGE_TO_RUN="$(image_repo):${COMMIT}"
+
+        if [[ "$(docker images -q ${IMAGE_TO_RUN})" == "" ]]; then
+            >&2 echo "ERROR: No image made for commit ${COMMIT}! Falling-back to BIONEMO_IMAGE: ${BIONEMO_IMAGE}"
+            IMAGE_TO_RUN="${BIONEMO_IMAGE}"
+        fi
+    else
+        echo "ERROR: invalid! Provide either 0 or 1 for first argument!"
+        return 1
+    fi
+    echo "${IMAGE_TO_RUN}"
+}
+
+
 dev() {
+    local use_stable_bionemo_image_name=0
     CMD='bash'
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -454,6 +591,10 @@ dev() {
                 DOCKER_CMD="${DOCKER_CMD} -d"
                 shift
                 ;;
+            -s|--stable)
+                shift
+                use_stable_bionemo_image_name=1
+                ;;
             -c|--cmd)
                 shift
                 CMD="$@"
@@ -461,7 +602,7 @@ dev() {
                 ;;
             *)
                 echo "Unknown option '$1'.
-Available options are -a(--additional-args), -i(--image), -d(--demon) and -c(--cmd)"
+Available options are -a(--additional-args), -i(--image), -d(--demon), -s(--stable), and -c(--cmd)"
                 exit 1
                 ;;
         esac
@@ -469,31 +610,50 @@ Available options are -a(--additional-args), -i(--image), -d(--demon) and -c(--c
 
 
     setup "dev"
+
+    local IMAGE_TO_RUN
+    IMAGE_TO_RUN=$(image_to_run $use_stable_bionemo_image_name)
+    if [[ "$?" != "0" ]]; then
+        echo $IMAGE_TO_RUN
+        exit 1
+    fi
+
     set -x
-    ${DOCKER_CMD} --rm -it --name ${DEV_CONT_NAME} ${BIONEMO_IMAGE} ${CMD}
+    ${DOCKER_CMD} --rm -it --name ${DEV_CONT_NAME} ${IMAGE_TO_RUN} ${CMD}
     set +x
     exit
 }
 
-
 run() {
     CMD='bash'
+    local use_stable_bionemo_image_name=0
     while [[ $# -gt 0 ]]; do
         case $1 in
-	    -c|--cmd)
-	        shift
-		CMD="$@"
-		break
-		;;
-	    *)
-	        echo "Unknown option '$1'. Only available option is -c(--cmd)"
-		exit 1
-		;;
-	esac
+            -s|--stable)
+                shift
+                use_stable_bionemo_image_name=1
+                ;;
+            -c|--cmd)
+                shift
+                CMD="$@"
+                break
+                ;;
+            *)
+                echo "Unknown option '$1'. Only available option is -s(--stable) and -c(--cmd)"
+                exit 1
+                ;;
+	    esac
     done
 
+    local IMAGE_TO_RUN
+    IMAGE_TO_RUN=$(image_to_run $use_stable_bionemo_image_name)
+    if [[ "$?" != "0" ]]; then
+        echo $IMAGE_TO_RUN
+        exit 1
+    fi
+
     set -x
-    ${DOCKER_CMD} --rm -it --gpus all -e HOME=${DOCKER_REPO_PATH} -w ${DOCKER_REPO_PATH} --name ${DEV_CONT_NAME} ${BIONEMO_IMAGE} ${CMD}
+    ${DOCKER_CMD} --rm -it --gpus all -e HOME=${DOCKER_REPO_PATH} -w ${DOCKER_REPO_PATH} --name ${DEV_CONT_NAME} ${IMAGE_TO_RUN} ${CMD}
     set +x
     exit
 }
@@ -507,6 +667,17 @@ attach() {
     exit
 }
 
+info() {
+    echo "BioNeMo Image Repository Information:"
+    echo '----------------------------------------------------------------'
+    echo "GitLab:  gitlab-master.nvidia.com:5005/clara-discovery/bionemo"
+    echo "NVCR:    nvcr.io/nvidian/cvai_bnmo_trng/bionemo"
+    echo '----------------------------------------------------------------'
+    echo "To change the stable image (-s), set BIONEMO_IMAGE in either the environment or the .env file."
+    echo "NOTE: This value requires both the image repository name and the tag, separated by ':'."
+    exit 0
+}
+
 
 case $1 in
     download)
@@ -518,7 +689,7 @@ case $1 in
         download "$@"
         download_test_data
         ;;
-    build | run | push | pull | dev | attach | download_test_data)
+    build | run | push | pull | dev | attach | download_test_data | info)
         $@
         ;;
     *)

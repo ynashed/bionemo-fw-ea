@@ -20,7 +20,7 @@ from tqdm import tqdm, trange
 
 from bionemo.core import BioNeMoDataModule
 from bionemo.data.utils import expand_dataset_paths
-from bionemo.model.utils import _reconfigure_inference_batch
+from bionemo.model.utils import _reconfigure_inference_batch, get_from_encoder_or_model
 from bionemo.tokenizer.label2id_tokenizer import Label2IDTokenizer
 
 
@@ -238,7 +238,7 @@ class get_data:
             return None
 
     def get_hidden_size(self):
-        return self.model.cfg.model.hidden_size
+        return get_from_encoder_or_model(self.model.cfg.model, "hidden_size")
 
     def get_embeddings(self, idx):
         if self.model is not None:

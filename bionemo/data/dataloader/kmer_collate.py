@@ -31,7 +31,6 @@ __all__ = [
 
 
 class KmerTokenizerAdapter(TokenizerAdapterSpec):
-
     """
     A Tokenizer Adapter for BioNeMo's KmerTokenizer
 

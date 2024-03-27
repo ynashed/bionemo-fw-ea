@@ -11,6 +11,7 @@
 import random
 from typing import Iterator, List
 
+from nemo.utils import logging
 from torch.utils.data import DataLoader
 
 from bionemo.data.protein.openfold.datasets import FinetuningDataset, InitialTrainingDataset, ValidationDataset
@@ -19,32 +20,36 @@ from bionemo.data.protein.openfold.samplers import FinetuningSampler, InitialTra
 from bionemo.model.protein.openfold.utils.torch_utils import map_tensor_tree
 
 
-class InitialTrainingDataloader(DataLoader):
-    """Dataloader for the initial training stage."""
+class InitialTrainingDataloaderPT(DataLoader):
+    """Dataloader for the initial training stage, PyTorch(PT) version - no custom priority queue."""
 
     def __init__(
         self,
         dataset: InitialTrainingDataset,
         sampler: InitialTrainingSampler,
-        device_batch_size: int,
+        local_batch_size: int,
         num_workers: int,
+        prefetch_factor: int,
         seed: int,
         uniform_recycling_iters: List[int],
         num_prev_iters: int,
+        use_threading: bool,
         **kwargs,  # TODO: doesn't it foreshadow sampler with batch_sampler? Remove and re-check
     ) -> None:
-        self.device_batch_size = device_batch_size
+        self.device_batch_size = local_batch_size
         self.num_prev_iters = num_prev_iters
         self.seed = seed
         self.uniform_recycling_iters = uniform_recycling_iters
-        super(InitialTrainingDataloader, self).__init__(
+        if use_threading:
+            logging.warning(f"threading is not supported in {InitialTrainingDataloaderPT}")
+        super(InitialTrainingDataloaderPT, self).__init__(
             dataset=dataset,
             collate_fn=collate,
             sampler=sampler,
-            batch_size=device_batch_size,
+            batch_size=local_batch_size,
             num_workers=num_workers,
             drop_last=True,
-            prefetch_factor=(4 if num_workers > 0 else None),
+            prefetch_factor=(prefetch_factor if num_workers > 0 else None),
             persistent_workers=bool(num_workers > 0),
         )
         self._set_train_batch_properties_fn = TrainBatchProperties(

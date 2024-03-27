@@ -31,6 +31,14 @@ models:
         symlink:
             source: "../../megamolbart.nemo"
             target: "molecule/megamolbart/megamolbart.nemo"
+    molmim_70m_24_3:
+        # TODO-REL: update ngc location before release
+        # https://wandb.ai/clara-discovery/molmim_convergence_prod_March2024/runs/cOLZ4Eme
+        ngc: null
+        pbss: "s3://bionemo-ci/models/molmim_70m_24_3.nemo"
+        symlink:
+            source: "../../molmim_70m_24_3.nemo"
+            target: "molecule/molmim/molmim_70m_24_3.nemo"
     equidock_dips:
         ngc: "nvidia/clara/equidock_dips:1.1"
         pbss: "s3://bionemo-ci/models/equidock_dips.nemo"
@@ -69,8 +77,26 @@ models:
         symlink:
             source: "../../esm2nv_3B_converted.nemo"
             target: "protein/esm2nv/esm2nv_3B_converted.nemo"
+    openfold_initial_training_public: # DO NOT RELEASE
+        ngc: "nvidian/cvai_bnmo_trng/openfold:openfold_initial_training_public_checkpoint"
+        pbss: "s3://bionemo-ci/models/openfold_initial_training_public_checkpoint.nemo"
+        symlink:
+            source: "../../openfold_initial_training_public_checkpoint.nemo"
+            target: "protein/openfold/openfold_initial_training_public_checkpoint.nemo"
+    openfold_finetuning_4_public: # DO NOT RELEASE
+        ngc: "nvidian/cvai_bnmo_trng/openfold:openfold_finetuning_4_public_checkpoint"
+        pbss: "s3://bionemo-ci/models/openfold_finetuning_4_public_checkpoint.nemo"
+        symlink:
+            source: "../../openfold_finetuning_4_public_checkpoint.nemo"
+            target: "protein/openfold/openfold_finetuning_4_public_checkpoint.nemo"
+    openfold_initial_training_inhouse: # DO NOT RELEASE
+        ngc: "nvidian/cvai_bnmo_trng/openfold:openfold_initial_training_inhouse_checkpoint"
+        pbss: "s3://bionemo-ci/models/openfold_initial_training_inhouse_checkpoint.nemo"
+        symlink:
+            source: "../../openfold_initial_training_inhouse_checkpoint.nemo"
+            target: "protein/openfold/openfold_initial_training_inhouse_checkpoint.nemo"
     openfold_finetuning_inhouse:
-        ngc: "nvidia/clara/openfold:finetuned_1.2"
+        ngc: "nvidian/cvai_bnmo_trng/openfold:openfold_finetuning_inhouse_checkpoint"
         pbss: "s3://bionemo-ci/models/openfold_finetuning_inhouse_checkpoint.nemo"
         symlink:
             source: "../../openfold_finetuning_inhouse_checkpoint.nemo"
@@ -89,7 +115,6 @@ models:
         extra_args: "--recursive"
     dnabert:
         pbss: "s3://bionemo-ci/models/dnabert-86M.nemo"
-        ngc: "nvidia/clara/dnabert:1.2"
         symlink:
             source: "../../dnabert-86M.nemo"
             target: "dna/dnabert/dnabert-86M.nemo"

@@ -1,8 +1,21 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+#
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
+
+from typing import Callable, Optional, Union
+
 import torch
 from einops import rearrange
 from nemo.collections.nlp.modules.common.megatron.adapters.parallel_adapters import (
     InfusedAdapterConfig,
     LoraKQVAdapterConfig,
+    LoraKQVAdapterWeightTyingConfig,
     LoraKVAdapterConfig,
     LoraQAdapterConfig,
 )
@@ -30,6 +43,7 @@ except (ImportError, ModuleNotFoundError):
 
 try:
     from megatron.core import parallel_state, tensor_parallel
+    from megatron.core.model_parallel_config import ModelParallelConfig
 
     HAVE_MEGATRON_CORE = True
 
@@ -57,6 +71,7 @@ from nemo.utils import logging
 # END BIONEMO
 
 
+# TODO(dorotat, georgea) Refactor these part to use directly megatron.core
 class ESMnvCoreAttention(CoreAttention):
     """Region where selective activation recomputation is applied.
     See Figure 3. in Reducing Activation Recomputation in Large Transformer Models
@@ -82,8 +97,10 @@ class ESMnvCoreAttention(CoreAttention):
         rotary_pos_emb=None,
         relative_position_bias=None,
         headscale_tensor=None,
+        inference_mode=None,
     ):
-        b, np, sq, sk, hn = (  # noqa: F841
+        # b, np, sq, sk, hn
+        _, _, sq, sk, _ = (
             query_layer.size(1),
             query_layer.size(2),
             query_layer.size(0),
@@ -144,7 +161,9 @@ class ESMnvCoreAttention(CoreAttention):
         # relative_position_bias [b, np, sq, sk]
         # context_layer [b, np, sq, hn]
         # ==================================================
-        context_layer = self.attn_fn(query_layer, key_layer, value_layer, attention_mask, relative_position_bias)
+        context_layer = self.attn_fn(
+            query_layer, key_layer, value_layer, attention_mask, relative_position_bias, inference_mode
+        )
 
         if self.return_intermediate:
             context_layer, attention_probs, attention_scores = context_layer
@@ -158,6 +177,7 @@ class ESMnvCoreAttention(CoreAttention):
         # [sq, b, np, hn] --> [sq, b, hp]
         new_context_layer_shape = context_layer.size()[:-2] + (self.hidden_size_per_partition,)
         context_layer = context_layer.view(*new_context_layer_shape)
+
         if self.return_intermediate:
             return (
                 context_layer,
@@ -169,7 +189,50 @@ class ESMnvCoreAttention(CoreAttention):
             )
         return context_layer
 
-    def torch_attention(self, query_layer, key_layer, value_layer, attention_mask, attention_bias):
+    def esm2_scale_mask_softmax(
+        self,
+        input: torch.Tensor,
+        mask: Optional[torch.Tensor] = None,
+        scale: Optional[Union[float, int]] = None,
+        mask_func: Optional[Callable] = None,
+    ) -> torch.Tensor:
+        """Scale Mask Softmax function.
+
+        Args:
+            input: Tensor of shape (Batch, NP, SK, SQ). The input may or may not have already
+                had a mask applied to it.
+            mask: If a mask is to be applied, it will go here.
+            scale: A scale factor that will be applied before the softmax.
+            mask_func: An optional function to apply to the mask. If None, it is assumed that
+                the input already had the mask applied to it.
+
+        Returns:
+            probs: Tensor of normalized probabilities after the softmax has been applied,
+                of shape (Batch, NP, SK, SQ).
+        """
+        if self.attn_mask_type.name != "padding":
+            raise ValueError(
+                f"self.attn_mask_type: {self.attn_mask_type} is not 'padding'. Only 'padding' type is supported currently."
+            )
+
+        original_dtype = input.dtype  # Store original dtype
+        if (original_dtype == torch.float16 or original_dtype == torch.bfloat16) and self.attention_softmax_in_fp32:
+            input = input.float()  # Convert to float32 for softmax
+
+        if scale is not None:
+            input = input * scale  # Apply scaling
+
+        if mask is not None and mask_func is not None:
+            input = mask_func(input, mask)  # Apply mask function if provided
+
+        probs = torch.nn.functional.softmax(input, dim=-1)  # Apply softmax
+
+        if self.attention_softmax_in_fp32 and original_dtype in (torch.float16, torch.bfloat16):
+            probs = probs.to(original_dtype)  # Convert back to original dtype if necessary
+
+        return probs
+
+    def torch_attention(self, query_layer, key_layer, value_layer, attention_mask, attention_bias, inference_mode):
         sq, b, np, hn = query_layer.shape
         sk = key_layer.shape[0]
 
@@ -182,7 +245,7 @@ class ESMnvCoreAttention(CoreAttention):
             key_layer = rearrange(key_layer, 'sk b np hn -> (b np) hn sk')
             value_layer = rearrange(value_layer, 'sv b np hn -> (b np) sv hn')
 
-        matmul_input_buffer = torch.empty(
+        matmul_input_buffer = torch.zeros(
             query_layer.shape[0],
             query_layer.shape[1],
             key_layer.shape[2],
@@ -200,24 +263,22 @@ class ESMnvCoreAttention(CoreAttention):
 
         # change view to [b, np, sq, sk]
         attention_scores = matmul_result.view(b, np, sq, sk)
-        # BIONEMO CUSTOM ATTENTION MASKING
         # TODO(srabhi, georgea): refactor the custom torch_attention module using Megatron Core when NeMo 1.21 is available
         if self.use_esm_attention:
             # NOTE: the slicing here is to make the attention_mask the same shape as the extended
             #  attention mask in ESM2. The multiplication by -3.4028e+38 is similarly motivated
             #  by ESM2's maskikng approach, which forces softmax of attention scores for
             #  masked entries to be close to 0.
-            attention_probs = self.scale_mask_softmax(
-                attention_scores + attention_mask[:, :, 0:1, :] * -3.4028e38, None
+            attention_probs = self.esm2_scale_mask_softmax(
+                attention_scores + attention_mask[:, :, 0:1, :] * -3.4028e38
             )
-        # END BIONEMO
         else:
             if attention_bias is not None:
                 attention_scores += attention_bias
 
             attention_probs = self.scale_mask_softmax(attention_scores, attention_mask)
-        # This is actually dropping out entire tokens to attend to, which might
-        # seem a bit unusual, but is taken from the original Transformer paper.
+            # This is actually dropping out entire tokens to attend to, which might
+            # seem a bit unusual, but is taken from the original Transformer paper.
 
         if not self.sequence_parallel:
             with tensor_parallel.random.get_cuda_rng_tracker().fork():
@@ -243,6 +304,7 @@ class ESMnvCoreAttention(CoreAttention):
 class ESMnvParallelAttention(ParallelAttention):
     def __init__(
         self,
+        config: ModelParallelConfig,
         init_method,
         output_layer_init_method,
         layer_number,
@@ -253,7 +315,6 @@ class ESMnvParallelAttention(ParallelAttention):
         precision=16,
         apply_query_key_layer_scaling=False,
         kv_channels=None,
-        use_cpu_initialization=False,
         megatron_amp_O2=False,
         masked_softmax_fusion=True,
         attention_dropout=0.1,
@@ -263,15 +324,12 @@ class ESMnvParallelAttention(ParallelAttention):
         headscale=False,
         position_embedding_type='learned_absolute',
         multi_query_attention=False,
-        activations_checkpoint_granularity=None,
-        sequence_parallel=False,
-        gradient_accumulation_fusion=False,
         normalize_attention_scores=True,
         use_flash_attention=False,
         # NEW BIONEMO ARGS
         use_esm_attention=False,
     ):
-        super(ParallelAttention, self).__init__()
+        super(ParallelAttention, self).__init__(config=config)
         self.return_intermediate = False
         self.layer_number = max(1, layer_number)
         self.attention_type = attention_type
@@ -279,9 +337,10 @@ class ESMnvParallelAttention(ParallelAttention):
         self.normalize_attention_scores = normalize_attention_scores
         self.position_embedding_type = position_embedding_type
         self.multi_query_attention = multi_query_attention
+        self.use_flash_attention = use_flash_attention
 
         self.megatron_legacy = megatron_legacy
-        self.dtype = utils_funcs.dtype_from_precision(precision, megatron_amp_O2)
+        self.dtype = utils_funcs.torch_dtype_from_precision(precision, megatron_amp_O2)
 
         self.set_accepted_adapter_types(
             [
@@ -289,6 +348,7 @@ class ESMnvParallelAttention(ParallelAttention):
                 LoraKQVAdapterConfig._target_,
                 LoraQAdapterConfig._target_,
                 LoraKVAdapterConfig._target_,
+                LoraKQVAdapterWeightTyingConfig._target_,
             ]
         )
 
@@ -307,53 +367,38 @@ class ESMnvParallelAttention(ParallelAttention):
             self.num_attention_heads_per_partition * parallel_state.get_tensor_model_parallel_rank()
         )
 
-        async_tensor_model_parallel_allreduce = (
-            parallel_state.get_tensor_model_parallel_world_size() > 1 and not sequence_parallel
-        )
-
         # Strided linear layer.
         if attention_type == AttnType.self_attn:
             self.query_key_value = tensor_parallel.ColumnParallelLinear(
                 hidden_size,
                 3 * projection_size,
+                config=config,
                 gather_output=False,
                 init_method=init_method,
-                use_cpu_initialization=use_cpu_initialization,
-                params_dtype=self.dtype,
                 bias=bias,
-                sequence_parallel_enabled=sequence_parallel,
-                async_tensor_model_parallel_allreduce=async_tensor_model_parallel_allreduce,
-                gradient_accumulation_fusion=gradient_accumulation_fusion,
             )
         else:
             assert attention_type == AttnType.cross_attn
             self.query = tensor_parallel.ColumnParallelLinear(
                 hidden_size,
                 projection_size,
+                config=config,
                 gather_output=False,
                 init_method=init_method,
-                use_cpu_initialization=use_cpu_initialization,
-                params_dtype=self.dtype,
                 bias=bias,
-                sequence_parallel_enabled=sequence_parallel,
-                async_tensor_model_parallel_allreduce=async_tensor_model_parallel_allreduce,
-                gradient_accumulation_fusion=gradient_accumulation_fusion,
             )
 
             self.key_value = tensor_parallel.ColumnParallelLinear(
                 hidden_size,
                 2 * projection_size,
+                config=config,
                 gather_output=False,
                 init_method=init_method,
-                use_cpu_initialization=use_cpu_initialization,
-                params_dtype=self.dtype,
                 bias=bias,
-                sequence_parallel_enabled=sequence_parallel,
-                async_tensor_model_parallel_allreduce=async_tensor_model_parallel_allreduce,
-                gradient_accumulation_fusion=gradient_accumulation_fusion,
             )
 
         self.core_attention = ESMnvCoreAttention(
+            config=config,
             layer_number=self.layer_number,
             num_attention_heads=num_attention_heads,
             hidden_size=hidden_size,
@@ -365,7 +410,6 @@ class ESMnvParallelAttention(ParallelAttention):
             masked_softmax_fusion=masked_softmax_fusion,
             attention_dropout=attention_dropout,
             multi_query_attention=multi_query_attention,
-            sequence_parallel=sequence_parallel,
             normalize_attention_scores=normalize_attention_scores,
             position_embedding_type=position_embedding_type,
             use_flash_attention=use_flash_attention,
@@ -377,14 +421,11 @@ class ESMnvParallelAttention(ParallelAttention):
         self.dense = tensor_parallel.RowParallelLinear(
             projection_size,
             hidden_size,
+            config=config,
             input_is_parallel=True,
             init_method=output_layer_init_method,
             skip_bias_add=True,
-            use_cpu_initialization=use_cpu_initialization,
-            params_dtype=self.dtype,
             bias=bias,
-            sequence_parallel_enabled=sequence_parallel,
-            gradient_accumulation_fusion=gradient_accumulation_fusion,
         )
 
         self.headscale = headscale

@@ -9,7 +9,7 @@
 # its affiliates is strictly prohibited.
 
 import re
-from typing import Optional, Type, TypeVar
+from typing import Optional, Tuple, Type, TypeVar
 
 import pytorch_lightning as pl
 import torch
@@ -18,7 +18,6 @@ from nemo.collections.nlp.parts.nlp_overrides import (
     MegatronHalfPrecisionPlugin,
     NLPDDPStrategy,
     NLPSaveRestoreConnector,
-    PEFTSaveRestoreConnector,
     PipelineMixedPrecisionPlugin,
 )
 from nemo.utils import logging
@@ -31,11 +30,8 @@ from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelSummary
 from pytorch_lightning.callbacks.timer import Timer
 from pytorch_lightning.plugins.environments import TorchElasticEnvironment
-from pytorch_lightning.trainer.connectors.checkpoint_connector import (
-    CheckpointConnector,
-)
 
-from bionemo.callbacks.utils import add_test_callbacks
+from bionemo.callbacks.utils import add_test_callbacks, add_training_callbacks
 
 
 M = TypeVar('M')
@@ -52,6 +48,51 @@ try:
     HAVE_APEX = True
 except (ImportError, ModuleNotFoundError):
     HAVE_APEX = False
+
+
+def pad_preds_after_first_eos(
+    preds: torch.LongTensor, eos_id: int, pad_id: int
+) -> Tuple[torch.LongTensor, torch.BoolTensor]:
+    """Given token ids from model.decode, this will ensure that they are padded after the first EOS token is encountered.
+        This is not generally required for producing strings, however it could be useful for testing when some samplers do this
+        internally, such as beam search, while others do not, such as greedy search.
+
+    Args:
+        preds (torch.LongTensor): token id preds from model.decode (modified in place and returned for convenience)
+        eos_id (int): eos token from model.tokenizer.eos_id
+        pad_id (int): pad token from model.tokenizer.pad_id
+
+    Returns:
+        torch.LongTensor: cleaned up preds tokens where everything after the first EOS is changed to a PAD.
+    """
+    # set everything after the first eos_id to pad_id so that greedy is in line with beam search
+    eos_cum_sum_mask = (preds == eos_id).cumsum(dim=1) > 0
+    mask_after_first_eos = torch.roll(eos_cum_sum_mask, shifts=1, dims=1)
+    mask_after_first_eos[:, 0] = False  # Ensure the first column is not affected by the roll
+    preds[mask_after_first_eos] = pad_id
+    return preds, mask_after_first_eos
+
+
+def get_from_encoder_or_model(model_cfg, key):
+    """Returns key from encoder or from model (allows backward compatibility)"""
+    if "encoder" in model_cfg and key in model_cfg.encoder:
+        return getattr(model_cfg.encoder, key)
+    if key in model_cfg:
+        return getattr(model_cfg, key)
+
+    raise ValueError(f"Either model_cfg.encoder.{key} or model_cfg.{key} must be provided")
+
+
+def get_from_decoder_encoder_or_model(model_cfg, key):
+    """Returns key from decoder or from model (allows backward compatibility)"""
+    if "decoder" in model_cfg and key in model_cfg.decoder:
+        return getattr(model_cfg.decoder, key)
+    if "encoder" in model_cfg and key in model_cfg.encoder:
+        return getattr(model_cfg.encoder, key)
+    if key in model_cfg:
+        return getattr(model_cfg, key)
+
+    raise ValueError(f"Either model_cfg.decoder.{key} or model_cfg.{key} must be provided")
 
 
 def set_cfg_key(key, value, cfg_section, msg=""):
@@ -154,9 +195,9 @@ class TrainerBuilder:
     @staticmethod
     def configure_plugins(cfg):
         plugins = []
-        if cfg.trainer.precision in [16, "bf16"]:
+        if cfg.trainer.precision in [16, "bf16", "16-mixed", "bf16-mixed"]:
             scaler = None
-            if cfg.trainer.precision == 16:
+            if cfg.trainer.precision == 16 or cfg.trainer.precision == "16-mixed":
                 scaler = GradScaler(
                     init_scale=cfg.model.get("native_amp_init_scale", 2**32),
                     growth_interval=cfg.model.get("native_amp_growth_interval", 1000),
@@ -196,13 +237,10 @@ class TrainerBuilder:
     @staticmethod
     def resume_checkpoint(cfg, trainer):
         # update resume from checkpoint found by exp_manager
-        if cfg.model.resume_from_checkpoint is not None:
-            resume_from_checkpoint = cfg.model.resume_from_checkpoint
-        else:
-            resume_from_checkpoint = trainer._checkpoint_connector.resume_from_checkpoint_fit_path
-        logging.info(f"Resuming training from checkpoint: {resume_from_checkpoint}")
-
-        trainer._checkpoint_connector = CheckpointConnector(trainer, resume_from_checkpoint=resume_from_checkpoint)
+        if cfg.model.get('resume_from_checkpoint', None) is not None:
+            new_path = cfg.model.resume_from_checkpoint
+            logging.info(f"Resuming from checkpoint: {new_path} rather than {trainer.ckpt_path}")
+            trainer.ckpt_path = cfg.model.resume_from_checkpoint
         # Override timer callback to a stateless one
         for idx, callback in enumerate(trainer.callbacks):
             if isinstance(callback, Timer):
@@ -236,6 +274,7 @@ def setup_trainer(cfg, builder=None, callbacks=[], adjust_config=True, verbose=T
     mode = "train" if cfg.get("do_training", False) else "test"
     callbacks = builder.configure_callbacks(cfg, callbacks)
     add_test_callbacks(cfg, callbacks=callbacks, mode="infer" if builder == InferenceTrainerBuilder else mode)
+    add_training_callbacks(cfg, callbacks)
 
     if interactive:
         strategy = 'auto'
@@ -246,6 +285,11 @@ def setup_trainer(cfg, builder=None, callbacks=[], adjust_config=True, verbose=T
 
     trainer = Trainer(plugins=plugins, strategy=strategy, callbacks=callbacks, **cfg.trainer)
 
+    # exp_manager()
+    #   - One action done in this function is to find the 'correct' checkpoint,
+    #   which is one that matches *last.ckpt, and assigns it to trainer.ckpt_path
+    #
+    # https://github.com/NVIDIA/NeMo/blob/main/nemo/utils/exp_manager.py
     exp_manager(trainer, cfg.get("exp_manager", None))
 
     builder.resume_checkpoint(cfg, trainer)
@@ -308,15 +352,9 @@ def restore_model(
         cfg.model.precision = trainer.precision
 
     if cfg.get('use_peft', False):  # skipped if use_peft is false or not present in config
-        if cfg.model.resume_from_checkpoint is not None:
-            resume_from_checkpoint = cfg.model.resume_from_checkpoint
-        else:
-            resume_from_checkpoint = trainer._checkpoint_connector.resume_from_checkpoint_fit_path
-        logging.info(f'Resuming training from checkpoint: {resume_from_checkpoint}')
+        # TODO(dorotat): PEFT is not present in NeMo 1.22 - it was refactored. Disabling it till it is fixed
+        raise ValueError("PEFT is disabled")
 
-        save_restore_connector = PEFTSaveRestoreConnector(
-            peft_model_nemo_path=cfg.model.peft.restore_from_path, peft_model_ckpt_path=resume_from_checkpoint
-        )
     else:
         save_restore_connector = NLPSaveRestoreConnector()
 
@@ -442,7 +480,7 @@ def initialize_distributed_parallel_state(
     # if not interactive and not torch.distributed.is_initialized():
     if not torch.distributed.is_initialized():
         logging.info("pytorch DDP is not initialized. Initializing with pytorch-lightening...")
-        trainer = pl.Trainer(gpus=1, strategy='ddp' if not interactive else "auto", num_nodes=1)
+        trainer = pl.Trainer(devices=1, strategy='ddp' if not interactive else "auto", num_nodes=1)
 
         if trainer.strategy.launcher is not None:
             trainer.strategy.launcher.launch(_dummy, trainer=trainer)

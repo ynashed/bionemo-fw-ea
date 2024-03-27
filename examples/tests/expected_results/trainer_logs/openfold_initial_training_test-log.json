@@ -1,0 +1,13 @@
+{
+    "distogram": 4.1574177742004395,
+    "experimentally_resolved": 0.6931471228599548,
+    "fape": 0.9117436408996582,
+    "masked_msa": 3.1353869438171387,
+    "plddt_loss": 3.9118754863739014,
+    "scaled_weighted_total_loss": 73.21288299560547,
+    "supervised_chi": 0.4755159616470337,
+    "train_backward_timing in s": 2.9520227909088135,
+    "train_step_timing in s": 4.16460657119751,
+    "violation": 194.8334503173828,
+    "weighted_total_loss": 8.944377899169922
+}

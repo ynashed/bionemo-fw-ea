@@ -1,5 +1,6 @@
 import glob
 import os
+from pathlib import Path
 
 import pytest
 from omegaconf import OmegaConf
@@ -9,7 +10,6 @@ from bionemo.utils.tests import get_directory_hash
 
 
 # FLIP secondary structure benchmark dataset is small and will be fully downloaded in this test
-ROOT_DIR = 'FLIP'
 CONFIG = {'url': None, 'num_csv_files': 1}
 HEADER = 'id,sequence,3state,resolved'
 NUM_ENTRIES = 11156
@@ -19,24 +19,29 @@ TRAIN_VAL_TEST_HASHES = {
     'test': 'a92c394b0017cd573d25fbd86cc6abf7',
 }
 
-##############
+
+@pytest.fixture(scope='session')
+def bionemo_home() -> Path:
+    try:
+        x = os.environ['BIONEMO_HOME']
+    except KeyError:
+        raise ValueError("Need to set BIONEMO_HOME in order to run unit tests! See docs for instructions.")
+    else:
+        yield Path(x).absolute()
 
 
 @pytest.fixture(scope="session")
-def tmp_directory(tmp_path_factory, root_directory=ROOT_DIR):
-    """Create tmp directory"""
-    tmp_path_factory.mktemp(root_directory)
-    return tmp_path_factory.getbasetemp()
+def config_path_for_tests(bionemo_home) -> str:
+    yield str(bionemo_home / "examples" / "tests" / "conf")
 
 
 @pytest.mark.parametrize(
     'config, header, num_entries, hash_dict', [(CONFIG, HEADER, NUM_ENTRIES, TRAIN_VAL_TEST_HASHES)]
 )
-def test_prepare_dataset(tmp_directory, config, header, num_entries, hash_dict):
+def test_prepare_dataset(tmp_path, config, header, num_entries, hash_dict):
     cfg = OmegaConf.create(config)
-    preproc = FLIPPreprocess(root_directory=tmp_directory)
-    processed_directory = os.path.join(tmp_directory, 'processed')
-    print(processed_directory)
+    preproc = FLIPPreprocess(root_directory=str(tmp_path))
+    processed_directory = os.path.join(tmp_path, 'processed')
     preproc.prepare_dataset(num_csv_files=cfg.num_csv_files, output_dir=processed_directory)
 
     total_lines = 0

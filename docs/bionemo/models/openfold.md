@@ -1,5 +1,5 @@
-# OpenFold
-#  Model Overview
+# OpenFold 
+# Model Overview
 
 ## Description:
 This is an OpenFold implementation under BioNeMo framework, derived from public OpenFold and DeepMind AlphaFold-2. This checkpoint was fine-tuned on the initial training checkpoint from the public OpenFold team.
@@ -114,30 +114,11 @@ OpenFold under BioNeMo framework  <br>
 * [Ampere] <br>
 * [Hopper] <br>
 
-## Benchmarks
+## Accuracy Benchmarks
+TBD
 
-### Accuracy benchmark
-
-There are two stages of training OpenFold: initial-training and fine-tuning. 4 checkpoints are available for download: a pair of initial-training and fintuining available publicly and converted to .nemo format, and another pair of in-house trained checkpoints. All checkpoints are benchmarked against [CAMEO benchmark](https://cameo3d.org/modeling/3-months/) with proteins dated from 2021-09-17 to 2021-12-11. This validation set is available through training data.
-
-Benchmark results (lDDT-cα) for checkpoints trained using BioNeMo framework:
-
-|                                 | initial-training | fine-tuning* |
-|---------------------------------|------------------|--------------|
-| CAMEO  2021-09-17 to 2021-12-11 |       89.82      |      91.0    |
-
-*this checkpoint was fine-tuned starting from **public** inital-training, and is available for download via NGC (using the `download_models.py` script).
-
-### Training Performance Benchmarks
-
-Training speed was tested 16 DGX-A100 (128 GPUs) with 80GB of memory, with a single protein (micro batch size of 1) per GPU.
-
-|                        | initial-training | fine-tuning |
-|------------------------|------------------|-------------|
-| number of steps        |      80,000      |    12,000   |
-| training step time (s) |       6.06       |    24.91    |
-
-Note that in the default configuration of OpenFold training shipped in BioNeMo, there is validation every 200 steps, which takes about 3 minutes of duration. Initial training therefore takes approximately 6.5 days.
+## Performance Benchmarks
+TBD
 
 ## Ethical Considerations:
 NVIDIA believes Trustworthy AI is a shared responsibility and we have established policies and practices to enable development for a wide array of AI applications.  When downloaded or used in accordance with our terms of service, developers should work with their supporting model team to ensure this model meets requirements for the relevant industry and use case and addresses unforeseen product misuse.  For more detailed information on ethical considerations for this model, please see the Model Card++ Explainability, Bias, Safety & Security, and Privacy Subcards.  Please report security vulnerabilities or NVIDIA AI Concerns [here](https://www.nvidia.com/en-us/support/submit-security-vulnerability/).

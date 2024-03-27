@@ -115,8 +115,8 @@ if os.path.exists(os.path.join(package_path, ".so3.npz")):
     _score_norms = so3['_score_norms']
     _exp_score_norms = so3['_exp_score_norms']
 else:
-    _eps_array = 10 ** np.linspace(np.log10(MIN_EPS), np.log10(MAX_EPS), N_EPS)
-    _omegas_array = np.linspace(0, np.pi, X_N + 1)[1:]
+    _eps_array = (10 ** np.linspace(np.log10(MIN_EPS), np.log10(MAX_EPS), N_EPS)).astype(np.float128)
+    _omegas_array = np.linspace(0, np.pi, X_N + 1)[1:].astype(np.float128)
 
     _exp_vals = _expansion_vectorized(_omegas_array, _eps_array)
     _pdf_vals = _density(_exp_vals, _omegas_array, marginal=True)
@@ -129,6 +129,11 @@ else:
     )
 
     _exp_score_norms = np.sqrt(np.sum(_score_norms**2 * _pdf_vals, axis=1) / np.sum(_pdf_vals, axis=1) / np.pi)
+
+    _omegas_array = _omegas_array.astype(np.float64)
+    _cdf_vals = _cdf_vals.astype(np.float64)
+    _score_norms = _score_norms.astype(np.float64)
+    _exp_score_norms = _exp_score_norms.astype(np.float64)
 
     np.savez(
         os.path.join(package_path, ".so3.npz"),

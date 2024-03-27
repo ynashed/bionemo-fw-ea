@@ -11,13 +11,13 @@ from typing import List, Optional, Sequence, Tuple
 
 import torch
 
-from bionemo.model.core.infer import BaseEncoderDecoderInference
+from bionemo.model.core.infer import BaseEncoderInference
 
 
 __all__: Sequence[str] = ("ESM1nvInference",)
 
 
-class ESM1nvInference(BaseEncoderDecoderInference):
+class ESM1nvInference(BaseEncoderInference):
     '''
     All inference functions
     '''
@@ -70,7 +70,7 @@ class ESM1nvInference(BaseEncoderDecoderInference):
             enc_mask (torch.Tensor, long): boolean mask for special tokens (<BOS> and <EOS>) and padded sections
         '''
         token_ids, enc_mask = self.tokenize(sequences)
-        hidden_states = self.model.encode(token_ids, enc_mask)
+        hidden_states = self.model.encode(token_ids, enc_mask, reconfigure_microbatch=not self.interactive)
 
         # ignore <BOS> and <EOS> tokens
         enc_mask[:, 0:2] = 0

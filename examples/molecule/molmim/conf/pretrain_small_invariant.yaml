@@ -1,0 +1,17 @@
+defaults:
+  - pretrain_base_invariant
+  - _self_
+
+# Small model
+trainer:
+  devices: 8
+  num_nodes: 8
+
+model: 
+  name: MolMIM-small
+  
+  # model architecture
+  encoder:
+    num_layers: 6
+    num_attention_heads: 8
+    hidden_size: 512

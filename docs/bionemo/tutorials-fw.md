@@ -13,12 +13,16 @@ In both types of tutorials, it is convenient to first launch the BioNeMo Framewo
 | Topic              | Title                                                                                              |
 | ------------------ | -------------------------------------------------------------------------------------------------- |
 | Model Pre-Training | [Launching a MegaMolBART model pre-training with ZINC-15 dataset](./notebooks/model_training_mmb.ipynb) |
+| Custom Datasets | [Setting up the ZINC15 dataset used for training MolMIM](./notebooks/ZINC15-data-preprocessing.ipynb) |
+| Model Pre-Training | [Launching a MolMIM model pre-training with ZINC-15 dataset, both from scratch and starting from an existing checkpoint](./notebooks/model_training_molmim.ipynb) |
 | Model Pre-Training | [Launching an ESM-1nv model pre-training with UniRef50 dataset](./notebooks/model_training_esm1nv.ipynb) |
 | Model Pre-Training | [Launching an ESM-2nv model pre-training with curated data from UniRef50, UniRef90](./notebooks/model_training_esm2nv.ipynb) |
 | Model Training     | [Launching an EquiDock model pre-training with DIPS or DB5 datasets](./notebooks/model_training_equidock.ipynb)|
 | Inference          | [Performing Inference with MegaMolBART for Generative Chemistry and Predictive Modeling with RAPIDS](./notebooks/MMB_GenerativeAI_Inference_with_examples.ipynb) |
+| Inference          | [Performing Inference with MolMIM for Generative Chemistry and Predictive Modeling with RAPIDS](./notebooks/MolMIM_GenerativeAI_local_inference_with_examples.ipynb) |
 | Inference          | [Performing Inference with ESM1-nv and Predictive Modeling with RAPIDS](./notebooks/protein-esm1nv-clustering.ipynb) |
 | Inference          | [Performing Inference with ESM2-nv and Predictive Modeling with RAPIDS](./notebooks/protein-esm2nv-clustering.ipynb) |
+| Inference          | [Performing Property-guided Molecular Optimization with MolMIM, which internally involves inference](./notebooks/cma_es_guided_molecular_optimization_molmim.ipynb) |
 | Model Finetuning   | [Overview of Finetuning pre-trained models in BioNeMo](./notebooks/bionemo-finetuning-overview.ipynb)                             |
 | Encoder Finetuning | [Encoder Fine-tuning in BioNeMo: MegaMolBART](./notebooks/encoder-finetuning-notebook-fw.ipynb)                             |
 | Downstream Tasks   | [Training a Retrosynthesis Model using USPTO50 Dataset](./notebooks/retrosynthesis-notebook.ipynb)                             |

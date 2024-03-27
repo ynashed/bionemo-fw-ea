@@ -27,7 +27,7 @@ ACCUMULATE_GRAD_BATCHES=1 # gradient accumulation
 VAL_CHECK_INTERVAL=500 # how often validation step is performed, including downstream task validation
 MICRO_BATCH_SIZE=1
 TENSOR_MODEL_PARALLEL_SIZE=1 # if > 1 must turn off pytorch base layers
-PRECISION=32 #fp [16, 32]
+PRECISION=32 #fp [16-mixed, bf16-mixed, 32]
 # =========================
 
 # Logging

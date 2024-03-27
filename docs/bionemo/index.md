@@ -24,7 +24,6 @@ Some of the key features of BioNeMo Framework are:
 
 | **Model**                                               | **Modality**             | **Uses**                                      |**Trained/Converted Checkpoints on NGC**           |
 |---------------------------------------------------------|--------------------------|-----------------------------------------------|---------------------------------------------------|
-|[DNABERT]](./models/dnabert.md)                          | DNA                      | Representation Learning                       | [BioNeMo checkpoint pretrained from scratch](https://registry.ngc.nvidia.com/orgs/nvidia/teams/clara/models/openfold)     |
 | [OpenFold](./models/openfold.md)                        | Protein                  | Protein Structure Prediction                  | [Public checkpoint fine-tuned by BioNeMo](https://registry.ngc.nvidia.com/orgs/nvidia/teams/clara/models/openfold)     |
 | [DiffDock Score Model](./models/diffdock.md)            | Protein + Molecule       | Generation of Ligand Poses                    | [Public checkpoint converted to BioNeMo format](https://registry.ngc.nvidia.com/orgs/nvidia/teams/clara/models/dnabert)     |
 | [DiffDock Confidence Model](./models/diffdock.md)       | Protein + Molecule       | Generation of Ligand Poses                    | [Public checkpoint converted to BioNeMo format](https://registry.ngc.nvidia.com/orgs/nvidia/teams/clara/models/diffdock_confidence)        |
@@ -35,7 +34,8 @@ Some of the key features of BioNeMo Framework are:
 | [ESM-1nv](./models/esm1-nv.md)                          | Protein                  | Representation Learning                       | [BioNeMo checkpoints pre-trained from scratch](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/clara/models/esm1nv)                       |
 | [ProtT5nv](./models/prott5nv.md)                        | Protein                  | Representation Learning                       | [BioNeMo checkpoints pre-trained from scratch](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/clara/models/prott5nv)                     |
 | [MegaMolBART](./models/megamolbart.md)                  | Small Molecule           | Representation Learning + Molecule Generation | [BioNeMo checkpoints pre-trained from scratch](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/clara/models/megamolbart)                  |
+| [MolMIM](./models/molmim.md)                  | Small Molecule           | Representation Learning + Molecule Generation | [BioNeMo checkpoints pre-trained from scratch](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/clara/models/molmim)                  |
 
-For more information about the models included in BioNeMo Framework, refer to the Model Cards linked in the table above or the original publications referenced in the respective model descriptions.
+For more information about the models included in BioNeMo Framework, refer to the Model Cards linked in the table above or the original publications referenced in the respective model descriptions. One can also go to the linked NGC Model Catalog Pages to download the model checkpoints, integrate it into your own BioNeMo FW workflows. You can use the tutorials provided in the documentation to learn how to plug in a bionemo model and run training/inference or downstream tasks.
 
 Refer to the [Quickstart Guide](./quickstart-fw.md) for details on how to get started with BioNeMo Framework.

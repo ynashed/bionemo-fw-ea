@@ -28,7 +28,7 @@ from omegaconf import DictConfig
 from torch.utils.data import DataLoader
 
 from bionemo.model.loading import setup_inference
-from bionemo.triton.utils import load_model_config
+from bionemo.utils.hydra import load_model_config
 
 
 __all__: Sequence[str] = (
@@ -155,7 +155,7 @@ def main(config_path: str, config_name: str, output_override: Optional[str], ove
     print("Overwrite output file if it exists?", {overwrite})
     print('-' * 80)
 
-    cfg = load_model_config(Path(config_path), config_name, logger=logging)
+    cfg = load_model_config(config_name=config_name, config_path=config_path, logger=logging)
 
     output_fname = _resolve_and_validate_output_filename(cfg, output_override, overwrite)
 

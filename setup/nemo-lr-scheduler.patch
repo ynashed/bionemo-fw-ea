@@ -1,0 +1,52 @@
+diff --git a/nemo/core/optim/lr_scheduler.py b/nemo/core/optim/lr_scheduler.py
+index 73ad1e18a..c20d56a01 100644
+--- a/nemo/core/optim/lr_scheduler.py
++++ b/nemo/core/optim/lr_scheduler.py
+@@ -216,6 +216,39 @@ class WarmupHoldPolicy(WarmupPolicy):
+         return self._get_lr(step)
+ 
+ 
++class WarmupAnnealDecayHold(_LRScheduler):
++    def __init__(self, optimizer, *, max_steps, warmup_steps, max_lr, min_lr: float = 4e-5, anneal_percentage: float = 0.10, last_epoch: int = -1, constant_steps: int = None, warmup_ratio: float = None):
++        """
++        Initializes the WarmupAnnealDecayHold learning rate scheduler.
++
++        :param max_steps: Total number of training steps.
++        :param warmup_steps: Number of steps for the linear warm-up.
++        :param max_lr: Peak learning rate to be achieved after warm-up.
++        """
++        self.max_steps = max_steps
++        self.warmup_steps = warmup_steps
++        self.max_lr = max_lr
++        self.anneal_percentage = anneal_percentage 
++        self.last_epoch = last_epoch
++        self.min_lr = min_lr
++
++        for group in optimizer.param_groups:
++            group.setdefault('initial_lr', max_lr)
++        
++        super(WarmupAnnealDecayHold, self).__init__(optimizer, last_epoch)
++
++    def get_lr(self):
++        step_num = self.last_epoch
++        if step_num < self.warmup_steps:
++            lr = self.min_lr + (self.max_lr - self.min_lr) * step_num / self.warmup_steps
++        else:
++            decay_steps = self.max_steps - self.warmup_steps
++            lr = self.max_lr * (1 - (step_num - self.warmup_steps) / decay_steps)
++            lr = max(lr, self.max_lr * self.anneal_percentage)
++        
++        return [lr for _ in self.optimizer.param_groups]
++
++
+ class WarmupAnnealHoldPolicy(_LRScheduler):
+     """Adds warmup kwargs and warmup logic to lr policy.
+     All arguments should be passed as kwargs for clarity,
+@@ -962,6 +995,7 @@ AVAILABLE_SCHEDULERS = {
+     'CosineAnnealing': CosineAnnealing,
+     'NoamAnnealing': NoamAnnealing,
+     'NoamHoldAnnealing': NoamHoldAnnealing,
++    'WarmupAnnealDecayHold':WarmupAnnealDecayHold,
+     'WarmupAnnealing': WarmupAnnealing,
+     'InverseSquareRootAnnealing': InverseSquareRootAnnealing,
+     'T5InverseSquareRootAnnealing': T5InverseSquareRootAnnealing,

@@ -30,9 +30,10 @@ from bionemo.triton.types_constants import (
 )
 from bionemo.triton.utils import (
     encode_str_batch,
-    load_model_config,
     load_model_for_inference,
 )
+from bionemo.utils.hydra import load_model_config
+from bionemo.utils.tests import teardown_apex_megatron_cuda
 
 
 SEQS = ['MSLKRKNIALIPAAGIGVRFGADKPKQYVEIGSKTVLEHVL', 'MIQSQINRNIRLDLADAILLSKAKKDLSFAEIADGTGLA']
@@ -46,7 +47,7 @@ NAME_HIDDENS = complete_model_name(MODEL_NAME, HIDDENS)
 @pytest.fixture(scope='module')
 def cfg(bionemo_home: Path) -> DictConfig:
     return load_model_config(
-        config_path=bionemo_home / "examples" / "protein" / MODEL_NAME / "conf",
+        config_path=str(bionemo_home / "examples" / "protein" / MODEL_NAME / "conf"),
         config_name="infer.yaml",
         logger=None,
     )
@@ -56,7 +57,8 @@ def cfg(bionemo_home: Path) -> DictConfig:
 def model(cfg: DictConfig) -> ESM1nvInference:
     # TODO [mgreaves] replace with this in !553
     # model = load_model_for_inference(cfg, interactive=False)
-    return load_model_for_inference(cfg)
+    yield load_model_for_inference(cfg)
+    teardown_apex_megatron_cuda()
 
 
 @pytest.fixture(scope='module')

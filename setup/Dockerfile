@@ -14,7 +14,7 @@
 #   - libstdcxx-ng=11.1.0=h56837e0_8
 #   - pycairo=1.20.1=py38hf61ee4a_0
 
-ARG BASE_IMAGE=nvcr.io/nvidia/nemo:23.06
+ARG BASE_IMAGE=nvcr.io/nvidia/nemo:23.10
 FROM ${BASE_IMAGE}
 
 ENV TERM=xterm
@@ -43,7 +43,7 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y \
         python3-setuptools python3-dev swig \
-        wget git unzip tmux vim tree xterm && \
+        wget git unzip tmux vim emacs-nox tree xterm && \
     rm -rf /var/lib/apt/lists/*
 
 # Optional: Install code-server to enable easy remote development on a container
@@ -53,36 +53,66 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
 #
 # # Install extensions from the marketplace
 # RUN code-server --install-extension ms-python.python
-
-
-COPY setup/requirements.txt /tmp/requirements.txt
-RUN --mount=type=secret,id=GITLAB_TOKEN GITLAB_TOKEN=$(cat /run/secrets/GITLAB_TOKEN) pip install -r /tmp/requirements.txt
 # TODO: unnecessary for main container, move test+dev dep installation to dev only & update CI to use dev image
+# moved -test and -dev up in build to resolve build errors
 COPY setup/requirements-test.txt /tmp/requirements-test.txt
 RUN pip install -r /tmp/requirements-test.txt
-COPY setup/requirements-dev.txt /tmp/requirements-dev.txt
-RUN pip install -r /tmp/requirements-dev.txt
 # end TODO
+COPY setup/requirements.txt /tmp/requirements.txt
+RUN --mount=type=secret,id=GITLAB_TOKEN GITLAB_TOKEN=$(cat /run/secrets/GITLAB_TOKEN) pip install -r /tmp/requirements.txt
+# requirements-cve.txt *must* be installed last to patch security vulns in pip
+# packages.
+COPY setup/requirements-cve.txt /tmp/requirements-cve.txt
+RUN pip install -r /tmp/requirements-cve.txt
+
+
 
 # AWS CLI is inside requirements.txt. Add config file.
 # This config file does not contain access keys.
 RUN mkdir $HOME/.aws
 COPY setup/aws-config-swiftstack $HOME/.aws/config
 
-## Install NGC cli in container for artifact download
-ENV NGC_CLI_INSTALL_PREFIX=/usr/local/bin
-RUN wget -O /tmp/ngccli_linux.zip --content-disposition \
-    "https://api.ngc.nvidia.com/v2/resources/nvidia/ngc-apps/ngc_cli/versions/3.38.0/files/ngccli_linux.zip" && \
-    unzip /tmp/ngccli_linux.zip -d ${NGC_CLI_INSTALL_PREFIX} && \
-    chmod u+x ${NGC_CLI_INSTALL_PREFIX}/ngc-cli/ngc && \
-    ln -fns  ${NGC_CLI_INSTALL_PREFIX}/ngc-cli/ngc ${NGC_CLI_INSTALL_PREFIX}/ngc && \
-    rm /tmp/ngccli_linux.zip
-
 # Recompile Megatron helpers -- NOTE this may need to be done before running job later
 RUN NEMO_PATH=$(python -c 'import nemo; print(nemo.__path__[0])') && \
    cd ${NEMO_PATH}/collections/nlp/data/language_modeling/megatron && \
    make
 
+#########################################################################################
+# Apply NeMo patches for key upstream changes between releases
+#  TODO whenever we upgrade nemo see which can be removed.
+#########################################################################################
+# 1. Setting the workdir to the base nemo directory for all nemo patches
+
+# NOTE: This is to support the MegaMolBart LM model compatability with Jupyter notebooks and ipdb.
+#       This is exposed through the `iteractive=True` constructor parameter.
+#       In MegaMolBart, specifically, this patch adds support for recongifure_minibatch as a flag
+#       in its decode method.
+# TODO [mgreaves] Upstream this patch and then remove here when we can upgrade our nemo dependency.
+#                 https://jirasw.nvidia.com/browse/CDISCOVERY-2146
+COPY ./setup/nemo-v-1.22-support_interactive_megamolbart_lm-decode_reconfigure_minibatch.patch ./
+RUN NEMO_INST_DIR=$(python -c 'import nemo; from pathlib import Path; print(Path(nemo.__path__[0]).parent)') && \
+    patch -p1 -d $NEMO_INST_DIR -i $PWD/nemo-v-1.22-support_interactive_megamolbart_lm-decode_reconfigure_minibatch.patch && \
+    rm nemo-v-1.22-support_interactive_megamolbart_lm-decode_reconfigure_minibatch.patch
+
+# NOTE: hiddens_support_train_v_inf_outputs.patch applies the patch from https://github.com/NVIDIA/NeMo/pull/8466 which fixes an issue
+#        where training uses the same hiddens key for inference (eg always the gaussian noised z rather than z_mean).
+COPY ./setup/hiddens_support_train_v_inf_outputs.patch ./
+RUN NEMO_INST_DIR=$(python -c 'import nemo; from pathlib import Path; print(Path(nemo.__path__[0]).parent)') && \
+    patch -p1 -d $NEMO_INST_DIR -i $PWD/hiddens_support_train_v_inf_outputs.patch && \
+    rm hiddens_support_train_v_inf_outputs.patch
+
+# NOTE: hiddens_support_train_v_inf_outputs.patch applies the patch from https://github.com/NVIDIA/NeMo/pull/8576 which fixes an issue
+#        where you restart a run after an epoch.
+COPY ./setup/data_sampler_constant_len.patch ./
+RUN NEMO_INST_DIR=$(python -c 'import nemo; from pathlib import Path; print(Path(nemo.__path__[0]).parent)') && \
+    patch -p1 -d $NEMO_INST_DIR -i $PWD/data_sampler_constant_len.patch && \
+    rm data_sampler_constant_len.patch
+
+# NOTE: Adds patch for WarmupAnnealDecayHold NeMo LR Scheduler
+COPY ./setup/nemo-lr-scheduler.patch ./
+RUN NEMO_INST_DIR=$(python -c 'import nemo; from pathlib import Path; print(Path(nemo.__path__[0]).parent)') && \
+    patch -p1 -d $NEMO_INST_DIR -i $PWD/nemo-lr-scheduler.patch && \
+    rm nemo-lr-scheduler.patch
 #########################################################################################
 # BioNeMo Build
 #########################################################################################
@@ -91,25 +121,7 @@ RUN NEMO_PATH=$(python -c 'import nemo; print(nemo.__path__[0])') && \
 ARG BIONEMO_HOME=/workspace/bionemo
 ENV BIONEMO_HOME=${BIONEMO_HOME}
 RUN mkdir -p ${BIONEMO_HOME}
-
-
-### Patching dependencies.
-# TODO(trvachov): Remove after NeMo is upgraded to 1.21
-COPY ./setup/nemo-v-1.20-fix-for-esm2.patch /nemo-v-1.20-fix-for-esm2.patch
-RUN patch -p1 /usr/local/lib/python3.10/dist-packages/nemo/collections/nlp/data/language_modeling/megatron/dataset_utils.py /nemo-v-1.20-fix-for-esm2.patch \
-    && rm /nemo-v-1.20-fix-for-esm2.patch
-
-# NOTE: This is to support the MegaMolBart LM model compatability with Jupyter notebooks and ipdb.
-#       This is exposed through the `iteractive=True` constructor parameter.
-#       In MegaMolBart, specifically, this patch adds support for recongifure_minibatch as a flag
-#       in its decode method.
-# TODO [mgreaves] Upstream this patch and then remove here when we can upgrade our nemo dependency.
-#                 https://jirasw.nvidia.com/browse/CDISCOVERY-2146
-COPY ./setup/nemo-v-1.20-support_interactive_megamolbart_lm-decode_reconfigure_minibatch.patch /nemo-v-1.20-support_interactive_megamolbart_lm-decode_reconfigure_minibatch.patch
-RUN patch -p1 /usr/local/lib/python3.10/dist-packages/nemo/collections/nlp/models/language_modeling/megatron_lm_encoder_decoder_model.py /nemo-v-1.20-support_interactive_megamolbart_lm-decode_reconfigure_minibatch.patch \
-    && rm /nemo-v-1.20-support_interactive_megamolbart_lm-decode_reconfigure_minibatch.patch
-
-
+WORKDIR ${BIONEMO_HOME}
 ### Copy the bionemo repo contents for distribution
 COPY LICENSE README.md artifact_paths.yaml download_models.py launch.sh setup.py pyproject.toml ${BIONEMO_HOME}/
 COPY setup ${BIONEMO_HOME}/setup
@@ -135,13 +147,8 @@ RUN rm -rf /usr/local/nvm
 RUN /bin/bash -c "sed -i '/NVM/d' /root/.bashrc && sed -i '/nvm.sh/d' /etc/bash.bashrc"
 # Remove OpenCV: We do not use it and it adds a security vulnerability which no current fix:
 # https://nvd.nist.gov/vuln/detail/CVE-2023-2617
-RUN pip uninstall -y opencv-python
-RUN pip uninstall -y opencv
-RUN rm -rf /usr/local/lib/python3.10/dist-packages/cv2
-RUN rm -rf /usr/local/include/opencv4
-RUN rm -rf /usr/local/share/opencv4
-RUN rm -rf /usr/local/lib/cmake/opencv4
-RUN rm -rf /usr/local/bin/opencv*
+RUN pip uninstall -y opencv-python opencv
+RUN rm -rf /usr/local/lib/python3.10/dist-packages/cv2 /usr/local/include/opencv4 /usr/local/share/opencv4 /usr/local/lib/cmake/opencv4 /usr/local/bin/opencv*
 # Remove Slurm: The BioNeMo FW Container can certainly be deployed to Slurm clusters, however having Slurm
 # installed *inside* the container does not typically have a use case. Slurm introduces vulnerabilities
 # into our container.

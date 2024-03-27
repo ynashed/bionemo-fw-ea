@@ -147,9 +147,11 @@ def sampling(
                         complex_graph,
                         tr_perturb[i : i + 1],
                         rot_perturb[i : i + 1].squeeze(0),
-                        tor_perturb[i * torsions_per_molecule : (i + 1) * torsions_per_molecule]
-                        if not model_cfg.diffusion.no_torsion
-                        else None,
+                        (
+                            tor_perturb[i * torsions_per_molecule : (i + 1) * torsions_per_molecule]
+                            if not model_cfg.diffusion.no_torsion
+                            else None
+                        ),
                     )
                     for i, complex_graph in enumerate(complex_graph_batch.to('cpu').to_data_list())
                 ]

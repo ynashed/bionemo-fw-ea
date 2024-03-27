@@ -1,6 +1,10 @@
 defaults:
   - pretrain_small
 
+hydra:
+  searchpath:
+     - ${oc.env:BIONEMO_HOME}/examples/protein/esm1nv/conf
+
 name: esm1nv_sec_str
 do_training: True # set to false if data preprocessing steps must be completed
 do_testing: False # set to true to run evaluation on test data after training

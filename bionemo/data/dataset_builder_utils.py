@@ -2,12 +2,11 @@ import logging
 import os
 from typing import List, Optional, Union
 
-from nemo.collections.nlp.data.language_modeling.text_memmap_dataset import CSVMemMapDataset
+from nemo.collections.nlp.data.language_modeling.text_memmap_dataset import CSVFieldsMemmapDataset, CSVMemMapDataset
 from nemo.core import Dataset
 from omegaconf import OmegaConf
 
 from bionemo.data.mapped_dataset import ResamplingMappedDataset
-from bionemo.data.memmap_csv_fields_dataset import CSVFieldsMemmapDataset
 from bionemo.data.memmap_fasta_fields_dataset import FASTAFieldsMemmapDataset
 from bionemo.data.utils import check_paths_exist, expand_dataset_paths
 

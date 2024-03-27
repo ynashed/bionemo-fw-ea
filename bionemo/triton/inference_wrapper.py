@@ -45,13 +45,13 @@ class InferenceWrapper:
     samplings_client: ModelClient
     decodes_client: ModelClient
 
-    def seqs_to_embedding(self, smis: List[str]) -> torch.Tensor:
-        result = send_seqs_for_inference(self.embeddings_client, SEQUENCES, smis)
+    def seqs_to_embedding(self, seqs: List[str]) -> torch.Tensor:
+        result = send_seqs_for_inference(self.embeddings_client, SEQUENCES, seqs)
         embeddings = torch.Tensor(result[EMBEDDINGS])
         return embeddings
 
-    def seqs_to_hidden(self, smis: List[str]) -> Tuple[torch.Tensor, torch.Tensor]:
-        result = send_seqs_for_inference(self.hiddens_client, SEQUENCES, smis)
+    def seqs_to_hidden(self, seqs: List[str]) -> Tuple[torch.Tensor, torch.Tensor]:
+        result = send_seqs_for_inference(self.hiddens_client, SEQUENCES, seqs)
         if HIDDENS not in result:
             raise ValueError(f"Expecting {HIDDENS} but only found {result.keys()=}")
         if MASK not in result:
@@ -61,7 +61,7 @@ class InferenceWrapper:
         return hiddens, masks
 
     def hidden_to_seqs(self, hidden_states: torch.Tensor, masks: torch.Tensor) -> List[str]:
-        smis = send_masked_embeddings_for_inference(
+        seqs = send_masked_embeddings_for_inference(
             self.decodes_client,
             # DECODES,
             HIDDENS,
@@ -69,10 +69,10 @@ class InferenceWrapper:
             masks.detach().cpu().numpy(),
             output_name=SEQUENCES,
         )
-        return smis
+        return seqs
 
-    def sample_seqs(self, smis: List[str]) -> List[List[str]]:
-        result = send_seqs_for_inference(self.samplings_client, SEQUENCES, smis)
+    def sample_seqs(self, seqs: List[str]) -> List[List[str]]:
+        result = send_seqs_for_inference(self.samplings_client, SEQUENCES, seqs)
         generated: np.ndarray = result[GENERATED]
         sequences = np.char.decode(generated.astype('bytes'), 'utf-8')
         return sequences.tolist()

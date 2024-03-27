@@ -38,6 +38,7 @@ models/esm1-nv
 models/esm2-nv
 models/prott5nv
 models/megamolbart
+models/molmim
 models/equidock
 models/diffdock
 models/dnabert
@@ -54,6 +55,33 @@ datasets/zinc15
 datasets/pdb
 datasets/GRCh38.p13.md
 datasets/openproteinset.md
+datasets/moleculenet-physchem
+```
+
+```{toctree}
+:maxdepth: 3
+:caption: TUTORIALS
+preprocessing-bcp-training-diffdock
+preprocessing-bcp-training-esm2nv
+notebooks/MMB_GenerativeAI_Inference_with_examples
+notebooks/MolMIM_GenerativeAI_local_inference_with_examples
+notebooks/ZINC15-data-preprocessing
+notebooks/bionemo-finetuning-overview
+notebooks/cma_es_guided_molecular_optimization_molmim
+notebooks/custom-dataset-class-fw
+notebooks/custom-dataset-dataloader
+notebooks/custom-dataset-preprocessing-fw
+notebooks/encoder-finetuning-notebook-fw
+notebooks/model_training_diffdock
+notebooks/model_training_equidock
+notebooks/model_training_esm1nv
+notebooks/model_training_esm2nv
+notebooks/model_training_mmb
+notebooks/model_training_molmim
+notebooks/physchem-notebook-fw
+notebooks/protein-esm1nv-clustering
+notebooks/protein-esm2nv-clustering
+notebooks/retrosynthesis-notebook
 ```
 
 ```{toctree}
