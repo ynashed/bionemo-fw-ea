@@ -1,16 +1,31 @@
 # Prerequisites for Using BioNeMo Framework
 
-Before you begin using the BioNeMo framework, ensure the following prerequisites are met:
+Before you begin using the BioNeMo framework, ensure the following prerequisites are met. 
+
+BioNeMo is only supported on x86 Linux systems. If you are not on such a system, you must use the project's Docker images to develop and execute BioNeMo code.
+System Requirements:
+
+Docker (with GPU support, docker engine >= 19.03).
+Python 3.10 or above
+Pytorch 1.13.1 or above
+NeMo pinned to version 1.20
+NVIDIA GPU, if you intend to do model training. BioNeMo is compatible with most NVIDIA GPUs, with some incompatibility:
+
+Tested GPUs:
+DGX-H100, A100, V100
+RTX A6000, A8000
+Tesla T4
+GeForce RTX 2080 Ti
+
+GPUs with known issues:
+Tesla K80
+
+bfloat16 precision requires an Ampere generation GPU or higher.
+
+To request access : 
 
 1. Access to [BioNeMo Framework](https://www.nvidia.com/en-us/gpu-cloud/bionemo/) from NVIDIA.
 2. Access to NVIDIA DGX compute infrastructure ([DGX-Cloud](https://www.nvidia.com/en-us/data-center/dgx-cloud/) or [DGX-Pod](https://www.nvidia.com/en-us/data-center/dgx-basepod/)).
-
-Additionally, if you're using BioNeMo locally in a container, ensure that you're using the following:
-* Linux OS
-* Pascal, Volta, Turing, or an NVIDIA Ampere architecture-based GPU
-* NVIDIA Driver
-* CUDA toolkit installed
-* Docker with Nvidia-DOcker support.
 
 ## How to Run the Example Commands?
 All BioNeMo Framework (`bionemo`) code **must** be run within containers created from the official release images.

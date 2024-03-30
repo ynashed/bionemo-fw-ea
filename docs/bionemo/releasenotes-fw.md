@@ -1,4 +1,30 @@
 # Release Notes
+## BioNeMo Framework v1.3
+## New Models
+* MolMIM implementation under BioNeMo framework, [a small molecule model developed at NVIDIA](https://arxiv.org/abs/2208.09016) which can be used to produce embeddings and novel molecules.
+
+### New Features
+* [MolMIM](https://developer.nvidia.com/blog/new-models-molmim-and-diffdock-power-molecule-generation-and-molecular-docking-in-bionemo/) re-trained on more data is now available in the framework, and achieves [state of the art performance](models/molmim.md).
+* [MolMIM property guided tutorial notebook](notebooks/cma_es_guided_molecular_optimization_molmim.ipynb) covering property guided optimization using our new framework model.
+* [MolMIM training tutorial](notebooks/model_training_molmim.ipynb) available walking users through either training from scratch or from an existing checkpoint on your own data.
+* [MolMIM tutorial notebook covering molecular sampling and property prediction](notebooks/MolMIM_GenerativeAI_local_inference_with_examples.ipynb) is also now available.
+* Numerous optimizations from [NVIDIA's entry to the MLPerf competition](https://developer.nvidia.com/blog/optimizing-openfold-training-for-drug-discovery/) have been added to OpenFold. Documentation and detailed benchmarks are works in progress and will be published in upcoming releases. This release contains the following performance optimizations:
+    * Fused GEMMs in multi-head attention (MHA)
+    * Non-blocking data pipeline
+    * BF16 precision training
+    * Fused MHA gating
+    * Inductor Compiled LayerNorm
+    * OpenAI Triton LayerNorm kernels
+    * OpenAI Triton MHA
+
+### Bug fixes and Improvements
+* NeMo upgraded to v1.22 ([see NeMo release notes](https://github.com/NVIDIA/NeMo/releases)),
+* PyTorch Lightning upgraded to 2.0.7
+* [NGC CLI](https://org.ngc.nvidia.com/setup/installers/cli) has been removed from the release container. If users download models from inside the container (via e.g. `download_models.py` or `launch.sh download`), the NGC CLI will be auto-installed to pull the models from NGC.
+
+### Known Issues
+* BioNeMo Framework v24.03 container is vulnerable to [GHSA-whh8-fjgc-qp73](https://github.com/advisories/GHSA-whh8-fjgc-qp73) in onnx 1.14.0. Users are advised not to open untrusted onnx files with this image. Restrict your mount point to minimize directory traversal impact.
+
 ## BioNeMo Framework v1.2
 ## New Models
 * OpenFold implementation under BioNeMo framework, derived from public OpenFold and DeepMind AlphaFold-2.

@@ -57,11 +57,14 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
 # moved -test and -dev up in build to resolve build errors
 COPY setup/requirements-test.txt /tmp/requirements-test.txt
 RUN pip install -r /tmp/requirements-test.txt
-COPY setup/requirements-dev.txt /tmp/requirements-dev.txt
-RUN pip install -r /tmp/requirements-dev.txt
 # end TODO
 COPY setup/requirements.txt /tmp/requirements.txt
 RUN --mount=type=secret,id=GITLAB_TOKEN GITLAB_TOKEN=$(cat /run/secrets/GITLAB_TOKEN) pip install -r /tmp/requirements.txt
+# requirements-cve.txt *must* be installed last to patch security vulns in pip
+# packages.
+COPY setup/requirements-cve.txt /tmp/requirements-cve.txt
+RUN pip install -r /tmp/requirements-cve.txt
+
 
 
 # AWS CLI is inside requirements.txt. Add config file.

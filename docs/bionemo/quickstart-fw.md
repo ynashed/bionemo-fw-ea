@@ -50,14 +50,15 @@ docker run -it --rm --gpus all {deploy_ngc_registry}/{deploy_ngc_org_team}/{depl
 #### Step 2: Pre-process the data
 
 ```bash
-cd /workspace/bionemo/examples/molecule/megamolbart && python pretrain.py --config-path=conf --config-name=pretrain_xsmall_span_aug do_training=False model.data.links_file='${oc.env:BIONEMO_HOME}/examples/molecule/megamolbart/dataset/ZINC-downloader-sample.txt' model.data.dataset_path=zinc_csv
+cd /workspace/bionemo/examples/molecule/megamolbart
+python pretrain.py --config-path=conf --config-name=pretrain_xsmall_span_aug do_training=False model.data.links_file='${oc.env:BIONEMO_HOME}/examples/molecule/megamolbart/dataset/ZINC-downloader-sample.txt' model.data.dataset_path=$(pwd)/zinc_csv
 ```
 BioNeMo currently offers offline data pre-processing to enable faster loading of data samples during training/inference. Raw data is pre-processed, memory mapped and stored on disk. This pre-processed data is then ingested into the training/inference pipeline. This also allows for exact resuming of data samples when resuming from a checkpoint etc. There is no online data pre-processing at the moment (meaning, data processing cannot be done during training).
 
 #### Step 3: Train
 
 ```bash
-python pretrain.py --config-path=conf --config-name=pretrain_xsmall_span_aug do_training=True model.data.dataset_path=zinc_csv model.data.dataset.train=x000 model.data.dataset.val=x000 model.data.dataset.test=x000 exp_manager.exp_dir=results
+python pretrain.py --config-path=conf --config-name=pretrain_xsmall_span_aug do_training=True model.data.dataset_path=$(pwd)/zinc_csv model.data.dataset.train=x000 model.data.dataset.val=x000 model.data.dataset.test=x000 exp_manager.exp_dir=$(pwd)/results
 ```
 BioNeMo creates a number of log files during training in the results directory:
 

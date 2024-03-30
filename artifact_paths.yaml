@@ -14,24 +14,25 @@
 
 models:
     esm1nv:
-        ngc: "nvidian/clara-lifesciences/esm1nv:23.06"
+        ngc: "nvidia/clara/esm1nv:1.0"
         pbss: "s3://bionemo-ci/models/esm1nv.nemo"
         symlink:
             source: "../../esm1nv.nemo"
             target: "protein/esm1nv/esm1nv.nemo"
     prott5nv:
-        ngc: "nvidian/clara-lifesciences/prott5nv:23.06"
+        ngc: "nvidia/clara/prott5nv:1.0"
         pbss: "s3://bionemo-ci/models/prott5nv.nemo"
         symlink:
             source: "../../prott5nv.nemo"
             target: "protein/prott5nv/prott5nv.nemo"
     megamolbart:
-        ngc: "nvidian/clara-lifesciences/megamolbart:23.06"
+        ngc: "nvidia/clara/megamolbart:1.0"
         pbss: "s3://bionemo-ci/models/megamolbart.nemo"
         symlink:
             source: "../../megamolbart.nemo"
             target: "molecule/megamolbart/megamolbart.nemo"
     molmim_70m_24_3:
+        # TODO-REL: update ngc location before release
         # https://wandb.ai/clara-discovery/molmim_convergence_prod_March2024/runs/cOLZ4Eme
         ngc: null
         pbss: "s3://bionemo-ci/models/molmim_70m_24_3.nemo"
@@ -39,39 +40,39 @@ models:
             source: "../../molmim_70m_24_3.nemo"
             target: "molecule/molmim/molmim_70m_24_3.nemo"
     equidock_dips:
-        ngc: "nvidian/clara-lifesciences/equidock:dips.23.10"
+        ngc: "nvidia/clara/equidock_dips:1.1"
         pbss: "s3://bionemo-ci/models/equidock_dips.nemo"
         symlink:
             source: "../../equidock_dips.nemo"
             target: "protein/equidock/equidock_dips.nemo"
     equidock_db5:
-        ngc: "nvidian/clara-lifesciences/equidock:db5.23.10"
+        ngc: "nvidia/clara/equidock_db5:1.1"
         pbss: "s3://bionemo-ci/models/equidock_db5.nemo"
         symlink:
             source: "../../equidock_db5.nemo"
             target: "protein/equidock/equidock_db5.nemo"
     diffdock_score:
-        ngc: "nvidian/clara-lifesciences/diffdock:paper_score.23.08"
+        ngc: "nvidia/clara/diffdock_score:1.1"
         pbss: "s3://bionemo-ci/models/diffdock_score.nemo"
         symlink:
             source: "../../diffdock_score.nemo"
             target: "molecule/diffdock/diffdock_score.nemo"
     diffdock_confidence:
-        ngc: "nvidian/clara-lifesciences/diffdock:paper_confidence.23.08"
+        ngc: "nvidia/clara/diffdock_confidence:1.1"
         pbss: "s3://bionemo-ci/models/diffdock_confidence.nemo"
         symlink:
             source: "../../diffdock_confidence.nemo"
             target: "molecule/diffdock/diffdock_confidence.nemo"
     esm2nv_650m:
         #TODO: update path when model is released
-        ngc: "nvidian/cvai_bnmo_trng/esm2nv650m:1.0-rc1"
+        ngc: "nvidia/clara/esm2nv650m:1.0"
         pbss: "s3://bionemo-ci/models/esm2nv_650M_converted.nemo"
         symlink:
             source: "../../esm2nv_650M_converted.nemo"
             target: "protein/esm2nv/esm2nv_650M_converted.nemo"
     esm2nv_3b:
         #TODO: update path when model is released
-        ngc: "nvidian/cvai_bnmo_trng/esm2nv3b:1.0-rc1"
+        ngc: "nvidia/clara/esm2nv3b:1.0"
         pbss: "s3://bionemo-ci/models/esm2nv_3B_converted.nemo"
         symlink:
             source: "../../esm2nv_3B_converted.nemo"
