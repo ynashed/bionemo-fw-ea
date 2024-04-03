@@ -2,8 +2,7 @@ name: mmb_physchem
 do_training: true
 do_testing: true
 seed: 42
-restore_from_path: ${oc.env:BIONEMO_HOME}/models/molecule/megamolbart/megamolbart.nemo
-use_peft: false
+restore_from_path: null
 trainer:
   devices: 1
   num_nodes: 1
@@ -162,6 +161,7 @@ model:
           last_epoch: -1
           warmup_ratio: 0.01
           max_steps: 1000
+  restore_encoder_path: ${oc.env:BIONEMO_HOME}/models/molecule/megamolbart/megamolbart.nemo
   encoder_frozen: true
   downstream_task:
     n_outputs: 1
@@ -207,5 +207,6 @@ exp_manager:
     - ${name}
     - ${model.name}
     offline: false
+do_preprocessing: false
 target: bionemo.model.molecule.megamolbart.MegaMolBARTModel
 infer_target: bionemo.model.molecule.megamolbart.infer.MegaMolBARTInference

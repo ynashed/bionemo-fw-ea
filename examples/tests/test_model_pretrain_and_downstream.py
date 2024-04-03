@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import List, Type, TypedDict
 
 import pytest
-from omegaconf import OmegaConf
+from omegaconf import OmegaConf, open_dict
 from pytorch_lightning import LightningModule
 
 from bionemo.callbacks import setup_dwnstr_task_validation_callbacks
@@ -243,7 +243,9 @@ def test_model_size(config_name: str, model_class: LightningModule, model_parame
         callbacks = setup_dwnstr_task_validation_callbacks(cfg)
         trainer = setup_trainer(cfg, callbacks=callbacks)
         if model_class == FineTuneProteinModel or model_class == FineTuneMegaMolBART:
-            model = model_class(cfg, trainer)
+            with open_dict(cfg):
+                cfg.model.encoder_cfg = cfg
+            model = model_class(cfg.model, trainer)
         elif model_class == DiffdockScoreModel or model_class == DiffdockConfidenceModel:
             data_manager = DiffdockDataManager(cfg)
             model = model_class(cfg=cfg, trainer=trainer, data_manager=data_manager)

@@ -26,14 +26,13 @@ from bionemo.model.core.encoder_finetuning import EncoderFineTuning
 
 class FineTuneProteinModel(EncoderFineTuning):
     def __init__(self, cfg, trainer):
-        self.full_cfg = cfg
-        self.encoder_frozen = self.full_cfg.model.encoder_frozen
-        self.task_type = self.full_cfg.model.data.task_type
+        self.encoder_frozen = cfg.encoder_frozen
+        self.task_type = cfg.data.task_type
 
-        if self.encoder_frozen and self.full_cfg.get('use_peft', False):
+        if self.encoder_frozen and cfg.get('peft.enabled', False):
             raise ValueError("Using PEFT requires encoder_frozen: False for training")
 
-        super().__init__(cfg.model, trainer=trainer)
+        super().__init__(cfg, trainer=trainer)
 
     def configure_optimizers(self):
         super().setup_optimization(optim_config=self.cfg.finetuning_optim)
@@ -65,20 +64,20 @@ class FineTuneProteinModel(EncoderFineTuning):
 
         elif self.task_type == 'token-level-classification':
             task_head = ConvNet(
-                self.full_cfg.model.hidden_size,
+                self.encoder_model.cfg.model.hidden_size,
                 output_sizes=self.cfg.data.target_sizes,
-                bottleneck_dim=self.full_cfg.model.cnn_dim,
-                dropout_rate=self.full_cfg.model.dropout_rate,
+                bottleneck_dim=self.cfg.cnn_dim,
+                dropout_rate=self.cfg.dropout_rate,
             )
         return task_head
 
     def setup_encoder_model(self, cfg, trainer):
         # Uses PEFT flag to determine whether to load enconder +/- adapters
-        infer_class = import_class_by_path(self.full_cfg.infer_target)
+        infer_class = import_class_by_path(self.cfg.encoder_cfg.infer_target)
         pretrained_model = infer_class(
-            self.full_cfg,
-            freeze=self.encoder_frozen,
-            restore_path=self.full_cfg.restore_from_path,
+            self.cfg.encoder_cfg,
+            freeze=self.cfg.encoder_frozen,
+            restore_path=self.cfg.restore_encoder_path,
             training=not self.cfg.encoder_frozen,
             adjust_config=False,
         )
@@ -101,9 +100,19 @@ class FineTuneProteinModel(EncoderFineTuning):
         self.build_train_valid_test_datasets()
         return super().on_fit_start()
 
+    def on_test_start(self):
+        self._test_ds = self.data_module.get_sampled_test_dataset()
+        return super().on_test_start()
+
     def build_train_valid_test_datasets(self):
-        self._train_ds = self.data_module.get_sampled_train_dataset()
-        self._validation_ds = self.data_module.get_sampled_val_dataset()
+        if self.trainer.limit_train_batches == 0:
+            self._train_ds = None
+        else:
+            self._train_ds = self.data_module.get_sampled_train_dataset()
+        if self.trainer.limit_val_batches == 0:
+            self._validation_ds = None
+        else:
+            self._validation_ds = self.data_module.get_sampled_val_dataset()
         self._test_ds = self.data_module.get_sampled_test_dataset()
 
     def encoder_forward(self, protein_model, batch: dict):
@@ -125,9 +134,7 @@ class FineTuneProteinModel(EncoderFineTuning):
             enc_output = torch.cat(
                 [
                     enc_output,
-                    torch.zeros((batch_size, (self.full_cfg.model.seq_length - seq_len), emb_dim)).to(
-                        device=enc_output.device
-                    ),
+                    torch.zeros((batch_size, (self.cfg.seq_length - seq_len), emb_dim)).to(device=enc_output.device),
                 ],
                 dim=1,
             )
@@ -139,7 +146,11 @@ class FineTuneProteinModel(EncoderFineTuning):
         return input_tensor.float()
 
     def get_target_from_batch(self, batch):
-        _, (labels, masks) = PerTokenValueDataset.prepare_batch(batch, self._train_ds)
+        if self._train_ds is not None:
+            data = self._train_ds
+        elif self._test_ds is not None:
+            data = self._test_ds
+        _, (labels, masks) = PerTokenValueDataset.prepare_batch(batch, data)
         padded_labels = []
         padded_masks = []
         for i in range(len(labels)):
@@ -149,14 +160,12 @@ class FineTuneProteinModel(EncoderFineTuning):
             label = torch.cat(
                 [
                     label,
-                    torch.zeros((batch_size, (self.full_cfg.model.seq_length - seq_len), n_labels)).to(
-                        device=label.device
-                    ),
+                    torch.zeros((batch_size, (self.cfg.seq_length - seq_len), n_labels)).to(device=label.device),
                 ],
                 dim=1,
             )
             mask = torch.cat(
-                [mask, torch.zeros((batch_size, (self.full_cfg.model.seq_length - seq_len))).to(device=mask.device)],
+                [mask, torch.zeros((batch_size, (self.cfg.seq_length - seq_len))).to(device=mask.device)],
                 dim=1,
             )
             padded_labels.append(label)
@@ -175,7 +184,7 @@ class FineTuneProteinModel(EncoderFineTuning):
     def state_dict(self, destination=None, prefix=None, keep_vars=False):
         custom_state_dict = super(FineTuneProteinModel, self).state_dict()
 
-        if self.full_cfg.get('use_peft', False):  # skipped if use_peft is false or not present in config
+        if self.cfg.get('peft.enabled', False):  # skipped if peft.enabled is false or not present in config
             custom_state_dict.update(self.encoder_model.model.state_dict())
 
         return custom_state_dict

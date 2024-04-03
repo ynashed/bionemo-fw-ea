@@ -237,7 +237,7 @@ class BaseEncoderInference(LightningModule):
             )
 
         # Check for PEFT flag before calling `setup_optimizer_param_groups`
-        if cfg.get('use_peft', False):  # skipped if use_peft is false or not present in config
+        if cfg.get('model.peft.enabled', False):  # skipped if peft.enabled is false or not present in config
             model.setup_optimizer_param_groups()
         elif self._freeze_model:  # only use encoder_frozen flag if not doing peft
             model.freeze()

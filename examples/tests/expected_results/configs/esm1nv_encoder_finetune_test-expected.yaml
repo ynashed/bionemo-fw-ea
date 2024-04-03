@@ -1,8 +1,7 @@
 name: esm1nv_sec_str
 do_training: true
 do_testing: false
-restore_from_path: ${oc.env:BIONEMO_HOME}/models/protein/esm1nv/esm1nv.nemo
-use_peft: false
+restore_from_path: null
 trainer:
   devices: 1
   num_nodes: 1
@@ -185,6 +184,7 @@ model:
           last_epoch: -1
           warmup_ratio: 0.01
           max_steps: 1000
+  restore_encoder_path: ${oc.env:BIONEMO_HOME}/models/protein/esm1nv/esm1nv.nemo
   encoder_frozen: false
   global_batch_size: null
   cnn_dim: 32
@@ -203,5 +203,6 @@ model:
       last_epoch: -1
       warmup_steps: 100
       max_steps: 1000
+do_preprocessing: false
 target: bionemo.model.protein.esm1nv.ESM1nvModel
 infer_target: bionemo.model.protein.esm1nv.infer.ESM1nvInference

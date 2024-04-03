@@ -351,7 +351,7 @@ def restore_model(
             cfg.model = OmegaConf.merge(cfg.model, restore_cfg)
         cfg.model.precision = trainer.precision
 
-    if cfg.get('use_peft', False):  # skipped if use_peft is false or not present in config
+    if cfg.get('model.peft.enabled', False):  # skipped if peft.enabled is false or not present in config
         # TODO(dorotat): PEFT is not present in NeMo 1.22 - it was refactored. Disabling it till it is fixed
         raise ValueError("PEFT is disabled")
 

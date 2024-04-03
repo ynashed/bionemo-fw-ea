@@ -8,8 +8,6 @@ restore_from_path: ${oc.env:BIONEMO_HOME}/models/protein/esm2nv/esm2nv_650M_conv
 target: bionemo.model.protein.esm1nv.bert_peft_models.BertLoRAModel
 infer_target: bionemo.model.protein.esm1nv.infer.ESM1nvInference # target inference class for protein model
 
-use_peft: True # indicates whether we intend to use PEFT technique
-
 trainer:
   devices: 1 # number of GPUs or CPUs
   num_nodes: 1 
@@ -31,6 +29,7 @@ model:
   tensor_model_parallel_size: 1  # model parallelism
   
   peft:
+    enabled: True # indicates whether we intend to use PEFT technique
     peft_scheme: "lora"  # currently supported: lora
     restore_from_path: null #set to null to initialize random weights and train
     

@@ -1,9 +1,10 @@
 name: esm1nv_flip
 defaults:
   - pretrain_small
+do_preprocessing: False
 do_training: True # set to false if data preprocessing steps must be completed
 do_testing: True # set to true to run evaluation on test data after training
-restore_from_path: ${oc.env:BIONEMO_HOME}/models/protein/esm1nv/esm1nv.nemo # path to nemo checkpoint of the protein model
+restore_from_path: null # path to nemo checkpoint of the fine-tuned model (encoder + task head) to be used for further training, testing or inference
 target: bionemo.model.protein.esm1nv.ESM1nvModel # target class for protein model
 infer_target: bionemo.model.protein.esm1nv.infer.ESM1nvInference # target inference class for protein model
 
@@ -21,6 +22,7 @@ exp_manager:
     name: ${name}_${model.data.task_name}_finetuning_encoder_frozen_${model.encoder_frozen}
 
 model:
+  restore_encoder_path: ${oc.env:BIONEMO_HOME}/models/protein/esm1nv/esm1nv.nemo # path to nemo checkpoint of the protein model/encoder
   encoder_frozen: True # encoder trainable or frozen
   post_process: False # must be False for downstream task
   micro_batch_size: 64 # NOTE: adjust to occupy ~ 90% of GPU memory

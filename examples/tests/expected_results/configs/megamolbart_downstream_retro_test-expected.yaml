@@ -2,8 +2,7 @@ name: MegaMolBARTRetro_uspto50k
 do_training: true
 do_testing: false
 seed: 42
-restore_from_path: ${oc.env:BIONEMO_HOME}/models/molecule/megamolbart/megamolbart.nemo
-use_peft: false
+restore_from_path: null
 trainer:
   devices: 1
   num_nodes: 1
@@ -168,6 +167,7 @@ model:
           last_epoch: -1
           warmup_ratio: 0.01
           max_steps: 1000
+  restore_encoder_path: ${oc.env:BIONEMO_HOME}/models/molecule/megamolbart/megamolbart.nemo
 exp_manager:
   name: ${name}
   resume_if_exists: true

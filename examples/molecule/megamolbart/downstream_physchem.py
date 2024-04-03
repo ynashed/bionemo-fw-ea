@@ -8,9 +8,12 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
+from nemo.collections.nlp.parts.nlp_overrides import (
+    NLPSaveRestoreConnector,
+)
 from nemo.core.config import hydra_runner
 from nemo.utils import logging
-from omegaconf.omegaconf import OmegaConf
+from omegaconf.omegaconf import OmegaConf, open_dict
 
 from bionemo.data import PhysChemPreprocess
 from bionemo.model.molecule.megamolbart import FineTuneMegaMolBART
@@ -24,21 +27,8 @@ def main(cfg) -> None:
     logging.info("\n\n************* Fintune config ****************")
     logging.info(f'\n{OmegaConf.to_yaml(cfg)}')
 
-    if cfg.do_training:
-        trainer = setup_trainer(cfg, builder=None)
-        model = FineTuneMegaMolBART(cfg, trainer)
-
-        logging.info("************** Starting Training ***********")
-        trainer.fit(model)
-        logging.info("************** Finished Training ***********")
-        if cfg.do_testing:
-            if "test" in cfg.model.data.dataset:
-                trainer.test(model)
-            else:
-                raise UserWarning(
-                    "Skipping testing, test dataset file was not provided. Please specify 'test_ds.data_file' in yaml config"
-                )
-    else:
+    # Do preprocessing if preprocess
+    if cfg.do_preprocessing:
         logging.info("************** Starting Data PreProcessing ***********")
         PhysChemPreprocess().prepare_dataset(
             links_file=cfg.model.data.links_file, output_dir=cfg.model.data.preprocessed_data_path
@@ -52,6 +42,34 @@ def main(cfg) -> None:
                 val_frac=cfg.model.data.val_frac,
             )
         logging.info("************** Finished Data PreProcessing ***********")
+
+    # Load model
+    with open_dict(cfg):
+        cfg.model.encoder_cfg = cfg
+    trainer = setup_trainer(cfg, builder=None)
+    if cfg.restore_from_path:
+        logging.info("\nRestoring model from .nemo file " + cfg.restore_from_path)
+        model = FineTuneMegaMolBART.restore_from(
+            cfg.restore_from_path, cfg.model, trainer=trainer, save_restore_connector=NLPSaveRestoreConnector()
+        )
+    else:
+        model = FineTuneMegaMolBART(cfg.model, trainer)
+
+    if cfg.do_training:
+        logging.info("************** Starting Training ***********")
+        trainer.fit(model)
+        logging.info("************** Finished Training ***********")
+    if cfg.do_testing:
+        if "test" in cfg.model.data.dataset:
+            trainer.limit_train_batches = 0
+            trainer.limit_val_batches = 0
+            trainer.fit(model)
+            trainer.test(model, ckpt_path=None)
+        else:
+            raise UserWarning(
+                "Skipping testing, test dataset file was not provided. Please specify 'dataset.test' in yaml config"
+            )
+        logging.info("************** Finished Testing ***********")
 
 
 if __name__ == '__main__':
