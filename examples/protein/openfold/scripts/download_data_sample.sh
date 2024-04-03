@@ -17,7 +17,7 @@ unset DATA_PATH
 display_help() {
     echo "Usage: $0 [-data_path <path>] [-pbss <value>] [-help]"
     echo "  -data_path <path>   Specify the data path, \$BIONEMO_HOME/$REPO_DIR by default"
-    echo "  -pbss <value>       If set, data will be download from PBSS. If unset, NGC by default."
+    echo "  -pbss <value>       If set, data will be download from PBSS. If unset, public sources by default."
     echo "  -help               Display this help message"
     exit 1
 }
@@ -55,13 +55,26 @@ fi
 
 if [ -n "$PBSS" ]; then
     echo "Downloading from PBSS to $DATA_PATH"
-    aws s3 cp s3://bionemo-ci/test-data/openfold/openfold_vprocessed_sample_cif_pt/openfold_sample_data.tar.gz $DATA_PATH --endpoint-url https://pbss.s8k.io
-    tar -xvf $DATA_PATH/openfold_sample_data.tar.gz -C $DATA_PATH
+    aws s3 cp s3://bionemo-ci/test-data/openfold/openfold_vprocessed_sample_cif_pt/openfold_sample_data.tar.gz $DATA_PATH --endpoint-url https://pbss.s8k.io && \
+    tar -xvf $DATA_PATH/openfold_sample_data.tar.gz -C $DATA_PATH && \
+    rm $DATA_PATH/openfold_sample_data.tar.gz
 else
-    echo "Downloading from NGC to $DATA_PATH"
-    ngc registry resource download-version nvidian/cvai_bnmo_trng/openfold:processed_sample_cif_pt
-    tar -xvf openfold_vprocessed_sample_cif_pt/openfold_sample_data.tar.gz -C $DATA_PATH
-    rm -r openfold_vprocessed_sample_cif_pt/
+    echo "Downloading from public sources to $DATA_PATH (estimate download time < 5 mins)"
+
+    # Download cif from RCSB
+    PDB_DIR=${DATA_PATH}/openfold_data/inference/pdb
+    mkdir -p $PDB_DIR
+    for pdb_code in "7b4q" "7dnu"; do
+        wget -O ${PDB_DIR}/${pdb_code}.cif "https://files.rcsb.org/download/${pdb_code}.cif"
+    done
+
+    # Download msa from OpenProteinSet
+    MSA_DIR=${DATA_PATH}/openfold_data/inference/msas
+    mkdir -p $MSA_DIR
+    for pdb_chain_code in "7b4q_A" "7dnu_A"; do
+        aws s3 sync --no-sign-request s3://openfold/pdb/${pdb_chain_code}/a3m ${MSA_DIR}/${pdb_chain_code}
+    done
+
 fi
 
 
