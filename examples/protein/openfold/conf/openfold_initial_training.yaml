@@ -17,7 +17,7 @@ model:
   metrics:
     # available metrics are: lddt_ca, drmsd_ca, alignment_rmsd, gdt_ts, gdt_ha
     - lddt_ca
-
+  
   optim:
     name: adam
     lr: 1e-3

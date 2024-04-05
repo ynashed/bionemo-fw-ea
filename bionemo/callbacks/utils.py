@@ -16,6 +16,11 @@ from omegaconf import DictConfig
 from pytorch_lightning import Callback
 
 from bionemo.callbacks.logging_callbacks import PerfLoggingCallback, SaveTrainerFinalMetricCallback
+from bionemo.callbacks.testing_callbacks import (
+    KillAfterSignalCallback,
+    MetadataSaveCallback,
+    TestCheckpointIntegrityCallback,
+)
 from bionemo.utils.dllogger import DLLogger
 
 
@@ -48,6 +53,18 @@ def add_test_callbacks(cfg: DictConfig, callbacks: List[Callback], mode: str = "
     if cfg.get("create_trainer_metric_callback", False):
         trainer_metric_callback_kwargs = cfg.get("trainer_metric_callback_kwargs", {})
         callbacks.append(SaveTrainerFinalMetricCallback(**trainer_metric_callback_kwargs))
+
+    if cfg.get("create_kill_after_signal_callback", False):
+        kill_after_signal_callback_kwargs = cfg.get("kill_after_signal_callback_kwargs", {})
+        callbacks.append(KillAfterSignalCallback(**kill_after_signal_callback_kwargs))
+
+    if cfg.get("create_metadata_save_callback", False):
+        metadata_save_callback_kwargs = cfg.get("metadata_save_callback_kwargs", {})
+        callbacks.append(MetadataSaveCallback(**metadata_save_callback_kwargs))
+
+    if cfg.get("create_checkpoint_integrity_callback", False):
+        checkpoint_integrity_callback_kwargs = cfg.get("checkpoint_integrity_callback_kwargs", {})
+        callbacks.append(TestCheckpointIntegrityCallback(**checkpoint_integrity_callback_kwargs))
 
 
 def _select_dwnstr_task_validation_callbacks(cfg: DictConfig) -> List[DictConfig]:

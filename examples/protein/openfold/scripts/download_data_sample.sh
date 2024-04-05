@@ -54,10 +54,17 @@ else
 fi
 
 if [ -n "$PBSS" ]; then
+    # download data sample for training and inference tests
     echo "Downloading from PBSS to $DATA_PATH"
     aws s3 cp s3://bionemo-ci/test-data/openfold/openfold_vprocessed_sample_cif_pt/openfold_sample_data.tar.gz $DATA_PATH --endpoint-url https://pbss.s8k.io && \
     tar -xvf $DATA_PATH/openfold_sample_data.tar.gz -C $DATA_PATH && \
     rm $DATA_PATH/openfold_sample_data.tar.gz
+
+    # download data sample for stop and go tests that includes cameo sample
+    aws s3 cp s3://bionemo-ci/test-data/openfold/openfold_vprocessed_sample_cif_pt/openfold_training_samples.tar.gz $DATA_PATH --endpoint-url https://pbss.s8k.io
+    CAMEO_PATH="${DATA_PATH}openfold_training_samples.tar.gz"
+    tar -xvf $CAMEO_PATH -C "${DATA_PATH}openfold_data/"
+    rm $CAMEO_PATH
 else
     echo "Downloading from public sources to $DATA_PATH (estimate download time < 5 mins)"
 
