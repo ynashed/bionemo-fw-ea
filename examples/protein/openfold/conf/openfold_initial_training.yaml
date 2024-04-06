@@ -133,6 +133,14 @@ model:
   #      - dataloader_pq (DataLoader with a priority queue)
   optimisations: []
 
+  # Stop the application when close to the slurm-job-end-time
+  #   - When active, this functionality operates within the model class methods.
+  #   - To activate this functionality, uncomment the two lines below, where
+  #   the format for the time is HH:MM:SS
+  #
+  # do_stop_when_close_to_slurm_job_end: True
+  # buffer_before_slurm_job_end_time: 00:05:00
+
 trainer:
   # the effective batch size should be 128
   devices: 1
