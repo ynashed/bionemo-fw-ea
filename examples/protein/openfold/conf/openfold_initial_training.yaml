@@ -6,6 +6,12 @@ do_preprocess: false
 do_training: true
 do_validation: false
 
+# BnmoTQDMProgressBar
+#   To activate this progress bar, uncomment the 3 lines below
+# progress_bar_kwargs: 
+#   name: BnmoTQDMProgressBar
+#   warmup: 10
+
 model:
   stage: initial_training
   seed: 44

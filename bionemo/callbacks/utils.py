@@ -14,7 +14,9 @@ from typing import Any, Dict, List, Optional, Sequence
 from nemo.utils.model_utils import import_class_by_path
 from omegaconf import DictConfig
 from pytorch_lightning import Callback
+from pytorch_lightning.callbacks import ProgressBar
 
+from bionemo.callbacks.bnmo_progress_bar import BnmoTQDMProgressBar
 from bionemo.callbacks.logging_callbacks import PerfLoggingCallback, SaveTrainerFinalMetricCallback
 from bionemo.callbacks.testing_callbacks import (
     KillAfterSignalCallback,
@@ -24,7 +26,12 @@ from bionemo.callbacks.testing_callbacks import (
 from bionemo.utils.dllogger import DLLogger
 
 
-__all__: Sequence[str] = ("add_test_callbacks", "add_training_callbacks", "setup_dwnstr_task_validation_callbacks")
+__all__: Sequence[str] = (
+    "add_test_callbacks",
+    "add_training_callbacks",
+    "add_progress_bar_callback",
+    "setup_dwnstr_task_validation_callbacks",
+)
 
 
 def add_test_callbacks(cfg: DictConfig, callbacks: List[Callback], mode: str = "train"):
@@ -34,13 +41,13 @@ def add_test_callbacks(cfg: DictConfig, callbacks: List[Callback], mode: str = "
         cfg: config
         mode: str attached to the performance logs
     """
-
     if cfg.get("create_dllogger_callbacks", False):
         dllogger_callbacks_kwargs = cfg.get("dllogger_callbacks_kwargs", {})
         json_file = dllogger_callbacks_kwargs.get("json_file", "dllogger.json")
         append_to_json = dllogger_callbacks_kwargs.get("append_to_json", True)
         use_existing_dllogger = dllogger_callbacks_kwargs.get("use_existing_dllogger", False)
         warmup = dllogger_callbacks_kwargs.get("warmup", 0)
+
         dllogger = DLLogger(
             json_file=json_file, append_to_json=append_to_json, use_existing_dllogger=use_existing_dllogger
         )
@@ -121,4 +128,34 @@ def add_training_callbacks(cfg: DictConfig, callbacks: List[Callback]) -> List[C
             callback_kwargs = dict(deepcopy(callback_cfg))
             callback_cls = callback_kwargs.pop('class')
             callbacks.append(import_class_by_path(callback_cls)(**callback_kwargs))
+
+
+def add_progress_bar_callback(cfg: DictConfig, callbacks: List[Callback]) -> List[Callback]:
+    """Add a customized progressbar object to the list of callbacks passed
+    to the trainer initialization method.
+
+    The object added to the callbacks list must be an instance of a class
+    that inherits from the pytorch_lightning.callbacks.progress.ProgressBar.
+    Trainer has internal logic, such that if the callbacks list contains an
+    instance of ProgressBar, then it is used as the progress bar; otherwise,
+    an instance of TQDMProgressBar is used.
+
+    Args:
+        cfg: the top-level cfg passed to main
+        callbacks: a list of pytorch_lightning.callbacks.Callback instances
+
+    Returns:
+        The updated callbacks list
+
+    """
+    if "progress_bar_kwargs" in cfg and cfg.progress_bar_kwargs.get("name", None) == "BnmoTQDMProgressBar":
+        # if there is a ProgressBar instance in callbacks, remove it
+        num_callbacks = len(callbacks)
+        for i in range(num_callbacks - 1, -1, -1):
+            if isinstance(callbacks[i], ProgressBar):
+                callbacks.pop(i)
+
+        # add BnmoTQDMProgressBar
+        callbacks.append(BnmoTQDMProgressBar(warmup_n=cfg.progress_bar_kwargs.get("warmup", 1)))
+
     return callbacks

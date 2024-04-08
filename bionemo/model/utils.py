@@ -31,7 +31,7 @@ from pytorch_lightning.callbacks import ModelSummary
 from pytorch_lightning.callbacks.timer import Timer
 from pytorch_lightning.plugins.environments import TorchElasticEnvironment
 
-from bionemo.callbacks.utils import add_test_callbacks, add_training_callbacks
+from bionemo.callbacks.utils import add_progress_bar_callback, add_test_callbacks, add_training_callbacks
 
 
 M = TypeVar('M')
@@ -275,6 +275,7 @@ def setup_trainer(cfg, builder=None, callbacks=[], adjust_config=True, verbose=T
     callbacks = builder.configure_callbacks(cfg, callbacks)
     add_test_callbacks(cfg, callbacks=callbacks, mode="infer" if builder == InferenceTrainerBuilder else mode)
     add_training_callbacks(cfg, callbacks)
+    add_progress_bar_callback(cfg, callbacks)
 
     if interactive:
         strategy = 'auto'
