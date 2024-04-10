@@ -53,19 +53,17 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
 #
 # # Install extensions from the marketplace
 # RUN code-server --install-extension ms-python.python
-# TODO: unnecessary for main container, move test+dev dep installation to dev only & update CI to use dev image
 # moved -test and -dev up in build to resolve build errors
+# COPY files first **BEFORE** installing from them => use the layer cache effectively!
 COPY setup/requirements-test.txt /tmp/requirements-test.txt
-RUN pip install -r /tmp/requirements-test.txt
-# end TODO
-COPY setup/requirements.txt /tmp/requirements.txt
-RUN --mount=type=secret,id=GITLAB_TOKEN GITLAB_TOKEN=$(cat /run/secrets/GITLAB_TOKEN) pip install -r /tmp/requirements.txt
-# requirements-cve.txt *must* be installed last to patch security vulns in pip
-# packages.
 COPY setup/requirements-cve.txt /tmp/requirements-cve.txt
+COPY setup/requirements-dev.txt /tmp/requirements-dev.txt
+COPY setup/requirements.txt /tmp/requirements.txt
+RUN --mount=type=secret,id=GITLAB_TOKEN GITLAB_TOKEN=$(cat /run/secrets/GITLAB_TOKEN) pip install -r /tmp/requirements-dev.txt
+RUN pip install -r /tmp/requirements-test.txt
+RUN --mount=type=secret,id=GITLAB_TOKEN GITLAB_TOKEN=$(cat /run/secrets/GITLAB_TOKEN) pip install -r /tmp/requirements.txt
+# requirements-cve.txt *must* be installed last to patch security vulns in pip packages
 RUN pip install -r /tmp/requirements-cve.txt
-
-
 
 # AWS CLI is inside requirements.txt. Add config file.
 # This config file does not contain access keys.
@@ -113,6 +111,30 @@ COPY ./setup/nemo-lr-scheduler.patch ./
 RUN NEMO_INST_DIR=$(python -c 'import nemo; from pathlib import Path; print(Path(nemo.__path__[0]).parent)') && \
     patch -p1 -d $NEMO_INST_DIR -i $PWD/nemo-lr-scheduler.patch && \
     rm nemo-lr-scheduler.patch
+
+# Remove nvm as it's not expected users will need this, and it introduces unfixable vulnerabilties:
+# https://nvd.nist.gov/vuln/detail/CVE-2023-32002
+RUN /bin/bash -c "source /usr/local/nvm/nvm.sh && nvm deactivate && nvm unload && sed -i '/NVM/d' /root/.bashrc"
+RUN rm -rf /usr/local/nvm
+RUN /bin/bash -c "sed -i '/NVM/d' /root/.bashrc && sed -i '/nvm.sh/d' /etc/bash.bashrc"
+# Remove OpenCV: We do not use it and it adds a security vulnerability which no current fix:
+# https://nvd.nist.gov/vuln/detail/CVE-2023-2617
+RUN pip uninstall -y opencv-python opencv
+RUN rm -rf /usr/local/lib/python3.10/dist-packages/cv2 /usr/local/include/opencv4 /usr/local/share/opencv4 /usr/local/lib/cmake/opencv4 /usr/local/bin/opencv*
+# Remove Slurm: The BioNeMo FW Container can certainly be deployed to Slurm clusters, however having Slurm
+# installed *inside* the container does not typically have a use case. Slurm introduces vulnerabilities
+# into our container.
+RUN DEBIAN_FRONTEND=noninteractive apt remove -y libslurm37 libpmi2-0
+# Remove fonttool: We do not use it and it adds a security vulnerability: https://github.com/advisories/GHSA-6673-4983-2vx5
+RUN pip uninstall -y fonttools
+
+####
+#### NOTE: THIS MUST BE THE ABSOLUTE **LAST** STEP BEFORE ENTRYPOINT !!!!!
+####       SPECIFICALLY, THE SECTION LABELED "BioNeMo Build"
+####       DO NOT MAKE OTHER LAYERS **AFTER** THIS SECTON!
+####       OTHERWISE IT WILL MAKE REBUILDS ON SOURCE CHANGES TAKE LONGER THAN NECESSARY BY INVALIDATING THE LAYER CACHE.
+####
+
 #########################################################################################
 # BioNeMo Build
 #########################################################################################
@@ -134,28 +156,10 @@ COPY examples ${BIONEMO_HOME}/examples
 COPY tests ${BIONEMO_HOME}/tests
 COPY bionemo ${BIONEMO_HOME}/bionemo
 
-
 ### install bionemo
 WORKDIR ${BIONEMO_HOME}
 # we already install dependencies earlier, directly from the requirements*.txt files
 RUN pip install --no-deps -e .
-
-# Remove nvm as it's not expected users will need this, and it introduces unfixable vulnerabilties:
-# https://nvd.nist.gov/vuln/detail/CVE-2023-32002
-RUN /bin/bash -c "source /usr/local/nvm/nvm.sh && nvm deactivate && nvm unload && sed -i '/NVM/d' /root/.bashrc"
-RUN rm -rf /usr/local/nvm
-RUN /bin/bash -c "sed -i '/NVM/d' /root/.bashrc && sed -i '/nvm.sh/d' /etc/bash.bashrc"
-# Remove OpenCV: We do not use it and it adds a security vulnerability which no current fix:
-# https://nvd.nist.gov/vuln/detail/CVE-2023-2617
-RUN pip uninstall -y opencv-python opencv
-RUN rm -rf /usr/local/lib/python3.10/dist-packages/cv2 /usr/local/include/opencv4 /usr/local/share/opencv4 /usr/local/lib/cmake/opencv4 /usr/local/bin/opencv*
-# Remove Slurm: The BioNeMo FW Container can certainly be deployed to Slurm clusters, however having Slurm
-# installed *inside* the container does not typically have a use case. Slurm introduces vulnerabilities
-# into our container.
-RUN DEBIAN_FRONTEND=noninteractive apt remove -y libslurm37 libpmi2-0
-# Remove fonttool: We do not use it and it adds a security vulnerability: https://github.com/advisories/GHSA-6673-4983-2vx5
-RUN pip uninstall -y fonttools
-
 
 # FIXME: If BIONEMO_HOME _is not_ /workspace/bionemo, then this ENTRYPOINT is invalid!
 ENTRYPOINT ["/workspace/bionemo/setup/startup.sh"]

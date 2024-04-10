@@ -161,6 +161,16 @@ code_format:
    - generic
 
 
+license_check:
+  image: python:3.10.13-slim
+  stage: code_format
+  tags:
+   - generic
+  script:
+    - INFRA_BIONEMO_DEP=$(cat setup/requirements-dev.txt | grep "infra-bionemo==")
+    - pip install --index-url "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab-master.nvidia.com/api/v4/projects/118589/packages/pypi/simple" "${INFRA_BIONEMO_DEP}"
+    - license-check -c .
+
 build-bionemo-image:
   extends:
     - .docker-setup
