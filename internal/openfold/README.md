@@ -212,6 +212,100 @@ reason please have a look at `OpenProteinSet/Preprocess` and `PDBMMCIF/Preproces
 4. In the recipe below, we (internal developers) don't use 'Initial_training_slurm.sh', 
 which is the public-facing scripts.
 
+### (2.5) resume from failure [wip]
+
+If you executed a virtualpipe command, with `resumable: True`, you should 
+expect to see a sequence of slurm jobs, where each ends with a message like 
+the following in the log file.
+
+```bash
+Apr 07 19:34:50.986548 2613564 slurmstepd   0x155551a0d700: error: *** JOB 778085 ON batch-block2-2007 CANCELLED AT 2024-04-07T19:34:50 DUE TO TIME LIMIT ***
+srun: Job step aborted: Waiting up to 122 seconds for job step to finish.
+```
+
+But, on our slurm clusters, there are many factors outside of your control, 
+which can lead to cluster-wide outages.  You may see your sequence-of-slurm-jobs 
+come to a halt, where the second-to-last slurm job fails with a message like 
+below, in it's corresponding log file, e.g. `slurm-%j.out`
+```bash
+JOBID 780444
+PREVIOUS JOB 778085 FINISHED WITH TIMEOUT STATUS. RESUMING...
+Apr 08 03:37:03.834962 3444994 slurmstepd   0x155552ddfd40: error: pyxis: child 3444995 failed with error code: 1
+Apr 08 03:37:03.835051 3444994 slurmstepd   0x155552ddfd40: error: pyxis: failed to import docker image
+Apr 08 03:37:03.835067 3444994 slurmstepd   0x155552ddfd40: error: pyxis: printing enroot log file:
+Apr 08 03:37:03.835098 3444994 slurmstepd   0x155552ddfd40: error: pyxis:     [INFO] Querying registry for permission grant
+Apr 08 03:37:03.835121 3444994 slurmstepd   0x155552ddfd40: error: pyxis:     [INFO] Permission granted
+Apr 08 03:37:03.835130 3444994 slurmstepd   0x155552ddfd40: error: pyxis:     [INFO] Fetching image manifest list
+Apr 08 03:37:03.835140 3444994 slurmstepd   0x155552ddfd40: error: pyxis:     [ERROR] Could not process JSON input
+```
+
+The last slurm job's log file will look something like
+```bash
+JOBID 786632
+PREVIOUS JOB 780444 FINISHED WITH FAILED STATUS. RESUMING...
+PREVIOUS JOB 780444 FINISHED WITH FAILED STATUS. EXIT.
+```
+
+In order to resume the sequence-of-slurm-jobs, identify the last job in 
+the sequence that end `DUE TO TIME LIMIT`, as in the first message in this section.  
+Call it `LAST_GOOD_JOB_ID`. 
+
+Additionally, locate the `launch.sub` file created by virtualpipe, and placed 
+in the output directory created by virtualpipe.
+
+Submit `launch.sub` to the slurm cluster manager, with `LAST_GOOD_JOB_ID` as 
+the first positional argument
+```bash
+sbatch path-to-slurm-submission-script/launch.sub ${LAST_GOOD_JOB_ID}
+```
+
+For example
+```bash
+sbatch vp_out_20240331/vp20240404T1015zP_dev_br_cd-2858_validation_metric_debug_step_from_filename_20240403T1552_opt3q4q6q7q11_prbf16-mixed_n16_t8_v200_m80000_w4h_resTrue/virtualpipe_rundir_20240404_102009_448715/launch.sub 778085
+```
+
+The sequence-of-slurm-jobs will re-initiate training, with the most recent checkpoint in 
+`experiment_output_directory/artifacts/checkpoints`.  Here the definition of
+'most recent' is determined by NeMo.
+
+### (2.6) optimisation configurations
+
+To activate the optimisations implemented in [m550](https://gitlab-master.nvidia.com/clara-discovery/bionemo/-/merge_requests/550/), 
+we add a two command-line arguments '++model.optimisations' and 'trainer.precision' as in 
+
+```bash
+precision_in='32'
+opt_list_in='[layernorm_triton,layernorm_inductor,mha_triton]'
+python examples/protein/openfold/train.py \
+  --config-name openfold_initial_training \
+  ++model.data.dataset_path=/data \
+  ++model.optimisations=${opt_list_in} \
+  ++trainer.num_nodes=${total_nodes_in} \
+  ++trainer.devices=${ntasks_per_node_in} \
+  ++trainer.precision=${precision_in} \
+  ...other-command-line-args...
+  ++exp_manager.exp_dir=/result;
+```
+
+The possible values for `precision_in` are `32` and `bf16-mixed`.
+
+Below, the variable `opt_list_in` is a list with any combination of the strings
+
+```bash
+mha_fused_gemm
+layernorm_triton
+layernorm_inductor
+inductor_global
+dataloader_pq
+mha_triton
+```
+
+For `inductor_global` it's a little difficult to find the corresponding row in the 
+OpenFold HPC v3.0 roadmap tab at
+
+[v3.0 MLPerf-Training tracker](https://docs.google.com/spreadsheets/d/1eAYJ6WqbZDXXpqDXOidvgV-2woZVusRVPaDE8rSDRUs/edit#gid=975160894)
+
+but for the other settings, the correspondence is more clear.
 
 ## (3) fine-tuning
 
