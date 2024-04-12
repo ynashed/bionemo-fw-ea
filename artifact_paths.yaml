@@ -118,3 +118,8 @@ models:
         symlink:
             source: "../../dnabert-86M.nemo"
             target: "dna/dnabert/dnabert-86M.nemo"
+    geneformer:
+        pbss: "s3://bionemo-ci/models/geneformer-qa.nemo"
+        symlink:
+            source: "../../geneformer-qa.nemo"
+            target: "singlecell/geneformer/geneformer-qa.nemo"

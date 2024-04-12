@@ -1,0 +1,66 @@
+name: admson 
+defaults:
+  - geneformer_config 
+do_training: True # set to false if data preprocessing steps must be completed
+do_testing: True # set to true to run evaluation on test data after training
+restore_from_path: null
+target: bionemo.model.singlecell.geneformer.model.GeneformerModel # target class for geneformer model
+infer_target: bionemo.model.singlecell.geneformer.infer.GeneformerInference # target inference class for geneformer model
+
+trainer:
+  devices: 2 # number of GPUs or CPUs
+  num_nodes: 1 
+  max_epochs: 1 
+  val_check_interval: 50
+  precision: 32 
+  max_steps: 300
+
+exp_manager:
+  wandb_logger_kwargs:
+    project: ${name}_finetuning
+    name: ${name}_finetuning_encoder_frozen_${model.encoder_frozen}
+
+model:
+  restore_encoder_path: /workspace/bionemo/results/nemo_experiments/geneformer/geneformer-pretraining/geneformer/2024-04-05_04-18-13/checkpoints/geneformer.nemo
+  encoder_frozen: False # encoder trainable or frozen
+  bert_binary_head: True
+  post_process: False # set to False for downstream task
+  micro_batch_size: 64
+  input_size: 256
+  hidden_size: 256
+  global_batch_size: null # if null will be computed automatically
+  tensor_model_parallel_size: 1  # model parallelism
+  pipeline_model_parallel_size: 1  # model parallelism
+  loss_func: MSELoss
+  data:
+    task_type: "regression"
+    target_size: 5060
+    dataset_path: ${model.data.preprocessed_data_path}/
+    split_type: single # Specific parameter for the Adamson et al Dataset used in this perturb seq example.
+            # single: test set contains single perturbations not seen in train set, train contains both single and double not seen in test set.
+            # single_only: test set contains single pertubations not seen in train set, train contains single pertubations only.
+            # double:  test set contains double perturbations not seen in train set, train contains both double and single.
+            # double-0: filters pertubations in double pertubations that have both genes not in test genes. i.e. train set will only include double pertubations with atleast one gene not in test_genes
+            # double-1: filter pertubations in double pertubations that have both genes not in `test_genes`. i.e. train set will include double pertubations such that both perturbs are not in test set.
+    preprocessed_data_path: ${oc.env:BIONEMO_HOME}/data/geneformer # geneformer processed path
+    # These are produced by preprocessing
+    preprocessed_anndata_fn: ${model.data.preprocessed_data_path}/preprocessed_anndata.h5ad
+    target_gep_fn: ${model.data.preprocessed_data_path}/target_gep.npy
+
+    num_workers: 12
+    max_seq_length: ${model.seq_length}
+    emb_batch_size: ${model.micro_batch_size}
+  
+  finetuning_optim: # optimizer parameters for downstream task model
+    name: adam
+    lr: 0.0001
+    betas:
+      - 0.9
+      - 0.999
+    eps: 1e-8
+    weight_decay: 0.01
+    sched:
+      name: WarmupAnnealing
+      min_lr: 0.00001
+      last_epoch: -1
+      warmup_ratio: 10

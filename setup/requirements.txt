@@ -1,7 +1,7 @@
 --extra-index-url https://pypi.ngc.nvidia.com
 --extra-index-url "https://__token__:${GITLAB_TOKEN}@gitlab-master.nvidia.com/api/v4/projects/65301/packages/pypi/simple"
 pyfastx==1.1.0
-matplotlib==3.4.3
+matplotlib>=3.4.3
 rdkit==2023.9.1
 urllib3==1.26.16
 ijson==3.2.3
@@ -46,3 +46,5 @@ diffdock==0.0.5
 py3Dmol==2.0.4
 # Property guided molecule generation
 bionemo-controlled-generation==0.3.0
+scvi-tools==1.1.0.post2
+scanpy==1.9.8
