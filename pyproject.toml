@@ -53,6 +53,7 @@ markers = [
     'needs_fork: marks tests as requiring a separate pytest process (deselect with `-m "not needs_fork"`)',
     'internal: marks tests that can only be run inside of NVIDIA -- will not function in external customer code (deselect with `-m "not internal"`)',
     'integration_test: marks tests that rely on external subsystems to run, e.g. data download or NGC cluster use (deselect with `-m not integration_test"`)',
+    'needs_80gb_memory_gpu: marks tests that need 80gb of memory which is more than ci/cd runners provide (deselect with `-m not "needs_80gb_memory_gpu"`)',
 ]
 testpaths = ["tests",  "examples/tests",]
 filterwarnings = [ "ignore::DeprecationWarning",]

@@ -12,6 +12,7 @@ from functools import lru_cache
 
 import torch
 from nemo.utils.model_utils import import_class_by_path
+from omegaconf import OmegaConf
 
 import bionemo.utils
 from bionemo.data.datasets import (
@@ -29,7 +30,7 @@ class FineTuneProteinModel(EncoderFineTuning):
         self.encoder_frozen = cfg.encoder_frozen
         self.task_type = cfg.data.task_type
 
-        if self.encoder_frozen and cfg.get('peft.enabled', False):
+        if self.encoder_frozen and OmegaConf.select(cfg, 'peft.enabled'):
             raise ValueError("Using PEFT requires encoder_frozen: False for training")
 
         super().__init__(cfg, trainer=trainer)
@@ -184,7 +185,7 @@ class FineTuneProteinModel(EncoderFineTuning):
     def state_dict(self, destination=None, prefix=None, keep_vars=False):
         custom_state_dict = super(FineTuneProteinModel, self).state_dict()
 
-        if self.cfg.get('peft.enabled', False):  # skipped if peft.enabled is false or not present in config
+        if not self.encoder_frozen:
             custom_state_dict.update(self.encoder_model.model.state_dict())
 
         return custom_state_dict

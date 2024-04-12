@@ -20,6 +20,7 @@ from nemo.collections.nlp.parts.nlp_overrides import (
     NLPSaveRestoreConnector,
     PipelineMixedPrecisionPlugin,
 )
+from nemo.collections.nlp.parts.peft_config import LoraPEFTConfig
 from nemo.utils import logging
 from nemo.utils.app_state import AppState
 from nemo.utils.exp_manager import StatelessTimer, exp_manager
@@ -352,12 +353,7 @@ def restore_model(
             cfg.model = OmegaConf.merge(cfg.model, restore_cfg)
         cfg.model.precision = trainer.precision
 
-    if cfg.get('model.peft.enabled', False):  # skipped if peft.enabled is false or not present in config
-        # TODO(dorotat): PEFT is not present in NeMo 1.22 - it was refactored. Disabling it till it is fixed
-        raise ValueError("PEFT is disabled")
-
-    else:
-        save_restore_connector = NLPSaveRestoreConnector()
+    save_restore_connector = NLPSaveRestoreConnector()
 
     model = model_cls.restore_from(
         restore_path=restore_path,
@@ -366,6 +362,12 @@ def restore_model(
         save_restore_connector=save_restore_connector,
         strict=strict,
     )
+
+    if OmegaConf.select(cfg, 'model.peft.enabled') is not None:  # skipped if peft.enabled is not present in config
+        if cfg.model.peft.enabled:  # skipped if peft.enabled is false
+            peft_cfg = LoraPEFTConfig(cfg.model)
+            model.add_adapter(peft_cfg)
+
     if cfg.get('load_from_checkpoint') is not None:
         model.load_from_checkpoint(checkpoint_path=cfg.load_from_checkpoint, strict=strict)
 

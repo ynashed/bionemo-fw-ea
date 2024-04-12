@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple, TypedDic
 
 import torch
 from nemo.utils import logging
-from omegaconf import ListConfig
+from omegaconf import ListConfig, OmegaConf
 from pandas import DataFrame, Series
 from pytorch_lightning.core import LightningModule
 
@@ -236,11 +236,10 @@ class BaseEncoderInference(LightningModule):
                 data_parallel_size=1,  # We check above to make sure that dataparallel size is always 1 at inference.
             )
 
-        # Check for PEFT flag before calling `setup_optimizer_param_groups`
-        if cfg.get('model.peft.enabled', False):  # skipped if peft.enabled is false or not present in config
-            model.setup_optimizer_param_groups()
-        elif self._freeze_model:  # only use encoder_frozen flag if not doing peft
-            model.freeze()
+        # Check for PEFT flag
+        if not OmegaConf.select(cfg, 'model.peft.enabled'):  # skipped if peft.enabled is True
+            if self._freeze_model:  # only use encoder_frozen flag if not doing peft
+                model.freeze()
 
         self.model = model
 

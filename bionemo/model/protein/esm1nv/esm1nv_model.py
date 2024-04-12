@@ -21,6 +21,7 @@ from nemo.collections.nlp.modules.common.megatron.utils import (
     average_losses_across_data_parallel_group,
 )
 from nemo.collections.nlp.modules.common.tokenizer_utils import get_nmt_tokenizer
+from nemo.collections.nlp.parts.mixins.nlp_adapter_mixins import NLPAdapterModelMixin
 from nemo.core import Dataset
 from nemo.core.neural_types import NeuralType
 from nemo.utils import AppState, logging
@@ -55,7 +56,7 @@ except (ImportError, ModuleNotFoundError):
     HAVE_MEGATRON_CORE = False
 
 
-__all__ = ["ESM1nvModel", "ESM2nvModel"]
+__all__ = ["ESM1nvModel", "ESM2nvModel", "ESM2nvLoRAModel"]
 
 
 def esm1nv_build_train_valid_test_datasets(
@@ -748,3 +749,9 @@ class ESM2nvModel(ESM1nvModel):
         if hasattr(self, '_test_ds'):
             consumed_samples = 0
             self._test_dl = self.build_pretraining_data_loader(self._test_ds, consumed_samples, num_workers=0)
+
+
+class ESM2nvLoRAModel(NLPAdapterModelMixin, ESM2nvModel):
+    def __init__(self, cfg: DictConfig, trainer: Trainer):
+        super().__init__(cfg, trainer)
+        self.setup_complete = True
