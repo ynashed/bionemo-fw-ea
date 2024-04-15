@@ -547,6 +547,12 @@ jet-configure:
 
 jet-trigger:
   extends: [.jet-trigger-template]
+  variables:
+    JET_CUSTOM_CONFIG: |
+      launchers:
+        dgxa100_dracooci:
+          additional_flags:
+            deadline: now+42hours
   inherit:
     variables:
       - EXCLUDE_JET
