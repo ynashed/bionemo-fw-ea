@@ -123,3 +123,19 @@ models:
         symlink:
             source: "../../geneformer-qa.nemo"
             target: "singlecell/geneformer/geneformer-qa.nemo"
+    enformer_finetuned16:
+        pbss: "s3://bionemo-ci/models/dna/enformer/enformer_finetuned16/0.1.0/enformer_finetuned16.nemo"
+        ngc: "nvidian/clara-lifesciences/enformer_finetuned16:0.1.0"
+        relative_download_dir: "dna/enformer/"
+    enformer_finetuned32:
+        pbss: "s3://bionemo-ci/models/dna/enformer/enformer_finetuned32/0.1.0/enformer_finetuned32.nemo"
+        ngc: "nvidian/clara-lifesciences/enformer_finetuned32:0.1.0"
+        relative_download_dir: "dna/enformer/"
+    enformer_pretrained16:
+        pbss: "s3://bionemo-ci/models/dna/enformer/enformer_pretrained16/0.1.0/enformer_pretrained16.nemo"
+        ngc: "nvidian/clara-lifesciences/enformer_pretrained16:0.1.0"
+        relative_download_dir: "dna/enformer/"
+    enformer_pretrained32:
+        pbss: "s3://bionemo-ci/models/dna/enformer/enformer_pretrained32/0.1.0/enformer_pretrained32.nemo"
+        ngc: "nvidian/clara-lifesciences/enformer_pretrained32:0.1.0"
+        relative_download_dir: "dna/enformer/"
