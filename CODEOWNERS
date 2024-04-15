@@ -16,15 +16,15 @@
 docs/ @ntadimeti @trvachov
 
 # Requires bionemo FW team or PM review to change CODEOWNERS or README
-CODEOWNERS @broland @dorotat @jomitchell @kdidi @mgreaves @ntadimeti @trvachov
-README.md @broland @dorotat @jomitchell @kdidi @mgreaves @ntadimeti @trvachov
+CODEOWNERS @broland @cye @dorotat @jomitchell @kdidi @mgreaves @ntadimeti @trvachov 
+README.md @broland @cye @dorotat @jomitchell @kdidi @mgreaves @ntadimeti @trvachov
 
 # Requires bionemo FW team review when modifying: environment, internal-only code, CI, interacting with the codebase
-.gitlab-ci.yml @broland @dorotat @jomitchell @kdidi @mgreaves @trvachov
-internal/ @broland @dorotat @jomitchell @kdidi @mgreaves @trvachov
-setup/Dockerfile* @broland @dorotat @jomitchell @kdidi @mgreaves @trvachov
-setup/requirements*.txt @broland @dorotat @jomitchell @kdidi @mgreaves @trvachov
-CONTRIBUTING.md @broland @dorotat @jomitchell @kdidi @mgreaves @trvachov
+.gitlab-ci.yml @broland @cye @dorotat @jomitchell @kdidi @mgreaves @trvachov
+internal/ @broland @cye @dorotat @jomitchell @kdidi @mgreaves @trvachov
+setup/Dockerfile* @broland @cye @dorotat @jomitchell @kdidi @mgreaves @trvachov
+setup/requirements*.txt @broland @cye @dorotat @jomitchell @kdidi @mgreaves @trvachov
+CONTRIBUTING.md @broland @cye @dorotat @jomitchell @kdidi @mgreaves @trvachov
 
 
 
@@ -216,19 +216,19 @@ docs/build/html/models/megamolbart.html @sveccham
 docs/build/html/.doctrees/models/megamolbart.doctree @sveccham
 
 ##
-## molmim @jstjohn
+## molmim @tshimko 
 ##
-bionemo/model/molecule/molmim @jstjohn
-bionemo/model/molecule/mol_enc_dec_model_base.py @jstjohn
-tests/test_triton/test_molmim_triton.py @jstjohn
-docs/bionemo/images/molmim_wandb_charts.png @jstjohn
-docs/bionemo/images/MolMIM_molecule_generation_1.png @jstjohn
-docs/bionemo/images/MolMIM_molecule_generation_2.png @jstjohn
-docs/bionemo/models/molmim.md @jstjohn
-docs/bionemo/notebooks/MolMIM_GenerativeAI_local_inference_with_examples.ipynb @jstjohn
-docs/bionemo/notebooks/cma_es_guided_molecular_optimization_molmim.ipynb @jstjohn
-docs/bionemo/notebooks/model_training_molmim.ipynb @jstjohn
-docs/readme-images/molmim_training_throughput.png @jstjohn
+bionemo/model/molecule/molmim @jstjohn @tshimko
+bionemo/model/molecule/mol_enc_dec_model_base.py @jstjohn @tshimko
+tests/test_triton/test_molmim_triton.py @jstjohn @tshimko
+docs/bionemo/images/molmim_wandb_charts.png @jstjohn @tshimko
+docs/bionemo/images/MolMIM_molecule_generation_1.png @jstjohn @tshimko
+docs/bionemo/images/MolMIM_molecule_generation_2.png @jstjohn @tshimko
+docs/bionemo/models/molmim.md @jstjohn @tshimko
+docs/bionemo/notebooks/MolMIM_GenerativeAI_local_inference_with_examples.ipynb @jstjohn @tshimko
+docs/bionemo/notebooks/cma_es_guided_molecular_optimization_molmim.ipynb @jstjohn @tshimko
+docs/bionemo/notebooks/model_training_molmim.ipynb @tshimko @jstjohn 
+docs/readme-images/molmim_training_throughput.png @jstjohn @tshimko
 
 ##
 ## openfold @broland @kdidi
