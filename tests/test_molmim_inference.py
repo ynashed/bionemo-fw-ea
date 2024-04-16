@@ -21,18 +21,20 @@ from bionemo.utils.tests import (
     distributed_model_parallel_state,
 )
 
-from .molecule_inference_shared_test_code import (
-    SMIS_FOR_TEST,
+from .inference_shared_test_code import (
     get_config_dir,
     get_expected_vals_file,
     get_inference_class,
+    run_seqs_to_embedding,
+    run_seqs_to_hiddens_with_goldens,
+)
+from .molecule_inference_shared_test_code import (
+    SMIS_FOR_TEST,
     run_beam_search,
     run_beam_search_product,
     run_hidden_to_smis,
     run_interpolate,
     run_sample_not_beam,
-    run_smis_to_embedding,
-    run_smis_to_hiddens_with_goldens,
 )
 
 
@@ -65,13 +67,20 @@ def molmim_expected_vals_path(bionemo_home: Path) -> Path:
 def test_smis_to_hiddens_with_goldens_molmim(
     molmim_inferer: MolMIMInference, _smis: List[str], molmim_expected_vals_path: Path
 ):
-    run_smis_to_hiddens_with_goldens(molmim_inferer, _smis, molmim_expected_vals_path)
+    run_seqs_to_hiddens_with_goldens(
+        molmim_inferer,
+        _smis,
+        molmim_expected_vals_path,
+        molmim_inferer.model.cfg.encoder.hidden_size,
+        molmim_inferer.model.cfg.encoder.arch,
+        tokenize_fn=molmim_inferer._tokenize,
+    )
 
 
 @pytest.mark.needs_fork
 @pytest.mark.needs_gpu
 def test_smis_to_embedding_molmim(molmim_inferer: MolMIMInference, _smis: List[str]):
-    run_smis_to_embedding(molmim_inferer, _smis)
+    run_seqs_to_embedding(molmim_inferer, _smis, molmim_inferer.model.cfg.encoder.hidden_size)
 
 
 @pytest.mark.needs_fork

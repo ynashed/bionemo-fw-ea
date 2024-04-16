@@ -10,18 +10,42 @@
 
 import logging
 import os
+from copy import deepcopy
+from pathlib import Path
+from typing import List
 
 import pytest
 
 from bionemo.model.protein.prott5nv import ProtT5nvInference
 from bionemo.model.utils import initialize_distributed_parallel_state
 from bionemo.utils.hydra import load_model_config
-from bionemo.utils.tests import check_model_exists, teardown_apex_megatron_cuda
+from bionemo.utils.tests import (
+    check_model_exists,
+    distributed_model_parallel_state,
+    teardown_apex_megatron_cuda,
+)
+
+from .inference_shared_test_code import (
+    get_config_dir,
+    get_expected_vals_file,
+    get_inference_class,
+    run_seqs_to_embedding,
+    run_seqs_to_hiddens_with_goldens,
+)
 
 
 log = logging.getLogger(__name__)
 
 CHECKPOINT_PATH = os.path.join(os.environ["BIONEMO_HOME"], "models/protein/prott5nv/prott5nv.nemo")
+SEQS_FOR_TEST = [
+    'MSLKRKNIALIPAAGIGVRFGADKPKQYVEIGSKTVLEHVLGIFERHEAVDLTVVVVSPEDTFADKVQTAFPQVRVWKNGGQTRAETVRNGVAKLLETGLAAETDNILVHDAARCCLPSEALARLIEQAGNAAEGGILAVPVADTLKRAESGQISATVDRSGLWQAQTPQLFQAGLLHRALAAENLGGITDEASAVEKLGVRPLLIQGDARNLKLTQPQDAYIVRLLLDAV',
+    'MIQSQINRNIRLDLADAILLSKAKKDLSFAEIADGTGLAEAFVTAALLGQQALPADAARLVGAKLDLDEDSILLLQMIPLRGCIDDRIPTDPTMYRFYEMLQVYGTTLKALVHEKFGDGIISAINFKLDVKKVADPEGGERAVITLDGKYLPTKPF',
+]
+
+
+@pytest.fixture()
+def _seqs() -> List[str]:
+    return deepcopy(SEQS_FOR_TEST)
 
 
 @pytest.fixture(scope="module")
@@ -76,3 +100,41 @@ def test_long_seq_to_embedding(inference_model):
         assert False
     except Exception:
         pass
+
+
+@pytest.fixture(scope="module")
+def prott5nv_inferer(bionemo_home: Path) -> ProtT5nvInference:
+    model_name = "prott5nv"
+    cfg_path = get_config_dir(bionemo_home, model_name)
+    cfg = load_model_config(config_name='infer', config_path=cfg_path)
+    with distributed_model_parallel_state():
+        inferer = get_inference_class(model_name)(
+            cfg=cfg, inference_batch_size_for_warmup=2
+        )  # Change to 1 to debug the failure
+        yield inferer  # Yield so cleanup happens after the test
+
+
+@pytest.fixture(scope="module")
+def prott5nv_expected_vals_path(bionemo_home: Path) -> Path:
+    return get_expected_vals_file(bionemo_home, "prott5nv")
+
+
+@pytest.mark.needs_fork
+@pytest.mark.needs_gpu
+def test_seq_to_hiddens_with_goldens_prott5nv(
+    prott5nv_inferer: ProtT5nvInference, _seqs: List[str], prott5nv_expected_vals_path: Path
+):
+    run_seqs_to_hiddens_with_goldens(
+        prott5nv_inferer,
+        _seqs,
+        prott5nv_expected_vals_path,
+        prott5nv_inferer.cfg.model.encoder.hidden_size,
+        prott5nv_inferer.model.cfg.encoder.arch,
+        tokenize_fn=prott5nv_inferer._tokenize,
+    )
+
+
+@pytest.mark.needs_fork
+@pytest.mark.needs_gpu
+def test_seqs_to_embedding_prott5nv(prott5nv_inferer: ProtT5nvInference, _seqs: List[str]):
+    run_seqs_to_embedding(prott5nv_inferer, _seqs, prott5nv_inferer.cfg.model.encoder.hidden_size)

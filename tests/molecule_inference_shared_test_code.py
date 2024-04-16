@@ -9,17 +9,12 @@
 # its affiliates is strictly prohibited.
 
 import logging
-import os
-from pathlib import Path
-from typing import List, Type
+from typing import List
 
-import torch
-import torch.utils
 from rdkit import Chem
 
 from bionemo.model.molecule.infer import MolInference
 from bionemo.model.molecule.megamolbart import MegaMolBARTInference
-from bionemo.model.molecule.molmim.infer import MolMIMInference
 
 
 log = logging.getLogger(__name__)
@@ -32,84 +27,6 @@ SMIS_FOR_TEST = [
 
 
 MAX_GEN_LEN: int = 64
-UPDATE_GOLDEN_VALUES = os.environ.get("UPDATE_GOLDEN_VALUES", "0") == "1"
-
-
-def get_inference_class(model_name: str) -> Type[MolInference]:
-    return {"megamolbart": MegaMolBARTInference, "molmim": MolMIMInference}[model_name]
-
-
-def get_config_dir(bionemo_home: Path, model_name: str) -> str:
-    return str(bionemo_home / "examples" / "molecule" / model_name / "conf")
-
-
-def get_expected_vals_file(bionemo_home: Path, model_name: str) -> Path:
-    return bionemo_home / "tests" / "data" / model_name / "inference_test_golden_values.pt"
-
-
-def run_smis_to_hiddens_with_goldens(inferer: MolInference, smis: List[str], expected_vals_path: Path):
-    if UPDATE_GOLDEN_VALUES:
-        os.makedirs(os.path.dirname(expected_vals_path), exist_ok=True)
-    else:
-        assert os.path.exists(
-            expected_vals_path
-        ), f"Expected values file not found at {expected_vals_path}. Rerun with UPDATE_GOLDEN_VALUES=1 to create it."
-    assert inferer.training is False
-    hidden_state, pad_masks = inferer.seq_to_hiddens(smis)
-    hidden_state2, pad_masks2 = inferer.seq_to_hiddens(smis)
-    hidden_state3, pad_masks3 = inferer.seq_to_hiddens(smis)
-    assert hidden_state is not None
-    assert hidden_state2 is not None
-    assert hidden_state3 is not None
-    # Shape should be batch, position (max of input batch here), hidden_size
-    assert len(hidden_state.shape) == 3
-    assert hidden_state.shape[0] == len(smis)
-    assert hidden_state.shape[2] == inferer.model.cfg.encoder.hidden_size
-    if inferer.model.cfg.encoder.arch == "perceiver" or isinstance(inferer, MolMIMInference):
-        # Perceiver uses a fixed length for the position state. MolMIM is defined with this arch
-        #  so assert it
-        assert inferer.model.cfg.encoder.arch == "perceiver"
-        assert hidden_state.shape[1] == inferer.model.cfg.encoder.hidden_steps
-    else:
-        # Most models will have one position per input token.
-        # Note the following is not true in general since token length != sequence length
-        #  in general. This should technically be token length, but works for these SMIS.
-        assert hidden_state.shape[1] == max([len(s) for s in smis])
-    assert pad_masks is not None
-    assert pad_masks2 is not None
-    assert pad_masks3 is not None
-    assert pad_masks.shape == hidden_state.shape[:2]
-
-    # Make sure that sequential runs of infer give the same result.
-    torch.testing.assert_close(pad_masks3, pad_masks2, rtol=None, atol=None, equal_nan=True)
-    torch.testing.assert_close(pad_masks, pad_masks2, rtol=None, atol=None, equal_nan=True)
-    torch.testing.assert_close(hidden_state3, hidden_state2, rtol=None, atol=None, equal_nan=True)
-    torch.testing.assert_close(hidden_state, hidden_state2, rtol=None, atol=None, equal_nan=True)
-
-    if UPDATE_GOLDEN_VALUES:
-        torch.save(
-            {
-                "expected_hidden_state": hidden_state,
-                "expected_pad_masks": pad_masks,
-            },
-            expected_vals_path,
-        )
-        assert False, f"Updated expected values at {expected_vals_path}, rerun with UPDATE_GOLDEN_VALUES=0"
-    else:
-        expected_vals = {k: v.to(pad_masks.device) for k, v in torch.load(expected_vals_path).items()}
-        torch.testing.assert_close(
-            hidden_state, expected_vals["expected_hidden_state"], rtol=None, atol=None, equal_nan=True
-        )
-        assert torch.all(pad_masks == expected_vals["expected_pad_masks"])
-
-
-def run_smis_to_embedding(inferer: MolInference, smis: List[str]):
-    embedding = inferer.seq_to_embeddings(smis)
-    assert embedding is not None
-    # Shape should be batch, hidden_size (Embeddings pool out the position axis of hiddens by some means)
-    assert embedding.shape[0] == len(smis)
-    assert embedding.shape[1] == inferer.model.cfg.encoder.hidden_size
-    assert len(embedding.shape) == 2
 
 
 def run_hidden_to_smis(inferer: MolInference, smis: List[str]):
