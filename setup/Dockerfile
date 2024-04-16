@@ -38,13 +38,46 @@ RUN cd dgl/python && python setup.py install && cd ../.. && rm -rf dgl
 # LABEL "com.nvidia.nemo.git_hash"="a5fbsegy"
 # LABEL "com.nvidia.nemo.description"="Cusotom build with XYZ fixed"
 
-## Installing dependencies and tools
+## Installing system dependencies and tools
+##
+## NOTE: Need to resolve issue with libboost-all-dev for vina py. dependency.
+##      If we apt install libboost-dev-all, then, on import torch, we observe an error
+##      stating that ucm_set_global_opts is undefined in libucs. The error stack will
+##      always look something like the following:
+##
+## .........................................: in <module>
+##     import torch
+## /usr/local/lib/python3.10/dist-packages/torch/__init__.py:234: in <module>
+##     from torch._C import *  # noqa: F403
+## E   ImportError: /opt/hpcx/ucx/lib/libucs.so.0: undefined s
+##
+
 RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y \
-        python3-setuptools python3-dev swig \
-        wget git unzip tmux vim emacs-nox tree xterm && \
-    rm -rf /var/lib/apt/lists/*
+        python3-setuptools python3-dev libboost-all-dev swig \
+        wget git unzip tmux vim emacs-nox tree xterm \
+        liblmdb-dev libopenbabel-dev python3-openbabel openbabel libopenbabel7
+
+## libboost-all-dev is required by vina==1.2.5 for its compilation
+## While at the runtime only boost-thread and boost-filesystem are needed
+RUN pip install --no-build-isolation vina==1.2.5
+RUN apt purge *mpi* -y \
+    && apt autoremove -y \
+    && apt install libboost-thread-dev libboost-filesystem-dev -y \
+    && rm -rf /var/lib/apt/lists/*
+
+# special handling for openbabel:
+# apt installs the openbabel3 library to /usr/include/openbabel3, but the openbabel python package
+# assumes that it is under /usr/local/include/openbabel3. The error will look like this on install:
+#       Error: SWIG failed. Is Open Babel installed?
+#       You may need to manually specify the location of Open Babel include and library directories. For example:
+#         python setup.py build_ext -I/usr/local/include/openbabel3 -L/usr/local/lib
+#         python setup.py install
+#       [end of output]
+# To fix, we symlink!
+RUN ln -s /usr/include/openbabel3 /usr/local/include/openbabel3
+# NOTE: openbabel is inlcuded in setup/requirements.txt
 
 # Optional: Install code-server to enable easy remote development on a container
 # More info about code-server be found here: https://coder.com/docs/code-server/v4.4.0
@@ -59,9 +92,13 @@ COPY setup/requirements-test.txt /tmp/requirements-test.txt
 COPY setup/requirements-cve.txt /tmp/requirements-cve.txt
 COPY setup/requirements-dev.txt /tmp/requirements-dev.txt
 COPY setup/requirements.txt /tmp/requirements.txt
+COPY setup/install_lmdb.sh /tmp/install_lmdb.sh
 RUN --mount=type=secret,id=GITLAB_TOKEN GITLAB_TOKEN=$(cat /run/secrets/GITLAB_TOKEN) pip install -r /tmp/requirements-dev.txt
 RUN pip install -r /tmp/requirements-test.txt
 RUN --mount=type=secret,id=GITLAB_TOKEN GITLAB_TOKEN=$(cat /run/secrets/GITLAB_TOKEN) pip install -r /tmp/requirements.txt
+# need special install for lmdb: it cannot be installed via pip, but be built from source
+# but unfortunately, https://github.com/jnwatson/py-lmdb.git isn't PEP-512 compliant, so we have to manually run setup.py
+RUN /tmp/install_lmdb.sh
 # requirements-cve.txt *must* be installed last to patch security vulns in pip packages
 RUN pip install -r /tmp/requirements-cve.txt
 
@@ -112,21 +149,26 @@ RUN NEMO_INST_DIR=$(python -c 'import nemo; from pathlib import Path; print(Path
     patch -p1 -d $NEMO_INST_DIR -i $PWD/nemo-lr-scheduler.patch && \
     rm nemo-lr-scheduler.patch
 
+#
+# Special Handling for Python Package Security Vulnerabilities
+#
+
 # Remove nvm as it's not expected users will need this, and it introduces unfixable vulnerabilties:
 # https://nvd.nist.gov/vuln/detail/CVE-2023-32002
-RUN /bin/bash -c "source /usr/local/nvm/nvm.sh && nvm deactivate && nvm unload && sed -i '/NVM/d' /root/.bashrc"
-RUN rm -rf /usr/local/nvm
-RUN /bin/bash -c "sed -i '/NVM/d' /root/.bashrc && sed -i '/nvm.sh/d' /etc/bash.bashrc"
-# Remove OpenCV: We do not use it and it adds a security vulnerability which no current fix:
+RUN /bin/bash -c "source /usr/local/nvm/nvm.sh && nvm deactivate && nvm unload && sed -i '/NVM/d' /root/.bashrc" \
+    && rm -rf /usr/local/nvm \
+    && /bin/bash -c "sed -i '/NVM/d' /root/.bashrc && sed -i '/nvm.sh/d' /etc/bash.bashrc"
+
+# Remove OpenCV: We do not use it and it adds a security vulnerability (fix: https://github.com/opencv/opencv_contrib/pull/3480)
 # https://nvd.nist.gov/vuln/detail/CVE-2023-2617
-RUN pip uninstall -y opencv-python opencv
-RUN rm -rf /usr/local/lib/python3.10/dist-packages/cv2 /usr/local/include/opencv4 /usr/local/share/opencv4 /usr/local/lib/cmake/opencv4 /usr/local/bin/opencv*
-# Remove Slurm: The BioNeMo FW Container can certainly be deployed to Slurm clusters, however having Slurm
-# installed *inside* the container does not typically have a use case. Slurm introduces vulnerabilities
-# into our container.
-RUN DEBIAN_FRONTEND=noninteractive apt remove -y libslurm37 libpmi2-0
 # Remove fonttool: We do not use it and it adds a security vulnerability: https://github.com/advisories/GHSA-6673-4983-2vx5
-RUN pip uninstall -y fonttools
+RUN pip uninstall -y opencv-python opencv fonttools \
+    && rm -rf \
+       /usr/local/lib/python3.10/dist-packages/cv2 \
+       /usr/local/include/opencv4 \
+       /usr/local/share/opencv4 \
+       /usr/local/lib/cmake/opencv4 \
+       /usr/local/bin/opencv*
 
 ####
 #### NOTE: THIS MUST BE THE ABSOLUTE **LAST** STEP BEFORE ENTRYPOINT !!!!!

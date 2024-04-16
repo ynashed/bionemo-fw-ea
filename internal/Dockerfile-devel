@@ -28,4 +28,3 @@ ARG TPL_REPO=ssh://git@gitlab-master.nvidia.com:12051/dl/gwe/torch_performance_l
 RUN --mount=type=ssh pip install git+${TPL_REPO}
 
 COPY ./internal ${BIONEMO_HOME}/internal
-COPY CONTRIBUTING.md ${BIONEMO_HOME}/
