@@ -23,9 +23,9 @@ exp_manager:
 model:
   restore_encoder_path: /workspace/bionemo/results/nemo_experiments/geneformer/geneformer-pretraining/geneformer/2024-04-05_04-18-13/checkpoints/geneformer.nemo
   encoder_frozen: False # encoder trainable or frozen
-  bert_binary_head: True
+  bert_binary_head: True # this MUST be set for perturb-seq finetuning because it allows use to use the tokentype_embeddings, its here that we set the pertubation target.
   post_process: False # set to False for downstream task
-  micro_batch_size: 64
+  micro_batch_size: 16
   input_size: 256
   hidden_size: 256
   global_batch_size: null # if null will be computed automatically

@@ -84,7 +84,7 @@ class ESM1nvInference(BaseEncoderInference):
 
         return hidden_states, enc_mask
 
-    def load_model(self, cfg, model=None, restore_path=None):
+    def load_model(self, cfg, model=None, restore_path=None, strict: bool = True):
         """Load saved model checkpoint
 
         Params:
@@ -98,7 +98,7 @@ class ESM1nvInference(BaseEncoderInference):
             post_process = cfg.model.post_process
         else:
             post_process = model.model.post_process
-        model = super().load_model(cfg, model=model, restore_path=restore_path)
+        model = super().load_model(cfg, model=model, restore_path=restore_path, strict=strict)
 
         model.model.post_process = post_process
 

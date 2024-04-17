@@ -38,12 +38,11 @@ def main(cfg) -> None:
     logging.info("************** Starting Preprocessing ***********")
     preprocessor = GeneformerPreprocess(
         cfg.model.data.dataset_path,
-        cfg.model.tokenizer.model,
         cfg.model.tokenizer.vocab_file,
         cfg.model.data.dataset,
     )
     match preprocessor.preprocess():
-        case {'tokenizer': tokenizer, 'median_dict': median_dict}:
+        case {'tokenizer': _, 'median_dict': median_dict}:
             logging.info("*************** Preprocessing Finished ************")
         case _:
             logging.error("Preprocessing failed.")
@@ -57,9 +56,8 @@ def main(cfg) -> None:
             )
         else:
             # process_item consumes this
-            # TODO: max length needs to be configurable
             # TODO: mask prob needs to be configurable
-            model = GeneformerModel(cfg.model, trainer, tokenizer, median_dict)
+            model = GeneformerModel(cfg.model, trainer, median_dict)
 
         logging.info("************** Starting Training ***********")
         trainer.fit(model)

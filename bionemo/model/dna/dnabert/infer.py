@@ -65,7 +65,7 @@ class DNABERTInference(BaseEncoderInference):
         #       DNABERT does not have a padding token, so this is redundant.
         return output_tensor, padding_mask
 
-    def load_model(self, cfg, model=None, restore_path=None):
+    def load_model(self, cfg, model=None, restore_path=None, strict: bool = True):
         """Load saved model checkpoint
 
         Params:
@@ -75,7 +75,7 @@ class DNABERTInference(BaseEncoderInference):
             ESM trained model
         """
         # control post-processing, load_model messes with our config so we need to bring it in here.
-        model = super().load_model(cfg, model=model, restore_path=restore_path)
+        model = super().load_model(cfg, model=model, restore_path=restore_path, strict=strict)
         # Hardcoded for DNABERT as there is no post-processing
         model.model.post_process = False
         return model

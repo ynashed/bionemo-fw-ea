@@ -127,7 +127,14 @@ class BaseEncoderInference(LightningModule):
         adjust_config: bool = True,
         interactive: bool = False,
         inference_batch_size_for_warmup: Optional[int] = None,
+        strict_restore_from_path: bool = True,
     ):
+        '''
+        Parameters:
+            strict_restore_from_path: When the underlying model is restored, requires that all keys are present in the checkpoint.
+            Users may want to set this to false when they are modifying the underlying model upon restoring. For example, this is done
+            to use the embeddingtoken_types field for Fine tuning on a downstream task.
+        '''
         super().__init__()
         self.needs_warmup = (
             True  # Set this to False after calling super().__init__ if you don't need warmup in your model.
@@ -137,7 +144,7 @@ class BaseEncoderInference(LightningModule):
         self.adjust_config = adjust_config
         self.training = training
         self.interactive = interactive
-        self.model = self.load_model(cfg, model=model, restore_path=restore_path)
+        self.model = self.load_model(cfg, model=model, restore_path=restore_path, strict=strict_restore_from_path)
         self._trainer = self.model.trainer
         self.tokenizer = self.model.tokenizer
 
@@ -202,23 +209,36 @@ class BaseEncoderInference(LightningModule):
 
         return result_dict
 
-    def load_model(self, cfg, model: Optional[Any] = None, restore_path: Optional[str] = None) -> Any:
-        """Load saved model checkpoint
+    def load_model(
+        self, cfg, model: Optional[Any] = None, restore_path: Optional[str] = None, strict: bool = True
+    ) -> Any:
+        """
+        Loads a model from a given configuration and restore path.
 
-        Params:
-            checkpoint_path: path to nemo checkpoint
+        Args:
+            cfg (Any): The configuration object.
+            model (Optional[Any]): The model object to load. If None, a new model will be restored .
+            restore_path (Optional[str]): The path to restore the model from. If None, the restore path will be obtained from the configuration.
+            strict (bool): Requires all keys in the restored checkpoint to match those in the target model class.
 
         Returns:
-            Loaded model
-        """
+            Any: The loaded model.
 
+        Raises:
+            Any: Any exceptions that occur during model loading.
+
+        """
         # load model class from config which is required to load the .nemo file
 
         if model is None:
             if restore_path is None:
                 restore_path = cfg.model.downstream_task.restore_from_path
             model = restore_model(
-                restore_path=restore_path, cfg=cfg, adjust_config=self.adjust_config, interactive=self.interactive
+                restore_path=restore_path,
+                cfg=cfg,
+                adjust_config=self.adjust_config,
+                interactive=self.interactive,
+                strict=strict,
             )
         # move self to same device as loaded model
         self.to(model.device)

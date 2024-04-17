@@ -46,7 +46,7 @@ model:
   tensor_model_parallel_size: 1
   pipeline_model_parallel_size: 1
   use_flash_attention: True
-  seq_length: 1024
+  seq_length: 2048
   encoder_seq_length: ${.seq_length}
   max_position_embeddings: ${.seq_length}
   num_layers: 6

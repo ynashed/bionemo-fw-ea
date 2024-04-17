@@ -42,7 +42,6 @@ def main(cfg) -> None:
     # Create the preprocessor for the restored model.
     preprocessor = GeneformerPreprocess(
         cfg.model.data.dataset_path,
-        cfg.model.tokenizer.model,
         cfg.model.tokenizer.vocab_file,
         cfg.model.data.dataset,
     )

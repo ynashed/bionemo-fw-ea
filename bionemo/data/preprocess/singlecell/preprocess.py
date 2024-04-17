@@ -65,7 +65,6 @@ class GeneformerResourcePreprocessor(ResourcePreprocessor):
 @dataclass
 class SCPreprocessorDataClass:
     preproc_dir: str
-    tokenizer_model_path: str
     tokenizer_vocab_path: str
     dataset_conf: OmegaConf
 
@@ -77,7 +76,6 @@ class GeneformerPreprocess(SCPreprocessorDataClass):
         """Downloads HGNC symbols
 
         preproc_dir (str): Directory to store the reference preproc in
-        tokenizer_model_path (str): Filepath to store the tokenzier parameters
         tokenizer_vocab_path (str): Filepath to store the tokenizer vocab
         tokenizer_k (int): k-mer size for the tokenizer
         dataset_conf (OmegaConf): has 'train', 'val', 'test' keys containing
@@ -85,12 +83,11 @@ class GeneformerPreprocess(SCPreprocessorDataClass):
         """
         super().__init__(*args, **kwargs)
         self._validate_tokenizer_args(
-            self.tokenizer_model_path,
             self.tokenizer_vocab_path,
         )
         self.gene_set = gene_set
 
-    def build_tokenizer(self, gene_ens, model_output_name, vocab_output_name):
+    def build_tokenizer(self, gene_ens, vocab_output_name):
         """Builds a tokenizer for a given k
 
         Args:
@@ -102,28 +99,13 @@ class GeneformerPreprocess(SCPreprocessorDataClass):
 
         tokenizer = GeneTokenizer()
         tokenizer.build_vocab(gene_ens)
+        tokenizer.save_vocab(vocab_output_name)
         return tokenizer
 
-    def _validate_tokenizer_args(self, model_output_name, vocab_output_name):
-        model_exists = os.path.exists(model_output_name)
+    def _validate_tokenizer_args(self, vocab_output_name):
         vocab_exists = os.path.exists(vocab_output_name)
-        if model_exists and vocab_exists:
-            logging.warning(
-                f"Tokenizer model file: {model_output_name} and tokenizer "
-                f"vocab name: {vocab_output_name} already exist. Skipping "
-                f"tokenizer building stage."
-            )
-            return
-        elif model_exists:
-            raise ValueError(
-                f"Tokenizer model file: {model_output_name} already "
-                f"exists, but vocab file: {vocab_output_name} does not."
-            )
-        elif vocab_exists:
-            raise ValueError(
-                f"Tokenizer vocab file: {vocab_output_name} already "
-                f"exists, but model file: {model_output_name} does not."
-            )
+        if vocab_exists:
+            logging.warning(f"Tokenizer vocab file: {vocab_output_name} already exists.")
 
     def preprocess(self) -> dict[Literal['tokenizer', 'median_dict'], Any]:
         """Preprocesses for the Geneformer model"""
@@ -139,7 +121,6 @@ class GeneformerPreprocess(SCPreprocessorDataClass):
 
         tokenizer = self.build_tokenizer(
             gene_ens,
-            self.tokenizer_model_path,
             self.tokenizer_vocab_path,
         )
 

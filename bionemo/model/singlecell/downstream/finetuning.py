@@ -39,13 +39,13 @@ class FineTuneGeneformerModel(EncoderFineTuning):
     def __init__(self, cfg, trainer, tokenizer, median_dict, *args, **kwargs):
         # This changed too.
         self.encoder_frozen = cfg.encoder_frozen
-        self.use_peft = cfg.get('use_peft', False)
+        self.use_peft = cfg.get('peft.enabled', False)
         # TODO this was changed
         # TODO still need this?
         self.median_dict = median_dict
         self.tokenizer = tokenizer
+        self.task_type = cfg.data.task_type
         super().__init__(cfg, trainer=trainer)
-        self.task_type = self.cfg.data.task_type
 
     def configure_optimizers(self) -> Union[Optimizer, tuple[list[Optimizer], list[_LRScheduler]]]:
         super().setup_optimization(optim_config=self.cfg.finetuning_optim)
@@ -83,6 +83,7 @@ class FineTuneGeneformerModel(EncoderFineTuning):
             restore_path=self.cfg.restore_encoder_path,
             training=not self.cfg.encoder_frozen,
             adjust_config=False,
+            strict_restore_from_path=False,
         )
         return pretrained_model
 

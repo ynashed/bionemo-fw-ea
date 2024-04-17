@@ -7,6 +7,7 @@
 # disclosure or distribution of this material and related documentation
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
+import os
 from typing import Dict, List, Optional
 
 from .label2id_tokenizer import Label2IDTokenizer
@@ -61,6 +62,42 @@ class GeneTokenizer(Label2IDTokenizer):
             int: The ID corresponding to the token.
         """
         return self.vocab.get(token)
+
+    @property
+    def pad_id(self) -> int:
+        return self.token_to_id(self.pad_token)
+
+    def tokens_to_ids(self, tokens: List[str]) -> List[int]:
+        return super().tokens_to_ids(tokens)
+
+    def save_vocab(self, vocab_file):
+        '''Saves the vocabulary as a newline delimieted vocabulary file, each line represents an int -> token mapping. line number is assumed to be the integer.'''
+        vocab_dir = os.path.dirname(vocab_file)
+        if not os.path.exists(vocab_dir):
+            os.makedirs(vocab_dir)
+
+        with open(vocab_file, 'w') as f:
+            for i in range(len(self.vocab)):
+                f.write(self.decode_vocab[i] + '\n')
+
+    @staticmethod
+    def from_vocab_file(vocab_file):
+        if not os.path.exists(vocab_file):
+            raise FileNotFoundError(f"Vocab file {vocab_file} not found, run preprocessing to create it.")
+
+        with open(vocab_file) as f:
+            ids_to_text = {id: line.strip() for id, line in enumerate(f.readlines())}
+
+        tokenizer = GeneTokenizer(
+            cls_token=ids_to_text[0],
+            mask_token=ids_to_text[1],
+            pad_token=ids_to_text[2],
+            sep_token=ids_to_text[3],
+            ukw_token=ids_to_text[4],
+        )
+        vocab = {ids_to_text[id]: "NotAGeneID" for id in range(5, len(ids_to_text))}
+        tokenizer.build_vocab(vocab)
+        return tokenizer
 
     def gene_tok_to_ens(self, gene: str) -> str:
         """
@@ -131,12 +168,12 @@ class GeneTokenizer(Label2IDTokenizer):
 
         Args:
             gene_ens: (Dict): genes and ensemble id map to
-                build the vocabulary with.
+                build the vocabulary with. Only the keys are used.
         """
         self.gene_to_ens = gene_ens
         self.ens_to_gene = dict(zip(self.gene_to_ens.values(), self.gene_to_ens.keys()))
 
-        for gene, ens in gene_ens.items():
+        for gene in gene_ens.keys():
             if gene not in self.vocab:
                 self.vocab[gene] = len(self.vocab)
                 self.decode_vocab[self.vocab[gene]] = gene
@@ -156,4 +193,4 @@ class GeneTokenizer(Label2IDTokenizer):
         for token in tokens:
             if token is not None and token not in self.vocab:
                 self.vocab[token] = len(self.vocab)
-                self.decode_vocab[len(self.vocab)] = token
+                self.decode_vocab[self.vocab[token]] = token

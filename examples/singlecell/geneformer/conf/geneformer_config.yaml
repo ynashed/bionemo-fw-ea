@@ -17,8 +17,7 @@ model:
   post_process: True
   bert_binary_head: False
   tokenizer:
-    model: ${oc.env:BIONEMO_HOME}/tokenizers/singlecell/geneformer/vocab/geneformer$
-    vocab_file: ${oc.env:BIONEMO_HOME}/tokenizers/singlecell/geneformer/vocab/geneformer$
+    vocab_file: ${oc.env:BIONEMO_HOME}/tokenizers/singlecell/geneformer/vocab/geneformer.vocab
   data:
     dataset_path: /workspace/bionemo/data/sc-pretraining
     micro_batch_size: ${model.micro_batch_size}
