@@ -88,10 +88,7 @@ RUN ln -s /usr/include/openbabel3 /usr/local/include/openbabel3
 # RUN code-server --install-extension ms-python.python
 # moved -test and -dev up in build to resolve build errors
 # COPY files first **BEFORE** installing from them => use the layer cache effectively!
-COPY setup/requirements-test.txt /tmp/requirements-test.txt
-COPY setup/requirements-cve.txt /tmp/requirements-cve.txt
-COPY setup/requirements-dev.txt /tmp/requirements-dev.txt
-COPY setup/requirements.txt /tmp/requirements.txt
+COPY setup/requirements*.txt /tmp/
 COPY setup/install_lmdb.sh /tmp/install_lmdb.sh
 RUN --mount=type=secret,id=GITLAB_TOKEN GITLAB_TOKEN=$(cat /run/secrets/GITLAB_TOKEN) pip install -r /tmp/requirements-dev.txt
 RUN pip install -r /tmp/requirements-test.txt
@@ -102,9 +99,10 @@ RUN /tmp/install_lmdb.sh
 # requirements-cve.txt *must* be installed last to patch security vulns in pip packages
 RUN pip install -r /tmp/requirements-cve.txt
 
+
 # AWS CLI is inside requirements.txt. Add config file.
 # This config file does not contain access keys.
-RUN mkdir $HOME/.aws
+RUN mkdir -p $HOME/.aws
 COPY setup/aws-config-swiftstack $HOME/.aws/config
 
 # Recompile Megatron helpers -- NOTE this may need to be done before running job later
@@ -122,33 +120,21 @@ RUN NEMO_PATH=$(python -c 'import nemo; print(nemo.__path__[0])') && \
 #       This is exposed through the `iteractive=True` constructor parameter.
 #       In MegaMolBart, specifically, this patch adds support for recongifure_minibatch as a flag
 #       in its decode method.
-# TODO [mgreaves] Upstream this patch and then remove here when we can upgrade our nemo dependency.
+# TODO [mgreaves] Upstream nemo-v-1.22-support_interactive_megamolbart_lm-decode_reconfigure_minibatch patch and
+# then remove here when we can upgrade our nemo dependency.
 #                 https://jirasw.nvidia.com/browse/CDISCOVERY-2146
-COPY ./setup/nemo-v-1.22-support_interactive_megamolbart_lm-decode_reconfigure_minibatch.patch ./
-RUN NEMO_INST_DIR=$(python -c 'import nemo; from pathlib import Path; print(Path(nemo.__path__[0]).parent)') && \
-    patch -p1 -d $NEMO_INST_DIR -i $PWD/nemo-v-1.22-support_interactive_megamolbart_lm-decode_reconfigure_minibatch.patch && \
-    rm nemo-v-1.22-support_interactive_megamolbart_lm-decode_reconfigure_minibatch.patch
-
 # NOTE: hiddens_support_train_v_inf_outputs.patch applies the patch from https://github.com/NVIDIA/NeMo/pull/8466 which fixes an issue
 #        where training uses the same hiddens key for inference (eg always the gaussian noised z rather than z_mean).
-COPY ./setup/hiddens_support_train_v_inf_outputs.patch ./
-RUN NEMO_INST_DIR=$(python -c 'import nemo; from pathlib import Path; print(Path(nemo.__path__[0]).parent)') && \
-    patch -p1 -d $NEMO_INST_DIR -i $PWD/hiddens_support_train_v_inf_outputs.patch && \
-    rm hiddens_support_train_v_inf_outputs.patch
-
-# NOTE: hiddens_support_train_v_inf_outputs.patch applies the patch from https://github.com/NVIDIA/NeMo/pull/8576 which fixes an issue
+# NOTE: data_sampler_constant_len.patch.patch applies the patch from https://github.com/NVIDIA/NeMo/pull/8576 which fixes an issue
 #        where you restart a run after an epoch.
-COPY ./setup/data_sampler_constant_len.patch ./
+# NOTE: nemo-lr-scheduler.patch adds patch for WarmupAnnealDecayHold NeMo LR Scheduler
+COPY ./setup/*.patch ./
 RUN NEMO_INST_DIR=$(python -c 'import nemo; from pathlib import Path; print(Path(nemo.__path__[0]).parent)') && \
+    patch -p1 -d $NEMO_INST_DIR -i $PWD/nemo-v-1.22-support_interactive_megamolbart_lm-decode_reconfigure_minibatch.patch && \
+    patch -p1 -d $NEMO_INST_DIR -i $PWD/hiddens_support_train_v_inf_outputs.patch && \
     patch -p1 -d $NEMO_INST_DIR -i $PWD/data_sampler_constant_len.patch && \
-    rm data_sampler_constant_len.patch
-
-# NOTE: Adds patch for WarmupAnnealDecayHold NeMo LR Scheduler
-COPY ./setup/nemo-lr-scheduler.patch ./
-RUN NEMO_INST_DIR=$(python -c 'import nemo; from pathlib import Path; print(Path(nemo.__path__[0]).parent)') && \
     patch -p1 -d $NEMO_INST_DIR -i $PWD/nemo-lr-scheduler.patch && \
-    rm nemo-lr-scheduler.patch
-
+    rm *.patch
 #
 # Special Handling for Python Package Security Vulnerabilities
 #
