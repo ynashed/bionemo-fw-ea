@@ -57,6 +57,9 @@ MSA_PATHS = [
     ],
 ]
 
+DRYRUN_SEQUENCES = ['AAAAA', 'CCCCC']
+DRYRUN_SEQ_NAMES = ['first', 'second']
+
 
 @pytest.fixture(scope='module')
 def infer_cfg() -> Iterator[DictConfig]:
@@ -225,7 +228,19 @@ def test_openfold_inference_no_output_check(
             dataset = get_predict_dataset(alphafold_cfg)
     else:
         alphafold_model, trainer = alphafold_model_trainer
-        dataset = get_predict_dataset(alphafold_cfg)
+        dataset_paths = get_structured_paths(alphafold_cfg.model.data)
+        dataset = PredictDataset(
+            sequences=DRYRUN_SEQUENCES,
+            seq_names=DRYRUN_SEQ_NAMES,
+            pdb_mmcif_chains_filepath=dataset_paths.mmcif_chains,
+            pdb_mmcif_dicts_dirpath=dataset_paths.mmcif_dicts,
+            pdb_obsolete_filepath=dataset_paths.obsolete_filepath,
+            template_hhr_filepaths=alphafold_cfg.model.data.template_hhr_filepaths,
+            msa_a3m_filepaths=alphafold_cfg.model.data.msa_a3m_filepaths,
+            generate_templates_if_missing=alphafold_cfg.model.data.generate_templates_if_missing,
+            pdb70_database_path=alphafold_cfg.model.data.pdb70_database_path,
+            cfg=alphafold_cfg.model,
+        )
         dl = DataLoader(
             dataset,
             batch_size=alphafold_cfg.model.micro_batch_size,
