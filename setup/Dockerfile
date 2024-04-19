@@ -175,7 +175,6 @@ WORKDIR ${BIONEMO_HOME}
 ### Copy the bionemo repo contents for distribution
 COPY LICENSE README.md artifact_paths.yaml download_models.py launch.sh setup.py pyproject.toml ${BIONEMO_HOME}/
 COPY setup ${BIONEMO_HOME}/setup
-COPY docs ${BIONEMO_HOME}/docs
 COPY hydra_plugins ${BIONEMO_HOME}/hydra_plugins
 COPY tokenizers ${BIONEMO_HOME}/tokenizers
 # copy the package contents *last* as most churn occurs here
