@@ -68,8 +68,8 @@ $ py.test tests/regression_tests -v -L 0
 =========================================== test session starts ============================================
 platform linux -- Python 3.8.10, pytest-7.2.0, pluggy-1.0.0 -- /usr/bin/python
 cachedir: .pytest_cache
-hypothesis profile 'default' -> database=DirectoryBasedExampleDatabase('/workspace/bionemo/.hypothesis/examples')
-rootdir: /workspace/bionemo
+hypothesis profile 'default' -> database=DirectoryBasedExampleDatabase('$BIONEMO_HOME/.hypothesis/examples')
+rootdir: $BIONEMO_HOME
 plugins: hydra-core-1.2.0, rerunfailures-10.2, xdoctest-1.0.2, shard-0.1.2, hypothesis-5.35.1, xdist-3.0.2
 collected 5 items
 Running 5 items in this shard: tests/regression_tests/test_regression.py::test_a, tests/regression_tests/test_regression.py::test_b, tests/regression_tests/test_regression.py::test_c, tests/regression_tests/test_regression.py::test_d, tests/regression_tests/test_regression.py::test_e

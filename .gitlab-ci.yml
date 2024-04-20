@@ -343,7 +343,27 @@ build-docs:
         - docs_build
       expire_in: 1 week
 
+.common_pytest_before_script: &common_before_script
+  before_script:
+    - nvidia-smi
+    - df -Thl
+    - pwd
+    - echo $BIONEMO_HOME
+    - ls $BIONEMO_HOME
+    - mkdir -p /builds/bionemo/
+    - cp -av $BIONEMO_HOME /builds/
+    - rm /workspace/bionemo -rf
+    - ln -s /builds/bionemo /workspace/bionemo
+    - export BIONEMO_HOME=/builds/bionemo
+    - echo $BIONEMO_HOME
+    - cd $BIONEMO_HOME
+    - ls -ltr
+    - ls -lts /
+    - df -Thl
+
 pytest:
+  extends:
+    - .common_pytest_before_script
   image:
     name: "${IMAGE_NAME}${SUFFIX_DEV}"
     entrypoint: [ "" ]
@@ -357,16 +377,6 @@ pytest:
   variables:
     GIT_STRATEGY: none
     GIT_CHECKOUT: "false"
-  before_script:
-    - nvidia-smi
-    - df -Thl
-    - pwd
-    # TODO(trvachov): Here, we test the code inside the gitlab mounted path, /builds/clara-discovery/bionemo - CI_PROJECT_DIR
-    # We do not test the code that's mounted to /workspace/bionemo. We probably need two separate test paths for this.
-    - cd $BIONEMO_HOME
-    - ls -ltr
-    - ls -lts /
-    - df -Thl
   script:
     # TODO(trvachov): This install the NGC CLI, but this should be removed once all of our tests stop relying on data from NGC.
     - wget --content-disposition https://api.ngc.nvidia.com/v2/resources/nvidia/ngc-apps/ngc_cli/versions/3.40.0/files/ngccli_linux.zip -O /tmp/ngccli_linux.zip && unzip /tmp/ngccli_linux.zip -d /tmp/ && export PATH=$PATH:/tmp/ngc-cli
@@ -383,7 +393,7 @@ pytest:
     - rm -rf ./.pytest_cache/
     - mkdir -p /builds/clara-discovery/bionemo/heatmaps
     - pytest -m "not internal and not needs_fork and not needs_80gb_memory_gpu" -vv --durations=0 --cov=bionemo --cov-report term --cov-report xml:coverage.xml -k "not test_model_training"
-    - cp -rv /workspace/bionemo/tests/data/esm2_golden_values/heatmaps /builds/clara-discovery/bionemo/heatmaps
+    - cp -rv ${BIONEMO_HOME}/tests/data/esm2_golden_values/heatmaps /builds/clara-discovery/bionemo/heatmaps
     - df -Thl
   coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
   artifacts:
@@ -397,6 +407,8 @@ pytest:
 
 
 pytest-fork:
+  extends:
+    - .common_pytest_before_script
   image:
     name: "${IMAGE_NAME}${SUFFIX_DEV}"
     entrypoint: [ "" ]
@@ -410,16 +422,6 @@ pytest-fork:
   variables:
     GIT_STRATEGY: none
     GIT_CHECKOUT: "false"
-  before_script:
-    - nvidia-smi
-    - df -Thl
-    - pwd
-    # TODO(trvachov): Here, we test the code inside the gitlab mounted path, /builds/clara-discovery/bionemo - CI_PROJECT_DIR
-    # We do not test the code that's mounted to /workspace/bionemo. We probably need two separate test paths for this.
-    - cd $BIONEMO_HOME
-    - ls -ltr
-    - ls -lts /
-    - df -Thl
   script:
     - export NGC_CLI_ORG NGC_CLI_TEAM NGC_CLI_FORMAT_TYPE NGC_CLI_API_KEY
     - export AWS_ENDPOINT_URL=https://pbss.s8k.io
@@ -436,6 +438,8 @@ pytest-fork:
 
 
 pytest-internal:
+  extends:
+    - .common_pytest_before_script
   image:
     name: "${IMAGE_NAME}${SUFFIX_DEV}"
     entrypoint: [ "" ]
@@ -450,16 +454,6 @@ pytest-internal:
   variables:
     GIT_STRATEGY: none
     GIT_CHECKOUT: "false"
-  before_script:
-    - nvidia-smi
-    - df -Thl
-    - pwd
-    # TODO(trvachov): Here, we test the code inside the gitlab mounted path, /builds/clara-discovery/bionemo - CI_PROJECT_DIR
-    # We do not test the code that's mounted to /workspace/bionemo. We probably need two separate test paths for this.
-    - cd $BIONEMO_HOME
-    - export PYTHONPATH=${BIONEMO_HOME}:${BIONEMO_HOME}/generated:${PYTHON_PATH}
-    - ls -ltr
-    - ls -lts /
   script:
     - export NGC_CLI_ORG NGC_CLI_TEAM NGC_CLI_FORMAT_TYPE NGC_CLI_API_KEY
     - export AWS_ENDPOINT_URL=https://pbss.s8k.io

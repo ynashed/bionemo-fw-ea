@@ -33,15 +33,15 @@ class DefaultConfigSearchPathConfig(SearchPathPlugin):
     APPEND_SEARCH_PATH=<PATH1>,<PATH_2>,..,<PATH_M> PREPEND_SEARCH_PATH=<PATH1>,<PATH_2>,..,<PATH_M> python ....
 
     with native support from hydra:
-        python examples/molecule/megamolbart/pretrain.py --config-path /workspace/bionemo/examples/tests/conf
-        --config-name megamolbart_test hydra.searchpath=[file:///workspace/bionemo/examples/molecule/megamolbart/conf]
+        python examples/molecule/megamolbart/pretrain.py --config-path $BIONEMO_HOME/examples/tests/conf
+        --config-name megamolbart_test hydra.searchpath=[file://$BIONEMO_HOME/examples/molecule/megamolbart/conf]
 
     with this new solution
-        BIONEMO_APPEND_SEARCH_PATH=/workspace/bionemo/examples/molecule/megamolbart/conf
-        python examples/molecule/megamolbart/pretrain.py --config-path /workspace/bionemo/examples/tests/conf --config-name megamolbart_test
+        BIONEMO_APPEND_SEARCH_PATH=$BIONEMO_HOME/examples/molecule/megamolbart/conf
+        python examples/molecule/megamolbart/pretrain.py --config-path $BIONEMO_HOME/examples/tests/conf --config-name megamolbart_test
 
-        BIONEMO_PREPEND_SEARCH_PATH=/workspace/bionemo/examples/molecule/megamolbart/conf
-        python examples/molecule/megamolbart/pretrain.py --config-path /workspace/bionemo/examples/tests/conf --config-name megamolbart_test
+        BIONEMO_PREPEND_SEARCH_PATH=$BIONEMO_HOME/examples/molecule/megamolbart/conf
+        python examples/molecule/megamolbart/pretrain.py --config-path $BIONEMO_HOME/examples/tests/conf --config-name megamolbart_test
 
 
     """
