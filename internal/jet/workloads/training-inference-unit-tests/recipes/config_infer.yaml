@@ -18,6 +18,9 @@ launchers:
   name:dgxa100_dracooci:
     mounts:
       /workspace/bionemo/models: /lustre/fsw/portfolios/convai/projects/convai_bionemo_training/jet/models
+      # TODO fix JET for singlecell and uncomment the following line
+      # /workspace/bionemo/examples/tests/test_data/singlecell: /lustre/fsw/portfolios/convai/projects/convai_bionemo_training/jet/data/test_data/singlecell
+
 spec:
   build: bionemo
   scope: perf-infer
@@ -82,3 +85,10 @@ products:
             config_name: [prott5nv_infer]
             batch_size: [4]
             checkpoint_name: [prott5nv]
+      # TODO fix JET for singlecell and uncomment the following line
+      # - domain: [singlecell]
+      #   products:
+      #     - model: [geneformer]
+      #       config_name: [geneformer_infer_test]
+      #       batch_size: [4]
+      #       checkpoint_name: [geneformer_31M_240430]

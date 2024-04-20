@@ -39,7 +39,13 @@ def get_inference_class(model_name: str) -> Type[BaseEncoderDecoderInference]:
 
 
 def get_config_dir(bionemo_home: Path, model_name: str) -> str:
-    modality = {"megamolbart": "molecule", "molmim": "molecule", "prott5nv": "protein", "esm1nv": "protein"}
+    modality = {
+        "megamolbart": "molecule",
+        "molmim": "molecule",
+        "prott5nv": "protein",
+        "esm1nv": "protein",
+        "geneformer": "singlecell",
+    }
     return str(bionemo_home / "examples" / modality[model_name] / model_name / "conf")
 
 
@@ -56,10 +62,10 @@ def run_seqs_to_hiddens_with_goldens(
     tokenize_fn: Callable,
 ):
     if UPDATE_GOLDEN_VALUES:
-        expected_vals_path.parent.mkdirs(exist_ok=True, parents=True)
+        expected_vals_path.parent.mkdir(exist_ok=True, parents=True)
     else:
-        assert os.path.exists(
-            expected_vals_path
+        assert (
+            expected_vals_path.exists()
         ), f"Expected values file not found at {expected_vals_path}. Rerun with UPDATE_GOLDEN_VALUES=1 to create it."
     assert inferer.training is False
     hidden_state, pad_masks = inferer.seq_to_hiddens(seqs)
@@ -78,7 +84,8 @@ def run_seqs_to_hiddens_with_goldens(
         assert hidden_state.shape[1] == inferer.model.cfg.encoder.hidden_steps
     else:
         # Number of hidden states should be equal to token length
-        assert hidden_state.shape[1] == max([len(tokenize_fn([s])[0]) for s in seqs])
+        expected_max_padded_len: int = max([len(tokenize_fn([s])[0]) for s in seqs])
+        assert hidden_state.shape[1] == expected_max_padded_len
     assert hidden_state.shape[2] == hidden_size
     assert pad_masks is not None
     assert pad_masks2 is not None

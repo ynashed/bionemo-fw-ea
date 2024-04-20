@@ -161,9 +161,13 @@ def test_dataset_process_item():
         mask_prob=1.0,
         target_sum=1,
     )
-    assert all(processed_item['text'] == [5, 1, 2, 3, 4])  # CLS, 1, 2, 3, PAD
-    # TODO: this is wrong too for some reason.
+    # NOTE: we need to set masked tokens to MASK so that they are decoded.
+    assert all(processed_item['text'] == [5, 6, 6, 6, 4])  # CLS, MASK, MASK, MASK, PAD
+    # NOTE: MASKed tokens are the only ones used by loss
     assert all(processed_item['loss_mask'] == [0, 1, 1, 1, 0])  # NO, MASK, MASK, MASK, NO
+    # the ARBITRARY labels should be ignored due to loss mask.
+    assert all(processed_item['labels'] == [-1, 1, 2, 3, -1])  # ARBITRARY, 1, 2, 3, ARBITRARY
+    assert all(processed_item['is_random'] == 0)  # For now we don't support random masking.
 
     # checks sequence is truncated for a long sequence
     processed_item = process_item(

@@ -61,7 +61,15 @@ class SingleCellDataset(Dataset):
         bionemo/data/singlecell/sc_memmap.py - creates the artifacts required for instantiating a singlecell dataset from hdf5 files.
     """
 
-    def __init__(self, data_path: str, tokenizer: Any, median_dict: Optional[dict] = None, max_len: int = 1024):
+    def __init__(
+        self,
+        data_path: str,
+        tokenizer: Any,
+        median_dict: Optional[dict] = None,
+        max_len: int = 1024,
+        probabilistic_dirichlet_sampling: bool = False,
+        dirichlet_alpha: float = 0.5,
+    ):
         super().__init__()
         self.data_path = data_path
         self.max_len = max_len
@@ -72,6 +80,10 @@ class SingleCellDataset(Dataset):
 
         # - median dict
         self.gene_medians = median_dict
+
+        # - dirichlet sampling
+        self.probabilistic_dirichlet_sampling = probabilistic_dirichlet_sampling
+        self.dirichlet_alpha = dirichlet_alpha
 
         # - train/val idxs sampled contiguously
         total_el = sum([v["num_el"] for _, v in self.metadata.items()])
@@ -120,7 +132,14 @@ class SingleCellDataset(Dataset):
         '''Performs a lookup and the required transformation for the model'''
         gene_data, col_idxs, metadata = self.lookup_cell_by_idx(idx)
         return process_item(
-            gene_data, col_idxs, metadata, self.tokenizer, gene_median=self.gene_medians, max_len=self.max_len
+            gene_data,
+            col_idxs,
+            metadata,
+            self.tokenizer,
+            gene_median=self.gene_medians,
+            max_len=self.max_len,
+            probabilistic_dirichlet_sampling=self.probabilistic_dirichlet_sampling,
+            dirichlet_alpha=self.dirichlet_alpha,
         )
 
 
@@ -143,6 +162,9 @@ def process_item(
     mask_prob: float = 0.15,
     target_sum: int = 10000,
     normalize: bool = True,
+    probabilistic_dirichlet_sampling: bool = False,
+    dirichlet_alpha: float = 0.5,
+    same_length: bool = True,
 ) -> Item:
     """Process a single item in the dataset.
 
@@ -160,7 +182,9 @@ def process_item(
         target_sum (int): Target sum for normalization. Defaults to 10000.
         normalize (bool): Flag to normalize the gene data. Defaults to True.
             When set, this re-orders the gene tokens by their median expression value.
-
+        probabilistic_dirichlet_sampling (bool): Flag to enable probabilistic dirichlet sampling. Defaults to False.
+        dirichlet_alpha (float): Alpha value for dirichlet sampling if set by `probabilistic_dirichlet_sampling`. Defaults to 0.5.
+        same_length (bool): when true, sample the same length of genes as you originally had before the dirichlet sampler.
     Returns:
         dict: Processed item dictionary.
 
@@ -175,7 +199,16 @@ def process_item(
 
     max_len = max_len - 1  # - minus 1 for [CLS] token
     # - convert from data vocab to global vocab
-    gene_names = [metadata["feature_names"][idx] for idx in gene_idxs]
+    n_genes_nonzero: int = len(gene_idxs)
+    if probabilistic_dirichlet_sampling:
+        # In this case expand gene data (names + expression) with zeros
+        gene_names = metadata["feature_names"]  # all of them, even 0
+        gene_data_tmp = np.zeros(len(gene_names), dtype=float)
+        gene_data_tmp[gene_idxs] = gene_data
+        gene_data = gene_data_tmp
+    else:
+        # in this case subset gene names to ones with data
+        gene_names = [metadata["feature_names"][idx] for idx in gene_idxs]
     genes, tokens, medians = [], [], []
     for tok, gene in zip(gene_names, gene_data):
         if tok in tokenizer.vocab:
@@ -194,9 +227,18 @@ def process_item(
         # re-order according to expression median normalized rank. ascending order.
         genes = genes / genes.sum() * target_sum
         genes = genes / medians.astype(float)
+        if probabilistic_dirichlet_sampling:
+            # add small pseudo-count for zero genes. Non zero genes are typically ~0.99 at a minimum, max around 150.
+            # this changes scale which is ok.
+            # multiply target_sum back in for fun, incase someone wants to look at this and expects sum==target_sum
+            genes = np.random.dirichlet(genes + dirichlet_alpha) * target_sum
         idxs = np.argsort(genes)
         genes = genes[idxs]
         token_ids = token_ids[idxs]
+        if same_length:
+            # This is so that the model will sometimes see [PAD] tokens and not get confused by them in validation.
+            genes = genes[:n_genes_nonzero]
+            token_ids = token_ids[:n_genes_nonzero]
 
     # - select max_len subset, set sample to false so it doesnt permute the already rank ordered expression values.
     token_ids = sample_or_truncate_plus_pad(
@@ -210,10 +252,10 @@ def process_item(
         probs[token_ids == tokenizer.token_to_id(tokenizer.pad_token)] = 0.0
         mask = np.random.binomial(1, probs).astype(bool)
 
-        # - ensure [CLS] token is not masked
+        # - ensure [CLS] token is masked from the loss. Note that we're dealing with 1d arrays so flattening isn't a problem here.
         mask = np.insert(mask, 0, False)
 
-    # - add [CLS] token
+    # - add [CLS] token, note that token_ids is a 1d array so flattening isn't a problem here.
     token_ids = np.insert(token_ids, 0, tokenizer.token_to_id(tokenizer.cls_token))
 
     labels = np.ones(len(token_ids)) * -1
@@ -221,11 +263,10 @@ def process_item(
     labels[mask] = token_ids[mask]
 
     pad_mask = token_ids == tokenizer.token_to_id(tokenizer.pad_token)
-
     if mask is None:
         # If prob is set to zero, we get None for our mask, which could have unintended side effects.
         mask = np.zeros(shape=token_ids.shape, dtype=bool)
-
+    token_ids[mask] = tokenizer.token_to_id(tokenizer.mask_token)
     if mask is None:
         breakpoint()
 

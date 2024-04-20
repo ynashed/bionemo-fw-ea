@@ -40,9 +40,10 @@ def main(cfg) -> None:
         cfg.model.data.dataset_path,
         cfg.model.tokenizer.vocab_file,
         cfg.model.data.dataset,
+        # cfg.model.artifacts.medians_file,
     )
     match preprocessor.preprocess():
-        case {'tokenizer': _, 'median_dict': median_dict}:
+        case {'tokenizer': _, 'median_dict': _}:
             logging.info("*************** Preprocessing Finished ************")
         case _:
             logging.error("Preprocessing failed.")
@@ -57,7 +58,7 @@ def main(cfg) -> None:
         else:
             # process_item consumes this
             # TODO: mask prob needs to be configurable
-            model = GeneformerModel(cfg.model, trainer, median_dict)
+            model = GeneformerModel(cfg.model, trainer)
 
         logging.info("************** Starting Training ***********")
         trainer.fit(model)

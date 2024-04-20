@@ -36,16 +36,15 @@ class FineTuneGeneformerModel(EncoderFineTuning):
         **kwargs: Arbitrary keyword arguments.
     """
 
-    def __init__(self, cfg, trainer, tokenizer, median_dict, *args, **kwargs):
+    def __init__(self, cfg, trainer, median_dict, **kwargs):
         # This changed too.
         self.encoder_frozen = cfg.encoder_frozen
         self.use_peft = cfg.get('peft.enabled', False)
-        # TODO this was changed
-        # TODO still need this?
-        self.median_dict = median_dict
-        self.tokenizer = tokenizer
         self.task_type = cfg.data.task_type
         super().__init__(cfg, trainer=trainer)
+        self.tokenizer = self.encoder_model.tokenizer
+        self.median_dict = median_dict
+        # self.median_dict = self.encoder_model.median_dict
 
     def configure_optimizers(self) -> Union[Optimizer, tuple[list[Optimizer], list[_LRScheduler]]]:
         super().setup_optimization(optim_config=self.cfg.finetuning_optim)
@@ -89,7 +88,9 @@ class FineTuneGeneformerModel(EncoderFineTuning):
 
     @lru_cache
     def data_setup(self):
-        self.data_module = AdamsonDataModule(self.cfg, self.trainer, self.tokenizer, self.median_dict)
+        self.data_module = AdamsonDataModule(
+            self.cfg, self.trainer, self.tokenizer, self.median_dict, max_len=self.cfg.seq_length
+        )
 
     def on_fit_start(self):
         self.build_train_valid_test_datasets()

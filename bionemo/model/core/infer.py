@@ -12,12 +12,12 @@ from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple, TypedDic
 
 import torch
 from nemo.utils import logging
-from omegaconf import ListConfig, OmegaConf
+from omegaconf import OmegaConf
 from pandas import DataFrame, Series
 from pytorch_lightning.core import LightningModule
 
 from bionemo.data.utils import pad_token_ids
-from bionemo.model.utils import _reconfigure_inference_batch, initialize_model_parallel, restore_model
+from bionemo.model.utils import initialize_model_parallel, restore_model
 
 
 try:
@@ -180,35 +180,6 @@ class BaseEncoderInference(LightningModule):
     def warmup(self, max_bs: int):
         self.seq_to_hiddens(sequences=[self.get_example_input_sequence()] * max_bs)  # warmup
 
-    def __call__(self, sequences: Union[Series, Dict, List[str]]) -> torch.Tensor:
-        """
-        Computes embeddings for a list of sequences.
-        Embeddings are detached from model.
-
-        Params
-            sequences: Pandas Series containing a list of strings or or a list of strings (e.g., SMILES, AA sequences, etc)
-
-        Returns
-            embeddings
-        """
-        ids = None
-        if isinstance(sequences, Series):
-            sequences = sequences.tolist()
-        if isinstance(sequences, Dict):
-            ids = sequences["id"]
-            sequences = sequences["sequence"]
-        result_dict = {}
-        hiddens, enc_mask = self.seq_to_hiddens(sequences)
-        embeddings = self.hiddens_to_embedding(hiddens, enc_mask)
-        result_dict["embeddings"] = embeddings.float().detach().clone()
-        result_dict["hiddens"] = hiddens.float().detach().clone()
-        result_dict["mask"] = enc_mask.detach().clone()
-        result_dict["sequence"] = sequences
-        if ids is not None:
-            result_dict["id"] = ids
-
-        return result_dict
-
     def load_model(
         self, cfg, model: Optional[Any] = None, restore_path: Optional[str] = None, strict: bool = True
     ) -> Any:
@@ -265,41 +236,34 @@ class BaseEncoderInference(LightningModule):
 
         return model
 
-    def forward(self, batch: Dict[str, torch.Tensor]) -> Forward:
-        """Forward pass of the model. Can return embeddings or hiddens, as required"""
-        if self.k_sequence is None or self.k_id is None:
-            raise ValueError(
-                "Configuration used during initialization was invalid: it needs 2 keys. "
-                "(1) It needs a key to identify the sequence in each batch (model.data.data_fields_map.sequence). "
-                "(2) It needs a key to identify the sequence IDs in each batch (model.data.data_fields_map.id)."
-            )
-        sequences = batch[self.k_sequence]
-        sequence_ids = batch[self.k_id]
-        prediction_data = {"sequence_ids": sequence_ids}
-        outputs = self.cfg.model.downstream_task.outputs
-        # make sure we have a list
-        if not isinstance(outputs, ListConfig):
-            outputs = [outputs]
+    def forward(self, sequences: Union[Series, Dict, List[str]]) -> torch.Tensor:
+        """
+        Computes embeddings for a list of sequences.
+        Embeddings are detached from model.
 
-        # adjust microbatch size
-        if not self.interactive:
-            _reconfigure_inference_batch(global_batch_per_gpu=len(sequences))
+        Params
+            sequences: Pandas Series containing a list of strings or or a list of strings (e.g., SMILES, AA sequences, etc)
 
-        with torch.set_grad_enabled(self._freeze_model):
-            for output_type in outputs:
-                if output_type == 'hiddens':
-                    hiddens, mask = self.seq_to_hiddens(sequences)
-                    prediction_data["hiddens"] = hiddens
-                    prediction_data["mask"] = mask
-                elif output_type == 'embeddings':
-                    prediction_data["embeddings"] = self.seq_to_embeddings(sequences)
-                else:
-                    raise ValueError(
-                        f"Invalid prediction type: {self.cfg.model.downstream_task.prediction} "
-                        f"For output type: {output_type}"
-                    )
+        Returns
+            embeddings
+        """
+        ids = None
+        if isinstance(sequences, Series):
+            sequences = sequences.tolist()
+        if isinstance(sequences, Dict):
+            ids = sequences["id"]
+            sequences = sequences["sequence"]
+        result_dict = {}
+        hiddens, enc_mask = self.seq_to_hiddens(sequences)
+        embeddings = self.hiddens_to_embedding(hiddens, enc_mask)
+        result_dict["embeddings"] = embeddings.float().detach().clone()
+        result_dict["hiddens"] = hiddens.float().detach().clone()
+        result_dict["mask"] = enc_mask.detach().clone()
+        result_dict["sequence"] = sequences
+        if ids is not None:
+            result_dict["id"] = ids
 
-        return prediction_data
+        return result_dict
 
     def _tokenize(self, sequences: List[str]) -> torch.Tensor:
         """
@@ -808,7 +772,7 @@ class BaseEncoderDecoderInference(BaseEncoderInference):
             return samples
 
     # TODO: we might want to return embeddings only in some cases, why always return hiddens + embeddings? (commented for now, need to fix ir just use parent implementation)
-    def __call__(self, sequences: Union[Series, IdedSeqs, List[str]]) -> Inference:
+    def forward(self, sequences: Union[Series, IdedSeqs, List[str]]) -> Inference:
         """
         Computes embeddings for a list of sequences.
         Embeddings are detached from model.

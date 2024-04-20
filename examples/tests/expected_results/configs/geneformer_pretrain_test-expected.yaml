@@ -1,53 +1,49 @@
 name: geneformer_base_config
 restore_from_path: null
-
 do_training: true
-
 trainer:
-  devices: 2
+  devices: 1
   num_nodes: 1
   accelerator: gpu
-  precision: 16-mixed
-  logger: False
-  enable_checkpointing: False
-  use_distributed_sampler: False
+  precision: bf16-mixed
+  logger: false
+  enable_checkpointing: false
+  use_distributed_sampler: false
   max_epochs: 1
-  max_steps: 100000
-  log_every_n_steps: 10
+  max_steps: 100
+  log_every_n_steps: 100
   val_check_interval: 100
-  limit_val_batches: 50
+  limit_val_batches: 8
   limit_test_batches: 500
   accumulate_grad_batches: 1
   gradient_clip_val: 1.0
-  benchmark: False
-
+  benchmark: false
 exp_manager:
   explicit_log_dir: null
   exp_dir: ${oc.env:BIONEMO_HOME}/results/nemo_experiments/${.name}/${.wandb_logger_kwargs.name}
   name: geneformer
-  create_wandb_logger: False
+  create_wandb_logger: true
   wandb_logger_kwargs:
     project: null
-    name: geneformer-base
-    offline: False
-  resume_if_exists: True
-  resume_ignore_no_checkpoint: True 
-  create_checkpoint_callback: True
+    name: geneformer-pretraining
+    offline: false
+  resume_if_exists: true
+  resume_ignore_no_checkpoint: true
+  create_checkpoint_callback: true
   checkpoint_callback_params:
     monitor: val_loss
     save_top_k: 1
     mode: min
-    always_save_nemo: True
-    filename: 'geneformer--{val_loss:.2f}-{step}-{consumed_samples}'
+    always_save_nemo: true
+    filename: geneformer--{val_loss:.2f}-{step}-{consumed_samples}
     model_parallel_size: ${multiply:${model.tensor_model_parallel_size}, ${model.pipeline_model_parallel_size}}
-
 model:
   tokenizer:
     vocab_file: ${oc.env:BIONEMO_HOME}/tokenizers/singlecell/geneformer/vocab/geneformer.vocab
-  micro_batch_size: 16
+  micro_batch_size: 8
   tensor_model_parallel_size: 1
   pipeline_model_parallel_size: 1
-  use_flash_attention: True
+  use_flash_attention: true
   seq_length: 2048
   encoder_seq_length: ${.seq_length}
   max_position_embeddings: ${.seq_length}
@@ -58,48 +54,47 @@ model:
   init_method_std: 0.02
   hidden_dropout: 0.1
   kv_channels: null
-  apply_query_key_layer_scaling: True
-  layernorm_epsilon: 1e-5
+  apply_query_key_layer_scaling: true
+  layernorm_epsilon: 1.0e-05
   make_vocab_size_divisible_by: 128
-  pre_process: True
-  post_process: True
-  bert_binary_head: False
+  pre_process: true
+  post_process: true
+  bert_binary_head: false
   resume_from_checkpoint: null
-  masked_softmax_fusion: True
+  masked_softmax_fusion: true
   native_amp_init_scale: 4294967296
   native_amp_growth_interval: 1000
-  fp32_residual_connection: False
-  fp16_lm_cross_entropy: False
+  fp32_residual_connection: false
+  fp16_lm_cross_entropy: false
   seed: 1234
-  use_cpu_initialization: False
-  onnx_safe: False
+  use_cpu_initialization: false
+  onnx_safe: false
   activations_checkpoint_method: null
   activations_checkpoint_num_layers: 1
-
   data:
-    data_impl: "geneformer"
-    probabilistic_dirichlet_sampling_train: False  # Set to True to enable some shuffling of order when gene counts are close.
-    dataset_path: ???
+    data_impl: geneformer
+    probabilistic_dirichlet_sampling_train: false
+    dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/singlecell
     data_prefix: ''
     shuffle: true
-    dataset: "/"
+    dataset: /
     index_mapping_dir: null
-    skip_warmup: True
-    index_mapping_type: 'online'
-    block_size: 1000000 # OnlineSampleMapping parameter
-    cache_maxsize: 1000000 # OnlineSampleMapping parameter
+    skip_warmup: true
+    index_mapping_type: online
+    block_size: 1000000
+    cache_maxsize: 1000000
     truncate_to_block_boundary: false
-    train_ratio: .98
-    val_ratio: .01
-    num_workers: 10
+    train_ratio: 0.98
+    val_ratio: 0.01
+    num_workers: 12
     dataloader_type: single
     seq_length: ${model.seq_length}
     seed: ${model.seed}
-    dynamic_padding: true  # output a different length if you call with more/fewer genes.
-
+    dynamic_padding: false
+    micro_batch_size: ${model.micro_batch_size}
   optim:
     name: fused_adam
-    lr: 2e-4
+    lr: 0.0002
     weight_decay: 0.01
     betas:
     - 0.9
@@ -108,4 +103,5 @@ model:
       name: CosineAnnealing
       warmup_steps: 500
       constant_steps: 50000
-      min_lr: 2e-5
+      min_lr: 2.0e-05
+  precision: bf16-mixed

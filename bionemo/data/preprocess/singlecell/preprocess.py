@@ -82,9 +82,10 @@ class GeneformerPreprocess(SCPreprocessorDataClass):
             the names of preprocessed train/val/test files to use for training.
         """
         super().__init__(*args, **kwargs)
-        self._validate_tokenizer_args(
-            self.tokenizer_vocab_path,
-        )
+        if self.tokenizer_vocab_path is not None:
+            self._validate_tokenizer_args(
+                self.tokenizer_vocab_path,
+            )
         self.gene_set = gene_set
 
     def build_tokenizer(self, gene_ens, vocab_output_name):
@@ -119,10 +120,16 @@ class GeneformerPreprocess(SCPreprocessorDataClass):
         with open(gene_median_dict_fn, 'rb') as fd:
             median_dict = pickle.load(fd)
 
-        tokenizer = self.build_tokenizer(
-            gene_ens,
-            self.tokenizer_vocab_path,
-        )
+        # with open(self.medians_file, 'w') as fp:
+        #     json.dump(median_dict, fp)
+
+        if self.tokenizer_vocab_path is not None:
+            tokenizer = self.build_tokenizer(
+                gene_ens,
+                self.tokenizer_vocab_path,
+            )
+        else:
+            tokenizer = None
 
         return {'tokenizer': tokenizer, 'median_dict': median_dict}
 

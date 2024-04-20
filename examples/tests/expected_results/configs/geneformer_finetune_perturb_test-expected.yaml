@@ -1,0 +1,135 @@
+name: admson
+restore_from_path: null
+do_training: true
+trainer:
+  devices: 2
+  num_nodes: 1
+  accelerator: gpu
+  precision: 32
+  logger: false
+  enable_checkpointing: false
+  use_distributed_sampler: false
+  max_epochs: 1
+  max_steps: 300
+  log_every_n_steps: 100
+  val_check_interval: 50
+  limit_val_batches: 8
+  limit_test_batches: 500
+  accumulate_grad_batches: 1
+  gradient_clip_val: 1.0
+  benchmark: false
+exp_manager:
+  explicit_log_dir: null
+  exp_dir: ${oc.env:BIONEMO_HOME}/results/nemo_experiments/${.name}/${.wandb_logger_kwargs.name}
+  name: geneformer
+  create_wandb_logger: true
+  wandb_logger_kwargs:
+    project: ${name}_finetuning
+    name: ${name}_finetuning_encoder_frozen_${model.encoder_frozen}
+    offline: false
+  resume_if_exists: true
+  resume_ignore_no_checkpoint: true
+  create_checkpoint_callback: true
+  checkpoint_callback_params:
+    monitor: val_loss
+    save_top_k: 1
+    mode: min
+    always_save_nemo: true
+    filename: geneformer--{val_loss:.2f}-{step}-{consumed_samples}
+    model_parallel_size: ${multiply:${model.tensor_model_parallel_size}, ${model.pipeline_model_parallel_size}}
+model:
+  micro_batch_size: 16
+  tensor_model_parallel_size: 1
+  pipeline_model_parallel_size: 1
+  use_flash_attention: true
+  seq_length: 2048
+  encoder_seq_length: ${.seq_length}
+  max_position_embeddings: ${.seq_length}
+  num_layers: 6
+  hidden_size: 256
+  ffn_hidden_size: 512
+  num_attention_heads: 4
+  init_method_std: 0.02
+  hidden_dropout: 0.1
+  kv_channels: null
+  apply_query_key_layer_scaling: true
+  layernorm_epsilon: 1.0e-05
+  make_vocab_size_divisible_by: 128
+  pre_process: true
+  post_process: false
+  bert_binary_head: true
+  resume_from_checkpoint: null
+  masked_softmax_fusion: true
+  native_amp_init_scale: 4294967296
+  native_amp_growth_interval: 1000
+  fp32_residual_connection: false
+  fp16_lm_cross_entropy: false
+  seed: 1234
+  use_cpu_initialization: false
+  onnx_safe: false
+  activations_checkpoint_method: null
+  activations_checkpoint_num_layers: 1
+  data:
+    data_impl: geneformer
+    dataset_path: ${model.data.preprocessed_data_path}/
+    data_prefix: ''
+    shuffle: true
+    dataset: /
+    index_mapping_dir: null
+    skip_warmup: true
+    index_mapping_type: online
+    block_size: 1000000
+    cache_maxsize: 1000000
+    truncate_to_block_boundary: false
+    train_ratio: 0.98
+    val_ratio: 0.01
+    num_workers: 12
+    dataloader_type: single
+    seq_length: ${model.seq_length}
+    seed: ${model.seed}
+    dynamic_padding: false
+    micro_batch_size: ${model.micro_batch_size}
+    task_type: regression
+    target_size: 5060
+    split_type: single
+    preprocessed_data_path: ${oc.env:BIONEMO_HOME}/data/geneformer
+    preprocessed_anndata_fn: ${model.data.preprocessed_data_path}/preprocessed_anndata.h5ad
+    target_gep_fn: ${model.data.preprocessed_data_path}/target_gep.npy
+    max_seq_length: ${model.seq_length}
+    emb_batch_size: ${model.micro_batch_size}
+  optim:
+    name: fused_adam
+    lr: 0.0002
+    weight_decay: 0.01
+    betas:
+    - 0.9
+    - 0.98
+    sched:
+      name: CosineAnnealing
+      warmup_steps: 500
+      constant_steps: 50000
+      min_lr: 2.0e-05
+  tokenizer:
+    vocab_file: ${oc.env:BIONEMO_HOME}/tokenizers/singlecell/geneformer/vocab/geneformer.vocab
+  precision: bf16-mixed
+  restore_encoder_path: ${oc.env:BIONEMO_HOME}/models/singlecell/geneformer/geneformer-31M-240430.nemo
+  encoder_frozen: false
+  input_size: 256
+  global_batch_size: null
+  loss_func: MSELoss
+  finetuning_optim:
+    name: adam
+    lr: 0.0001
+    betas:
+    - 0.9
+    - 0.999
+    eps: 1.0e-08
+    weight_decay: 0.01
+    sched:
+      name: WarmupAnnealing
+      min_lr: 1.0e-05
+      last_epoch: -1
+      warmup_ratio: 10
+do_testing: true
+target: bionemo.model.singlecell.geneformer.model.GeneformerModel
+infer_target: bionemo.model.singlecell.geneformer.infer.GeneformerInference

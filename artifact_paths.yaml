@@ -118,7 +118,15 @@ models:
         symlink:
             source: "../../dnabert-86M.nemo"
             target: "dna/dnabert/dnabert-86M.nemo"
+    geneformer_31M_240430:
+        # A pretrained 31M parameter geneformer.
+        ngc: null
+        pbss: "s3://bionemo-ci/models/geneformer-31M-240430.nemo"
+        symlink:
+            source: "../../geneformer-31M-240430.nemo"
+            target: "singlecell/geneformer/geneformer-31M-240430.nemo"
     geneformer:
+        # A QA model for geneformer with randomly initialized weights.
         pbss: "s3://bionemo-ci/models/geneformer-qa.nemo"
         symlink:
             source: "../../geneformer-qa.nemo"

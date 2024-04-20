@@ -1,13 +1,20 @@
 defaults:
   - geneformer_base_config
+  # allow this config to override defaults
+  - _self_
+
+hydra:
+  searchpath:
+     - file://${oc.env:BIONEMO_HOME}/examples/conf/
+     - file://${oc.env:BIONEMO_HOME}/examples/singlecell/geneformer/conf/
 
 trainer:
-  devices: 2
+  devices: 1
   val_check_interval: 100
   log_every_n_steps: 100
   limit_val_batches: 8
   limit_test_batches: 500
-  max_steps: 400000
+  max_steps: 100
   precision: bf16-mixed
 
 model:
@@ -16,13 +23,10 @@ model:
   pre_process: True
   post_process: True
   bert_binary_head: False
-  # artifacts:
-  #   medians_file:  ${oc.env:BIONEMO_HOME}/tokenizers/singlecell/geneformer/vocab/geneformer.medians.json
   tokenizer:
     vocab_file: ${oc.env:BIONEMO_HOME}/tokenizers/singlecell/geneformer/vocab/geneformer.vocab
   data:
-    probabilistic_dirichlet_sampling_train: False  # Set to True to enable some shuffling of order when gene counts are close.
-    dataset_path: /workspace/bionemo/data/sc-pretraining
+    dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/singlecell
     micro_batch_size: ${model.micro_batch_size}
     num_workers: 12
     dataloader_type: single

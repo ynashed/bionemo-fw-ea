@@ -44,6 +44,7 @@ def main(cfg) -> None:
         cfg.model.data.dataset_path,
         cfg.model.tokenizer.vocab_file,
         cfg.model.data.dataset,
+        # cfg.model.artifacts.medians_file,
     )
 
     match preprocessor.preprocess():
@@ -74,7 +75,7 @@ def main(cfg) -> None:
         trainer = setup_trainer(cfg, builder=None)
 
         # Create model
-        model = FineTuneGeneformerModel(cfg.model, trainer, tokenizer, median_dict)
+        model = FineTuneGeneformerModel(cfg.model, trainer=trainer, tokenizer=tokenizer, median_dict=median_dict)
 
         # Add evaluation metrics
         metrics = {"MSE": mse}
@@ -90,12 +91,6 @@ def main(cfg) -> None:
             metrics = trainer.test(model, dataloaders=model.data_module.test_dataloader())
             logging.info(metrics)
             logging.info("************** Finished Testing ***********")
-
-        if cfg.get('do_prediction', False):
-            # TODO - this is the section where we pass in a separate dataset, fire up the dataloaders, and perform inference.
-            #      - could be tricky to get this right since the PERTURB-seq dataset is not standardized
-            #      - alternative approach is to just dump the splits to disk and pick them up in the benchmark.
-            return -1
 
 
 if __name__ == '__main__':

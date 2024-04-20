@@ -57,6 +57,8 @@ class SingleCellDataModule(BioNeMoDataModule):
         train_ratio: float = 0.98,
         val_ratio: float = 0.01,
         max_len: int = 1024,
+        probabilistic_dirichlet_sampling_train: bool = False,
+        dirichlet_alpha: float = 0.5,
     ):
         super().__init__(cfg, trainer)
         self.cfg = cfg.data
@@ -67,12 +69,29 @@ class SingleCellDataModule(BioNeMoDataModule):
         assert train_ratio + val_ratio < 1
         self.train_ratio = train_ratio
         self.val_ratio = val_ratio
+        self.probabilistic_dirichlet_sampling_train = probabilistic_dirichlet_sampling_train
+        self.dirichlet_alpha = dirichlet_alpha
 
     @lru_cache
     def onetime_init_backed_dataset(self):
         '''Unfortunately the way all our stuff fits together we need a delayed instantiation of the Dataset object.'''
         tmp = SingleCellDataset(self.cfg.dataset_path, self.tokenizer, self.median_dict, self.max_len)
         # Shuffles the dataset, no upsampling occurs here
+        if self.probabilistic_dirichlet_sampling_train:
+            # Need a train only copy that is shuffled in this way.
+            tmp_trn = SingleCellDataset(
+                self.cfg.dataset_path,
+                self.tokenizer,
+                self.median_dict,
+                self.max_len,
+                probabilistic_dirichlet_sampling=True,
+                dirichlet_alpha=self.dirichlet_alpha,
+            )
+            self.trn_only_dataset = ResamplingMappedDataset(
+                tmp_trn, num_samples=None, data_prefix='backed', cfg=self.cfg
+            )
+        else:
+            self.trn_only_dataset = None
         self.dataset = ResamplingMappedDataset(tmp, num_samples=None, data_prefix='backed', cfg=self.cfg)
         return self.dataset
 
@@ -107,7 +126,11 @@ class SingleCellDataModule(BioNeMoDataModule):
 
         """
         self.onetime_init_backed_dataset()
-        return SliceDataset(self.dataset, start=0, end=int(len(self.dataset) * self.train_ratio))
+        if self.trn_only_dataset is not None:
+            dataset = self.trn_only_dataset
+        else:
+            dataset = self.dataset
+        return SliceDataset(dataset, start=0, end=int(len(self.dataset) * self.train_ratio))
 
     def val_dataset(self):
         """Get the validation dataset.

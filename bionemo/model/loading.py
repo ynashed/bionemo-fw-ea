@@ -19,6 +19,8 @@ from torch.utils.data import DataLoader
 
 from bionemo.data.mapped_dataset import FilteredMappedDataset
 from bionemo.data.memmap_fasta_fields_dataset import FASTAFieldsMemmapDataset
+from bionemo.data.preprocess.singlecell.preprocess import GeneformerPreprocess
+from bionemo.data.singlecell.dataset import SingleCellDataset
 from bionemo.data.utils import expand_dataset_paths
 from bionemo.model.core.infer import BaseEncoderInference, M
 
@@ -61,6 +63,7 @@ def setup_inference(cfg: DictConfig, *, interactive: bool = False) -> Tuple[M, p
             index_mapping_dir=cfg.model.data.index_mapping_dir,
             **cfg.model.data.data_impl_kwargs.get("csv_fields_mmap", {}),
         )
+        remove_too_long = True
     elif cfg.model.data.data_impl == "fasta_fields_mmap":
         dataset_paths = expand_dataset_paths(cfg.model.data.dataset_path, ext=".fasta")
         ds = FASTAFieldsMemmapDataset(
@@ -68,14 +71,39 @@ def setup_inference(cfg: DictConfig, *, interactive: bool = False) -> Tuple[M, p
             index_mapping_dir=cfg.model.data.index_mapping_dir,
             **cfg.model.data.data_impl_kwargs.get("fasta_fields_mmap", {}),
         )
+        remove_too_long = True
+    elif cfg.model.data.data_impl == "geneformer":
+        # Get the medians from the single cell data we want to do inference on.
+        #  for now recompute these medians for a user's query incase of batch effects.
+        preprocessor = GeneformerPreprocess(
+            cfg.model.data.dataset_path,
+            None,  # Do not rebuild the vocab, get it from the saved model
+            cfg.model.data.dataset,
+        )
+        match preprocessor.preprocess():
+            case {'tokenizer': _, 'median_dict': median_dict}:  # just use the model's packaged tokenizer
+                logging.info("*************** Preprocessing Finished ************")
+            case _:
+                logging.error("Preprocessing failed.")
+        ds = SingleCellDataset(
+            cfg.model.data.dataset_path,
+            infer_model.tokenizer,
+            median_dict,
+            max_len=cfg.model.seq_length,
+        )
+        remove_too_long = False  # there is no "too long", the dataset will take the top N genes from each cell.
     else:
         raise ValueError(f'Unknown data_impl: {cfg.model.data.data_impl}')
+        remove_too_long = True
 
     # remove too long sequences
-    filtered_ds = FilteredMappedDataset(
-        dataset=ds,
-        criterion_fn=lambda x: len(infer_model._tokenize([x["sequence"]])[0]) <= infer_model.model.cfg.seq_length,
-    )
+    if remove_too_long:
+        filtered_ds = FilteredMappedDataset(
+            dataset=ds,
+            criterion_fn=lambda x: len(infer_model._tokenize([x["sequence"]])[0]) <= infer_model.model.cfg.seq_length,
+        )
+    else:
+        filtered_ds = ds  # no filtering
 
     dataloader = DataLoader(
         filtered_ds,

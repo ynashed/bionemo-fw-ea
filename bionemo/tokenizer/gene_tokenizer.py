@@ -67,6 +67,10 @@ class GeneTokenizer(Label2IDTokenizer):
     def pad_id(self) -> int:
         return self.token_to_id(self.pad_token)
 
+    @property
+    def class_id(self) -> int:
+        return self.token_to_id(self.cls_token)
+
     def tokens_to_ids(self, tokens: List[str]) -> List[int]:
         return super().tokens_to_ids(tokens)
 
@@ -74,7 +78,7 @@ class GeneTokenizer(Label2IDTokenizer):
         '''Saves the vocabulary as a newline delimieted vocabulary file, each line represents an int -> token mapping. line number is assumed to be the integer.'''
         vocab_dir = os.path.dirname(vocab_file)
         if not os.path.exists(vocab_dir):
-            os.makedirs(vocab_dir)
+            os.makedirs(vocab_dir, exist_ok=True)  # ensure the dir exists but be ok with race conditions.
 
         with open(vocab_file, 'w') as f:
             for i in range(len(self.vocab)):
