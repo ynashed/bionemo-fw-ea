@@ -16,7 +16,7 @@ model:
   tensor_model_parallel_size: 1
   pipeline_model_parallel_size: 1
   resume_from_checkpoint: null
-  num_train_iters: 12000 # TODO: merge with trainer's max steps?
+  num_steps_in_one_epoch: 12000
   metrics:
   - lddt_ca
 
@@ -66,7 +66,7 @@ model:
     num_workers: 2
     val_max_sequence_length: 700
     realign_when_required: ${model.data.realign_when_required}
-  
+    
   # Stop the application when close to the slurm-job-end-time
   #   - When active, this functionality operates within the model class methods.
   #   - To activate this functionality, uncomment the two lines below, where
@@ -79,7 +79,7 @@ trainer:
   # the effective batch size should be 128
   devices: 1
   accelerator : gpu
-  precision: 32 # has been only trained with 32 precision
+  precision: 32 # default precision
   num_nodes: 1
   max_steps : 12000
   max_epochs: 1 # step-based training

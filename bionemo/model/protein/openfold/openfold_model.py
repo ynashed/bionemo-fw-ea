@@ -56,7 +56,7 @@ from bionemo.model.protein.openfold.template_pair_stack import TemplatePairStack
 from bionemo.model.protein.openfold.template_pointwise_attention import TemplatePointwiseAttention
 from bionemo.model.protein.openfold.utils.logging_utils import (
     environ_as_multiline_str,
-    log_with_nemo_at_debug,
+    log_with_nemo_at_level,
 )
 from bionemo.model.protein.openfold.utils.time_utils import StopWhenCloseToSlurmJobEnd
 from bionemo.model.protein.openfold.utils.torch_utils import map_tensor_tree
@@ -210,7 +210,7 @@ class AlphaFold(ModelPT):
         self.multisessionstep_from_checkpoint_filename: Union[str, None] = None
         self.val_metrics_in_model_as_tensors: Dict = {}
 
-        log_with_nemo_at_debug(
+        log_with_nemo_at_level(
             f"""
             AlphaFold.__init__(), end,
             nemo.__version__={nemo.__version__}
@@ -483,14 +483,24 @@ class AlphaFold(ModelPT):
         return prevs
 
     def get_checkpoint_step(self) -> int:
-        """In DDP, checkpoints are loaded after data setup. This means information about
-        global step is unavailable while recreating data loaders. Here, we decode step
-        from checkpoint name and deduct 1 since iterations are calculated starting from 1
-        and data loaders index from 0
+        """Determine the number of Pytorch Lightning steps, i.e., calls to
+        on_train_batch_end(..), from previous runs in a sequence of
+        training application runs.
+
+        The variable multisessionstpe_from_checkpoint_filename is determined
+        from the filename of self.trainer.ckpt_path, if an appropriate file is
+        found in artifacts/checkpoints.
+
+        If no file is found, then the number of PL steps completed in previous
+        training application runs is 0.
+
+        In DDP, checkpoints are loaded after data setup. This means information about
+        global step is unavailable while recreating data loaders.
+
         Returns:
-            int: iteration number
+            int: number of PL steps completed in previous runs
         """
-        log_with_nemo_at_debug(
+        log_with_nemo_at_level(
             f"""
             AlphaFold.get_checkpoint_step(),
             self.trainer.ckpt_path={self.trainer.ckpt_path}
@@ -501,14 +511,14 @@ class AlphaFold(ModelPT):
                 float(re.search(r".*multisessionstep=(\d+.\d+)--.*", self.trainer.ckpt_path).group(1))
             )
             step_from_checkpoint_filename = int(re.search(r".*--step=(\d+)--.*", self.trainer.ckpt_path).group(1))
-            log_with_nemo_at_debug(
+            log_with_nemo_at_level(
                 f"""
                 AlphaFold.get_checkpoint_step(),
                 multisessionstep_from_checkpoint_filename={self.multisessionstep_from_checkpoint_filename}
                 step_from_checkpoint_filename={step_from_checkpoint_filename}
                 """
             )
-            return self.multisessionstep_from_checkpoint_filename - 1
+            return self.multisessionstep_from_checkpoint_filename
 
         else:
             return 0
@@ -520,6 +530,25 @@ class AlphaFold(ModelPT):
         )
 
     def setup_training_data(self, train_data_cfg: Union[omegaconf.DictConfig, Dict]):
+        """A ModelPT method, see https://github.com/NVIDIA/NeMo/blob/f3d45fd64482b15a6b0f63e7079d6db1be4f46e6/nemo/core/classes/modelPT.py#L489
+
+        This method is called during ModelPT.__init__, see
+        https://github.com/NVIDIA/NeMo/blob/f3d45fd64482b15a6b0f63e7079d6db1be4f46e6/nemo/core/classes/modelPT.py#L147.
+
+        In typical usage, this method is used to create the training set
+        dataloader.
+
+        If the current ModelPT instantiation is the resumption of a sequence
+        of slurm jobs, for example, then the value of trainer.global_step
+        associated with the checkpoint from the previous slurm job is
+        passed to get_training_dataloader through dist_setup.iteration.
+
+        Args:
+            train_data_cfg: model_cfg.train_ds, see openfold_initial_training.yaml,
+                where model_cfg is cfg.model and cfg is the 'main' or top-level cfg
+                in train.py
+
+        """
         dist_setup = self.get_dist_setup()
         self._train_dl = get_training_dataloader(
             model_cfg=self.cfg, train_session_cfg=dist_setup, ds_cfg=train_data_cfg
@@ -528,7 +557,7 @@ class AlphaFold(ModelPT):
     def setup_validation_data(self, val_data_cfg: Union[omegaconf.DictConfig, Dict]):
         dist_setup = self.get_dist_setup()
         self._validation_dl = get_validation_dataloader(model_cfg=self.cfg, dist_cfg=dist_setup, ds_cfg=val_data_cfg)
-        log_with_nemo_at_debug(
+        log_with_nemo_at_level(
             f"""
             AlphaFold.setup_validation_data(),
             self._validation_dl.sampler._dataset_length={self._validation_dl.sampler._dataset_length}
@@ -542,7 +571,7 @@ class AlphaFold(ModelPT):
         This is called for global_step=0.
         """
         if self.trainer.global_step % self.trainer.val_check_interval == 0:
-            log_with_nemo_at_debug(
+            log_with_nemo_at_level(
                 f"""
                 AlphaFold.training_step(), begin,
                 train_batch_idx={train_batch_idx}
@@ -571,7 +600,7 @@ class AlphaFold(ModelPT):
         """
         # (0) log data record data debug level,
         #   - activate with export NEMO_TESTING=True
-        log_with_nemo_at_debug(
+        log_with_nemo_at_level(
             f"""
             AlphaFold.validation_step(),
             val_batch_idx={val_batch_idx}
@@ -593,9 +622,9 @@ class AlphaFold(ModelPT):
         self._update_val_metrics_this_validation_step(val_batch, val_metrics_this_step_this_rank)
 
     def on_validation_start(self):
-        log_with_nemo_at_debug("AlphaFold.on_validation_start(), begin", self)
+        log_with_nemo_at_level("AlphaFold.on_validation_start(), begin", self)
         super(AlphaFold, self).on_validation_start()
-        log_with_nemo_at_debug("AlphaFold.on_validation_start(), end", self)
+        log_with_nemo_at_level("AlphaFold.on_validation_start(), end", self)
 
     def on_validation_epoch_end(self):
         """Called at the end of one pass through the validation dataset,
@@ -612,12 +641,12 @@ class AlphaFold(ModelPT):
         self.log cannot be put in on_validation_end, must be in
         on_validation_epoch_end
         """
-        log_with_nemo_at_debug("AlphaFold.on_validation_epoch_end(), begin", self)
+        log_with_nemo_at_level("AlphaFold.on_validation_epoch_end(), begin", self)
 
         # if within k min of the time the cluster manager will kill job,
         #   then sleep
         if self.stop_when and self.stop_when.is_close_to_slurm_job_end_time():
-            log_with_nemo_at_debug(
+            log_with_nemo_at_level(
                 f"""
                 AlphaFold.on_validation_epoch_end(), within hh:mm:ss={self.stop_when.buffer_before_slurm_job_end_time} of slurm job end time, sleep
                 self.stop_when.time_at_buffer_before_slurm_job_end_time_in_utc={self.stop_when.time_at_buffer_before_slurm_job_end_time_in_utc}
@@ -631,7 +660,7 @@ class AlphaFold(ModelPT):
 
         else:
             if self.stop_when:
-                log_with_nemo_at_debug(
+                log_with_nemo_at_level(
                     f"""
                     AlphaFold.on_validation_epoch_end(), not within hh:mm:ss={self.stop_when.buffer_before_slurm_job_end_time} of slurm job end time, proceed, checkpoints will be saved
                     self.stop_when.time_at_buffer_before_slurm_job_end_time_in_utc={self.stop_when.time_at_buffer_before_slurm_job_end_time_in_utc}
@@ -642,7 +671,7 @@ class AlphaFold(ModelPT):
             self._manage_val_metrics_on_validation_epoch_end()
             super(AlphaFold, self).on_validation_epoch_end()
 
-        log_with_nemo_at_debug("""AlphaFold.on_validation_epoch_end(), end""", self)
+        log_with_nemo_at_level("""AlphaFold.on_validation_epoch_end(), end""", self)
 
     def on_validation_end(self):
         """Below is the call stack to write checkpoints.  This member
@@ -659,20 +688,20 @@ class AlphaFold(ModelPT):
 
         https://github.com/Lightning-AI/pytorch-lightning/blob/master/src/lightning/pytorch/callbacks/model_checkpoint.py#L333
         """
-        log_with_nemo_at_debug(
+        log_with_nemo_at_level(
             "AlphaFold.on_validation_end(), begin, checkpoints will be saved",
             self,
         )
         super(AlphaFold, self).on_validation_end()
-        log_with_nemo_at_debug(
+        log_with_nemo_at_level(
             """AlphaFold.on_validation_end(), end, checkpoints have been saved""",
             self,
         )
 
     def on_save_checkpoint(self, checkpoint: Dict[str, Any]) -> None:
-        log_with_nemo_at_debug("AlphaFold.on_save_checkpoint(), begin", self)
+        log_with_nemo_at_level("AlphaFold.on_save_checkpoint(), begin", self)
         super().on_save_checkpoint(checkpoint)
-        log_with_nemo_at_debug("AlphaFold.on_save_checkpoint(), end", self)
+        log_with_nemo_at_level("AlphaFold.on_save_checkpoint(), end", self)
 
     def _update_and_log_multisessionstep_this_validation_step(self):
         # (1) progress counters
@@ -687,7 +716,7 @@ class AlphaFold(ModelPT):
         #   - Will have to overwrite this method to get integer values in filename ?
         #      https://github.com/Lightning-AI/pytorch-lightning/blob/master/src/lightning/pytorch/callbacks/model_checkpoint.py#L567
         #
-        log_with_nemo_at_debug(
+        log_with_nemo_at_level(
             f"""
             AlphaFold.validation_step(),
             multisessionstep={multisessionstep}
@@ -710,7 +739,7 @@ class AlphaFold(ModelPT):
             metrics_names=set(self.cfg.metrics),
         )
         for metric_name, metric_value in val_metrics_this_step_this_rank.items():
-            log_with_nemo_at_debug(
+            log_with_nemo_at_level(
                 f"""
                 AlphaFold.validation_step(),
                 val_batch_idx={val_batch_idx}
@@ -780,7 +809,7 @@ class AlphaFold(ModelPT):
         """
         # (0) log some info
         #
-        log_with_nemo_at_debug(
+        log_with_nemo_at_level(
             f"""
             AlphaFold.on_validation_epoch_end(),
             self.val_metrics_in_model_as_tensors=\n{self.val_metrics_in_model_as_tensors}
@@ -791,7 +820,7 @@ class AlphaFold(ModelPT):
         # (1) All-gather
         ptl_gathered_val_metrics_as_tensors = self.all_gather(self.val_metrics_in_model_as_tensors)
 
-        log_with_nemo_at_debug(
+        log_with_nemo_at_level(
             f"""
             AlphaFold.on_validation_epoch_end(),
             ptl_gathered_val_metrics_as_tensors={ptl_gathered_val_metrics_as_tensors}
@@ -817,7 +846,7 @@ class AlphaFold(ModelPT):
                     / num_nondistinct_val_example_ids_this_epoch
                 )
 
-        log_with_nemo_at_debug(
+        log_with_nemo_at_level(
             f"""
             AlphaFold.on_validation_epoch_end(), after compute means
             num_nondistinct_val_example_ids_this_epoch={num_nondistinct_val_example_ids_this_epoch}

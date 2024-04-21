@@ -34,14 +34,14 @@ from typing import Iterable, List, Tuple
 
 from omegaconf import DictConfig
 
-from bionemo.model.protein.openfold.utils.logging_utils import log_with_nemo_at_debug
+from bionemo.model.protein.openfold.utils.logging_utils import log_with_nemo_at_level
 
 
 def isolate_last_checkpoint(entire_cfg: DictConfig) -> Tuple[List[str], List[str], int]:
     """
         - NeMo supports experiment management, which includes checkpoint management.
         Separate checkpoint files for model and EMA are saved at each call to
-        validation_step..
+        validation_step.
 
         - Expected behavior, is that the checkpoint files writte at validation_step()
         are tagged with 'last' in the filename, and previous filenames with 'last'
@@ -75,7 +75,7 @@ def isolate_last_checkpoint(entire_cfg: DictConfig) -> Tuple[List[str], List[str
         return [], []
 
     listdir_checkpoint_dir = os.listdir(checkpoint_dir)
-    log_with_nemo_at_debug(
+    log_with_nemo_at_level(
         f"""
         isolate_last_checkpoint(), begin
         checkpoint_dir={checkpoint_dir}
@@ -94,7 +94,7 @@ def isolate_last_checkpoint(entire_cfg: DictConfig) -> Tuple[List[str], List[str
         full_path_with_last = os.path.join(checkpoint_dir, base_filename_with_last)
         full_path_renamed = os.path.join(checkpoint_dir, base_filename_with_last.replace("last", "bnmorecent"))
 
-        log_with_nemo_at_debug(
+        log_with_nemo_at_level(
             f"""
             isolate_last_checkpoint(), begin
             Rename checkpoint: {full_path_with_last}
@@ -117,7 +117,7 @@ def isolate_filenames_with_last_to_keep(base_filenames: Iterable[str]) -> Tuple[
         Tuple[List[str]]: _description_
     """
 
-    log_with_nemo_at_debug(
+    log_with_nemo_at_level(
         f"""
         isolate_filenames_with_last_to_keep(), begin
         base_filenames={base_filenames}
@@ -133,7 +133,7 @@ def isolate_filenames_with_last_to_keep(base_filenames: Iterable[str]) -> Tuple[
     filenames_with_last_and_ckpt_but_not_last_ckpt = sorted(
         filenames_with_last_and_ckpt_but_not_last_ckpt, reverse=True
     )
-    log_with_nemo_at_debug(
+    log_with_nemo_at_level(
         f"""
         isolate_filenames_with_last_to_keep(), after isolating
         filenames_with_last_ckpt={filenames_with_last_ckpt}

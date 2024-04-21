@@ -32,12 +32,12 @@ class InitialTrainingDataloaderPT(DataLoader):
         prefetch_factor: int,
         seed: int,
         uniform_recycling_iters: List[int],
-        num_prev_iters: int,
+        num_prev_steps: int,
         use_threading: bool,
         **kwargs,  # TODO: doesn't it foreshadow sampler with batch_sampler? Remove and re-check
     ) -> None:
         self.device_batch_size = local_batch_size
-        self.num_prev_iters = num_prev_iters
+        self.num_prev_steps = num_prev_steps
         self.seed = seed
         self.uniform_recycling_iters = uniform_recycling_iters
         if use_threading:
@@ -55,7 +55,7 @@ class InitialTrainingDataloaderPT(DataLoader):
         self._set_train_batch_properties_fn = TrainBatchProperties(
             seed=seed,
             uniform_recycling_iters=uniform_recycling_iters,
-            num_prev_iters=num_prev_iters,
+            num_prev_steps=num_prev_steps,
         )
 
     def __iter__(self) -> Iterator[dict]:
@@ -97,7 +97,7 @@ class FinetuningDataloader(DataLoader):
         num_workers: int,
         seed: int,
         uniform_recycling_iters: List[int],
-        num_prev_iters: int,
+        num_prev_steps: int,
     ) -> None:
         super(FinetuningDataloader, self).__init__(
             dataset=dataset,
@@ -112,7 +112,7 @@ class FinetuningDataloader(DataLoader):
         self._set_train_batch_properties_fn = TrainBatchProperties(
             seed=seed,
             uniform_recycling_iters=uniform_recycling_iters,
-            num_prev_iters=num_prev_iters,
+            num_prev_steps=num_prev_steps,
         )
 
     def __iter__(self) -> Iterator[dict]:
@@ -128,17 +128,17 @@ class TrainBatchProperties:
         self,
         seed: int,
         uniform_recycling_iters: List[int],
-        num_prev_iters: int,
+        num_prev_steps: int,
     ) -> None:
         self._random_num_recycling_iters_iterator = _random_num_recycling_iters_generator(
             uniform_recycling_iters=uniform_recycling_iters,
             seed=seed,
         )
-        assert num_prev_iters >= 0
-        self._iteration = num_prev_iters
+        assert num_prev_steps >= 0
+        self._iteration = num_prev_steps
         self._num_recycling_iters = None
         # restore rng state by iterating through previous iterations:
-        for _ in range(num_prev_iters):
+        for _ in range(num_prev_steps):
             next(self._random_num_recycling_iters_iterator)
 
     def __call__(self, batch: dict) -> dict:

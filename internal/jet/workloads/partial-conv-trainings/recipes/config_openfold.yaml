@@ -36,14 +36,14 @@ spec:
   warmup: 200
   default_overwrites: "++exp_manager.create_tensorboard_logger=True ++exp_manager.wandb_logger_kwargs.offline=False ++exp_manager.create_wandb_logger=True ++exp_manager.create_checkpoint_callback=False ++exp_manager.resume_if_exists=False"
   extra_overwrites: ""
-  script: |-    
+  script: |-
     cd {BIONEMO_HOME};
     if [ "$SLURM_LOCALID" = "0" ]; then bash examples/protein/openfold/scripts/install_third_party.sh; fi;
     export WANDB_API_KEY=$BIONEMO_WANDB_API_KEY;
     model_tag={model}__{variant}__{config_name};
     python examples/{domain}/{model}/{variant}.py --config-name {config_name} \
     trainer.num_nodes={nodes} trainer.devices={gpus} trainer.precision={precision} model.seed={seed} \
-    trainer.max_steps={max_steps} model.num_train_iters={max_steps} model.micro_batch_size={batch_size} \
+    trainer.max_steps={max_steps} model.num_steps_in_one_epoch={max_steps} model.micro_batch_size={batch_size} \
     trainer.val_check_interval={val_check_interval} \
     {default_overwrites} {extra_overwrites} \
     ++exp_manager.exp_dir={assets_dir} \

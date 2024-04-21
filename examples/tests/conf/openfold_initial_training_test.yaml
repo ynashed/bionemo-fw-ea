@@ -7,7 +7,7 @@ hydra:
      - ${oc.env:BIONEMO_HOME}/examples/protein/openfold/conf
 
 model:
-  num_train_iters: 30 # originally 100
+  num_steps_in_one_epoch: 30 # originally 100
   data:
     dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/openfold_data # only if downloaded
     filter_by_alignments: true

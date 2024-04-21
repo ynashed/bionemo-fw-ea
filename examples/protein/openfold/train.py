@@ -8,6 +8,16 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
+"""Train the AlphaFold model class at bionemo.model.protein.openfold.openfold_model
+
+Typical usage example:
+    cd $BIONEMO_HOME
+    python examples/protein/openfold/train.py --config=openfold_initial_training
+
+Notes:
+    See examples/protein/openfold/conf/openfold_initial_training.yaml
+    for parameters and settings for this script.
+"""
 
 import numpy as np
 import pytorch_lightning as pl
@@ -24,7 +34,7 @@ from bionemo.model.protein.openfold.checkpoint_utils import load_pt_checkpoint
 from bionemo.model.protein.openfold.lr_scheduler import AlphaFoldLRScheduler
 from bionemo.model.protein.openfold.openfold_model import AlphaFold
 from bionemo.model.protein.openfold.optim_hub import enable_mlperf_optim
-from bionemo.model.protein.openfold.utils.logging_utils import log_with_nemo_at_debug
+from bionemo.model.protein.openfold.utils.logging_utils import log_with_nemo_at_level
 from bionemo.model.protein.openfold.utils.nemo_exp_manager_utils import isolate_last_checkpoint
 from bionemo.model.utils import setup_trainer
 
@@ -66,7 +76,7 @@ def main(cfg) -> None:
 
     if cfg.get('do_training', False) or cfg.get('do_validation', False):
         filenames_to_keep, filenames_to_rename = isolate_last_checkpoint(cfg)
-        log_with_nemo_at_debug(
+        log_with_nemo_at_level(
             f"""
             examples/protein/openfold/train.py:main(),
             checkpoint filenames_to_keep={filenames_to_keep}

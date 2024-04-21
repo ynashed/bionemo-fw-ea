@@ -81,6 +81,25 @@ def get_structured_paths(data_cfg) -> DictConfig:
 def get_initial_training_dl(
     model_cfg: Union[DictConfig, Dict], train_session_cfg: Union[DictConfig, Dict], ds_cfg: Union[DictConfig, Dict]
 ) -> DataLoader:
+    """Create the dataloader instance.
+
+    Args:
+        model_cfg: The DictConfig representation of the section of openfold_initial_training.yaml
+            under the key 'model'.
+
+        train_session_cfg: Has keys
+            "rank": The index identifying this instance of ModelPT
+            "world_size": The number of GPUs in the mini-cluster for this job,
+                also the number of ModelPT instances.
+            "iteration":
+                The first value for trainer.global_step that will be used in
+                the current instance of train.py.  The value of iteration may
+                have been read from the checkpoint file from the previous
+                instance of train.py.
+
+        ds_cfg: The DictConfig representation of the section of openfold_initial_training.yaml
+            under model.train_ds.  Ds for dataset.
+    """
     ds_paths = get_structured_paths(model_cfg.data)
 
     initial_training_dataset = InitialTrainingDataset(
@@ -98,14 +117,14 @@ def get_initial_training_dl(
 
     initial_training_sampler = InitialTrainingSampler(
         dataset=initial_training_dataset,
-        device_batch_size=model_cfg.micro_batch_size,
+        device_batch_size=model_cfg.micro_batch_size,  # number of input records for each rank, per global step
         global_batch_size=model_cfg.global_batch_size,
-        num_train_iters=model_cfg.num_train_iters,
+        num_steps_in_one_epoch=model_cfg.num_steps_in_one_epoch,
         seed=model_cfg.seed,
         is_distributed=True,
         rank=train_session_cfg.rank,
         world_size=train_session_cfg.world_size,
-        num_prev_iters=train_session_cfg.iteration,
+        num_prev_steps=train_session_cfg.iteration,  # iteration
     )
 
     # initial_training_dataset = InitialTrainingDataset(
@@ -121,7 +140,7 @@ def get_initial_training_dl(
         num_workers=ds_cfg.num_workers,
         seed=model_cfg.seed,
         uniform_recycling_iters=list(range(0, model_cfg.num_recycling_iters + 1)),
-        num_prev_iters=train_session_cfg.iteration,
+        num_prev_steps=train_session_cfg.iteration,
         use_threading=ds_cfg.threading_enabled,
         prefetch_factor=2,
     )
@@ -202,12 +221,12 @@ def get_finetuning_dl(
         },
         device_batch_size=model_cfg.micro_batch_size,
         global_batch_size=model_cfg.global_batch_size,
-        num_train_iters=model_cfg.num_train_iters,
+        num_steps_in_one_epoch=model_cfg.num_steps_in_one_epoch,
         seed=model_cfg.seed,
         is_distributed=True,
         rank=train_session_cfg.rank,
         world_size=train_session_cfg.world_size,
-        num_prev_iters=train_session_cfg.iteration,
+        num_prev_steps=train_session_cfg.iteration,
     )
 
     finetuning_dataloader = FinetuningDataloader(
@@ -217,7 +236,7 @@ def get_finetuning_dl(
         num_workers=ds_cfg.num_workers,
         seed=model_cfg.seed,
         uniform_recycling_iters=list(range(0, model_cfg.num_recycling_iters + 1)),
-        num_prev_iters=train_session_cfg.iteration,
+        num_prev_steps=train_session_cfg.iteration,
     )
 
     return finetuning_dataloader
@@ -226,6 +245,21 @@ def get_finetuning_dl(
 def get_training_dataloader(
     model_cfg: Union[DictConfig, Dict], train_session_cfg: Union[DictConfig, Dict], ds_cfg: Union[DictConfig, Dict]
 ):
+    """Dispatcher to the factory function for either the initial training dataloader,
+    or the finetuning dataloader.
+
+    Args:
+        model_cfg: The DictConfig representation of the section of openfold_initial_training.yaml
+            under the key 'model'.
+
+        train_session_cfg: Contains the variable iteration, which is the first
+            value for trainer.global_step that will be used in the the current
+            instance of train.py.  The value of iteration may have been read
+            from the checkpoint file from the previous instance of train.py.
+
+        ds_cfg: The DictConfig representation of the section of openfold_initial_training.yaml
+            under model.train_ds.  Ds for dataset.
+    """
     stage = model_cfg.stage
     if stage == "initial_training":
         return get_initial_training_dl(model_cfg=model_cfg, train_session_cfg=train_session_cfg, ds_cfg=ds_cfg)

@@ -155,6 +155,11 @@ def get_num_devices(n_devices):
 class TrainerBuilder:
     @staticmethod
     def adjust_config(cfg):
+        """Update the contents of cfg
+
+        (1) Add key "global_batch_size" to main_cfg.model
+        (2) Add key "accumulate_grad_batches" to main_cfg.trainer
+        """
         micro_batch_size = cfg.model.micro_batch_size
         tensor_model_parallel_size = cfg.model.tensor_model_parallel_size
         pipeline_model_parallel_size = cfg.model.pipeline_model_parallel_size
@@ -270,7 +275,7 @@ def setup_trainer(cfg, builder=None, callbacks=[], adjust_config=True, verbose=T
         builder = TrainerBuilder
 
     if adjust_config:
-        builder.adjust_config(cfg)
+        builder.adjust_config(cfg)  # e.g., compute global_batch_size, set accumulate_grad_batches
     plugins = builder.configure_plugins(cfg)
     mode = "train" if cfg.get("do_training", False) else "test"
     callbacks = builder.configure_callbacks(cfg, callbacks)
