@@ -1,7 +1,7 @@
 type: recipe
 format_version: 1
 maintainers: [dorotat]
-logger: dllogger
+loggers: [tensorboard, dllogger, extra]
 labels:
   origin: bionemo
   workload_ref: ""
@@ -30,6 +30,7 @@ spec:
   BIONEMO_HOME: "/workspace/bionemo"
   platforms: [linux/amd64]
   wandb_project_name: ""
+  wandb_run_link: ""
   pipeline_label: ""
   warmup: 200
   default_overwrites: "++exp_manager.create_tensorboard_logger=True ++exp_manager.wandb_logger_kwargs.offline=False ++exp_manager.create_wandb_logger=True ++exp_manager.create_checkpoint_callback=False ++exp_manager.resume_if_exists=False"
@@ -55,16 +56,32 @@ spec:
     ++create_dllogger_callbacks=True ++create_trainer_metric_callback=True \
     ++dllogger_callbacks_kwargs.use_existing_dllogger=True ++dllogger_callbacks_kwargs.warmup={warmup} \
     ++dllogger_callbacks_kwargs.json_file={dllogger_file} ++trainer_metric_callback_kwargs.log_path={assets_dir} \
-    ++logs_dir={logs_dir}
-  time_limit: 3600
+    ++logs_dir={logs_dir};
+    if [ -z $SLURM_LOCALID ] || [ $SLURM_LOCALID = 0 ]
+    then
+      mkdir -p {tensorboard_dir}
+      find {assets_dir} -type f -name "events.out.tfevents*" -exec cp {{}} {tensorboard_dir} \;
+      latest_log="{assets_dir}/run_0/output_script-0.log";
+      [ ! -f "$latest_log" ] && {{ echo "File $latest_log does not exist. Exiting with error."; exit 1; }};
+      experiment_link=$(grep -o "View run at https://wandb.ai/[^']*" "$latest_log" | awk 'NR==1 {{print $4}}');
+      project_link=$(grep -o "View project at https://wandb.ai/[^']*" "$latest_log" | awk 'NR==1 {{print $4}}');
+      echo "{{WANDB_RUN_LINK: \"$experiment_link\", WANDB_PROJECT_LINK: \"$project_link\"}}" > {logs_dir}/extra.yaml
+    fi
+  time_limit: 14400
   artifacts: {}
-  metrics:
-    reduced_train_loss:
-      goal: minimize
-      tags: [primary]
-    val_loss:
-      goal: minimize
-      tags: [secondary]
+metrics:
+  throughput_train:
+    goal: maximize
+    tags: [ performance ]
+    key: primary
+  reduced_train_loss:
+    goal: minimize
+    tags: [accuracy]
+    key: secondary
+  val_loss:
+    goal: minimize
+    tags: [accuracy ]
+    key: tertiary
 products:
   - nodes: [4]
     gpus: [8]

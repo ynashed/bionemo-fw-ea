@@ -1,7 +1,7 @@
 type: recipe
 format_version: 1
 maintainers: [dorotat]
-logger: dllogger
+loggers: [tensorboard, dllogger, extra]
 labels:
   origin: bionemo
   workload_ref: ""
@@ -59,16 +59,36 @@ spec:
     ++create_dllogger_callbacks=True ++create_trainer_metric_callback=True \
     ++dllogger_callbacks_kwargs.use_existing_dllogger=True ++dllogger_callbacks_kwargs.warmup={warmup} \
     ++dllogger_callbacks_kwargs.json_file={dllogger_file} ++trainer_metric_callback_kwargs.log_path={assets_dir} \
-    ++logs_dir={logs_dir}
+    ++logs_dir={logs_dir};
+    if [ -z $SLURM_LOCALID ] || [ $SLURM_LOCALID = 0 ]
+    then
+      mkdir -p {tensorboard_dir}
+      find {assets_dir} -type f -name "events.out.tfevents*" -exec cp {{}} {tensorboard_dir} \;
+      latest_log="{assets_dir}/run_0/output_script-0.log";
+      [ ! -f "$latest_log" ] && {{ echo "File $latest_log does not exist. Exiting with error."; exit 1; }};
+      experiment_link=$(grep -o "View run at https://wandb.ai/[^']*" "$latest_log" | awk 'NR==1 {{print $4}}');
+      project_link=$(grep -o "View project at https://wandb.ai/[^']*" "$latest_log" | awk 'NR==1 {{print $4}}');
+      echo "{{WANDB_RUN_LINK: \"$experiment_link\", WANDB_PROJECT_LINK: \"$project_link\"}}" > {logs_dir}/extra.yaml
+    fi
   time_limit: 14400
   artifacts: {}
-  metrics:
-    train_loss_epoch:
-      goal: minimize
-      tags: [primary]
-    val_loss:
-      goal: minimize
-      tags: [secondary]
+metrics:
+  throughput_train:
+    goal: maximize
+    tags: [ performance ]
+    key: primary
+  train_loss_epoch:
+    goal: minimize
+    tags: [accuracy]
+    key: secondary
+  valinf_rmsds_lt2:
+    goal: maximize
+    tags: [secondary]
+    key: tertiary
+  valinf_rmsds_lt5:
+    goal: maximize
+    tags: [accuracy ]
+    key: 4th
 products:
   - domain: [molecule]
     variant: [train]
@@ -81,5 +101,3 @@ products:
     precision: [32]
     tp_type: [fast_tp]
     seed: [42]
-
-
