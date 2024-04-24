@@ -54,6 +54,19 @@ def load_pdb_chain_clusters(pdb_chain_clusters_filepath: Path) -> List[List[str]
     return pdb_chain_clusters
 
 
+def load_uniclust30_target(targets_super_index: dict, target_key: str, uniclust30_targets_dirpath: Path) -> bytes:
+    """Load uniclust30 target from bytes"""
+    targets_index = targets_super_index[target_key]
+    targets_db_path = uniclust30_targets_dirpath / targets_index["db"]
+    assert len(targets_index["files"]) == 1
+    file_index = targets_index["files"][0]
+    filename, start, size = file_index
+    with open(targets_db_path, "rb") as f:
+        f.seek(start)
+        pdb_bytes = f.read(size)
+    return pdb_bytes
+
+
 class OpenProteinSetPreprocess:
     S3_BUCKET = 's3://openfold'
 

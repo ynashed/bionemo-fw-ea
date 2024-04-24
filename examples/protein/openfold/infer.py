@@ -15,11 +15,8 @@ from hydra.utils import instantiate
 from nemo.core.config import hydra_runner
 from nemo.utils import logging
 from omegaconf.omegaconf import OmegaConf
-from torch.utils.data import DataLoader
 
-from bionemo.data.protein.openfold.datahub import get_structured_paths
-from bionemo.data.protein.openfold.datasets import PredictDataset
-from bionemo.data.protein.openfold.helpers import collate
+from bionemo.data.protein.openfold.datahub import get_predict_dataloader
 from bionemo.model.protein.openfold.checkpoint_utils import load_pt_checkpoint
 from bionemo.model.protein.openfold.openfold_model import AlphaFold
 from bionemo.model.protein.openfold.writer import PredictionFeatureWriter, PredictionPDBWriter
@@ -56,24 +53,8 @@ def main(cfg) -> None:
                            Inference was not ran.'
         )
 
-    ds_paths = get_structured_paths(cfg.model.data)
-    ds = PredictDataset(
-        sequences=cfg.sequences,
-        seq_names=cfg.seq_names,
-        pdb_mmcif_chains_filepath=ds_paths.mmcif_chains,
-        pdb_mmcif_dicts_dirpath=ds_paths.mmcif_dicts,
-        pdb_obsolete_filepath=ds_paths.obsolete_filepath,
-        template_hhr_filepaths=cfg.model.data.template_hhr_filepaths,
-        msa_a3m_filepaths=cfg.model.data.msa_a3m_filepaths,
-        generate_templates_if_missing=cfg.model.data.generate_templates_if_missing,
-        pdb70_database_path=cfg.model.data.pdb70_database_path,
-        cfg=cfg.model,
-    )
-
-    dl = DataLoader(
-        ds, batch_size=cfg.model.micro_batch_size, num_workers=cfg.model.data.num_workers, collate_fn=collate
-    )
-    trainer.predict(alphafold, dl, return_predictions=False)
+    predict_dataloader = get_predict_dataloader(model_cfg=cfg.model, predict_session_cfg=cfg)
+    trainer.predict(alphafold, predict_dataloader, return_predictions=False)
 
 
 if __name__ == '__main__':

@@ -23,9 +23,11 @@ from bionemo.data.protein.openfold.dataloaders_pq import InitialTrainingDataload
 from bionemo.data.protein.openfold.datasets import (
     FinetuningDataset,
     InitialTrainingDataset,
+    PredictDataset,
     SelfDistillationDataset,
     ValidationDataset,
 )
+from bionemo.data.protein.openfold.helpers import collate
 from bionemo.data.protein.openfold.samplers import FinetuningSampler, InitialTrainingSampler, ValidationSampler
 from bionemo.model.protein.openfold.optim_hub import OptimHub
 
@@ -148,7 +150,9 @@ def get_initial_training_dl(
     return initial_training_dataloader
 
 
-def get_validation_dataloader(model_cfg, dist_cfg: Union[DictConfig, Dict], ds_cfg: Union[DictConfig, Dict]):
+def get_validation_dataloader(
+    model_cfg: Union[DictConfig, Dict], dist_cfg: Union[DictConfig, Dict], ds_cfg: Union[DictConfig, Dict]
+) -> DataLoader:
     ds_paths = get_structured_paths(model_cfg.data)
     validation_dataset = ValidationDataset(
         pdb_mmcif_chains_filepath=ds_paths.mmcif_chains,
@@ -179,9 +183,9 @@ def get_validation_dataloader(model_cfg, dist_cfg: Union[DictConfig, Dict], ds_c
     return validation_dataloader
 
 
-def get_finetuning_dl(
+def get_finetuning_dataloader(
     model_cfg: Union[DictConfig, Dict], train_session_cfg: Union[DictConfig, Dict], ds_cfg: Union[DictConfig, Dict]
-):
+) -> DataLoader:
     ds_paths = get_structured_paths(model_cfg.data)
     initial_training_dataset = InitialTrainingDataset(
         pdb_mmcif_chains_filepath=ds_paths.mmcif_chains,
@@ -244,7 +248,7 @@ def get_finetuning_dl(
 
 def get_training_dataloader(
     model_cfg: Union[DictConfig, Dict], train_session_cfg: Union[DictConfig, Dict], ds_cfg: Union[DictConfig, Dict]
-):
+) -> DataLoader:
     """Dispatcher to the factory function for either the initial training dataloader,
     or the finetuning dataloader.
 
@@ -264,7 +268,32 @@ def get_training_dataloader(
     if stage == "initial_training":
         return get_initial_training_dl(model_cfg=model_cfg, train_session_cfg=train_session_cfg, ds_cfg=ds_cfg)
     elif stage == "finetuning":
-        return get_finetuning_dl(model_cfg=model_cfg, train_session_cfg=train_session_cfg, ds_cfg=ds_cfg)
+        return get_finetuning_dataloader(model_cfg=model_cfg, train_session_cfg=train_session_cfg, ds_cfg=ds_cfg)
     else:
         # no custom exception since this should be unrecoverable
         raise Exception(f"Stage {stage} is not recognised. Please choose either initial_training or finetuning.")
+
+
+def get_predict_dataloader(
+    model_cfg: Union[DictConfig, Dict], predict_session_cfg: Union[DictConfig, Dict]
+) -> DataLoader:
+    ds_paths = get_structured_paths(model_cfg.data)
+    predict_dataset = PredictDataset(
+        sequences=predict_session_cfg.sequences,
+        seq_names=predict_session_cfg.seq_names,
+        pdb_mmcif_chains_filepath=ds_paths.mmcif_chains,
+        pdb_mmcif_dicts_dirpath=ds_paths.mmcif_dicts,
+        pdb_obsolete_filepath=ds_paths.obsolete_filepath,
+        template_hhr_filepaths=model_cfg.data.template_hhr_filepaths,
+        msa_a3m_filepaths=model_cfg.data.msa_a3m_filepaths,
+        generate_templates_if_missing=model_cfg.data.generate_templates_if_missing,
+        pdb70_database_path=model_cfg.data.pdb70_database_path,
+        cfg=model_cfg,
+    )
+    predict_dataloader = DataLoader(
+        predict_dataset,
+        batch_size=model_cfg.micro_batch_size,
+        num_workers=model_cfg.data.num_workers,
+        collate_fn=collate,
+    )
+    return predict_dataloader

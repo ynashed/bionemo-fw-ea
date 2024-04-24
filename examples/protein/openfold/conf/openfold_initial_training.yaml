@@ -161,7 +161,10 @@ model:
         source_variant: ${model.data.dataset_variant}
         force: False
 
+      # use default lists of ids if not provided
       sample_pdb_chain_ids: null # list of pdb ids that are part of training data and should be included in training sample
+      sample_cameo_chain_ids: null  # list of pdb ids that are part of validation data and should be included in validation sample
+      sample_uniclust30_ids: null # list of uniclust30 ids that are part of fine-tuning data and should be included in training sample
 
 
     use_only_pdb_chain_ids: null # Optional list of pdb chain ids for intersection with train and val datasets.
