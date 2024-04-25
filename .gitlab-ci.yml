@@ -334,7 +334,7 @@ build-docs:
       when: never
     - when: on_success
   script:
-    # Build the docs, store as artifact
+    # Build the docs, store as artifact in ${CI_PROJECT_DIR = /builds/clara-discovery/bionemo}.
     - mkdir -p /builds/clara-discovery/bionemo/docs_build
     - cd /docs
     - sphinx-build bionemo /builds/clara-discovery/bionemo/docs_build/html
@@ -391,15 +391,20 @@ pytest:
     - bash ./examples/singlecell/geneformer/scripts/download_sample_data.sh -data_path $BIONEMO_HOME/examples/tests/test_data
     - ls examples/tests/test_data/uniref202104_esm2_qc_test200_val200
     - rm -rf ./.pytest_cache/
-    - mkdir -p /builds/clara-discovery/bionemo/heatmaps
-    - pytest -m "not internal and not needs_fork and not needs_80gb_memory_gpu" -vv --durations=0 --cov=bionemo --cov-report term --cov-report xml:coverage.xml -k "not test_model_training"
-    - cp -rv ${BIONEMO_HOME}/tests/data/esm2_golden_values/heatmaps /builds/clara-discovery/bionemo/heatmaps
+    - mkdir -p ${CI_PROJECT_DIR}/heatmaps
+    - pytest -m "not internal and not needs_fork and not needs_80gb_memory_gpu" -vv --durations=0 --cov=bionemo --cov-report term --cov-report xml:coverage.xml -k "not test_model_training" | tee coverage.log
+    # Compute test coverage. From "TOTAL ${COVERED TESTS} ${NON-COVERED TESTS} ${AVG TEST COVERAGE}", compute ${COVERED TESTS} / (${COVERED TESTS} + ${NON-COVERED TESTS}).
+    - cat coverage.log | grep -Eo "TOTAL\s+[0-9]+\s+[0-9]+\s+[0-9]+\%" | python -c 'import sys; lines=sys.stdin.readline(); x = lines.split(); d = int(x[1]) + int(x[2]); print(f"BIONEMO TEST COVERAGE = {100 * int(x[1]) / d:.8f}%")'
+    - cp -rv ${BIONEMO_HOME}/tests/data/esm2_golden_values/heatmaps ${CI_PROJECT_DIR}/heatmaps
+    - cp ${BIONEMO_HOME}/coverage.xml ${CI_PROJECT_DIR}
     - df -Thl
-  coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
+    - if [ ! -e "${CI_PROJECT_DIR}/coverage.xml" ]; then echo "${CI_PROJECT_DIR}/coverage.xml does not exist. Failing..."; exit 1; fi
+  coverage: '/BIONEMO TEST COVERAGE = ([0-9]+\.*[0-9]*%)/'
   artifacts:
     reports:
       coverage_report:
         coverage_format: cobertura
+        # Relative path in ${CI_PROJECT_DIR}...
         path: coverage.xml
     paths:
       - heatmaps
