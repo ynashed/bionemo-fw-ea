@@ -392,9 +392,10 @@ pytest:
     - ls examples/tests/test_data/uniref202104_esm2_qc_test200_val200
     - rm -rf ./.pytest_cache/
     - mkdir -p ${CI_PROJECT_DIR}/heatmaps
-    - pytest -m "not internal and not needs_fork and not needs_80gb_memory_gpu" -vv --durations=0 --cov=bionemo --cov-report term --cov-report xml:coverage.xml -k "not test_model_training" | tee coverage.log
-    # Compute test coverage. From "TOTAL ${COVERED TESTS} ${NON-COVERED TESTS} ${AVG TEST COVERAGE}", compute ${COVERED TESTS} / (${COVERED TESTS} + ${NON-COVERED TESTS}).
-    - cat coverage.log | grep -Eo "TOTAL\s+[0-9]+\s+[0-9]+\s+[0-9]+\%" | python -c 'import sys; lines=sys.stdin.readline(); x = lines.split(); d = int(x[1]) + int(x[2]); print(f"BIONEMO TEST COVERAGE = {100 * int(x[1]) / d:.8f}%")'
+    - pytest -m "not internal and not needs_fork and not needs_80gb_memory_gpu" -vv --durations=0 --cov=bionemo --cov-report term --cov-report xml:coverage.xml -k "not test_model_training" | tee pytest_report.log
+    # Compute test coverage with higher precision, i.e. up to 2 decimal digits. (In the logs, we'll have 8 decimal digits.)
+    # From "TOTAL ${TOTAL STATEMENTS} ${NON-COVERED STATEMENTS} ${COVERAGE PERCENT}", compute (${TOTAL STATEMENTS} - ${NON-COVERED STATEMENTS}) / ${TOTAL STATEMENTS}.
+    - cat pytest_report.log | grep -Eo "TOTAL\s+[0-9]+\s+[0-9]+\s+[0-9]+%" | python -c 'import sys; lines=sys.stdin.readline(); x = lines.split(); n = int(x[1]) - int(x[2]); print(f"BIONEMO TEST COVERAGE = {100 * n / int(x[1]):.8f}%")'
     - cp -rv ${BIONEMO_HOME}/tests/data/esm2_golden_values/heatmaps ${CI_PROJECT_DIR}/heatmaps
     - cp ${BIONEMO_HOME}/coverage.xml ${CI_PROJECT_DIR}
     - df -Thl
