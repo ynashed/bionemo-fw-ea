@@ -40,20 +40,21 @@ def main(cfg) -> None:
     with open_dict(cfg):
         cfg.model.encoder_cfg = cfg
     # Create the preprocessor for the restored model.
-    preprocessor = GeneformerPreprocess(
-        cfg.model.data.dataset_path,
-        cfg.model.tokenizer.vocab_file,
-        cfg.model.data.dataset,
-        # cfg.model.artifacts.medians_file,
-    )
-
-    match preprocessor.preprocess():
-        case {'tokenizer': tokenizer, 'median_dict': median_dict}:
-            logging.info("*************** Geneformer Preprocessing Finished ************")
-        case _:
-            logging.error("Preprocessing failed.")
 
     if not cfg.do_training:
+        # Get the medians and vocab setup appropriately
+        logging.info("************** Starting Preprocessing ***********")
+        preprocessor = GeneformerPreprocess(
+            cfg.model.data.dataset_path,
+            cfg.model.tokenizer.vocab_file,
+            cfg.model.data.dataset,
+            cfg.model.data.medians_file,
+        )
+        match preprocessor.preprocess():
+            case {'tokenizer': _, 'median_dict': _}:
+                logging.info("*************** Preprocessing Finished ************")
+            case _:
+                logging.error("Preprocessing failed.")
         # Preprocesses the Adamson PERTURB-seq dataset.
         resource_fetcher = AdamsonResources(
             root_directory=cfg.model.data.dataset_path, dest_directory=cfg.model.data.preprocessed_data_path
@@ -75,7 +76,7 @@ def main(cfg) -> None:
         trainer = setup_trainer(cfg, builder=None)
 
         # Create model
-        model = FineTuneGeneformerModel(cfg.model, trainer=trainer, tokenizer=tokenizer, median_dict=median_dict)
+        model = FineTuneGeneformerModel(cfg.model, trainer=trainer)
 
         # Add evaluation metrics
         metrics = {"MSE": mse}

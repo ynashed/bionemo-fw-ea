@@ -36,14 +36,14 @@ class FineTuneGeneformerModel(EncoderFineTuning):
         **kwargs: Arbitrary keyword arguments.
     """
 
-    def __init__(self, cfg, trainer, median_dict, **kwargs):
+    def __init__(self, cfg, trainer, **kwargs):
         # This changed too.
         self.encoder_frozen = cfg.encoder_frozen
         self.use_peft = cfg.get('peft.enabled', False)
         self.task_type = cfg.data.task_type
         super().__init__(cfg, trainer=trainer)
-        self.tokenizer = self.encoder_model.tokenizer
-        self.median_dict = median_dict
+        self.tokenizer = self.encoder_model.model.tokenizer
+        self.median_dict = self.encoder_model.model.median_dict
         # self.median_dict = self.encoder_model.median_dict
 
     def configure_optimizers(self) -> Union[Optimizer, tuple[list[Optimizer], list[_LRScheduler]]]:

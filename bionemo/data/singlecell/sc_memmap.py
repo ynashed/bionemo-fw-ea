@@ -168,7 +168,7 @@ def write_data(
     # - extract the features from the data
     # TODO: this doesnt work if obs_column doesnt have the right things in it.
     if not strict:
-        new_obs_cols = set(data.obs.columns.tolist()) & set(obs_cols)
+        new_obs_cols = list(set(data.obs.columns.tolist()) & set(obs_cols))
         features = data.obs[new_obs_cols]
     else:
         features = data.obs[obs_cols]

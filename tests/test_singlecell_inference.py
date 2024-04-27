@@ -34,21 +34,9 @@ log.setLevel(logging.INFO)
 
 
 CELLS_FOR_TEST = [
-    [
-        'ACOT7',
-        'ESPN',
-        'CACNA1E',
-        'ZNF648',
-        'LINC01344',
-        'YPEL5P1',
-        'RNU6-152P',
-        'EIF1P3',
-        'MIR4794',
-        'RAVER2',
-        'SPATA1',
-    ],
-    ['SCYGR3', 'NBPF3', 'SCYGR6', 'RNA5SP114', 'MIR561', 'GULP1', 'RNU6-298P', 'TEFM', 'PFN1P10'],
-    ['RNU2-38P', 'RNVU1-24', 'SLC25A34', 'SLC25A34-AS1', 'TMEM82', 'FBLIM1', 'SUZ12P1', 'CRLF3'],
+    ['GPR35', 'LRRC45', 'PYHIN1', 'PUS10', 'RAC3', 'IFI16', 'PEX13', 'DCXR', 'REL', 'ANKMY1'],
+    ['SOX5', 'KRT10-AS1', 'PROKR1', 'ARHGAP25', 'FMNL1', 'MITF', 'COPS7B', 'MIR920', 'PMCH', 'IGF1'],
+    ['MIR1282', 'MFAP1', 'ALG10', 'PCK1', 'CAPN8', 'UBE3D', 'SLC24A1', 'KITLG'],
 ]
 
 
@@ -70,6 +58,11 @@ def geneformer_inferer(bionemo_home: Path) -> Generator[GeneformerInference, Non
 @pytest.fixture(scope="module")
 def geneformer_expected_vals_path(bionemo_home: Path) -> Path:
     return get_expected_vals_file(bionemo_home, "geneformer")
+
+
+def test_inferer_error_bad_token(geneformer_inferer: GeneformerInference):
+    with pytest.raises(ValueError, match="Unknown token"):
+        geneformer_inferer.seq_to_hiddens([["BAD_TOKEN"]])
 
 
 def test_geneformer_inference_tokenization(geneformer_inferer: GeneformerInference, cells: List[List[str]]):

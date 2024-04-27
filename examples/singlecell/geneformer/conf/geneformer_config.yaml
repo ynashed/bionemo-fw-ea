@@ -1,8 +1,10 @@
 defaults:
   - geneformer_base_config
+  
+seed_everything: false  # Set to False with real runs in parallel to avoid duplicated seeds across nodes.
 
 trainer:
-  devices: 2
+  devices: 1
   val_check_interval: 100
   log_every_n_steps: 100
   limit_val_batches: 8
@@ -16,10 +18,8 @@ model:
   pre_process: True
   post_process: True
   bert_binary_head: False
-  # artifacts:
-  #   medians_file:  ${oc.env:BIONEMO_HOME}/tokenizers/singlecell/geneformer/vocab/geneformer.medians.json
   tokenizer:
-    vocab_file: ${oc.env:BIONEMO_HOME}/tokenizers/singlecell/geneformer/vocab/geneformer.vocab
+    vocab_file: ${..data.dataset_path}/geneformer.vocab
   data:
     probabilistic_dirichlet_sampling_train: False  # Set to True to enable some shuffling of order when gene counts are close.
     dataset_path: /workspace/bionemo/data/sc-pretraining
@@ -27,6 +27,7 @@ model:
     num_workers: 12
     dataloader_type: single
     dynamic_padding: false
+    medians_file: ${.dataset_path}/medians.json
   precision: bf16-mixed
 
 exp_manager:

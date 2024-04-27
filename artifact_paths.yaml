@@ -119,11 +119,14 @@ models:
             source: "../../dnabert-86M.nemo"
             target: "dna/dnabert/dnabert-86M.nemo"
     geneformer_31M_240430:
-        # A pretrained 31M parameter geneformer.
+        # A pretrained 9.2M parameter geneformer (BERT) on 31M single cells and a 21k tokens.
+        #  this is our tokenizer that used ensg ids from medians (25k) to filter out missing ids from
+        #  our regular set of human readable gene names (40k), bringing the total down to 21k tokens.
+        # See https://wandb.ai/clara-discovery/scFM_v6/runs/1olz7ksb
         ngc: null
-        pbss: "s3://bionemo-ci/models/geneformer-31M-240430.nemo"
+        pbss: "s3://bionemo-ci/models/geneformer-31M-240430-step-7000-wandb-1olz7ksb.nemo"
         symlink:
-            source: "../../geneformer-31M-240430.nemo"
+            source: "../../geneformer-31M-240430-step-7000-wandb-1olz7ksb.nemo"
             target: "singlecell/geneformer/geneformer-31M-240430.nemo"
     geneformer:
         # A QA model for geneformer with randomly initialized weights.

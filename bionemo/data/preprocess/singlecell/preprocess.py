@@ -8,6 +8,7 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
+import json
 import os
 import pickle
 from dataclasses import dataclass
@@ -67,6 +68,7 @@ class SCPreprocessorDataClass:
     preproc_dir: str
     tokenizer_vocab_path: str
     dataset_conf: OmegaConf
+    medians_file: str
 
 
 class GeneformerPreprocess(SCPreprocessorDataClass):
@@ -88,25 +90,18 @@ class GeneformerPreprocess(SCPreprocessorDataClass):
             )
         self.gene_set = gene_set
 
-    def build_tokenizer(self, gene_ens, vocab_output_name):
-        """Builds a tokenizer for a given k
-
-        Args:
-            gene_ens (dict): maps gene symbols to ensemble ids
-            model_output_name (str): Filepath to store the tokenizer parameters
-            vocab_output_name (str): Filepath to store the tokenizer vocab
-            k (int): k-mer size for the tokenizer
-        """
-
-        tokenizer = GeneTokenizer()
-        tokenizer.build_vocab(gene_ens)
+    def build_and_save_tokenizer(self, gene_ens, vocab_output_name):
+        '''Builds the GeneTokenizer using the geneid -> ensemblid dictionary,
+        then serializes and saves the dictionary to disk.
+        '''
+        tokenizer = GeneTokenizer(gene_ens)
         tokenizer.save_vocab(vocab_output_name)
         return tokenizer
 
     def _validate_tokenizer_args(self, vocab_output_name):
         vocab_exists = os.path.exists(vocab_output_name)
         if vocab_exists:
-            logging.warning(f"Tokenizer vocab file: {vocab_output_name} already exists.")
+            logging.warning(f"Tokenizer vocab file: {vocab_output_name} already exists. Overwriting...")
 
     def preprocess(self) -> dict[Literal['tokenizer', 'median_dict'], Any]:
         """Preprocesses for the Geneformer model"""
@@ -114,17 +109,25 @@ class GeneformerPreprocess(SCPreprocessorDataClass):
             dest_directory=self.preproc_dir, root_directory=self.root_directory
         ).prepare()
 
+        # Load artifacts
         with open(gene_name_dict_fn, 'rb') as fd:
             gene_ens = pickle.load(fd)
 
         with open(gene_median_dict_fn, 'rb') as fd:
             median_dict = pickle.load(fd)
 
-        # with open(self.medians_file, 'w') as fp:
-        #     json.dump(median_dict, fp)
+        # Save converted artifacts to JSON to prevent pickle issues.
+        medians_dir = os.path.dirname(self.medians_file)
+        if not os.path.exists(medians_dir):
+            os.makedirs(medians_dir, exist_ok=True)  # ensure the dir exists but be ok with race conditions.
+        with open(self.medians_file, 'w') as fp:
+            json.dump(median_dict, fp)
+
+        # Filter anything in the gene_ens that is not in the median_dict
+        gene_ens = {k: v for k, v in gene_ens.items() if v in median_dict}
 
         if self.tokenizer_vocab_path is not None:
-            tokenizer = self.build_tokenizer(
+            tokenizer = self.build_and_save_tokenizer(
                 gene_ens,
                 self.tokenizer_vocab_path,
             )

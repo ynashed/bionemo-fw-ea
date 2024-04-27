@@ -16,7 +16,7 @@ import numpy as np
 from torch.utils.data import Dataset
 
 from bionemo.data.singlecell.utils import sample_or_truncate_plus_pad
-from tokenizers import Tokenizer
+from bionemo.tokenizer.gene_tokenizer import GeneTokenizer
 
 
 class SingleCellDataset(Dataset):
@@ -67,12 +67,16 @@ class SingleCellDataset(Dataset):
         tokenizer: Any,
         median_dict: Optional[dict] = None,
         max_len: int = 1024,
-        probabilistic_dirichlet_sampling: bool = False,
-        dirichlet_alpha: float = 0.5,
+        mask_prob: float = 0.15,
+        mask_token_prob: float = 0.8,
+        random_token_prob: float = 0.1,
     ):
         super().__init__()
         self.data_path = data_path
         self.max_len = max_len
+        self.random_token_prob = random_token_prob
+        self.mask_token_prob = mask_token_prob
+        self.mask_prob = mask_prob
         path = Path(data_path)
 
         # - metadata
@@ -80,10 +84,6 @@ class SingleCellDataset(Dataset):
 
         # - median dict
         self.gene_medians = median_dict
-
-        # - dirichlet sampling
-        self.probabilistic_dirichlet_sampling = probabilistic_dirichlet_sampling
-        self.dirichlet_alpha = dirichlet_alpha
 
         # - train/val idxs sampled contiguously
         total_el = sum([v["num_el"] for _, v in self.metadata.items()])
@@ -138,8 +138,9 @@ class SingleCellDataset(Dataset):
             self.tokenizer,
             gene_median=self.gene_medians,
             max_len=self.max_len,
-            probabilistic_dirichlet_sampling=self.probabilistic_dirichlet_sampling,
-            dirichlet_alpha=self.dirichlet_alpha,
+            mask_token_prob=self.mask_token_prob,
+            mask_prob=self.mask_prob,
+            random_token_prob=self.random_token_prob,
         )
 
 
@@ -156,15 +157,14 @@ def process_item(
     gene_data: np.array,
     gene_idxs: np.array,
     metadata: dict[str, float],
-    tokenizer: Tokenizer,
-    gene_median: dict = None,
+    tokenizer: GeneTokenizer,
+    gene_median: dict,
     max_len: int = 1024,
     mask_prob: float = 0.15,
+    mask_token_prob: float = 0.8,
+    random_token_prob: float = 0.1,
     target_sum: int = 10000,
     normalize: bool = True,
-    probabilistic_dirichlet_sampling: bool = False,
-    dirichlet_alpha: float = 0.5,
-    same_length: bool = True,
 ) -> Item:
     """Process a single item in the dataset.
 
@@ -185,30 +185,31 @@ def process_item(
         probabilistic_dirichlet_sampling (bool): Flag to enable probabilistic dirichlet sampling. Defaults to False.
         dirichlet_alpha (float): Alpha value for dirichlet sampling if set by `probabilistic_dirichlet_sampling`. Defaults to 0.5.
         same_length (bool): when true, sample the same length of genes as you originally had before the dirichlet sampler.
+        recompute_globals (bool): when true, global arrays are always recomputed. this is only useful for testing.
     Returns:
         dict: Processed item dictionary.
 
     NOTE: this method is very important and very useful. To generalize thiswwe should add an abstraction for
         Datasets that have some kind of functor transformation.
     """
+
     if max_len < 1:
         raise ValueError(f"max_len must be greater than 1, {max_len=}")
 
+    if random_token_prob + mask_token_prob > 1.0:
+        raise ValueError(
+            "Sum of random_token_prob and mask_token_prob must be less than or equal to 1.0, identity_token_prob is any remainder less than 1.0."
+        )
+
+    identity_token_prob = 1.0 - (random_token_prob + mask_token_prob)
+    assert identity_token_prob >= 0.0
+
     if gene_median is None:
-        gene_median = {}
+        raise ValueError("gene_median must be provided for this tokenizer")
 
     max_len = max_len - 1  # - minus 1 for [CLS] token
-    # - convert from data vocab to global vocab
-    n_genes_nonzero: int = len(gene_idxs)
-    if probabilistic_dirichlet_sampling:
-        # In this case expand gene data (names + expression) with zeros
-        gene_names = metadata["feature_names"]  # all of them, even 0
-        gene_data_tmp = np.zeros(len(gene_names), dtype=float)
-        gene_data_tmp[gene_idxs] = gene_data
-        gene_data = gene_data_tmp
-    else:
-        # in this case subset gene names to ones with data
-        gene_names = [metadata["feature_names"][idx] for idx in gene_idxs]
+
+    gene_names = [metadata["feature_names"][idx] for idx in gene_idxs]
     genes, tokens, medians = [], [], []
     for tok, gene in zip(gene_names, gene_data):
         if tok in tokenizer.vocab:
@@ -223,22 +224,14 @@ def process_item(
     token_ids = np.asarray(tokens)
     medians = np.asarray(medians)
 
-    if normalize and gene_median is not None:
-        # re-order according to expression median normalized rank. ascending order.
+    if normalize:
+        # re-order according to expression median normalized rank. descending order.
+
         genes = genes / genes.sum() * target_sum
         genes = genes / medians.astype(float)
-        if probabilistic_dirichlet_sampling:
-            # add small pseudo-count for zero genes. Non zero genes are typically ~0.99 at a minimum, max around 150.
-            # this changes scale which is ok.
-            # multiply target_sum back in for fun, incase someone wants to look at this and expects sum==target_sum
-            genes = np.random.dirichlet(genes + dirichlet_alpha) * target_sum
-        idxs = np.argsort(genes)
+        idxs = np.argsort(-genes)  # sort in descending order so that the 0th position is the highest value.
         genes = genes[idxs]
         token_ids = token_ids[idxs]
-        if same_length:
-            # This is so that the model will sometimes see [PAD] tokens and not get confused by them in validation.
-            genes = genes[:n_genes_nonzero]
-            token_ids = token_ids[:n_genes_nonzero]
 
     # - select max_len subset, set sample to false so it doesnt permute the already rank ordered expression values.
     token_ids = sample_or_truncate_plus_pad(
@@ -257,24 +250,35 @@ def process_item(
 
     # - add [CLS] token, note that token_ids is a 1d array so flattening isn't a problem here.
     token_ids = np.insert(token_ids, 0, tokenizer.token_to_id(tokenizer.cls_token))
+    attention_mask = token_ids != tokenizer.token_to_id(tokenizer.pad_token)
 
     labels = np.ones(len(token_ids)) * -1
-    # We abuse the scenario where mask == None
-    labels[mask] = token_ids[mask]
 
-    pad_mask = token_ids == tokenizer.token_to_id(tokenizer.pad_token)
     if mask is None:
         # If prob is set to zero, we get None for our mask, which could have unintended side effects.
+        # We abuse the scenario where mask == None
+        labels[mask] = token_ids[mask]
         mask = np.zeros(shape=token_ids.shape, dtype=bool)
-    token_ids[mask] = tokenizer.token_to_id(tokenizer.mask_token)
-    if mask is None:
-        breakpoint()
+    else:
+        mask[~attention_mask] = False  # make sure that we aren't doing MLM on [PAD] tokens
+        labels[mask] = token_ids[mask]
+
+    mask_tokens_positions = mask & np.random.binomial(1, mask_token_prob, mask.shape).astype(bool)
+    random_tokens_positions = (
+        mask & np.random.binomial(1, random_token_prob, mask.shape).astype(bool) & (~mask_tokens_positions)
+    )
+    # identity_tokens = mask & (~mask_tokens_positions) & (~random_tokens_positions), not needed because
+    token_ids[mask_tokens_positions] = tokenizer.token_to_id(tokenizer.mask_token)
+    # There are 5 special tokens in the tokenizer, so we start from 5. TODO make this a parameter of the tokenizer.
+    token_ids[random_tokens_positions] = np.random.randint(5, len(tokenizer.vocab), random_tokens_positions.sum())
 
     # NeMo megatron assumes this return structure.
     item = {
         "text": token_ids.astype(np.int64),
         "types": np.zeros_like(token_ids).astype(np.int64),
-        "padding_mask": pad_mask.astype(np.int64),
+        "padding_mask": attention_mask.astype(
+            np.int64
+        ),  # NeMo BERT wants the attention mask to be named "padding_mask" in this version.
         "labels": labels.astype(np.int64),
         "loss_mask": mask,
         "is_random": np.zeros_like(token_ids).astype(np.int64),

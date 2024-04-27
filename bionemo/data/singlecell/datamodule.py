@@ -8,6 +8,7 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
+import os
 from functools import lru_cache
 from typing import List, Literal
 
@@ -57,8 +58,6 @@ class SingleCellDataModule(BioNeMoDataModule):
         train_ratio: float = 0.98,
         val_ratio: float = 0.01,
         max_len: int = 1024,
-        probabilistic_dirichlet_sampling_train: bool = False,
-        dirichlet_alpha: float = 0.5,
     ):
         super().__init__(cfg, trainer)
         self.cfg = cfg.data
@@ -69,30 +68,18 @@ class SingleCellDataModule(BioNeMoDataModule):
         assert train_ratio + val_ratio < 1
         self.train_ratio = train_ratio
         self.val_ratio = val_ratio
-        self.probabilistic_dirichlet_sampling_train = probabilistic_dirichlet_sampling_train
-        self.dirichlet_alpha = dirichlet_alpha
+        self.mask_prob = cfg.data.get("mask_prob", 0.15)
+        self.mask_token_prob = cfg.data.get("mask_token_prob", 0.8)
+        self.random_token_prob = cfg.data.get("random_token_prob", 0.1)
+        self.index_mapping_dir = cfg.data.get("index_mapping_dir", os.path.dirname(self.data_path))
 
     @lru_cache
     def onetime_init_backed_dataset(self):
         '''Unfortunately the way all our stuff fits together we need a delayed instantiation of the Dataset object.'''
         tmp = SingleCellDataset(self.cfg.dataset_path, self.tokenizer, self.median_dict, self.max_len)
-        # Shuffles the dataset, no upsampling occurs here
-        if self.probabilistic_dirichlet_sampling_train:
-            # Need a train only copy that is shuffled in this way.
-            tmp_trn = SingleCellDataset(
-                self.cfg.dataset_path,
-                self.tokenizer,
-                self.median_dict,
-                self.max_len,
-                probabilistic_dirichlet_sampling=True,
-                dirichlet_alpha=self.dirichlet_alpha,
-            )
-            self.trn_only_dataset = ResamplingMappedDataset(
-                tmp_trn, num_samples=None, data_prefix='backed', cfg=self.cfg
-            )
-        else:
-            self.trn_only_dataset = None
-        self.dataset = ResamplingMappedDataset(tmp, num_samples=None, data_prefix='backed', cfg=self.cfg)
+        self.dataset = ResamplingMappedDataset(
+            tmp, num_samples=None, data_prefix='backed', cfg=self.cfg, index_mapping_dir=self.index_mapping_dir
+        )
         return self.dataset
 
     @lru_cache
@@ -116,6 +103,7 @@ class SingleCellDataModule(BioNeMoDataModule):
             num_samples=self.train_num_samples,
             cfg=self.cfg,
             name='train',
+            index_mapping_dir=self.index_mapping_dir,
         )
 
     def train_dataset(self):
@@ -126,10 +114,7 @@ class SingleCellDataModule(BioNeMoDataModule):
 
         """
         self.onetime_init_backed_dataset()
-        if self.trn_only_dataset is not None:
-            dataset = self.trn_only_dataset
-        else:
-            dataset = self.dataset
+        dataset = self.dataset
         return SliceDataset(dataset, start=0, end=int(len(self.dataset) * self.train_ratio))
 
     def val_dataset(self):
@@ -169,6 +154,7 @@ class AdamsonDataModule(BioNeMoDataModule):
         max_len: int = 1024,
     ):
         super().__init__(cfg, trainer)
+        self.data_path = self.cfg.dataset_path
         self.preprocessed_anndata_fn = cfg.data.preprocessed_anndata_fn
         self.target_gep_fn = cfg.data.target_gep_fn
         self.tokenizer = tokenizer
@@ -178,6 +164,7 @@ class AdamsonDataModule(BioNeMoDataModule):
         self.max_len = max_len
         self.seed = cfg.data.seed + 1  # Give it a slightly different number than before..
         self.split_type = cfg.data.split_type
+        self.index_mapping_dir = cfg.data.get("index_mapping_dir", os.path.dirname(self.data_path))
 
     def onetime_init_num_samples(self):
         self.init_num_samples()
@@ -200,6 +187,7 @@ class AdamsonDataModule(BioNeMoDataModule):
             num_samples=self.train_num_samples,
             cfg=self.cfg,
             name='train',
+            index_mapping_dir=self.index_mapping_dir,
         )
 
     def train_dataset(self):

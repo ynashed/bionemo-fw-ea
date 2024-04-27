@@ -8,7 +8,7 @@ target: bionemo.model.singlecell.geneformer.model.GeneformerModel # target class
 infer_target: bionemo.model.singlecell.geneformer.infer.GeneformerInference # target inference class for geneformer model
 
 trainer:
-  devices: 2 # number of GPUs or CPUs
+  devices: 1 # number of GPUs or CPUs
   num_nodes: 1 
   max_epochs: 1 
   val_check_interval: 50
@@ -32,10 +32,13 @@ model:
   tensor_model_parallel_size: 1  # model parallelism
   pipeline_model_parallel_size: 1  # model parallelism
   loss_func: MSELoss
+  tokenizer:
+    vocab_file: ${..data.dataset_path}/geneformer.vocab
   data:
     task_type: "regression"
     target_size: 5060
     dataset_path: ${model.data.preprocessed_data_path}/
+    medians_file: ${.dataset_path}/medians.json
     split_type: single # Specific parameter for the Adamson et al Dataset used in this perturb seq example.
             # single: test set contains single perturbations not seen in train set, train contains both single and double not seen in test set.
             # single_only: test set contains single pertubations not seen in train set, train contains single pertubations only.

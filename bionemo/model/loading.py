@@ -19,7 +19,6 @@ from torch.utils.data import DataLoader
 
 from bionemo.data.mapped_dataset import FilteredMappedDataset
 from bionemo.data.memmap_fasta_fields_dataset import FASTAFieldsMemmapDataset
-from bionemo.data.preprocess.singlecell.preprocess import GeneformerPreprocess
 from bionemo.data.singlecell.dataset import SingleCellDataset
 from bionemo.data.utils import expand_dataset_paths
 from bionemo.model.core.infer import BaseEncoderInference, M
@@ -73,23 +72,13 @@ def setup_inference(cfg: DictConfig, *, interactive: bool = False) -> Tuple[M, p
         )
         remove_too_long = True
     elif cfg.model.data.data_impl == "geneformer":
-        # Get the medians from the single cell data we want to do inference on.
-        #  for now recompute these medians for a user's query incase of batch effects.
-        preprocessor = GeneformerPreprocess(
-            cfg.model.data.dataset_path,
-            None,  # Do not rebuild the vocab, get it from the saved model
-            cfg.model.data.dataset,
-        )
-        match preprocessor.preprocess():
-            case {'tokenizer': _, 'median_dict': median_dict}:  # just use the model's packaged tokenizer
-                logging.info("*************** Preprocessing Finished ************")
-            case _:
-                logging.error("Preprocessing failed.")
+        # Get the medians and tokenizer from the inference model for our dataset.
         ds = SingleCellDataset(
             cfg.model.data.dataset_path,
-            infer_model.tokenizer,
-            median_dict,
+            infer_model.model.tokenizer,
+            infer_model.model.median_dict,
             max_len=cfg.model.seq_length,
+            mask_prob=0,  # Assume we do not want to mask any genes
         )
         remove_too_long = False  # there is no "too long", the dataset will take the top N genes from each cell.
     else:

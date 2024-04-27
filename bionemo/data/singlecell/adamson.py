@@ -120,6 +120,9 @@ def process_item(
     max_len = max_len - 1  # - minus 1 for [CLS] token
     genes, tokens, medians = [], [], []
 
+    if gene_median is None:
+        raise ValueError("Gene median dictionary is required for normalization")
+
     # Are gene_idxs and gene_values the same length?
     for i, (tok, gene) in enumerate(zip(gene_idxs, gene_values)):
         if tok in tokenizer.vocab:
@@ -138,7 +141,7 @@ def process_item(
     if normalize:
         genes = genes / genes.sum() * target_sum
         genes = genes / medians.astype(float)
-        idxs = np.argsort(genes)
+        idxs = np.argsort(-genes)  # sort in descending order so that the 0th position is the highest value.
         genes = genes[idxs]
         token_ids = token_ids[idxs]
 
@@ -156,11 +159,13 @@ def process_item(
             # add pertubed genes to our mask
             mask[token_ids == id] = True
 
-    pad_mask = token_ids == tokenizer.token_to_id(tokenizer.pad_token)
+    attention_mask = token_ids != tokenizer.token_to_id(tokenizer.pad_token)
     item = {
         "input_ids": token_ids.astype(np.int64),
         "types": mask.astype(np.int64),
-        "padding_mask": pad_mask.astype(np.int64),
+        "padding_mask": attention_mask.astype(
+            np.int64
+        ),  # NeMo BERT wants the attention mask to be named "padding_mask".
         "target": target.astype(np.float32),
     }
 

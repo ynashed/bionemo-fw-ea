@@ -65,11 +65,20 @@ def test_dataset_ccum():
 def test_dataset_process_item():
     tokenizer = MagicMock()
 
-    tokenizer.pad_token = 4
-    tokenizer.cls_token = 5
-    # Not using ensembl ids, this is a very specific usecase.
+    tokenizer.pad_token = 'pad'
+    tokenizer.cls_token = 'cls'
+    tokenizer.mask_token = 'mask'
+    tokenizer.ukw_token = 'ukn'
     tokenizer.gene_tok_to_ens = lambda x: x
-    tokenizer.vocab = {'GENE0': 1, 'GENE1': 2, 'GENE2': 3}
+
+    # Need this to mock the underlying dictionary behavior with arbitrary keys
+    class gene_to_ens:
+        @staticmethod
+        def get(x, other):
+            return x
+
+    tokenizer.gene_to_ens = gene_to_ens
+    tokenizer.vocab = {'GENE0': 1, 'GENE1': 2, 'GENE2': 3, 'ukn': 7, 'mask': 7, 'cls': 5, 'pad': 4}
 
     def tok_to_id(tok):
         if tok == tokenizer.pad_token:
@@ -78,6 +87,8 @@ def test_dataset_process_item():
             return 5
         if tok == tokenizer.mask_token:
             return 6
+        if tok == tokenizer.ukw_token:
+            return 7
         if tok == 'GENE0':
             return 1
         if tok == 'GENE1':
@@ -96,17 +107,18 @@ def test_dataset_process_item():
     # Process the input item
     from bionemo.data.singlecell.dataset import process_item
 
-    # no padding, no masking, no medianrank norm. checks that CLS and correct tokenization is applied
     processed_item = process_item(
         input_item['expression'],
         input_item['indices'],
         input_item['metadata'],
         tokenizer,
-        gene_median=None,
-        max_len=4,
+        gene_median={'GENE0': 1, 'GENE1': 1, 'GENE2': 1},
+        max_len=5,
         mask_prob=0,
     )
-    assert all(processed_item['text'] == [5, 1, 2, 3])  # CLS, 1, 2, 3
+    assert all(processed_item['text'] == [5, 3, 2, 1, tok_to_id("pad")])  # CLS, 1, 2, 3, PAD
+    # The following is used as 'attention_mask' in NeMo, so it's probably the opposite of what you think it should be.
+    assert all(processed_item['padding_mask'] == [1, 1, 1, 1, 0])  # NO, NO, NO, NO, YES
 
     ###### Check median rank norm, sorts in ascending order. ######
 
@@ -121,10 +133,10 @@ def test_dataset_process_item():
         mask_prob=0,
         target_sum=1,
     )
-    assert all(processed_item['text'] == [5, 3, 2, 1])  # CLS, 1, 2, 3
+    assert all(processed_item['text'] == [5, 1, 2, 3])
 
     # Checks median norm, should change the order due to medians.
-    # 1/6/.5=1/3, 2/6/1=2/6=1/3, 3/6/2=3/12=1/4 => 3,1,2
+    # 1/6/.5=1/3, 2/6/1=2/6=1/3, 3/6/2=3/12=1/4
     processed_item = process_item(
         input_item['expression'],
         input_item['indices'],
@@ -135,7 +147,7 @@ def test_dataset_process_item():
         mask_prob=0,
         target_sum=1,
     )
-    assert all(processed_item['text'] == [5, 3, 1, 2])  # CLS, 1, 2, 3
+    assert all(processed_item['text'] == [5, 1, 2, 3])
 
     # checks padding is added for a short sequence
     processed_item = process_item(
@@ -143,12 +155,12 @@ def test_dataset_process_item():
         input_item['indices'],
         input_item['metadata'],
         tokenizer,
-        gene_median=None,
+        gene_median={'GENE0': 1, 'GENE1': 1, 'GENE2': 1},
         max_len=5,
         mask_prob=0,
         target_sum=1,
     )
-    assert all(processed_item['text'] == [5, 1, 2, 3, 4])  # CLS, 1, 2, 3, PAD
+    assert all(processed_item['text'] == [5, 3, 2, 1, 4])
 
     #    Masking - test that no special tokens are masked, all when 100, none when 0
     processed_item = process_item(
@@ -156,9 +168,11 @@ def test_dataset_process_item():
         input_item['indices'],
         input_item['metadata'],
         tokenizer,
-        gene_median=None,
+        gene_median={'GENE0': 1, 'GENE1': 1, 'GENE2': 1},
+        random_token_prob=0,
         max_len=5,
         mask_prob=1.0,
+        mask_token_prob=1.0,
         target_sum=1,
     )
     # NOTE: we need to set masked tokens to MASK so that they are decoded.
@@ -166,7 +180,7 @@ def test_dataset_process_item():
     # NOTE: MASKed tokens are the only ones used by loss
     assert all(processed_item['loss_mask'] == [0, 1, 1, 1, 0])  # NO, MASK, MASK, MASK, NO
     # the ARBITRARY labels should be ignored due to loss mask.
-    assert all(processed_item['labels'] == [-1, 1, 2, 3, -1])  # ARBITRARY, 1, 2, 3, ARBITRARY
+    assert all(processed_item['labels'] == [-1, 3, 2, 1, -1])  # ARBITRARY, 3, 2, 1, ARBITRARY
     assert all(processed_item['is_random'] == 0)  # For now we don't support random masking.
 
     # checks sequence is truncated for a long sequence
@@ -175,7 +189,7 @@ def test_dataset_process_item():
         input_item['indices'],
         input_item['metadata'],
         tokenizer,
-        gene_median=None,
+        gene_median={'GENE0': 1, 'GENE1': 1, 'GENE2': 1},
         max_len=3,
         mask_prob=0,
         target_sum=1,

@@ -192,7 +192,7 @@ TEST_PARAMS: List[TrainingTestParams] = [
         "config_name": 'geneformer_pretrain_test',
         "script_path": "examples/singlecell/geneformer/pretrain.py",
         "model_cls": GeneformerModel,
-        "model_size": 14115968,
+        "model_size": 9247360,
     },
     # TODO get the following working with a small test case.
     # {
@@ -278,6 +278,7 @@ def test_model_size(config_name: str, model_class: LightningModule, model_parame
                 cfg.model.data.dataset_path,
                 cfg.model.tokenizer.vocab_file,
                 cfg.model.data.dataset,
+                cfg.model.data.medians_file,
             )
             match preprocessor.preprocess():
                 case {'tokenizer': _, 'median_dict': median_dict}:  # just use the model's packaged tokenizer

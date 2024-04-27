@@ -1,6 +1,6 @@
 name: geneformer_base_config
 restore_from_path: null
-
+seed_everything: true  # Set to False with real runs in parallel to avoid duplicated seeds across nodes.
 do_training: true
 
 trainer:
@@ -83,12 +83,18 @@ model:
     data_prefix: ''
     shuffle: true
     dataset: "/"
+    medians_file: ${oc.env:BIONEMO_HOME}/tokenizers/singlecell/geneformer/vocab/medians.json
     index_mapping_dir: null
     skip_warmup: True
-    index_mapping_type: 'online'
-    block_size: 1000000 # OnlineSampleMapping parameter
-    cache_maxsize: 1000000 # OnlineSampleMapping parameter
-    truncate_to_block_boundary: false
+    # NOTE: we encountered bugs with 'online' mapping when called how we call it in geneformer.
+    #   Please confirm that you do not see a block structure after the first 100k 
+    #   steps or so at the current batch size in the losses if you switch back to 
+    #   an 'online' strategy.
+    index_mapping_type: 'memmap'
+    # IF we do switch back to an "online" mapping strategy, the following parameters were what we used:
+    # block_size: 1000000 # OnlineSampleMapping parameter
+    # cache_maxsize: 1000000 # OnlineSampleMapping parameter
+    # truncate_to_block_boundary: false
     train_ratio: .98
     val_ratio: .01
     num_workers: 10
@@ -106,6 +112,8 @@ model:
     - 0.98
     sched:
       name: CosineAnnealing
-      warmup_steps: 500
-      constant_steps: 50000
+      # Make parameters a function of trainer.max_steps by default.
+      warmup_steps: ${multiply:${trainer.max_steps}, 0.01}
+      constant_steps: ${multiply:${trainer.max_steps}, 0.05}
+      max_steps: ${trainer.max_steps}
       min_lr: 2e-5

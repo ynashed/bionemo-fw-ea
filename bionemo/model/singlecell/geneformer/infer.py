@@ -59,14 +59,23 @@ class GeneformerInference(BaseEncoderInference):
 
     def _tokenize(self, sequences: List[List[str]]) -> List[torch.Tensor]:
         # parent pulls the tokenizer from the loaded model.
-        token_ids = [
-            torch.tensor(
-                [self.tokenizer.class_id] + [self.tokenizer.token_to_id(gene_symbol) for gene_symbol in gene_symbols],
-                device=self.device,
-                dtype=torch.long,
+        try:
+            token_ids = [
+                torch.tensor(
+                    [self.tokenizer.class_id]
+                    + [self.tokenizer.token_to_id(gene_symbol) for gene_symbol in gene_symbols],
+                    device=self.device,
+                    dtype=torch.long,
+                )
+                for gene_symbols in sequences
+            ]
+        except TypeError as e:
+            invalid_tokens = {gene_symbol for gene_symbols in sequences for gene_symbol in gene_symbols} - set(
+                self.tokenizer.vocab.keys()
             )
-            for gene_symbols in sequences
-        ]
+            raise ValueError(
+                f"Unknown token in gene symbols. Please filter genes for those present in self.tokenizer:\n{invalid_tokens}\nLeads to error:\n{e}"
+            )
         return token_ids
 
     def tokens_to_hiddens(self, input_ids, attention_mask, token_type_ids=None, **kwargs) -> torch.Tensor:
@@ -136,7 +145,17 @@ class GeneformerInference(BaseEncoderInference):
         return hiddens, enc_mask
 
     def hiddens_to_embedding(self, hidden_states: Tensor, enc_mask: Tensor) -> Tensor:
-        mu_embedding = hidden_states.sum(dim=1) / enc_mask.sum(dim=1, keepdim=True)
+        """Take the average of non-masked positions discarding the [CLS] token as the default embedding. Since
+            pretraining doesn't do anything with the [CLS] token we exclude it from the mean.
+
+        Args:
+            hidden_states (Tensor): hidden states from the model
+            enc_mask (Tensor): mask of pad tokens
+
+        Returns:
+            Tensor: average across positions of non-pad tokens (excluding [CLS] token)
+        """
+        mu_embedding = hidden_states[:, 1:, :].sum(dim=1) / enc_mask[:, 1:].sum(dim=1, keepdim=True)
         return mu_embedding
 
     def load_model(
@@ -170,9 +189,11 @@ class GeneformerInference(BaseEncoderInference):
         else:
             token_type_ids = None
         with torch.autocast(enabled=self.needs_autocast(), device_type=self.device.type):
+            # WARNING: in the current version of nemo the model wants the attention_mask to be named 'padding_mask'.
+            #  This may be surprising to some users, and we should pay attention to whether this is refactored in future releases.
             hiddens = self.tokens_to_hiddens(batch["text"], batch["padding_mask"], token_type_ids=token_type_ids)
         embeddings = self.hiddens_to_embedding(hiddens, batch["padding_mask"])
-        return {
-            "hiddens": hiddens,
-            "embeddings": embeddings,
-        }
+        output = batch
+        output["hiddens"] = hiddens
+        output["embeddings"] = embeddings
+        return output

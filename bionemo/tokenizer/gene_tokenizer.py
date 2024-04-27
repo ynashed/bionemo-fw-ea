@@ -7,8 +7,9 @@
 # disclosure or distribution of this material and related documentation
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
+import json
 import os
-from typing import Dict, List, Optional
+from typing import Dict, List, Union
 
 from .label2id_tokenizer import Label2IDTokenizer
 
@@ -28,28 +29,36 @@ class GeneTokenizer(Label2IDTokenizer):
         other_tokens (Optional[List[str]]): A list of additional special tokens. Defaults to None.
     """
 
-    def __init__(
-        self,
-        cls_token: str = "[CLS]",
-        mask_token: str = "[MASK]",
-        pad_token: str = "[PAD]",
-        sep_token: str = "[SEP]",
-        ukw_token: str = "[UKW]",
-        other_tokens: Optional[List[str]] = None,
-    ):
-        self.vocab = {}
-        self._update_index()
+    def __init__(self, gene_to_ens: Dict[str, str]):
+        # Sets up vocab/decode_vocab dictionaries, parent class is sateful.
+        super().__init__()
 
-        self.cls_token = cls_token
-        self.mask_token = mask_token
-        self.pad_token = pad_token
-        self.sep_token = sep_token
-        self.ukw_token = ukw_token
+        # The only special things we add are these
+        self.gene_to_ens = gene_to_ens
+        self.ens_to_gene = dict(zip(self.gene_to_ens.values(), self.gene_to_ens.keys()))
 
-        self.add_special_tokens([cls_token, mask_token, pad_token, sep_token, ukw_token])
+        # Removed these from the constructor because theyre never changed
+        self.cls_token: str = "[CLS]"
+        self.mask_token: str = "[MASK]"
+        self.pad_token: str = "[PAD]"
+        self.sep_token: str = "[SEP]"
+        self.ukw_token: str = "[UKW]"
 
-        if other_tokens:
-            self.add_special_tokens(other_tokens)
+        # Adds to vocab and decode_vocab
+        self.build_vocab([self.cls_token, self.mask_token, self.pad_token, self.sep_token, self.ukw_token])
+        self.build_vocab(gene_to_ens.keys())
+
+    def build_vocab(self, strings: Union[List[str], str]):
+        '''We override the parent because complete strings are tokens. Otherwise has the same behavior.'''
+        if isinstance(strings, str):
+            strings = [strings]
+
+        for token in strings:
+            if token not in self.vocab:
+                self.vocab[token] = len(self.vocab)
+                self.decode_vocab[self.vocab[token]] = token
+
+        return self
 
     def token_to_id(self, token: str) -> int:
         """
@@ -80,27 +89,23 @@ class GeneTokenizer(Label2IDTokenizer):
         if not os.path.exists(vocab_dir):
             os.makedirs(vocab_dir, exist_ok=True)  # ensure the dir exists but be ok with race conditions.
 
-        with open(vocab_file, 'w') as f:
-            for i in range(len(self.vocab)):
-                f.write(self.decode_vocab[i] + '\n')
+        to_serialize = {}
+        to_serialize['gene_to_ens'] = self.gene_to_ens
 
-    @staticmethod
-    def from_vocab_file(vocab_file):
+        with open(vocab_file, 'w') as f:
+            json.dump(to_serialize, f)
+
+    @classmethod
+    def from_vocab_file(cls, vocab_file):
+        '''This method adds a layer on the constructor in the case we are working from a filename instead of a dictionary'''
         if not os.path.exists(vocab_file):
             raise FileNotFoundError(f"Vocab file {vocab_file} not found, run preprocessing to create it.")
 
         with open(vocab_file) as f:
-            ids_to_text = {id: line.strip() for id, line in enumerate(f.readlines())}
+            to_deserialize = json.load(f)
+            gene_to_ens = to_deserialize['gene_to_ens']
 
-        tokenizer = GeneTokenizer(
-            cls_token=ids_to_text[0],
-            mask_token=ids_to_text[1],
-            pad_token=ids_to_text[2],
-            sep_token=ids_to_text[3],
-            ukw_token=ids_to_text[4],
-        )
-        vocab = {ids_to_text[id]: "NotAGeneID" for id in range(5, len(ids_to_text))}
-        tokenizer.build_vocab(vocab)
+        tokenizer = GeneTokenizer(gene_to_ens)  # Adds special tokens and nothing more
         return tokenizer
 
     def gene_tok_to_ens(self, gene: str) -> str:
@@ -166,35 +171,3 @@ class GeneTokenizer(Label2IDTokenizer):
             else:
                 raise ValueError(f"{ens_id} not found")
         return genes
-
-    def build_vocab(self, gene_ens: Dict[str, str]):
-        """Builds the vocabulary of the tokenizer from gene to ens dict map
-
-        Args:
-            gene_ens: (Dict): genes and ensemble id map to
-                build the vocabulary with. Only the keys are used.
-        """
-        self.gene_to_ens = gene_ens
-        self.ens_to_gene = dict(zip(self.gene_to_ens.values(), self.gene_to_ens.keys()))
-
-        for gene in gene_ens.keys():
-            if gene not in self.vocab:
-                self.vocab[gene] = len(self.vocab)
-                self.decode_vocab[self.vocab[gene]] = gene
-
-        return self
-
-    def add_special_tokens(self, tokens: List[str]) -> None:
-        """Add a series of tokens if not already present in the vocabulary
-
-        Args:
-            tokens (List[str]):
-                A list of string values to be added to the vocabulary
-
-        Returns:
-            None
-        """
-        for token in tokens:
-            if token is not None and token not in self.vocab:
-                self.vocab[token] = len(self.vocab)
-                self.decode_vocab[self.vocab[token]] = token

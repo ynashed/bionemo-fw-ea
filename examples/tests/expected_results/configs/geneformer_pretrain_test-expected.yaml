@@ -1,5 +1,6 @@
 name: geneformer_base_config
 restore_from_path: null
+seed_everything: true
 do_training: true
 trainer:
   devices: 1
@@ -78,12 +79,10 @@ model:
     data_prefix: ''
     shuffle: true
     dataset: /
+    medians_file: ${oc.env:BIONEMO_HOME}/tokenizers/singlecell/geneformer/vocab/medians.json
     index_mapping_dir: null
     skip_warmup: true
-    index_mapping_type: online
-    block_size: 1000000
-    cache_maxsize: 1000000
-    truncate_to_block_boundary: false
+    index_mapping_type: memmap
     train_ratio: 0.98
     val_ratio: 0.01
     num_workers: 12
@@ -101,7 +100,8 @@ model:
     - 0.98
     sched:
       name: CosineAnnealing
-      warmup_steps: 500
-      constant_steps: 50000
+      warmup_steps: ${multiply:${trainer.max_steps}, 0.01}
+      constant_steps: ${multiply:${trainer.max_steps}, 0.05}
+      max_steps: ${trainer.max_steps}
       min_lr: 2.0e-05
   precision: bf16-mixed
