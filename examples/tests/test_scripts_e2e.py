@@ -15,6 +15,7 @@ from glob import glob
 
 import pytest
 import torch
+from lightning.fabric.plugins.environments.lightning import find_free_network_port
 
 from bionemo.utils.tests import teardown_apex_megatron_cuda
 
@@ -195,10 +196,14 @@ def get_train_args_overrides(script_or_cfg_path, train_args):
 def test_train_scripts(script_path, train_args, data_args, tmp_path):
     data_str = get_data_overrides(script_path)
     train_args = get_train_args_overrides(script_path, train_args)
-    cmd = f'python {script_path} ++exp_manager.exp_dir={tmp_path} {data_str} ' + ' '.join(
-        f'++{k}={v}' for k, v in train_args.items()
+    # Lookup a free socket to fix errors with DDP on a single node, e.g. this pytest.
+    # TODO(@cye): Why did this solution regress in PyTorch Lightning?
+    open_port = find_free_network_port()
+    cmd = (
+        f'export MASTER_PORT={open_port} && python {script_path} ++exp_manager.exp_dir={tmp_path} {data_str} '
+        + ' '.join(f'++{k}={v}' for k, v in train_args.items())
     )
-    # TODO(dorotat) Trye to simplify  when data-related utils for ESM2 are refactored
+    # TODO(dorotat) Try to simplify when data-related utils for ESM2 are refactored
     if "esm2" not in script_path and "dnabert" not in script_path:
         cmd += ' ' + ' '.join(f'++{k}={v}' for k, v in data_args.items())
     print(cmd)
@@ -245,8 +250,11 @@ def test_infer_script(config_path, tmp_path):
     infer_args = get_infer_args_overrides(config_path, tmp_path)
     if not os.path.exists(script_path):
         script_path = 'bionemo/model/infer.py'
+    # Lookup a free socket to fix errors with DDP on a single node, e.g. this pytest.
+    # TODO(@cye): Why did this solution regress in PyTorch Lightning?
+    open_port = find_free_network_port()
     cmd: str = (
-        f'python {script_path} --config-dir {config_dir} --config-name {config_name} ++exp_manager.exp_dir={tmp_path} '
+        f'export MASTER_PORT={open_port} && python {script_path} --config-dir {config_dir} --config-name {config_name} ++exp_manager.exp_dir={tmp_path} '
         + ' '.join(f'++{k}={v}' for k, v in infer_args.items())
     )
 
