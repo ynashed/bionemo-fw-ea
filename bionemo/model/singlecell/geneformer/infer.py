@@ -155,7 +155,9 @@ class GeneformerInference(BaseEncoderInference):
         Returns:
             Tensor: average across positions of non-pad tokens (excluding [CLS] token)
         """
-        mu_embedding = hidden_states[:, 1:, :].sum(dim=1) / enc_mask[:, 1:].sum(dim=1, keepdim=True)
+        mu_embedding = (hidden_states[:, 1:, :] * enc_mask[:, 1:, None]).sum(dim=1) / enc_mask[:, 1:].sum(
+            dim=1, keepdim=True
+        )
         return mu_embedding
 
     def load_model(

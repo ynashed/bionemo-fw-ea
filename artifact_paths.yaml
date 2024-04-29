@@ -32,9 +32,8 @@ models:
             source: "../../megamolbart.nemo"
             target: "molecule/megamolbart/megamolbart.nemo"
     molmim_70m_24_3:
-        # TODO-REL: update ngc location before release
         # https://wandb.ai/clara-discovery/molmim_convergence_prod_March2024/runs/cOLZ4Eme
-        ngc: null
+        ngc: "nvidia/clara/molmim:1.3"
         pbss: "s3://bionemo-ci/models/molmim_70m_24_3.nemo"
         symlink:
             source: "../../molmim_70m_24_3.nemo"
@@ -122,12 +121,22 @@ models:
         # A pretrained 9.2M parameter geneformer (BERT) on 31M single cells and a 21k tokens.
         #  this is our tokenizer that used ensg ids from medians (25k) to filter out missing ids from
         #  our regular set of human readable gene names (40k), bringing the total down to 21k tokens.
-        # See https://wandb.ai/clara-discovery/scFM_v6/runs/1olz7ksb
+        # See https://wandb.ai/clara-discovery/scFM_v6/runs/tqrv9wrl
         ngc: null
-        pbss: "s3://bionemo-ci/models/geneformer-31M-240430-step-7000-wandb-1olz7ksb.nemo"
+        pbss: "s3://bionemo-ci/models/geneformer-31M-240430-step-50000-wandb-tqrv9wrl.nemo"
         symlink:
-            source: "../../geneformer-31M-240430-step-7000-wandb-1olz7ksb.nemo"
+            source: "../../geneformer-31M-240430-step-50000-wandb-tqrv9wrl.nemo"
             target: "singlecell/geneformer/geneformer-31M-240430.nemo"
+    geneformer_31M_240430_large:
+        # A pretrained 103M parameter geneformer (BERT) on 31M single cells and a 21k tokens.
+        #  this is our tokenizer that used ensg ids from medians (25k) to filter out missing ids from
+        #  our regular set of human readable gene names (40k), bringing the total down to 21k tokens.
+        # See https://wandb.ai/clara-discovery/scFM_v6/runs/iyxsxz2m
+        ngc: null
+        pbss: "s3://bionemo-ci/models/geneformer-31M-240430-step-73505-wandb-iyxsxz2m.nemo"
+        symlink:
+            source: "../../geneformer-31M-240430-step-73505-wandb-iyxsxz2m.nemo"
+            target: "singlecell/geneformer/geneformer-31M-240430-large.nemo"
     geneformer:
         # A QA model for geneformer with randomly initialized weights.
         pbss: "s3://bionemo-ci/models/geneformer-qa.nemo"
