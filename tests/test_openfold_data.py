@@ -8,16 +8,13 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
-import copy
 import os
 import tempfile
-from typing import Dict, Iterator
+from typing import Dict
 
 import numpy as np
 import pytest
 import torch
-from hydra import compose, initialize
-from hydra.core.global_hydra import GlobalHydra
 from omegaconf import DictConfig
 from torch.utils.data import DataLoader
 
@@ -38,10 +35,11 @@ from bionemo.data.protein.openfold.helpers import collate
 from bionemo.model.protein.openfold.openfold_model import AlphaFold
 from bionemo.model.protein.openfold.schema import FEATURE_SHAPES
 from bionemo.model.utils import setup_trainer
-from bionemo.utils.tests import download_s3_tar_gz_to_target_path
+from bionemo.utils.hydra import load_model_config
 
 
 BIONEMO_HOME = os.getenv('BIONEMO_HOME')
+EXAMPLE_CONFIG_PATH = os.path.join(BIONEMO_HOME, 'examples/protein/openfold/conf')
 TEST_DATA_PATH = os.path.join(BIONEMO_HOME, 'examples/tests/test_data')
 SAMPLE_DATA_PATH = os.path.join(TEST_DATA_PATH, 'openfold_data')
 SAMPLE_INFER_DATA_PATH = os.path.join(SAMPLE_DATA_PATH, 'inference')
@@ -145,75 +143,50 @@ INITIAL_TRAINING_FEATURE_NAMES = {
 }
 
 
-@pytest.fixture(scope='module', autouse=True)
-def download_test_data(s3_data_path=S3_DATA_PATH, dest_path=TEST_DATA_PATH):
-    """Download unittest data once per module"""
-    if not os.path.exists(os.path.join(dest_path, 'openfold_data')):
-        download_s3_tar_gz_to_target_path(s3_data_path, dest_path)
+@pytest.fixture(scope='function')
+def infer_cfg() -> DictConfig:
+    """Setting up the general inference config object.
 
-
-@pytest.fixture(scope='module')
-def infer_cfg() -> Iterator[DictConfig]:
-    """Setting up the general inference config object..
-
-    Yields:
-        Iterator[DictConfig]: Inference Config object containing path and name
+    Returns:
+        DictConfig: Inference Config object containing path and name
     """
-    this_file_dir = os.path.dirname(os.path.realpath(__file__))
-    config_path = "examples/protein/openfold/conf"
-    config_name = "infer"
-    absolute_config_path = os.path.join(os.getenv("BIONEMO_HOME"), config_path)
-    relative_config_path = os.path.relpath(absolute_config_path, this_file_dir)
-    with initialize(config_path=relative_config_path):
-        cfg = compose(config_name=config_name)
-    yield cfg
-    GlobalHydra.instance().clear()
+    return load_model_config(config_name='infer', config_path=EXAMPLE_CONFIG_PATH)
 
 
-@pytest.fixture(scope='module')
-def initial_training_cfg() -> Iterator[DictConfig]:
-    """Setting up the general initial training config object..
+@pytest.fixture(scope='function')
+def initial_training_cfg() -> DictConfig:
+    """Setting up the general initial training config object.
 
-    Yields:
-        Iterator[DictConfig]: Initial training Config object containing path and name
+    Returns:
+        DictConfig: Initial training Config object containing path and name
     """
-    this_file_dir = os.path.dirname(os.path.realpath(__file__))
-    config_path = "examples/protein/openfold/conf"
-    config_name = "openfold_initial_training"
-    absolute_config_path = os.path.join(os.getenv("BIONEMO_HOME"), config_path)
-    relative_config_path = os.path.relpath(absolute_config_path, this_file_dir)
-    with initialize(config_path=relative_config_path):
-        cfg = compose(config_name=config_name)
+    cfg = load_model_config(config_name='openfold_initial_training', config_path=EXAMPLE_CONFIG_PATH)
 
     # switch to sample training data
     cfg.model.data.dataset_path = SAMPLE_DATA_PATH
     cfg.model.data.dataset_variant = TRAINING_DATA_VARIANT
+    cfg.model.train_ds.num_workers = 1
+    cfg.model.validation_ds.num_workers = 1
 
-    yield cfg
-    GlobalHydra.instance().clear()
+    return cfg
 
 
-@pytest.fixture(scope='module')
-def finetuning_cfg() -> Iterator[DictConfig]:
-    """Setting up the general initial training config object..
+@pytest.fixture(scope='function')
+def finetuning_cfg() -> DictConfig:
+    """Setting up the general finetuning config object.
 
     Yields:
-        Iterator[DictConfig]: Initial training Config object containing path and name
+        DictConfig: Initial training Config object containing path and name
     """
-    this_file_dir = os.path.dirname(os.path.realpath(__file__))
-    config_path = "examples/protein/openfold/conf"
-    config_name = "openfold_finetuning"
-    absolute_config_path = os.path.join(os.getenv("BIONEMO_HOME"), config_path)
-    relative_config_path = os.path.relpath(absolute_config_path, this_file_dir)
-    with initialize(config_path=relative_config_path):
-        cfg = compose(config_name=config_name)
+    cfg = load_model_config(config_name='openfold_finetuning', config_path=EXAMPLE_CONFIG_PATH)
 
     # switch to sample training data
     cfg.model.data.dataset_path = SAMPLE_DATA_PATH
     cfg.model.data.dataset_variant = TRAINING_DATA_VARIANT
+    cfg.model.train_ds.num_workers = 1
+    cfg.model.validation_ds.num_workers = 1
 
-    yield cfg
-    GlobalHydra.instance().clear()
+    return cfg
 
 
 @pytest.fixture(scope='function')
@@ -428,6 +401,15 @@ def raise_exception_if_feature_shape_mismatch(features: dict, cfg: DictConfig, N
         assert tuple(feature.shape) == tuple(feature_shape), f'Shape mismatch in feature {k}'
 
 
+def test_sample_data_exists():
+    """Test whether sample data for OpenFold unittest exists"""
+    if not os.path.exists(SAMPLE_DATA_PATH):
+        raise FileNotFoundError(
+            'Before testing, users must download openfold sample data through examples/protein/openfold/scripts/download_sample_data.sh.'
+        )
+
+
+@pytest.mark.skipif(not os.path.exists(SAMPLE_DATA_PATH), reason='Test sample data not found')
 def test_initial_training_dataset_shape(initial_training_cfg: DictConfig):
     """Test feature shape in initial training dataset
 
@@ -441,6 +423,7 @@ def test_initial_training_dataset_shape(initial_training_cfg: DictConfig):
     raise_exception_if_feature_shape_mismatch(sample, initial_training_cfg, N_res)
 
 
+@pytest.mark.skipif(not os.path.exists(SAMPLE_DATA_PATH), reason='Test sample data not found')
 def test_self_distillation_dataset_shape(finetuning_cfg: DictConfig):
     """Test feature shape in self-distillation dataset
 
@@ -454,6 +437,7 @@ def test_self_distillation_dataset_shape(finetuning_cfg: DictConfig):
     raise_exception_if_feature_shape_mismatch(sample, finetuning_cfg, N_res)
 
 
+@pytest.mark.skipif(not os.path.exists(SAMPLE_DATA_PATH), reason='Test sample data not found')
 def test_create_sequence_features_aatype(infer_cfg: DictConfig):
     """Test aatype in sequence features.
 
@@ -472,6 +456,7 @@ def test_create_sequence_features_aatype(infer_cfg: DictConfig):
     assert rc.aatype_to_str_sequence(aa_idx) == sequence
 
 
+@pytest.mark.skipif(not os.path.exists(SAMPLE_DATA_PATH), reason='Test sample data not found')
 def test_predict_dataloader_feature_names(predict_dataloader: DataLoader):
     """Test whether batch from dataloader of PredictDataset has all the features.
 
@@ -482,6 +467,7 @@ def test_predict_dataloader_feature_names(predict_dataloader: DataLoader):
     assert set(batch) == PREDICT_FEATURE_NAMES
 
 
+@pytest.mark.skipif(not os.path.exists(SAMPLE_DATA_PATH), reason='Test sample data not found')
 def test_initial_training_dataloader_feature_names(initial_training_dataloader: DataLoader):
     """Test whether batch from dataloader of InitialTrainingDataset has all the features.
 
@@ -492,6 +478,7 @@ def test_initial_training_dataloader_feature_names(initial_training_dataloader: 
     assert set(batch) == INITIAL_TRAINING_FEATURE_NAMES
 
 
+@pytest.mark.skipif(not os.path.exists(SAMPLE_DATA_PATH), reason='Test sample data not found')
 def test_finetuning_dataloader_feature_names(finetuning_dataloader: DataLoader):
     """Test whether batch from dataloader of FinetuningDataset has all the features.
 
@@ -502,6 +489,7 @@ def test_finetuning_dataloader_feature_names(finetuning_dataloader: DataLoader):
     assert set(batch) == INITIAL_TRAINING_FEATURE_NAMES
 
 
+@pytest.mark.skipif(not os.path.exists(SAMPLE_DATA_PATH), reason='Test sample data not found')
 @pytest.mark.slow
 def test_openfold_sample_creator_initial_training_dataset(initial_training_cfg: DictConfig):
     """Test OpenFoldSampleCreator for initial training dataset.
@@ -509,8 +497,6 @@ def test_openfold_sample_creator_initial_training_dataset(initial_training_cfg: 
     Args:
         initial_training_cfg (DictConfig): Config object for initial training.
     """
-    initial_training_cfg = copy.deepcopy(initial_training_cfg)
-
     # create test case config
     initial_training_cfg.model.micro_batch_size = 1
     initial_training_cfg.model.data.realign_when_required = False
@@ -547,6 +533,7 @@ def test_openfold_sample_creator_initial_training_dataset(initial_training_cfg: 
             assert pdb_chain_id in SAMPLE_PDB_CHAIN_IDS
 
 
+@pytest.mark.skipif(not os.path.exists(SAMPLE_DATA_PATH), reason='Test sample data not found')
 @pytest.mark.slow
 def test_openfold_sample_creator_self_distillation_dataset(finetuning_cfg: DictConfig):
     """Test OpenFoldSampleCreator for self-distillation dataset.
@@ -554,8 +541,6 @@ def test_openfold_sample_creator_self_distillation_dataset(finetuning_cfg: DictC
     Args:
         finetuning_cfg (DictConfig): Config object for fine-tuning.
     """
-    finetuning_cfg = copy.deepcopy(finetuning_cfg)
-
     # create test case config
     finetuning_cfg.model.micro_batch_size = 1
     finetuning_cfg.model.data.realign_when_required = False
@@ -589,6 +574,7 @@ def test_openfold_sample_creator_self_distillation_dataset(finetuning_cfg: DictC
             assert pdb_chain_id in SAMPLE_UNICLUST30_IDS
 
 
+@pytest.mark.skipif(not os.path.exists(SAMPLE_DATA_PATH), reason='Test sample data not found')
 @pytest.mark.slow
 def test_openfold_sample_creator_validation_dataset(initial_training_cfg: DictConfig):
     """Test OpenFoldSampleCreator for fine-tuning dataset.
@@ -596,8 +582,6 @@ def test_openfold_sample_creator_validation_dataset(initial_training_cfg: DictCo
     Args:
         initial_training_cfg (DictConfig): Config object for initial training.
     """
-    initial_training_cfg = copy.deepcopy(initial_training_cfg)
-
     # create test case config
     initial_training_cfg.model.micro_batch_size = 1
     initial_training_cfg.model.data.realign_when_required = False

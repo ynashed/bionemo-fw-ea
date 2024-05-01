@@ -10,15 +10,12 @@
 
 import os
 import tempfile
-from copy import deepcopy
 from pathlib import Path
-from typing import Iterator, Tuple
+from typing import Tuple
 
 import pytest
 import pytorch_lightning as plt
 import torch
-from hydra import compose, initialize
-from hydra.core.global_hydra import GlobalHydra
 from omegaconf import DictConfig
 from torch.utils.data import DataLoader
 
@@ -31,12 +28,13 @@ from bionemo.model.protein.openfold.openfold_model import AlphaFold
 from bionemo.model.protein.openfold.validation_metrics import compute_validation_metrics
 from bionemo.model.protein.openfold.writer import PredictionFeatureWriter
 from bionemo.model.utils import setup_trainer
-from bionemo.utils.tests import download_s3_tar_gz_to_target_path
+from bionemo.utils.hydra import load_model_config
 
 
 GRADIENT_CHECKPOINTING = False
 
 BIONEMO_HOME = os.getenv('BIONEMO_HOME')
+EXAMPLE_CONFIG_PATH = os.path.join(BIONEMO_HOME, 'examples/protein/openfold/conf')
 TEST_DATA_PATH = os.path.join(BIONEMO_HOME, 'examples/tests/test_data')
 SAMPLE_DATA_PATH = os.path.join(TEST_DATA_PATH, 'openfold_data')
 
@@ -69,29 +67,14 @@ DRYRUN_SEQUENCES = ['AAAAA', 'CCCCC']
 DRYRUN_SEQ_NAMES = ['first', 'second']
 
 
-@pytest.fixture(scope='module', autouse=True)
-def download_test_data(s3_data_path=S3_DATA_PATH, dest_path=TEST_DATA_PATH):
-    """Download unittest data once per module"""
-    if not os.path.exists(os.path.join(dest_path, 'openfold_data')):
-        download_s3_tar_gz_to_target_path(s3_data_path, dest_path)
-
-
-@pytest.fixture(scope='module')
-def infer_cfg() -> Iterator[DictConfig]:
+@pytest.fixture(scope='function')
+def infer_cfg() -> DictConfig:
     """Setting up the general inference config object.
 
-    Yields:
-        Iterator[DictConfig]: Inference Config object containing path and name
+    Returns:
+        DictConfig: Inference Config object containing path and name
     """
-    this_file_dir = os.path.dirname(os.path.realpath(__file__))
-    config_path = "examples/protein/openfold/conf"
-    config_name = "infer"
-    absolute_config_path = os.path.join(os.getenv("BIONEMO_HOME"), config_path)
-    relative_config_path = os.path.relpath(absolute_config_path, this_file_dir)
-    with initialize(config_path=relative_config_path):
-        cfg = compose(config_name=config_name)
-    yield cfg
-    GlobalHydra.instance().clear()
+    return load_model_config(config_name='infer', config_path=EXAMPLE_CONFIG_PATH)
 
 
 def get_alphafold_model_trainer(cfg: DictConfig) -> Tuple[AlphaFold, plt.Trainer]:
@@ -185,18 +168,19 @@ def test_openfold_inference_sequence_only_dryrun(
         alphafold_cfg (DictConfig): Config object for the model and dataset setup.
         alphafold_model_trainer (Tuple[AlphaFold, plt.Trainer]): Model and Trainer for inference.
     """
-    alphafold_cfg = deepcopy(infer_cfg)
-    alphafold_cfg.model.data.msa_a3m_filepaths = None
-    alphafold_cfg.model.data.generate_templates_if_missing = False
+    infer_cfg.sequences = DRYRUN_SEQUENCES
+    infer_cfg.seq_names = DRYRUN_SEQ_NAMES
+    infer_cfg.model.data.msa_a3m_filepaths = None
+    infer_cfg.model.data.generate_templates_if_missing = False
 
-    alphafold_model, trainer = get_alphafold_model_trainer(alphafold_cfg)
-    dataset = get_predict_dataset(alphafold_cfg)
+    alphafold_model, trainer = get_alphafold_model_trainer(infer_cfg)
+    dataset = get_predict_dataset(infer_cfg)
     assert len(dataset) > 0
 
     dl = DataLoader(
         dataset,
-        batch_size=alphafold_cfg.model.micro_batch_size,
-        num_workers=alphafold_cfg.model.data.num_workers,
+        batch_size=infer_cfg.model.micro_batch_size,
+        num_workers=infer_cfg.model.data.num_workers,
         collate_fn=collate,
     )
     trainer.predict(alphafold_model, dl, return_predictions=False)
@@ -212,17 +196,18 @@ def test_openfold_inference_sequence_and_msa_dryrun(
         alphafold_cfg (DictConfig): Config object for the model and dataset setup.
         alphafold_model_trainer (Tuple[AlphaFold, plt.Trainer]): Model and Trainer for inference.
     """
-    alphafold_cfg = deepcopy(infer_cfg)
-    alphafold_cfg.model.data.generate_templates_if_missing = False
+    infer_cfg.sequences = DRYRUN_SEQUENCES
+    infer_cfg.seq_names = DRYRUN_SEQ_NAMES
+    infer_cfg.model.data.generate_templates_if_missing = False
 
-    alphafold_model, trainer = get_alphafold_model_trainer(alphafold_cfg)
-    dataset = get_predict_dataset(alphafold_cfg)
+    alphafold_model, trainer = get_alphafold_model_trainer(infer_cfg)
+    dataset = get_predict_dataset(infer_cfg)
     assert len(dataset) > 0
 
     dl = DataLoader(
         dataset,
-        batch_size=alphafold_cfg.model.micro_batch_size,
-        num_workers=alphafold_cfg.model.data.num_workers,
+        batch_size=infer_cfg.model.micro_batch_size,
+        num_workers=infer_cfg.model.data.num_workers,
         collate_fn=collate,
     )
     trainer.predict(alphafold_model, dl, return_predictions=False)
@@ -235,6 +220,15 @@ def test_openfold_inference_sequence_and_msa_dryrun(
 #  - realign_when_mismatch requires third party softwares on top of template inputs
 
 
+def test_sample_data_exists():
+    """Test whether sample data for OpenFold unittest exists"""
+    if not os.path.exists(SAMPLE_DATA_PATH):
+        raise FileNotFoundError(
+            'Before testing, users must download openfold sample data through examples/protein/openfold/scripts/download_sample_data.sh.'
+        )
+
+
+@pytest.mark.skipif(not os.path.exists(SAMPLE_DATA_PATH), reason='Test sample data not found')
 @pytest.mark.needs_gpu
 def test_openfold_inference_lddt_validation_metric_check(infer_cfg: DictConfig):
     """Test that checks whether the structure predicted by OpenFold is similar to the ground truth structure.
@@ -251,8 +245,7 @@ def test_openfold_inference_lddt_validation_metric_check(infer_cfg: DictConfig):
     Args:
         alphafold_cfg (DictConfig): Config Object to restore AlphaFold model from checkpoint and initialise dataset.
     """
-    alphafold_cfg = deepcopy(infer_cfg)
-    alphafold_cfg.model.data.generate_templates_if_missing = False
+    infer_cfg.model.data.generate_templates_if_missing = False
 
     # load ground truth data from mmcif files
     mmcif_strings = [load_mmcif_file(mmcif_path) for mmcif_path in CIF_PATHS]
@@ -268,13 +261,13 @@ def test_openfold_inference_lddt_validation_metric_check(infer_cfg: DictConfig):
         torch.unsqueeze(gt_coords, 0) for gt_coords in ground_truth_atom_37_coords_list
     ]
     # setup for inference
-    alphafold_model, trainer = get_alphafold_model_trainer(alphafold_cfg)
+    alphafold_model, trainer = get_alphafold_model_trainer(infer_cfg)
     # get prediction dataset from config file, containing only sequences and MSAs, no structures
-    dataset = get_predict_dataset(alphafold_cfg)
+    dataset = get_predict_dataset(infer_cfg)
     data_loader = DataLoader(
         dataset,
-        batch_size=alphafold_cfg.model.micro_batch_size,
-        num_workers=alphafold_cfg.model.data.num_workers,
+        batch_size=infer_cfg.model.micro_batch_size,
+        num_workers=infer_cfg.model.data.num_workers,
         collate_fn=collate,
     )
     # inference
