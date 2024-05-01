@@ -1,14 +1,12 @@
 name: esm2nv_flip
 defaults:
   - pretrain_esm2_650M # options: pretrain_esm2_3B, pretrain_esm2_15B, pretrain_esm2_8M
+do_preprocessing: False
 do_training: True # set to false if data preprocessing steps must be completed
 do_testing: True # set to true to run evaluation on test data after training
-restore_from_path: ${oc.env:BIONEMO_HOME}/models/protein/esm2nv/esm2nv_650M_converted.nemo # path to nemo checkpoint of the protein model. Other options: esm2nv_3B_converted.nemo
-# target: bionemo.model.protein.esm1nv.ESM2nvModel # target class for protein model
-target: bionemo.model.protein.esm1nv.bert_peft_models.BertLoRAModel
+restore_from_path: null # path to nemo checkpoint of the fine-tuned model (encoder + task head) to be used for further training, testing or inference
+target: bionemo.model.protein.esm1nv.ESM2nvLoRAModel # target class for protein model
 infer_target: bionemo.model.protein.esm1nv.infer.ESM1nvInference # target inference class for protein model
-
-use_peft: True # indicates whether we intend to use PEFT technique
 
 trainer:
   devices: 1 # number of GPUs or CPUs
@@ -24,13 +22,18 @@ exp_manager:
     name: ${name}_${model.data.task_name}_finetuning_encoder_frozen_${model.encoder_frozen}_${model.peft.peft_scheme}
 
 model:
+  restore_encoder_path: ${oc.env:BIONEMO_HOME}/models/protein/esm2nv/esm2nv_650M_converted.nemo # path to nemo checkpoint of the protein model. Other options: esm2nv_3B_converted.nemo
   encoder_frozen: False # encoder trainable or frozen; set to False when using peft
   post_process: False # must be False for downstream task
   micro_batch_size: 2 # NOTE: adjust to occupy ~ 90% of GPU memory
   global_batch_size: null # if null will be computed automatically
   tensor_model_parallel_size: 1  # model parallelism
+  cnn_dim: 32
+  dropout_rate: 0.25
+  megatron_amp_O2: False #Required by NLPAdapterModelMixin for PEFT
   
   peft:
+    enabled: True # indicates whether we intend to use PEFT technique
     peft_scheme: "lora"  # currently supported: lora
     restore_from_path: null #set to null to initialize random weights and train
     
@@ -39,7 +42,10 @@ model:
       adapter_dropout: 0.0
       column_init_method: 'xavier' # options: xavier, zero or normal
       row_init_method: 'zero' # options: xavier, zero or normal
-  
+      layer_selection: null  # selects in which layers to add lora adapters. e.g. [1,12] will add lora to layer 1 (lowest) and 12. null will apply adapters to all layers
+      weight_tying: False
+      position_embedding_strategy: null # used only when weight_tying is True
+
   data:
     task_name: secondary_structure # options: aav, bind, conservation, gb1, meltome, sav, scl, secondary_structure
     task_type: 'token-level-classification'  # alternative: classification, regression

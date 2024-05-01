@@ -180,10 +180,12 @@ class Zinc15Preprocess:
         os.makedirs(os.path.join(output_dir, 'train'), exist_ok=True)
         os.makedirs(os.path.join(output_dir, 'test'), exist_ok=True)
         os.makedirs(os.path.join(output_dir, 'val'), exist_ok=True)
-
         total_samples_per_file = sum([train_samples_per_file, val_samples_per_file, test_samples_per_file])
+        # Make the download directory absolute for the split command since it also involves cding into
+        #  the split_data directory.
+        abs_download_dir = os.path.abspath(download_dir)
         self._run_cmd(
-            f"cd {split_data}; tail -q -n +2 {download_dir}/** | split -d -l {total_samples_per_file} -a 3",
+            f"cd {split_data}; tail -q -n +2 {abs_download_dir}/** | split -d -l {total_samples_per_file} -a 3",
             failure_error='Error while merging files',
         )
 

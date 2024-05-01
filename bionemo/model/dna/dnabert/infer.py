@@ -12,10 +12,10 @@ from typing import List, Optional
 import torch
 from torch.cuda.amp import autocast
 
-from bionemo.model.core.infer import BaseEncoderDecoderInference
+from bionemo.model.core.infer import BaseEncoderInference
 
 
-class DNABERTInference(BaseEncoderDecoderInference):
+class DNABERTInference(BaseEncoderInference):
     def __init__(
         self,
         cfg,
@@ -25,6 +25,7 @@ class DNABERTInference(BaseEncoderDecoderInference):
         training: bool = False,
         adjust_config: bool = True,
         interactive: bool = False,
+        inference_batch_size_for_warmup: Optional[int] = None,
     ):
         super().__init__(
             cfg=cfg,
@@ -34,7 +35,11 @@ class DNABERTInference(BaseEncoderDecoderInference):
             training=training,
             adjust_config=adjust_config,
             interactive=interactive,
+            inference_batch_size_for_warmup=inference_batch_size_for_warmup,
         )
+
+    def get_example_input_sequence(self) -> str:
+        return "AAAAAATATATATAAAAAA"
 
     def _tokenize(self, sequences: List[str]):
         # parent pulls the tokenizer from the loaded model.
@@ -60,7 +65,7 @@ class DNABERTInference(BaseEncoderDecoderInference):
         #       DNABERT does not have a padding token, so this is redundant.
         return output_tensor, padding_mask
 
-    def load_model(self, cfg, model=None, restore_path=None):
+    def load_model(self, cfg, model=None, restore_path=None, strict: bool = True):
         """Load saved model checkpoint
 
         Params:
@@ -70,7 +75,7 @@ class DNABERTInference(BaseEncoderDecoderInference):
             ESM trained model
         """
         # control post-processing, load_model messes with our config so we need to bring it in here.
-        model = super().load_model(cfg, model=model, restore_path=restore_path)
+        model = super().load_model(cfg, model=model, restore_path=restore_path, strict=strict)
         # Hardcoded for DNABERT as there is no post-processing
         model.model.post_process = False
         return model

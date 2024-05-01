@@ -12,6 +12,7 @@ import functools
 import os
 import time
 from abc import ABC, abstractmethod
+from copy import deepcopy
 from typing import Dict, Optional, Sequence
 
 import numpy as np
@@ -508,6 +509,43 @@ class ResamplingMappedDataset(MappedDataset):
         index_mapping_dir=None,
         name=None,
     ):
+        """
+        Resamples a dataset to a specified target length by adjusting the sample distribution.
+        This can involve either upsampling (repeating samples) or downsampling (reducing samples)
+        to match the target sample size. It supports different strategies for resampling, such as
+        in-memory mapping or online resampling, based on the provided configuration.
+
+        Parameters:
+            dataset (Dataset): The dataset to be resampled.
+            num_samples (int, optional): The target number of samples after resampling. If not provided,
+                the length of the dataset is used.
+            data_prefix (str, optional): A prefix used for data processing or file naming. This can be
+                inferred from the configuration if not provided directly. Used in memmap index mapping
+                strategy.
+            max_seq_length (int, optional): The maximum sequence length for samples in the dataset. This
+                can also be inferred from the configuration.
+            seed (int, optional): Seed for random number generation, used in shuffling the dataset. This
+                can be provided directly or inferred from the configuration.
+            index_mapping_dir (str, optional): Directory path where index mapping files are stored or will
+                be generated. Used in memmap index mapping strategy.
+            name (str, optional): An optional name for the dataset. If not provided, it is inferred from
+                the data_prefix or set to None.
+            cfg (dict, optional): A configuration dictionary, usually found in model.data, which can
+                contain default values for other parameters if they are not explicitly provided. The following keys
+                are used by this class:
+                - `index_mapping_type`: Strategy for index mapping ("online" or "memmap").
+                - `block_size`: Size of each block of samples in online sampling.
+                - `cache_maxsize`: Maximum cache size for online sampling.
+                - `shuffle`: Whether to shuffle the dataset during resampling.
+                - `truncate_to_block_boundary`: Whether to truncate the sample mapping to block boundaries in online sampling.
+
+        Raises:
+            ValueError: If num_samples is set to 0, as it's not possible to resample to no samples.
+            ValueError: If an unknown index_mapping_type is specified in the configuration.
+
+        This class supports dynamic adjustment of the sample size of a dataset through different
+        resampling strategies, enabling flexible dataset manipulation for training or evaluation purposes.
+        """
         self.data_prefix, self.max_seq_length, self.seed = _infer_kwarg_values(cfg, data_prefix, max_seq_length, seed)
         self.index_mapping_dir = index_mapping_dir
         self.name = name
@@ -593,14 +631,15 @@ class FilteredMappedDataset(MappedDataset):
 class IndexMappedDataset(MappedDataset):
     """Maps a dataset to a new dataset based on provides indices."""
 
-    def __init__(self, dataset, indices):
+    def __init__(self, dataset, indices, copy: bool = False):
         """
         Args:
             dataset (Dataset): Dataset to filter
             indices: indices to keep
+            copy: Create a deep copy of the underlying dataset (can prevent UAF mistakes in DDP)
         """
         self.sample_mapping = indices
-        super().__init__(dataset=dataset, num_samples=None)
+        super().__init__(dataset=deepcopy(dataset), num_samples=None)
 
     def create_sample_mapping(self, dataset: Dataset, num_samples: int):
         """Creates a sample mapping for filtering the `dataset` based on the criterion function."""

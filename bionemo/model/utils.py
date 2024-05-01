@@ -20,6 +20,7 @@ from nemo.collections.nlp.parts.nlp_overrides import (
     NLPSaveRestoreConnector,
     PipelineMixedPrecisionPlugin,
 )
+from nemo.collections.nlp.parts.peft_config import LoraPEFTConfig
 from nemo.utils import logging
 from nemo.utils.app_state import AppState
 from nemo.utils.exp_manager import StatelessTimer, exp_manager
@@ -31,7 +32,7 @@ from pytorch_lightning.callbacks import ModelSummary
 from pytorch_lightning.callbacks.timer import Timer
 from pytorch_lightning.plugins.environments import TorchElasticEnvironment
 
-from bionemo.callbacks.utils import add_test_callbacks, add_training_callbacks
+from bionemo.callbacks.utils import add_progress_bar_callback, add_test_callbacks, add_training_callbacks
 
 
 M = TypeVar('M')
@@ -154,6 +155,11 @@ def get_num_devices(n_devices):
 class TrainerBuilder:
     @staticmethod
     def adjust_config(cfg):
+        """Update the contents of cfg
+
+        (1) Add key "global_batch_size" to main_cfg.model
+        (2) Add key "accumulate_grad_batches" to main_cfg.trainer
+        """
         micro_batch_size = cfg.model.micro_batch_size
         tensor_model_parallel_size = cfg.model.tensor_model_parallel_size
         pipeline_model_parallel_size = cfg.model.pipeline_model_parallel_size
@@ -269,12 +275,13 @@ def setup_trainer(cfg, builder=None, callbacks=[], adjust_config=True, verbose=T
         builder = TrainerBuilder
 
     if adjust_config:
-        builder.adjust_config(cfg)
+        builder.adjust_config(cfg)  # e.g., compute global_batch_size, set accumulate_grad_batches
     plugins = builder.configure_plugins(cfg)
     mode = "train" if cfg.get("do_training", False) else "test"
     callbacks = builder.configure_callbacks(cfg, callbacks)
     add_test_callbacks(cfg, callbacks=callbacks, mode="infer" if builder == InferenceTrainerBuilder else mode)
     add_training_callbacks(cfg, callbacks)
+    add_progress_bar_callback(cfg, callbacks)
 
     if interactive:
         strategy = 'auto'
@@ -351,12 +358,7 @@ def restore_model(
             cfg.model = OmegaConf.merge(cfg.model, restore_cfg)
         cfg.model.precision = trainer.precision
 
-    if cfg.get('use_peft', False):  # skipped if use_peft is false or not present in config
-        # TODO(dorotat): PEFT is not present in NeMo 1.22 - it was refactored. Disabling it till it is fixed
-        raise ValueError("PEFT is disabled")
-
-    else:
-        save_restore_connector = NLPSaveRestoreConnector()
+    save_restore_connector = NLPSaveRestoreConnector()
 
     model = model_cls.restore_from(
         restore_path=restore_path,
@@ -365,6 +367,12 @@ def restore_model(
         save_restore_connector=save_restore_connector,
         strict=strict,
     )
+
+    if OmegaConf.select(cfg, 'model.peft.enabled') is not None:  # skipped if peft.enabled is not present in config
+        if cfg.model.peft.enabled:  # skipped if peft.enabled is false
+            peft_cfg = LoraPEFTConfig(cfg.model)
+            model.add_adapter(peft_cfg)
+
     if cfg.get('load_from_checkpoint') is not None:
         model.load_from_checkpoint(checkpoint_path=cfg.load_from_checkpoint, strict=strict)
 

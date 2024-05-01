@@ -1,7 +1,7 @@
 --extra-index-url https://pypi.ngc.nvidia.com
 --extra-index-url "https://__token__:${GITLAB_TOKEN}@gitlab-master.nvidia.com/api/v4/projects/65301/packages/pypi/simple"
 pyfastx==1.1.0
-matplotlib==3.4.3
+matplotlib>=3.4.3
 rdkit==2023.9.1
 urllib3==1.26.16
 ijson==3.2.3
@@ -15,7 +15,6 @@ git+https://github.com/prokotg/tfrecord@float16zlib
 nvidia-pytriton==0.4.0
 triton-model-navigator==0.7.4
 git+https://github.com/NVIDIA/dllogger@v1.0.0#egg=dllogger
-POT==0.7.0
 dgllife==0.2.8
 pipdeptree==2.13.0
 gevent==23.9.1
@@ -46,3 +45,17 @@ diffdock==0.0.5
 py3Dmol==2.0.4
 # Property guided molecule generation
 bionemo-controlled-generation==0.3.0
+# Single Cell
+scanpy==1.9.8
+# 3DMG: TargetDiff + MultiFlow
+easydict==1.9
+openbabel==3.1.1.1
+cffi==1.16.0
+pot==0.9.3
+pdb2pqr==3.6.2
+meeko==0.1.dev3
+# vina==1.2.5 # base container issues with libbost. Note that this is installed in the image manually.
+git+https://github.com/Valdes-Tresanco-MS/AutoDockTools_py3@1.5.7.post1
+lightning==2.2.1
+# DSMBind and DSMBind-anchor
+chemprop==1.6.1

@@ -179,6 +179,8 @@ class ProteinLigandDockingDataset(Dataset):
         keep_local_structures=False,
         chunk_size=5,
         seed=None,
+        generate_conformer_max_iterations=0,
+        generate_conformer_enforce_chirality=True,
     ):
         super(ProteinLigandDockingDataset, self).__init__(root, transform)
         self.protein_dir = root
@@ -201,6 +203,8 @@ class ProteinLigandDockingDataset(Dataset):
         self.atom_radius, self.atom_max_neighbors = atom_radius, atom_max_neighbors
         self.chunk_size = chunk_size
         self.seed = seed
+        self.generate_conformer_max_iterations = generate_conformer_max_iterations
+        self.generate_conformer_enforce_chirality = generate_conformer_enforce_chirality
 
         self.heterograph_store: Optional[HeterographStore] = None
         self.full_cache_path = self.heterograph_cache_path(cache_path)
@@ -367,6 +371,8 @@ class ProteinLigandDockingDataset(Dataset):
                         self.num_conformers,
                         remove_hs=self.remove_hs,
                         seed=self.seed,
+                        generate_conformer_max_iterations=self.generate_conformer_max_iterations,
+                        generate_conformer_enforce_chirality=self.generate_conformer_enforce_chirality,
                     )
                     rec, rec_coords, c_alpha_coords, n_coords, c_coords, lm_embeddings = extract_receptor_structure(
                         copy.deepcopy(rec_model), lig, lm_embedding_chains=lm_embedding_chain

@@ -36,7 +36,7 @@ from bionemo.utils.tests import (
 
 
 os.environ["BIONEMO_HOME"] = os.environ.get("BIONEMO_HOME", '/workspace/bionemo')
-
+BIONEMO_HOME = os.environ["BIONEMO_HOME"]
 
 THIS_FILE_DIR = pathlib.Path(os.path.abspath(__file__))
 PROJ_BASE_DIR = THIS_FILE_DIR.parent
@@ -54,8 +54,8 @@ GOLDEN_VALUES_FP32JSON = GOLDEN_VALUE_PREPEND_DIR / "revert_esm2nv_infer_golden_
 HEATMAPS_REPO_DIR = GOLDEN_VALUE_PREPEND_DIR / "heatmaps"
 
 # Diffs
-DIFF_FILEPATH_FP32 = '/workspace/bionemo/tests/data/esm2_golden_values/differences-fp32.yaml'
-DIFF_FILEPATH_FP16 = '/workspace/bionemo/tests/data/esm2_golden_values/differences-fp16.yaml'
+DIFF_FILEPATH_FP32 = f'{BIONEMO_HOME}/tests/data/esm2_golden_values/differences-fp32.yaml'
+DIFF_FILEPATH_FP16 = f'{BIONEMO_HOME}/tests/data/esm2_golden_values/differences-fp16.yaml'
 
 
 def get_cfg(prepend_config_path, config_name, config_path='conf'):

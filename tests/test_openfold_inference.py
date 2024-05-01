@@ -1,3 +1,13 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+#
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
+
 import os
 import tempfile
 from pathlib import Path
@@ -29,23 +39,26 @@ INFERENCE_DIR = os.path.join(
 )
 
 PDB_DIR = os.path.join(INFERENCE_DIR, 'pdb')
-PDB_NAMES = ['first_sequence.pdb', 'second_sequence.pdb']
-PDB_PATHS = [Path(os.path.join(PDB_DIR, pdb)) for pdb in PDB_NAMES]
-
-CIF_NAMES = ['first_sequence.cif', 'second_sequence.cif']
+CIF_NAMES = ['7b4q.cif', '7dnu.cif']
 CIF_PATHS = [Path(os.path.join(PDB_DIR, cif)) for cif in CIF_NAMES]
-CIF_CHAIN_IDS = ["A", "B"]
+CIF_CHAIN_IDS = ["A", "A"]
 
 MSA_DIR = os.path.join(INFERENCE_DIR, 'msas')
-MSA_NAMES = [
-    ['7ZHL_A_mgnify_alignment.a3m', '7ZHL_A_smallbfd_alignment.a3m', '7ZHL_A_uniref90_alignment.a3m'],
-    ['7YVT_B_mgnify_alignment.a3m', '7YVT_B_smallbfd_alignment.a3m', '7YVT_B_uniref90_alignment.a3m'],
+MSA_PATHS = [
+    [
+        os.path.join(MSA_DIR, '7b4q_A', 'bfd_uniclust_hits.a3m'),
+        os.path.join(MSA_DIR, '7b4q_A', 'mgnify_hits.a3m'),
+        os.path.join(MSA_DIR, '7b4q_A', 'uniref90_hits.a3m'),
+    ],
+    [
+        os.path.join(MSA_DIR, '7dnu_A', 'bfd_uniclust_hits.a3m'),
+        os.path.join(MSA_DIR, '7dnu_A', 'mgnify_hits.a3m'),
+        os.path.join(MSA_DIR, '7dnu_A', 'uniref90_hits.a3m'),
+    ],
 ]
-MSA_PATHS = [[os.path.join(MSA_DIR, msa) for msa in msas] for msas in MSA_NAMES]
 
-PT_DIR = os.path.join(INFERENCE_DIR, 'pt')
-PT_NAMES = ['first_sequence.pt', 'second_sequence.pt']
-PT_PATHS = [Path(os.path.join(PT_DIR, pt)) for pt in PT_NAMES]
+DRYRUN_SEQUENCES = ['AAAAA', 'CCCCC']
+DRYRUN_SEQ_NAMES = ['first', 'second']
 
 
 @pytest.fixture(scope='module')
@@ -215,7 +228,19 @@ def test_openfold_inference_no_output_check(
             dataset = get_predict_dataset(alphafold_cfg)
     else:
         alphafold_model, trainer = alphafold_model_trainer
-        dataset = get_predict_dataset(alphafold_cfg)
+        dataset_paths = get_structured_paths(alphafold_cfg.model.data)
+        dataset = PredictDataset(
+            sequences=DRYRUN_SEQUENCES,
+            seq_names=DRYRUN_SEQ_NAMES,
+            pdb_mmcif_chains_filepath=dataset_paths.mmcif_chains,
+            pdb_mmcif_dicts_dirpath=dataset_paths.mmcif_dicts,
+            pdb_obsolete_filepath=dataset_paths.obsolete_filepath,
+            template_hhr_filepaths=alphafold_cfg.model.data.template_hhr_filepaths,
+            msa_a3m_filepaths=alphafold_cfg.model.data.msa_a3m_filepaths,
+            generate_templates_if_missing=alphafold_cfg.model.data.generate_templates_if_missing,
+            pdb70_database_path=alphafold_cfg.model.data.pdb70_database_path,
+            cfg=alphafold_cfg.model,
+        )
         dl = DataLoader(
             dataset,
             batch_size=alphafold_cfg.model.micro_batch_size,

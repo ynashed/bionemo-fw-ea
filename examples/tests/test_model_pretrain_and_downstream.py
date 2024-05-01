@@ -23,12 +23,13 @@ from pathlib import Path
 from typing import List, Type, TypedDict
 
 import pytest
-from omegaconf import OmegaConf
+from omegaconf import OmegaConf, open_dict
 from pytorch_lightning import LightningModule
 
 from bionemo.callbacks import setup_dwnstr_task_validation_callbacks
 from bionemo.data.diffdock.data_manager import DataManager as DiffdockDataManager
 from bionemo.data.equidock import DataManager
+from bionemo.data.preprocess.singlecell.preprocess import GeneformerPreprocess
 from bionemo.model.dna.dnabert.dnabert_model import DNABERTModel
 from bionemo.model.molecule.diffdock.models.nemo_model import (
     DiffdockTensorProductScoreModel as DiffdockScoreModel,
@@ -43,6 +44,8 @@ from bionemo.model.protein.equidock.equidock_model import EquiDock
 from bionemo.model.protein.esm1nv import ESM1nvModel, ESM2nvModel
 from bionemo.model.protein.openfold.openfold_model import AlphaFold
 from bionemo.model.protein.prott5nv import ProtT5nvModel
+from bionemo.model.singlecell.downstream.finetuning import FineTuneGeneformerModel
+from bionemo.model.singlecell.geneformer.model import GeneformerModel
 from bionemo.model.utils import setup_trainer
 from bionemo.utils.hydra import load_model_config
 from bionemo.utils.tests import (
@@ -185,6 +188,19 @@ TEST_PARAMS: List[TrainingTestParams] = [
         "model_cls": MolMIMModel,
         "model_size": 70349440,
     },
+    {
+        "config_name": 'geneformer_pretrain_test',
+        "script_path": "examples/singlecell/geneformer/pretrain.py",
+        "model_cls": GeneformerModel,
+        "model_size": 9247360,
+    },
+    # TODO get the following working with a small test case.
+    # {
+    #     "config_name": 'geneformer_finetune_perturb_test',
+    #     "script_path": "examples/singlecell/geneformer/finetune_perturbseq.py",
+    #     "model_cls": FineTuneGeneformerModel,
+    #     "model_size": 15549510,
+    # },
 ]
 
 CONFIG_NAME = [params["config_name"] for params in TEST_PARAMS]
@@ -243,7 +259,9 @@ def test_model_size(config_name: str, model_class: LightningModule, model_parame
         callbacks = setup_dwnstr_task_validation_callbacks(cfg)
         trainer = setup_trainer(cfg, callbacks=callbacks)
         if model_class == FineTuneProteinModel or model_class == FineTuneMegaMolBART:
-            model = model_class(cfg, trainer)
+            with open_dict(cfg):
+                cfg.model.encoder_cfg = cfg  # TODO: why do we have to do this?
+            model = model_class(cfg.model, trainer)
         elif model_class == DiffdockScoreModel or model_class == DiffdockConfidenceModel:
             data_manager = DiffdockDataManager(cfg)
             model = model_class(cfg=cfg, trainer=trainer, data_manager=data_manager)
@@ -252,7 +270,22 @@ def test_model_size(config_name: str, model_class: LightningModule, model_parame
             cfg.model.input_edge_feats_dim = data_manager.train_ds[0][0].edata['he'].shape[1]
             trainer = setup_trainer(cfg, callbacks=callbacks)
             model = EquiDock(cfg=cfg, trainer=trainer, data_manager=data_manager)
-
+        elif model_class in {FineTuneGeneformerModel, GeneformerModel}:
+            if model_class == FineTuneGeneformerModel:
+                with open_dict(cfg):
+                    cfg.model.encoder_cfg = cfg  # TODO: why do we have to do this?
+            preprocessor = GeneformerPreprocess(
+                cfg.model.data.dataset_path,
+                cfg.model.tokenizer.vocab_file,
+                cfg.model.data.dataset,
+                cfg.model.data.medians_file,
+            )
+            match preprocessor.preprocess():
+                case {'tokenizer': _, 'median_dict': median_dict}:  # just use the model's packaged tokenizer
+                    logging.info("*************** Preprocessing Finished ************")
+                case _:
+                    logging.error("Preprocessing failed.")
+            model = model_class(cfg.model, trainer, median_dict=median_dict)
         else:
             model = model_class(cfg.model, trainer)
         assert model.num_weights == model_parameters

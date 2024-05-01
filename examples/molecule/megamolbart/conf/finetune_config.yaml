@@ -1,9 +1,10 @@
 name: mmb_physchem
 defaults: 
   - pretrain_small_span_aug
+do_preprocessing: False
 do_training: True # set to false if data preprocessing steps must be completed
 do_testing: True # set to true to run evaluation on test data after training, requires test_dataset section
-restore_from_path: ${oc.env:BIONEMO_HOME}/models/molecule/megamolbart/megamolbart.nemo
+restore_from_path: null # path to nemo checkpoint of the fine-tuned model (encoder + task head) to be used for further training, testing or inference
 target: bionemo.model.molecule.megamolbart.MegaMolBARTModel
 infer_target: bionemo.model.molecule.megamolbart.infer.MegaMolBARTInference
 
@@ -27,6 +28,7 @@ exp_manager:
   resume_if_exists: True
 
 model:
+  restore_encoder_path: ${oc.env:BIONEMO_HOME}/models/molecule/megamolbart/megamolbart.nemo # path to nemo checkpoint of the MegaMolBART model
   seq_length: 512 # TODO make a checkpoint with this set to 128. Maximum sequence length allowed. Set to 512 for backwards compatibililty with the checkpoint.
   max_position_embeddings: ${.seq_length}
   encoder_frozen: True

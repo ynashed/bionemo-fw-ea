@@ -22,9 +22,8 @@ from bionemo.model.core.encoder_finetuning import EncoderFineTuning
 
 class FineTuneMegaMolBART(EncoderFineTuning):
     def __init__(self, cfg, trainer):
-        self.full_cfg = cfg
-        self.encoder_frozen = self.full_cfg.model.encoder_frozen
-        super().__init__(cfg.model, trainer=trainer)
+        self.encoder_frozen = cfg.encoder_frozen
+        super().__init__(cfg, trainer=trainer)
         self.batch_target_name = self.cfg.data.target_column
 
     def configure_optimizers(self):
@@ -52,11 +51,11 @@ class FineTuneMegaMolBART(EncoderFineTuning):
         return task_head
 
     def setup_encoder_model(self, cfg, trainer):
-        infer_class = import_class_by_path(self.full_cfg.infer_target)
+        infer_class = import_class_by_path(self.cfg.encoder_cfg.infer_target)
         pretrained_model = infer_class(
-            self.full_cfg,
+            self.cfg.encoder_cfg,
             freeze=self.encoder_frozen,
-            restore_path=self.full_cfg.restore_from_path,
+            restore_path=self.cfg.restore_encoder_path,
             training=not self.cfg.encoder_frozen,
         )
         return pretrained_model

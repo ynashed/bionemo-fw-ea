@@ -34,7 +34,7 @@ class InitialTrainingDataloaderPQ:
         prefetch_factor: int,
         seed: int,
         uniform_recycling_iters: List[int],
-        num_prev_iters: int,
+        num_prev_steps: int,
         use_threading: bool,
     ) -> None:
         self.dataset = dataset
@@ -45,7 +45,7 @@ class InitialTrainingDataloaderPQ:
         self._set_train_batch_properties_fn = TrainBatchProperties(
             seed=seed,
             uniform_recycling_iters=uniform_recycling_iters,
-            num_prev_iters=num_prev_iters,
+            num_prev_steps=num_prev_steps,
         )
         self.queue_maxsize = self.num_workers * self.prefetch_factor
         if torch.distributed.is_initialized():

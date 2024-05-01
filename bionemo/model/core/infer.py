@@ -12,12 +12,12 @@ from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple, TypedDic
 
 import torch
 from nemo.utils import logging
-from omegaconf import ListConfig
+from omegaconf import OmegaConf
 from pandas import DataFrame, Series
 from pytorch_lightning.core import LightningModule
 
 from bionemo.data.utils import pad_token_ids
-from bionemo.model.utils import _reconfigure_inference_batch, initialize_model_parallel, restore_model
+from bionemo.model.utils import initialize_model_parallel, restore_model
 
 
 try:
@@ -126,15 +126,25 @@ class BaseEncoderInference(LightningModule):
         training: bool = False,
         adjust_config: bool = True,
         interactive: bool = False,
+        inference_batch_size_for_warmup: Optional[int] = None,
+        strict_restore_from_path: bool = True,
     ):
+        '''
+        Parameters:
+            strict_restore_from_path: When the underlying model is restored, requires that all keys are present in the checkpoint.
+            Users may want to set this to false when they are modifying the underlying model upon restoring. For example, this is done
+            to use the embeddingtoken_types field for Fine tuning on a downstream task.
+        '''
         super().__init__()
-
+        self.needs_warmup = (
+            True  # Set this to False after calling super().__init__ if you don't need warmup in your model.
+        )
         self.cfg = cfg
         self._freeze_model = freeze
         self.adjust_config = adjust_config
         self.training = training
         self.interactive = interactive
-        self.model = self.load_model(cfg, model=model, restore_path=restore_path)
+        self.model = self.load_model(cfg, model=model, restore_path=restore_path, strict=strict_restore_from_path)
         self._trainer = self.model.trainer
         self.tokenizer = self.model.tokenizer
 
@@ -155,8 +165,78 @@ class BaseEncoderInference(LightningModule):
                 "Provide a valid configuration that has this value under model.data.data_fields_map.id."
             )
             self.k_id = None
+        if inference_batch_size_for_warmup is None:
+            inference_batch_size_for_warmup = self.model.cfg.get(
+                "micro_batch_size", 2
+            )  # Default value of 2, or what the user trained with if we can find it
+        # FIXME: remove the need for the following line in our idempotency tests (see CDISCOVERY-2878)
+        #   for example, remove it and see if you can still get tests/test_molecule_inference.py to pass.
+        if self.needs_warmup:
+            self.warmup(max_bs=inference_batch_size_for_warmup)
 
-    def __call__(self, sequences: Union[Series, Dict, List[str]]) -> torch.Tensor:
+    def get_example_input_sequence(self) -> str:
+        raise NotImplementedError("Please return a short example input sequence to be used for warmup.")
+
+    def warmup(self, max_bs: int):
+        self.seq_to_hiddens(sequences=[self.get_example_input_sequence()] * max_bs)  # warmup
+
+    def load_model(
+        self, cfg, model: Optional[Any] = None, restore_path: Optional[str] = None, strict: bool = True
+    ) -> Any:
+        """
+        Loads a model from a given configuration and restore path.
+
+        Args:
+            cfg (Any): The configuration object.
+            model (Optional[Any]): The model object to load. If None, a new model will be restored .
+            restore_path (Optional[str]): The path to restore the model from. If None, the restore path will be obtained from the configuration.
+            strict (bool): Requires all keys in the restored checkpoint to match those in the target model class.
+
+        Returns:
+            Any: The loaded model.
+
+        Raises:
+            Any: Any exceptions that occur during model loading.
+
+        """
+        # load model class from config which is required to load the .nemo file
+
+        if model is None:
+            if restore_path is None:
+                restore_path = cfg.model.downstream_task.restore_from_path
+            model = restore_model(
+                restore_path=restore_path,
+                cfg=cfg,
+                adjust_config=self.adjust_config,
+                interactive=self.interactive,
+                strict=strict,
+            )
+        # move self to same device as loaded model
+        self.to(model.device)
+
+        # check whether the DDP is initialized
+        initialize_model_parallel(model, interactive=self.interactive)
+
+        if not self.interactive:
+            # Reconfigure microbatch sizes here because on model restore, this will contain the micro/global batch configuration used while training.
+            _reconfigure_microbatch_calculator(
+                rank=0,  # This doesn't matter since it is only used for logging
+                rampup_batch_size=None,
+                global_batch_size=1,
+                micro_batch_size=1,  # Make sure that there is no "grad acc" while decoding.
+                data_parallel_size=1,  # We check above to make sure that dataparallel size is always 1 at inference.
+            )
+
+        # Check for PEFT flag
+        if not OmegaConf.select(cfg, 'model.peft.enabled'):  # skipped if peft.enabled is True
+            if self._freeze_model:  # only use encoder_frozen flag if not doing peft
+                model.freeze()
+
+        self.model = model
+
+        return model
+
+    def forward(self, sequences: Union[Series, Dict, List[str]]) -> torch.Tensor:
         """
         Computes embeddings for a list of sequences.
         Embeddings are detached from model.
@@ -184,86 +264,6 @@ class BaseEncoderInference(LightningModule):
             result_dict["id"] = ids
 
         return result_dict
-
-    def load_model(self, cfg, model: Optional[Any] = None, restore_path: Optional[str] = None) -> Any:
-        """Load saved model checkpoint
-
-        Params:
-            checkpoint_path: path to nemo checkpoint
-
-        Returns:
-            Loaded model
-        """
-
-        # load model class from config which is required to load the .nemo file
-
-        if model is None:
-            if restore_path is None:
-                restore_path = cfg.model.downstream_task.restore_from_path
-            model = restore_model(
-                restore_path=restore_path, cfg=cfg, adjust_config=self.adjust_config, interactive=self.interactive
-            )
-        # move self to same device as loaded model
-        self.to(model.device)
-
-        # check whether the DDP is initialized
-        initialize_model_parallel(model, interactive=self.interactive)
-
-        if not self.interactive:
-            # Reconfigure microbatch sizes here because on model restore, this will contain the micro/global batch configuration used while training.
-            _reconfigure_microbatch_calculator(
-                rank=0,  # This doesn't matter since it is only used for logging
-                rampup_batch_size=None,
-                global_batch_size=1,
-                micro_batch_size=1,  # Make sure that there is no "grad acc" while decoding.
-                data_parallel_size=1,  # We check above to make sure that dataparallel size is always 1 at inference.
-            )
-
-        # Check for PEFT flag before calling `setup_optimizer_param_groups`
-        if cfg.get('use_peft', False):  # skipped if use_peft is false or not present in config
-            model.setup_optimizer_param_groups()
-        elif self._freeze_model:  # only use encoder_frozen flag if not doing peft
-            model.freeze()
-
-        self.model = model
-
-        return model
-
-    def forward(self, batch: Dict[str, torch.Tensor]) -> Forward:
-        """Forward pass of the model. Can return embeddings or hiddens, as required"""
-        if self.k_sequence is None or self.k_id is None:
-            raise ValueError(
-                "Configuration used during initialization was invalid: it needs 2 keys. "
-                "(1) It needs a key to identify the sequence in each batch (model.data.data_fields_map.sequence). "
-                "(2) It needs a key to identify the sequence IDs in each batch (model.data.data_fields_map.id)."
-            )
-        sequences = batch[self.k_sequence]
-        sequence_ids = batch[self.k_id]
-        prediction_data = {"sequence_ids": sequence_ids}
-        outputs = self.cfg.model.downstream_task.outputs
-        # make sure we have a list
-        if not isinstance(outputs, ListConfig):
-            outputs = [outputs]
-
-        # adjust microbatch size
-        if not self.interactive:
-            _reconfigure_inference_batch(global_batch_per_gpu=len(sequences))
-
-        with torch.set_grad_enabled(self._freeze_model):
-            for output_type in outputs:
-                if output_type == 'hiddens':
-                    hiddens, mask = self.seq_to_hiddens(sequences)
-                    prediction_data["hiddens"] = hiddens
-                    prediction_data["mask"] = mask
-                elif output_type == 'embeddings':
-                    prediction_data["embeddings"] = self.seq_to_embeddings(sequences)
-                else:
-                    raise ValueError(
-                        f"Invalid prediction type: {self.cfg.model.downstream_task.prediction} "
-                        f"For output type: {output_type}"
-                    )
-
-        return prediction_data
 
     def _tokenize(self, sequences: List[str]) -> torch.Tensor:
         """
@@ -454,6 +454,7 @@ class BaseEncoderDecoderInference(BaseEncoderInference):
         training=False,
         adjust_config=True,
         interactive: bool = False,
+        inference_batch_size_for_warmup: Optional[int] = None,
     ):
         super().__init__(
             cfg=cfg,
@@ -463,7 +464,13 @@ class BaseEncoderDecoderInference(BaseEncoderInference):
             training=training,
             adjust_config=adjust_config,
             interactive=interactive,
+            inference_batch_size_for_warmup=inference_batch_size_for_warmup,
         )
+
+    def warmup(self, max_bs: int):
+        # Override encoder only warmup to also warmup the decoder
+        hiddens, mask = self.seq_to_hiddens(sequences=[self.get_example_input_sequence()] * max_bs)  # warmup encoder
+        self.hiddens_to_seq(hiddens, mask)  # warmup decoder as well
 
     def hiddens_to_seq(self, hiddens: torch.Tensor, enc_mask: torch.Tensor, **kwargs) -> SeqsOrBatch:
         """
@@ -765,7 +772,7 @@ class BaseEncoderDecoderInference(BaseEncoderInference):
             return samples
 
     # TODO: we might want to return embeddings only in some cases, why always return hiddens + embeddings? (commented for now, need to fix ir just use parent implementation)
-    def __call__(self, sequences: Union[Series, IdedSeqs, List[str]]) -> Inference:
+    def forward(self, sequences: Union[Series, IdedSeqs, List[str]]) -> Inference:
         """
         Computes embeddings for a list of sequences.
         Embeddings are detached from model.

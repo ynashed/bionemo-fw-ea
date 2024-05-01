@@ -207,7 +207,7 @@ model:
   tensor_model_parallel_size: 1
   pipeline_model_parallel_size: 1
   resume_from_checkpoint: null
-  num_train_iters: 30
+  num_steps_in_one_epoch: 30
   metrics:
   - lddt_ca
   optim:

@@ -1,6 +1,20 @@
 # Release Notes
+## BioNeMo Framework v1.4
+### New Models
+* **Beta** [Geneformer](https://www.nature.com/articles/s41586-023-06139-9) a foundation model for single-cell data that encodes each cell as represented by an ordered list of differentially expressed genes for that cell.
+
+### New Features
+* **Beta** [Geneformer pretraining with custom datasets](notebooks/geneformer_cellxgene_tutorial.ipynb)
+* [Low-Rank Adaptation (LoRA) finetuning for ESM2](lora-finetuning-esm2.md)
+
+### Bug fixes and Improvements
+* [OpenFold training improved benchmarks and validation of optimizations](models/openfold.md)
+
+### Known Issues
+* BioNeMo Framework v24.04 container is vulnerable to [GHSA-whh8-fjgc-qp73](https://github.com/advisories/GHSA-whh8-fjgc-qp73) in onnx 1.14.0. Users are advised not to open untrusted onnx files with this image. Restrict your mount point to minimize directory traversal impact. A fix for this is scheduled in the 24.05 (May) release.
+
 ## BioNeMo Framework v1.3
-## New Models
+### New Models
 * MolMIM implementation under BioNeMo framework, [a small molecule model developed at NVIDIA](https://arxiv.org/abs/2208.09016) which can be used to produce embeddings and novel molecules.
 
 ### New Features

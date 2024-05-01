@@ -1,3 +1,13 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+#
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
+
 # Configuration file for the Sphinx documentation builder.
 #
 # This file only contains a selection of the most common options. For a full
@@ -66,7 +76,7 @@ deploy_ngc_org = "nvidia"  # FIXME
 deploy_ngc_org_id = 'cobwt4rder8b'  # FIXME
 deploy_ngc_team = "clara"  # FIXME
 deploy_container_name = 'bionemo-framework'  # FIXME
-deploy_container_tag = '1.3'  # FIXME
+deploy_container_tag = '1.4'  # FIXME
 
 myst_enable_extensions = [
     "dollarmath",

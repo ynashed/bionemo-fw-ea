@@ -61,12 +61,15 @@ DIRS_TO_TEST = [
     'examples/dna/dnabert/',
     'examples/molecule/diffdock/',
     'examples/molecule/molmim/',
+    'examples/singlecell/geneformer/',
 ]
 
 TRAIN_SCRIPTS = []
 for subdir in DIRS_TO_TEST:
     TRAIN_SCRIPTS += list(glob(os.path.join(subdir, '*train*.py')))
     TRAIN_SCRIPTS += [f for f in glob(os.path.join(subdir, 'downstream*.py')) if not f.endswith('test.py')]
+    #  TODO add required test files for finetune to work without first manually calling preprocess.
+    # TRAIN_SCRIPTS += [f for f in glob(os.path.join(subdir, 'finetune*.py')) if not f.endswith('test.py')]
 
 
 INFERENCE_CONFIGS = []
@@ -96,17 +99,21 @@ def get_data_overrides(script_or_cfg_path: str) -> str:
         'dnabert',
         'diffdock',
         'molmim',
+        'geneformer',
     ), 'update this function, patterns might be wrong'
 
     task = {
         'molecule': 'physchem/SAMPL',
         'protein': 'downstream',
         'dna': 'downstream',
+        'singlecell': 'downstream',
     }
 
     if conf == ['conf']:
         if model in ('megamolbart', 'openfold', 'molmim'):
             return ''
+        elif model == 'geneformer':
+            return MAIN % 'singlecell'
         else:
             return MAIN % f'{domain}/{task[domain]}/test/x000'
 

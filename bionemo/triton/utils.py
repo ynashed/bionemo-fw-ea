@@ -149,7 +149,7 @@ def register_masked_decode_infer_fn(
     )
 
 
-def load_model_for_inference(cfg: DictConfig, *, interactive: bool = False) -> M:
+def load_model_for_inference(cfg: DictConfig, *, interactive: bool = False, **kwargs) -> M:
     """Loads a bionemo encoder-decoder model from a complete configuration, preparing it only for inference."""
     if not hasattr(cfg, "infer_target"):
         raise ValueError(f"Expecting configuration to have an `infer_target` attribute. Invalid config: {cfg=}")
@@ -163,7 +163,7 @@ def load_model_for_inference(cfg: DictConfig, *, interactive: bool = False) -> M
         interactive=interactive,
     )
 
-    model = infer_class(cfg, interactive=interactive)
+    model = infer_class(cfg, interactive=interactive, **kwargs)
     model.freeze()
 
     return model

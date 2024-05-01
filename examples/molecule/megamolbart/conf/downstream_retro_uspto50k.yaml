@@ -11,7 +11,7 @@ defaults:
 
 name: MegaMolBARTRetro_uspto50k
 # model architecture compatible with MegaMolBart model downloaded by executing ./launch.sh download
-restore_from_path: ${oc.env:BIONEMO_HOME}/models/molecule/megamolbart/megamolbart.nemo # set to null to start from randomly initialize weights
+restore_from_path: null # path to nemo checkpoint of the fine-tuned model (encoder + task head) to be used for further training, testing or inference
 
 trainer:
   num_nodes: 1
@@ -22,6 +22,7 @@ trainer:
 
 model:
   name: ${name}
+  restore_encoder_path: ${oc.env:BIONEMO_HOME}/models/molecule/megamolbart/megamolbart.nemo # set to null to start from randomly initialize weights
   seq_length: 512 # TODO make a checkpoint with this set to 128. Maximum sequence length allowed. Set to 512 for backwards compatibililty with the checkpoint.
   max_position_embeddings: ${.seq_length}
   micro_batch_size: 256

@@ -31,6 +31,7 @@ class ESM1nvInference(BaseEncoderInference):
         training: bool = False,
         adjust_config: bool = True,
         interactive: bool = False,
+        inference_batch_size_for_warmup: Optional[int] = None,
     ):
         super().__init__(
             cfg=cfg,
@@ -40,7 +41,12 @@ class ESM1nvInference(BaseEncoderInference):
             training=training,
             adjust_config=adjust_config,
             interactive=interactive,
+            inference_batch_size_for_warmup=inference_batch_size_for_warmup,
         )
+        self.needs_warmup = False  # @jomitchell verified that this method does not need warmup.
+
+    def get_example_input_sequence(self) -> str:
+        return "DAEFRHDSGYEVHHQKLVFF"
 
     def _tokenize(self, sequences: List[str]) -> List[torch.Tensor]:
         """
@@ -78,7 +84,7 @@ class ESM1nvInference(BaseEncoderInference):
 
         return hidden_states, enc_mask
 
-    def load_model(self, cfg, model=None, restore_path=None):
+    def load_model(self, cfg, model=None, restore_path=None, strict: bool = True):
         """Load saved model checkpoint
 
         Params:
@@ -92,7 +98,7 @@ class ESM1nvInference(BaseEncoderInference):
             post_process = cfg.model.post_process
         else:
             post_process = model.model.post_process
-        model = super().load_model(cfg, model=model, restore_path=restore_path)
+        model = super().load_model(cfg, model=model, restore_path=restore_path, strict=strict)
 
         model.model.post_process = post_process
 

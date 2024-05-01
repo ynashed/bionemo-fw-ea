@@ -38,13 +38,46 @@ RUN cd dgl/python && python setup.py install && cd ../.. && rm -rf dgl
 # LABEL "com.nvidia.nemo.git_hash"="a5fbsegy"
 # LABEL "com.nvidia.nemo.description"="Cusotom build with XYZ fixed"
 
-## Installing dependencies and tools
+## Installing system dependencies and tools
+##
+## NOTE: Need to resolve issue with libboost-all-dev for vina py. dependency.
+##      If we apt install libboost-dev-all, then, on import torch, we observe an error
+##      stating that ucm_set_global_opts is undefined in libucs. The error stack will
+##      always look something like the following:
+##
+## .........................................: in <module>
+##     import torch
+## /usr/local/lib/python3.10/dist-packages/torch/__init__.py:234: in <module>
+##     from torch._C import *  # noqa: F403
+## E   ImportError: /opt/hpcx/ucx/lib/libucs.so.0: undefined s
+##
+
 RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y \
-        python3-setuptools python3-dev swig \
-        wget git unzip tmux vim emacs-nox tree xterm && \
-    rm -rf /var/lib/apt/lists/*
+        python3-setuptools python3-dev libboost-all-dev swig \
+        wget git unzip tmux vim emacs-nox tree xterm \
+        liblmdb-dev libopenbabel-dev python3-openbabel openbabel libopenbabel7
+
+## libboost-all-dev is required by vina==1.2.5 for its compilation
+## While at the runtime only boost-thread and boost-filesystem are needed
+RUN pip install --no-build-isolation vina==1.2.5
+RUN apt purge *mpi* -y \
+    && apt autoremove -y \
+    && apt install libboost-thread-dev libboost-filesystem-dev -y \
+    && rm -rf /var/lib/apt/lists/*
+
+# special handling for openbabel:
+# apt installs the openbabel3 library to /usr/include/openbabel3, but the openbabel python package
+# assumes that it is under /usr/local/include/openbabel3. The error will look like this on install:
+#       Error: SWIG failed. Is Open Babel installed?
+#       You may need to manually specify the location of Open Babel include and library directories. For example:
+#         python setup.py build_ext -I/usr/local/include/openbabel3 -L/usr/local/lib
+#         python setup.py install
+#       [end of output]
+# To fix, we symlink!
+RUN ln -s /usr/include/openbabel3 /usr/local/include/openbabel3
+# NOTE: openbabel is inlcuded in setup/requirements.txt
 
 # Optional: Install code-server to enable easy remote development on a container
 # More info about code-server be found here: https://coder.com/docs/code-server/v4.4.0
@@ -53,23 +86,23 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
 #
 # # Install extensions from the marketplace
 # RUN code-server --install-extension ms-python.python
-# TODO: unnecessary for main container, move test+dev dep installation to dev only & update CI to use dev image
 # moved -test and -dev up in build to resolve build errors
-COPY setup/requirements-test.txt /tmp/requirements-test.txt
+# COPY files first **BEFORE** installing from them => use the layer cache effectively!
+COPY setup/requirements*.txt /tmp/
+COPY setup/install_lmdb.sh /tmp/install_lmdb.sh
+RUN --mount=type=secret,id=GITLAB_TOKEN GITLAB_TOKEN=$(cat /run/secrets/GITLAB_TOKEN) pip install -r /tmp/requirements-dev.txt
 RUN pip install -r /tmp/requirements-test.txt
-# end TODO
-COPY setup/requirements.txt /tmp/requirements.txt
 RUN --mount=type=secret,id=GITLAB_TOKEN GITLAB_TOKEN=$(cat /run/secrets/GITLAB_TOKEN) pip install -r /tmp/requirements.txt
-# requirements-cve.txt *must* be installed last to patch security vulns in pip
-# packages.
-COPY setup/requirements-cve.txt /tmp/requirements-cve.txt
+# need special install for lmdb: it cannot be installed via pip, but be built from source
+# but unfortunately, https://github.com/jnwatson/py-lmdb.git isn't PEP-512 compliant, so we have to manually run setup.py
+RUN /tmp/install_lmdb.sh
+# requirements-cve.txt *must* be installed last to patch security vulns in pip packages
 RUN pip install -r /tmp/requirements-cve.txt
-
 
 
 # AWS CLI is inside requirements.txt. Add config file.
 # This config file does not contain access keys.
-RUN mkdir $HOME/.aws
+RUN mkdir -p $HOME/.aws
 COPY setup/aws-config-swiftstack $HOME/.aws/config
 
 # Recompile Megatron helpers -- NOTE this may need to be done before running job later
@@ -87,32 +120,59 @@ RUN NEMO_PATH=$(python -c 'import nemo; print(nemo.__path__[0])') && \
 #       This is exposed through the `iteractive=True` constructor parameter.
 #       In MegaMolBart, specifically, this patch adds support for recongifure_minibatch as a flag
 #       in its decode method.
-# TODO [mgreaves] Upstream this patch and then remove here when we can upgrade our nemo dependency.
+# TODO [mgreaves] Upstream nemo-v-1.22-support_interactive_megamolbart_lm-decode_reconfigure_minibatch patch and
+# then remove here when we can upgrade our nemo dependency.
 #                 https://jirasw.nvidia.com/browse/CDISCOVERY-2146
-COPY ./setup/nemo-v-1.22-support_interactive_megamolbart_lm-decode_reconfigure_minibatch.patch ./
-RUN NEMO_INST_DIR=$(python -c 'import nemo; from pathlib import Path; print(Path(nemo.__path__[0]).parent)') && \
-    patch -p1 -d $NEMO_INST_DIR -i $PWD/nemo-v-1.22-support_interactive_megamolbart_lm-decode_reconfigure_minibatch.patch && \
-    rm nemo-v-1.22-support_interactive_megamolbart_lm-decode_reconfigure_minibatch.patch
-
 # NOTE: hiddens_support_train_v_inf_outputs.patch applies the patch from https://github.com/NVIDIA/NeMo/pull/8466 which fixes an issue
 #        where training uses the same hiddens key for inference (eg always the gaussian noised z rather than z_mean).
-COPY ./setup/hiddens_support_train_v_inf_outputs.patch ./
-RUN NEMO_INST_DIR=$(python -c 'import nemo; from pathlib import Path; print(Path(nemo.__path__[0]).parent)') && \
-    patch -p1 -d $NEMO_INST_DIR -i $PWD/hiddens_support_train_v_inf_outputs.patch && \
-    rm hiddens_support_train_v_inf_outputs.patch
-
-# NOTE: hiddens_support_train_v_inf_outputs.patch applies the patch from https://github.com/NVIDIA/NeMo/pull/8576 which fixes an issue
+# NOTE: data_sampler_constant_len.patch.patch applies the patch from https://github.com/NVIDIA/NeMo/pull/8576 which fixes an issue
 #        where you restart a run after an epoch.
-COPY ./setup/data_sampler_constant_len.patch ./
+# NOTE: nemo-lr-scheduler.patch adds patch for WarmupAnnealDecayHold NeMo LR Scheduler
+COPY ./setup/*.patch ./
 RUN NEMO_INST_DIR=$(python -c 'import nemo; from pathlib import Path; print(Path(nemo.__path__[0]).parent)') && \
+    patch -p1 -d $NEMO_INST_DIR -i $PWD/nemo-v-1.22-support_interactive_megamolbart_lm-decode_reconfigure_minibatch.patch && \
+    patch -p1 -d $NEMO_INST_DIR -i $PWD/hiddens_support_train_v_inf_outputs.patch && \
     patch -p1 -d $NEMO_INST_DIR -i $PWD/data_sampler_constant_len.patch && \
-    rm data_sampler_constant_len.patch
-
-# NOTE: Adds patch for WarmupAnnealDecayHold NeMo LR Scheduler
-COPY ./setup/nemo-lr-scheduler.patch ./
-RUN NEMO_INST_DIR=$(python -c 'import nemo; from pathlib import Path; print(Path(nemo.__path__[0]).parent)') && \
     patch -p1 -d $NEMO_INST_DIR -i $PWD/nemo-lr-scheduler.patch && \
-    rm nemo-lr-scheduler.patch
+    rm *.patch
+#
+# Special Handling for Python Package Security Vulnerabilities
+#
+
+# Remove nvm as it's not expected users will need this, and it introduces unfixable vulnerabilties:
+# https://nvd.nist.gov/vuln/detail/CVE-2023-32002
+RUN /bin/bash -c "source /usr/local/nvm/nvm.sh && nvm deactivate && nvm unload && sed -i '/NVM/d' /root/.bashrc" \
+    && rm -rf /usr/local/nvm \
+    && /bin/bash -c "sed -i '/NVM/d' /root/.bashrc && sed -i '/nvm.sh/d' /etc/bash.bashrc"
+
+# Remove OpenCV: We do not use it and it adds a security vulnerability (fix: https://github.com/opencv/opencv_contrib/pull/3480)
+# https://nvd.nist.gov/vuln/detail/CVE-2023-2617
+# Remove fonttool: We do not use it and it adds a security vulnerability: https://github.com/advisories/GHSA-6673-4983-2vx5
+RUN pip uninstall -y opencv-python opencv fonttools \
+    && rm -rf \
+       /usr/local/lib/python3.10/dist-packages/cv2 \
+       /usr/local/include/opencv4 \
+       /usr/local/share/opencv4 \
+       /usr/local/lib/cmake/opencv4 \
+       /usr/local/bin/opencv*
+# Remove Slurm: The BioNeMo FW Container can certainly be deployed to Slurm clusters, however having Slurm
+# installed *inside* the container does not typically have a use case. Slurm introduces vulnerabilities
+# into our container.
+RUN DEBIAN_FRONTEND=noninteractive apt remove -y libslurm37 libpmi2-0
+# Remove ONNX source code from container. Note -- this just reduces the duplicate onnx line item in the
+# vulnerability report -- it doesn't remove the onnx vulnerability which is in the
+# /usr/local/lib/python3.10/dist-packages/onnx wheel.
+# The onnx vulnerability is expected to be fixed in BioNeMo FW v1.5 when the underlying pytorch frameworks image
+# fixes the issue.
+RUN rm -rf /opt/pytorch/pytorch/third_party/onnx
+
+####
+#### NOTE: THIS MUST BE THE ABSOLUTE **LAST** STEP BEFORE ENTRYPOINT !!!!!
+####       SPECIFICALLY, THE SECTION LABELED "BioNeMo Build"
+####       DO NOT MAKE OTHER LAYERS **AFTER** THIS SECTON!
+####       OTHERWISE IT WILL MAKE REBUILDS ON SOURCE CHANGES TAKE LONGER THAN NECESSARY BY INVALIDATING THE LAYER CACHE.
+####
+
 #########################################################################################
 # BioNeMo Build
 #########################################################################################
@@ -125,7 +185,6 @@ WORKDIR ${BIONEMO_HOME}
 ### Copy the bionemo repo contents for distribution
 COPY LICENSE README.md artifact_paths.yaml download_models.py launch.sh setup.py pyproject.toml ${BIONEMO_HOME}/
 COPY setup ${BIONEMO_HOME}/setup
-COPY docs ${BIONEMO_HOME}/docs
 COPY hydra_plugins ${BIONEMO_HOME}/hydra_plugins
 COPY tokenizers ${BIONEMO_HOME}/tokenizers
 # copy the package contents *last* as most churn occurs here
@@ -134,28 +193,10 @@ COPY examples ${BIONEMO_HOME}/examples
 COPY tests ${BIONEMO_HOME}/tests
 COPY bionemo ${BIONEMO_HOME}/bionemo
 
-
 ### install bionemo
 WORKDIR ${BIONEMO_HOME}
 # we already install dependencies earlier, directly from the requirements*.txt files
 RUN pip install --no-deps -e .
-
-# Remove nvm as it's not expected users will need this, and it introduces unfixable vulnerabilties:
-# https://nvd.nist.gov/vuln/detail/CVE-2023-32002
-RUN /bin/bash -c "source /usr/local/nvm/nvm.sh && nvm deactivate && nvm unload && sed -i '/NVM/d' /root/.bashrc"
-RUN rm -rf /usr/local/nvm
-RUN /bin/bash -c "sed -i '/NVM/d' /root/.bashrc && sed -i '/nvm.sh/d' /etc/bash.bashrc"
-# Remove OpenCV: We do not use it and it adds a security vulnerability which no current fix:
-# https://nvd.nist.gov/vuln/detail/CVE-2023-2617
-RUN pip uninstall -y opencv-python opencv
-RUN rm -rf /usr/local/lib/python3.10/dist-packages/cv2 /usr/local/include/opencv4 /usr/local/share/opencv4 /usr/local/lib/cmake/opencv4 /usr/local/bin/opencv*
-# Remove Slurm: The BioNeMo FW Container can certainly be deployed to Slurm clusters, however having Slurm
-# installed *inside* the container does not typically have a use case. Slurm introduces vulnerabilities
-# into our container.
-RUN DEBIAN_FRONTEND=noninteractive apt remove -y libslurm37 libpmi2-0
-# Remove fonttool: We do not use it and it adds a security vulnerability: https://github.com/advisories/GHSA-6673-4983-2vx5
-RUN pip uninstall -y fonttools
-
 
 # FIXME: If BIONEMO_HOME _is not_ /workspace/bionemo, then this ENTRYPOINT is invalid!
 ENTRYPOINT ["/workspace/bionemo/setup/startup.sh"]

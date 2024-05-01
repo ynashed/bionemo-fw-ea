@@ -11,6 +11,7 @@
 import copy
 import os
 import warnings
+from typing import Optional
 
 import numpy as np
 import scipy.spatial as spa
@@ -378,20 +379,46 @@ def get_lig_graph(mol, complex_graph):
     return
 
 
-def generate_conformer(mol, seed=None):
+def generate_conformer(
+    mol: Chem.rdchem.Mol, seed: Optional[int] = None, max_iterations: int = 0, enforce_chirality: bool = True
+):
+    """Embedding molecule with coordinates/Generating molecule conformer.
+
+    Args:
+        mol (Chem.rdchem.Mol): RDKit molecule object
+        seed (Optional[int], optional): random seed for generating molecule conformer. Defaults to None.
+        max_iterations (int, optional): number of maximal iterations for generating molecule conformer.
+            If set to 0 as the default value in RDKit, it is 10x the number of molecule atoms.
+            Suggest setting this to 10, so it can fail quickly and try with random coordinates.
+            Defaults to 0.
+        enforce_chirality (bool, optional): whether enforce chirality check after failure from first try without using random coordinates.
+            Most failures are due to incorrect charities, suggest to set to False. Defaults to True.
+    """
     ps = AllChem.ETKDGv2()
     if seed is not None:
         ps.randomSeed = seed
+    ps.maxIterations = max_iterations
     id = AllChem.EmbedMolecule(mol, ps)
     if id == -1:
         logging.info('rdkit coords could not be generated without using random coords. using random coords now.')
         ps.useRandomCoords = True
+        ps.enforceChirality = enforce_chirality
         AllChem.EmbedMolecule(mol, ps)
         AllChem.MMFFOptimizeMolecule(mol, confId=0)
 
 
 def get_lig_graph_with_matching(
-    mol_, complex_graph, popsize, maxiter, matching, keep_original, num_conformers, remove_hs, seed=None
+    mol_,
+    complex_graph,
+    popsize,
+    maxiter,
+    matching,
+    keep_original,
+    num_conformers,
+    remove_hs,
+    seed=None,
+    generate_conformer_max_iterations=0,
+    generate_conformer_enforce_chirality=True,
 ):
     if matching:
         mol_maybe_noh = copy.deepcopy(mol_)
@@ -409,7 +436,12 @@ def get_lig_graph_with_matching(
 
             mol_rdkit.RemoveAllConformers()
             mol_rdkit = AllChem.AddHs(mol_rdkit)
-            generate_conformer(mol_rdkit, seed=seed)
+            generate_conformer(
+                mol_rdkit,
+                seed=seed,
+                max_iterations=generate_conformer_max_iterations,
+                enforce_chirality=generate_conformer_enforce_chirality,
+            )
             if remove_hs:
                 mol_rdkit = RemoveHs(mol_rdkit, sanitize=True)
             mol = copy.deepcopy(mol_maybe_noh)

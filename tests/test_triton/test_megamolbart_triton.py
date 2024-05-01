@@ -67,7 +67,7 @@ def cfg(bionemo_home: Path) -> DictConfig:
 def model(cfg: DictConfig) -> MegaMolBARTInference:
     # TODO [mgreaves] replace with this in !553
     # model = load_model_for_inference(cfg, interactive=False)
-    yield load_model_for_inference(cfg)
+    yield load_model_for_inference(cfg, inference_batch_size_for_warmup=len(SMILES))
     teardown_apex_megatron_cuda()
 
 

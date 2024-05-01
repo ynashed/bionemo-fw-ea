@@ -1,3 +1,54 @@
+# Title: openfold_initial_training.yaml
+# Usage: 
+#   cd $BIONEMO_HOME
+#   python examples/protein/openfold/train.py --config=openfold_initial_training
+#
+# Description:
+#   This file contains settings and parameters for the training of the 
+#   AlphaFold model class at bionemo.model.protein.openfold.openfold_model
+#
+#   (1) AlphaFold currently does not have tensor or pipeline parallelism, so 
+#
+#     world_size = num_nodes * num_devices
+#     global_batch_size = micro_batch_size * world_size * accumulate_grad_batches
+#
+#   where global_batch_size is computed in bionemo.model.utils.infer_global_batch_size
+#
+#
+#   (2) accumulate_grad_batches is set to default 1 in 
+#
+#   (3) To set the number of steps for the training job, set the parameters
+#     
+#     model.num_steps_in_one_epoch, i.e. num_training_steps_in_one_epoch, 
+#         i.e., num_batches_in_one_epoch ,this identically determines the 
+#         number of mini-batches for 1 epoch, since it determines the number 
+#         of training example indices in the training data loader for each rank
+#
+#           1 epoch:
+#
+#               rank_0: example_00, example_01, ...., example_{0,num_steps_in_one_epoch-1}
+#               rank_1: example_10, example_11, ...., example_{1,num_steps_in_one_epoch-1}
+#         
+#     trainer.max_steps: at most, this many training steps will occur
+#     trainer.max_epochs: at most, this many epoch will be processes
+#   
+#   trainer.fit will determine the end of the training job via
+#
+#       trainer.global_step = min(
+#             model.num_steps_in_one_epoch * trainer.max_epochs, 
+#             trainer.max_steps,              
+#       )
+#
+#
+#             epoch index = trainer.global_step // len(train_data_loader)
+#            /
+#           v
+#     Epoch 0:  20%|▏| 2/10 [01:11<04:45, 35.74s/it,
+#                      ^  ^
+#                    /      \
+#    trainer.global_step     model.num_steps_in_one_epoch
+#
+#
 defaults:
   - base_config
   - _self_
@@ -6,18 +57,24 @@ do_preprocess: false
 do_training: true
 do_validation: false
 
+# BnmoTQDMProgressBar
+#   To activate this progress bar, uncomment the 3 lines below
+# progress_bar_kwargs: 
+#   name: BnmoTQDMProgressBar
+#   warmup: 10
+
 model:
   stage: initial_training
   seed: 44
-  micro_batch_size: 1
+  micro_batch_size: 1 # input MSA, pair-matrix per GPU per collection of grads
   tensor_model_parallel_size: 1
   pipeline_model_parallel_size: 1
   resume_from_checkpoint: null
-  num_train_iters: 80000
+  num_steps_in_one_epoch: 80000  # number of training steps in one epoch
   metrics:
     # available metrics are: lddt_ca, drmsd_ca, alignment_rmsd, gdt_ts, gdt_ha
     - lddt_ca
-
+  
   optim:
     name: adam
     lr: 1e-3
@@ -133,11 +190,19 @@ model:
   #      - dataloader_pq (DataLoader with a priority queue)
   optimisations: []
 
+  # Stop the application when close to the slurm-job-end-time
+  #   - When active, this functionality operates within the model class methods.
+  #   - To activate this functionality, uncomment the two lines below, where
+  #   the format for the time is HH:MM:SS
+  #
+  # do_stop_when_close_to_slurm_job_end: True
+  # buffer_before_slurm_job_end_time: 00:05:00
+
 trainer:
   # the effective batch size should be 128
   devices: 1
   accelerator : gpu
-  precision: 32 # has been only trained with 32 precision
+  precision: 32 # default precision
   num_nodes: 1
   max_steps : 80_000 # pre-training default as in the paper
   max_epochs: 1 # step-based training
