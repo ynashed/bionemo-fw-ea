@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import List, Type, TypedDict
 
 import pytest
+from lightning.fabric.plugins.environments.lightning import find_free_network_port
 from omegaconf import OmegaConf, open_dict
 from pytorch_lightning import LightningModule
 
@@ -303,7 +304,12 @@ def test_model_training(
     """
     Run short model training and ensure key metrics are identical
     """
+    # Lookup a free socket to fix errors with DDP on a single node, e.g. this pytest.
+    # TODO(@cye): Why does this depend on how `pytest` is executed, i.e. with a single vs. multiple tests?
+    # Some tests succeed when run in batch / fail otherwise, other tests succeed when run alone / fail otherwise.
+    open_port = find_free_network_port()
     cmd = (
+        f'export MASTER_PORT={open_port} && '
         f'python {script_path}  --config-path {config_path_for_tests} --config-name {config_name} '
         f'++exp_manager.exp_dir={tmp_path} '
         f'++create_trainer_metric_callback=True ++trainer_metric_callback_kwargs.log_path={tmp_path}'

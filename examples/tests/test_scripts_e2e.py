@@ -251,7 +251,8 @@ def test_infer_script(config_path, tmp_path):
     if not os.path.exists(script_path):
         script_path = 'bionemo/model/infer.py'
     # Lookup a free socket to fix errors with DDP on a single node, e.g. this pytest.
-    # TODO(@cye): Why did this solution regress in PyTorch Lightning?
+    # TODO(@cye): Why does this depend on how `pytest` is executed, i.e. with a single vs. multiple tests?
+    # Some tests succeed when run in batch / fail otherwise, other tests succeed when run alone / fail otherwise.
     open_port = find_free_network_port()
     cmd: str = (
         f'export MASTER_PORT={open_port} && python {script_path} --config-dir {config_dir} --config-name {config_name} ++exp_manager.exp_dir={tmp_path} '
