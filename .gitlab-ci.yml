@@ -549,7 +549,13 @@ jet-configure:
 jet-trigger:
   extends: [.jet-trigger-template]
   variables:
+    JET_API_TAG: v0.0.0-dev.14637274
     JET_CUSTOM_CONFIG: |
+      restarter:
+        enabled: true
+        max_retries: 2
+        retry_on: ['1.2.1.2']
+        waiting_time: 60
       launchers:
         dgxa100_dracooci:
           additional_flags:
