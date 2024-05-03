@@ -62,6 +62,18 @@ models:
         symlink:
             source: "../../diffdock_confidence.nemo"
             target: "molecule/diffdock/diffdock_confidence.nemo"
+    esm2nv_8m_untrained:
+        ngc: null
+        pbss: "s3://bionemo-ci/models/esm2nv_8M_untrained.nemo"
+        symlink:
+            source: "../../esm2nv_8M_untrained.nemo"
+            target: "protein/esm2nv/esm2nv_8M_untrained.nemo"
+    esm2nv_8m_lora:
+        ngc: null
+        pbss: "s3://bionemo-ci/models/esm2nv_sec_str_lora.nemo"
+        symlink:
+            source: "../../esm2nv_sec_str_lora.nemo"
+            target: "protein/esm2nv/esm2nv_sec_str_lora.nemo"
     esm2nv_650m:
         #TODO: update path when model is released
         ngc: "nvidia/clara/esm2nv650m:1.0"

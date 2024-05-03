@@ -1,0 +1,89 @@
+defaults:
+  - pretrain_esm2_8M
+
+hydra:
+  searchpath:
+    - file:///workspace/bionemo/examples/protein/esm2nv/conf
+
+name: esm2nv_sec_str_lora
+do_preprocessing: False
+do_training: True # set to false if data preprocessing steps must be completed
+do_testing: True # set to true to run evaluation on test data after training
+restore_from_path: null # path to nemo checkpoint of the protein model. Other options: esm2nv_3B_converted.nemo
+target: bionemo.model.protein.esm1nv.ESM2nvLoRAModel # target class for protein model
+infer_target: bionemo.model.protein.esm1nv.infer.ESM1nvInference # target inference class for protein model
+
+
+trainer:
+  devices: 1 # number of GPUs or CPUs
+  num_nodes: 1 
+  max_epochs: 1 # # use max_steps instead with NeMo Megatron model
+  max_steps: 10 # consumed_samples = global_step * micro_batch_size * data_parallel_size * accumulate_grad_batches
+  val_check_interval: 10
+  limit_val_batches: 1.0 # number of batches in validation step, use fraction for fraction of data
+  limit_test_batches: 1.0 # number of batches in test step, use fraction for fraction of data
+  num_sanity_val_steps: 0
+
+exp_manager:
+  exp_dir: ${oc.env:BIONEMO_HOME}/test_results/nemo_experiments/esm2nv_lora_finetuning
+  create_wandb_logger: False
+  create_tensorboard_logger: False
+  wandb_logger_kwargs:
+    offline: True
+  resume_if_exists: False
+
+model:
+  restore_encoder_path: ${oc.env:BIONEMO_HOME}/models/protein/esm2nv/esm2nv_8M_untrained.nemo # path to nemo checkpoint of the protein model. Other options: esm2nv_3B_converted.nemo
+  encoder_frozen: False
+  post_process: False
+  micro_batch_size: 2 # NOTE: adjust to occupy ~ 90% of GPU memory
+  global_batch_size: null
+  tensor_model_parallel_size: 1  # model parallelism
+  cnn_dim: 32
+  dropout_rate: 0.25
+  megatron_amp_O2: False #Required by NLPAdapterModelMixin for PEFT
+
+  peft:
+    enabled: True # indicates whether we intend to use PEFT technique
+    peft_scheme: "lora"  # currently supported: lora
+    restore_from_path: null #set to null to initialize random weights and train
+    
+    lora_tuning:
+      adapter_dim: 32
+      adapter_dropout: 0.0
+      column_init_method: 'xavier' # options: xavier, zero or normal
+      row_init_method: 'zero' # options: xavier, zero or normal
+      layer_selection:  null  # selects in which layers to add lora adapters. e.g. [1,12] will add lora to layer 1 (lowest) and 12. null will apply adapters to all layers
+      weight_tying: False
+      position_embedding_strategy: null # used only when weight_tying is True
+  
+  data:
+    task_name: secondary_structure # options: aav, bind, conservation, gb1, meltome, sav, scl, secondary_structure
+    task_type: 'token-level-classification'  # alternative: classification, regression
+    emb_batch_size: ${model.micro_batch_size}
+    dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/protein/downstream
+    dataset:
+      train: x000
+      test: x000
+      val: x000
+    sequence_column: "sequence" 
+    target_column: ["3state"] # names of label columns in csv file 
+    target_sizes: [3] # number of classes in each label 
+    mask_column: ["resolved"] # names of mask columns in csv file, masks must be 0 or 1
+    num_workers: 8
+    max_seq_length: ${model.seq_length}
+  
+  finetuning_optim:
+    name: adam
+    lr: 0.001
+    betas:
+      - 0.9
+      - 0.999
+    eps: 1e-8
+    weight_decay: 0.01
+    sched:
+      name: WarmupAnnealing
+      min_lr: 0.00001
+      last_epoch: -1
+      warmup_steps: 100
+      max_steps: 1000
