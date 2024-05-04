@@ -98,7 +98,6 @@ model:
   batch_norm_with_shift: true
   tensor_product:
     use_second_order_repr: false
-    type: e3nn
   cross_max_distance: 80.0
   dynamic_max_cross: true
   dropout: 0.1

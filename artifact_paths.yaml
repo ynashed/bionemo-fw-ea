@@ -51,16 +51,16 @@ models:
             source: "../../equidock_db5.nemo"
             target: "protein/equidock/equidock_db5.nemo"
     diffdock_score:
-        ngc: "nvidia/clara/diffdock_score:1.1"
-        pbss: "s3://bionemo-ci/models/diffdock_score.nemo"
+        ngc: "nvidian/clara-lifesciences/diffdock:paper_score_cugraph.24.02"
+        pbss: "s3://bionemo-ci/models/diffdock_score_v24.02_cugraph.nemo"
         symlink:
-            source: "../../diffdock_score.nemo"
+            source: "../../diffdock_score_v24.02_cugraph.nemo"
             target: "molecule/diffdock/diffdock_score.nemo"
     diffdock_confidence:
-        ngc: "nvidia/clara/diffdock_confidence:1.1"
-        pbss: "s3://bionemo-ci/models/diffdock_confidence.nemo"
+        ngc: "nvidian/clara-lifesciences/diffdock:paper_confidence_cugraph.24.02"
+        pbss: "s3://bionemo-ci/models/diffdock_confidence_v24.02_cugraph.nemo"
         symlink:
-            source: "../../diffdock_confidence.nemo"
+            source: "../../diffdock_confidence_v24.02_cugraph.nemo"
             target: "molecule/diffdock/diffdock_confidence.nemo"
     esm2nv_8m_untrained:
         ngc: null

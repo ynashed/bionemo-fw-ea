@@ -379,7 +379,7 @@ def restore_model(
     return model
 
 
-def load_model_for_inference(cfg: DictConfig, strict: bool = True):
+def load_model_for_inference(cfg: DictConfig, strict: bool = True, interactive: bool = False):
     """load model with config for model inference. Freeze model and reconfigure DDP and batch size.
 
     Args:
@@ -391,11 +391,7 @@ def load_model_for_inference(cfg: DictConfig, strict: bool = True):
     """
 
     # load model class from config which is required to load the .nemo file
-    model = restore_model(
-        restore_path=cfg.restore_from_path,
-        cfg=cfg,
-        strict=strict,
-    )
+    model = restore_model(restore_path=cfg.restore_from_path, cfg=cfg, strict=strict, interactive=interactive)
 
     # check whether the DDP is initialized
     if parallel_state.is_unitialized():
@@ -408,13 +404,14 @@ def load_model_for_inference(cfg: DictConfig, strict: bool = True):
             model.trainer.strategy.launcher.launch(dummy, trainer=model.trainer)
         model.trainer.strategy.setup_environment()
     # Reconfigure microbatch sizes here because on model restore, this will contain the micro/global batch configuration used while training.
-    _reconfigure_microbatch_calculator(
-        rank=0,  # This doesn't matter since it is only used for logging
-        rampup_batch_size=None,
-        global_batch_size=1,
-        micro_batch_size=1,  # Make sure that there is no "grad acc" while decoding.
-        data_parallel_size=1,  # We check above to make sure that dataparallel size is always 1 at inference.
-    )
+    if not interactive:
+        _reconfigure_microbatch_calculator(
+            rank=0,  # This doesn't matter since it is only used for logging
+            rampup_batch_size=None,
+            global_batch_size=1,
+            micro_batch_size=1,  # Make sure that there is no "grad acc" while decoding.
+            data_parallel_size=1,  # We check above to make sure that dataparallel size is always 1 at inference.
+        )
     model.freeze()
     return model
 
