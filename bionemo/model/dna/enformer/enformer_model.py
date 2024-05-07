@@ -317,7 +317,7 @@ class Enformer(ModelPT):
     def setup_test_data(self, test_data_config: Union[omegaconf.DictConfig, Dict]):
         self._test_dl, self._test_names = self._single_infer_dataloader(cfg=test_data_config, split='test')
 
-    def validation_step(self, batch, batch_idx, dataset_idx=None):
+    def validation_step(self, batch, batch_idx, dataloader_idx=0):
         if batch is None:
             return
         head = batch['head_name']
@@ -339,8 +339,8 @@ class Enformer(ModelPT):
             )
             metric.reset()
 
-    def test_step(self, batch, batch_idx, dataset_idx=None):
-        self.validation_step(batch, batch_idx)
+    def test_step(self, batch, batch_idx, dataloader_idx=0):
+        self.validation_step(batch, batch_idx, dataloader_idx=dataloader_idx)
 
     def on_test_epoch_end(self):
         self.on_validation_epoch_end()

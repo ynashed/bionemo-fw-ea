@@ -5,6 +5,7 @@ defaults:
 
 restore_from_path: ???
 infer_path: ??? # path to a FASTA file that contains sequence to predict on 
+infer_target: bionemo.model.dna.enformer.Enformer
 
 model:
   predictions_output_path: ??? # where prediction results will be stored
