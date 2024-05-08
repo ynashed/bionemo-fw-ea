@@ -40,8 +40,9 @@ exp_manager:
     model_parallel_size: ${multiply:${model.tensor_model_parallel_size}, ${model.pipeline_model_parallel_size}}
 model:
   tokenizer:
-    vocab_file: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/singlecell/geneformer.vocab
+    vocab_file: ${..data.train_dataset_path}/geneformer.vocab
   micro_batch_size: 8
+  activation: relu
   tensor_model_parallel_size: 1
   pipeline_model_parallel_size: 1
   use_flash_attention: true
@@ -53,10 +54,11 @@ model:
   ffn_hidden_size: 512
   num_attention_heads: 4
   init_method_std: 0.02
-  hidden_dropout: 0.1
+  hidden_dropout: 0.02
+  attention_dropout: 0.02
   kv_channels: null
   apply_query_key_layer_scaling: true
-  layernorm_epsilon: 1.0e-05
+  layernorm_epsilon: 1.0e-12
   make_vocab_size_divisible_by: 128
   pre_process: true
   post_process: true
@@ -65,7 +67,7 @@ model:
   masked_softmax_fusion: true
   native_amp_init_scale: 4294967296
   native_amp_growth_interval: 1000
-  fp32_residual_connection: false
+  fp32_residual_connection: true
   fp16_lm_cross_entropy: false
   seed: 1234
   use_cpu_initialization: false
@@ -75,16 +77,17 @@ model:
   data:
     data_impl: geneformer
     probabilistic_dirichlet_sampling_train: false
-    dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/singlecell
+    train_dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/cellxgene_2023-12-15_small/processed_data/train
+    val_dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/cellxgene_2023-12-15_small/processed_data/val
+    test_dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/cellxgene_2023-12-15_small/processed_data/test
+    dataset_path: null
+    dataset: /
     data_prefix: ''
     shuffle: true
-    dataset: /
-    medians_file: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/singlecell/medians.json
-    index_mapping_dir: null
+    medians_file: ${.train_dataset_path}/medians.json
+    index_mapping_dir: ${exp_manager.exp_dir}/index_mapping
     skip_warmup: true
     index_mapping_type: memmap
-    train_ratio: 0.98
-    val_ratio: 0.01
     num_workers: 12
     dataloader_type: single
     seq_length: ${model.seq_length}
@@ -93,11 +96,11 @@ model:
     micro_batch_size: ${model.micro_batch_size}
   optim:
     name: fused_adam
-    lr: 0.0002
-    weight_decay: 0.01
+    lr: 0.001
+    weight_decay: 0.1
     betas:
     - 0.9
-    - 0.98
+    - 0.999
     sched:
       name: CosineAnnealing
       warmup_steps: ${multiply:${trainer.max_steps}, 0.01}

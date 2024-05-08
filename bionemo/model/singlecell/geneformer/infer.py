@@ -10,6 +10,7 @@
 from typing import Any, Dict, List, Optional, Tuple
 
 import torch
+from megatron.core import tensor_parallel
 from torch import Tensor
 
 from bionemo.model.core.infer import BaseEncoderInference
@@ -41,7 +42,6 @@ class GeneformerInference(BaseEncoderInference):
         strict_restore_from_path: bool = True,
         inference_batch_size_for_warmup: Optional[int] = None,
     ):
-        self.needs_warmup = False  # Not needed for geneformer. See inference test which covers the need for warmup.
         super().__init__(
             cfg=cfg,
             model=model,
@@ -52,6 +52,7 @@ class GeneformerInference(BaseEncoderInference):
             interactive=interactive,
             strict_restore_from_path=strict_restore_from_path,  # NOTE(SKH): This is IMPORTANT, we add tokentype embeddings during fine tuning, if we restore strictly, this will fail.
             inference_batch_size_for_warmup=inference_batch_size_for_warmup,
+            needs_warmup=True,
         )
 
     def get_example_input_sequence(self) -> List[str]:
@@ -79,7 +80,10 @@ class GeneformerInference(BaseEncoderInference):
         return token_ids
 
     def tokens_to_hiddens(self, input_ids, attention_mask, token_type_ids=None, **kwargs) -> torch.Tensor:
-        return self.model(input_ids, attention_mask, token_type_ids=token_type_ids, **kwargs)
+        with torch.autocast(
+            enabled=self.needs_autocast(), device_type=self.device.type, dtype=self.model.autocast_dtype
+        ):
+            return self.model(input_ids, attention_mask, token_type_ids=token_type_ids, **kwargs)
 
     def extract_embeddings(self, input_ids, attention_mask, token_type_ids=None, **kwargs):
         """This function is used for downstream task training where we want to fine-tune the [CLS] token.
@@ -96,8 +100,8 @@ class GeneformerInference(BaseEncoderInference):
         Returns:
             _type_: _description_
         """
-        with torch.autocast(enabled=self.needs_autocast(), device_type=self.device.type):
-            hiddens = self.tokens_to_hiddens(input_ids, attention_mask, token_type_ids=token_type_ids, **kwargs)
+        # with torch.autocast(enabled=self.needs_autocast(), device_type=self.device.type):
+        hiddens = self.tokens_to_hiddens(input_ids, attention_mask, token_type_ids=token_type_ids, **kwargs)
         outputs = hiddens[:, 0, :]  # Use the [CLS] token for downstream tasks
         return outputs
 
@@ -110,7 +114,7 @@ class GeneformerInference(BaseEncoderInference):
         return self.model.model.language_model.embedding.tokentype_embeddings is not None
 
     def needs_autocast(self) -> bool:
-        return self.model.cfg.precision not in {32, "32"} and self.device.type != "cpu"
+        return self.model.autocast_dtype != torch.float32 and self.device.type != "cpu"
 
     def seq_to_hiddens(self, sequences: List[List[str]]) -> Tuple[Tensor, Tensor]:
         '''
@@ -132,11 +136,11 @@ class GeneformerInference(BaseEncoderInference):
             token_type_ids = torch.zeros_like(token_ids)
         else:
             token_type_ids = None  # We are just using the pretrained model by itself, and not running inference with any additional token types.
-        with torch.autocast(enabled=self.needs_autocast(), device_type=self.device.type):
-            hiddens = self.tokens_to_hiddens(token_ids, enc_mask, token_type_ids=token_type_ids)
-            if isinstance(hiddens, tuple):
-                assert hiddens[1] is None, "We are not expecting a second output from the model."
-                hiddens = hiddens[0]
+        # with torch.autocast(enabled=self.needs_autocast(), device_type=self.device.type):
+        hiddens = self.tokens_to_hiddens(token_ids, enc_mask, token_type_ids=token_type_ids)
+        if isinstance(hiddens, tuple):
+            assert hiddens[1] is None, "We are not expecting a second output from the model."
+            hiddens = hiddens[0]
 
         if hiddens.shape[:2] != enc_mask.shape:
             raise ValueError(
@@ -179,7 +183,11 @@ class GeneformerInference(BaseEncoderInference):
         #
         # TODO: set to strict
         model = super().load_model(cfg, model, restore_path, strict=strict)
-        # WARNING! if this is true, eg if you do not override pretrain's setting, then you get logits for each position, not the embeddings.
+        # WARNING! if this is true, eg if you do not override pretrain's setting for post_process, then you get logits for each position, not the embeddings.
+        #  make sure you override this value before loading the config.
+        # NOTE: for some rason setting post_process:False in the inference config does not result in the model loading with this value set to False, likely
+        #  some state is being saved in the model checkpoint that is overriding the config value. Here we specifically set it to False after loading the model
+        #  to ensure that we get embeddings and not logits, if that's what the user wants.
         model.model.language_model.post_process = cfg.model.get("post_process", False)
         model.model.post_process = cfg.model.get("post_process", False)
         return model
@@ -190,12 +198,19 @@ class GeneformerInference(BaseEncoderInference):
             token_type_ids = batch.get("token_type_ids", torch.zeros_like(batch["text"]))
         else:
             token_type_ids = None
-        with torch.autocast(enabled=self.needs_autocast(), device_type=self.device.type):
-            # WARNING: in the current version of nemo the model wants the attention_mask to be named 'padding_mask'.
-            #  This may be surprising to some users, and we should pay attention to whether this is refactored in future releases.
-            hiddens = self.tokens_to_hiddens(batch["text"], batch["padding_mask"], token_type_ids=token_type_ids)
-        embeddings = self.hiddens_to_embedding(hiddens, batch["padding_mask"])
+        hiddens = self.tokens_to_hiddens(batch["text"], batch["padding_mask"], token_type_ids=token_type_ids)
         output = batch
-        output["hiddens"] = hiddens
-        output["embeddings"] = embeddings
+        if isinstance(hiddens, tuple):
+            # This is the case when the model has post_process:True in the config, when the user wants (or at least has set in the config that they want)
+            #  logits to be output. Generally for inference the user will want embeddings instead of logits and this should not be the case.
+            assert hiddens[1] is None, "We are not expecting a second output from the model."
+            logits = tensor_parallel.gather_from_tensor_model_parallel_region(hiddens[0])
+            if "labels" in batch:
+                output["loss"] = torch.nn.functional.cross_entropy(
+                    logits[batch['loss_mask']][:, : len(self.tokenizer.vocab)], batch['labels'][batch['loss_mask']]
+                )
+        else:
+            embeddings = self.hiddens_to_embedding(hiddens, batch["padding_mask"])
+            output["hiddens"] = hiddens
+            output["embeddings"] = embeddings
         return output

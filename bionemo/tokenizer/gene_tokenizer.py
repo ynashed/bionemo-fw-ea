@@ -9,7 +9,8 @@
 # its affiliates is strictly prohibited.
 import json
 import os
-from typing import Dict, List, Union
+from copy import deepcopy
+from typing import Dict, List, Tuple, Union
 
 from .label2id_tokenizer import Label2IDTokenizer
 
@@ -18,47 +19,44 @@ __all__ = ["GeneTokenizer"]
 
 
 class GeneTokenizer(Label2IDTokenizer):
-    """Initializes the GeneTokenizer object.
+    """Initializes the GeneTokenizer object."""
 
-    Args:
-        cls_token (str): The token used for the classification task. Defaults to "[CLS]".
-        mask_token (str): The token used for masking. Defaults to "[MASK]".
-        pad_token (str): The token used for padding. Defaults to "[PAD]".
-        sep_token (str): The token used for separating sequences. Defaults to "[SEP]".
-        ukw_token (str): The token used for unknown words. Defaults to "[UKW]".
-        other_tokens (Optional[List[str]]): A list of additional special tokens. Defaults to None.
-    """
+    cls_token: str = "[CLS]"
+    mask_token: str = "[MASK]"
+    pad_token: str = "[PAD]"
+    sep_token: str = "[SEP]"
+    ukw_token: str = "[UKW]"
+    special_tokens: Tuple[str, str, str, str, str] = (cls_token, mask_token, pad_token, sep_token, ukw_token)
 
-    def __init__(self, gene_to_ens: Dict[str, str]):
+    def __init__(self, vocab: Dict[str, int], gene_to_ens: Dict[str, str]):
         # Sets up vocab/decode_vocab dictionaries, parent class is sateful.
         super().__init__()
+        assert set(self.special_tokens).issubset(
+            set(vocab.keys())
+        ), f"Vocab must contain all of {self.special_tokens}, missing {set(self.special_tokens) - set(vocab.keys())}"
+        self.gene_to_ens = deepcopy(gene_to_ens)
+        self.ens_to_gene = {v: k for k, v in self.gene_to_ens.items()}
+        self.vocab = deepcopy(vocab)
+        self.decode_vocab = {v: k for k, v in self.vocab.items()}
 
-        # The only special things we add are these
-        self.gene_to_ens = gene_to_ens
-        self.ens_to_gene = dict(zip(self.gene_to_ens.values(), self.gene_to_ens.keys()))
+    @classmethod
+    def from_medians_and_genes_dicts(cls, median_dict: Dict[str, float], gene_to_ens: Dict[str, str]):
+        '''Creates a tokenizer from a median dictionary'''
+        tokens = list(cls.special_tokens) + list(median_dict.keys())
+        vocab = cls._build_vocab(tokens)
+        return cls(vocab, gene_to_ens)
 
-        # Removed these from the constructor because theyre never changed
-        self.cls_token: str = "[CLS]"
-        self.mask_token: str = "[MASK]"
-        self.pad_token: str = "[PAD]"
-        self.sep_token: str = "[SEP]"
-        self.ukw_token: str = "[UKW]"
-
-        # Adds to vocab and decode_vocab
-        self.build_vocab([self.cls_token, self.mask_token, self.pad_token, self.sep_token, self.ukw_token])
-        self.build_vocab(gene_to_ens.keys())
-
-    def build_vocab(self, strings: Union[List[str], str]):
+    @staticmethod
+    def _build_vocab(strings: Union[List[str], str]):
         '''We override the parent because complete strings are tokens. Otherwise has the same behavior.'''
+        vocab = {}
         if isinstance(strings, str):
             strings = [strings]
 
         for token in strings:
-            if token not in self.vocab:
-                self.vocab[token] = len(self.vocab)
-                self.decode_vocab[self.vocab[token]] = token
-
-        return self
+            if token not in vocab:
+                vocab[token] = len(vocab)
+        return vocab
 
     def token_to_id(self, token: str) -> int:
         """
@@ -90,6 +88,7 @@ class GeneTokenizer(Label2IDTokenizer):
             os.makedirs(vocab_dir, exist_ok=True)  # ensure the dir exists but be ok with race conditions.
 
         to_serialize = {}
+        to_serialize['vocab'] = self.vocab
         to_serialize['gene_to_ens'] = self.gene_to_ens
 
         with open(vocab_file, 'w') as f:
@@ -103,9 +102,10 @@ class GeneTokenizer(Label2IDTokenizer):
 
         with open(vocab_file) as f:
             to_deserialize = json.load(f)
+            vocab = to_deserialize['vocab']
             gene_to_ens = to_deserialize['gene_to_ens']
 
-        tokenizer = GeneTokenizer(gene_to_ens)  # Adds special tokens and nothing more
+        tokenizer = GeneTokenizer(vocab, gene_to_ens)
         return tokenizer
 
     def gene_tok_to_ens(self, gene: str) -> str:
@@ -132,7 +132,7 @@ class GeneTokenizer(Label2IDTokenizer):
         """
         return self.ens_to_gene[ens]
 
-    def gene_to_ens(self, genes: List[str]) -> List[str]:
+    def genes_to_enss(self, genes: List[str]) -> List[str]:
         """Converts a list of gene names to Ensembl IDs.
 
         Args:
@@ -152,7 +152,7 @@ class GeneTokenizer(Label2IDTokenizer):
                 raise ValueError(f"{gene} not found")
         return ens_ids
 
-    def ens_to_gene(self, ensemble_ids: List[str]) -> List[str]:
+    def enss_to_genes(self, ensemble_ids: List[str]) -> List[str]:
         """Converts a list of ensemble IDs to gene names.
 
         Args:

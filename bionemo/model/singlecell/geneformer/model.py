@@ -13,6 +13,7 @@ import json
 from bionemo.core import BioNeMoBertModel
 from bionemo.data.singlecell.datamodule import SingleCellDataModule
 from bionemo.tokenizer.gene_tokenizer import GeneTokenizer
+from bionemo.utils.logging import logging
 
 
 __all__ = [
@@ -21,7 +22,7 @@ __all__ = [
 
 
 class GeneformerModel(BioNeMoBertModel):
-    def __init__(self, cfg, trainer, median_dict=None, *args, **kwargs):
+    def __init__(self, cfg, trainer, *args, **kwargs):
         # NOTE, we are doing this first to ensure that the tokenizer is loaded before the data module
         self.vocab_file = cfg.tokenizer.vocab_file
         self.medians_file = cfg.data.medians_file
@@ -30,15 +31,23 @@ class GeneformerModel(BioNeMoBertModel):
         self._build_medians(self.medians_file)
 
         # Uses median dictionary lookup, which is ens -> median. Alos uses gene_to_ens to get median lookup.
-        self.data_module = SingleCellDataModule(
-            cfg,
-            trainer,
-            tokenizer=self.tokenizer,
-            median_dict=self.median_dict,
-            train_ratio=cfg.data.train_ratio,
-            val_ratio=cfg.data.val_ratio,
-            max_len=cfg.data.seq_length,
-        )
+        try:
+            self.data_module = SingleCellDataModule(
+                cfg,
+                trainer,
+                tokenizer=self.tokenizer,
+                median_dict=self.median_dict,
+                max_len=cfg.get("seq_length", 2048),
+                random_token_prob=cfg.data.get("random_token_prob", 0.1),
+                mask_prob=cfg.data.get("mask_prob", 0.15),
+                mask_token_prob=cfg.data.get("mask_token_prob", 0.8),
+            )
+        except Exception as e:
+            logging.info(
+                f"Failed to build data module: {e}. This is expected at inference/finetune time but not training."
+            )
+            self.data_module = None
+
         # this will load the tokenizer again, but doesnt matter :)
         super().__init__(cfg, trainer, *args, **kwargs)
 

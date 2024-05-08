@@ -10,6 +10,7 @@
 
 import os
 from functools import lru_cache
+from pathlib import Path
 from typing import List, Literal
 
 import numpy as np
@@ -19,7 +20,7 @@ from scanpy import AnnData
 from torch.utils.data import DataLoader
 
 from bionemo.core import BioNeMoDataModule
-from bionemo.data.mapped_dataset import IndexMappedDataset, ResamplingMappedDataset, SliceDataset
+from bionemo.data.mapped_dataset import IndexMappedDataset, ResamplingMappedDataset
 from bionemo.data.singlecell.adamson import AdamsonDataset, _parse_pert
 from bionemo.data.singlecell.dataset import SingleCellDataset
 from tokenizers import Tokenizer
@@ -55,35 +56,26 @@ class SingleCellDataModule(BioNeMoDataModule):
         trainer: Trainer,
         tokenizer: Tokenizer,
         median_dict: dict[str, float],
-        train_ratio: float = 0.98,
-        val_ratio: float = 0.01,
+        mask_prob: float = 0.15,
+        mask_token_prob: float = 0.8,
+        random_token_prob: float = 0.1,
         max_len: int = 1024,
     ):
         super().__init__(cfg, trainer)
         self.cfg = cfg.data
-        self.data_path = self.cfg.dataset_path
+        self.data_path_train = self.cfg.train_dataset_path
+        self.data_path_val = self.cfg.val_dataset_path
+        self.data_path_test = self.cfg.test_dataset_path
         self.tokenizer = tokenizer
         self.median_dict = median_dict
         self.max_len = max_len
-        assert train_ratio + val_ratio < 1
-        self.train_ratio = train_ratio
-        self.val_ratio = val_ratio
-        self.mask_prob = cfg.data.get("mask_prob", 0.15)
-        self.mask_token_prob = cfg.data.get("mask_token_prob", 0.8)
-        self.random_token_prob = cfg.data.get("random_token_prob", 0.1)
-        self.index_mapping_dir = cfg.data.get("index_mapping_dir", os.path.dirname(self.data_path))
-
-    @lru_cache
-    def onetime_init_backed_dataset(self):
-        '''Unfortunately the way all our stuff fits together we need a delayed instantiation of the Dataset object.'''
-        tmp = SingleCellDataset(self.cfg.dataset_path, self.tokenizer, self.median_dict, self.max_len)
-        self.dataset = ResamplingMappedDataset(
-            tmp, num_samples=None, data_prefix='backed', cfg=self.cfg, index_mapping_dir=self.index_mapping_dir
-        )
-        return self.dataset
-
-    @lru_cache
-    def onetime_init_num_samples(self):
+        self.mask_prob = mask_prob
+        self.mask_token_prob = mask_token_prob
+        self.random_token_prob = random_token_prob
+        self.index_mapping_dir = cfg.data.get("index_mapping_dir", str(Path(self.data_path_train).parent))
+        self._train_dataset = SingleCellDataset(self.data_path_train, self.tokenizer, self.median_dict, self.max_len)
+        self._val_dataset = SingleCellDataset(self.data_path_val, self.tokenizer, self.median_dict, self.max_len)
+        self._test_dataset = SingleCellDataset(self.data_path_test, self.tokenizer, self.median_dict, self.max_len)
         self.init_num_samples()
 
     def sample_train_dataset(self, dataset):
@@ -96,13 +88,33 @@ class SingleCellDataModule(BioNeMoDataModule):
             ResamplingMappedDataset: Resampled dataset
 
         """
-        self.onetime_init_num_samples()
         # This is where re-sampling occurs.
+        os.makedirs(self.index_mapping_dir, exist_ok=True)
         return ResamplingMappedDataset(
             dataset,
             num_samples=self.train_num_samples,
             cfg=self.cfg,
-            name='train',
+            name=f'train_{self.train_num_samples}',
+            index_mapping_dir=self.index_mapping_dir,
+        )
+
+    def sample_val_dataset(self, dataset):
+        os.makedirs(self.index_mapping_dir, exist_ok=True)
+        return ResamplingMappedDataset(
+            dataset,
+            num_samples=self.val_num_samples,
+            cfg=self.cfg,
+            name=f'val_{self.val_num_samples}',
+            index_mapping_dir=self.index_mapping_dir,
+        )
+
+    def sample_test_dataset(self, dataset):
+        os.makedirs(self.index_mapping_dir, exist_ok=True)
+        return ResamplingMappedDataset(
+            dataset,
+            num_samples=self.test_num_samples,
+            cfg=self.cfg,
+            name=f'test_{self.test_num_samples}',
             index_mapping_dir=self.index_mapping_dir,
         )
 
@@ -113,9 +125,7 @@ class SingleCellDataModule(BioNeMoDataModule):
             torch.utils.data.Dataset: Training dataset
 
         """
-        self.onetime_init_backed_dataset()
-        dataset = self.dataset
-        return SliceDataset(dataset, start=0, end=int(len(self.dataset) * self.train_ratio))
+        return self._train_dataset
 
     def val_dataset(self):
         """Get the validation dataset.
@@ -124,10 +134,7 @@ class SingleCellDataModule(BioNeMoDataModule):
             torch.utils.data.Dataset: Validation dataset
 
         """
-        self.onetime_init_backed_dataset()
-        start = int(len(self.dataset) * self.train_ratio)
-        end = int(len(self.dataset) * (self.train_ratio + self.val_ratio))
-        return SliceDataset(self.dataset, start=start, end=end)
+        return self._val_dataset
 
     def test_dataset(self):
         """Get the test dataset.
@@ -136,10 +143,7 @@ class SingleCellDataModule(BioNeMoDataModule):
             torch.utils.data.Dataset: Test dataset
 
         """
-        self.onetime_init_backed_dataset()
-        start = int(len(self.dataset) * (self.train_ratio + self.val_ratio))
-        end = len(self.dataset)
-        return SliceDataset(self.dataset, start=start, end=end)
+        return self._test_dataset
 
 
 class AdamsonDataModule(BioNeMoDataModule):
@@ -182,11 +186,12 @@ class AdamsonDataModule(BioNeMoDataModule):
     def sample_train_dataset(self, dataset):
         # Need to setup distributed state to compute num_samples, need num_samples to not deadlock.
         self.onetime_init_num_samples()
+        os.makedirs(self.index_mapping_dir, exist_ok=True)
         return ResamplingMappedDataset(
             dataset,
             num_samples=self.train_num_samples,
             cfg=self.cfg,
-            name='train',
+            name=f'train_{self.train_num_samples}',
             index_mapping_dir=self.index_mapping_dir,
         )
 

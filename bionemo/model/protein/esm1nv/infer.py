@@ -42,8 +42,8 @@ class ESM1nvInference(BaseEncoderInference):
             adjust_config=adjust_config,
             interactive=interactive,
             inference_batch_size_for_warmup=inference_batch_size_for_warmup,
+            needs_warmup=True,  # @jstjohn verified that this is currently required 5/7/2024. Try removing it on upgrade if you can.
         )
-        self.needs_warmup = False  # @jomitchell verified that this method does not need warmup.
 
     def get_example_input_sequence(self) -> str:
         return "DAEFRHDSGYEVHHQKLVFF"

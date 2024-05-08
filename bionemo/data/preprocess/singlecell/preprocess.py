@@ -12,13 +12,13 @@ import json
 import os
 import pickle
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, List, Literal
 from zipfile import ZipFile
 
 import numpy as np
 import scanpy
 from nemo.utils import logging
-from omegaconf.omegaconf import OmegaConf
 from scanpy import AnnData
 
 from bionemo.data.preprocess import ResourcePreprocessor
@@ -28,9 +28,9 @@ from bionemo.utils.remote import RemoteResource
 
 @dataclass
 class GeneformerResourcePreprocessor(ResourcePreprocessor):
-    """ResourcePreprocessor for the HUGO Gene Nomenclature Committee"""
+    """ResourcePreprocessor for the Geneformer model. Downloads the gene_name_id_dict.pkl and gene_median_dictionary.pkl files."""
 
-    dest_directory: str = "hgnc"
+    dest_directory: str = "geneformer"
 
     def get_remote_resources(self) -> List[RemoteResource]:
         url_fn = {
@@ -63,38 +63,27 @@ class GeneformerResourcePreprocessor(ResourcePreprocessor):
         return [self.prepare_resource(resource) for resource in self.get_remote_resources()]
 
 
-@dataclass
-class SCPreprocessorDataClass:
-    preproc_dir: str
-    tokenizer_vocab_path: str
-    dataset_conf: OmegaConf
-    medians_file: str
-
-
-class GeneformerPreprocess(SCPreprocessorDataClass):
-    root_directory = "/"
-
-    def __init__(self, *args, gene_set: str = "protein", **kwargs):
+class GeneformerPreprocess:
+    def __init__(self, download_directory: Path, medians_file_path: Path, tokenizer_vocab_path: Path):
         """Downloads HGNC symbols
 
         preproc_dir (str): Directory to store the reference preproc in
         tokenizer_vocab_path (str): Filepath to store the tokenizer vocab
-        tokenizer_k (int): k-mer size for the tokenizer
         dataset_conf (OmegaConf): has 'train', 'val', 'test' keys containing
             the names of preprocessed train/val/test files to use for training.
         """
-        super().__init__(*args, **kwargs)
-        if self.tokenizer_vocab_path is not None:
-            self._validate_tokenizer_args(
-                self.tokenizer_vocab_path,
-            )
-        self.gene_set = gene_set
+        self.download_directory = download_directory
+        self.medians_file_path = medians_file_path
+        self.tokenizer_vocab_path = tokenizer_vocab_path
+        self._validate_tokenizer_args(
+            self.tokenizer_vocab_path,
+        )
 
-    def build_and_save_tokenizer(self, gene_ens, vocab_output_name):
-        '''Builds the GeneTokenizer using the geneid -> ensemblid dictionary,
+    def build_and_save_tokenizer(self, median_dict, gene_to_ens, vocab_output_name):
+        '''Builds the GeneTokenizer using the median dictionary
         then serializes and saves the dictionary to disk.
         '''
-        tokenizer = GeneTokenizer(gene_ens)
+        tokenizer = GeneTokenizer.from_medians_and_genes_dicts(median_dict, gene_to_ens)
         tokenizer.save_vocab(vocab_output_name)
         return tokenizer
 
@@ -106,7 +95,7 @@ class GeneformerPreprocess(SCPreprocessorDataClass):
     def preprocess(self) -> dict[Literal['tokenizer', 'median_dict'], Any]:
         """Preprocesses for the Geneformer model"""
         gene_name_dict_fn, gene_median_dict_fn = GeneformerResourcePreprocessor(
-            dest_directory=self.preproc_dir, root_directory=self.root_directory
+            dest_directory=self.download_directory,
         ).prepare()
 
         # Load artifacts
@@ -117,17 +106,15 @@ class GeneformerPreprocess(SCPreprocessorDataClass):
             median_dict = pickle.load(fd)
 
         # Save converted artifacts to JSON to prevent pickle issues.
-        medians_dir = os.path.dirname(self.medians_file)
+        medians_dir = os.path.dirname(self.medians_file_path)
         if not os.path.exists(medians_dir):
             os.makedirs(medians_dir, exist_ok=True)  # ensure the dir exists but be ok with race conditions.
-        with open(self.medians_file, 'w') as fp:
+        with open(self.medians_file_path, 'w') as fp:
             json.dump(median_dict, fp)
-
-        # Filter anything in the gene_ens that is not in the median_dict
-        gene_ens = {k: v for k, v in gene_ens.items() if v in median_dict}
 
         if self.tokenizer_vocab_path is not None:
             tokenizer = self.build_and_save_tokenizer(
+                median_dict,
                 gene_ens,
                 self.tokenizer_vocab_path,
             )

@@ -109,12 +109,18 @@ def get_data_overrides(script_or_cfg_path: str) -> str:
         'dna': 'downstream',
         'singlecell': 'downstream',
     }
-
+    if model == 'geneformer':
+        return (
+            # This is what we run inference on when running infer.py. This is not checked or used during pretraining.
+            f' {DATA}.dataset_path={TEST_DATA_DIR}/cellxgene_2023-12-15_small/processed_data/test'
+            # The following three paths are used for pretrain.py, but also are required to support model loading currently when running inference.
+            f' {DATA}.train_dataset_path={TEST_DATA_DIR}/cellxgene_2023-12-15_small/processed_data/train'
+            f' {DATA}.val_dataset_path={TEST_DATA_DIR}/cellxgene_2023-12-15_small/processed_data/val'
+            f' {DATA}.test_dataset_path={TEST_DATA_DIR}/cellxgene_2023-12-15_small/processed_data/test'
+        )
     if conf == ['conf']:
         if model in ('megamolbart', 'openfold', 'molmim'):
             return ''
-        elif model == 'geneformer':
-            return MAIN % 'singlecell'
         else:
             return MAIN % f'{domain}/{task[domain]}/test/x000'
 

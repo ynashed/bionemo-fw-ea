@@ -70,6 +70,8 @@ class SingleCellDataset(Dataset):
         mask_prob: float = 0.15,
         mask_token_prob: float = 0.8,
         random_token_prob: float = 0.1,
+        prepend_cls_token: bool = True,
+        assert_increasing_columns: bool = True,
     ):
         super().__init__()
         self.data_path = data_path
@@ -77,6 +79,10 @@ class SingleCellDataset(Dataset):
         self.random_token_prob = random_token_prob
         self.mask_token_prob = mask_token_prob
         self.mask_prob = mask_prob
+        self.prepend_cls_token = prepend_cls_token
+        # check if column indices are increasing for looking up genes. This is a way of spotting if the sc_memmap.py
+        #  script produced properly strctured sparse files.
+        self.assert_increasing_columns = assert_increasing_columns
         path = Path(data_path)
 
         # - metadata
@@ -117,14 +123,20 @@ class SingleCellDataset(Dataset):
         return self.num_samples
 
     def metadata_lookup(self, idx) -> dict:
+        """Go from a cell idx to the file-level metadata associated with that cell."""
         did = sum(~(self.dataset_ccum > idx)) - 1
         metadata = self.metadata[self.dataset_map[did]]
         return metadata
 
     def lookup_cell_by_idx(self, idx) -> tuple[np.array, np.array, dict]:
         ptr = slice(int(self.gene_data_ptr[idx]), int(self.gene_data_ptr[idx + 1]))
-        col_idxs = np.asarray(self.gene_data_indices[ptr]).astype(int)
-        gene_data = np.asarray(self.gene_data[col_idxs]).astype(np.int64)
+        # col idxs poin to offsets in the original sparse metadata, this is for looking up metadata eg gene names
+        col_idxs = np.asarray(self.gene_data_indices[ptr]).astype(int)  # keyed by ptr
+        if self.assert_increasing_columns and len(col_idxs) > 1:
+            is_increasing = np.diff(col_idxs) > 0
+            if not np.all(is_increasing):
+                raise ValueError(f"Column indices are not increasing for {np.sum(~is_increasing)} pairs of genes")
+        gene_data = np.asarray(self.gene_data[ptr]).astype(int)  # keyed by ptr
         metadata = self.metadata_lookup(idx)
         return gene_data, col_idxs, metadata
 
@@ -141,6 +153,7 @@ class SingleCellDataset(Dataset):
             mask_token_prob=self.mask_token_prob,
             mask_prob=self.mask_prob,
             random_token_prob=self.random_token_prob,
+            prepend_cls_token=self.prepend_cls_token,
         )
 
 
@@ -165,6 +178,7 @@ def process_item(
     random_token_prob: float = 0.1,
     target_sum: int = 10000,
     normalize: bool = True,
+    prepend_cls_token: bool = True,
 ) -> Item:
     """Process a single item in the dataset.
 
@@ -173,7 +187,7 @@ def process_item(
 
     Args:
         gene_data (list): List of gene data, these are expression counts.
-        gene_idxs (list): List of gene indices, these are keys in 'metadata['feature_names']' and correspdong the CSR entry. These are computed by sc_memmap.
+        gene_idxs (list): List of gene indices, these are keys in 'metadata['feature_ids']' and correspdong the CSR entry. These are computed by sc_memmap.
         metadata (dict): Metadata dictionary.
         tokenizer (Tokenizer): Tokenizer object.
         gene_median (optional(dict)): Dictionary of gene medians. Defaults to None. Expects ensembl IDs to be keys.
@@ -209,15 +223,14 @@ def process_item(
 
     max_len = max_len - 1  # - minus 1 for [CLS] token
 
-    gene_names = [metadata["feature_names"][idx] for idx in gene_idxs]
+    gene_names = [metadata["feature_ids"][idx] for idx in gene_idxs]
     genes, tokens, medians = [], [], []
     for tok, gene in zip(gene_names, gene_data):
         if tok in tokenizer.vocab:
             tokens.append(tokenizer.token_to_id(tok))
             genes.append(gene)
             if normalize:
-                ens = tokenizer.gene_tok_to_ens(tok)  # Gene name to ensembl id.
-                med = gene_median.get(ens, "1")  # If not in the dictionary we default to no normalization ("1")
+                med = gene_median.get(tok, 1)  # If not in the dictionary we default to no normalization (1)
                 medians.append(med)
 
     genes = np.asarray(genes)
@@ -239,17 +252,27 @@ def process_item(
     )
 
     mask = None
+    mask_tokens_positions = None
+    random_tokens_positions = None
+
     # - masked tokens
     if mask_prob > 0.0:
         probs = np.full(token_ids.shape[0], mask_prob)
         probs[token_ids == tokenizer.token_to_id(tokenizer.pad_token)] = 0.0
         mask = np.random.binomial(1, probs).astype(bool)
-
+        mask_tokens_positions = mask & np.random.binomial(1, mask_token_prob, mask.shape).astype(bool)
+        random_tokens_positions = (
+            mask & np.random.binomial(1, random_token_prob, mask.shape).astype(bool) & (~mask_tokens_positions)
+        )
         # - ensure [CLS] token is masked from the loss. Note that we're dealing with 1d arrays so flattening isn't a problem here.
-        mask = np.insert(mask, 0, False)
+        if prepend_cls_token:
+            mask = np.insert(mask, 0, False)
+            mask_tokens_positions = np.insert(mask_tokens_positions, 0, False)
+            random_tokens_positions = np.insert(random_tokens_positions, 0, False)
 
     # - add [CLS] token, note that token_ids is a 1d array so flattening isn't a problem here.
-    token_ids = np.insert(token_ids, 0, tokenizer.token_to_id(tokenizer.cls_token))
+    if prepend_cls_token:
+        token_ids = np.insert(token_ids, 0, tokenizer.token_to_id(tokenizer.cls_token))
     attention_mask = token_ids != tokenizer.token_to_id(tokenizer.pad_token)
 
     labels = np.ones(len(token_ids)) * -1
@@ -262,15 +285,15 @@ def process_item(
     else:
         mask[~attention_mask] = False  # make sure that we aren't doing MLM on [PAD] tokens
         labels[mask] = token_ids[mask]
-
-    mask_tokens_positions = mask & np.random.binomial(1, mask_token_prob, mask.shape).astype(bool)
-    random_tokens_positions = (
-        mask & np.random.binomial(1, random_token_prob, mask.shape).astype(bool) & (~mask_tokens_positions)
-    )
+    if mask_tokens_positions is None:
+        mask_tokens_positions = np.zeros_like(mask)
+    if random_tokens_positions is None:
+        random_tokens_positions = np.zeros_like(mask)
     # identity_tokens = mask & (~mask_tokens_positions) & (~random_tokens_positions), not needed because
     token_ids[mask_tokens_positions] = tokenizer.token_to_id(tokenizer.mask_token)
     # There are 5 special tokens in the tokenizer, so we start from 5. TODO make this a parameter of the tokenizer.
-    token_ids[random_tokens_positions] = np.random.randint(5, len(tokenizer.vocab), random_tokens_positions.sum())
+    if random_tokens_positions.sum() > 0:
+        token_ids[random_tokens_positions] = np.random.randint(5, len(tokenizer.vocab), random_tokens_positions.sum())
 
     # NeMo megatron assumes this return structure.
     item = {

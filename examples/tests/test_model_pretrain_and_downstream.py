@@ -30,7 +30,6 @@ from pytorch_lightning import LightningModule
 from bionemo.callbacks import setup_dwnstr_task_validation_callbacks
 from bionemo.data.diffdock.data_manager import DataManager as DiffdockDataManager
 from bionemo.data.equidock import DataManager
-from bionemo.data.preprocess.singlecell.preprocess import GeneformerPreprocess
 from bionemo.model.dna.dnabert.dnabert_model import DNABERTModel
 from bionemo.model.molecule.diffdock.models.nemo_model import (
     DiffdockTensorProductScoreModel as DiffdockScoreModel,
@@ -193,7 +192,7 @@ TEST_PARAMS: List[TrainingTestParams] = [
         "config_name": 'geneformer_pretrain_test',
         "script_path": "examples/singlecell/geneformer/pretrain.py",
         "model_cls": GeneformerModel,
-        "model_size": 9247360,
+        "model_size": 10300032,
     },
     # TODO get the following working with a small test case.
     # {
@@ -275,18 +274,7 @@ def test_model_size(config_name: str, model_class: LightningModule, model_parame
             if model_class == FineTuneGeneformerModel:
                 with open_dict(cfg):
                     cfg.model.encoder_cfg = cfg  # TODO: why do we have to do this?
-            preprocessor = GeneformerPreprocess(
-                cfg.model.data.dataset_path,
-                cfg.model.tokenizer.vocab_file,
-                cfg.model.data.dataset,
-                cfg.model.data.medians_file,
-            )
-            match preprocessor.preprocess():
-                case {'tokenizer': _, 'median_dict': median_dict}:  # just use the model's packaged tokenizer
-                    logging.info("*************** Preprocessing Finished ************")
-                case _:
-                    logging.error("Preprocessing failed.")
-            model = model_class(cfg.model, trainer, median_dict=median_dict)
+            model = model_class(cfg.model, trainer)
         else:
             model = model_class(cfg.model, trainer)
         assert model.num_weights == model_parameters
