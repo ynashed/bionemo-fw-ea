@@ -40,7 +40,7 @@ exp_manager:
     model_parallel_size: ${multiply:${model.tensor_model_parallel_size}, ${model.pipeline_model_parallel_size}}
 model:
   tokenizer:
-    vocab_file: ${oc.env:BIONEMO_HOME}/tokenizers/singlecell/geneformer/vocab/geneformer.vocab
+    vocab_file: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/singlecell/geneformer.vocab
   micro_batch_size: 8
   tensor_model_parallel_size: 1
   pipeline_model_parallel_size: 1
@@ -79,7 +79,7 @@ model:
     data_prefix: ''
     shuffle: true
     dataset: /
-    medians_file: ${oc.env:BIONEMO_HOME}/tokenizers/singlecell/geneformer/vocab/medians.json
+    medians_file: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/singlecell/medians.json
     index_mapping_dir: null
     skip_warmup: true
     index_mapping_type: memmap

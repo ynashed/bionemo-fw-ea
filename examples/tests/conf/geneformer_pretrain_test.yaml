@@ -24,8 +24,10 @@ model:
   post_process: True
   bert_binary_head: False
   tokenizer:
-    vocab_file: ${oc.env:BIONEMO_HOME}/tokenizers/singlecell/geneformer/vocab/geneformer.vocab
+    # Should probably also be tests/test_data
+    vocab_file: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/singlecell/geneformer.vocab
   data:
+    medians_file: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/singlecell/medians.json
     dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/singlecell
     micro_batch_size: ${model.micro_batch_size}
     num_workers: 12
