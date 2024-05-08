@@ -15,7 +15,6 @@ key_segments:
   extra_overwrites: False
   seed: seed
   max_epochs: mepochs
-  tp_type: tptype
 launchers:
   type:slurm:
     ntasks_per_node: '{gpus}'
@@ -45,7 +44,7 @@ spec:
     model_tag={model}__{variant}__{config_name};
     python examples/{domain}/{model}/{variant}.py --config-name {config_name} \
     trainer.num_nodes={nodes} trainer.devices={gpus} trainer.precision={precision} seed={seed} \
-    trainer.max_epochs={max_epochs} model.micro_batch_size={batch_size} model.tensor_product.type={tp_type} \
+    trainer.max_epochs={max_epochs} model.micro_batch_size={batch_size} \
     data.cache_path={BIONEMO_HOME}/data/diffdock_conv_test_data/data_cache \
     data.split_train={BIONEMO_HOME}/data/diffdock_conv_test_data/splits/train \
     data.split_val={BIONEMO_HOME}/data/diffdock_conv_test_data/splits/val \
@@ -99,5 +98,4 @@ products:
     max_epochs: [80]
     batch_size: [12]
     precision: [32]
-    tp_type: [fast_tp]
     seed: [42]
