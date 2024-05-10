@@ -545,7 +545,15 @@ jet-configure:
     branch: bionemo # NOTE: this branch name enables running JET on Draco OCI
     strategy: depend
 
-
+#### ADDITIONAL RESOURCES ON jet-trigger ####
+# jet-trigger stage described in JET docs: https://jet.nvidia.com/docs/execution/ci-cd/downstream-pipelines/
+# it uses base_config.yaml for the configuration of bionemo account under: https://gitlab-master.nvidia.com/dl/jet/ci/-/blob/bionemo/base_config.yaml?ref_type=heads
+#####
+# restarter - restarting jobs which failed due to <ERROR_CODE> listed under retry_on: [<ERROR_CODE>]
+# for more info about error codes see https://jet.nvidia.com/docs/logs/status/
+####
+# deadline - increases the time limit of jobs queueing on SLURM clusters, here dgxa100_dracooci
+# default deadline under corresponding section in base_config.yaml: https://gitlab-master.nvidia.com/dl/jet/ci/-/blob/bionemo/base_config.yaml?ref_type=heads#L33
 jet-trigger:
   extends: [.jet-trigger-template]
   variables:
@@ -554,7 +562,7 @@ jet-trigger:
       restarter:
         enabled: true
         max_retries: 2
-        retry_on: ['1.2.1.2']
+        retry_on: ['1.2', '1.2.1', '1.2.1.1', '1.2.1.2']
         waiting_time: 60
       launchers:
         dgxa100_dracooci:
