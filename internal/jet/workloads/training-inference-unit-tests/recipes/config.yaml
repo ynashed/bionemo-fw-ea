@@ -21,7 +21,7 @@ launchers:
   name:dgxa100_dracooci:
     mounts:
       /workspace/bionemo/models: /lustre/fsw/portfolios/convai/projects/convai_bionemo_training/jet/models
-      /workspace/bionemo/examples/tests/test_data/singlecell: /lustre/fsw/portfolios/convai/projects/convai_bionemo_training/jet/data/test_data/singlecell
+      /workspace/bionemo/examples/tests/test_data/cellxgene_2023-12-15_small: /lustre/fsw/portfolios/convai/projects/convai_bionemo_training/jet/data/test_data/cellxgene_2023-12-15_small
 spec:
   build: bionemo
   scope: perf-train
@@ -121,7 +121,7 @@ products:
         dwnstr_task: [False]
         products:
           - model: [geneformer]
-            batch_size: [4]
+            batch_size: [8]
             variant: [pretrain]
             config_name: [geneformer_pretrain_test]
       - domain: [dna]
