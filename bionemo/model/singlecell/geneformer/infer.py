@@ -54,7 +54,6 @@ class GeneformerInference(BaseEncoderInference):
             inference_batch_size_for_warmup=inference_batch_size_for_warmup,
             needs_warmup=True,
         )
-        self.inference_output_everything: bool = self.cfg.model.get("inference_output_everything", False)
 
     def get_example_input_sequence(self) -> List[str]:
         return list(self.tokenizer.vocab.keys())[:64]
@@ -200,10 +199,7 @@ class GeneformerInference(BaseEncoderInference):
         else:
             token_type_ids = None
         hiddens = self.tokens_to_hiddens(batch["text"], batch["padding_mask"], token_type_ids=token_type_ids)
-        if self.inference_output_everything:
-            output = batch
-        else:
-            output = {}
+        output = batch
         if isinstance(hiddens, tuple):
             # This is the case when the model has post_process:True in the config, when the user wants (or at least has set in the config that they want)
             #  logits to be output. Generally for inference the user will want embeddings instead of logits and this should not be the case.
@@ -215,7 +211,6 @@ class GeneformerInference(BaseEncoderInference):
                 )
         else:
             embeddings = self.hiddens_to_embedding(hiddens, batch["padding_mask"])
-            if self.inference_output_everything:
-                output["hiddens"] = hiddens
+            output["hiddens"] = hiddens
             output["embeddings"] = embeddings
         return output

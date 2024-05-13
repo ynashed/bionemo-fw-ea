@@ -52,6 +52,7 @@ models/model-benchmarks
 :caption: DATASETS
 
 datasets/uniprot
+datasets/CELLxGENE
 datasets/zinc15
 datasets/pdb
 datasets/GRCh38.p13.md
