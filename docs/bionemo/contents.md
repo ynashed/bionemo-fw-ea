@@ -43,6 +43,7 @@ models/equidock
 models/diffdock
 models/dnabert
 models/openfold
+models/sc-fm
 models/model-benchmarks
 ```
 

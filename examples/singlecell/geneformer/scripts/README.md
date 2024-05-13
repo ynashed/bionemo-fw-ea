@@ -2,6 +2,7 @@
 First download cellxgene into a nice metadata preserving heirarchy. Files will also be split into small parts so that we can more granularly break into train/val/test.
 ```bash
 cd /workspace/bionemo
+pip install cellxgene-census==1.13.0  # Make sure that the license terms etc are acceptable
 python examples/singlecell/geneformer/download_pretraining_data.py --num-workers 32
 ```
 

@@ -55,7 +55,7 @@ model:
   num_attention_heads: 4
   init_method_std: 0.02
   hidden_dropout: 0.02
-  attention_dropout: 0.02
+  attention_dropout: 0.1
   kv_channels: null
   apply_query_key_layer_scaling: true
   layernorm_epsilon: 1.0e-12

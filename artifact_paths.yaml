@@ -129,26 +129,24 @@ models:
         symlink:
             source: "../../dnabert-86M.nemo"
             target: "dna/dnabert/dnabert-86M.nemo"
-    geneformer_31M_240430:
-        # A pretrained 9.2M parameter geneformer (BERT) on 31M single cells and a 21k tokens.
-        #  this is our tokenizer that used ensg ids from medians (25k) to filter out missing ids from
-        #  our regular set of human readable gene names (40k), bringing the total down to 21k tokens.
-        # See https://wandb.ai/clara-discovery/scFM_v6/runs/tqrv9wrl
+    geneformer_10M_240530:
+        # A pretrained 10.3M parameter geneformer (BERT) on 23M unique single cells and 25429 ENSG based tokens,
+        #   padded to a final shape of 25472 for GPU efficiency.
+        # See https://wandb.ai/clara-discovery/scFM_v9/runs/4ij9ghox
         ngc: null
-        pbss: "s3://bionemo-ci/models/geneformer-31M-240430-step-50000-wandb-tqrv9wrl.nemo"
+        pbss: "s3://bionemo-ci/models/geneformer-10M-240530-step-115430-wandb-4ij9ghox.nemo"
         symlink:
-            source: "../../geneformer-31M-240430-step-50000-wandb-tqrv9wrl.nemo"
-            target: "singlecell/geneformer/geneformer-31M-240430.nemo"
-    geneformer_31M_240430_large:
-        # A pretrained 103M parameter geneformer (BERT) on 31M single cells and a 21k tokens.
-        #  this is our tokenizer that used ensg ids from medians (25k) to filter out missing ids from
-        #  our regular set of human readable gene names (40k), bringing the total down to 21k tokens.
-        # See https://wandb.ai/clara-discovery/scFM_v6/runs/iyxsxz2m
+            source: "../../geneformer-10M-240530-step-115430-wandb-4ij9ghox.nemo"
+            target: "singlecell/geneformer/geneformer-10M-240530.nemo"
+    geneformer_106M_240530:
+        # A pretrained 106M parameter geneformer (BERT) on 23M unique single cells and 25429 ENSG based tokens,
+        #   padded to a final shape of 25472 for GPU efficiency.
+        # See https://wandb.ai/clara-discovery/scFM_v9/runs/KZxWJ0I5
         ngc: null
-        pbss: "s3://bionemo-ci/models/geneformer-31M-240430-step-73505-wandb-iyxsxz2m.nemo"
+        pbss: "s3://bionemo-ci/models/geneformer-106M-240530-step-115430-wandb-KZxWJ0I5.nemo"
         symlink:
-            source: "../../geneformer-31M-240430-step-73505-wandb-iyxsxz2m.nemo"
-            target: "singlecell/geneformer/geneformer-31M-240430-large.nemo"
+            source: "../../geneformer-106M-240530-step-115430-wandb-KZxWJ0I5.nemo"
+            target: "singlecell/geneformer/geneformer-106M-240530.nemo"
     geneformer:
         # A QA model for geneformer with randomly initialized weights.
         pbss: "s3://bionemo-ci/models/geneformer-qa.nemo"

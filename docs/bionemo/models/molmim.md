@@ -18,7 +18,7 @@ This model is for research and development only.
 [3]: [MIM: Mutual Information Machine](https://arxiv.org/abs/1910.03175)
 
 
-## License: TODO @Neha update licenses
+## License:
 MolMIM is provided under the {{model_license_slug}}.
 
 ## Model Architecture:
