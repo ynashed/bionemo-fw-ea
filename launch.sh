@@ -221,12 +221,12 @@ download() {
         pip install $(cat setup/requirements.txt | grep pydantic)
     fi
     mkdir -p ${MODEL_PATH}
-    python download_models.py all --source ngc --download_dir ${MODEL_PATH} --verbose
+    python download_artifacts.py --models all --source ngc --download_dir ${MODEL_PATH} --verbose
 }
 
 download_test_data() {
     echo 'Downloading test data for openfold...'
-    source $BIONEMO_HOME/examples/protein/openfold/scripts/download_data_sample.sh
+    source python $BIONEMO_HOME/download_artifacts.py --data all --source pbss --verbose
     echo 'Openfold data download complete.'
     echo 'Downloading test data for diffdock...'
     source $BIONEMO_HOME/examples/molecule/diffdock/scripts/download_data_sample.sh

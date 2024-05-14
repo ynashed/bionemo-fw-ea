@@ -62,7 +62,7 @@ UPDATE_EXPECTED_CFG=1 pytest examples/tests/test_model_pretrain_and_downstream.p
 ## Stages of the gitlab CI pipeline during Merge Requests
 The MR pipeline must be completed successfully if MR is to be merged. The subsequent stages are outlined in  `.gitlab-ci.yml` file:
 1) `build` - builds a pipeline-specific docker image which can be found in the [Container Registry](https://gitlab-master.nvidia.com/clara-discovery/bionemo/container_registry) searching for `pipeline-<GITLAB-PIPELINE_ID>` and `pipeline-<GITLAB-PIPELINE_ID>-devel`
-2) `download` - the checkpoints of the models listed in `artifact_paths.yaml` are downloaded by `download_models.py`
+2) `download` - the checkpoints of the models listed in `artifact_paths.yaml` are downloaded by `download_artifacts.py`
 3) `test` - CPU-specific and GPU-specific unit tests are run using `pytest`, excluding `pytest examples/tests/test_model_pretrain_and_downstream.py -k test_model_training`
 4) `jet` - comprehensive performance and convergence tests of BioNeMo models that are run and managed by [JET](https://jet.nvidia.com/docs), this step can be omitted if a MR is eligible for NOT running it (see below). More information on JET in `internal/README.md`
 

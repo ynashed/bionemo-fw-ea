@@ -12,17 +12,18 @@
 import argparse
 import os
 import sys
+import tarfile
 from pathlib import Path
 from subprocess import PIPE, Popen
 from typing import Dict, List, Literal, Optional, Tuple
 
 import yaml
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel
 
 
 ALL_KEYWORD = "all"
 DATA_SOURCE_CONFIG = Path("artifact_paths.yaml")
-ModelSource = Literal['ngc', 'pbss']
+ArtifactSource = Literal['ngc', 'pbss']
 
 
 #####################################################
@@ -33,23 +34,31 @@ class SymlinkConfig(BaseModel):
     target: Path
 
 
-class ModelConfig(BaseModel):
+class ArtifactConfig(BaseModel):
     ngc: Optional[str] = None
     pbss: Optional[str] = None
     symlink: Optional[SymlinkConfig] = None
     relative_download_dir: Optional[Path] = None
     extra_args: Optional[str] = None
+    untar_dir: Optional[str] = None
 
 
 class Config(BaseModel):
-    models: Dict[str, ModelConfig]
-
+    models: Dict[str, ArtifactConfig]
+    data: Dict[str, ArtifactConfig]
+    """
     @model_validator(mode="after")
     def check_download_source_exists(cls, values):
         for model_name, model_config in values.models.items():
             if model_config.ngc is None and model_config.pbss is None:
                 raise ValueError(f"Model {model_name} doesn't have a NGC or PBSS download path.")
+
+        for data_name, data_config in values.data.items():
+            if data_config.ngc is None and data_config.pbss is None:
+                raise ValueError(f"Data {data_name} doesn't have a NGC or PBSS download path.")
+
         return values
+    """
 
 
 #####################################################
@@ -103,7 +112,7 @@ def streamed_subprocess_call(cmd: str, stream_stdout: bool = False) -> Tuple[str
     return "".join(stdout), stderr, p.returncode
 
 
-def get_available_models(config: Config, source: ModelSource) -> List[str]:
+def get_available_models(config: Config, source: ArtifactSource) -> List[str]:
     """
     Get a list of models that are available from a given source.
 
@@ -153,22 +162,28 @@ def check_and_install_ngc_cli(ngc_install_dir="/tmp"):
         raise ValueError(f"Unable to install NGC CLI: {stderr}")
 
 
-def download_models(
-    config: Config, model_list: List, source: ModelSource, download_dir_base: Path, stream_stdout: bool = False
+def download_artifacts(
+    config: Config,
+    artifact_list: List,
+    source: ArtifactSource,
+    download_dir_base: Path,
+    stream_stdout: bool = False,
+    artifact_type: str = 'model',
 ) -> None:
     """
-    Download models from a given source.
+    Download models or data from a given source.
 
     Args:
         config (Config): The artifacts configuration.
-        model_list (List): A list of model names to download that should be present in
+        artifact_list (List): A list of model or data names to download that should be present in
                            the config.
         source (str): The source of the models to download, "ngc" or "pbss".
         download_dir_base (str): The target local directory for download.
         stream_stdout (bool): If true, stream the subprocess calls to stdout.
+        artifact_type (str): Whether it's a model or data that we are downloading. Should be model or data
     """
-    if len(model_list) == 0:
-        raise ValueError("Must supply non-empty model list for download!")
+    if len(artifact_list) == 0:
+        raise ValueError("Must supply non-empty model or data list for download!")
     if source == "ngc":
         if check_ngc_cli():
             ngc_call_command = "ngc"
@@ -176,39 +191,53 @@ def download_models(
             NGC_INSTALL_DIR = "/tmp"
             check_and_install_ngc_cli(NGC_INSTALL_DIR)
             ngc_call_command = str(os.path.join(NGC_INSTALL_DIR, "ngc-cli/ngc"))
-
-    for model in model_list:
-        model_source_path = getattr(config.models[model], source)
-        if not model_source_path:
-            print(f"Warning: {model} does not have a {source} URL; skipping download.")
+    if artifact_type == 'model':
+        conf = config.models
+    else:
+        conf = config.data
+    for download_artifact in artifact_list:
+        artifact_source_path = getattr(conf[download_artifact], source)
+        if not artifact_source_path:
+            print(f"Warning: {download_artifact} does not have a {source} URL; skipping download.")
             continue
 
-        if config.models[model].relative_download_dir:
-            complete_download_dir = download_dir_base / config.models[model].relative_download_dir
+        if conf[download_artifact].relative_download_dir:
+            complete_download_dir = download_dir_base / conf[download_artifact].relative_download_dir
         else:
             complete_download_dir = download_dir_base
 
         if source == "ngc":
             # NGC seems to always download to a specific directory that we can't
             # specify ourselves
-            ngc_dirname = Path(os.path.split(model_source_path)[1].replace(":", "_v"))
+            ngc_dirname = Path(os.path.split(artifact_source_path)[1].replace(":", "_v"))
             ngc_dirname = complete_download_dir / ngc_dirname
-            command = f"mkdir -p {str(complete_download_dir)} && {ngc_call_command} registry model download-version {model_source_path} --dest {str(complete_download_dir)} && mv {str(ngc_dirname)}/* {str(complete_download_dir)}/ && rm -d {str(ngc_dirname)}"
+
+            # TODO: this assumes that it's a model for now.
+            command = f"mkdir -p {str(complete_download_dir)} && {ngc_call_command} registry model download-version {artifact_source_path} --dest {str(complete_download_dir)} && mv {str(ngc_dirname)}/* {str(complete_download_dir)}/ && rm -d {str(ngc_dirname)}"
+            file_name = artifact_source_path.split('/')[-1]
         elif source == "pbss":
-            command = (
-                f"aws s3 cp {str(model_source_path)} {str(complete_download_dir)}/ --endpoint-url https://pbss.s8k.io"
-            )
-        if config.models[model].extra_args:
-            extra_args = config.models[model].extra_args
+            command = f"aws s3 cp {str(artifact_source_path)} {str(complete_download_dir)}/ --endpoint-url https://pbss.s8k.io"
+            file_name = artifact_source_path.split('/')[-1]
+        if conf[download_artifact].extra_args:
+            extra_args = conf[download_artifact].extra_args
             command = f"{command} {extra_args}"
 
         _, stderr, retcode = streamed_subprocess_call(command, stream_stdout)
         if retcode != 0:
-            raise ValueError(f"Failed to download {model=}! {stderr=}")
+            raise ValueError(f"Failed to download {download_artifact=}! {stderr=}")
+        if artifact_type == "data":
+            tar_file = f"{str(complete_download_dir)}/{file_name}"
+            with tarfile.open(tar_file) as tar:
+                extract_path = f"{str(complete_download_dir)}"
+                if conf[download_artifact].untar_dir:
+                    extract_path = f"{extract_path}/{conf[download_artifact].untar_dir}"
+                tar.extractall(path=extract_path)
+            Path(tar_file).unlink()
+
         # Create symlinks, if necessary
-        if config.models[model].symlink:
-            source_file = config.models[model].symlink.source
-            target_file = complete_download_dir / config.models[model].symlink.target
+        if conf[download_artifact].symlink:
+            source_file = conf[download_artifact].symlink.source
+            target_file = complete_download_dir / conf[download_artifact].symlink.target
             target_dir = target_file.parent
             command = f"mkdir -p {target_dir} && ln -sf {str(source_file)} {str(target_file)}"
             _, stderr, retcode = streamed_subprocess_call(command, stream_stdout=True)
@@ -225,7 +254,6 @@ def load_config(config_file: Path = DATA_SOURCE_CONFIG) -> Config:
     """
     with open(DATA_SOURCE_CONFIG, 'rt') as rt:
         config_data = yaml.safe_load(rt)
-
     return Config(**config_data)
 
 
@@ -238,38 +266,54 @@ def main():
     """
     config = load_config()
     all_models_list = list(config.models.keys())
-    parser = argparse.ArgumentParser(description='Pull pretrained model checkpoints.')
+    all_data_list = list(config.data.keys())
+    parser = argparse.ArgumentParser(description='Pull pretrained model checkpoints and corresponding data.')
     parser.add_argument(
-        'model_name',
-        nargs='+',
+        '--models',
+        nargs='*',
         choices=all_models_list + [ALL_KEYWORD],
-        help='Name of the data to download (optional if downloading all data)',
+        help='Name of the model (optional if downloading all models)',
     )
+
+    parser.add_argument(
+        '--data',
+        nargs='*',
+        choices=all_data_list + [ALL_KEYWORD],
+        help='Name of the data (optional if downloading all data)',
+    )
+
     parser.add_argument(
         '--download_dir',
         default='.',
         type=str,
-        help='Directory into which download and symlink the model.',
+        help='Directory into which download and symlink the model or data.',
     )
 
     parser.add_argument(
         '--source',
-        choices=list(ModelSource.__args__),
+        choices=list(ArtifactSource.__args__),
         default='ngc',
         help='Pull model from NVIDIA GPU Cloud (NGC) or SwiftStack (internal). Default is NGC.',
     )
-
     parser.add_argument("--verbose", action="store_true", help="Print model download progress.")
-
     args = parser.parse_args()
-    if args.model_name:
-        if ALL_KEYWORD in args.model_name:
+    if args.models:
+        if ALL_KEYWORD in args.models:
             download_list = all_models_list
         else:
-            download_list = args.model_name
-        download_models(config, download_list, args.source, Path(args.download_dir), args.verbose)
-    else:
-        print("No models were selected to download.")
+            download_list = args.models
+        download_artifacts(
+            config, download_list, args.source, Path(args.download_dir), args.verbose, artifact_type="model"
+        )
+    if args.data:
+        if ALL_KEYWORD in args.data:
+            download_list = all_data_list
+        else:
+            download_list = args.data
+        download_artifacts(config, download_list, args.source, Path(args.download_dir), args.verbose, "data")
+
+    if not (args.models or args.data):
+        print("No models or data were selected to download.")
 
 
 if __name__ == "__main__":

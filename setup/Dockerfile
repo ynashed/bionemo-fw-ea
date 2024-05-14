@@ -173,7 +173,7 @@ ENV BIONEMO_HOME=${BIONEMO_HOME}
 RUN mkdir -p ${BIONEMO_HOME}
 WORKDIR ${BIONEMO_HOME}
 ### Copy the bionemo repo contents for distribution
-COPY LICENSE README.md artifact_paths.yaml download_models.py launch.sh setup.py pyproject.toml ${BIONEMO_HOME}/
+COPY LICENSE README.md artifact_paths.yaml download_artifacts.py launch.sh setup.py pyproject.toml ${BIONEMO_HOME}/
 COPY setup ${BIONEMO_HOME}/setup
 COPY hydra_plugins ${BIONEMO_HOME}/hydra_plugins
 COPY tokenizers ${BIONEMO_HOME}/tokenizers

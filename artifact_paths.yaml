@@ -174,6 +174,16 @@ models:
     enformer_pretrained32:
         pbss: "s3://bionemo-ci/models/dna/enformer/enformer_pretrained32/0.1.0/enformer_pretrained32.nemo"
         ngc: "nvidian/clara-lifesciences/enformer_pretrained32:0.1.0"
+        relative_download_dir: "dna/enformer/"
         symlink:
             source: "../../enformer_pretrained32.nemo"
             target: "dna/enformer/enformer_pretrained32.nemo"
+        relative_download_dir: "dna/enformer/"
+data:
+    openfold_sample:
+        pbss: "s3://bionemo-ci/test-data/openfold/openfold_vprocessed_sample/openfold_sample_data.tar.gz"
+        relative_download_dir: "examples/tests/test_data/"
+    openfold_training:
+        pbss: "s3://bionemo-ci/test-data/openfold/openfold_vprocessed_sample_cif_pt/openfold_training_samples.tar.gz"
+        relative_download_dir: "examples/tests/test_data/"
+        untar_dir: "openfold_data"

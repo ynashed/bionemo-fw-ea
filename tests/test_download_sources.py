@@ -12,7 +12,7 @@ import shutil
 
 import pytest
 
-from download_models import download_models, get_available_models, load_config, streamed_subprocess_call
+from download_artifacts import download_artifacts, get_available_models, load_config, streamed_subprocess_call
 
 
 @pytest.fixture(scope='module')
@@ -29,9 +29,9 @@ def download_models_for_test(tmpdir_factory):
     print(f"{ngc_download_path=}")
     print(f"{pbss_download_path=}")
     # Download models from NGC
-    download_models(config, common_models, "ngc", ngc_download_path)
+    download_artifacts(config, common_models, "ngc", ngc_download_path)
     # Download models from PBSS
-    download_models(config, common_models, "pbss", pbss_download_path)
+    download_artifacts(config, common_models, "pbss", pbss_download_path)
 
     yield ngc_download_path, pbss_download_path
 
