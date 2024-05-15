@@ -170,6 +170,12 @@ model:
     use_only_pdb_chain_ids: null # Optional list of pdb chain ids for intersection with train and val datasets.
     filter_by_alignments: true
 
+  # train_ds:
+  #
+  #   To set an optional timeout parameter for use with the setting
+  #     model.optimisations=[dataloader_pq], set
+  #     timeout_for_pqueue_get: 2
+  #
   train_ds:
     train_max_pdb_release_date: "2021-09-16"
     num_workers: 14

@@ -129,23 +129,28 @@ def get_initial_training_dl(
         num_prev_steps=train_session_cfg.iteration,  # iteration
     )
 
-    # initial_training_dataset = InitialTrainingDataset(
+    # --------------------------------------
+    # Create dataloader
+    # --------------------------------------
+    args_for_dataloader = {
+        "dataset": initial_training_dataset,
+        "sampler": initial_training_sampler,
+        "local_batch_size": model_cfg.micro_batch_size,
+        "num_workers": ds_cfg.num_workers,
+        "seed": model_cfg.seed,
+        "uniform_recycling_iters": list(range(0, model_cfg.num_recycling_iters + 1)),
+        "num_prev_steps": train_session_cfg.iteration,
+        "use_threading": ds_cfg.threading_enabled,
+        "prefetch_factor": 2,
+    }
     if OptimHub.config('dataloader_pq'):
         InitialTrainingDataloader = InitialTrainingDataloaderPQ
+        if "timeout_for_pqueue_get" in ds_cfg:
+            args_for_dataloader["timeout_for_pqueue_get"] = ds_cfg["timeout_for_pqueue_get"]
     else:
         InitialTrainingDataloader = InitialTrainingDataloaderPT
 
-    initial_training_dataloader = InitialTrainingDataloader(
-        dataset=initial_training_dataset,
-        sampler=initial_training_sampler,
-        local_batch_size=model_cfg.micro_batch_size,
-        num_workers=ds_cfg.num_workers,
-        seed=model_cfg.seed,
-        uniform_recycling_iters=list(range(0, model_cfg.num_recycling_iters + 1)),
-        num_prev_steps=train_session_cfg.iteration,
-        use_threading=ds_cfg.threading_enabled,
-        prefetch_factor=2,
-    )
+    initial_training_dataloader = InitialTrainingDataloader(**args_for_dataloader)
 
     return initial_training_dataloader
 
