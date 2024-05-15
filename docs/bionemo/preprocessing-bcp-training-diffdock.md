@@ -1,5 +1,5 @@
 
-# DiffDoc: Preparing Workspace and Data for Pre-training
+# DiffDock: Preparing Workspace and Data for Pre-training
 
 This section outlines the steps to prepare your workspace with pre-processed files for training DiffDock using the NVIDIA NGC platform. 
 

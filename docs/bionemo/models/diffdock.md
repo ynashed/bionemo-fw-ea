@@ -41,8 +41,17 @@ This donor model was not owned or developed by NVIDIA. This model has been devel
 * [Windows] <br>
 
 ## Model Version(s): 
-diffdock_score.nemo, version: 23.08
-diffdock_confidence.nemo, version: 23.08
+diffdock_score_v24.02_cugraph.nemo, version: 24.05
+diffdock_confidence_v24.02_cugraph.nemo, version: 24.05
+
+**NOTE**: previous version of checkpoint files, i.e., version 23.08, can be converted to the current version by running the scripts:
+
+```
+python ${BIONEMO_HOME}/examples/molecule/diffdock/scripts/convert_nemo_chkpt_cugraph-equiv.py previous_checkpoint.nemo new_checkpoint.nemo --swap_mlp_weight_blocks
+```
+where `previous_checkpoint.nemo` is the previous checkpoint version 23.08 and
+the script outputs the new checkpoint for version 24.05 to
+`new_checkpoint.nemo` as specified in the command line.
 
 # Evaluation: 
 ## Evaluation Dataset:
@@ -78,13 +87,15 @@ The accuracy of DiffDock was measured over the 428 protein complexes from the Po
 
 ### Training Performance Benchmarks
 
-Training speed was tested on DGX-A100 systems GPUs with 80GB of memory. Three comparisons were made: 1) DiffDock GitHub As-Received from original author source 2) DiffDock integrated into BioNeMo FW 3) NVIDIA Acceleration of Tensor Product operation in DiffDock. Transition 1-->2 highlights the BioNeMo FW, while 2-->3 showcases the minute operation improvement and subsequent scaling implemented by NVIDIA engineers. 
+Training speed was tested on DGX-A100 systems GPUs with 80GB of memory. Three iterations of performance improvement were made by NVIDIA engineers: 1) DiffDock integrated into BioNeMo FW featuring the size-aware batch sampling enhancement 2) NVIDIA Acceleration of Tensor Product operation in DiffDock 3) Integrated with cugraph-equivariant for fast tensor product graph convolution. The As-Received version of DiffDock does not support multi-GPU operations, and therefore is not shown in the table below.
 
 While the BioNeMo FW makes use of adaptive batch samplers depending on dataset size, we keep a fixed micro_batch size of 4 in the FW, and a batch size of 4 for the DiffDock As-Received code.
 
-The As-Received version of DiffDock does not support multi-GPU operations, and therefore is not shown in the second panel of benchmarking. 
-
-![EquiDock benchmarks](../images/diffdock_perf.png)
+|Time   |Label|Speed [it/s]|Epochs to Converge|Epochs/GPU Hour|GPU Hours|Dataset|Batch size|Number of A100 GPUs|
+|-------|:-----:|------------|------------------|---------------|---------|-------|----------|:------:|
+|2023-09|Size Aware Batch Sampling (first version in BioNeMo FW) |0.41|400|1.1296244|354.1|NV-PDBData|96|8|
+|2023-11|Fast Tensor Product Kernel Integration|1.09|400|2.965159377|134.9|NV-PDBData|96|8|
+|2024-04|Cugraph-equivariant Integration|1.32|400|3.613369467|110.7|NV-PDBData|96|8|
 
 ## Limitations
 DiffDock is currently restricted to static snapshot understanding of single ligand and protein interactions. For more involved systems included multi-ligands in a single protein pocket, multiple protein pockets without a ligand blocker, DiffDock inference may perform poorly due to the unaware implications of ligand-ligand interactions in solvent. Because ESM2 is used as a featurizer, some non-standard amino acids are ignored in the process. 
