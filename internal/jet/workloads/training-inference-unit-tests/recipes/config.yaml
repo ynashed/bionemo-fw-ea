@@ -33,8 +33,8 @@ spec:
   NGC_CLI_TEAM: clara-lifesciences
   config_path: "examples/tests/conf/"
   warmup: 0
-  val_check_interval: 100
-  max_steps: 500
+  val_check_interval: 50
+  max_steps: 100
   default_overwrites: "++exp_manager.create_wandb_logger=False ++exp_manager.create_tensorboard_logger=False ++exp_manager.exp_dir=/tmp/nemo_experiments/ ++exp_manager.create_checkpoint_callback=False ++exp_manager.resume_if_exists=False"
   extra_overwrites: ""
   script: |-
@@ -60,7 +60,7 @@ spec:
     ++create_dllogger_callbacks=True ++create_trainer_metric_callback=True \
     ++dllogger_callbacks_kwargs.use_existing_dllogger=True ++dllogger_callbacks_kwargs.warmup={warmup} \
     ++dllogger_callbacks_kwargs.json_file={dllogger_file} ++trainer_metric_callback_kwargs.log_path={assets_dir} ++logs_dir={logs_dir}
-  time_limit: 3600
+  time_limit: 1800
   artifacts: {}
   metrics:
     throughput_train:

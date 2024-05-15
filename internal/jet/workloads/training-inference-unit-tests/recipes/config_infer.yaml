@@ -42,7 +42,7 @@ spec:
     ++create_dllogger_callbacks=True ++dllogger_callbacks_kwargs.use_existing_dllogger=True \
     ++dllogger_callbacks_kwargs.warmup={warmup} \
     ++dllogger_callbacks_kwargs.json_file={dllogger_file} ++assets_dir={assets_dir} ++logs_dir={logs_dir}
-  time_limit: 3600
+  time_limit: 1800
   artifacts: {}
   metrics:
     throughput_train:
