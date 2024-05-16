@@ -41,17 +41,20 @@ This donor model was not owned or developed by NVIDIA. This model has been devel
 * [Windows] <br>
 
 ## Model Version(s): 
-diffdock_score_v24.02_cugraph.nemo, version: 24.05
-diffdock_confidence_v24.02_cugraph.nemo, version: 24.05
+diffdock_score_v24.02_cugraph.nemo, version: 1.5
+diffdock_confidence_v24.02_cugraph.nemo, version: 1.5
 
-**NOTE**: previous version of checkpoint files, i.e., version 23.08, can be converted to the current version by running the scripts:
+**NOTE**: previous version of checkpoint files, i.e., version 1.1, can be converted to the current version by running the scripts:
 
 ```
 python ${BIONEMO_HOME}/examples/molecule/diffdock/scripts/convert_nemo_chkpt_cugraph-equiv.py previous_checkpoint.nemo new_checkpoint.nemo --swap_mlp_weight_blocks
 ```
-where `previous_checkpoint.nemo` is the previous checkpoint version 23.08 and
+where `previous_checkpoint.nemo` is the previous checkpoint version 1.1 and
 the script outputs the new checkpoint for version 24.05 to
 `new_checkpoint.nemo` as specified in the command line.
+
+## Change Log:
+* version 1.5: A new version of tensor product convolution layer is implemented using the cugraph-equivariant package, which results in 1.2x speed up in training performance. Because of this new implementation, the checkpoint file should be reformatted. We provide a new checkpoint file for this release and a script that can convert the checkpoint file in the old format to the new format (see section [Model Version(s)](#model-versions) for details). 
 
 # Evaluation: 
 ## Evaluation Dataset:
