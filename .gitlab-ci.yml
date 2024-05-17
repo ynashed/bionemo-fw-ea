@@ -106,6 +106,9 @@ workflow:
         EXCLUDE_DOCS_BUILD: "true"
         EXCLUDE_PYTEST: "true"
         EXCLUDE_JET: "true"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_LABELS =~ /PYTEST_NOT_REQUIRED/
+      variables:
+        EXCLUDE_PYTEST: "true"
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_LABELS =~ /JET_NOT_REQUIRED/
       variables:
         EXCLUDE_JET: "true"
@@ -559,12 +562,12 @@ jet-configure:
 jet-trigger:
   extends: [.jet-trigger-template]
   variables:
-    JET_API_TAG: v0.0.0-dev.14637274
+    JET_API_TAG: v0.0.0-dev.15024080
     JET_CUSTOM_CONFIG: |
-      restarter:
+      retrier:
         enabled: true
         max_retries: 2
-        retry_on: ['1.2', '1.2.1', '1.2.1.1', '1.2.1.2']
+        retry_on: ['1.2', '1.2.*']
         waiting_time: 60
       launchers:
         dgxa100_dracooci:
