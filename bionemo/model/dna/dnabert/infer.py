@@ -13,13 +13,14 @@ import torch
 from torch.cuda.amp import autocast
 
 from bionemo.model.core.infer import BaseEncoderInference
+from bionemo.model.dna.dnabert.dnabert_model import DNABERTModel
 
 
 class DNABERTInference(BaseEncoderInference):
     def __init__(
         self,
         cfg,
-        model=None,
+        model: DNABERTModel | None = None,
         freeze: bool = True,
         restore_path: Optional[str] = None,
         training: bool = False,
