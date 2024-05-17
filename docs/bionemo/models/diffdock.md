@@ -78,21 +78,19 @@ The pretrained DiffDock checkpoints for score and confidence models are availabl
 
 ### Accuracy Benchmarks
 
-The accuracy of DiffDock was measured over the 428 protein complexes from the PoseBusters benchmark {cite:p}`buttenschoen2023posebusters` available in [zenodo](https://zenodo.org/records/8278563). The metrics was computed from 20 independent runs with the [DiffDock GitHub](https://github.com/gcorso/DiffDock/commit/bc6b5151457ea5304ee69779d92de0fded599a2c) and the DiffDock in this BioNeMo Framework, and use the same evaluation scripts as in DiffDock GitHub. Due to the inherent stochasticity of DiffDock during the molecular docking generation, the metrics are not expected to be identical.
+The accuracy of DiffDock was measured over the 428 protein complexes from the PoseBusters benchmark {cite:p}`buttenschoen2023posebusters` available in [zenodo](https://zenodo.org/records/8278563). The metrics was computed from 20 independent runs with the [DiffDock GitHub](https://github.com/gcorso/DiffDock/commit/bc6b5151457ea5304ee69779d92de0fded599a2c) and the DiffDock in this BioNeMo Framework. Due to the inherent stochasticity of DiffDock during the molecular docking generation, the metrics are not expected to be identical. The values in parentheses are standard deviations from 20 runs.
 
 | Dataset     | Number of Poses Sampled | Metric                                  | BioNeMo | GitHub |
 |-------------|-------------------------|-----------------------------------------|---------|--------|
-| PoseBusters |            10           | Percentage of Top-1 RMSD<2 Å (%) &uarr; | 26.74   | 25.30  |
-| PoseBusters |            10           | Median of Top-1 RMSD (Å) &darr;         | 5.00    | 5.35   |
-| PoseBusters |            10           | Percentage of Top-5 RMSD<2 Å (%) &uarr; | 37.39   | 35.48  |
-| PoseBusters |            10           | Median of Top-5 RMSD (Å) &darr;         | 2.92    | 3.06   |
+| PoseBusters |            10           | Percentage of Top-1 RMSD<2 Å (%) &uarr; | 34.4 (1.4)   | 32.3 (1.0)  |
+| PoseBusters |            10           | Median of Top-1 RMSD (Å) &darr;         | 3.36 (0.14)    | 3.61 (0.15)   |
+| PoseBusters |            10           | Percentage of Top-5 RMSD<2 Å (%) &uarr; | 41.9 (0.9)  | 39.9 (0.8)  |
+| PoseBusters |            10           | Median of Top-5 RMSD (Å) &darr;         | 2.52 (0.07)    | 2.68 (0.08)   |
 
 
 ### Training Performance Benchmarks
 
-Training speed was tested on DGX-A100 systems GPUs with 80GB of memory. Three iterations of performance improvement were made by NVIDIA engineers: 1) DiffDock integrated into BioNeMo FW featuring the size-aware batch sampling enhancement 2) NVIDIA Acceleration of Tensor Product operation in DiffDock 3) Integrated with cugraph-equivariant for fast tensor product graph convolution. The As-Received version of DiffDock does not support multi-GPU operations, and therefore is not shown in the table below.
-
-While the BioNeMo FW makes use of adaptive batch samplers depending on dataset size, we keep a fixed micro_batch size of 4 in the FW, and a batch size of 4 for the DiffDock As-Received code.
+Training speed was tested on DGX-A100 systems GPUs with 80GB of memory. Three iterations of performance improvement were made by NVIDIA engineers: 1) DiffDock integrated into BioNeMo FW featuring the size-aware batch sampling enhancement 2) NVIDIA Acceleration of Tensor Product operation in DiffDock 3) Integrated with cugraph-equivariant for fast tensor product graph convolution. [The public As-Received version of DiffDock](https://github.com/gcorso/DiffDock/tree/bc6b5151457ea5304ee69779d92de0fded599a2c) used a dataset with a similar size, while it was trained using 4 A6000 GPUs and converged after 850 epochs for 18 days. As detailed performance metrics are not available, therefore it is not shown in the table below.
 
 |Time   |Label|Speed [it/s]|Epochs to Converge|Epochs/GPU Hour|GPU Hours|Dataset|Batch size|Number of A100 GPUs|
 |-------|:-----:|------------|------------------|---------------|---------|-------|----------|:------:|
@@ -101,11 +99,12 @@ While the BioNeMo FW makes use of adaptive batch samplers depending on dataset s
 |2024-04|Cugraph-equivariant Integration|1.32|400|3.613369467|110.7|NV-PDBData|96|8|
 
 ## Limitations
-DiffDock is currently restricted to static snapshot understanding of single ligand and protein interactions. For more involved systems included multi-ligands in a single protein pocket, multiple protein pockets without a ligand blocker, DiffDock inference may perform poorly due to the unaware implications of ligand-ligand interactions in solvent. Because ESM2 is used as a featurizer, some non-standard amino acids are ignored in the process. 
+DiffDock is currently restricted to static snapshot understanding of single ligand and protein interactions. For more involved systems included multi-ligands in a single protein pocket, multiple protein pockets without a ligand blocker, DiffDock inference may perform poorly due to the unaware implications of ligand-ligand interactions in solvent.
 
-Size-aware batch sampler is used because the memory from the cross-graph (ligand-receptor) fluctuate a lot.  Size-aware batch sampler estimate the upper bound of memory usage from estimating the upper bound of the number of cross graphs, and do sampling or prepare batch of samples to avoid Out-Of-Memory error.
+DiffDock is also restricted to rigid protein-ligand docking. For the systems have structural or conformation changes during docking, DiffDock inference may generate not ideal results.
 
-Primary data limitations for the original implementation of DiffDock arise in non-uniform sizes from the cross-graph (ligand-receptor). In the forward diffusion, ligands are randomly perturbed, and a dynamic cutoff is used to build cross graph between ligand and receptor, this results in a dynamic cross graph that has fluctuating edges, depending on the diffusion time and resulting in fluctuating memory usage. This has been solved in the BioNeMo FW implementation `SizeAwareBatchSampler`. This setting can be used to estimate the upper bound of memory usage from estimating the upper bound of the number of cross graphs, and do sampling or prepare batchs of samples to avoid Out-Of-Memory error.
+Because ESM2 is used as a featurizer, some non-standard amino acids are ignored in the data preprocessing. 
+
 
 ## License
 DiffDock is provided under the {{model_license_slug}}.
