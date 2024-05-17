@@ -87,7 +87,7 @@ products:
     nodes: [2]
     gpus: [8]
     config_name: [openfold_initial_training]
-    max_steps: [1675]
+    max_steps: [1625]
     batch_size: [1]
     precision: [32]
     seed: [44]

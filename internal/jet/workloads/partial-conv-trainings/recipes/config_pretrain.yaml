@@ -88,13 +88,13 @@ products:
     precision: [32]
     products:
       - domain: [protein]
-        dwnstr_task: [False, True]
+        dwnstr_task: [False]
         products:
           - variant: [pretrain]
             model: [esm2nv]
             config_name: [pretrain_esm2_650M]
             batch_size: [8]
-            max_steps: [144000]
+            max_steps: [142400]
             seed: [1234]
             val_check_interval: [500]
             accumulate_grad_batches: [8]
