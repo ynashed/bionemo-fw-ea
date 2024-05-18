@@ -1,4 +1,8 @@
 # Release Notes
+## BioNeMo Framework v1.5
+### New Models
+* [Geneformer](https://www.nature.com/articles/s41586-023-06139-9) is out of **Beta** status. This release includes newly trained checkpoints and benchmarks, including a variant based on the publication with 10M parameters, and the largest variant of geneformer publically available to date with 106M parameters.
+
 ## BioNeMo Framework v1.4
 ### New Models
 * **Beta** [Geneformer](https://www.nature.com/articles/s41586-023-06139-9) a foundation model for single-cell data that encodes each cell as represented by an ordered list of differentially expressed genes for that cell.
