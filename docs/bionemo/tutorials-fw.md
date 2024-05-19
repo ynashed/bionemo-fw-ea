@@ -18,6 +18,7 @@ In both types of tutorials, it is convenient to first launch the BioNeMo Framewo
 | Model Pre-Training | [Launching an ESM-1nv model pre-training with UniRef50 dataset](./notebooks/model_training_esm1nv.ipynb) |
 | Model Pre-Training | [Launching an ESM-2nv model pre-training with curated data from UniRef50, UniRef90](./notebooks/model_training_esm2nv.ipynb) |
 | Model Pre-Training | [Pretraining a geneformer model for representing single cell RNA-seq data](./notebooks/geneformer_cellxgene_tutorial.ipynb) |
+| Geneformer Benchmarking| [Benchmarking pre-trained Geneformer models against a baseline with cell type classification](./notebooks/Geneformer-celltype-classification-example.ipynb) |
 | Model Training     | [Launching an EquiDock model pre-training with DIPS or DB5 datasets](./notebooks/model_training_equidock.ipynb)|
 | Inference          | [Performing Inference with MegaMolBART for Generative Chemistry and Predictive Modeling with RAPIDS](./notebooks/MMB_GenerativeAI_Inference_with_examples.ipynb) |
 | Inference          | [Performing Inference with MolMIM for Generative Chemistry and Predictive Modeling with RAPIDS](./notebooks/MolMIM_GenerativeAI_local_inference_with_examples.ipynb) |
