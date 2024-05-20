@@ -29,6 +29,8 @@ class StopAndGoTestParams(TypedDict):
 # new values can be defined there by adding new getter functions
 TEST_PARAMS: List[StopAndGoTestParams] = [
     {"script_path": "examples/protein/openfold/train.py", "metadata_keys": ["learning_rate", "global_step"]},
+    {"script_path": "examples/dna/dnabert/pretrain.py", "metadata_keys": ["learning_rate", "global_step"]},
+    {"script_path": "examples/singlecell/geneformer/pretrain.py", "metadata_keys": ["learning_rate", "global_step"]},
 ]
 
 TRAINING_SCRIPTS_PATH = [params["script_path"] for params in TEST_PARAMS]
@@ -83,22 +85,34 @@ def get_data_overrides(script_or_cfg_path: str) -> str:
         'dnabert',
         'diffdock',
         'molmim',
+        'geneformer',
     ), 'update this function, patterns might be wrong'
 
     task = {
         'molecule': 'physchem/SAMPL',
         'protein': 'downstream',
         'dna': 'downstream',
+        'singlecell': 'downstream',
     }
-
     if conf == ['conf']:
         if model in ('megamolbart', 'openfold', 'molmim'):
             return ''
+        elif model == 'geneformer':
+            return MAIN % 'singlecell'
         else:
             return MAIN % f'{domain}/{task[domain]}/test/x000'
 
     if 'retro' in script:
         return MAIN % 'reaction'
+    elif model == 'geneformer':
+        return (
+            # This is what we run inference on when running infer.py. This is not checked or used during pretraining.
+            f' {DATA}.dataset_path={TEST_DATA_DIR}/cellxgene_2023-12-15_small/processed_data/test'
+            # The following three paths are used for pretrain.py, but also are required to support model loading currently when running inference.
+            f' {DATA}.train_dataset_path={TEST_DATA_DIR}/cellxgene_2023-12-15_small/processed_data/train'
+            f' {DATA}.val_dataset_path={TEST_DATA_DIR}/cellxgene_2023-12-15_small/processed_data/val'
+            f' {DATA}.test_dataset_path={TEST_DATA_DIR}/cellxgene_2023-12-15_small/processed_data/test'
+        )
     elif model == 'openfold':
         return MAIN % 'openfold_data/processed_sample'
     elif model == 'diffdock':
@@ -193,7 +207,9 @@ def test_stop_and_go(script_path: str, metadata_keys: List[str], train_args, dat
     assert process_handle.returncode == 0, f"Initial training command failed:\n{cmd}\n Error log:\n{error_out}"
 
     # assert that metadata was saved correctly
-    assert os.path.isfile(tmp_path / 'checkpoints/metadata.pkl'), f"No file found at {tmp_path / 'metadata.pkl'}"
+    assert os.path.isfile(
+        tmp_path / 'checkpoints/metadata.pkl'
+    ), f"No file found at {tmp_path / 'checkpoints/metadata.pkl'}"
 
     # add check checkpoint integrity callback for second run
     train_args['create_checkpoint_integrity_callback'] = True

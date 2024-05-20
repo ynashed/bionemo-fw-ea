@@ -52,4 +52,4 @@ exp_manager:
     project: null
     name: dnabert-splicesite
     offline: False
-  resume_if_exists: False
+  resume_if_exists: True
