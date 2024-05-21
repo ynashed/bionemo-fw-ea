@@ -1,0 +1,61 @@
+.uniprot-visual-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+#uniprot-circlepack-anchor {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.uniprot-visual-small-text {
+  text-align: left;
+  padding-left: 10px;
+  font-size: 10px;
+  color: #535252;
+}
+
+#uniprot-visual-step-text {
+  font-weight: bold;
+}
+
+.uniprot-visual-play-container {
+  display: flex;
+}
+
+#uniprot-visual-play-button {
+  margin-right: 10px;
+  padding: 4px 8px;
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+
+#uniprot-visual-play-button:disabled {
+  opacity: 0.5;
+}
+
+#uniprot-visual-slider {
+  width: 80%;
+}
+
+#uniprot-visual-description-text {
+  min-height: 60px;
+  overflow: hidden;
+}
+
+.uniprot-visual-circle-label,
+.uniprot-visual-sequence-label {
+  stroke: white;
+  fill: black;
+  paint-order: stroke fill;
+  pointer-events: none;
+}
+
+.uniprot-visual-sequence-label {
+  stroke-width: 3px;
+}

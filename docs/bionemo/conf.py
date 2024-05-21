@@ -199,6 +199,27 @@ nb_execution_mode = "off"  # Global execution disable
 # execution_excludepatterns = ['tutorials/tts-python-basics.ipynb']  # Individual notebook disable
 
 
+def inject_uniprot_visuals(app, pagename, templatename, context, doctree):
+    """
+    Inject specific JavaScript and CSS files for the uniprot page to ensure that
+    js/functionality specific to this page do not affect other pages in the documentation.
+    """
+    uniprot_url = "datasets/uniprot"
+
+    # only inject js/css to uniprot page
+    if pagename == uniprot_url:
+        base_path = '_static/uniprot_visual'
+        js_files = ['d3.min.js', 'unirefClusterSample.js', 'UniprotCirclePackViz.js', 'main.js']
+        css_files = ['uniprot_styles.css']
+
+        # inject js -- note, app.add_js_file inside html-page-context doesn't work,
+        # so here I directly append our scripts alongside the uniprot page header scripts
+        context['script_files'].extend(f"{base_path}/js/{file}" for file in js_files)
+
+        # inject css
+        context['css_files'].extend(f"{base_path}/css/{file}" for file in css_files)
+
+
 def setup(app):
     app.add_config_value('ultimate_replacements', {}, True)
     app.connect('source-read', ultimateReplace)
@@ -208,6 +229,9 @@ def setup(app):
 
     if visitor_script:
         app.add_js_file(visitor_script)
+
+    # add uniprot visual to uniprot page
+    app.connect("html-page-context", inject_uniprot_visuals)
 
     # if not os.environ.get("READTHEDOCS") and not os.environ.get("GITHUB_ACTIONS"):
     #     app.add_css_file(
