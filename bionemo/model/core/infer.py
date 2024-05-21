@@ -229,7 +229,9 @@ class BaseEncoderInference(LightningModule):
 
         # Check for PEFT flag
         if not OmegaConf.select(cfg, 'model.peft.enabled'):  # skipped if peft.enabled is True
-            if OmegaConf.select(cfg, 'model.freeze_layers') is not None:  # Check whether to freeze individual layers of the model.
+            if (
+                OmegaConf.select(cfg, 'model.freeze_layers') is not None
+            ):  # Check whether to freeze individual layers of the model.
                 num_layers = len(model.model.language_model.encoder.layers)
                 freeze_layers = OmegaConf.select(cfg, 'model.freeze_layers')
                 if freeze_layers < 0:  # If freeze_layers < 0, freeze everything but the last `freeze_layers`
