@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH -A healthcareeng_bionemo
-#SBATCH -p polar,polar2,polar3
+#SBATCH --account=healthcareeng_bionemo
+#SBATCH --partition=interactive
 #SBATCH 
-#SBATCH -N 1
+#SBATCH --nodes=1
 #SBATCH --ntasks-per-node 8
 #SBATCH --gpus-per-node 8
 #SBATCH --time 00:30:00                 # wall time
@@ -12,12 +12,21 @@
 
 #
 # title: launch_qa_testcase_01.sh
-# description: initial training,  single node
+# description: initial training, single node
+#
 # usage:
-#   sbatch path-to-script/launch_qa_testcase_01.sh
+#   (1) update the parameter IMAGE_NAME in this file
+#   (2) run command
+#         sbatch path-to-script/launch_qa_testcase_01.sh
+#
 # notes:
 #   (1) Default SBATCH variable assignments must appear immediately after the /bin/bash statement.
 #   (2) The user may need to provide an account name on line 2.
+#   (3) We use the interactive queue, for shorter queue times
+#
+# dependencies
+#   (1) dataset at ${INPUT_DIR} is needed
+#   (2) AWS credentials are not needed
 #
 # tests:
 #   (a) train from random weights
@@ -25,13 +34,14 @@
 #   (c) validation step occurs
 #   (d) writes checkpoint file
 #
-# expected behavior / success criteria:
+# expected results / success criteria:
 #   (1) There is a single slurm job
-#   (2) Users should obtain a checkpoint file, in the directory ${OUTPUT_DIR}/artifacts/checkpoints, called
+#   (2) Estimated run time: ToDo
+#   (3) Users should obtain a checkpoint file, in the directory ${OUTPUT_DIR}/artifacts/checkpoints, called
 #         
 #       openfold--{multisessionstep}--{step}.ckpt 
 #
-# updated / reviewed: 2024-05-13
+# updated / reviewed: 2024-05-20
 #
 
 # (0) preamble
@@ -57,8 +67,7 @@ echo JOBID $SLURM_JOB_ID
 # (4) Run the command.
 srun --mpi=pmix \
   --container-image=${IMAGE_NAME} \
-  --output=${OUTPUT_DIR}/slurm-%j.out \
-  --error=${OUTPUT_DIR}/error-%j.out \
+  --output=${OUTPUT_DIR}/logs/slurm-%j.out \
   --container-mounts=${OUTPUT_DIR}/logs:/result,${OUTPUT_DIR}/artifacts:/result,${INPUT_DIR}:/data \
   bash -c "trap : SIGTERM ; set -x; set -e; echo 'launch_qa_testcase_01.sh - before date' &&
   echo "'date=$(date +'%Y%m%dT%H%M')'" &&
