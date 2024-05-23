@@ -30,6 +30,7 @@ model:
   tensor_model_parallel_size: 1  # model parallelism
   dropout_rate: 0.25 # dropout rate for downstream task
   cnn_dim: 32 # output channels in the downstream convolution layer
+  modify_percent: 0.0 # Turn off input sequence masking by default at inference time.
   data:
     task_name: secondary_structure # options: aav, bind, conservation, gb1, meltome, sav, scl, secondary_structure
     task_type: 'token-level-classification'  # alternative: classification, regression

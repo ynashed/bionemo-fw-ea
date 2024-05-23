@@ -101,6 +101,7 @@ tests/test_triton/test_esm2nv_triton.py @farhadr @jomitchell @mgreaves
 tests/test_examples/test_esm1nv_inference_notebook.py @farhadr @jomitchell @mgreaves
 tests/test_examples/test_esm2nv_inference_notebook.py @farhadr @jomitchell @mgreaves
 tests/test_esm2nv_data_utils.py @farhadr @jomitchell
+tests/test_protein_dataloader.py @jstjohn @farhadr @jomitchell @sichu
 tests/_test_esm2_uf90clustermapping_dataset.py @farhadr @jomitchell
 tests/test_esm2nv_training_utils.py @farhadr @jomitchell
 tests/data/esm2_golden_values @farhadr @jomitchell
@@ -244,7 +245,6 @@ docs/bionemo/models/openfold.md @broland @kdidi
 bionemo/model/protein/prott5nv @mkorshunova
 tests/test_prott5nv_inference.py @mkorshunova
 tests/test_examples/test_prott5nv_inference_notebook.py @mkorshunova @mgreaves
-tests/test_protein_dataloader.py @mkorshunova
 examples/protein/prott5nv @mkorshunova
 tokenizers/protein/prott5nv @mkorshunova
 docs/bionemo/models/prott5nv.md @mkorshunova

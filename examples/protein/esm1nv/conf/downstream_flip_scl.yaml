@@ -35,6 +35,7 @@ model:
   data:
     task_name: scl # options: aav, bind, conservation, gb1, meltome, sav, scl, secondary_structure
     task_type: classification #'token-level-classification'  # alternative: classification, regression
+    modify_percent: 0.0 # Turn off input sequence masking by default at inference time.
     preprocessed_data_path: ${oc.env:BIONEMO_HOME}/data/FLIP # path where all preprocessed FLIP datasets are saved
     dataset_path: ${model.data.preprocessed_data_path}/${model.data.task_name} # path to a training data
     dataset:

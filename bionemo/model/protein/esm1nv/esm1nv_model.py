@@ -169,12 +169,17 @@ class ESM1nvModel(ESMnvMegatronBertModel):
         pad_size_divisible_by_8 = True if self._cfg.masked_softmax_fusion else False
         if self.cfg.pipeline_model_parallel_size > 1 and self.cfg.data.dynamic_padding:
             raise ValueError("Pipeline model parallelism does not support dynamic_padding.")
+        perturb_percent = self._cfg.data.get("perturb_percent", 0.1)
+        mask_percent = self._cfg.data.get("mask_percent", 0.8)
+        identity_percent = self._cfg.data.get("identity_percent", max(1 - (mask_percent + perturb_percent), 0))
         dataloader.collate_fn = ProteinBertCollate(
             tokenizer=self.tokenizer,
             seq_length=self._cfg.seq_length,
             pad_size_divisible_by_8=pad_size_divisible_by_8,
             modify_percent=self._cfg.data.modify_percent,
-            perturb_percent=self._cfg.data.perturb_percent,
+            perturb_token_percent=perturb_percent,
+            mask_token_percent=mask_percent,
+            identity_token_percent=identity_percent,
             dynamic_padding=self.cfg.data.dynamic_padding,
         ).collate_fn
 
@@ -728,12 +733,21 @@ class ESM2nvModel(ESM1nvModel):
         pad_size_divisible_by_8 = True if self._cfg.masked_softmax_fusion else False
         if self.cfg.pipeline_model_parallel_size > 1 and self.cfg.data.dynamic_padding:
             raise ValueError("Pipeline model parallelism does not support dynamic_padding.")
+        modify_percentage = self._cfg.data.get("modify_percent", 0.15)
+        perturb_percentage = self._cfg.data.get("perturb_percent", 0.1)
+        mask_percentage = self._cfg.data.get("mask_percent", 0.8)
+        identity_percentage = self._cfg.data.get(
+            "identity_percent", max(1 - (mask_percentage + perturb_percentage), 0)
+        )
+
         dataloader.collate_fn = ESM2BertCollate(
             tokenizer=self.tokenizer,
             seq_length=self._cfg.seq_length,
             pad_size_divisible_by_8=pad_size_divisible_by_8,
-            modify_percent=self._cfg.data.modify_percent,
-            perturb_percent=self._cfg.data.perturb_percent,
+            modify_percent=modify_percentage,
+            perturb_token_percent=perturb_percentage,
+            mask_token_percent=mask_percentage,
+            identity_token_percent=identity_percentage,
             dynamic_padding=self.cfg.data.dynamic_padding,
         ).collate_fn
         return dataloader

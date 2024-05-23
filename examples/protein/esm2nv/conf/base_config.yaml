@@ -141,8 +141,6 @@ model:
     reset_position_ids: False # Reset position ids after end-of-document token
     reset_attention_mask: False # Reset attention mask after end-of-document token
     eod_mask_loss: False # Mask loss for the end of document tokens
-    masked_lm_prob: 0.15 # Probability of replacing a token with mask.
-    short_seq_prob: 0.1 # Probability of producing a short sequence.
     skip_lines: 0
     drop_last: False
     pin_memory: False
@@ -229,11 +227,16 @@ model:
       index_mapping_dir: ${model.data.index_mapping_dir}
       max_seq_length: ${model.seq_length} # Maximum input sequence length. Longer sequences are truncated
       seed: ${model.seed} # Random seed
-
     
-    
-    modify_percent: 0.1 # Percentage of characters in a protein sequence to modify. (Modification means replacing with another amino acid or with a mask token)
-    perturb_percent: 0.5 # Of the modify_percent, what percentage of characters are to be replaced with another amino acid.
+    # These control the MLM token probabilities. The following settings are commonly used in literature.
+    modify_percent: 0.15 # Fraction of characters in a protein sequence to modify. (Modification means replacing with another amino acid or with a mask token)
+    # NOTE: if you want to replicate runs prior to 5/2024, set modify_percent (above) to 0.1 perturb_percent to 0.5, mask_percent to 0.5, and identity_percent to 0.0
+    # NOTE2: a very common bug in implementations of MLM is for the random token to be selected with a binomial on only tokens that were not assigned the
+    #  [MASK]. This results in too few random tokens (10% of 20% non-[mask] = 2%!). If you want to try this undocumented behavior, which would also be common
+    #  in the wild, set mask_percent: 0.8, perturb_percent: 0.02, identity_percent: 0.18.
+    perturb_percent: 0.1 # Of the modify_percent, what fraction of characters are to be replaced with another amino acid.
+    mask_percent: 0.8 # Of the modify_percent, what fraction of characters are to be replaced with a mask token.
+    identity_percent: 0.1 # Of the modify_percent, what fraction of characters are to be unchanged as the original amino acid.
 
   dwnstr_task_validation:
     enabled: False 

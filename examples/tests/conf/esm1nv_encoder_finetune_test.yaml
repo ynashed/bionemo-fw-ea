@@ -23,6 +23,7 @@ trainer:
   limit_test_batches: 1 # number of batches in test step, use fraction for fraction of data
   num_sanity_val_steps: 0
 
+
 exp_manager:
   exp_dir: ${oc.env:BIONEMO_HOME}/test_results/nemo_experiments/esm1nv_encoder_finetuning
   create_wandb_logger: False
@@ -53,6 +54,11 @@ model:
     target_sizes: [3, 8, 2] 
     mask_column: ["resolved", "resolved", null]
     num_workers: 8
+    
+    modify_percent: 0.0  # Turn off modifications
+    perturb_percent: 0.1
+    mask_percent: 0.8
+    identity_percent: 0.1
   
   finetuning_optim:
     name: adam
