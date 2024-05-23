@@ -44,6 +44,7 @@ variables:
   # JET variables
   JET_WORKLOAD_FOLDER: "training-inference-unit-tests"
   JET_WORKLOADS_DIR: "internal/jet/workloads/$JET_WORKLOAD_FOLDER"
+  JET_WORKLOADS_FILTER: type == 'recipe'
   ### variables excluding stages of the CI pipeline
   EXCLUDE_DOCKER_IMAGE_BUILD: "false"
   EXCLUDE_DOCS_BUILD: "false"
@@ -116,11 +117,13 @@ workflow:
     ## NOTE: Convergence test are run using JET via CI. They can be triggered from any branch but only from the Run pipeline page
     ## (https://gitlab-master.nvidia.com/clara-discovery/bionemo/-/pipelines) by clicking Run pipeline button and setting JET_CONV_TEST=true
     ## Only docker build-bionemo-image and jet stage using training definitions from JET_WORKLOAD_FOLDER is executed (docs build and pytest stages is disabled)
+    ## TODO(dorotat) Temporary disable ems2 pretrain for conv tests. enable again after ESM2 refactor is done, mid June 2024
     - if: ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "schedule") &&  $JET_CONV_TEST == "true"
       variables:
         EXCLUDE_DOCS_BUILD: "true"
         EXCLUDE_PYTEST: "true"
         JET_WORKLOAD_FOLDER: "partial-conv-trainings"
+        JET_WORKLOADS_FILTER: type == 'recipe' and spec.config_name != 'pretrain_esm2_650M'
     - if: ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "schedule") && $PYTEST != "true" && $JET == "true"
       variables:
         EXCLUDE_PYTEST: "true"
@@ -543,7 +546,6 @@ jet-configure:
   variables:
     JET_WORKLOADS_PROJECT: $JET_WORKLOADS_PROJECT
     JET_WORKLOADS_JOB: $JET_WORKLOADS_JOB
-    JET_WORKLOADS_FILTER: type == 'recipe'
     JET_BUILDS_PLATFORMS: linux/amd64
   trigger:
     project: dl/jet/ci
@@ -576,6 +578,7 @@ jet-trigger:
   inherit:
     variables:
       - EXCLUDE_JET
+      - JET_WORKLOADS_FILTER
   rules:
     - if: $EXCLUDE_JET == "true"
       when: never
