@@ -6,6 +6,8 @@ Nvidia-internal developers to the openfold project.
 Before beginning developement or experimentation, a developer might 
 1. build and start an image
 2. trigger all pytests in the repo
+3. initialize initial training
+4. initiailize fine-tuning
 
 In addition to the repo-wide pytests, the openfold developer might want to 
 know which tests were specifically written for openfold code.  See below.
@@ -13,6 +15,9 @@ know which tests were specifically written for openfold code.  See below.
 Alternatively, after steps (1) and (2) above, the developer might want to initiate 
 an initial training or fine tuning job.  See below.
 
+In parallel to step 1-4 above, the developer might want to do the following procedures 
+
+* compute multiple sequence alignment
 
 ## (1) openfold-specific merge-gating tests
 ### (1.1) openfold-specific pytests
@@ -28,6 +33,8 @@ To trigger the openfold-specific pytests, run one of the two following commands.
 
 ```bash
 cd /workspace/bionemo
+python download_models.py openfold_initial_training_public openfold_finetuning_4_public openfold_initial_training_inhouse openfold_finetuning_inhouse --source pbss --download_dir $MODEL_PATH --verbose
+bash ./examples/protein/openfold/scripts/download_data_sample.sh -data_path $BIONEMO_HOME/examples/tests/test_data/ -pbss
 pytest -k test_openfold
 ```
 
@@ -36,6 +43,8 @@ or
 ```bash
 # inside bionemo container
 cd /workspace/bionemo
+python download_models.py openfold_initial_training_public openfold_finetuning_4_public openfold_initial_training_inhouse openfold_finetuning_inhouse --source pbss --download_dir $MODEL_PATH --verbose
+bash ./examples/protein/openfold/scripts/download_data_sample.sh -data_path $BIONEMO_HOME/examples/tests/test_data/ -pbss
 pytest tests/test_openfold_inference.py 
 pytest tests/test_openfold_checkpoint.py
 ```
@@ -328,8 +337,106 @@ Eos:
       Slack: #hwinf-eos-users 
 ```
 
+## (a) compute muliple sequence alignment
+### (a.1) identify CAMEO targets
+[OpenProteinSet](https://registry.opendata.aws/openfold/) computes MSAs for CAMEO targets all the way until 2021-12-15. To obtain CAMEO targets beyond, the developer can traces all targets until 2022-07-05 under `bionemo/data/protein/openfold/reosurces/cameo_targets.json` or access directly from CAMEO webpage by specifying `start_date` following the url below.
+
+```
+https://cameo3d.org/modeling/1-week/difficulty/all/?to_date=${start_date}
+```
+
+### (a.2) set up for multiple sequence alignment
+To follow the MSA generation protocol provided by public OpenFold team, The users should prepare the following MSAs.
+
+1. mgnify_hits.ato (jackhmmer on mgnify)
+
+2. uniref90.sto (jackhmmer on uniref90)
+
+3. bfd_uniclust_hits.a3m (hhblits on bfd and uniclust30)
+
+Users can download mgnify, uniref90, bfd and uniclust30 databases using download scripts from [their repo](https://github.com/aqlaboratory/openfold) or directly from PBSS.
+
+Template search needs `hhsearch`, which is already installed in the docker, and pdb70 database.
+
+```bash
+# list databases
+aws s3 ls --endpoint-url https://pbss.s8k.io general-purpose/datasets/sichu/
+
+# download database to /data (~2TB)
+aws s3 sync --endpoint-url https://pbss.s8k.io s3://general-purpose/datasets/sichu/bfd /data
+aws s3 sync --endpoint-url https://pbss.s8k.io s3://general-purpose/datasets/sichu/mgnify /data
+aws s3 sync --endpoint-url https://pbss.s8k.io s3://general-purpose/datasets/sichu/uniclust30 /data
+aws s3 sync --endpoint-url https://pbss.s8k.io s3://general-purpose/datasets/sichu/uniref90 /data
+
+# download database for template search
+aws s3 sync --endpoint-url https://pbss.s8k.io s3://general-purpose/datasets/sichu/pdb70 /data
+```
+
+Then users can generate MSAs by specifying the path to the input fasta directory and output MSA directory. Try compute node with larger memory size if no `bfd_uniclust_hits.a3m` is returned.
+```bash
+#!/bin/bash
+#SBATCH --account=convai_bionemo_training
+#SBATCH --job-name=openfold_compute_alignment
+#SBATCH --nodes=1
+#SBATCH --ntasks=16
+#SBATCH --partition=batch_singlenode
+#SBATCH --time=0-04:00:00
+
+export pdbcode=$1
+image=""
+mounts=""
+
+srun --nodes=1 \
+        --container-image $image \
+        --container-mounts $mounts \
+        bash -c '''
+# debugging
+#set +ex
+
+# export input and output directories
+export input_dir=FASTA_DIR
+export output_dir=MSA_DIR
+
+if [ "$SLURM_PROCID" == "0" ]; then
+        # clean up previous run
+        subdir="${output_dir}/$pdbcode"
+        if [ ! -f "$subdir/bfd_uniclust_hits.a3m" ]; then
+                echo "Removing $subdir since no bfd alignment is found."
+                rm -rf $subdir
+        fi
+
+        # copy fasta into temporary directory
+        mkdir -p /tmp/$pdbcode
+        cp /tmp/$pdbcode.fasta $input_dir/$pdbcode/
+
+        # run alignment
+        # hhsearch and pdb70_database_path are for template search only
+        mkdir $output_dir
+        /usr/bin/time -v python scripts/precompute_alignments.py ${input_dir}/$pdbcode $output_dir \
+                --jackhmmer_binary_path=/opt/conda/bin/jackhmmer \
+                --hhblits=/opt/conda/bin/hhblits \
+                --uniref90_database_path=/data/uniref90/uniref90.fasta \
+                --mgnify_database_path=/data/mgnify/mgy_clusters_2018_12.fa \
+                --bfd_database_path=/data/bfd/bfd_metaclust_clu_complete_id30_c90_final_seq.sorted_opt \
+                --uniclust30_database_path=/data/uniclust30/uniclust30_2018_08/uniclust30_2018_08 \
+                --cpus_per_task 16 \
+                --hhsearch=/opt/conda/bin/hhsearch \
+                --pdb70_database_path=/data/pdb70/pdb70 \
+                2> ${output_dir}/${pdbcode}.log
+fi
+'''
+```
+
+The runtime for each sequence can range from 30 minutes to above 4 hours.
+
+### (a.3) convert from stockholm to a3m format
+Currently our `infer.yaml` accepts `msa_a3m_filepaths` but jackhmmer outputs in sto format. Users can convert sto to a3m file using `convert_stockholm_to_a3m` under `bionemo/data/protein/openfold/parsers.py`. 
+
 ## Appendix
 
 - [OpenFold Engineering FAQ](https://docs.google.com/document/d/1MRbjLpKibLF9qSRUXAtAeFemP_3yERdye5pn-8RW_Bo/edit)
 - https://github.com/TimoLassmann/kalign
 - https://github.com/soedinglab/hh-suite
+- [public OpenFold repo](https://github.com/aqlaboratory/openfold)
+- [OpenProteinSet registry](https://registry.opendata.aws/openfold/)
+- [CAMEO](https://cameo3d.org/)

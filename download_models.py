@@ -11,7 +11,6 @@
 """Script to download pretrained models from NGC or PBSS. """
 import argparse
 import os
-import sys
 from pathlib import Path
 from subprocess import PIPE, Popen
 from typing import Dict, List, Literal, Optional, Tuple
@@ -97,9 +96,7 @@ def streamed_subprocess_call(cmd: str, stream_stdout: bool = False) -> Tuple[str
 
         if p.returncode != 0:
             stderr = p.stderr.read()
-            print(stderr, file=sys.stderr)
-        else:
-            print("\nDone.")
+
     return "".join(stdout), stderr, p.returncode
 
 
@@ -157,7 +154,7 @@ def download_models(
     config: Config, model_list: List, source: ModelSource, download_dir_base: Path, stream_stdout: bool = False
 ) -> None:
     """
-    Download models from a given source.
+    Download models from a given source..
 
     Args:
         config (Config): The artifacts configuration.
@@ -203,8 +200,24 @@ def download_models(
             command = f"{command} {extra_args}"
 
         _, stderr, retcode = streamed_subprocess_call(command, stream_stdout)
-        if retcode != 0:
+
+        if retcode == 0:
+            print("\nDone.")
+
+        elif "Client Error: 403 Response: Access Denied" in stderr:
+            resource_path = "/".join(model_source_path.split("/")[0:2])
+            print(
+                f"""
+                Warning: Failed to download {model=}! {stderr=}.
+                You do not have access to {resource_path}
+                This is expected behavior for external customers.
+                If this warning is unexpected, please check your NGC access to {resource_path}
+                """
+            )
+
+        else:
             raise ValueError(f"Failed to download {model=}! {stderr=}")
+
         # Create symlinks, if necessary
         if config.models[model].symlink:
             source_file = config.models[model].symlink.source

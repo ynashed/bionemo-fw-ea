@@ -15,6 +15,7 @@ from glob import glob
 
 import pytest
 import torch
+from lightning.fabric.plugins.environments.lightning import find_free_network_port
 
 from bionemo.utils.tests import teardown_apex_megatron_cuda
 
@@ -108,12 +109,18 @@ def get_data_overrides(script_or_cfg_path: str) -> str:
         'dna': 'downstream',
         'singlecell': 'downstream',
     }
-
+    if model == 'geneformer':
+        return (
+            # This is what we run inference on when running infer.py. This is not checked or used during pretraining.
+            f' {DATA}.dataset_path={TEST_DATA_DIR}/cellxgene_2023-12-15_small/processed_data/test'
+            # The following three paths are used for pretrain.py, but also are required to support model loading currently when running inference.
+            f' {DATA}.train_dataset_path={TEST_DATA_DIR}/cellxgene_2023-12-15_small/processed_data/train'
+            f' {DATA}.val_dataset_path={TEST_DATA_DIR}/cellxgene_2023-12-15_small/processed_data/val'
+            f' {DATA}.test_dataset_path={TEST_DATA_DIR}/cellxgene_2023-12-15_small/processed_data/test'
+        )
     if conf == ['conf']:
         if model in ('megamolbart', 'openfold', 'molmim'):
             return ''
-        elif model == 'geneformer':
-            return MAIN % 'singlecell'
         else:
             return MAIN % f'{domain}/{task[domain]}/test/x000'
 
@@ -184,7 +191,6 @@ def get_train_args_overrides(script_or_cfg_path, train_args):
         train_args['model.micro_batch_size'] = 2
         train_args['model.estimate_memory_usage.maximal'] = 'null'
         train_args['model.max_total_size'] = 'null'
-        train_args['model.tensor_product.type'] = 'fast_tp'
 
     return train_args
 
@@ -195,10 +201,14 @@ def get_train_args_overrides(script_or_cfg_path, train_args):
 def test_train_scripts(script_path, train_args, data_args, tmp_path):
     data_str = get_data_overrides(script_path)
     train_args = get_train_args_overrides(script_path, train_args)
-    cmd = f'python {script_path} ++exp_manager.exp_dir={tmp_path} {data_str} ' + ' '.join(
-        f'++{k}={v}' for k, v in train_args.items()
+    # Lookup a free socket to fix errors with DDP on a single node, e.g. this pytest.
+    # TODO(@cye): Why did this solution regress in PyTorch Lightning?
+    open_port = find_free_network_port()
+    cmd = (
+        f'export MASTER_PORT={open_port} && python {script_path} ++exp_manager.exp_dir={tmp_path} {data_str} '
+        + ' '.join(f'++{k}={v}' for k, v in train_args.items())
     )
-    # TODO(dorotat) Trye to simplify  when data-related utils for ESM2 are refactored
+    # TODO(dorotat) Try to simplify when data-related utils for ESM2 are refactored
     if "esm2" not in script_path and "dnabert" not in script_path:
         cmd += ' ' + ' '.join(f'++{k}={v}' for k, v in data_args.items())
     print(cmd)
@@ -245,8 +255,12 @@ def test_infer_script(config_path, tmp_path):
     infer_args = get_infer_args_overrides(config_path, tmp_path)
     if not os.path.exists(script_path):
         script_path = 'bionemo/model/infer.py'
+    # Lookup a free socket to fix errors with DDP on a single node, e.g. this pytest.
+    # TODO(@cye): Why does this depend on how `pytest` is executed, i.e. with a single vs. multiple tests?
+    # Some tests succeed when run in batch / fail otherwise, other tests succeed when run alone / fail otherwise.
+    open_port = find_free_network_port()
     cmd: str = (
-        f'python {script_path} --config-dir {config_dir} --config-name {config_name} ++exp_manager.exp_dir={tmp_path} '
+        f'export MASTER_PORT={open_port} && python {script_path} --config-dir {config_dir} --config-name {config_name} ++exp_manager.exp_dir={tmp_path} '
         + ' '.join(f'++{k}={v}' for k, v in infer_args.items())
     )
 

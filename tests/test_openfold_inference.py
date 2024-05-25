@@ -11,13 +11,11 @@
 import os
 import tempfile
 from pathlib import Path
-from typing import Iterator, Tuple
+from typing import Tuple
 
 import pytest
 import pytorch_lightning as plt
 import torch
-from hydra import compose, initialize
-from hydra.core.global_hydra import GlobalHydra
 from omegaconf import DictConfig
 from torch.utils.data import DataLoader
 
@@ -30,20 +28,28 @@ from bionemo.model.protein.openfold.openfold_model import AlphaFold
 from bionemo.model.protein.openfold.validation_metrics import compute_validation_metrics
 from bionemo.model.protein.openfold.writer import PredictionFeatureWriter
 from bionemo.model.utils import setup_trainer
+from bionemo.utils.hydra import load_model_config
 
 
 GRADIENT_CHECKPOINTING = False
 
-INFERENCE_DIR = os.path.join(
+BIONEMO_HOME = os.getenv('BIONEMO_HOME')
+EXAMPLE_CONFIG_PATH = os.path.join(BIONEMO_HOME, 'examples/protein/openfold/conf')
+TEST_DATA_PATH = os.path.join(BIONEMO_HOME, 'examples/tests/test_data')
+SAMPLE_DATA_PATH = os.path.join(TEST_DATA_PATH, 'openfold_data')
+
+S3_DATA_PATH = 's3://bionemo-ci/test-data/openfold/openfold_vprocessed_sample/openfold_sample_data.tar.gz'
+
+SAMPLE_INFER_DATA_PATH = os.path.join(
     os.path.dirname(os.path.realpath(__file__)), '../examples/tests/test_data/openfold_data/inference'
 )
 
-PDB_DIR = os.path.join(INFERENCE_DIR, 'pdb')
+PDB_DIR = os.path.join(SAMPLE_INFER_DATA_PATH, 'pdb')
 CIF_NAMES = ['7b4q.cif', '7dnu.cif']
 CIF_PATHS = [Path(os.path.join(PDB_DIR, cif)) for cif in CIF_NAMES]
 CIF_CHAIN_IDS = ["A", "A"]
 
-MSA_DIR = os.path.join(INFERENCE_DIR, 'msas')
+MSA_DIR = os.path.join(SAMPLE_INFER_DATA_PATH, 'msas')
 MSA_PATHS = [
     [
         os.path.join(MSA_DIR, '7b4q_A', 'bfd_uniclust_hits.a3m'),
@@ -61,43 +67,17 @@ DRYRUN_SEQUENCES = ['AAAAA', 'CCCCC']
 DRYRUN_SEQ_NAMES = ['first', 'second']
 
 
-@pytest.fixture(scope='module')
-def infer_cfg() -> Iterator[DictConfig]:
-    """Setting up the general inference config object..
-
-    Yields:
-        Iterator[DictConfig]: Inference Config object containing path and name
-    """
-    this_file_dir = os.path.dirname(os.path.realpath(__file__))
-    config_path = "examples/protein/openfold/conf"
-    config_name = "infer"
-    absolute_config_path = os.path.join(os.getenv("BIONEMO_HOME"), config_path)
-    relative_config_path = os.path.relpath(absolute_config_path, this_file_dir)
-    with initialize(config_path=relative_config_path):
-        cfg = compose(config_name=config_name)
-    yield cfg
-    GlobalHydra.instance().clear()
-
-
 @pytest.fixture(scope='function')
-def alphafold_cfg(request, infer_cfg) -> DictConfig:
-    """Append additional parameters to the inference config specific to the instantiated AF model.
-
-    Args:
-        request: Request object containing the parameters that should be updated.
-        infer_cfg (DictConfig): Initial inference config object.
+def infer_cfg() -> DictConfig:
+    """Setting up the general inference config object.
 
     Returns:
-        DictConfig: Updated AlphaFold config.
+        DictConfig: Inference Config object containing path and name
     """
-    msa_a3m_filepaths, generate_templates_if_missing = request.param
-    infer_cfg.model.data.msa_a3m_filepaths = msa_a3m_filepaths
-    infer_cfg.model.data.generate_templates_if_missing = generate_templates_if_missing
-    return infer_cfg
+    return load_model_config(config_name='infer', config_path=EXAMPLE_CONFIG_PATH)
 
 
-@pytest.fixture(scope='function')
-def alphafold_model_trainer(alphafold_cfg: DictConfig) -> Tuple[AlphaFold, plt.Trainer]:
+def get_alphafold_model_trainer(cfg: DictConfig) -> Tuple[AlphaFold, plt.Trainer]:
     """Setting up the AF model and trainer.
 
     Args:
@@ -106,28 +86,9 @@ def alphafold_model_trainer(alphafold_cfg: DictConfig) -> Tuple[AlphaFold, plt.T
     Returns:
         Tuple[AlphaFold, plt.Trainer]: AlphaFold model and trainer.
     """
-    trainer = setup_trainer(alphafold_cfg, callbacks=[])
-    alphafold = AlphaFold.restore_from(
-        restore_path=alphafold_cfg.restore_from_path, override_config_path=alphafold_cfg, trainer=trainer
-    )
+    trainer = setup_trainer(cfg, callbacks=[])
+    alphafold = AlphaFold.restore_from(restore_path=cfg.restore_from_path, override_config_path=cfg, trainer=trainer)
     return alphafold, trainer
-
-
-@pytest.fixture(scope='function')
-def alphafold_model(infer_cfg: DictConfig) -> AlphaFold:
-    """Given a config object, setup an AlphaFoldTest object from a checkpoint.
-
-    Args:
-        infer_cfg (DictConfig): Config Object containing path to checkpoint.
-
-    Returns:
-        AlphaFoldTest: Loaded AlphaFoldTest checkpoint.
-    """
-    trainer = setup_trainer(infer_cfg, callbacks=[])
-    alphafold = AlphaFold.restore_from(
-        restore_path=infer_cfg.restore_from_path, override_config_path=infer_cfg, trainer=trainer
-    )
-    return alphafold
 
 
 def get_predict_dataset(cfg: DictConfig) -> PredictDataset:
@@ -175,7 +136,7 @@ def test_openfold_prediction_pdb_writer(infer_cfg: DictConfig, outputs: str):
     seq_name = infer_cfg.seq_names[0]
     N_res = len(sequence)
     batch_size = infer_cfg.model.micro_batch_size
-    N_seq = 508
+    N_seq = infer_cfg.model.max_msa_clusters
 
     input_dict = {'seq_name': [seq_name]}
     output_dict = {
@@ -198,67 +159,78 @@ def test_openfold_prediction_pdb_writer(infer_cfg: DictConfig, outputs: str):
 
 
 @pytest.mark.needs_gpu
-@pytest.mark.parametrize(
-    "alphafold_cfg",
-    [
-        (
-            [
-                [],
-            ]
-            * len(MSA_PATHS),
-            False,
-        ),  # sequence-only inference
-        (MSA_PATHS, False),  # sequence-and-msa inference without template
-        (MSA_PATHS, True),  # inference with template but no template dataset given
-    ],
-    indirect=True,
-)
-def test_openfold_inference_no_output_check(
-    alphafold_cfg: DictConfig, alphafold_model_trainer: Tuple[AlphaFold, plt.Trainer]
+def test_openfold_inference_sequence_only_dryrun(
+    infer_cfg: DictConfig,
 ):
-    """Testing if inference itself is running, with no output check.
+    """Testing if inference itself can dryrun on sequence-only input.
 
     Args:
         alphafold_cfg (DictConfig): Config object for the model and dataset setup.
         alphafold_model_trainer (Tuple[AlphaFold, plt.Trainer]): Model and Trainer for inference.
     """
-    # setup for inference
-    if alphafold_cfg.model.data.generate_templates_if_missing:
-        with pytest.raises(ValueError):  # raise error if generate template without template database
-            dataset = get_predict_dataset(alphafold_cfg)
-    else:
-        alphafold_model, trainer = alphafold_model_trainer
-        dataset_paths = get_structured_paths(alphafold_cfg.model.data)
-        dataset = PredictDataset(
-            sequences=DRYRUN_SEQUENCES,
-            seq_names=DRYRUN_SEQ_NAMES,
-            pdb_mmcif_chains_filepath=dataset_paths.mmcif_chains,
-            pdb_mmcif_dicts_dirpath=dataset_paths.mmcif_dicts,
-            pdb_obsolete_filepath=dataset_paths.obsolete_filepath,
-            template_hhr_filepaths=alphafold_cfg.model.data.template_hhr_filepaths,
-            msa_a3m_filepaths=alphafold_cfg.model.data.msa_a3m_filepaths,
-            generate_templates_if_missing=alphafold_cfg.model.data.generate_templates_if_missing,
-            pdb70_database_path=alphafold_cfg.model.data.pdb70_database_path,
-            cfg=alphafold_cfg.model,
-        )
-        dl = DataLoader(
-            dataset,
-            batch_size=alphafold_cfg.model.micro_batch_size,
-            num_workers=alphafold_cfg.model.data.num_workers,
-            collate_fn=collate,
-        )
-        assert len(dataset) > 0
-        # inference
-        trainer.predict(alphafold_model, dl, return_predictions=False)
+    infer_cfg.sequences = DRYRUN_SEQUENCES
+    infer_cfg.seq_names = DRYRUN_SEQ_NAMES
+    infer_cfg.model.data.msa_a3m_filepaths = None
+    infer_cfg.model.data.generate_templates_if_missing = False
+
+    alphafold_model, trainer = get_alphafold_model_trainer(infer_cfg)
+    dataset = get_predict_dataset(infer_cfg)
+    assert len(dataset) > 0
+
+    dl = DataLoader(
+        dataset,
+        batch_size=infer_cfg.model.micro_batch_size,
+        num_workers=infer_cfg.model.data.num_workers,
+        collate_fn=collate,
+    )
+    trainer.predict(alphafold_model, dl, return_predictions=False)
 
 
 @pytest.mark.needs_gpu
-@pytest.mark.parametrize(
-    "alphafold_cfg",
-    [(MSA_PATHS, False)],
-    indirect=True,
-)
-def test_openfold_inference_lddt_validation_metric_check(alphafold_cfg: DictConfig):
+def test_openfold_inference_sequence_and_msa_dryrun(
+    infer_cfg: DictConfig,
+):
+    """Testing if inference itself can dryrun on sequence and msa input.
+
+    Args:
+        alphafold_cfg (DictConfig): Config object for the model and dataset setup.
+        alphafold_model_trainer (Tuple[AlphaFold, plt.Trainer]): Model and Trainer for inference.
+    """
+    infer_cfg.sequences = DRYRUN_SEQUENCES
+    infer_cfg.seq_names = DRYRUN_SEQ_NAMES
+    infer_cfg.model.data.generate_templates_if_missing = False
+
+    alphafold_model, trainer = get_alphafold_model_trainer(infer_cfg)
+    dataset = get_predict_dataset(infer_cfg)
+    assert len(dataset) > 0
+
+    dl = DataLoader(
+        dataset,
+        batch_size=infer_cfg.model.micro_batch_size,
+        num_workers=infer_cfg.model.data.num_workers,
+        collate_fn=collate,
+    )
+    trainer.predict(alphafold_model, dl, return_predictions=False)
+
+
+# TODO: test dryrun inference with template inputs
+#  considerations:
+#  - the (sample) pdb_mmcif database has to contain every template in sample hhr
+#  - a (sample) pdb70 database is needed to test option - generate_templates_if_missing
+#  - realign_when_mismatch requires third party softwares on top of template inputs
+
+
+def test_sample_data_exists():
+    """Test whether sample data for OpenFold unittest exists"""
+    if not os.path.exists(SAMPLE_DATA_PATH):
+        raise FileNotFoundError(
+            'Before testing, users must download openfold sample data through examples/protein/openfold/scripts/download_sample_data.sh.'
+        )
+
+
+@pytest.mark.skipif(not os.path.exists(SAMPLE_DATA_PATH), reason='Test sample data not found')
+@pytest.mark.needs_gpu
+def test_openfold_inference_lddt_validation_metric_check(infer_cfg: DictConfig):
     """Test that checks whether the structure predicted by OpenFold is similar to the ground truth structure.
     For this, the predicted and ground truth coordinates are both represented in atom37 format and fed into
     the `compute_validation_metrics` function that computes the metric `{"lddt_ca"}`.
@@ -273,6 +245,8 @@ def test_openfold_inference_lddt_validation_metric_check(alphafold_cfg: DictConf
     Args:
         alphafold_cfg (DictConfig): Config Object to restore AlphaFold model from checkpoint and initialise dataset.
     """
+    infer_cfg.model.data.generate_templates_if_missing = False
+
     # load ground truth data from mmcif files
     mmcif_strings = [load_mmcif_file(mmcif_path) for mmcif_path in CIF_PATHS]
     mmcif_dicts = [parse_mmcif_string(mmcif_string) for mmcif_string in mmcif_strings]
@@ -287,16 +261,13 @@ def test_openfold_inference_lddt_validation_metric_check(alphafold_cfg: DictConf
         torch.unsqueeze(gt_coords, 0) for gt_coords in ground_truth_atom_37_coords_list
     ]
     # setup for inference
-    trainer = setup_trainer(alphafold_cfg)
-    alphafold_model = AlphaFold.restore_from(
-        restore_path=alphafold_cfg.restore_from_path, override_config_path=alphafold_cfg, trainer=trainer
-    )
+    alphafold_model, trainer = get_alphafold_model_trainer(infer_cfg)
     # get prediction dataset from config file, containing only sequences and MSAs, no structures
-    dataset = get_predict_dataset(alphafold_cfg)
+    dataset = get_predict_dataset(infer_cfg)
     data_loader = DataLoader(
         dataset,
-        batch_size=alphafold_cfg.model.micro_batch_size,
-        num_workers=alphafold_cfg.model.data.num_workers,
+        batch_size=infer_cfg.model.micro_batch_size,
+        num_workers=infer_cfg.model.data.num_workers,
         collate_fn=collate,
     )
     # inference

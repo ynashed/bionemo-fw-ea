@@ -55,11 +55,13 @@ fi
 
 VERSION_PROCESSED_SAMPLE=processed_sample_01082024
 VERSION_PREPROCESSING_TEST=preprocessing_test_02282024
+VERSION_MODELIO=model_io_03042024_cugraph
 
 if [ -n "$PBSS" ]; then
     echo "Downloading from PBSS to $DATA_PATH"
     aws s3 cp s3://bionemo-ci/test-data/diffdock/diffdock_v${VERSION_PROCESSED_SAMPLE}/ $DATA_PATH --endpoint-url https://pbss.s8k.io --recursive
     aws s3 cp s3://bionemo-ci/test-data/diffdock/diffdock_v${VERSION_PREPROCESSING_TEST} $DATA_PATH --endpoint-url https://pbss.s8k.io --recursive
+    aws s3 cp s3://bionemo-ci/test-data/diffdock/diffdock_v${VERSION_MODELIO} $DATA_PATH --endpoint-url https://pbss.s8k.io --recursive
     # Add actions for pbss
 else
     echo "Downloading from NGC to $DATA_PATH"
@@ -69,4 +71,8 @@ else
     ngc registry resource download-version nvidian/clara-lifesciences/diffdock:${VERSION_PREPROCESSING_TEST}
     tar -xvf diffdock_v${VERSION_PREPROCESSING_TEST}//preprocessing_test.tar.gz -C $DATA_PATH
     rm -r diffdock_v${VERSION_PREPROCESSING_TEST}/
+    ngc registry resource download-version nvidian/clara-lifesciences/diffdock:${VERSION_MODELIO}
+    mkdir -p ${DATA_PATH}/model_io
+    mv diffdock_v${VERSION_MODELIO}/* ${DATA_PATH}/model_io/
+    rm -r diffdock_v${VERSION_MODELIO}
 fi

@@ -170,11 +170,20 @@ class BioNeMoDataModule(ABC):
     def get_total_eval_batches(self):
         num_val_batches_per_epoch_full = len(self.get_val_dataset()) // self.get_global_batch_size()
         num_val_batches_per_epoch = min(self.trainer.limit_val_batches, num_val_batches_per_epoch_full)
-        return num_val_batches_per_epoch
+        if num_val_batches_per_epoch_full == 0:
+            logging.warning(
+                f"Not enough samples to create validation batches. This may occur when the validation dataset is smaller than the global batch size (after DDP). Validation Dataset Size={len(self.get_val_dataset())}, Global Batch Size={self.get_global_batch_size()}"
+            )
+        return max(num_val_batches_per_epoch, 1)  # at least 1 batch
 
     def get_total_test_batches(self):
         num_test_batches_per_epoch_full = len(self.get_test_dataset()) // self.get_global_batch_size()
-        return min(self.trainer.limit_test_batches, num_test_batches_per_epoch_full)
+        num_test_batches_per_epoch = min(self.trainer.limit_test_batches, num_test_batches_per_epoch_full)
+        if num_test_batches_per_epoch_full == 0:
+            logging.warning(
+                f"Not enough samples to create testing batches. This may occur when the testing dataset is smaller than the global batch size (after DDP). Test Dataset Size={len(self.get_test_dataset())}, Global Batch Size={self.get_global_batch_size()}"
+            )
+        return max(num_test_batches_per_epoch, 1)  # at least 1 batch
 
     def get_sampled_train_dataset(self):
         return self.sample_train_dataset(self.get_train_dataset())

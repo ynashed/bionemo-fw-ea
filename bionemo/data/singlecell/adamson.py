@@ -14,6 +14,7 @@ import scanpy
 from torch.utils.data import Dataset
 
 from bionemo.data.singlecell.utils import sample_or_truncate_plus_pad
+from bionemo.tokenizer.gene_tokenizer import GeneTokenizer
 from tokenizers import Tokenizer
 
 
@@ -52,7 +53,9 @@ class AdamsonDataset(Dataset):
         self.gene_medians = median_dict
 
         self.data = scanpy.read_h5ad(preprocessed_anndata_fn)
-        self.genes = np.asarray(self.data.var.gene_name.values).squeeze()
+        self.gene_ids = np.asarray(self.data.var.index.values).squeeze()
+        if not self.gene_ids[0].startswith("ENSG"):
+            raise ValueError("Gene IDs must be Ensembl IDs")
         self.target = np.load(target_gep_fn)
 
     def __len__(self):
@@ -67,7 +70,7 @@ class AdamsonDataset(Dataset):
         perts = sample.obs["condition"].values[0]
         return process_item(
             gene_values.squeeze(),
-            self.genes,
+            self.gene_ids,
             self.tokenizer,
             perts,
             target,
@@ -86,7 +89,7 @@ class Item(TypedDict):
 def process_item(
     gene_values: np.array,
     gene_idxs: np.array,
-    tokenizer: Tokenizer,
+    tokenizer: GeneTokenizer,
     perts: list[str],
     target: np.array,
     gene_median: Optional[dict] = None,
@@ -130,8 +133,7 @@ def process_item(
             genes.append(gene)
 
             if normalize:
-                ens = tokenizer.gene_tok_to_ens(tok)
-                med = gene_median.get(ens, "1")
+                med = gene_median.get(tok, "1")
                 medians.append(med)
 
     genes = np.asarray(genes)
@@ -153,9 +155,11 @@ def process_item(
     token_ids = np.insert(token_ids, 0, tokenizer.token_to_id(tokenizer.cls_token))
 
     mask = np.zeros(len(token_ids), dtype=bool)
+    # perts are gene names, we need to convert them to ensemble ids
     for p in _parse_pert(perts):
-        if p in tokenizer.vocab:
-            id = tokenizer.vocab[p]
+        p_ens_id = tokenizer.gene_to_ens.get(p, tokenizer.ukw_token)
+        if p_ens_id in tokenizer.vocab:
+            id = tokenizer.vocab[p_ens_id]
             # add pertubed genes to our mask
             mask[token_ids == id] = True
 

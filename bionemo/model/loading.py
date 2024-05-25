@@ -73,8 +73,15 @@ def setup_inference(cfg: DictConfig, *, interactive: bool = False) -> Tuple[M, p
         remove_too_long = True
     elif cfg.model.data.data_impl == "geneformer":
         # Get the medians and tokenizer from the inference model for our dataset.
+        dataset_path = cfg.model.data.get("dataset_path", None)
+        if dataset_path is None:
+            raise ValueError(
+                "model.data.dataset_path must be provided as the path to the dataset that we want to run inference on. "
+                "Annoyingly you still need to also provide train/test/val paths in the config to support model loading, "
+                "but those are not what are used for inference."
+            )
         ds = SingleCellDataset(
-            cfg.model.data.dataset_path,
+            dataset_path,
             infer_model.model.tokenizer,
             infer_model.model.median_dict,
             max_len=cfg.model.seq_length,

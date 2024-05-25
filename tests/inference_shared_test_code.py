@@ -42,6 +42,7 @@ def get_config_dir(bionemo_home: Path, model_name: str) -> str:
     modality = {
         "megamolbart": "molecule",
         "molmim": "molecule",
+        "dsmbind": "molecule",
         "prott5nv": "protein",
         "esm1nv": "protein",
         "geneformer": "singlecell",

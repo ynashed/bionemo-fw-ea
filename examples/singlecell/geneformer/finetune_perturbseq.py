@@ -44,11 +44,11 @@ def main(cfg) -> None:
     if not cfg.do_training:
         # Get the medians and vocab setup appropriately
         logging.info("************** Starting Preprocessing ***********")
+        # Path that the medians file gets saved to. Note that internally the tokenizer also controls saving its vocab based on a location in the config
         preprocessor = GeneformerPreprocess(
-            cfg.model.data.dataset_path,
-            cfg.model.tokenizer.vocab_file,
-            cfg.model.data.dataset,
-            cfg.model.data.medians_file,
+            download_directory=cfg.model.data.train_dataset_path,
+            medians_file_path=cfg.model.data.medians_file,
+            tokenizer_vocab_path=cfg.model.tokenizer.vocab_file,
         )
         match preprocessor.preprocess():
             case {'tokenizer': _, 'median_dict': _}:

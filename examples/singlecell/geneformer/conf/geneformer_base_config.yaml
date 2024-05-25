@@ -7,7 +7,7 @@ trainer:
   devices: 2
   num_nodes: 1
   accelerator: gpu
-  precision: 16-mixed
+  precision: bf16-mixed
   logger: False
   enable_checkpointing: False
   use_distributed_sampler: False
@@ -43,8 +43,9 @@ exp_manager:
 
 model:
   tokenizer:
-    vocab_file: ${oc.env:BIONEMO_HOME}/tokenizers/singlecell/geneformer/vocab/geneformer.vocab
+    vocab_file: ${..data.train_dataset_path}/geneformer.vocab  # By convention the vocab file is preprocessed into the train dataset path.
   micro_batch_size: 16
+  activation:  relu
   tensor_model_parallel_size: 1
   pipeline_model_parallel_size: 1
   use_flash_attention: True
@@ -56,10 +57,11 @@ model:
   ffn_hidden_size: 512
   num_attention_heads: 4
   init_method_std: 0.02
-  hidden_dropout: 0.1
+  hidden_dropout: 0.02
+  attention_dropout: 0.1
   kv_channels: null
   apply_query_key_layer_scaling: True
-  layernorm_epsilon: 1e-5
+  layernorm_epsilon: 1e-12
   make_vocab_size_divisible_by: 128
   pre_process: True
   post_process: True
@@ -68,7 +70,7 @@ model:
   masked_softmax_fusion: True
   native_amp_init_scale: 4294967296
   native_amp_growth_interval: 1000
-  fp32_residual_connection: False
+  fp32_residual_connection: True
   fp16_lm_cross_entropy: False
   seed: 1234
   use_cpu_initialization: False
@@ -79,12 +81,15 @@ model:
   data:
     data_impl: "geneformer"
     probabilistic_dirichlet_sampling_train: False  # Set to True to enable some shuffling of order when gene counts are close.
-    dataset_path: ???
+    train_dataset_path: ???
+    val_dataset_path: ???
+    test_dataset_path: ???
+    dataset_path: null  # Set this for inference
+    dataset: "/"
     data_prefix: ''
     shuffle: true
-    dataset: "/"
-    medians_file: ${oc.env:BIONEMO_HOME}/tokenizers/singlecell/geneformer/vocab/medians.json
-    index_mapping_dir: null
+    medians_file: ${.train_dataset_path}/medians.json  # by convention the medians file is preprocessed into the train dataset path.
+    index_mapping_dir: ${exp_manager.exp_dir}/index_mapping
     skip_warmup: True
     # NOTE: we encountered bugs with 'online' mapping when called how we call it in geneformer.
     #   Please confirm that you do not see a block structure after the first 100k 
@@ -95,8 +100,6 @@ model:
     # block_size: 1000000 # OnlineSampleMapping parameter
     # cache_maxsize: 1000000 # OnlineSampleMapping parameter
     # truncate_to_block_boundary: false
-    train_ratio: .98
-    val_ratio: .01
     num_workers: 10
     dataloader_type: single
     seq_length: ${model.seq_length}
@@ -105,11 +108,11 @@ model:
 
   optim:
     name: fused_adam
-    lr: 2e-4
-    weight_decay: 0.01
+    lr: 1e-3
+    weight_decay: 0.1
     betas:
     - 0.9
-    - 0.98
+    - 0.999
     sched:
       name: CosineAnnealing
       # Make parameters a function of trainer.max_steps by default.

@@ -40,10 +40,10 @@ class DiffDockModelInference(LightningModule):
     Base class for inference.
     """
 
-    def __init__(self, cfg):
+    def __init__(self, cfg, interactive: bool = False):
         super().__init__()
         self.cfg = cfg
-        self.model = load_model_for_inference(cfg, strict=False)
+        self.model = load_model_for_inference(cfg, strict=False, interactive=interactive)
         # move self to same device as loaded model
         self.to(self.model.device)
         self._trainer = self.model.trainer

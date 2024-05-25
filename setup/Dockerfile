@@ -155,16 +155,6 @@ RUN pip uninstall -y opencv-python opencv fonttools \
        /usr/local/share/opencv4 \
        /usr/local/lib/cmake/opencv4 \
        /usr/local/bin/opencv*
-# Remove Slurm: The BioNeMo FW Container can certainly be deployed to Slurm clusters, however having Slurm
-# installed *inside* the container does not typically have a use case. Slurm introduces vulnerabilities
-# into our container.
-RUN DEBIAN_FRONTEND=noninteractive apt remove -y libslurm37 libpmi2-0
-# Remove ONNX source code from container. Note -- this just reduces the duplicate onnx line item in the
-# vulnerability report -- it doesn't remove the onnx vulnerability which is in the
-# /usr/local/lib/python3.10/dist-packages/onnx wheel.
-# The onnx vulnerability is expected to be fixed in BioNeMo FW v1.5 when the underlying pytorch frameworks image
-# fixes the issue.
-RUN rm -rf /opt/pytorch/pytorch/third_party/onnx
 
 ####
 #### NOTE: THIS MUST BE THE ABSOLUTE **LAST** STEP BEFORE ENTRYPOINT !!!!!

@@ -72,7 +72,10 @@ def main(cfg) -> None:
         sample_creator = OpenFoldSampleCreator(
             dataset_root_path=cfg.model.data.dataset_path, **cfg.model.data.prepare.sample
         )
-        sample_creator.prepare(cfg.model.data.prepare.sample_pdb_chain_ids)
+        sample_creator.prepare(
+            sample_pdb_chain_ids=cfg.model.data.prepare.sample_pdb_chain_ids,
+            sample_uniclust30_ids=cfg.model.data.prepare.sample_uniclust30_ids,
+        )
 
     if cfg.get('do_training', False) or cfg.get('do_validation', False):
         filenames_to_keep, filenames_to_rename = isolate_last_checkpoint(cfg)

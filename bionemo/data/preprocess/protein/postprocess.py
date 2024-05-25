@@ -20,6 +20,7 @@ from typing import Dict, List, Optional, Set, Tuple, Union
 import pandas as pd
 from nemo.utils import logging
 
+from bionemo.data.preprocess.protein.open_protein_set import load_uniclust30_target
 from bionemo.data.protein.openfold.alignments import load_alignments, load_alignments_super_index
 from bionemo.data.protein.openfold.helpers import hash_string_into_number
 from bionemo.data.protein.openfold.mmcif import load_mmcif_chains_df
@@ -74,6 +75,30 @@ class OpenFoldSampleCreator:
         "5tan_G",
         "5gky_C",
     ]
+    SAMPLE_CAMEO_CHAIN_IDS = [
+        # 2 chains for CAMEO target non-overlapping with training date range
+        "7f17_B",  # 2021-10-23
+        "7lc5_A",  # 2021-10-30
+    ]
+    SAMPLE_UNICLUST30_IDS = [
+        # the first 16 uniclust30 ids
+        'A0A009JVE4',
+        'A0A010PP53',
+        'A0A010Q9I4',
+        'A0A010QBD7',
+        'A0A010QES4',
+        'A0A010QS11',
+        'A0A010QU37',
+        'A0A010QX93',
+        'A0A010R2Y6',
+        'A0A010RA97',
+        'A0A010RHX7',
+        'A0A010RKM9',
+        'A0A010RW12',
+        'A0A010Z0A0',
+        'A0A011NJF4',
+        'A0A011PLK7',
+    ]
 
     def __init__(
         self,
@@ -105,13 +130,23 @@ class OpenFoldSampleCreator:
         self.sample_variant = sample_variant
         self.force = force
 
-    def prepare(self, sample_pdb_chain_ids: List[str] = SAMPLE_PDB_CHAIN_IDS):
+    def prepare(
+        self,
+        sample_pdb_chain_ids: List[str] = SAMPLE_PDB_CHAIN_IDS,
+        sample_cameo_chain_ids: List[str] = SAMPLE_CAMEO_CHAIN_IDS,
+        sample_uniclust30_ids: List[str] = SAMPLE_UNICLUST30_IDS,
+    ):
         """Prepares sample.
 
         Args:
             sample_pdb_chain_ids (List[str], optional): List of pdb ids that should be a part
-            of sample training data. Requested PDB ids must be present in full  data but they might
+            of sample training data. Requested PDB ids must be present in full data but they might
             be a part of both train and test subsets. Defaults to SAMPLE_PDB_CHAIN_IDS.
+            sample_cameo_chain_ids (List[str], optional): List of pdb ids that should be part of
+            sample validation data in cameo if within validation date range. Defaults to
+            SAMPLE_CAMEO_CHAIN_IDS.
+            sample_uniclust30_ids (List[str], optional): List of uniclust30 ids that should be a
+            part of sample training data in fine-tuning. Defaults to SAMPLE_UNICLUST30_IDS.
 
         Raises:
             ValueError: if destination for sample is the same as for full training data -- to prevent
@@ -121,8 +156,14 @@ class OpenFoldSampleCreator:
         """
         if sample_pdb_chain_ids is None:
             sample_pdb_chain_ids = self.SAMPLE_PDB_CHAIN_IDS
+        if sample_cameo_chain_ids is None:
+            sample_cameo_chain_ids = self.SAMPLE_CAMEO_CHAIN_IDS
+        if sample_uniclust30_ids is None:
+            sample_uniclust30_ids = self.SAMPLE_UNICLUST30_IDS
         logging.info("Generating pdb_mmcif/open_protein_set sample has started...")
         logging.info(f"len(sample_pdb_chain_ids)={len(sample_pdb_chain_ids)}")
+        logging.info(f"len(sample_cameo_chain_ids)={len(sample_cameo_chain_ids)}")
+        logging.info(f"len(sample_uniclust30_ids)={len(sample_uniclust30_ids)}")
 
         if self.source_variant == self.sample_variant:
             raise ValueError(
@@ -163,10 +204,24 @@ class OpenFoldSampleCreator:
             verbose=True,
         )
 
+        # Load and filter uniclust30_targets for the `processed_sample` variant:
+        if sample_uniclust30_ids is not None:
+            with open(input_open_protein_set_dirpath / 'uniclust30_targets' / 'super.index') as f:
+                input_uniclust30_targets_super_index = json.load(f)
+
+            output_uniclust30_targets = {}
+            for sample_uniclust30_id in sample_uniclust30_ids:
+                output_uniclust30_target = load_uniclust30_target(
+                    targets_super_index=input_uniclust30_targets_super_index,
+                    target_key=sample_uniclust30_id,
+                    uniclust30_targets_dirpath=input_open_protein_set_dirpath / 'uniclust30_targets',
+                )
+                output_uniclust30_targets[sample_uniclust30_id] = output_uniclust30_target
+
         # Load pdb alignments for the `processed_sample` variant:
-        output_pdb_alignments = load_processed_sample_pdb_alignments(
-            input_pdb_alignments_dirpath=(input_open_protein_set_dirpath / "pdb_alignments"),
-            sample_pdb_chain_ids=sample_pdb_chain_ids,
+        output_pdb_alignments = load_processed_sample_alignments(
+            input_alignments_dirpath=(input_open_protein_set_dirpath / "pdb_alignments"),
+            sample_ids=[*sample_pdb_chain_ids, *sample_cameo_chain_ids],
             verbose=True,
         )
 
@@ -174,17 +229,43 @@ class OpenFoldSampleCreator:
         output_mmcif_chains_df = _filter_mmcif_chains(
             input_mmcif_chains_df=input_mmcif_chains_df,
             output_pdb_alignments=output_pdb_alignments,
-            sample_pdb_chain_ids=sample_pdb_chain_ids,
+            sample_pdb_chain_ids=[*sample_pdb_chain_ids, *sample_cameo_chain_ids],
         )
         logging.info(f"len(output_mmcif_chains_df)={len(output_mmcif_chains_df)}")
 
-        # Save the `processed_sample` variant of `open_protein_set`:
+        # Filter uniclust30 for the `processed_sample` variant:
+        if sample_uniclust30_ids is not None:
+            output_uniclust30_alignments = load_processed_sample_alignments(
+                input_alignments_dirpath=(input_open_protein_set_dirpath / "uniclust30_alignments"),
+                sample_ids=sample_uniclust30_ids,
+                verbose=True,
+            )
+
+        # Save the `processed_sample` variant of pdb_alignments in `open_protein_set`:
         _save_processed_sample_pdb_alignments(
             output_pdb_alignments=output_pdb_alignments,
             output_pdb_alignments_dirpath=(output_open_protein_set_dirpath / "pdb_alignments"),
             num_shards=self.num_shards,
             force=self.force,
         )
+
+        # Save the `processed_sample` variant of uniclust30_alignments in `open_protein_set`
+        if sample_uniclust30_ids is not None:
+            _save_processed_sample_pdb_alignments(
+                output_pdb_alignments=output_uniclust30_alignments,
+                output_pdb_alignments_dirpath=(output_open_protein_set_dirpath / "uniclust30_alignments"),
+                num_shards=self.num_shards,
+                force=self.force,
+            )
+
+            # Save the `processed_sample` variant of uniclust30_targets in `open_protein_set`
+            _save_processed_sample_uniclust30_targets(
+                input_uniclust30_targets_super_index=input_uniclust30_targets_super_index,
+                output_uniclust30_targets=output_uniclust30_targets,
+                output_uniclust30_targets_filepath=(output_open_protein_set_dirpath / "uniclust30_targets"),
+                num_shards=self.num_shards,
+                force=self.force,
+            )
 
         # Save the `processed_sample` variant of `pdb_mmcif`:
         _save_processed_sample_dicts(
@@ -204,6 +285,44 @@ class OpenFoldSampleCreator:
             force=self.force,
         )
         logging.info("generate_processed_sample finished successfully!")
+
+
+def _save_processed_sample_uniclust30_targets(
+    input_uniclust30_targets_super_index: Dict[str, dict],
+    output_uniclust30_targets: Dict[str, bytes],
+    output_uniclust30_targets_filepath: Path,
+    num_shards: int,
+    force: bool,
+) -> None:
+    output_uniclust30_targets_filepath.mkdir(exist_ok=force, parents=True)
+
+    shards = {shard_id: [] for shard_id in range(num_shards)}
+    for uniclust30_id, output_uniclust30_target in output_uniclust30_targets.items():
+        shard_id = hash_string_into_number(uniclust30_id) % num_shards
+        shards[shard_id].append([uniclust30_id, output_uniclust30_target])
+
+    output_uniclust30_targets_super_index = {}
+
+    for shard_id, shard_data in shards.items():
+        shard_filepath = output_uniclust30_targets_filepath / f'{shard_id}.db'
+        with shard_filepath.open('wb') as f_out:
+            start = 0
+            for uniclust30_id, output_uniclust30_target in shard_data:
+                f_out.write(output_uniclust30_target)
+
+                # Update super index
+                target_files = input_uniclust30_targets_super_index[uniclust30_id]['files']
+                assert len(target_files) == 1
+
+                size = len(output_uniclust30_target)
+                output_uniclust30_targets_super_index[uniclust30_id] = {
+                    'db': f'{shard_id}.db',
+                    'files': [[uniclust30_id, start, size]],
+                }
+                start += size
+
+    with (output_uniclust30_targets_filepath / 'super.index').open('w') as f:
+        json.dump(output_uniclust30_targets_super_index, f)
 
 
 def _save_processed_sample_dicts(
@@ -293,6 +412,7 @@ def _save_processed_sample_pdb_alignments(
     output_pdb_alignments_dirpath: Path,
     num_shards: int,
     force: bool,
+    chunk_size: int = 2**16,
 ) -> None:
     shards = get_shards(
         output_pdb_alignments=output_pdb_alignments,
@@ -316,8 +436,9 @@ def _save_processed_sample_pdb_alignments(
                 filenames = sorted(alignments.keys())
                 for filename in filenames:
                     filebytes = alignments[filename].encode("utf-8")
-                    f_out.write(filebytes)
                     size = len(filebytes)
+                    for chunk_i in range(0, size, chunk_size):
+                        f_out.write(filebytes[chunk_i : chunk_i + chunk_size])
                     file_index = [filename, start, size]
                     alignments_index["files"].append(file_index)
                     start += size
@@ -333,23 +454,23 @@ def _save_processed_sample_pdb_alignments(
     logging.info("alignments super index saved to " f"{alignments_super_index_filepath} successfully!")
 
 
-def load_processed_sample_pdb_alignments(
-    input_pdb_alignments_dirpath: Path,
-    sample_pdb_chain_ids: List[str],
+def load_processed_sample_alignments(
+    input_alignments_dirpath: Path,
+    sample_ids: List[str],
     verbose: bool,
 ) -> Dict[str, dict]:
     pdb_alignments_super_index = load_alignments_super_index(
-        alignments_super_index_filepath=(input_pdb_alignments_dirpath / "super.index"),
+        alignments_super_index_filepath=(input_alignments_dirpath / "super.index"),
         verbose=verbose,
     )
-    processed_sample_pdb_alignments = {}
-    for pdb_chain_id in sample_pdb_chain_ids:
-        processed_sample_pdb_alignments[pdb_chain_id] = load_alignments(
+    processed_sample_alignments = {}
+    for sample_id in sample_ids:
+        processed_sample_alignments[sample_id] = load_alignments(
             alignments_super_index=pdb_alignments_super_index,
-            alignments_dirpath=input_pdb_alignments_dirpath,
-            key=pdb_chain_id,
+            alignments_dirpath=input_alignments_dirpath,
+            key=sample_id,
         )
-    return processed_sample_pdb_alignments
+    return processed_sample_alignments
 
 
 def get_alignments_hash(alignments: dict) -> str:

@@ -1,9 +1,11 @@
 {
     "consumed_samples": 800.0,
     "global_step": 99.0,
-    "grad_norm": 1.0417261123657227,
+    "grad_norm": 0.4409439265727997,
     "lr": 1.9999999494757503e-05,
-    "reduced_train_loss": 8.711240768432617,
-    "train_backward_timing in s": 3.218650817871094e-05,
-    "train_step_timing in s": 0.11693859100341797
+    "reduced_train_loss": 9.248802185058594,
+    "train_backward_timing in s": 3.552436828613281e-05,
+    "train_step_timing in s": 0.1217811107635498,
+    "val_loss": 9.088427543640137,
+    "validation_step_timing in s": 0.00014662742614746094
 }

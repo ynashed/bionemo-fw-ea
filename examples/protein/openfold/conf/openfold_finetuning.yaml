@@ -55,6 +55,20 @@ model:
     use_only_pdb_chain_ids: null # Optional list of pdb chain ids for intersection with train and val datasets.
     filter_by_alignments: True # Whether to filter out mmcif chains with no alignments.
 
+    prepare:
+      create_sample: False
+      sample:
+        num_shards: 3
+        output_root_path: null
+        sample_variant: processed_sample
+        source_variant: ${model.data.dataset_variant}
+        force: False
+
+      # use default lists of ids if not provided
+      sample_pdb_chain_ids: null # list of pdb ids that are part of training data and should be included in training sample
+      sample_cameo_chain_ids: null  # list of pdb ids that are part of validation data and should be included in validation sample
+      sample_uniclust30_ids: null # list of uniclust30 ids that are part of fine-tuning data and should be included in training sample
+
   train_ds:
     train_max_pdb_release_date: "2021-09-16"
     num_workers: 14

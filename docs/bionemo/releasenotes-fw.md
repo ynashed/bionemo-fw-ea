@@ -1,4 +1,16 @@
 # Release Notes
+## BioNeMo Framework v1.5
+### New Models
+* [Geneformer](https://www.nature.com/articles/s41586-023-06139-9) is out of **Beta** status. This release includes newly trained checkpoints and benchmarks, including a variant based on the publication with 10M parameters, and the largest variant of geneformer publically available to date with 106M parameters.
+* DiffDock Score and Confidence models checkpoints updated to be compatible with the new implementation of tensor product convolution layer using cugraph-equivariance. Use model version 1.5 with BioNeMo Framework containers v1.5+ for code/checkpoint compatibility.
+
+### New Features
+* For the openfold model, this release includes improved handling of errors that occur when training terminates at 'max_steps', when the optimisation setting for the priority queue dataloader is activated.  Message are logged to clarify expected behavior for the user.  Benchmark results for improved training time, with the priority queue dataloader, are to come.
+* DiffDock score and confidence models adapted to using cugraph-equivariance.
+
+### Known Issues
+* For the OpenFold model, training with the optimisation setting ++model.optimisations=[dataloader_pq] proceeded successfully on a multi-node cluster.  But, in a single machine / single gpu setting on a local workstation, a training run with with a sample of 32 training examples did not successfully complete.  In future development cycles we'll return to a diagnosis of the single machine / single gpu setting.
+
 ## BioNeMo Framework v1.4
 ### New Models
 * **Beta** [Geneformer](https://www.nature.com/articles/s41586-023-06139-9) a foundation model for single-cell data that encodes each cell as represented by an ordered list of differentially expressed genes for that cell.

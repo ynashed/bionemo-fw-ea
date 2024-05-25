@@ -22,6 +22,7 @@ from nemo.utils import logging
 from omegaconf import DictConfig
 from torch.utils.data import Dataset
 
+from bionemo.data.preprocess.protein.open_protein_set import load_uniclust30_target
 from bionemo.data.protein.openfold.alignments import load_alignments, load_alignments_super_index
 from bionemo.data.protein.openfold.features import (
     create_mmcif_features,
@@ -493,14 +494,8 @@ class SelfDistillationDataset(Dataset):
         return targets_super_index
 
     def _load_target_dict(self, target_key: str) -> dict:
-        targets_index = self.targets_super_index[target_key]
-        targets_db_path = self.uniclust30_targets_dirpath / targets_index["db"]
-        assert len(targets_index["files"]) == 1
-        file_index = targets_index["files"][0]
-        filename, start, size = file_index
-        with open(targets_db_path, "rb") as f:
-            f.seek(start)
-            pdb_string = f.read(size).decode("utf-8")
+        pdb_bytes = load_uniclust30_target(self.targets_super_index, target_key, self.uniclust30_targets_dirpath)
+        pdb_string = pdb_bytes.decode('utf-8')
         protein = Protein.from_pdb_string(pdb_str=pdb_string)
         target_dict = {
             "id": target_key,

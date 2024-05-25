@@ -251,6 +251,8 @@ model:
         source_variant: ${model.data.dataset_variant}
         force: false
       sample_pdb_chain_ids: null
+      sample_cameo_chain_ids: null
+      sample_uniclust30_ids: null
     use_only_pdb_chain_ids: null
     filter_by_alignments: true
   train_ds:

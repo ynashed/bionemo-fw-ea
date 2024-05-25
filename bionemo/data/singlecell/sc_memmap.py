@@ -37,9 +37,6 @@ parser.add_argument(
     "--num-workers", "--nw", type=int, default=12, help="number of workers to use for multi-processing"
 )
 parser.add_argument(
-    "--partition-size", "--ps", type=int, default=200_000, help="number of workers to use for multi-processing"
-)
-parser.add_argument(
     "--obs-cols",
     nargs='+',
     default=[
@@ -64,7 +61,7 @@ GLOBAL_LOCK = Lock()
 def create_metadata(file_path: PosixPath, shared_dict: Dict[str, Dict[str, object]]) -> None:
     """Extract a series of metadata values from `AnnData` required to process all files into memmaps.
 
-    Note: it assumes var.feature_names contains the gene symbols for each dataset and corresponds to the same order as the data.X columns.
+    Note: it assumes var.feature_ids contains the gene symbols for each dataset and corresponds to the same order as the data.X columns.
 
     Args:
         file_path (PosixPath):
@@ -88,17 +85,16 @@ def create_metadata(file_path: PosixPath, shared_dict: Dict[str, Dict[str, objec
         return
 
     shape = data.shape
-    feature_names = list(data.var.feature_name)
+    feature_ids = list(data.var.feature_id)
 
     if data.raw is not None:
-        indices = data.raw.X.indices
+        X = data.raw.X
     else:
-        indices = data.X.indices
+        X = data.X
 
-    num_el = len(indices)
-
+    num_el = X.count_nonzero()  # Count the number of non-zero elements in the sparse array, in total
     # - metadata associated with each file
-    d = {"shape": shape, "feature_names": feature_names, "num_el": num_el, "file_path": str(file_path)}
+    d = {"shape": shape, "feature_ids": feature_ids, "num_el": num_el, "file_path": str(file_path)}
 
     shared_dict[str(file_path)] = d
 
@@ -161,9 +157,13 @@ def write_data(
     X = data.X if data.raw is None else data.raw.X  # Use X if raw is not None, otherwise use raw
 
     # - store the gene data, indices, and pointers in the respective arrays
-    gene_data[running_el : running_el + num_el] = X.data
-    gene_data_indices[running_el : running_el + num_el] = X.indices.astype(int)
-    gene_data_ptr[cur_count : cur_count + num_obs + 1] = X.indptr.astype(int) + int(running_el)
+    gene_data[running_el : running_el + num_el] = X.data  # This is a flattened array with everything in it.
+    gene_data_indices[running_el : running_el + num_el] = X.indices.astype(
+        int
+    )  # these are flattened column indices eg [0, 1, 2, 0, 1, 3] for a 2x4 sparse matrix
+    gene_data_ptr[cur_count : cur_count + num_obs + 1] = X.indptr.astype(int) + int(
+        running_el
+    )  # These are mappings between row indices and ranges. eg [0, 3, 6] for a 2x4 sparse matrix
 
     # - extract the features from the data
     # TODO: this doesnt work if obs_column doesnt have the right things in it.
@@ -183,7 +183,7 @@ def write_data(
     return features
 
 
-def find_ann_data_files(data_path):
+def find_ann_data_files(data_path: Path) -> List[Path]:
     """Find all AnnData files with the extension '.h5ad' in the given data path and its subdirectories.
 
     Args:
@@ -192,13 +192,7 @@ def find_ann_data_files(data_path):
     Returns:
         List[str]: A list of file paths to the AnnData files.
     """
-    ann_data_files = []
-    for root, dirs, files in os.walk(data_path):
-        for file in files:
-            if file.endswith(".h5ad"):
-                ann_data_files.append(Path(os.path.join(root, file)))
-
-    return ann_data_files
+    return sorted(data_path.rglob("*.h5ad"))
 
 
 if __name__ == "__main__":
@@ -243,7 +237,7 @@ if __name__ == "__main__":
         metadata = dict(shared_dict)
 
         for k, v in metadata.items():
-            assert v["shape"][1] == len(v["feature_names"]), f"feature names and shape mismatch for file {k}"
+            assert v["shape"][1] == len(v["feature_ids"]), f"feature names and shape mismatch for file {k}"
 
         with open(metadata_path, 'w') as fp:
             json.dump(metadata, fp)
@@ -286,9 +280,10 @@ if __name__ == "__main__":
     files = list(metadata.keys())
     obs_cols = args.obs_cols
 
-    if args.use_mp:
-        fn = partial(
-            write_data,
+    features = []
+    for fp in tqdm(file_paths, desc="Merging AnnData into numpy memaps..."):
+        feature = write_data(
+            fp,
             obs_cols=obs_cols,
             metadata=metadata,
             gene_data=gene_data,
@@ -296,23 +291,7 @@ if __name__ == "__main__":
             gene_data_ptr=gene_data_ptr,
             strict=strict,
         )
-        with Pool(num_proc) as pool:
-            features = list(
-                tqdm(pool.imap(fn, file_paths), total=len(file_paths), desc="Merging AnnData into numpy memaps...")
-            )
-    else:
-        features = []
-        for fp in tqdm(file_paths, desc="Merging AnnData into numpy memaps..."):
-            feature = write_data(
-                fp,
-                obs_cols=obs_cols,
-                metadata=metadata,
-                gene_data=gene_data,
-                gene_data_indices=gene_data_indices,
-                gene_data_ptr=gene_data_ptr,
-                strict=strict,
-            )
-            features.append(feature)
+        features.append(feature)
 
     print('Saving dataframe ...')
     df = pd.concat(features)

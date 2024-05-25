@@ -100,9 +100,30 @@ def format_predictions(
 
 
 def _convert_to_numpy(x: Union[torch.Tensor, np.ndarray]) -> np.ndarray:
-    if torch.is_tensor(x):
-        return x.detach().cpu().numpy()
-    return x
+    """
+    Converts a tensor or numpy array to a numpy array, gracefully handling bfloat16 and float16 types.
+
+    Args:
+        x (Union[torch.Tensor, np.ndarray]): The input tensor or numpy array.
+
+    Returns:
+        np.ndarray: The converted numpy array.
+
+    Raises:
+        None
+
+    """
+    if not torch.is_tensor(x):
+        return x
+
+    x = x.detach().cpu()
+
+    # Check and convert dtype if it is bfloat16 or float16
+    if x.dtype == torch.bfloat16 or x.dtype == torch.float16:
+        x = x.float()  # Converting to float32 before numpy conversion
+
+    # For other types, directly convert to numpy
+    return x.numpy()
 
 
 def _resolve_and_validate_output_filename(cfg: DictConfig, output_override: Optional[str], overwrite: bool) -> str:

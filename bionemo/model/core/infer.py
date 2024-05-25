@@ -128,6 +128,7 @@ class BaseEncoderInference(LightningModule):
         interactive: bool = False,
         inference_batch_size_for_warmup: Optional[int] = None,
         strict_restore_from_path: bool = True,
+        needs_warmup: bool = True,
     ):
         '''
         Parameters:
@@ -136,9 +137,7 @@ class BaseEncoderInference(LightningModule):
             to use the embeddingtoken_types field for Fine tuning on a downstream task.
         '''
         super().__init__()
-        self.needs_warmup = (
-            True  # Set this to False after calling super().__init__ if you don't need warmup in your model.
-        )
+        self.needs_warmup = needs_warmup
         self.cfg = cfg
         self._freeze_model = freeze
         self.adjust_config = adjust_config

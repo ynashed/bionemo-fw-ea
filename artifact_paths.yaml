@@ -10,7 +10,7 @@
 # "relative_download_dir" is used to specify the subdirectory to which the files should
 # be downloaded.
 # "extra_args" specifies any extra arguments that should be passed the ngc download or
-# s3 download commands.
+# s3 download commands..
 
 models:
     esm1nv:
@@ -25,6 +25,30 @@ models:
         symlink:
             source: "../../prott5nv.nemo"
             target: "protein/prott5nv/prott5nv.nemo"
+    openfold_initial_training_public: # DO NOT RELEASE
+        ngc: "nvidian/cvai_bnmo_trng/openfold:openfold_initial_training_public_checkpoint"
+        pbss: "s3://bionemo-ci/models/openfold_initial_training_public_checkpoint.nemo"
+        symlink:
+            source: "../../openfold_initial_training_public_checkpoint.nemo"
+            target: "protein/openfold/openfold_initial_training_public_checkpoint.nemo"
+    openfold_finetuning_4_public: # DO NOT RELEASE
+        ngc: "nvidian/cvai_bnmo_trng/openfold:openfold_finetuning_4_public_checkpoint"
+        pbss: "s3://bionemo-ci/models/openfold_finetuning_4_public_checkpoint.nemo"
+        symlink:
+            source: "../../openfold_finetuning_4_public_checkpoint.nemo"
+            target: "protein/openfold/openfold_finetuning_4_public_checkpoint.nemo"
+    openfold_initial_training_inhouse: # DO NOT RELEASE
+        ngc: "nvidian/cvai_bnmo_trng/openfold:openfold_initial_training_inhouse_checkpoint"
+        pbss: "s3://bionemo-ci/models/openfold_initial_training_inhouse_checkpoint.nemo"
+        symlink:
+            source: "../../openfold_initial_training_inhouse_checkpoint.nemo"
+            target: "protein/openfold/openfold_initial_training_inhouse_checkpoint.nemo"
+    openfold_finetuning_inhouse:
+        ngc: "nvidia/clara/openfold:finetuned_1.2"
+        pbss: "s3://bionemo-ci/models/openfold_finetuning_inhouse_checkpoint.nemo"
+        symlink:
+            source: "../../openfold_finetuning_inhouse_checkpoint.nemo"
+            target: "protein/openfold/openfold_finetuning_inhouse_checkpoint.nemo"
     megamolbart:
         ngc: "nvidia/clara/megamolbart:1.0"
         pbss: "s3://bionemo-ci/models/megamolbart.nemo"
@@ -51,17 +75,29 @@ models:
             source: "../../equidock_db5.nemo"
             target: "protein/equidock/equidock_db5.nemo"
     diffdock_score:
-        ngc: "nvidia/clara/diffdock_score:1.1"
-        pbss: "s3://bionemo-ci/models/diffdock_score.nemo"
+        ngc: "nvidia/clara/diffdock_score:1.5"
+        pbss: "s3://bionemo-ci/models/diffdock_score_v24.02_cugraph.nemo"
         symlink:
-            source: "../../diffdock_score.nemo"
+            source: "../../diffdock_score_v24.02_cugraph.nemo"
             target: "molecule/diffdock/diffdock_score.nemo"
     diffdock_confidence:
-        ngc: "nvidia/clara/diffdock_confidence:1.1"
-        pbss: "s3://bionemo-ci/models/diffdock_confidence.nemo"
+        ngc: "nvidia/clara/diffdock_confidence:1.5"
+        pbss: "s3://bionemo-ci/models/diffdock_confidence_v24.02_cugraph.nemo"
         symlink:
-            source: "../../diffdock_confidence.nemo"
+            source: "../../diffdock_confidence_v24.02_cugraph.nemo"
             target: "molecule/diffdock/diffdock_confidence.nemo"
+    esm2nv_8m_untrained:
+        ngc: null
+        pbss: "s3://bionemo-ci/models/esm2nv_8M_untrained.nemo"
+        symlink:
+            source: "../../esm2nv_8M_untrained.nemo"
+            target: "protein/esm2nv/esm2nv_8M_untrained.nemo"
+    esm2nv_8m_lora:
+        ngc: null
+        pbss: "s3://bionemo-ci/models/esm2nv_sec_str_lora.nemo"
+        symlink:
+            source: "../../esm2nv_sec_str_lora.nemo"
+            target: "protein/esm2nv/esm2nv_sec_str_lora.nemo"
     esm2nv_650m:
         #TODO: update path when model is released
         ngc: "nvidia/clara/esm2nv650m:1.0"
@@ -76,30 +112,12 @@ models:
         symlink:
             source: "../../esm2nv_3B_converted.nemo"
             target: "protein/esm2nv/esm2nv_3B_converted.nemo"
-    openfold_initial_training_public: # DO NOT RELEASE
-        ngc: "nvidian/cvai_bnmo_trng/openfold:openfold_initial_training_public_checkpoint"
-        pbss: "s3://bionemo-ci/models/openfold_initial_training_public_checkpoint.nemo"
+    dnabert:
+        ngc: "nvidia/clara/dnabert:1.2"
+        pbss: "s3://bionemo-ci/models/dnabert-86M.nemo"
         symlink:
-            source: "../../openfold_initial_training_public_checkpoint.nemo"
-            target: "protein/openfold/openfold_initial_training_public_checkpoint.nemo"
-    openfold_finetuning_4_public: # DO NOT RELEASE
-        ngc: "nvidian/cvai_bnmo_trng/openfold:openfold_finetuning_4_public_checkpoint"
-        pbss: "s3://bionemo-ci/models/openfold_finetuning_4_public_checkpoint.nemo"
-        symlink:
-            source: "../../openfold_finetuning_4_public_checkpoint.nemo"
-            target: "protein/openfold/openfold_finetuning_4_public_checkpoint.nemo"
-    openfold_initial_training_inhouse: # DO NOT RELEASE
-        ngc: "nvidian/cvai_bnmo_trng/openfold:openfold_initial_training_inhouse_checkpoint"
-        pbss: "s3://bionemo-ci/models/openfold_initial_training_inhouse_checkpoint.nemo"
-        symlink:
-            source: "../../openfold_initial_training_inhouse_checkpoint.nemo"
-            target: "protein/openfold/openfold_initial_training_inhouse_checkpoint.nemo"
-    openfold_finetuning_inhouse:
-        ngc: "nvidian/cvai_bnmo_trng/openfold:openfold_finetuning_inhouse_checkpoint"
-        pbss: "s3://bionemo-ci/models/openfold_finetuning_inhouse_checkpoint.nemo"
-        symlink:
-            source: "../../openfold_finetuning_inhouse_checkpoint.nemo"
-            target: "protein/openfold/openfold_finetuning_inhouse_checkpoint.nemo"
+            source: "../../dnabert-86M.nemo"
+            target: "dna/dnabert/dnabert-86M.nemo"
     esm2_650m_huggingface:
         pbss: "s3://bionemo-ci/models/esm2-650M-huggingface"
         relative_download_dir: "protein/esm2nv/esm2-650M-huggingface"
@@ -112,31 +130,24 @@ models:
         # Hugging face models are multiple files in a directory, so the recursive
         # flag is used to download everything in the dir.
         extra_args: "--recursive"
-    dnabert:
-        pbss: "s3://bionemo-ci/models/dnabert-86M.nemo"
-        symlink:
-            source: "../../dnabert-86M.nemo"
-            target: "dna/dnabert/dnabert-86M.nemo"
-    geneformer_31M_240430:
-        # A pretrained 9.2M parameter geneformer (BERT) on 31M single cells and a 21k tokens.
-        #  this is our tokenizer that used ensg ids from medians (25k) to filter out missing ids from
-        #  our regular set of human readable gene names (40k), bringing the total down to 21k tokens.
-        # See https://wandb.ai/clara-discovery/scFM_v6/runs/tqrv9wrl
+    geneformer_10M_240530:
+        # A pretrained 10.3M parameter geneformer (BERT) on 23M unique single cells and 25429 ENSG based tokens,
+        #   padded to a final shape of 25472 for GPU efficiency.
+        # See https://wandb.ai/clara-discovery/scFM_v9/runs/4ij9ghox
         ngc: null
-        pbss: "s3://bionemo-ci/models/geneformer-31M-240430-step-50000-wandb-tqrv9wrl.nemo"
+        pbss: "s3://bionemo-ci/models/geneformer-10M-240530-step-115430-wandb-4ij9ghox.nemo"
         symlink:
-            source: "../../geneformer-31M-240430-step-50000-wandb-tqrv9wrl.nemo"
-            target: "singlecell/geneformer/geneformer-31M-240430.nemo"
-    geneformer_31M_240430_large:
-        # A pretrained 103M parameter geneformer (BERT) on 31M single cells and a 21k tokens.
-        #  this is our tokenizer that used ensg ids from medians (25k) to filter out missing ids from
-        #  our regular set of human readable gene names (40k), bringing the total down to 21k tokens.
-        # See https://wandb.ai/clara-discovery/scFM_v6/runs/iyxsxz2m
+            source: "../../geneformer-10M-240530-step-115430-wandb-4ij9ghox.nemo"
+            target: "singlecell/geneformer/geneformer-10M-240530.nemo"
+    geneformer_106M_240530:
+        # A pretrained 106M parameter geneformer (BERT) on 23M unique single cells and 25429 ENSG based tokens,
+        #   padded to a final shape of 25472 for GPU efficiency.
+        # See https://wandb.ai/clara-discovery/scFM_v9/runs/KZxWJ0I5
         ngc: null
-        pbss: "s3://bionemo-ci/models/geneformer-31M-240430-step-73505-wandb-iyxsxz2m.nemo"
+        pbss: "s3://bionemo-ci/models/geneformer-106M-240530-step-115430-wandb-KZxWJ0I5.nemo"
         symlink:
-            source: "../../geneformer-31M-240430-step-73505-wandb-iyxsxz2m.nemo"
-            target: "singlecell/geneformer/geneformer-31M-240430-large.nemo"
+            source: "../../geneformer-106M-240530-step-115430-wandb-KZxWJ0I5.nemo"
+            target: "singlecell/geneformer/geneformer-106M-240530.nemo"
     geneformer:
         # A QA model for geneformer with randomly initialized weights.
         pbss: "s3://bionemo-ci/models/geneformer-qa.nemo"
@@ -146,16 +157,26 @@ models:
     enformer_finetuned16:
         pbss: "s3://bionemo-ci/models/dna/enformer/enformer_finetuned16/0.1.0/enformer_finetuned16.nemo"
         ngc: "nvidian/clara-lifesciences/enformer_finetuned16:0.1.0"
-        relative_download_dir: "dna/enformer/"
+        symlink:
+            source: "../../enformer_finetuned16.nemo"
+            target: "dna/enformer/enformer_finetuned16.nemo"
     enformer_finetuned32:
         pbss: "s3://bionemo-ci/models/dna/enformer/enformer_finetuned32/0.1.0/enformer_finetuned32.nemo"
         ngc: "nvidian/clara-lifesciences/enformer_finetuned32:0.1.0"
-        relative_download_dir: "dna/enformer/"
+        symlink:
+            source: "../../enformer_finetuned32.nemo"
+            target: "dna/enformer/enformer_finetuned32.nemo"
     enformer_pretrained16:
         pbss: "s3://bionemo-ci/models/dna/enformer/enformer_pretrained16/0.1.0/enformer_pretrained16.nemo"
         ngc: "nvidian/clara-lifesciences/enformer_pretrained16:0.1.0"
-        relative_download_dir: "dna/enformer/"
+        symlink:
+            source: "../../enformer_pretrained16.nemo"
+            target: "dna/enformer/enformer_pretrained16.nemo"
     enformer_pretrained32:
         pbss: "s3://bionemo-ci/models/dna/enformer/enformer_pretrained32/0.1.0/enformer_pretrained32.nemo"
         ngc: "nvidian/clara-lifesciences/enformer_pretrained32:0.1.0"
+        relative_download_dir: "dna/enformer/"
+        symlink:
+            source: "../../enformer_pretrained32.nemo"
+            target: "dna/enformer/enformer_pretrained32.nemo"
         relative_download_dir: "dna/enformer/"

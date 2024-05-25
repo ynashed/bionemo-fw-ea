@@ -23,13 +23,13 @@ from pathlib import Path
 from typing import List, Type, TypedDict
 
 import pytest
+from lightning.fabric.plugins.environments.lightning import find_free_network_port
 from omegaconf import OmegaConf, open_dict
 from pytorch_lightning import LightningModule
 
 from bionemo.callbacks import setup_dwnstr_task_validation_callbacks
 from bionemo.data.diffdock.data_manager import DataManager as DiffdockDataManager
 from bionemo.data.equidock import DataManager
-from bionemo.data.preprocess.singlecell.preprocess import GeneformerPreprocess
 from bionemo.model.dna.dnabert.dnabert_model import DNABERTModel
 from bionemo.model.molecule.diffdock.models.nemo_model import (
     DiffdockTensorProductScoreModel as DiffdockScoreModel,
@@ -192,7 +192,7 @@ TEST_PARAMS: List[TrainingTestParams] = [
         "config_name": 'geneformer_pretrain_test',
         "script_path": "examples/singlecell/geneformer/pretrain.py",
         "model_cls": GeneformerModel,
-        "model_size": 9247360,
+        "model_size": 10300032,
     },
     # TODO get the following working with a small test case.
     # {
@@ -274,18 +274,7 @@ def test_model_size(config_name: str, model_class: LightningModule, model_parame
             if model_class == FineTuneGeneformerModel:
                 with open_dict(cfg):
                     cfg.model.encoder_cfg = cfg  # TODO: why do we have to do this?
-            preprocessor = GeneformerPreprocess(
-                cfg.model.data.dataset_path,
-                cfg.model.tokenizer.vocab_file,
-                cfg.model.data.dataset,
-                cfg.model.data.medians_file,
-            )
-            match preprocessor.preprocess():
-                case {'tokenizer': _, 'median_dict': median_dict}:  # just use the model's packaged tokenizer
-                    logging.info("*************** Preprocessing Finished ************")
-                case _:
-                    logging.error("Preprocessing failed.")
-            model = model_class(cfg.model, trainer, median_dict=median_dict)
+            model = model_class(cfg.model, trainer)
         else:
             model = model_class(cfg.model, trainer)
         assert model.num_weights == model_parameters
@@ -303,7 +292,12 @@ def test_model_training(
     """
     Run short model training and ensure key metrics are identical
     """
+    # Lookup a free socket to fix errors with DDP on a single node, e.g. this pytest.
+    # TODO(@cye): Why does this depend on how `pytest` is executed, i.e. with a single vs. multiple tests?
+    # Some tests succeed when run in batch / fail otherwise, other tests succeed when run alone / fail otherwise.
+    open_port = find_free_network_port()
     cmd = (
+        f'export MASTER_PORT={open_port} && '
         f'python {script_path}  --config-path {config_path_for_tests} --config-name {config_name} '
         f'++exp_manager.exp_dir={tmp_path} '
         f'++create_trainer_metric_callback=True ++trainer_metric_callback_kwargs.log_path={tmp_path}'

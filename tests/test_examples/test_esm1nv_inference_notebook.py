@@ -7,12 +7,14 @@
 # disclosure or distribution of this material and related documentation
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
+import os
 import shutil
 import time
 from pathlib import Path
 from subprocess import Popen
 
 import pytest
+from lightning.fabric.plugins.environments.lightning import find_free_network_port
 from testbook import testbook
 
 
@@ -25,6 +27,7 @@ def server(bionemo_home: Path) -> Popen:
     # for DDP becoming incompatible with Jupyter notebook's kernel process management.
     # TODO [mgreaves] Once !553 is merged, we can re-use the test_*_triton.py's direct
     #                 creation of a `Triton` process when we load it with `interactive=True`.
+    open_port = find_free_network_port()
     triton = Popen(
         [
             shutil.which('python'),
@@ -33,7 +36,8 @@ def server(bionemo_home: Path) -> Popen:
             str(bionemo_home / "examples" / "protein" / MODEL_NAME / "conf"),
             "--config-name",
             "infer.yaml",
-        ]
+        ],
+        env={**os.environ.copy(), "MASTER_PORT": f"{open_port}"},
     )
     time.sleep(2)  # give process a moment to start before trying to see if it will fail
     if triton.poll() is not None:
@@ -47,7 +51,6 @@ def notebook_path(bionemo_home: Path) -> Path:
     return (bionemo_home / "examples" / "protein" / MODEL_NAME / "nbs" / "Inference.ipynb").absolute()
 
 
-@pytest.mark.needs_fork
 @pytest.mark.needs_checkpoint
 @pytest.mark.needs_gpu
 def test_example_notebook(server: Popen, notebook_path: Path):

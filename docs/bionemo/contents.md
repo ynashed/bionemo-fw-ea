@@ -43,6 +43,7 @@ models/equidock
 models/diffdock
 models/dnabert
 models/openfold
+models/geneformer
 models/model-benchmarks
 ```
 
@@ -51,6 +52,7 @@ models/model-benchmarks
 :caption: DATASETS
 
 datasets/uniprot
+datasets/CELLxGENE
 datasets/zinc15
 datasets/pdb
 datasets/GRCh38.p13.md

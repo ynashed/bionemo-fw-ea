@@ -76,7 +76,7 @@ deploy_ngc_org = "nvidia"  # FIXME
 deploy_ngc_org_id = 'cobwt4rder8b'  # FIXME
 deploy_ngc_team = "clara"  # FIXME
 deploy_container_name = 'bionemo-framework'  # FIXME
-deploy_container_tag = '1.4'  # FIXME
+deploy_container_tag = '1.3'  # FIXME
 
 myst_enable_extensions = [
     "dollarmath",

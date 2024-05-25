@@ -51,6 +51,6 @@ fi
 
 echo "Downloading from PBSS to $DATA_PATH"
 # TODO TODO TODO
-aws s3 cp s3://bionemo-ci/test-data/singlecell/singlecell-testdata-20240426.tar.gz $DATA_PATH --endpoint-url https://pbss.s8k.io
+aws s3 cp s3://bionemo-ci/test-data/singlecell/singlecell-testdata-20240506.tar.gz $DATA_PATH --endpoint-url https://pbss.s8k.io
 # TODO TODO TODO, we want to it to unpack the correct directory structure, which will be in tests/data
-tar -xvf $DATA_PATH/singlecell-testdata-20240426.tar.gz -C $DATA_PATH
+tar -xvf $DATA_PATH/singlecell-testdata-20240506.tar.gz -C $DATA_PATH

@@ -9,11 +9,13 @@ hydra:
 
 name: geneformer_inference
 desc: Minimum configuration for initializing a Geneformer model for inference.
+trainer:
+  precision: bf16-mixed  # This is where the model precision settings come from at inference time, match the model config.
 
 model:
   post_process: False # Set to false if you want embeddings and not logits
   downstream_task:
-    restore_from_path: "${oc.env:BIONEMO_HOME}/models/singlecell/geneformer/geneformer-31M-240430.nemo"
+    restore_from_path: "${oc.env:BIONEMO_HOME}/models/singlecell/geneformer/geneformer-qa.nemo"
     outputs: [embeddings, hiddens] # Which outputs to extract per sample (a value or list). Possible values: hiddens, embeddings.
   data:
     data_impl: "geneformer"

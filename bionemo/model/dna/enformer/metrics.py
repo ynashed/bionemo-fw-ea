@@ -21,7 +21,7 @@ class MeanPearsonCorrCoefPerChannel(Metric):
 
     def __init__(self, n_channels: int, dist_sync_on_step=False, process_group=None):
         """Calculates the mean pearson correlation across channels aggregated over regions"""
-        super().__init__(dist_sync_on_step=dist_sync_on_step, full_state_update=False, process_group=process_group)
+        super().__init__(dist_sync_on_step=dist_sync_on_step, process_group=process_group)
         self.reduce_dims = (0, 1)
         self.n_channels = n_channels
         self.add_state(

@@ -7,6 +7,7 @@
 # disclosure or distribution of this material and related documentation
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
+
 import pytorch_lightning as pl
 from nemo.core.config import hydra_runner
 from nemo.utils import logging
@@ -48,11 +49,11 @@ def main(cfg) -> None:
         logging.info("*************** Finish Training ************")
     else:
         logging.info("************** Starting Preprocessing ***********")
+        # Path that the medians file gets saved to. Note that internally the tokenizer also controls saving its vocab based on a location in the config
         preprocessor = GeneformerPreprocess(
-            cfg.model.data.dataset_path,
-            cfg.model.tokenizer.vocab_file,
-            cfg.model.data.dataset,
-            cfg.model.data.medians_file,
+            download_directory=cfg.model.data.train_dataset_path,
+            medians_file_path=cfg.model.data.medians_file,
+            tokenizer_vocab_path=cfg.model.tokenizer.vocab_file,
         )
         match preprocessor.preprocess():
             case {'tokenizer': _, 'median_dict': _}:

@@ -40,7 +40,10 @@ def log_with_nemo_at_level(
         model_pt.trainer.global_rank={model_pt.trainer.global_rank}
         """
 
-    if level == logging.DEBUG:
+    if level == logging.WARNING:
+        logging.warning(prefix_string_with_tag(output_string, tag))
+
+    elif level == logging.DEBUG:
         logging.debug(prefix_string_with_tag(output_string, tag))
 
     elif level == logging.INFO:
