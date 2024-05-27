@@ -7,22 +7,20 @@ python internal/jet/get_results_from_jet.py --pipeline_id $jet_pipeline_id  --sa
 
 # Extracts the 10th and 11th column from the csv file with information about jobs in jet pipeline corresponding
 # to workload id and job key and creates workload_ids and job_keys arrays.
-filename="jet_query_${jet_pipeline_id}.csv"
-workload_ids=($(cat $filename | cut -d ',' -f9))
-echo $workload_ids
-job_keys=($(cat $filename  | cut -d ',' -f11))
+# Save the original IFS
+filename="jet_query_${jet_pipeline_id}.json"
+workload_ids=($(jq -r '.[].jet_ci_workload_id' "$filename"))
+job_keys=($(jq -r '.[].job_key' "$filename"))
 
-
-if [[ -z "${workload_ids}" ]]
-then
+# Check if workload_ids is empty or if workload_ids and job_keys have different lengths
+if [[ -z "${workload_ids[*]}" || ${#workload_ids[@]} -ne ${#job_keys[@]} ]]; then
+  echo "Error: workload_ids is empty or workload_ids and job_keys have different lengths."
   exit 1
 fi
 
 echo "==================================================================================================================="
 echo "============================================ STARTING JET TEST ===================================================="
 echo "==================================================================================================================="
-
-
 for (( i=1; i<${#workload_ids[@]}; ++i)); do
   jet_log_id=${workload_ids[$i]}
   job_key=${job_keys[$i]}

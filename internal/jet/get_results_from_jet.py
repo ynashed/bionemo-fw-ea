@@ -381,10 +381,10 @@ def get_results_from_jet(
         log_detailed_job_info(df=df)
 
     if save_dir is not None:
-        filename = f'jet_query_{"_".join(pipelines_info.keys())}.csv'
+        filename = f'jet_query_{"_".join(pipelines_info.keys())}.json'
         filepath = os.path.join(save_dir, filename)
         logging.info(f"Saving query results to: {filepath}")
-        df.to_csv(filepath, index=False)
+        df.to_json(filepath, orient='records')
     if return_df:
         return df
 
