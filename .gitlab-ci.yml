@@ -577,7 +577,7 @@ jet-configure:
 jet-trigger:
   extends: [.jet-trigger-template]
   variables:
-    JET_API_TAG: v0.0.0-dev.15286379
+    JET_API_TAG: v0.0.0-dev.15352531
     JET_CUSTOM_CONFIG: |
       retrier:
         enabled: true
