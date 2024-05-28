@@ -201,6 +201,14 @@ build-bionemo-image:
     #        docker pull "${IMAGE_REPO_NAME}:$(git rev-parse HEAD~${i})" || true
     #      done
     # TODO [mgreaves] This had --no-cache on it before. Why would we want this?
+
+    - PULL_START=$(date +%s)
+    - docker pull nvcr.io/nvidian/cvai_bnmo_trng/bionemo:cache-py23.10
+    - PULL_END=$(date +%s)
+    - ELAPSED=$(( PULL_END - PULL_START ))
+    - echo "Cache target container pull time:" $ELAPSED
+    - export DOCKER_BUILDKIT=1
+    - BUILD_START=$(date +%s)
     - docker build
       --network host ${base}
       --label com.nvidia.bionemo.short_git_sha=${CI_COMMIT_SHORT_SHA}
@@ -210,8 +218,13 @@ build-bionemo-image:
       --label com.nvidia.bionemo.pipeline_id=${CI_PIPELINE_ID}
       --label com.nvidia.bionemo.merge_request_id=${CI_MERGE_REQUEST_IID}
       --secret id=GITLAB_TOKEN,env=RO_API_TOKEN
+      --cache-from nvcr.io/nvidian/cvai_bnmo_trng/bionemo:cache-py23.10
+      --build-arg BUILDKIT_INLINE_CACHE=1
       -t "${IMAGE_NAME}"
       -f setup/Dockerfile .
+    - BUILD_END=$(date +%s)
+    - ELAPSED=$(( BUILD_END - BUILD_START ))
+    - echo "container build time using cached nvcr.io/nvidian/cvai_bnmo_trng/bionemo:cache-py23.10" $ELAPSED
     - df -h
     - docker push "${IMAGE_NAME}"
     # tag with short commit too
@@ -624,6 +637,8 @@ qa-deploy:
     - IMAGE_NAME_QA="${IMAGE_REPO_NAME}:${IMAGE_TAG_QA}"
     - docker tag "${IMAGE_NAME}" "${IMAGE_NAME_QA}"
     - docker push "${IMAGE_NAME_QA}"
+    - docker tag "${IMAGE_NAME}" nvcr.io/nvidian/cvai_bnmo_trng/bionemo:cache-py23.10
+    - docker push nvcr.io/nvidian/cvai_bnmo_trng/bionemo:cache-py23.10
     - NGC_IMAGE_NAME_QA="${NGC_REPO_NAME}:${IMAGE_TAG_QA}"
     - docker tag "${IMAGE_NAME}" "${NGC_IMAGE_NAME_QA}"
     - docker push "${NGC_IMAGE_NAME_QA}"

@@ -1,6 +1,7 @@
+
 # SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: LicenseRef-NvidiaProprietary
-#
+
 # NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
 # property and proprietary rights in and to this material, related
 # documentation and any modifications thereto. Any use, reproduction,
@@ -14,8 +15,90 @@
 #   - libstdcxx-ng=11.1.0=h56837e0_8
 #   - pycairo=1.20.1=py38hf61ee4a_0
 
-ARG BASE_IMAGE=nvcr.io/nvidia/nemo:23.10
-FROM ${BASE_IMAGE}
+# Most of the first part is directly copied from NeMo v1.22 Dockerfile https://github.com/NVIDIA/NeMo/blob/v1.22.0/Dockerfile
+# kept all dependencies necessary for nemo.collections.nlp, nemo.core, nemo.utils, nemo.collections.common
+
+ARG BASE_IMAGE=nvcr.io/nvidia/pytorch:23.10-py3
+# build an image that includes only the nemo dependencies, ensures that dependencies
+# are included first for optimal caching, and useful for building a development
+# image (by specifying build target as `nemo-deps`)
+FROM ${BASE_IMAGE} as base
+
+# Ensure apt-get won't prompt for selecting options
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && \
+  apt-get upgrade -y && \
+  apt-get install -y \
+  libfreetype6 \
+  swig && \
+  rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace/
+
+# need this otherwise apex or transformer engine crashes since it runs out of host memory
+# c++: fatal error: Killed signal terminated program cc1plus 
+ARG MAX_JOBS=4
+ENV MAX_JOBS=${MAX_JOBS}
+
+# Install megatron core, this can be removed once 0.3 pip package is released
+# We leave it here in case we need to work off of a specific commit in main
+RUN git clone https://github.com/NVIDIA/Megatron-LM.git && \  
+  cd Megatron-LM && \
+  git checkout e122536b7645edcb7ebf099b5c92a443f7dbf8e7 && \
+  pip install .
+
+# Distributed Adam support for multiple dtypes
+RUN git clone https://github.com/NVIDIA/apex.git && \
+  cd apex && \
+  git checkout 52e18c894223800cb611682dce27d88050edf1de && \
+  pip install -v --no-build-isolation --disable-pip-version-check --no-cache-dir --config-settings "--build-option=--cpp_ext --cuda_ext --fast_layer_norm --distributed_adam --deprecated_fused_adam" ./
+
+# Transformer Engine used in NeMo v1.22 dockerfile 
+RUN git clone https://github.com/NVIDIA/TransformerEngine.git && \
+  cd TransformerEngine && \
+  git fetch origin 8eae4ce2b8fdfbbe525fc8bfecb0df5498cc9687 && \
+  git checkout FETCH_HEAD && \
+  git submodule init && git submodule update && \
+  NVTE_FRAMEWORK=pytorch NVTE_WITH_USERBUFFERS=0 MPI_HOME=/usr/local/mpi pip install .
+
+WORKDIR /tmp/
+
+# uninstall stuff from base container
+RUN pip3 uninstall -y sacrebleu torchtext
+
+WORKDIR /tmp/nemo
+# install flash attention
+RUN pip install flash-attn
+# install numba for latest containers
+# ImportError: Numba needs NumPy 1.24 or less
+RUN pip install numba>=0.57.1
+ARG NEMO_VERSION=1.22.0
+# Check that NEMO_VERSION is set. Build will fail without this. Expose NEMO and base container
+# version information as runtime environment variable for introspection purposes
+RUN /usr/bin/test -n "$NEMO_VERSION" && \
+  /bin/echo "export NEMO_VERSION=${NEMO_VERSION}" >> /root/.bashrc && \
+  /bin/echo "export BASE_IMAGE=${BASE_IMAGE}" >> /root/.bashrc
+
+# Install NeMo
+RUN git clone -b v$NEMO_VERSION https://github.com/NVIDIA/NeMo.git && \
+    cd NeMo && \
+    pip uninstall -y nemo_toolkit sacrebleu && \
+    pip install -r requirements/requirements_lightning.txt && \
+    pip install -r requirements/requirements_common.txt && \
+    sed -i "/torch/d" requirements/requirements.txt && \
+    sed -i "/triton/d" requirements/requirements.txt && \
+    sed -i "/megatron_core/d" requirements/requirements_nlp.txt && \
+    pip install -r requirements/requirements.txt && \
+    pip install -r requirements/requirements_nlp.txt && \
+    pip install ".[nlp]"
+
+# need this for backward compatibility: pytests rely on configs in /workspace/nemo/examples
+RUN mkdir -p /workspace/nemo/
+RUN cp -r /tmp/nemo/NeMo/scripts /workspace/nemo/scripts
+RUN cp -r /tmp/nemo/NeMo/examples /workspace/nemo/examples
+RUN cp -r /tmp/nemo/NeMo/tests /workspace/nemo/tests
+RUN cp -r /tmp/nemo/NeMo/tutorials /workspace/nemo/tutorials
 
 ENV TERM=xterm
 ENV FORCE_CUDA=1
