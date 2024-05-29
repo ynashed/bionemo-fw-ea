@@ -591,7 +591,6 @@ jet-trigger:
   extends: [.jet-trigger-template]
   variables:
     JET_WORKLOADS_FILTER: type == 'recipe'
-    JET_API_TAG: v0.0.0-dev.15352531
     JET_CUSTOM_CONFIG: |
       retrier:
         enabled: true
