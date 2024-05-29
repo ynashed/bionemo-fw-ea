@@ -59,10 +59,15 @@ spec:
     ++dllogger_callbacks_kwargs.json_file={dllogger_file} ++trainer_metric_callback_kwargs.log_path={assets_dir} ++logs_dir={logs_dir}
   time_limit: 1800
   artifacts: {}
-  metrics:
-    throughput_train:
-      goal: maximize
-      tags: [primary]
+metrics:
+  throughput_train:
+    goal: maximize
+    tags: [primary]
+tests_spec:
+  - logic_type: static
+    logic_spec:
+      exit_codes:
+        - 0
 products:
   - nodes: [1]
     gpus: [8]

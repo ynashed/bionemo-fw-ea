@@ -44,16 +44,21 @@ spec:
     ++dllogger_callbacks_kwargs.json_file={dllogger_file} ++assets_dir={assets_dir} ++logs_dir={logs_dir}
   time_limit: 1800
   artifacts: {}
-  metrics:
-    throughput_train:
-      goal: maximize
-      tags: [primary]
-    latency_train_mean:
-      goal: minimize
-      tags: [secondary]
-    train_loss:
-      goal: minimize
-      tags: [secondary]
+metrics:
+  throughput_train:
+    goal: maximize
+    tags: [primary]
+  latency_train_mean:
+    goal: minimize
+    tags: [secondary]
+  train_loss:
+    goal: minimize
+    tags: [secondary]
+tests_spec:
+  - logic_type: static
+    logic_spec:
+      exit_codes:
+        - 0
 products:
   - nodes: [1]
     gpus: [8]
