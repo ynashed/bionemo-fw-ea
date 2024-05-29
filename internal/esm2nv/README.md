@@ -22,8 +22,7 @@ python examples/protein/esm2nv/pretrain.py \
   ++model.data.train.uf50_datapath=/workspace/bionemo/examples/tests/test_data/uniref202104_esm2_qc_test200_val200/uniref50_train_filt.fasta \
   ++model.data.train.uf90_datapath=/workspace/bionemo/examples/tests/test_data/uniref202104_esm2_qc_test200_val200/ur90_ur50_sampler.fasta \
   ++model.data.train.cluster_mapping_tsv=/workspace/bionemo/examples/tests/test_data/uniref202104_esm2_qc_test200_val200/mapping.tsv \
-  ++model.data.dataset_path=/workspace/bionemo/examples/tests/test_data/uniref202104_esm2_qc_test200_val200 \
-  ++model.data.train.uf90.uniref90_path=/workspace/bionemo/examples/tests/test_data/uf90  # needed in addition to the settings in BioNeMo public documentation
+  ++model.data.dataset_path=/workspace/bionemo/examples/tests/test_data/uniref202104_esm2_qc_test200_val200
 ```
 
 ## (2) Pretraining
@@ -37,7 +36,6 @@ python examples/protein/esm2nv/pretrain.py \
   ++do_training=True \
   ++do_testing=False \
   ++model.data.dataset_path=examples/tests/test_data/uniref202104_esm2_qc_test200_val200 \
-  ++model.data.uf90.uniref90_path=examples/tests/test_data/uf90 \
   ++trainer.devices=2 \
   ++model.tensor_model_parallel_size=2 \
   ++model.micro_batch_size=4 \
