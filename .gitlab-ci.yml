@@ -44,7 +44,6 @@ variables:
   # JET variables
   JET_WORKLOAD_FOLDER: "training-inference-unit-tests"
   JET_WORKLOADS_DIR: "internal/jet/workloads/$JET_WORKLOAD_FOLDER"
-  JET_WORKLOADS_FILTER: type == 'recipe'
   ### variables excluding stages of the CI pipeline
   EXCLUDE_DOCKER_IMAGE_BUILD: "false"
   EXCLUDE_DOCS_BUILD: "false"
@@ -77,6 +76,20 @@ variables:
       - "false"
       - "true"
     description: "A flag that determines whether to run partial convergence tests in CI. Set to 'false' by default."
+  JET_MODEL_NAME:
+    value: "all"
+    options:
+      - "all"
+      - "OpenFold"
+      - "ESM2"
+      - "ESM1"
+      - "ProtT5"
+      - "Geneformer"
+      - "DNABERT"
+      - "MegaMolBART"
+      - "MolMIM"
+      - "DiffDock"
+    description: "A flag that specifies the model for which the JET pipeline should run. Defaults to all models."
   QA_DOCKER_DEPLOY:
     value: "false"
     options:
@@ -577,6 +590,7 @@ jet-configure:
 jet-trigger:
   extends: [.jet-trigger-template]
   variables:
+    JET_WORKLOADS_FILTER: type == 'recipe'
     JET_API_TAG: v0.0.0-dev.15352531
     JET_CUSTOM_CONFIG: |
       retrier:
@@ -592,10 +606,38 @@ jet-trigger:
   inherit:
     variables:
       - EXCLUDE_JET
-      - JET_WORKLOADS_FILTER
+      - JET_MODEL_NAME
+      - CI_MERGE_REQUEST_LABELS
   rules:
     - if: $EXCLUDE_JET == "true"
       when: never
+    - if: $CI_MERGE_REQUEST_LABELS =~ /OpenFold/ || $JET_MODEL_NAME == "OpenFold"
+      variables:
+        JET_WORKLOADS_FILTER: type == 'recipe' and spec.model == 'openfold'
+    - if: $CI_MERGE_REQUEST_LABELS =~ /ESM2/ || $JET_MODEL_NAME == "ESM2"
+      variables:
+        JET_WORKLOADS_FILTER: type == 'recipe' and spec.model == 'esm2nv'
+    - if: $CI_MERGE_REQUEST_LABELS =~ /ESM1/ || $JET_MODEL_NAME == "ESM1"
+      variables:
+        JET_WORKLOADS_FILTER: type == 'recipe' and spec.model == 'esm1nv'
+    - if: $CI_MERGE_REQUEST_LABELS =~ /ProtT5/ || $JET_MODEL_NAME == "ProtT5"
+      variables:
+        JET_WORKLOADS_FILTER: type == 'recipe' and spec.model == 'prott5nv'
+    - if: $CI_MERGE_REQUEST_LABELS =~ /Geneformer/ || $JET_MODEL_NAME == "Geneformer"
+      variables:
+        JET_WORKLOADS_FILTER: type == 'recipe' and spec.model == 'geneformer'
+    - if: $CI_MERGE_REQUEST_LABELS =~ /DNABERT/ || $JET_MODEL_NAME == "DNABERT"
+      variables:
+        JET_WORKLOADS_FILTER: type == 'recipe' and spec.model == 'dnabert'
+    - if: $CI_MERGE_REQUEST_LABELS =~ /MegaMolBART/ || $JET_MODEL_NAME == "MegaMolBART"
+      variables:
+        JET_WORKLOADS_FILTER: type == 'recipe' and spec.model == 'megamolbart'
+    - if: $CI_MERGE_REQUEST_LABELS =~ /MolMIM/ || $JET_MODEL_NAME == "MolMIM"
+      variables:
+        JET_WORKLOADS_FILTER: type == 'recipe' and spec.model == 'molmim'
+    - if: $CI_MERGE_REQUEST_LABELS =~ /DiffDock/ || $JET_MODEL_NAME == "DiffDock"
+      variables:
+        JET_WORKLOADS_FILTER: type == 'recipe' and spec.model == 'diffdock'
     - when: on_success
 
 
