@@ -31,6 +31,7 @@ TEST_PARAMS: List[StopAndGoTestParams] = [
     {"script_path": "examples/protein/openfold/train.py", "metadata_keys": ["learning_rate", "global_step"]},
     {"script_path": "examples/dna/dnabert/pretrain.py", "metadata_keys": ["learning_rate", "global_step"]},
     {"script_path": "examples/singlecell/geneformer/pretrain.py", "metadata_keys": ["learning_rate", "global_step"]},
+    {"script_path": "examples/molecule/molmim/pretrain.py", "metadata_keys": ["learning_rate", "global_step"]},
 ]
 
 TRAINING_SCRIPTS_PATH = [params["script_path"] for params in TEST_PARAMS]

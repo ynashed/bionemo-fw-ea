@@ -45,14 +45,19 @@ class KillAfterSignalCallback(Callback):
             logging.info("\nReceived SIGTERM signal, terminating process...\n")
             exit(0)
 
-        if trainer.is_global_zero:
-            pickle_file_path = os.path.join(self.metadata_path, 'checkpoints/metadata.pkl')
-            # check if metadata has been saved by MetadataSaveCallback
-            if os.path.exists(pickle_file_path):
-                # Register the signal handler
-                signal.signal(signal.SIGTERM, terminate_process)
-                # kill job afterwards
-                os.kill(os.getpid(), signal.SIGTERM)
+        pickle_file_path = os.path.join(self.metadata_path, 'checkpoints/metadata.pkl')
+
+        if not trainer.is_global_zero:
+            # Sleep the process if not global zero to clean up hanging procs
+            import time
+
+            time.sleep(5)
+
+        if os.path.exists(pickle_file_path):
+            # Register the signal handler
+            signal.signal(signal.SIGTERM, terminate_process)
+            # kill job afterwards
+            os.kill(os.getpid(), signal.SIGTERM)
 
 
 class MetadataSaveCallback(Callback):
