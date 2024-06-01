@@ -288,6 +288,29 @@ class ContinuousInterpolant(Interpolant):
         return x_next
 
 
+def log_1_min_a(a):
+    return torch.log(1 - torch.exp(a) + 1e-40)
+
+
+def log_sample_categorical(logits):
+    uniform = torch.rand_like(logits)
+    gumbel_noise = -torch.log(-torch.log(uniform + 1e-30) + 1e-30)
+    sample_index = (gumbel_noise + logits).argmax(dim=-1)
+    return sample_index
+
+
+def index_to_log_onehot(x, num_classes):
+    assert x.max().item() < num_classes, f'Error: {x.max().item()} >= {num_classes}'
+    x_onehot = F.one_hot(x, num_classes)
+    log_x = torch.log(x_onehot.float().clamp(min=1e-30))
+    return log_x
+
+
+def log_add_exp(a, b):
+    maximum = torch.max(a, b)
+    return maximum + torch.log(torch.exp(a - maximum) + torch.exp(b - maximum))
+
+
 class DiscreteInterpolant(Interpolant):
     """
     Class for continuous interpolation.
@@ -306,18 +329,53 @@ class DiscreteInterpolant(Interpolant):
         method_type: str,
         schedule_params: dict,
         prior_type: str,
-        update_weight_type: str = "linear",
-        solver_type: str = "ode",
+        update_weight_type: str = "d3pm",
+        solver_type: str = "sde",
         timesteps: int = 500,
+        num_classes: int = 10,
     ):
         super(DiscreteInterpolant, self).__init__(
             method_type, schedule_params, prior_type, update_weight_type, solver_type, timesteps
         )
+        self.num_classes = num_classes
         self.init_schedulers(method_type, schedule_params, timesteps)
+
+    def get_Qt(self, alpha_t: float, terminal_distribution: torch.Tensor):
+        #! If terminal distriubtion is [0 ... 0, 1] then we get masking state
+        #! If terminal is [1/k ... 1/k] we get uniform
+        # See Appendix A.2 D3PM https://arxiv.org/pdf/2107.03006
+        QT = []
+        for alpha_t in self.alphas:
+            stay_prob = torch.eye(len(terminal_distribution)) * alpha_t
+            diffuse_prob = (1.0 - alpha_t) * (
+                torch.ones(1, len(terminal_distribution)) * (terminal_distribution.unsqueeze(0))
+            )
+            QT.append(stay_prob + diffuse_prob)
+        return torch.stack(QT, dim=0)
+
+    def d3pm_setup(self, prior_dist):
+        Qt = self.get_Qt(prior_dist)
+        Qt_bar = torch.cumprod(Qt, dim=0)
+        Qt_bar_prev = Qt_bar[:-1]
+        Qt_prev_pad = torch.eye(self.num_classes)
+        Qt_bar_prev = torch.concat([Qt_prev_pad.unsqueeze(0), Qt_bar_prev], dim=0)
+        return Qt, Qt_bar, Qt_bar_prev
 
     def init_schedulers(self, method_type, schedule_params, timesteps):
         if method_type == "diffusion":
-            pass
+            self.schedule_type = schedule_params['type']
+            self.alphas, self.betas = cosine_beta_schedule(schedule_params, timesteps, return_alphas=True)
+            self.log_alpha = torch.log(self.alphas)
+            self.log_alpha_bar = torch.cumsum(self.log_alpha, dim=0)
+            self.alpha_bar = alphas_cumprod = torch.exp(self.log_alpha_bar)
+            self.alpha_bar_prev = torch.nn.functional.pad(alphas_cumprod[:-1], (1, 0), value=1.0)
+            if schedule_params['type'] == "d3pm":  # MIDI and EQ
+                self.Qt, self.Qt_bar, self.Qt_prev_bar = self.d3pm_setup()
+                self.forward_data_schedule = self.Qt_bar
+            elif schedule_params['type'] == "argmax":  # TargetDiff
+                self.forward_data_schedule = self.log_alpha_bar
+                self.forward_noise_schedule = log_1_min_a(self.log_alpha_bar)
+
         elif method_type == "flow_matching":
             if (
                 schedule_params['type'] == "linear"
@@ -357,15 +415,27 @@ class DiscreteInterpolant(Interpolant):
 
             return data_scale, 1 - data_scale, None
 
-    def interpolate(self, x1, t, num_classes):
+    def interpolate(self, x1, t=None, t_idx=None):
         """
         Interpolate using discrete interpolation method.
         """
         if self.method_type == "diffusion":
-            pass
+            if self.schedule_type == "d3pm":
+                probs = self.forward_schedule(t_idx)[0] * x1  #! Eqn 3 of D3PM https://arxiv.org/pdf/2107.03006
+                assert torch.all((probs.sum(-1) - 1.0).abs() < 1e-4)
+                xt = probs.multinomial(
+                    1,
+                )  # .squeeze()
+                return x1, xt, None
+            elif self.schedule_type == "argmax":
+                log_x0 = index_to_log_onehot(x1)
+                data_scale, noise_scale = self.forward_schedule(t_idx)
+                log_probs = log_add_exp(log_x0 + data_scale, noise_scale - np.log(self.num_classes))
+                xt = log_sample_categorical(log_probs)
+
         elif self.method_type == "flow_matching":
             if self.prior_type == "mask" or self.prior_type == "uniform":
-                x0 = self.prior((x1.shape[0], num_classes), x1.device)
+                x0 = self.prior((x1.shape[0], self.num_classes), x1.device)
                 t = pad_t_like_x(t, x0)
                 xt = x1.clone()
                 corrupt_mask = torch.rand((x1.shape[0], 1)).to(t.device) < (1 - t)  # [:, None])
@@ -409,13 +479,22 @@ class DiscreteInterpolant(Interpolant):
         Perform a euler step in the discrete interpolant method.
         """
         if self.method_type == "diffusion":
-            if self.solver_type == "sde":
-                x_next = None
+            if self.solver_type == "sde" and self.schedule_type == "d3pm":
+                # TODO: Verify that this is correct
+                xt_shape = xt.shape
+                xt = F.one_hot(xt, num_classes=self.num_classes)
+                A = xt * self.Qt[t_idx].T
+                B = x_hat * self.Qt_prev_bar[t_idx]
+                C = x_hat * self.Qt_bar[t_idx] * xt
+                factor = (A * B) / C.clamp(min=1e-5)
+                step_probs = (factor * x_hat).sum(-1)  # EQN 4
+                step_probs = step_probs / (step_probs.sum(dim=-1, keepdims=True) + 1e-5)  # normalize
+                x_next = torch.multinomial(step_probs.view(-1, self.num_classes), num_samples=1).view(xt_shape)
             else:
-                raise ValueError("Only SDE Implemented")
+                raise ValueError("Only SDE Implemented for D3PM")
         elif self.method_type == "flow_matching":
             N = stochasticity
-            S = x_hat.shape[-1]  # self.num_classes
+            S = self.num_classes
             if self.prior_type == "uniform":
                 logits_1 = x_hat
                 pt_x1_probs = F.softmax(logits_1 / temp, dim=-1)
@@ -509,3 +588,7 @@ class DiscreteInterpolant(Interpolant):
         # aatypes_t = aatypes_t * (1 - re_mask_mask) + MASK_TOKEN_INDEX * re_mask_mask
 
         # return aatypes_t
+
+
+if __name__ == "__main__":
+    print("TEST")
