@@ -439,17 +439,17 @@ class DiscreteDiffusionInterpolant(Interpolant):
 
     def __init__(
         self,
-        schedule_params: dict,
-        prior_type: str,
+        schedule_params: dict = {'type': 'd3pm'},
+        prior_type: str = "uniform",
         solver_type: str = "sde",
         timesteps: int = 500,
-        num_classes: int = 10,
+        num_classes: int = 12,
     ):
         super(DiscreteDiffusionInterpolant, self).__init__(schedule_params, prior_type, solver_type, timesteps)
         self.num_classes = num_classes
         self.init_schedulers(schedule_params, timesteps)
 
-    def get_Qt(self, alpha_t: float, terminal_distribution: torch.Tensor):
+    def get_Qt(self, terminal_distribution: torch.Tensor):
         #! If terminal distriubtion is [0 ... 0, 1] then we get masking state
         #! If terminal is [1/k ... 1/k] we get uniform
         # See Appendix A.2 D3PM https://arxiv.org/pdf/2107.03006
@@ -462,12 +462,25 @@ class DiscreteDiffusionInterpolant(Interpolant):
             QT.append(stay_prob + diffuse_prob)
         return torch.stack(QT, dim=0)
 
-    def d3pm_setup(self, prior_dist):
+    def d3pm_setup(self):
+        if self.prior_type == "uniform":
+            prior_dist = torch.ones((self.num_classes)) * 1 / self.num_classes
+        elif self.prior_type == "mask" or self.prior_type == "absorb":
+            prior_dist = torch.zeros((self.num_classes))
+            prior_dist[-1] = 1.0
+        assert torch.sum(prior_dist).item() - 1.0 < 1e-5
         Qt = self.get_Qt(prior_dist)
-        Qt_bar = torch.cumprod(Qt, dim=0)
+        Qt_prev = torch.eye(self.num_classes)
+        Qt_bar = []
+        for i in range(len(self.alphas)):
+            Qtb = Qt_prev @ Qt[i]
+            Qt_bar.append(Qtb)
+            Qt_prev = Qtb
+        Qt_bar = torch.stack(Qt_bar)
         Qt_bar_prev = Qt_bar[:-1]
         Qt_prev_pad = torch.eye(self.num_classes)
         Qt_bar_prev = torch.concat([Qt_prev_pad.unsqueeze(0), Qt_bar_prev], dim=0)
+        # import ipdb; ipdb.set_trace()
         return Qt, Qt_bar, Qt_bar_prev
 
     def init_schedulers(self, schedule_params, timesteps):
@@ -480,14 +493,15 @@ class DiscreteDiffusionInterpolant(Interpolant):
         if schedule_params['type'] == "d3pm":  # MIDI and EQ
             self.Qt, self.Qt_bar, self.Qt_prev_bar = self.d3pm_setup()
             self.forward_data_schedule = self.Qt_bar
+            self.forward_noise_schedule = self.Qt_bar
         elif schedule_params['type'] == "argmax":  # TargetDiff
             self.forward_data_schedule = self.log_alpha_bar
             self.forward_noise_schedule = log_1_min_a(self.log_alpha_bar)
 
-    def forward_schedule(self, t_idx):
+    def forward_schedule(self, t_idx, batch):
         # t = 1 - t
         t_idx = self.timesteps - 1 - t_idx
-        return self.forward_data_schedule[t_idx].unsqueeze(1), self.forward_noise_schedule[t_idx].unsqueeze(1)
+        return self.forward_data_schedule[t_idx][batch], self.forward_noise_schedule[t_idx][batch]
 
     def reverse_schedule(self, t_idx):
         t_idx = self.timesteps - 1 - t_idx
@@ -497,17 +511,21 @@ class DiscreteDiffusionInterpolant(Interpolant):
             self.log_var[t_idx].unsqueeze(1),
         )
 
-    def interpolate(self, x1, t=None, t_idx=None):
+    def interpolate(self, x1, batch, t=None, t_idx=None):
         """
         Interpolate using discrete interpolation method.
         """
+        if len(x1.shape) == 1:
+            x1_hot = F.one_hot(x1, self.num_classes)
         if self.schedule_type == "d3pm":
-            probs = self.forward_schedule(t_idx)[0] * x1  #! Eqn 3 of D3PM https://arxiv.org/pdf/2107.03006
+            ford = self.forward_schedule(t_idx, batch)[0]
+            probs = torch.einsum("nj, nji -> ni", [x1_hot.float(), ford])
+            # probs = self.forward_schedule(t_idx, batch)[0] * x1  #! Eqn 3 of D3PM https://arxiv.org/pdf/2107.03006
             assert torch.all((probs.sum(-1) - 1.0).abs() < 1e-4)
             xt = probs.multinomial(
                 1,
-            )  # .squeeze()
-            return x1, xt, None
+            ).squeeze()
+            return x1, xt, probs
         elif self.schedule_type == "argmax":
             log_x0 = index_to_log_onehot(x1)
             data_scale, noise_scale = self.forward_schedule(t_idx)
@@ -521,7 +539,7 @@ class DiscreteDiffusionInterpolant(Interpolant):
         Returns discrete index (num_samples, 1) or one hot if True (num_samples, num_classes)
         """
         num_samples, num_classes = shape
-        if self.prior_type == "mask":
+        if self.prior_type == "mask" or self.prior_type == "absorb":
             x0 = torch.ones((num_samples, 1)) * (num_classes - 1)
         elif self.prior_type == "uniform":
             x0 = torch.randint(0, num_classes, (num_samples, 1)).to(torch.int64)
@@ -547,13 +565,18 @@ class DiscreteDiffusionInterpolant(Interpolant):
         """
         if self.solver_type == "sde" and self.schedule_type == "d3pm":
             # TODO: Verify that this is correct
+            assert False
+            # TODO 6/3 fix this equation have it match eq
+            x_hat = F.one_hot(x_hat, num_classes=self.num_classes)
             xt_shape = xt.shape
             xt = F.one_hot(xt, num_classes=self.num_classes)
-            A = xt * self.Qt[t_idx].T
-            B = x_hat * self.Qt_prev_bar[t_idx]
-            C = x_hat * self.Qt_bar[t_idx] * xt
+            A = torch.einsum("nj, nji -> ni", [xt, self.Qt[t_idx].T])  # xt *
+            B = torch.einsum("nj, nji -> ni", [x_hat, self.Qt_prev_bar[t_idx]])  # x_hat * self.Qt_prev_bar[t_idx]
+            C = torch.einsum("nj, nji -> ni", [x_hat, self.Qt_prev_bar[t_idx]])  # x_hat * self.Qt_bar[t_idx] * xt
             factor = (A * B) / C.clamp(min=1e-5)
             step_probs = (factor * x_hat).sum(-1)  # EQN 4
+            unweighted_probs = None
+            unweighted_probs[unweighted_probs.sum(dim=-1) == 0] = 1e-5
             step_probs = step_probs / (step_probs.sum(dim=-1, keepdims=True) + 1e-5)  # normalize
             x_next = torch.multinomial(step_probs.view(-1, self.num_classes), num_samples=1).view(xt_shape)
         else:
@@ -628,7 +651,7 @@ class DiscreteFlowMatchingInterpolant(Interpolant):
         """
         Interpolate using discrete interpolation method.
         """
-        if self.prior_type == "mask" or self.prior_type == "uniform":
+        if self.prior_type in ["mask", "absorb", "uniform"]:
             x0 = self.prior(x1.shape[0], self.num_classes, x1.device)
             t = pad_t_like_x(t, x0)
             xt = x1.clone()
@@ -847,6 +870,40 @@ def test_continuous_flowmatching(ligand_pos, batch_ligand):
     # import ipdb; ipdb.set_trace()
 
 
+def test_discrete_diffusion(h, batch):
+    print("DiscreteDiffusionInterpolant-Uniform")
+    num_classes = 13
+
+    interpolant = DiscreteDiffusionInterpolant(num_classes=num_classes)
+    time_seq = list(range(0, 500))
+    for i in tqdm(time_seq, desc='discrete diffusion interpolation', total=len(time_seq)):
+        t_idx = interpolant.sample_time_idx(4, method='stab_mode')
+        data_scale, _ = interpolant.forward_schedule(t_idx, batch_ligand)
+        x1, xt, probs = interpolant.interpolate(h, batch, t_idx=t_idx)
+    assert all(torch.argmax(probs, 1) == x1)
+
+    # xt = interpolant.prior(h.shape, batch, device=h.device)
+    # for i in tqdm(time_seq, desc='discrete diffusion step', total=len(time_seq)):
+    #     t_idx = torch.full(size=(4,), fill_value=i, dtype=torch.int64, device='cpu')
+    #     x1, xt01, probs = interpolant.interpolate(ligand_pos, batch_ligand, t_idx=t_idx, com_free=True)
+    #     x_hat = xt01
+    #     x_tp1 = interpolant.step(xt, x_hat, batch, t_idx)
+    #     xt = x_tp1
+
+    print("DiscreteDiffusionInterpolant-Absorb")
+    num_classes = 14
+
+    interpolant = DiscreteDiffusionInterpolant(num_classes=num_classes, prior_type="absorb")
+    time_seq = list(range(0, 500))
+    for i in tqdm(time_seq, desc='discrete diffusion interpolation', total=len(time_seq)):
+        t_idx = interpolant.sample_time_idx(4, method='stab_mode')
+        data_scale, _ = interpolant.forward_schedule(t_idx, batch_ligand)
+        x1, xt, probs = interpolant.interpolate(h, batch, t_idx=t_idx)
+    # import ipdb; ipdb.set_trace()
+    probs[:, -1] = 0
+    assert all(torch.argmax(probs, 1) == x1)
+
+
 if __name__ == "__main__":
     from tqdm import tqdm
 
@@ -1009,8 +1066,10 @@ if __name__ == "__main__":
             1,
             1,
         ]
-    )
+    ).to(torch.int64)
 
     test_continuous_diffusion(ligand_pos, batch_ligand)
     test_continuous_flowmatching(ligand_pos, batch_ligand)
+
+    test_discrete_diffusion(ligand_feats, batch_ligand)
     print("SUCCESS")
