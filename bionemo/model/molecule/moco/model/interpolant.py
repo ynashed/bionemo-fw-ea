@@ -428,6 +428,10 @@ def log_add_exp(a, b):
 class DiscreteDiffusionInterpolant(Interpolant):
     """
     Class for continuous interpolation.
+    Note the udnerlying D3PM only works for discrete time.
+    Can look into MultiFlow Precurssor that uses CTMC for continuous time discrete diffusion (https://arxiv.org/pdf/2205.14987, https://github.com/andrew-cr/tauLDR/blob/main/lib/models/models.py)
+    Argmax Flow also operate over discrete time
+    Continuous time can work for cintuous gaussian representations found in DiffSBDD but we are not doing this.
 
     Attributes:
         schedule_params (dict): Type of interpolant schedule.
@@ -515,8 +519,11 @@ class DiscreteDiffusionInterpolant(Interpolant):
         """
         Interpolate using discrete interpolation method.
         """
+        # import ipdb; ipdb.set_trace()
         if len(x1.shape) == 1:
             x1_hot = F.one_hot(x1, self.num_classes)
+        else:
+            x1_hot = x1
         if self.schedule_type == "d3pm":
             ford = self.forward_schedule(t_idx, batch)[0]
             probs = torch.einsum("nj, nji -> ni", [x1_hot.float(), ford])
@@ -534,19 +541,19 @@ class DiscreteDiffusionInterpolant(Interpolant):
 
         return x1, xt, None
 
-    def prior(self, shape, device, one_hot=False):
+    def prior(self, shape, batch, device, one_hot=False):
         """
-        Returns discrete index (num_samples, 1) or one hot if True (num_samples, num_classes)
+        Returns discrete index (num_samples,) or one hot if True (num_samples, num_classes)
         """
-        num_samples, num_classes = shape
+        num_samples = shape[0]
         if self.prior_type == "mask" or self.prior_type == "absorb":
-            x0 = torch.ones((num_samples, 1)) * (num_classes - 1)
+            x0 = torch.ones((num_samples,)).to(torch.int64) * (self.num_classes - 1)
         elif self.prior_type == "uniform":
-            x0 = torch.randint(0, num_classes, (num_samples, 1)).to(torch.int64)
+            x0 = torch.randint(0, self.num_classes, (num_samples,)).to(torch.int64)
         else:
             raise ValueError("Only uniform and mask are supported")
         if one_hot:
-            x0 = F.one_hot(x0, num_classes=num_classes)
+            x0 = F.one_hot(x0, num_classes=self.num_classes)
         return x0.to(device)
 
     def step(
@@ -554,31 +561,44 @@ class DiscreteDiffusionInterpolant(Interpolant):
         xt,
         x_hat,
         batch,
-        t_idx=None,
-        t=None,
-        dt=None,
-        t_next=None,
-        mask=None,
+        t_idx,
     ):
         """
         Perform a euler step in the discrete interpolant method.
         """
         if self.solver_type == "sde" and self.schedule_type == "d3pm":
             # TODO: Verify that this is correct
-            assert False
-            # TODO 6/3 fix this equation have it match eq
-            x_hat = F.one_hot(x_hat, num_classes=self.num_classes)
-            xt_shape = xt.shape
-            xt = F.one_hot(xt, num_classes=self.num_classes)
-            A = torch.einsum("nj, nji -> ni", [xt, self.Qt[t_idx].T])  # xt *
-            B = torch.einsum("nj, nji -> ni", [x_hat, self.Qt_prev_bar[t_idx]])  # x_hat * self.Qt_prev_bar[t_idx]
-            C = torch.einsum("nj, nji -> ni", [x_hat, self.Qt_prev_bar[t_idx]])  # x_hat * self.Qt_bar[t_idx] * xt
-            factor = (A * B) / C.clamp(min=1e-5)
-            step_probs = (factor * x_hat).sum(-1)  # EQN 4
-            unweighted_probs = None
+            # import ipdb; ipdb.set_trace()
+            x_hat = F.one_hot(x_hat, num_classes=self.num_classes).float()
+            # import ipdb; ipdb.set_trace(0)
+            xt = F.one_hot(xt, num_classes=self.num_classes).float()
+            t_idx = t_idx[batch]
+
+            # a = torch.einsum("nj, nji -> ni", [xt, self.Qt[t_idx].transpose(-2, -1)])
+            # b = torch.einsum("nj, nji -> ni", [x_hat, self.Qt_prev_bar[t_idx]])
+            # p0 = a * b
+            # # (n, k)
+            # p1 = torch.einsum("nj, nji -> ni", [x_hat, self.Qt_bar[t_idx]])
+            # p1 = (p1 * xt).sum(-1, keepdims=True)
+            # # (n, 1)
+
+            # probs = p0 / p1
+            # check = torch.all((probs.sum(-1) - 1.0).abs() < 1e-4)
+            # assert check
+            # ! The above is the exact same but uses one more einsum so probably slower
+
+            A = torch.einsum("nj, nji -> ni", [xt, self.Qt[t_idx].permute(0, 2, 1)]).unsqueeze(1)
+            B = self.Qt_prev_bar[t_idx]
+            p0 = A * B
+            p1 = torch.einsum("nij, nj -> ni", [self.Qt_bar[t_idx], xt]).unsqueeze(-1)
+            probs = p0 / (p1.clamp(min=1e-5))
+            unweighted_probs = (probs * x_hat.unsqueeze(-1)).sum(1)
             unweighted_probs[unweighted_probs.sum(dim=-1) == 0] = 1e-5
-            step_probs = step_probs / (step_probs.sum(dim=-1, keepdims=True) + 1e-5)  # normalize
-            x_next = torch.multinomial(step_probs.view(-1, self.num_classes), num_samples=1).view(xt_shape)
+            # (N, a_t-1)
+            probs = unweighted_probs / (unweighted_probs.sum(-1, keepdims=True) + 1.0e-5)
+            x_next = probs.multinomial(
+                1,
+            ).squeeze()
         else:
             raise ValueError("Only SDE Implemented for D3PM")
 
@@ -871,7 +891,7 @@ def test_continuous_flowmatching(ligand_pos, batch_ligand):
 
 
 def test_discrete_diffusion(h, batch):
-    print("DiscreteDiffusionInterpolant-Uniform")
+    print("DiscreteDiffusionInterpolant-Uniform: ONLY WORKS with DISCRETE TIME")
     num_classes = 13
 
     interpolant = DiscreteDiffusionInterpolant(num_classes=num_classes)
@@ -885,7 +905,7 @@ def test_discrete_diffusion(h, batch):
     xt = interpolant.prior(h.shape, batch, device=h.device)
     for i in tqdm(time_seq, desc='discrete diffusion step', total=len(time_seq)):
         t_idx = torch.full(size=(4,), fill_value=i, dtype=torch.int64, device='cpu')
-        x1, xt01, probs = interpolant.interpolate(ligand_pos, batch_ligand, t_idx=t_idx, com_free=True)
+        x1, xt01, probs = interpolant.interpolate(h, batch_ligand, t_idx=t_idx)
         x_hat = xt01
         x_tp1 = interpolant.step(xt, x_hat, batch, t_idx)
         xt = x_tp1
@@ -895,13 +915,20 @@ def test_discrete_diffusion(h, batch):
 
     interpolant = DiscreteDiffusionInterpolant(num_classes=num_classes, prior_type="absorb")
     time_seq = list(range(0, 500))
-    for i in tqdm(time_seq, desc='discrete diffusion interpolation', total=len(time_seq)):
+    for i in tqdm(time_seq, desc='discrete diffusion absorb interpolation', total=len(time_seq)):
         t_idx = interpolant.sample_time_idx(4, method='stab_mode')
         data_scale, _ = interpolant.forward_schedule(t_idx, batch_ligand)
         x1, xt, probs = interpolant.interpolate(h, batch, t_idx=t_idx)
-    # import ipdb; ipdb.set_trace()
     probs[:, -1] = 0
     assert all(torch.argmax(probs, 1) == x1)
+
+    xt = interpolant.prior(h.shape, batch, device=h.device)
+    for i in tqdm(time_seq, desc='discrete diffusion absorb step', total=len(time_seq)):
+        t_idx = torch.full(size=(4,), fill_value=i, dtype=torch.int64, device='cpu')
+        x1, xt01, probs = interpolant.interpolate(h, batch_ligand, t_idx=t_idx)
+        x_hat = xt01
+        x_tp1 = interpolant.step(xt, x_hat, batch, t_idx)
+        xt = x_tp1
 
 
 if __name__ == "__main__":
