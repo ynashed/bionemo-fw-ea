@@ -33,12 +33,6 @@ TEST_PARAMS: List[StopAndGoTestParams] = [
     {"script_path": "examples/singlecell/geneformer/pretrain.py", "metadata_keys": ["learning_rate", "global_step"]},
     {"script_path": "examples/molecule/molmim/pretrain.py", "metadata_keys": ["learning_rate", "global_step"]},
     {"script_path": "examples/protein/esm2nv/pretrain.py", "metadata_keys": ["learning_rate", "global_step"]},
-    {"script_path": "examples/molecule/molmim/pretrain.py", "metadata_keys": ["learning_rate", "global_step"]},
-    {"script_path": "examples/protein/esm2nv/pretrain.py", "metadata_keys": ["learning_rate", "global_step"]},
-    {"script_path": "examples/molecule/molmim/pretrain.py", "metadata_keys": ["learning_rate", "global_step"]},
-    {"script_path": "examples/protein/esm2nv/pretrain.py", "metadata_keys": ["learning_rate", "global_step"]},
-    {"script_path": "examples/molecule/molmim/pretrain.py", "metadata_keys": ["learning_rate", "global_step"]},
-    {"script_path": "examples/protein/esm2nv/pretrain.py", "metadata_keys": ["learning_rate", "global_step"]},
 ]
 
 TRAINING_SCRIPTS_PATH = [params["script_path"] for params in TEST_PARAMS]
