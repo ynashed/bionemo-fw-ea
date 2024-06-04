@@ -7,119 +7,23 @@
 # disclosure or distribution of this material and related documentation
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
-
 import numpy as np
 import torch
 import torch.nn.functional as F
 from torch_scatter import scatter_mean
 
-
-def pad_t_like_x(t, x):
-    """Function to reshape the time vector t by the number of dimensions of x.
-
-    Parameters
-    ----------
-    x : Tensor, shape (bs, *dim)
-        represents the source minibatch
-    t : FloatTensor, shape (bs)
-
-    Returns
-    -------
-    t : Tensor, shape (bs, number of x dimensions)
-
-    Example
-    -------
-    x: Tensor (bs, C, W, H)
-    t: Vector (bs)
-    pad_t_like_x(t, x): Tensor (bs, 1, 1, 1)
-    """
-    if isinstance(t, (float, int)):
-        return t
-    return t.reshape(-1, *([1] * (x.dim() - 1)))
-
-
-def cosine_beta_schedule(params, num_diffusion_timesteps, s=0.008, nu=1.0, sqrt=False, return_alpha=False):
-    """
-    cosine schedule
-    as proposed in https://openreview.net/forum?id=-NEXDKk8gZ
-    """
-    steps = num_diffusion_timesteps + 1
-    x = np.linspace(0, steps, steps)
-    alphas_cumprod = np.cos((((x / steps) ** nu) + s) / (1 + s) * np.pi * 0.5) ** 2
-    alphas_cumprod = alphas_cumprod / alphas_cumprod[0]
-    alphas = alphas_cumprod[1:] / alphas_cumprod[:-1]
-    # Use sqrt of this, so the alpha in our paper is the alpha_sqrt from the
-    # Gaussian diffusion in Ho et al.
-    alphas = np.clip(alphas, a_min=0.001, a_max=1.0)  #! should this be 0.999 like EQ
-    if sqrt:
-        alphas = np.sqrt(alphas)
-    if return_alpha:
-        return torch.tensor(alphas), torch.tensor(1 - alphas)
-    return 1 - alphas
-
-
-def cosine_beta_schedule_fm(params, num_diffusion_timesteps, s=0.008, nu=1.0):
-    """
-    cosine schedule
-    as proposed in FlowMol
-    """
-    steps = num_diffusion_timesteps + 1
-    x = np.linspace(0, steps, steps)
-    t = x / steps
-    alphas = 1 - np.cos((t**nu + s) / (1 + s) * np.pi * 0.5) ** 2
-    t = torch.clamp_(t, min=1e-9)
-    alpha_prime = np.sin(np.pi * (t + s) ** nu / (1 + s)) * (np.pi / 2) * (nu * (t + s) ** (nu - 1)) / (1 + s)
-    return alphas, alpha_prime
-
-
-def clip_noise_schedule(alphas2, clip_value=0.001):
-    """
-    For a noise schedule given by alpha^2, this clips alpha_t / alpha_t-1. This may help improve stability during
-    sampling.
-    """
-    alphas2 = np.concatenate([np.ones(1), alphas2], axis=0)
-
-    alphas_step = alphas2[1:] / alphas2[:-1]
-
-    alphas_step = np.clip(alphas_step, a_min=clip_value, a_max=1.0)
-    alphas2 = np.cumprod(alphas_step, axis=0)
-
-    return alphas2
-
-
-def cosine_beta_schedule_eq(params, num_diffusion_timesteps, s=0.008, nu=1.0):
-    steps = num_diffusion_timesteps + 2
-    x = torch.linspace(0, num_diffusion_timesteps, steps)
-    alphas_cumprod = torch.cos(((x / num_diffusion_timesteps) + s) / (1 + s) * torch.pi * 0.5) ** 2
-    alphas_cumprod = alphas_cumprod / alphas_cumprod[0]
-    ### new included
-    alphas_cumprod = torch.from_numpy(clip_noise_schedule(alphas_cumprod, clip_value=0.05))
-    alphas = alphas_cumprod[1:] / alphas_cumprod[:-1]
-    alphas = alphas.clip(min=0.001)
-    betas = 1 - alphas
-    betas = betas[1:]  #! Cut the extra piece that EQ skipped so we can iterate [0, 499] instead of [1, 500]
-    betas = torch.clip(betas, 0.0, 0.999).float()
-    return 1 - betas, betas
-
-
-def float_time_to_index(time: torch.Tensor, num_time_steps: int) -> torch.Tensor:
-    """
-    Convert a float time value to a time index.
-
-    Args:
-        time (torch.Tensor): A tensor of float time values in the range [0, 1].
-        num_time_steps (int): The number of discrete time steps.
-
-    Returns:
-        torch.Tensor: A tensor of time indices corresponding to the input float time values.
-    """
-    # Ensure time values are in the range [0, 1]
-    time = torch.clamp(time, 0.0, 1.0)
-
-    # Scale to the index range and round
-    indices = torch.round(time * (num_time_steps - 1)).to(torch.int64)
-
-    return indices
+from bionemo.model.molecule.moco.model.interpolant_utils import (
+    float_time_to_index,
+    index_to_log_onehot,
+    log_1_min_a,
+    log_add_exp,
+    log_sample_categorical,
+)
+from bionemo.model.molecule.moco.model.schedulers import (
+    cosine_beta_schedule,
+    cosine_beta_schedule_eq,
+    cosine_beta_schedule_fm,
+)
 
 
 class Interpolant:
@@ -407,29 +311,6 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
         data_scale, noise_scale = self.reverse_schedule(batch, t_idx, t, t_next, dt)
         x_next = data_scale * x_hat + noise_scale * xt
         return x_next
-
-
-def log_1_min_a(a):
-    return torch.log(1 - torch.exp(a) + 1e-40)
-
-
-def log_sample_categorical(logits):
-    uniform = torch.rand_like(logits)
-    gumbel_noise = -torch.log(-torch.log(uniform + 1e-30) + 1e-30)
-    sample_index = (gumbel_noise + logits).argmax(dim=-1)
-    return sample_index
-
-
-def index_to_log_onehot(x, num_classes):
-    assert x.max().item() < num_classes, f'Error: {x.max().item()} >= {num_classes}'
-    x_onehot = F.one_hot(x, num_classes)
-    log_x = torch.log(x_onehot.float().clamp(min=1e-30))
-    return log_x
-
-
-def log_add_exp(a, b):
-    maximum = torch.max(a, b)
-    return maximum + torch.log(torch.exp(a - maximum) + torch.exp(b - maximum))
 
 
 class DiscreteDiffusionInterpolant(Interpolant):
