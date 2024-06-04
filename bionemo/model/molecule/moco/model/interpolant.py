@@ -882,13 +882,13 @@ def test_discrete_diffusion(h, batch):
         x1, xt, probs = interpolant.interpolate(h, batch, t_idx=t_idx)
     assert all(torch.argmax(probs, 1) == x1)
 
-    # xt = interpolant.prior(h.shape, batch, device=h.device)
-    # for i in tqdm(time_seq, desc='discrete diffusion step', total=len(time_seq)):
-    #     t_idx = torch.full(size=(4,), fill_value=i, dtype=torch.int64, device='cpu')
-    #     x1, xt01, probs = interpolant.interpolate(ligand_pos, batch_ligand, t_idx=t_idx, com_free=True)
-    #     x_hat = xt01
-    #     x_tp1 = interpolant.step(xt, x_hat, batch, t_idx)
-    #     xt = x_tp1
+    xt = interpolant.prior(h.shape, batch, device=h.device)
+    for i in tqdm(time_seq, desc='discrete diffusion step', total=len(time_seq)):
+        t_idx = torch.full(size=(4,), fill_value=i, dtype=torch.int64, device='cpu')
+        x1, xt01, probs = interpolant.interpolate(ligand_pos, batch_ligand, t_idx=t_idx, com_free=True)
+        x_hat = xt01
+        x_tp1 = interpolant.step(xt, x_hat, batch, t_idx)
+        xt = x_tp1
 
     print("DiscreteDiffusionInterpolant-Absorb")
     num_classes = 14
