@@ -322,10 +322,13 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
     def init_schedulers(self, schedule_params, timesteps):
         self.schedule_type = schedule_params['type']
         if schedule_params['type'] == "linear":  #! vpe_linear is just linear with an update weight of recip_time_to_go
+            self.discrete_time_only = False
             self.time = torch.linspace(self.min_t, 1, self.timesteps)
             self.forward_data_schedule = self.time  # lambda x: x/self.timesteps
             self.forward_noise_schedule = 1.0 - self.time  # lambda x: (1.0-x)/self.timesteps
         elif schedule_params['type'] == "vpe":
+            # ! Doing this enforces discrete_time_only
+            self.discrete_time_only = True
             self.alphas, self.alphas_prime = cosine_beta_schedule_fm(
                 schedule_params, timesteps
             )  # FlowMol defines alpha as 1 - cos ^2
@@ -334,12 +337,15 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
             self.derivative_forward_data_schedule = self.alphas_prime
             self.alpha_bar = self.alphas  # For SNR
 
-    def snr_loss_weight(self, t_idx):
-        if self.schedule_type == "linear":
-            t = t_idx / self.timesteps
-            return torch.clamp(t / (1 - t), min=0.05, max=1.5)
+    def snr_loss_weight(self, t_idx=None, t=None):
+        if t_idx is not None:
+            if self.schedule_type == "linear":
+                t = t_idx / self.timesteps
+                return torch.clamp(t / (1 - t), min=0.05, max=1.5)
+            else:
+                return torch.clamp(self.snr(t_idx), min=0.05, max=1.5)
         else:
-            return torch.clamp(self.snr(t_idx), min=0.05, max=1.5)
+            return torch.clamp(t / (1 - t), min=0.05, max=1.5)
 
     def update_weight(self, t):
         if self.update_weight_type == "constant":
@@ -363,6 +369,7 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
             or (t is not None and t_next is not None)
         ), "Must provide valid time."
         if dt is None:
+            assert not self.discrete_time_only
             dt = (t_next - t)[batch]
         if self.schedule_params['type'] == "linear":
             if t is None:
@@ -392,7 +399,7 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
             raise ValueError("Only Gaussian is supported")
         return x0.to(device)
 
-    def step(self, xt, x_hat, batch, t_idx=None, t=None, dt=None, t_next=None, mask=None):
+    def step(self, xt, x_hat, batch, t_idx=None, t=None, dt=None, t_next=None):
         """
         Perform a euler step in the continuous flow matching method.
         """
@@ -467,6 +474,7 @@ class DiscreteDiffusionInterpolant(Interpolant):
         return torch.stack(QT, dim=0)
 
     def d3pm_setup(self):
+        self.discrete_time_only = True
         if self.prior_type == "uniform":
             prior_dist = torch.ones((self.num_classes)) * 1 / self.num_classes
         elif self.prior_type == "mask" or self.prior_type == "absorb":
@@ -525,6 +533,7 @@ class DiscreteDiffusionInterpolant(Interpolant):
         else:
             x1_hot = x1
         if self.schedule_type == "d3pm":
+            assert self.discrete_time_only
             ford = self.forward_schedule(t_idx, batch)[0]
             probs = torch.einsum("nj, nji -> ni", [x1_hot.float(), ford])
             # probs = self.forward_schedule(t_idx, batch)[0] * x1  #! Eqn 3 of D3PM https://arxiv.org/pdf/2107.03006
@@ -567,6 +576,7 @@ class DiscreteDiffusionInterpolant(Interpolant):
         Perform a euler step in the discrete interpolant method.
         """
         if self.solver_type == "sde" and self.schedule_type == "d3pm":
+            assert self.discrete_time_only
             # TODO: Verify that this is correct
             # import ipdb; ipdb.set_trace()
             x_hat = F.one_hot(x_hat, num_classes=self.num_classes).float()
@@ -620,23 +630,28 @@ class DiscreteFlowMatchingInterpolant(Interpolant):
     def __init__(
         self,
         schedule_params: dict = {'type': 'linear'},
-        prior_type: str = "mask",
+        prior_type: str = "uniform",
         update_weight_type: str = "d3pm",
-        solver_type: str = "sde",
+        solver_type: str = "ode",
         timesteps: int = 500,
         num_classes: int = 10,
+        min_t: float = 1e-2,
     ):
         super(DiscreteFlowMatchingInterpolant, self).__init__(schedule_params, prior_type, solver_type, timesteps)
         self.num_classes = num_classes
         self.update_weight_type = update_weight_type
+        self.min_t = min_t
         self.init_schedulers(schedule_params, timesteps)
 
     def init_schedulers(self, schedule_params, timesteps):
+        self.schedule_type = schedule_params['type']
         if schedule_params['type'] == "linear":  #! vpe_linear is just linear with an update weight of recip_time_to_go
-            time = torch.linspace(0, 1, steps=timesteps)
+            self.discrete_time_only = False
+            time = torch.linspace(self.min_t, 1, self.timesteps)
             self.forward_data_schedule = time
             self.forward_noise_schedule = 1.0 - time
         elif schedule_params['type'] == "vpe":
+            self.discrete_time_only = True
             self.alphas, self.alphas_prime = cosine_beta_schedule_fm(
                 schedule_params, timesteps
             )  # FlowMol defines alpha as 1 - cos ^2
@@ -645,56 +660,81 @@ class DiscreteFlowMatchingInterpolant(Interpolant):
             self.derivative_forward_data_schedule = self.alphas_prime
             self.alpha_bar = self.alphas
 
+    def snr_loss_weight(self, t_idx=None, t=None):
+        if t_idx is not None:
+            if self.schedule_type == "linear":
+                t = t_idx / self.timesteps
+                return torch.clamp(t / (1 - t), min=0.05, max=1.5)
+            else:
+                return torch.clamp(self.snr(t_idx), min=0.05, max=1.5)
+        else:
+            return torch.clamp(t / (1 - t), min=0.05, max=1.5)
+
     def update_weight(self, t):
         if self.update_weight_type == "constant":
-            weight = 1
+            weight = torch.ones_like(t).to(t.device)
         elif self.update_weight_type == "recip_time_to_go":
-            weight = 1 / (1 - t)
+            weight = torch.clamp(1 / (1 - t), max=self.timesteps)  # at T = 1 this makes data_scale = 1
         return weight
 
-    def forward_schedule(self, t_idx):
-        return self.forward_data_schedule[t_idx].unsqueeze(1), self.forward_noise_schedule[t_idx].unsqueeze(1)
+    def forward_schedule(self, t=None, t_idx=None, batch=None):
+        if t is not None and self.schedule_type == "linear":
+            return t[batch].unsqueeze(1), (1.0 - t)[batch].unsqueeze(1)
+        return (
+            self.forward_data_schedule[t_idx].unsqueeze(1)[batch],
+            self.forward_noise_schedule[t_idx].unsqueeze(1)[batch],
+        )
 
-    def reverse_schedule(self, t_idx, t=None, t_next=None, dt=None):
+    def reverse_schedule(self, batch, t_idx=None, t=None, t_next=None, dt=None):
+        assert (
+            (t is not None and dt is not None)
+            or (t_idx is not None and dt is not None)
+            or (t is not None and t_next is not None)
+        ), "Must provide valid time."
         if dt is None:
-            dt = t_next - t
+            assert not self.discrete_time_only
+            dt = (t_next - t)[batch]
         if self.schedule_params['type'] == "linear":
-            data_scale = self.update_weight(t) * dt
+            if t is None:
+                t = self.forward_data_schedule[t_idx]
+            data_scale = self.update_weight(t[batch]) * dt
         elif self.schedule_params['type'] == "vpe":  # FlowMol
-            data_scale = (
-                self.derivative_forward_data_schedule[t_idx] * dt / (1 - self.forward_data_schedule[t_idx])
-            )  # alpha_prime[t]*dt/(1 - alpha[t]) #! EquiFm uses (1-a)^2 could be due to the definition of the scheduler FloMol uses cosine wheres EquiFm uses exp(- 0.5 * integral of betas(s)) where beta is some noise scheduler funtion
+            data_scale = (self.derivative_forward_data_schedule[t_idx] * dt / (1 - self.forward_data_schedule[t_idx]))[
+                batch
+            ]  # alpha_prime[t]*dt/(1 - alpha[t]) #! EquiFm uses (1-a)^2 could be due to the definition of the scheduler FloMol uses cosine wheres EquiFm uses exp(- 0.5 * integral of betas(s)) where beta is some noise scheduler funtion
 
         return data_scale.unsqueeze(1), (1 - data_scale).unsqueeze(1)
 
-    def interpolate(self, x1, t=None, t_idx=None):
+    def interpolate(self, x1, batch, t=None, t_idx=None):
         """
         Interpolate using discrete interpolation method.
         """
         if self.prior_type in ["mask", "absorb", "uniform"]:
-            x0 = self.prior(x1.shape[0], self.num_classes, x1.device)
-            t = pad_t_like_x(t, x0)
-            xt = x1.clone()
-            corrupt_mask = torch.rand((x1.shape[0], 1)).to(t.device) < (1 - t)  # [:, None])
+            x0 = self.prior(x1.shape, self.num_classes, x1.device).unsqueeze(1)
+            if t is None:
+                t = t_idx / self.timesteps
+            t = t[batch]
+            xt = x1.clone().unsqueeze(1)
+            corrupt_mask = torch.rand((x1.shape[0], 1)).to(t.device) < (1 - t.unsqueeze(1))  # [:, None])
             xt[corrupt_mask] = x0[corrupt_mask]
         else:
             raise ValueError("Only uniform and mask are supported")
 
-        return x1, xt, x0
+        return x1, xt.squeeze(1), x0.squeeze(1)
 
-    def prior(self, shape, device, one_hot=False):
+    def prior(self, shape, batch, device, one_hot=False):
         """
         Returns discrete index (num_samples, 1) or one hot if True (num_samples, num_classes)
         """
-        num_samples, num_classes = shape
-        if self.prior_type == "mask":
-            x0 = torch.ones((num_samples, 1)) * (num_classes - 1)
+        num_samples = shape[0]
+        if self.prior_type == "mask" or self.prior_type == "absorb":
+            x0 = torch.ones((num_samples,)).to(torch.int64) * (self.num_classes - 1)
         elif self.prior_type == "uniform":
-            x0 = torch.randint(0, num_classes, (num_samples, 1)).to(torch.int64)
+            x0 = torch.randint(0, self.num_classes, (num_samples,)).to(torch.int64)
         else:
-            raise ValueError("Only uniform and mask are supported")
+            raise ValueError("Only uniform and mask/absorb are supported")
         if one_hot:
-            x0 = F.one_hot(x0, num_classes=num_classes)
+            x0 = F.one_hot(x0, num_classes=self.num_classes)
         return x0.to(device)
 
     def step(
@@ -706,7 +746,6 @@ class DiscreteFlowMatchingInterpolant(Interpolant):
         t=None,
         dt=None,
         t_next=None,
-        mask=None,
         stochasticity=1,
         temp=0.1,
         use_purity=False,
@@ -718,21 +757,27 @@ class DiscreteFlowMatchingInterpolant(Interpolant):
 
         N = stochasticity
         S = self.num_classes
+        MASK_TOKEN_INDEX = S - 1
+        if t is None:
+            t = t_idx / self.timesteps
         if dt is None:
+            assert not self.discrete_time_only
             dt = t_next - t
+            dt = dt[batch].unsqueeze(1)
+        t = t[batch].unsqueeze(1)
         if self.prior_type == "uniform":
             logits_1 = x_hat
-            pt_x1_probs = F.softmax(logits_1 / temp, dim=-1)
-            pt_x1_eq_xt_prob = torch.gather(pt_x1_probs, dim=-1, index=xt.long().unsqueeze(-1))
             if last_step:
-                N = 0  #! no noise at final timestep
-            step_probs = dt * (pt_x1_probs * ((1 + N + N * (S - 1) * t) / (1 - t)) + N * pt_x1_eq_xt_prob)
+                x_next = torch.argmax(logits_1, dim=-1)
+            else:
+                pt_x1_probs = F.softmax(logits_1 / temp, dim=-1)
+                pt_x1_eq_xt_prob = torch.gather(pt_x1_probs, dim=-1, index=xt.long().unsqueeze(-1))
+                step_probs = dt * (pt_x1_probs * ((1 + N + N * (S - 1) * t) / (1 - t)) + N * pt_x1_eq_xt_prob)
 
-            step_probs = self._regularize_step_probs(step_probs, xt)
-            x_next = torch.multinomial(step_probs.view(-1, S), num_samples=1).view(xt.shape)  # Same as categorical
-        elif self.prior_type == "mask":
+                step_probs = self._regularize_step_probs(step_probs, xt)
+                x_next = torch.multinomial(step_probs.view(-1, S), num_samples=1).view(xt.shape)  # Same as categorical
+        elif self.prior_type in ["mask", "absorb"]:
             #! Masking is initalized with one more column as the mask state
-            MASK_TOKEN_INDEX = S - 1
             logits_1 = x_hat.clone()
             device = logits_1.device
             if last_step:
@@ -747,13 +792,14 @@ class DiscreteFlowMatchingInterpolant(Interpolant):
 
                     logits_1[:, MASK_TOKEN_INDEX] = -1e9
 
-                    pt_x1_probs = F.softmax(logits_1 / temp, dim=-1)  # (B, D, S)
+                    pt_x1_probs = F.softmax(logits_1 / temp, dim=-1)
 
                     xt_is_mask = (xt == MASK_TOKEN_INDEX).view(-1, 1).float()
-                    step_probs = dt * pt_x1_probs * ((1 + N * t) / ((1 - t)))  # (B, D, S) #!UNMASK
+                    step_probs = dt * pt_x1_probs * ((1 + N * t) / ((1 - t)))  #!UNMASK
                     step_probs += dt * (1 - xt_is_mask) * mask_one_hot.view(1, -1) * N  #!MASK UNMASKED STATES
 
                     step_probs = self._regularize_step_probs(step_probs, xt)
+
                     x_next = torch.multinomial(step_probs.view(-1, S), num_samples=1).view(
                         xt.shape
                     )  # Same as categorical
@@ -761,7 +807,6 @@ class DiscreteFlowMatchingInterpolant(Interpolant):
         return x_next
 
     def _regularize_step_probs(self, step_probs, aatypes_t):
-        # batch_size, num_res, S = step_probs.shape
         #! TODO look into if Batch matters here but should not since everything is -1 so over atom classes
         num_res, S = step_probs.shape
         device = step_probs.device
@@ -931,6 +976,100 @@ def test_discrete_diffusion(h, batch):
         xt = x_tp1
 
 
+def test_discrete_flowmatching(h, batch):
+    print("DiscreteDiffusionInterpolant-Uniform: ONLY WORKS with DISCRETE TIME")
+    num_classes = 13
+
+    interpolant = DiscreteFlowMatchingInterpolant(num_classes=num_classes, prior_type="uniform")
+    time_seq = list(range(0, 500))
+    for i in tqdm(time_seq, desc='discrete flowmatching interpolation', total=len(time_seq)):
+        t_idx = interpolant.sample_time_idx(4, method='stab_mode')
+        data_scale, _ = interpolant.forward_schedule(t_idx, batch_ligand)
+        x1, xt, x0 = interpolant.interpolate(h, batch, t_idx=t_idx)
+
+    xt = interpolant.prior(h.shape, batch, device=h.device)
+    for i in tqdm(time_seq, desc='discrete diffusion step', total=len(time_seq)):
+        t_idx = torch.full(size=(4,), fill_value=i, dtype=torch.int64, device='cpu')
+        x1, xt01, x0 = interpolant.interpolate(h, batch_ligand, t_idx=t_idx)
+        x_hat = F.one_hot(xt01, num_classes)
+        x_tp1 = interpolant.step(xt, x_hat, batch, t_idx=t_idx, dt=1 / 500)
+        xt = x_tp1
+
+    xt = interpolant.prior(h.shape, batch, device=h.device)
+    dt = 1 / 500
+    time_seq = torch.linspace(1e-2, 1, 500)  # min_t used in multi flow
+    for i in tqdm(time_seq, desc='continuous time discrete flow step static dt', total=len(time_seq)):
+        t = torch.full(size=(4,), fill_value=i, device='cpu')
+        x1, xt01, x0 = interpolant.interpolate(h, batch, t=t)
+        x_hat = F.one_hot(x1, num_classes)
+        if i == 1.0:
+            x_tp1 = interpolant.step(xt, x_hat, batch, t=t, dt=dt, last_step=True)
+        else:
+            x_tp1 = interpolant.step(xt, x_hat, batch, t=t, dt=dt)
+        xt = x_tp1
+
+    xt = interpolant.prior(h.shape, batch, device=h.device)
+    time_seq = torch.linspace(1e-2, 1, 500)  # min_t used in multi flow
+    for i in tqdm(range(1, len(time_seq) + 1), desc='continuous time flow step dynamic dt', total=len(time_seq)):
+        t = torch.full(size=(4,), fill_value=time_seq[i - 1], device='cpu')
+        if i < len(time_seq):
+            t_next = torch.full(size=(4,), fill_value=time_seq[i], device='cpu')
+        x1, xt01, x0 = interpolant.interpolate(h, batch, t=t)
+        x_hat = F.one_hot(x1, num_classes)
+        if i == len(time_seq):
+            x_tp1 = interpolant.step(xt, x_hat, batch, t=t, dt=1 / 500, last_step=True)
+        else:
+            x_tp1 = interpolant.step(xt, x_hat, batch, t=t, t_next=t_next)
+        xt = x_tp1
+    assert all(x1 == xt)
+
+    print("DiscreteDiffusionInterpolant-Absorb")
+    num_classes = 14
+
+    interpolant = DiscreteFlowMatchingInterpolant(num_classes=num_classes, prior_type="absorb")
+    time_seq = list(range(0, 500))
+    for i in tqdm(time_seq, desc='discrete diffusion absorb interpolation', total=len(time_seq)):
+        t_idx = interpolant.sample_time_idx(4, method='stab_mode')
+        data_scale, _ = interpolant.forward_schedule(t_idx, batch_ligand)
+        x1, xt, x0 = interpolant.interpolate(h, batch, t_idx=t_idx)
+
+    xt = interpolant.prior(h.shape, batch, device=h.device)
+    for i in tqdm(time_seq, desc='discrete diffusion absorb step', total=len(time_seq)):
+        t_idx = torch.full(size=(4,), fill_value=i, dtype=torch.int64, device='cpu')
+        x1, xt01, x0 = interpolant.interpolate(h, batch_ligand, t_idx=t_idx)
+        x_hat = F.one_hot(xt01, num_classes)
+        x_tp1 = interpolant.step(xt, x_hat, batch, t_idx=t_idx, dt=1 / 500)
+        xt = x_tp1
+
+    xt = interpolant.prior(h.shape, batch, device=h.device)
+    dt = 1 / 500
+    time_seq = torch.linspace(1e-2, 1, 500)  # min_t used in multi flow
+    for i in tqdm(time_seq, desc='continuous time discrete flow  absorb step static dt', total=len(time_seq)):
+        t = torch.full(size=(4,), fill_value=i, device='cpu')
+        x1, xt01, x0 = interpolant.interpolate(h, batch, t=t)
+        x_hat = F.one_hot(x1, num_classes)
+        if i == 1.0:
+            x_tp1 = interpolant.step(xt, x_hat, batch, t=t, dt=dt, last_step=True)
+        else:
+            x_tp1 = interpolant.step(xt, x_hat, batch, t=t, dt=dt)
+        xt = x_tp1
+
+    xt = interpolant.prior(h.shape, batch, device=h.device)
+    time_seq = torch.linspace(1e-2, 1, 500)  # min_t used in multi flow
+    for i in tqdm(range(1, len(time_seq) + 1), desc='continuous time flow step dynamic dt', total=len(time_seq)):
+        t = torch.full(size=(4,), fill_value=time_seq[i - 1], device='cpu')
+        if i < len(time_seq):
+            t_next = torch.full(size=(4,), fill_value=time_seq[i], device='cpu')
+        x1, xt01, x0 = interpolant.interpolate(h, batch, t=t)
+        x_hat = F.one_hot(x1, num_classes)
+        if i == len(time_seq):
+            x_tp1 = interpolant.step(xt, x_hat, batch, t=t, dt=1 / 500, last_step=True)
+        else:
+            x_tp1 = interpolant.step(xt, x_hat, batch, t=t, t_next=t_next)
+        xt = x_tp1
+    assert all(x1 == xt)
+
+
 if __name__ == "__main__":
     from tqdm import tqdm
 
@@ -1097,6 +1236,6 @@ if __name__ == "__main__":
 
     test_continuous_diffusion(ligand_pos, batch_ligand)
     test_continuous_flowmatching(ligand_pos, batch_ligand)
-
     test_discrete_diffusion(ligand_feats, batch_ligand)
+    test_discrete_flowmatching(ligand_feats, batch_ligand)
     print("SUCCESS")
