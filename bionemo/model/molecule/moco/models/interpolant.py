@@ -12,14 +12,14 @@ import torch
 import torch.nn.functional as F
 from torch_scatter import scatter_mean
 
-from bionemo.model.molecule.moco.model.interpolant_utils import (
+from bionemo.model.molecule.moco.models.interpolant_utils import (
     float_time_to_index,
     index_to_log_onehot,
     log_1_min_a,
     log_add_exp,
     log_sample_categorical,
 )
-from bionemo.model.molecule.moco.model.schedulers import (
+from bionemo.model.molecule.moco.models.scheduler import (
     cosine_beta_schedule,
     cosine_beta_schedule_eq,
     cosine_beta_schedule_fm,
