@@ -65,7 +65,7 @@ RUN git clone https://github.com/NVIDIA/TransformerEngine.git && \
 WORKDIR /tmp/
 
 # uninstall stuff from base container
-RUN pip3 uninstall -y sacrebleu torchtext
+RUN pip uninstall -y sacrebleu torchtext
 
 WORKDIR /tmp/nemo
 # install flash attention
