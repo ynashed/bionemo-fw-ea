@@ -13,18 +13,18 @@
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 # Documentation changes are user-facing
-docs/ @tshimko @trvachov
+docs/ @saeep @trvachov @tshimko
 
 # Requires bionemo FW team or PM review to change CODEOWNERS or README
-CODEOWNERS @broland @cye @dorotat @jomitchell @kdidi @mgreaves @ntadimeti @trvachov 
-README.md @broland @cye @dorotat @jomitchell @kdidi @mgreaves @ntadimeti @trvachov
+CODEOWNERS @broland @cye @dorotat @jomitchell @jwilber @kdidi @mgreaves @ntadimeti @pbinder @trvachov @yangzhang
+README.md @broland @cye @dorotat @jomitchell @jwilber @kdidi @mgreaves @ntadimeti @pbinder @trvachov @yangzhang
 
 # Requires bionemo FW team review when modifying: environment, internal-only code, CI, interacting with the codebase
-.gitlab-ci.yml @broland @cye @dorotat @jomitchell @kdidi @mgreaves @trvachov
-internal/ @broland @cye @dorotat @jomitchell @kdidi @mgreaves @trvachov
-setup/Dockerfile* @broland @cye @dorotat @jomitchell @kdidi @mgreaves @trvachov
-setup/requirements*.txt @broland @cye @dorotat @jomitchell @kdidi @mgreaves @trvachov
-CONTRIBUTING.md @broland @cye @dorotat @jomitchell @kdidi @mgreaves @trvachov
+.gitlab-ci.yml @broland @cye @dorotat @jomitchell @jwilber @kdidi @mgreaves @pbinder @trvachov @yangzhang
+internal/ @broland @cye @dorotat @jomitchell @kdidi @jwilber @mgreaves @pbinder @trvachov @yangzhang
+setup/Dockerfile* @broland @cye @dorotat @jomitchell @jwilber @kdidi @mgreaves @pbinder @trvachov @yangzhang
+setup/requirements*.txt @broland @cye @dorotat @jomitchell @jwilber @kdidi @mgreaves @pbinder @trvachov @yangzhang
+CONTRIBUTING.md @broland @cye @dorotat @jomitchell @jwilber @kdidi @mgreaves @pbinder @trvachov @yangzhang
 
 
 
