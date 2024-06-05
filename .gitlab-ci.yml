@@ -1,6 +1,10 @@
 ---
 default:
   image: docker:20.10.16
+  id_tokens:
+    VAULT_JWT_TOKEN:
+      aud: https://stg.vault.nvidia.com
+
        
 
 stages:
@@ -586,6 +590,7 @@ bionemo2-test:
     - generic
   needs:
     - job: build-bionemo-image
+      optional: true
     - job: pytest
       optional: true
   after_script:
@@ -736,8 +741,8 @@ jet-test:
   stage: jet
   before_script:
     - pip install tqdm
-    - export RO_API_TOKEN CI_PROJECT_ID CI_PIPELINE_ID GITLAB_USER_LOGIN CI_JOB_JWT
-    - jet secrets jwt-login jwt/nvidia/gitlab-master bionemo-ci $CI_JOB_JWT
+    - export RO_API_TOKEN CI_PROJECT_ID CI_PIPELINE_ID GITLAB_USER_LOGIN
+    - jet secrets jwt-login jwt/nvidia/gitlab-master bionemo-ci $VAULT_JWT_TOKEN
   script:
     - echo "CI_PROJECT_ID=${CI_PROJECT_ID}, CI_PIPELINE_ID=${CI_PIPELINE_ID}"
     - bash $CI_PROJECT_DIR/internal/jet/scripts/run_jet_test.sh
