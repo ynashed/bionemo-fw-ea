@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bionemo"
+version = "2.0.0"
+license.file = "LICENSE"
+readme = "README.md"
+description = "BioNeMo"
+authors = [
+    { name = "John St. John", email = "jstjohn@nvidia.com" },
+]
+dependencies = [
+    # Add your project's dependencies here, e.g.:
+    # "numpy",
+    # "pandas"
+]
+
+[tool.setuptools]
+packages = { find = { where = ["src"] } }

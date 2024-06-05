@@ -6,12 +6,19 @@ default:
 stages:
   - code_format
   - build
+  - bionemo2-build
   - test
   - jet
   - deploy
 
 variables:
   # docker build options
+  BIONEMO2_ONLY:
+    value: "false"
+    options:
+      - "false"
+      - "true"
+    description: "a flag that determines whether to build only BFW image. Set to 'false' by default."
   DOCKER_HOST: tcp://docker:2376
   DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
   DOCKER_TLS_VERIFY: 1
@@ -166,6 +173,18 @@ workflow:
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     - docker login -u '$oauthtoken' -p $NGC_CLI_API_KEY nvcr.io
 
+# Note: We need to use this docker version `docker:26.0.2-dind` or higher for buildx inline caching.
+.docker-setup-bionemo2:
+  services:
+    - docker:26.0.2-dind
+  tags:
+    - dind
+  before_script:
+    - until docker info; do sleep 1; done
+    - mkdir -p $HOME/.docker
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker login -u '$oauthtoken' -p $NGC_CLI_API_KEY nvcr.io
+
 
 code_format:
   stage: code_format
@@ -196,6 +215,8 @@ build-bionemo-image:
   stage: build
   rules:
     - if: $EXCLUDE_DOCKER_IMAGE_BUILD == "true"
+      when: never
+    - if: $BIONEMO2_ONLY == "true"
       when: never
     - when: on_success
   script:
@@ -309,6 +330,8 @@ build-docs-image:
   rules:
     - if: $EXCLUDE_DOCS_BUILD == "true"
       when: never
+    - if: $BIONEMO2_ONLY == "true"
+      when: never
     - when: on_success
   stage: build
   script:
@@ -364,6 +387,8 @@ build-docs:
   rules:
     - if: $EXCLUDE_DOCS_BUILD == "true"
       when: never
+    - if: $BIONEMO2_ONLY == "true"
+      when: never
     - when: on_success
   script:
     # Build the docs, store as artifact in ${CI_PROJECT_DIR = /builds/clara-discovery/bionemo}.
@@ -402,6 +427,8 @@ pytest:
   stage: test
   rules:
     - if: $EXCLUDE_PYTEST == "true"
+      when: never
+    - if: $BIONEMO2_ONLY == "true"
       when: never
     - when: on_success
   tags:
@@ -456,6 +483,8 @@ pytest-fork:
   rules:
     - if: $EXCLUDE_PYTEST == "true"
       when: never
+    - if: $BIONEMO2_ONLY == "true"
+      when: never
     - when: on_success
   tags:
     - gpu
@@ -488,6 +517,8 @@ pytest-internal:
   rules:
     - if: $EXCLUDE_PYTEST == "true"
       when: never
+    - if: $BIONEMO2_ONLY == "true"
+      when: never
     - when: on_success
   tags:
     - gpu
@@ -505,6 +536,49 @@ pytest-internal:
     - pytest -m "internal" -v --durations=0 --cov=bionemo --cov-report term --cov-report xml:coverage.xml -k "not test_model_training"
     - df -Thl
 
+# Build cache reference images like this:
+# docker buildx build --cache-to type=inline  -t <your-image-name>  -f bionemo2/Dockerfile .
+# If you build using `bash bionemo2/launch.sh build` this will be done automatically.
+bionemo2-build:
+  stage: bionemo2-build
+  extends:
+  # Note: We need to use this docker version `docker:26.0.2-dind` or higher for buildx inline caching.ds:
+    - .docker-setup-bionemo2
+  rules:
+    - if: $BIONEMO2_ONLY == "true"
+      when: always
+  script: 
+    - echo "Building bionemo2 image..."
+    - docker buildx version
+    - docker buildx build
+      --cache-from nvcr.io/nvidian/cvai_bnmo_trng/bionemo:bionemo2
+      -t "${IMAGE_NAME}${SUFFIX_DEV}"
+      -f bionemo2/Dockerfile .
+    - echo "Now pushing container"
+    - docker push "${IMAGE_NAME}${SUFFIX_DEV}"
+  
+bionemo2-test:
+  stage: test
+  extends:
+    - .common_pytest_before_script
+  image:
+    name: "${IMAGE_NAME}${SUFFIX_DEV}"
+    entrypoint: [ "" ]
+  stage: test
+  rules:
+    - if: $BIONEMO2_ONLY == "true"
+      when: always
+  tags:
+    - gpu
+  script:
+    - echo "Running BFW tests..."
+    - pwd
+    - echo ${BIONEMO_HOME}
+    - ls ${BIONEMO_HOME} -al
+    - ls ${BIONEMO_HOME}/bionemo2 -al
+    - cd ${BIONEMO_HOME}
+    - pytest -v bionemo2/
+
 
 .jet-configure:
   stage: jet
@@ -520,6 +594,7 @@ pytest-internal:
   artifacts:
     reports:
       dotenv: jet.env
+  
 
 
 jet-configure:
@@ -534,6 +609,8 @@ jet-configure:
       - $JET_WORKLOADS_DIR
   rules:
     - if: $EXCLUDE_JET == "true"
+      when: never
+    - if: $BIONEMO2_ONLY == "true"
       when: never
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $EXCLUDE_JET != "true"
       when: manual
@@ -568,7 +645,7 @@ jet-configure:
   stage: jet
   needs: [jet-configure]
   inherit:
-    variables: false
+    variables: true
   variables:
     JET_WORKLOADS_PROJECT: $JET_WORKLOADS_PROJECT
     JET_WORKLOADS_JOB: $JET_WORKLOADS_JOB
@@ -637,15 +714,20 @@ jet-trigger:
     - if: $CI_MERGE_REQUEST_LABELS =~ /DiffDock/ || $JET_MODEL_NAME == "DiffDock"
       variables:
         JET_WORKLOADS_FILTER: type == 'recipe' and spec.model == 'diffdock'
+    - if: $BIONEMO2_ONLY == "true"
+      when: never
     - when: on_success
+    
 
 
 jet-test:
-  needs: [jet-trigger]
   rules:
     - if: $EXCLUDE_JET == "true"
       when: never
-    - when: on_success
+    - if: $BIONEMO2_ONLY == "false"
+      needs: [jet-trigger]
+    - if: $BIONEMO2_ONLY == "true"
+      when: never
   image:
     name: gitlab-master.nvidia.com:5005/dl/jet/api:latest
     entrypoint: [ "" ]
