@@ -12,8 +12,8 @@
 ##                                                                                                                #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
-# Documentation changes are user-facing: require PM review
-docs/ @ntadimeti @trvachov
+# Documentation changes are user-facing
+docs/ @tshimko @trvachov
 
 # Requires bionemo FW team or PM review to change CODEOWNERS or README
 CODEOWNERS @broland @cye @dorotat @jomitchell @kdidi @mgreaves @ntadimeti @trvachov 
