@@ -303,11 +303,13 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
             raise ValueError("Only Gaussian is supported")
         return x0.to(device)
 
-    def step(self, xt, x_hat, batch, t_idx=None, t=None, dt=None, t_next=None):
+    def step(self, xt, x_hat, batch, t_idx=None, t=None, dt=None, t_next=None, last_step=False):
         """
         Perform a euler step in the continuous flow matching method.
         """
         # x_next = xt + self.update_weight(t) * dt * (x_hat - xt)
+        if last_step:
+            return x_hat  # xt + timesteps*1/timesteps * (x_hat - xt)
         data_scale, noise_scale = self.reverse_schedule(batch, t_idx, t, t_next, dt)
         x_next = data_scale * x_hat + noise_scale * xt
         return x_next
@@ -803,13 +805,17 @@ def test_continuous_flowmatching(ligand_pos, batch_ligand):
     xt = pos_interpolant.prior(x1.shape, batch_ligand, com_free=True, device=x1.device)
     check = [torch.sum((ligand_pos - xt) ** 2)]
     time_seq = torch.linspace(1e-2, 1, 500)  # min_t used in multi flow
-    for i in tqdm(range(1, len(time_seq)), desc='continuous time flow step dynamic dt', total=len(time_seq)):
+    for i in tqdm(range(1, len(time_seq) + 1), desc='continuous time flow step dynamic dt', total=len(time_seq)):
         t = torch.full(size=(4,), fill_value=time_seq[i - 1], device='cpu')
-        t_next = torch.full(size=(4,), fill_value=time_seq[i], device='cpu')
+        if i < len(time_seq):
+            t_next = torch.full(size=(4,), fill_value=time_seq[i], device='cpu')
         # import ipdb; ipdb.set_trace()
         x1, xt01, x0 = pos_interpolant.interpolate(ligand_pos, batch_ligand, t=t, com_free=True)
         x_hat = x1 + 0.0001 * pos_interpolant.prior(x1.shape, batch_ligand, True, x1.device)
-        x_tp1 = pos_interpolant.step(xt, x_hat, batch_ligand, t=t, t_next=t_next)
+        if i == len(time_seq):
+            x_tp1 = pos_interpolant.step(xt, x_hat, batch_ligand, t=t, last_step=True)
+        else:
+            x_tp1 = pos_interpolant.step(xt, x_hat, batch_ligand, t=t, t_next=t_next)
         xt = x_tp1
         check.append(torch.sum((ligand_pos - xt) ** 2))
     x_tp1 = pos_interpolant.step(xt, x_hat, batch_ligand, t=t, t_next=t_next)
@@ -891,7 +897,9 @@ def test_discrete_flowmatching(h, batch):
 
     xt = interpolant.prior(h.shape, batch, device=h.device)
     time_seq = torch.linspace(1e-2, 1, 500)  # min_t used in multi flow
-    for i in tqdm(range(1, len(time_seq) + 1), desc='continuous time flow step dynamic dt', total=len(time_seq)):
+    for i in tqdm(
+        range(1, len(time_seq) + 1), desc='continuous time discrete flow step dynamic dt', total=len(time_seq)
+    ):
         t = torch.full(size=(4,), fill_value=time_seq[i - 1], device='cpu')
         if i < len(time_seq):
             t_next = torch.full(size=(4,), fill_value=time_seq[i], device='cpu')
@@ -937,7 +945,9 @@ def test_discrete_flowmatching(h, batch):
 
     xt = interpolant.prior(h.shape, batch, device=h.device)
     time_seq = torch.linspace(1e-2, 1, 500)  # min_t used in multi flow
-    for i in tqdm(range(1, len(time_seq) + 1), desc='continuous time flow step dynamic dt', total=len(time_seq)):
+    for i in tqdm(
+        range(1, len(time_seq) + 1), desc='continuous time discrete flow step dynamic dt', total=len(time_seq)
+    ):
         t = torch.full(size=(4,), fill_value=time_seq[i - 1], device='cpu')
         if i < len(time_seq):
             t_next = torch.full(size=(4,), fill_value=time_seq[i], device='cpu')

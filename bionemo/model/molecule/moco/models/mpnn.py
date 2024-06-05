@@ -221,3 +221,281 @@ def unsorted_segment_sum(data, segment_ids, num_segments):
     result = data.new_full(result_shape, 0)  # Init empty result tensor.
     result.scatter_add_(0, segment_ids, data)
     return result
+
+
+if __name__ == "__main__":
+    ligand_pos = torch.rand((75, 3))
+    batch_ligand = torch.Tensor(
+        [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+        ]
+    ).to(torch.int64)
+    ligand_feats = torch.Tensor(
+        [
+            2,
+            4,
+            2,
+            4,
+            2,
+            4,
+            4,
+            3,
+            2,
+            2,
+            1,
+            1,
+            1,
+            1,
+            1,
+            5,
+            1,
+            3,
+            1,
+            1,
+            1,
+            2,
+            4,
+            2,
+            4,
+            2,
+            4,
+            4,
+            3,
+            2,
+            2,
+            1,
+            1,
+            1,
+            1,
+            1,
+            5,
+            1,
+            3,
+            1,
+            1,
+            1,
+            2,
+            2,
+            2,
+            2,
+            12,
+            2,
+            5,
+            2,
+            3,
+            5,
+            1,
+            5,
+            2,
+            4,
+            2,
+            4,
+            2,
+            4,
+            4,
+            3,
+            2,
+            2,
+            1,
+            1,
+            1,
+            1,
+            1,
+            5,
+            1,
+            3,
+            1,
+            1,
+            1,
+        ]
+    ).to(torch.int64)
+
+    # Initialize the adjacency matrix with zeros
+    adj_matrix = torch.zeros((75, 75, 5), dtype=torch.int64)
+    no_bond = torch.zeros(5)
+    no_bond[0] = 1
+    # Using broadcasting to create the adjacency matrix
+    adj_matrix[batch_ligand.unsqueeze(1) == batch_ligand] = 1
+    for idx, i in enumerate(batch_ligand):
+        for jdx, j in enumerate(batch_ligand):
+            if idx == jdx:
+                adj_matrix[idx][jdx] = no_bond
+            elif i == j:
+                # import ipdb; ipdb.set_trace()
+                adj_matrix[idx][jdx] = torch.nn.functional.one_hot(torch.randint(0, 5, (1,)), 5).squeeze(0)
+    # print(adj_matrix)
+
+    atom_embedder = nn.Linear(1, 64)
+    X = ligand_pos
+    H = atom_embedder(ligand_feats.unsqueeze(1).float())
+    A = adj_matrix
+    mask = batch_ligand.unsqueeze(1) == batch_ligand.unsqueeze(0)  # Shape: (75, 75)
+    E_idx = mask.nonzero(as_tuple=False).t()
+    self_loops = E_idx[0] != E_idx[1]
+    E_idx = E_idx[:, self_loops]
+    Z = atom_embedder(ligand_feats.unsqueeze(1).float()).unsqueeze(1) * atom_embedder(
+        ligand_feats.unsqueeze(1).float()
+    ).unsqueeze(0)
+
+    #! this is used if self.bond pred is true but its not
+    # D = (X[E_idx[1]] - X[E_idx[0]]).pow(2).sum(-1, keepdim=True).sqrt() # E x 1
+    # E_idx = torch.concat([H[E_idx[1]] + H[E_idx[0]], D], dim=-1) # E x 64 + 1
+    from torch_sparse import SparseTensor
+
+    def get_triplet(edge_index: torch.Tensor, num_nodes: int):
+        """
+        Compute triplets of nodes and corresponding edge indices in a graph.
+
+        Args:
+            edge_index (torch.Tensor): The edge index tensor representing
+            the connections between source and target nodes.
+            num_nodes (int): The total number of nodes in the graph.
+
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+                A tuple containing:
+                - input_edge_index (torch.Tensor): The input edge index tensor.
+                - idx_i (torch.Tensor): Node indices i in the triplets (k->j->i).
+                - idx_j (torch.Tensor): Node indices j in the triplets (k->j->i).
+                - idx_k (torch.Tensor): Node indices k in the triplets (k->j->i).
+                - idx_kj (torch.Tensor): Edge indices (k-j) in the triplets.
+                - idx_ji (torch.Tensor): Edge indices (j->i) in the triplets.
+        """
+        assert edge_index.size(0) == 2
+        input_edge_index = edge_index.clone()
+        source, target = edge_index  # j->i
+        # create identifiers for edges based on (source, target)
+        value = torch.arange(source.size(0), device=source.device)
+        # as row-index select the target (column) nodes --> transpose
+        # create neighbours from j
+        adj_t = SparseTensor(row=target, col=source, value=value, sparse_sizes=(num_nodes, num_nodes))
+        # get neighbours from j
+        adj_t_row = adj_t[source]
+        # returns the target nodes (k) that include the source (j)
+        # note there can be path i->j->k where k is i
+        num_triplets = adj_t_row.set_value(None).sum(dim=1).to(torch.long)
+        # print(num_triplets)
+        # Node indices (k->j->i) for triplets.
+        idx_i = target.repeat_interleave(num_triplets)
+        idx_j = source.repeat_interleave(num_triplets)
+        idx_k = adj_t_row.storage.col()  # get index for k
+        mask = idx_i != idx_k  # Remove i == k triplets.
+        idx_i, idx_j, idx_k = idx_i[mask], idx_j[mask], idx_k[mask]
+        # print(idx_i); print(idx_j); print(idx_k)
+        # Edge indices (k-j, j->i) for triplets.
+        idx_kj = adj_t_row.storage.value()[mask]
+        idx_ji = adj_t_row.storage.row()[mask]
+
+        return input_edge_index, idx_i, idx_j, idx_k, idx_kj, idx_ji
+
+    import ipdb
+
+    ipdb.set_trace()
+    source, target = E_idx
+    r = X[target] - X[source]  # E x 3
+    a = X[target] * X[source]
+    a = a.sum(-1)  # E
+    d = torch.clamp(torch.pow(r, 2).sum(-1), min=1e-6)
+    d = d.sqrt()  # E
+    r_norm = torch.div(r, (1.0 + d.unsqueeze(-1)))  # E x 3
+    E = A[source, target]  # E x 5
+    E = torch.cat((d.unsqueeze(1), a.unsqueeze(1), r_norm, E), dim=-1)  # E x 10
+    import ipdb
+
+    ipdb.set_trace()
+    # Edge Message Passing
+    from torch_geometric.nn import knn_graph
+
+    num_nodes = X.size(0)
+
+    E_full = torch.zeros(
+        size=(num_nodes, num_nodes, E.size(-1)),
+        device=E.device,
+        dtype=E.dtype,
+    )
+    E_full[E_idx[0], E_idx[1], :] = E
+
+    # create kNN graph
+    edge_index_knn = knn_graph(x=X, k=4, batch=batch_ligand, flow="source_to_target")
+    j, i = edge_index_knn
+    p_ij = X[j] - X[i]
+    p_ij_n = torch.nn.functional.normalize(p_ij, p=2, dim=-1)
+    d_ij = torch.pow(p_ij, 2).sum(-1, keepdim=True).sqrt()
+
+    edge_ij = E_full[j, i, :]
+
+    edge_index_knn, idx_i, idx_j, idx_k, idx_kj, idx_ji = get_triplet(edge_index_knn, num_nodes=num_nodes)
