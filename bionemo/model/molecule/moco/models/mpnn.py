@@ -2,6 +2,7 @@ import math
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch_geometric.nn import MessagePassing, knn_graph
 from torch_geometric.nn.norm import LayerNorm as BatchLayerNorm
 from torch_scatter import scatter, scatter_sum
@@ -285,7 +286,7 @@ class EnBaseLayer(nn.Module):
         return h, x
 
 
-class EGNN(MessagePassing):
+class EquivariantMessagePassingLayer(MessagePassing):
     def __init__(
         self,
         equivariant_node_feature_dim=3,
@@ -304,6 +305,9 @@ class EGNN(MessagePassing):
         self.coor_update_clamp_value = 10.0
         # self.reset_parameters()
         self.h_norm = BatchLayerNorm(invariant_node_feat_dim)
+        self.use_cross_product = True
+        if self.use_cross_product:
+            self.phi_x_cross = MLP(invariant_node_feat_dim, invariant_node_feat_dim, 1)
 
     #     self.apply(self.init_)
 
@@ -314,7 +318,7 @@ class EGNN(MessagePassing):
     #         nn.init.xavier_normal_(module.weight)
     #         nn.init.zeros_(module.bias)
 
-    def mix_edges(self, batch, X, E, k=4):
+    def mix_edges(self, batch, X, E_idx, E, k=4):
         num_nodes = X.size(0)
         A_full = torch.zeros(
             size=(num_nodes, num_nodes, E.size(-1)),
@@ -360,7 +364,7 @@ class EGNN(MessagePassing):
 
     def forward(self, batch, X, H, edge_index, edge_attr):
         # import ipdb; ipdb.set_trace()
-        edge_attr = self.mix_edges(batch, X, self.pre_edge(edge_attr), k=4)
+        edge_attr = self.mix_edges(batch, X, edge_index, self.pre_edge(edge_attr), k=4)
         source, target = edge_index
         rel_coors = X[source] - X[target]
         rel_dist = (rel_coors**2).sum(dim=-1, keepdim=True)
@@ -372,10 +376,20 @@ class EGNN(MessagePassing):
         if self.coor_update_clamp_value:
             coor_wij.clamp_(min=-self.coor_update_clamp_value, max=self.coor_update_clamp_value)
         X_rel_norm = rel_coors / (1 + torch.sqrt(rel_dist + 1e-8))
-        x_update = scatter(
-            X_rel_norm * coor_wij, index=target, dim=0, reduce='sum', dim_size=X.shape[0]
-        )  # sum over all the src since its src to target
-        X_out = X + x_update  # TODO: add cross product like FlowMol and DiffSBDD
+        x_update = scatter(X_rel_norm * coor_wij, index=target, dim=0, reduce='sum', dim_size=X.shape[0])
+        X_out = X + x_update
+        if self.use_cross_product:
+            mean = scatter(X, index=batch, dim=0, reduce='mean', dim_size=X.shape[0])
+            x_src = X[source] - mean[source]
+            x_tgt = X[target] - mean[target]
+            cross = torch.cross(x_src, x_tgt, dim=1)
+            cross = cross / (1 + torch.linalg.norm(cross, dim=1, keepdim=True))
+            coor_wij_cross = self.phi_x_cross(m_ij)
+            if self.coor_update_clamp_value:
+                coor_wij_cross.clamp_(min=-self.coor_update_clamp_value, max=self.coor_update_clamp_value)
+            x_update_cross = scatter(cross * coor_wij, index=target, dim=0, reduce='sum', dim_size=X.shape[0])
+            X_out = X_out + x_update_cross
+
         # m_i, m_ij = self.aggregate(inputs = m_ij * self.message_gate(m_ij), index = i, dim_size = X.shape[0])
         m_i = scatter(
             m_ij * self.message_gate(m_ij), index=target, dim=0, reduce='sum', dim_size=X.shape[0]
@@ -387,7 +401,7 @@ class EGNN(MessagePassing):
         # )  # self.h_norm(H, batch) #! the use of LN here prevents H blow up similar to FlowMol
         #! is the fact that FABind uses attention so a softmax weight (0,1) to scale before doing the residual update prevent explosion?
         #! We use target as the index since we are aaggregating over i [1, 0] and [2, 0] we want to argegat over the 0 so we use its edge index
-        return X_out, H_out, edge_attr
+        return X_out, H_out, edge_attr, m_ij
 
     # def message(self, H_i, H_j, edge_attr):
     #     # edge_attr already has the norm of distances
@@ -595,7 +609,7 @@ if __name__ == "__main__":
             1,
         ]
     ).to(torch.int64)
-
+    num_classes = 13
     # Initialize the adjacency matrix with zeros
     adj_matrix = torch.zeros((75, 75, 5), dtype=torch.int64)
     no_bond = torch.zeros(5)
@@ -611,16 +625,16 @@ if __name__ == "__main__":
                 adj_matrix[idx][jdx] = torch.nn.functional.one_hot(torch.randint(0, 5, (1,)), 5).squeeze(0)
     # print(adj_matrix)
 
-    atom_embedder = nn.Linear(1, 64)
+    atom_embedder = nn.Linear(num_classes, 64)
     X = ligand_pos
-    H = atom_embedder(ligand_feats.unsqueeze(1).float())
+    H = atom_embedder(F.one_hot(ligand_feats, num_classes).float())
     A = adj_matrix
     mask = batch_ligand.unsqueeze(1) == batch_ligand.unsqueeze(0)  # Shape: (75, 75)
     E_idx = mask.nonzero(as_tuple=False).t()
     self_loops = E_idx[0] != E_idx[1]
     E_idx = E_idx[:, self_loops]
-    Z = atom_embedder(ligand_feats.unsqueeze(1).float()).unsqueeze(1) * atom_embedder(
-        ligand_feats.unsqueeze(1).float()
+    Z = atom_embedder(F.one_hot(ligand_feats, num_classes).float()).unsqueeze(1) * atom_embedder(
+        F.one_hot(ligand_feats, num_classes).float()
     ).unsqueeze(0)
 
     source, target = E_idx
@@ -637,10 +651,10 @@ if __name__ == "__main__":
     E = edge_embedder(E.float())
 
     # import ipdb; ipdb.set_trace()
-    model = EGNN()  #! Layer norm forces stable.
+    model = EquivariantMessagePassingLayer()  #! Layer norm forces stable.
     print(X.sum(), H.sum(), E.sum())
     for i in range(25):
-        X, H, E = model(batch_ligand, X, H, E_idx, E)
+        X, H, E, m_ij = model(batch_ligand, X, H, E_idx, E)
         print(X.sum(), H.sum(), E.sum())
 
     # model = EnBaseLayer(64, 5) #! Stable but increasing
