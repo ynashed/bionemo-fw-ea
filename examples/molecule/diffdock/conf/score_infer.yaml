@@ -2,11 +2,15 @@
 # ${name} will be used as one of the tag to store the cached datasets
 # all the other necessary parameters will be fetched from the .nemo file in ${restore_from_path}
 # to override any values, refer to train_score.yaml
+
+defaults:
+  - embedding_preprocess
+
 score_infer:
   name: paper_large_score # this name will be used as part of cached dataset folder name for training confidence model
   restore_from_path: ${oc.env:BIONEMO_HOME}/models/molecule/diffdock/diffdock_score.nemo # used when starting from a .nemo file
   target: bionemo.model.molecule.diffdock.models.nemo_model.DiffdockTensorProductScoreModel  # path to model class to load
-  infer_target: bionemo.model.molecule.diffdock.infer.DiffDockModelInference # path to inferende class to load
+  infer_target: bionemo.model.molecule.diffdock.infer.DiffDockModelInference # path to inference class to load
   load_from_checkpoint: null
 
   data:
@@ -16,8 +20,11 @@ score_infer:
     atom_radius: 5.0
     atom_max_neighbors: 8
     remove_hs: True
+    no_torsion: False
+    cache_path: ${oc.env:BIONEMO_HOME}/data/data_cache # Folder from where to load/restore cached dataset
+
 
   trainer:
     devices: 1
     num_nodes: 1
-    precision: 32 # bf16 # To activate AMP set to 16 or 'bf16'; otherwise will be float32
+    precision: 32

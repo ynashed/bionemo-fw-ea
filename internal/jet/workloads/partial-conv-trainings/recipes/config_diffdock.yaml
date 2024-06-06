@@ -20,9 +20,9 @@ launchers:
     ntasks_per_node: '{gpus}'
   name:dgxa100_dracooci:
     mounts:
-      /workspace/bionemo/models: /lustre/fsw/portfolios/convai/projects/convai_bionemo_training/jet/models
-      /workspace/bionemo/data: /lustre/fsw/portfolios/convai/projects/convai_bionemo_training/jet/data
-      /misc_data/npz: /lustre/fsw/portfolios/convai/users/guoqingz/src/bionemo_code/misc_data/npz
+      /workspace/bionemo/models: /lustre/fsw/portfolios/healthcareeng/projects/healthcareeng_bionemo/jet/models
+      /workspace/bionemo/data: /lustre/fsw/portfolios/healthcareeng/projects/healthcareeng_bionemo/jet/data
+      /misc_data/npz: /lustre/fsw/portfolios/healthcareeng/users/guoqingz/src/bionemo_code/misc_data/npz
 spec:
   build: bionemo
   BIONEMO_HOME: "/workspace/bionemo"

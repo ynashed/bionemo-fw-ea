@@ -65,7 +65,7 @@ parser.add_argument(
     help="If turned on, will require all model parameters\
                     to be populated with the input nemo file except for\
                     those known not to receive update, e.g., the tensor\
-                    product backend's registred buffer",
+                    product backend's registered buffer",
 )
 
 args = parser.parse_args()

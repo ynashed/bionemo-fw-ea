@@ -502,7 +502,7 @@ class TensorProductScoreModelAllAtom(torch.nn.Module):
         rot_pred = global_pred[:, 3:6] + global_pred[:, 9:]
         data.graph_sigma_emb = self.timestep_emb_func(data.complex_t["tr"])
 
-        # adjust the magniture of the score vectors
+        # adjust the magnitude of the score vectors
         tr_norm = torch.linalg.vector_norm(tr_pred, dim=1).unsqueeze(1)
         tr_pred = tr_pred / tr_norm * self.tr_final_layer(torch.cat([tr_norm, data.graph_sigma_emb], dim=1))
 

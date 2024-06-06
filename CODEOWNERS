@@ -38,11 +38,15 @@ CONTRIBUTING.md @broland @cye @dorotat @jomitchell @jwilber @kdidi @mgreaves @pb
 ##
 ## diffdock @guoqingz
 ##
-bionemo/model/molecule/diffdock @guoqingz
+bionemo/model/molecule/diffdock @guoqingz @dejunl
 tests/test_diffdock_training.py @guoqingz
 tests/test_diffdock_inference.py @guoqingz
-bionemo/data/diffdock @guoqingz
-examples/tests/test_data/molecule/diffdock @guoqingz
+tests/test_diffdock_model.py @dejunl
+tests/test_so3.py @guoqingz
+tests/test_pickles_to_wds_tars.py @guoqingz
+tests/test_size_aware_batching.py @guoqingz
+bionemo/data/diffdock @guoqingz @dejunl
+examples/tests/test_data/molecule/diffdock @guoqingz @dejunl
 examples/molecule/diffdock @guoqingz
 docs/bionemo/preprocessing-bcp-training-diffdock.md @guoqingz
 docs/bionemo/images/diffdock_fw_overview.png @guoqingz @zmcclure
@@ -54,7 +58,7 @@ docs/bionemo/images/diffdock_perf.png @guoqingz @zmcclure
 docs/bionemo/models/diffdock.md @guoqingz @zmcclure
 docs/bionemo/notebooks/model_training_diffdock.ipynb @guoqingz
 docs/build/html/_sources/preprocessing-bcp-training-diffdock.md @guoqingz
-docs/build/html/_sources/models/diffdock.md @guoqingz
+docs/build/html/_sources/models/diffdock.md @guoqingz @zmcclure
 docs/build/html/_sources/notebooks/model_training_diffdock.ipynb @guoqingz
 docs/build/html/models/diffdock.html @guoqingz
 docs/build/html/_images/diffdock_fw_overview.png @guoqingz

@@ -32,19 +32,19 @@ os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:512"
 e3nn.set_optimization_defaults(optimize_einsums=True)
 
 inputs = [
-    ('diffdock_score_training_test', None),
-    ('diffdock_score_training_test', 'SizeAwareBatchSampler'),
+    ('diffdock_score_training_test', False),
+    ('diffdock_score_training_test', True),
     ('diffdock_confidence_training_test', None),
 ]
 
 
 @pytest.fixture(scope="function", params=inputs)
 def diffdock_cfg(request, tmp_path, config_path_for_tests) -> DictConfig:
-    config_name, batch_sampler = request.param
+    config_name, apply_size_control = request.param
     cfg = load_model_config(config_name=config_name, config_path=config_path_for_tests)
     with open_dict(cfg):
         cfg.exp_manager.exp_dir = tmp_path
-        cfg.model.batch_sampler = batch_sampler
+        cfg.model.apply_size_control = apply_size_control
     return cfg
 
 

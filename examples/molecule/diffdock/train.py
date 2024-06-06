@@ -52,7 +52,7 @@ def main(cfg) -> None:
 
     if cfg.do_embedding_preprocessing:
         logging.info("************** Starting Embedding PreProcessing ***********")
-        prep_embedding(cfg.training_data)
+        prep_embedding(cfg.protein_data)
 
     data_manager = DataManager(cfg)
     if cfg.do_preprocessing:

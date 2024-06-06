@@ -8,91 +8,162 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
-import binascii
 import copy
+import glob
 import math
 import multiprocessing
 import os
 import pickle
 import random
-from collections import defaultdict
-from concurrent import futures
 from contextlib import contextmanager
+from copy import deepcopy
+from dataclasses import dataclass, fields
+from enum import Enum
 from functools import lru_cache
 from multiprocessing import Pool, get_start_method, set_start_method
-from typing import Literal, Optional
+from typing import Callable, List, Literal, Optional, Tuple
 
 import numpy as np
+import pandas as pd
 import torch
 from nemo.utils import logging
+from omegaconf.dictconfig import DictConfig
 from torch_geometric.data import Dataset, HeteroData
 from torch_geometric.transforms import BaseTransform
 
-from bionemo.data.diffdock.embedding_store import EmbeddingStore
-from bionemo.data.diffdock.heterograph_store import HeterographStore
 from bionemo.data.diffdock.process_mols import (
     extract_receptor_structure,
     get_lig_graph_with_matching,
     get_rec_graph,
     parse_pdb_from_path,
-    parse_receptor,
     read_molecule,
 )
+from bionemo.data.diffdock.webdataset_utils import pickles_to_tars
 from bionemo.model.molecule.diffdock.utils import so3, torus
 from bionemo.model.molecule.diffdock.utils.ddp import get_rank
 from bionemo.model.molecule.diffdock.utils.diffusion import modify_conformer, set_time
 
 
-def make_cache_path(
-    cache_path="data/data_cache",
-    split_path="data/",
-    matching=True,
-    protein_path_list=None,
-    ligand_descriptions=None,
-    all_atoms=False,
-    limit_complexes=0,
-    max_lig_size=None,
-    remove_hs=False,
-    receptor_radius=30,
-    c_alpha_max_neighbors=None,
-    atom_radius=5,
-    atom_max_neighbors=None,
-    num_conformers=1,
-    esm_embeddings_path=None,
-    keep_local_structures=False,
-):
-    if matching or protein_path_list is not None and ligand_descriptions is not None:
-        cache_prefix = "torsion"
-    if all_atoms:
+@dataclass(kw_only=True)
+class HeteroGraphDataConfig:
+    """Protein-Ligand complex hetero graph data config data class"""
+
+    data_dir: Optional[os.PathLike] = None  # path to the protein-ligand complex structures
+    protein_ligand_csv: Optional[os.PathLike] = None  # csv file with complex_names, protein and ligand paths
+    # refer to example/molecule/diffdock/conf/embedding_preprocess.yaml
+    # for more details, set to None if use cached data
+    cache_path: os.PathLike  # path to save cached data
+    split_path: os.PathLike = None  # path to the split file.
+    esm_embeddings_path: Optional[os.PathLike] = None  # path to the esm embedding results
+
+    all_atoms: bool  # all atom or coarse grained/residue for protein
+    limit_complexes: int = 0  # if choose a subset of samples, set 0 to ignore
+    max_lig_size: Optional[int] = None  # maximal ligand size, set to None to ignore
+    remove_hs: bool  # if remove hydrogen in ligands
+    receptor_radius: float  # receptor graph cutoff
+    c_alpha_max_neighbors: Optional[int] = None  # C-alpha/residue maximal neighbors, set to None to ignore
+    atom_radius: float  # all atom receptor graph cutoff
+    atom_max_neighbors: Optional[int] = None  # all atom graph maximal neighbors, set to None to ignore
+    matching_popsize: int = 20  # A multiplier for setting the total population size
+    # when optimizing the generated conformer for matching
+    matching_maxiter: int = 20  # The maximum number of generations over which the entire population is evolved
+    # when optimizing the generated conformer for matching
+    no_torsion: bool = False  # whether not considering torsion
+    matching: Optional[bool] = None  # if use RDKit to generate matching conformers
+
+    generate_conformer_max_iterations: Optional[
+        int
+    ] = 10  # maximal number of iterations for RDkit to generate conformers.
+    # if failed, start with random coordinates. default to 10
+    generate_conformer_enforce_chirality: Optional[bool] = False
+    # whether keep enforcing chirality if failed with `generate_conformer_max_iterations`` iterations for RDkit to generate conformers.
+    # Default to False
+    keep_original: Optional[bool] = True  # if keep original ligand positions. Default to True.
+    num_conformers: Optional[int] = 1  # number of reference conformers to generate from RDKit. Default to 1.
+
+    num_chunks: Optional[int] = 1  # number of chunks to group the whole data in the split
+    seed: Optional[int] = None  # random seed
+
+    min_num_shards: Optional[
+        int
+    ] = 0  # minimal number of shard tar files to create when using webdataset. set to None to ignore
+
+    @classmethod
+    def init_from_hydra_config(cls, data_config: DictConfig):
+        """initialize data class from hydra dict config
+
+        Args:
+            data_config (DictConfig): Data config from hydra
+
+        Returns:
+            HeteroGraphDataConfig: data config in data class HeteroGraphDataConfig
+        """
+        inputs = {}
+        for field in fields(HeteroGraphDataConfig):
+            if hasattr(data_config, field.name):
+                inputs[field.name] = data_config.get(field.name)
+        if 'no_torsion' in inputs and ('matching' not in inputs or inputs['matching'] is None):
+            inputs['matching'] = not inputs['no_torsion']
+        return HeteroGraphDataConfig(**inputs)
+
+
+def get_heterograph_path_from_data_config(data_config: HeteroGraphDataConfig) -> os.PathLike:
+    """Get the heterograph data cache path for given data config
+
+    Args:
+        data_config (HeteroGraphDataConfig): Protein-Ligand complex hetero graph data config data class
+
+    Returns:
+        os.PathLike: absolute full cache path for the split in the given data config
+    """
+    if data_config.all_atoms:
         cache_prefix = "allatoms"
+    else:
+        cache_prefix = "torsion"
     full_cache_path = os.path.join(
-        cache_path,
-        f"{cache_prefix}_limit{limit_complexes}"
-        f"_INDEX{os.path.splitext(os.path.basename(split_path))[0]}"
-        f"_maxLigSize{max_lig_size}_H{int(not remove_hs)}"
-        f"_recRad{receptor_radius}_recMax{c_alpha_max_neighbors}"
-        + ("" if not all_atoms else f"_atomRad{atom_radius}_atomMax{atom_max_neighbors}")
-        + ("" if not matching or num_conformers == 1 else f"_confs{num_conformers}")
-        + ("" if esm_embeddings_path is None else "_esmEmbeddings")
-        + ("" if not keep_local_structures else "_keptLocalStruct")
+        data_config.cache_path,
+        f"{cache_prefix}_limit{data_config.limit_complexes}"
+        # f"_INDEX{os.path.splitext(os.path.basename(split_path))[0]}"
+        f"_maxLigSize{data_config.max_lig_size}_H{int(not data_config.remove_hs)}"
+        f"_recRad{data_config.receptor_radius}_recMax{data_config.c_alpha_max_neighbors}"
         + (
             ""
-            if protein_path_list is None or ligand_descriptions is None
-            else str(binascii.crc32("".join(ligand_descriptions + protein_path_list).encode()))
-        ),
+            if not data_config.all_atoms
+            else f"_atomRad{data_config.atom_radius}_atomMax{data_config.atom_max_neighbors}"
+        )
+        + (
+            ""
+            if not data_config.matching or data_config.num_conformers == 1
+            else f"_confs{data_config.num_conformers}"
+        )
+        + "_esmEmbeddings",
     )
     return full_cache_path
 
 
-def read_strings_from_txt(path):
+def read_strings_from_txt(path: os.PathLike) -> List:
+    """read lines from a txt file
+
+    Args:
+        path (os.PathLike): path to a text file
+
+    Returns:
+        List: list of each entry in the text file
+    """
     # every line will be one element of the returned list
-    with open(path) as file:
-        lines = file.readlines()
-        return [line.rstrip() for line in lines]
+    return np.genfromtxt(path, dtype=str).tolist()
 
 
 class NoiseTransform(BaseTransform):
-    def __init__(self, t_to_sigma, no_torsion, all_atom):
+    """Apply forward diffusion on the ligand
+
+    Args:
+        t_to_sigma (Callable): Callable to embed time
+        no_torsion (bool): if not to perturb ligand torsion degrees
+        all_atom (bool): # all atom or coarse grained/residue for protein
+    """
+
+    def __init__(self, t_to_sigma: Callable, no_torsion: bool, all_atom: bool):
         self.t_to_sigma = t_to_sigma
         self.no_torsion = no_torsion
         self.all_atom = all_atom
@@ -116,7 +187,7 @@ class NoiseTransform(BaseTransform):
             if torsion_updates is None
             else torsion_updates
         )
-        torsion_updates = None if self.no_torsion else torsion_updates
+        torsion_updates = None if self.no_torsion or data["ligand"].edge_mask.sum() == 0 else torsion_updates
         modify_conformer(data, tr_update, torch.from_numpy(rot_update).float(), torsion_updates)
 
         data.tr_score = -tr_update / tr_sigma**2
@@ -124,6 +195,12 @@ class NoiseTransform(BaseTransform):
         data.tor_score = None if self.no_torsion else torch.from_numpy(torus.score(torsion_updates, tor_sigma)).float()
         data.tor_sigma_edge = None if self.no_torsion else np.ones(data["ligand"].edge_mask.sum()) * tor_sigma
         return data
+
+    def apply_noise_iter(self, source, keep_pos=False):
+        for (data,) in source:
+            if keep_pos:
+                data['ligand'].aligned_pos = deepcopy(data['ligand'].pos)
+            yield self.__call__(data)
 
 
 @contextmanager
@@ -150,297 +227,270 @@ def ForkingBehavior(
 
 
 class ProteinLigandDockingDataset(Dataset):
-    """Protein ligand complex graph dataset"""
-
     def __init__(
         self,
-        root,
-        transform=None,
-        cache_path="/data/data_cache",
-        split_path="/data/",
-        limit_complexes=0,
-        receptor_radius=30,
-        num_workers=1,
-        c_alpha_max_neighbors=None,
-        popsize=15,
-        maxiter=15,
-        matching=True,
-        keep_original=False,
-        max_lig_size=None,
-        remove_hs=False,
-        num_conformers=1,
-        all_atoms=False,
-        atom_radius=5,
-        atom_max_neighbors=None,
-        esm_embeddings_path=None,
-        require_ligand=False,
-        protein_path_list=None,
-        ligand_descriptions=None,
-        keep_local_structures=False,
-        chunk_size=5,
-        seed=None,
-        generate_conformer_max_iterations=0,
-        generate_conformer_enforce_chirality=True,
+        data_config: HeteroGraphDataConfig,
+        transform: Optional[Callable] = None,
+        num_workers: int = 1,
     ):
-        super(ProteinLigandDockingDataset, self).__init__(root, transform)
-        self.protein_dir = root
-        self.max_lig_size = max_lig_size
-        self.split_path = split_path
-        self.limit_complexes = limit_complexes
-        self.receptor_radius = receptor_radius
-        self.num_workers = num_workers
-        self.c_alpha_max_neighbors = c_alpha_max_neighbors
-        self.remove_hs = remove_hs
-        self.esm_embeddings_path = esm_embeddings_path
-        self.require_ligand = require_ligand
-        self.protein_path_list = protein_path_list
-        self.ligand_descriptions = ligand_descriptions
-        self.keep_local_structures = keep_local_structures
-        self.popsize, self.maxiter = popsize, maxiter
-        self.matching, self.keep_original = matching, keep_original
-        self.num_conformers = num_conformers
-        self.all_atoms = all_atoms
-        self.atom_radius, self.atom_max_neighbors = atom_radius, atom_max_neighbors
-        self.chunk_size = chunk_size
-        self.seed = seed
-        self.generate_conformer_max_iterations = generate_conformer_max_iterations
-        self.generate_conformer_enforce_chirality = generate_conformer_enforce_chirality
+        """Protein ligand complex graph dataset
 
-        self.heterograph_store: Optional[HeterographStore] = None
-        self.full_cache_path = self.heterograph_cache_path(cache_path)
-        if not os.path.exists(os.path.join(self.full_cache_path, "heterographs.sqlite3")):
-            self.complex_graphs_ready = False
-            # self.build_complex_graphs():
-        else:
-            self.complex_graphs_ready = True
+        Args:
+            data_config (HeteroGraphDataConfig): Protein-Ligand complex hetero graph data config data class, refer to HeteroGraphDataConfig for more details
+            transform (Callable, optional): transformation applied to the data
+            num_workers (int, optional): number of workers to do data preprocessing. Defaults to 1.
+        """
+        super(ProteinLigandDockingDataset, self).__init__()
+        self.transform = transform
+
+        self.data_config = data_config
+        self.split_path = self.data_config.split_path
+        self.num_workers = num_workers
+
+        self.full_cache_path = get_heterograph_path_from_data_config(self.data_config)
+        self.split_cache_path = self.full_cache_path + (
+            f"_INDEX{os.path.splitext(os.path.basename(self.split_path))[0]}" if self.split_path is not None else ""
+        )
+
+        if not (os.path.exists(self.split_cache_path) and os.listdir(self.split_cache_path)):
+            logging.info(
+                f"Complex graphs split webdataset tar files do not exist yet: {self.split_cache_path}. "
+                "Use load_complex_graphs() to build"
+            )
+
+        self.webdataset_urls: Optional[List] = None
+        self.webdataset_fname_suffix_in_tar = "heterodata.pyd"
 
     def build_complex_graphs(self):
         local_rank = get_rank()
         if local_rank == 0:
             os.makedirs(self.full_cache_path, exist_ok=True)
-        if not os.path.exists(os.path.join(self.full_cache_path, "heterographs.sqlite3")):
-            if self.protein_path_list is None or self.ligand_descriptions is None:
-                self.preprocessing()
-                self.complex_graphs_ready = True
-        else:
-            logging.warning(
-                "Trying to call build scorec complex graph dataset, "
-                f"but cached file is here {self.confidence_cache_store_path}. "
-                "skip dataset building, if it is intended, remove the cached file."
-            )
-            self.complex_graphs_ready = True
+        self.preprocessing()
 
     def load_complex_graphs(self):
-        if self.complex_graphs_ready:
-            self.heterograph_store = HeterographStore(os.path.join(self.full_cache_path, "heterographs.sqlite3"))
-        else:
-            raise RuntimeError(
-                f"Failed to load cached heterographs.sqlite3 file in this folder {self.full_cache_path}"
-            )
+        if not (os.path.exists(self.split_cache_path) and os.listdir(self.split_cache_path)):
+            if os.path.exists(self.full_cache_path) and os.listdir(self.full_cache_path):
+                os.makedirs(self.split_cache_path, exist_ok=True)
+                complex_names = set(read_strings_from_txt(self.split_path))
+                pickles_to_tars(
+                    self.full_cache_path,
+                    "HeteroData.pyd",
+                    complex_names,
+                    self.split_cache_path,
+                    "heterographs",
+                    lambda complex_graph: {
+                        "__key__": complex_graph.name.replace('.', '-'),
+                        self.webdataset_fname_suffix_in_tar: pickle.dumps(complex_graph),
+                    },
+                    self.data_config.min_num_shards,
+                )
+            else:
+                raise RuntimeError(
+                    f"Can not load processed complex graph pickle files from {self.full_cache_path}, "
+                    f"which are required to create WebDataset tar files. "
+                    f"Use build_complex_graphs() to build."
+                )
 
-    def heterograph_cache_path(self, cache_path):
-        full_cache_path = make_cache_path(
-            cache_path=cache_path,
-            split_path=self.split_path,
-            matching=self.matching,
-            protein_path_list=self.protein_path_list,
-            ligand_descriptions=self.ligand_descriptions,
-            all_atoms=self.all_atoms,
-            limit_complexes=self.limit_complexes,
-            max_lig_size=self.max_lig_size,
-            remove_hs=self.remove_hs,
-            receptor_radius=self.receptor_radius,
-            c_alpha_max_neighbors=self.c_alpha_max_neighbors,
-            atom_radius=self.atom_radius,
-            atom_max_neighbors=self.atom_max_neighbors,
-            num_conformers=self.num_conformers,
-            esm_embeddings_path=self.esm_embeddings_path,
-            keep_local_structures=self.keep_local_structures,
-        )
-        return full_cache_path
+        self.webdataset_urls = glob.glob(os.path.join(self.split_cache_path, 'heterographs-*.tar'))
+        if len(self.webdataset_urls) == 0:
+            raise RuntimeError(f'{self.split_cache_path} is empty')
 
     @lru_cache(maxsize=None)
     def len(self):
-        return len(self.heterograph_store)
+        return len(read_strings_from_txt(self.split_path))
 
     def get(self, idx):
-        complex_graph = self.heterograph_store[idx]
-        return complex_graph
+        raise NotImplementedError("Using webdataset as backend which does not support indexing")
 
     def preprocessing(self):
         with ForkingBehavior(start_method="spawn", force=True):
             logging.info(
-                f"[preprocessing] processing complexes from [{self.split_path}] and saving it to [{self.full_cache_path}]"
+                f"[preprocessing] processing complexes from [{self.data_config.data_dir}] and saving them to [{self.full_cache_path}]"
             )
-            logging.info(f"[preprocessing] reading complexes from split file {self.split_path}")
-            complex_names_all = read_strings_from_txt(self.split_path)
-            if self.limit_complexes is not None and self.limit_complexes != 0:
-                complex_names_all = complex_names_all[: self.limit_complexes]
+            logging.info(f"[preprocessing] reading complexes from {self.data_config.data_dir}")
+
+            # skip the preprocessed complexes saved in the folder.
+            processed_names = {
+                filename[: -len(".HeteroData.pyd")]
+                for filename in os.listdir(self.full_cache_path)
+                if filename.endswith('.HeteroData.pyd')
+                and os.path.getsize(os.path.join(self.full_cache_path, filename)) > 0
+            }
+            num_processed_names = len(processed_names)
+            if num_processed_names > 0:
+                logging.info(
+                    f"{num_processed_names} complexes have been processed in {self.full_cache_path}, skipping them"
+                )
+
+            split_complex_names = set(read_strings_from_txt(self.split_path))
+            complex_names = split_complex_names - processed_names  # complexes for preprocessing in the split
+
+            if (
+                os.path.isfile(self.data_config.protein_ligand_csv)
+                and os.stat(self.data_config.protein_ligand_csv).st_size > 0
+            ):
+                df = pd.read_csv(self.data_config.protein_ligand_csv)
+            else:
+                logging.warning(
+                    f'The protein-ligand complex csv file does not exist : {self.data_config.protein_ligand_csv}. skipping'
+                )
+                return
+            if len(df) == 0:
+                logging.warning(
+                    f'The protein-ligand complex csv file in empty : {self.data_config.protein_ligand_csv}. skipping'
+                )
+                return
+
+            complexes_all = df[df['complex_name'].str.slice().isin(complex_names)][
+                ['complex_name', 'protein_path', 'ligand_paths']
+            ].values.tolist()
+
+            if self.data_config.limit_complexes is not None and self.data_config.limit_complexes != 0:
+                complexes_all = complexes_all[
+                    : max(0, self.data_config.limit_complexes - len(processed_names & split_complex_names))
+                ]
+
+            if len(complexes_all) == 0:
+                logging.info(
+                    f"All complexes have been processed in {self.split_path} and saved in {self.full_cache_path}, skipping"
+                )
+                return
+            complex_names_all = list(zip(*complexes_all))[0]
 
             num_cores = multiprocessing.cpu_count()
             if self.num_workers < num_cores:
                 logging.info(f"num_workers < num_cores: {self.num_workers} < {num_cores}")
 
-            if self.esm_embeddings_path is not None:
-                logging.info(
-                    f"[preprocessing] loading {len(complex_names_all)} complexes with {self.num_workers} threads."
-                )
-                chain_embeddings_dictlist = defaultdict(list)
-
-                def _pattern_search(complex_name):
-                    emb_store = EmbeddingStore(db_path=self.esm_embeddings_path)
-                    result = emb_store.search(complex_name)
-                    result = [pickle.loads(x[1]) for x in result]
-                    chain_embeddings_dictlist[complex_name] = result
-                    emb_store.conn.close()
-
-                with futures.ThreadPoolExecutor(max_workers=self.num_workers) as executor:
-                    executor.map(_pattern_search, complex_names_all)
-                lm_embeddings_chains_all = []
-                for name in complex_names_all:
-                    lm_embeddings_chains_all.append(chain_embeddings_dictlist[name])
-            else:
-                lm_embeddings_chains_all = [None] * len(complex_names_all)
-
-            chunk_size = len(complex_names_all) // (self.num_workers * self.chunk_size)
-            chunks = math.ceil(len(complex_names_all) / chunk_size)
-            complex_chunks = [complex_names_all[chunk_size * i : chunk_size * (i + 1)] for i in range(chunks)]
-            lm_chunks = [lm_embeddings_chains_all[chunk_size * i : chunk_size * (i + 1)] for i in range(chunks)]
+            chunks = self.data_config.num_chunks
+            chunk_size = math.ceil(len(complexes_all) / chunks)
+            complex_chunks = [complexes_all[chunk_size * i : chunk_size * (i + 1)] for i in range(chunks)]
 
             with Pool(self.num_workers) as p:
                 map_fn = p.imap_unordered if self.num_workers > 1 else map
                 logging.info(f"Computing for {len(complex_names_all)} complexes...")
                 total = 0
-                for lig_cnt, _ in map_fn(self.get_complex, zip(complex_chunks, lm_chunks)):
+                for lig_cnt, _ in map_fn(self.get_complex, complex_chunks):
                     total += lig_cnt
                 logging.info(f"Total processed complexes: {total}")
 
-    def get_complex(self, par):
-        names, lm_embedding_chains = par
-        ligands = None
-        ligand_descriptions = None
-
+    def get_complex(self, complexes: List) -> Tuple[int, int]:
         total_complexes = 0
         total_ligands = 0
-        for i in range(len(names)):
-            name = names[i]
-            lm_embedding_chain = lm_embedding_chains[i]
-            ligand = None
-            ligand_description = None
 
-            # TODO: Are these two variables necessary?
-            if ligands and ligand_descriptions:
-                ligand = ligands[i]
-                ligand_description = ligand_descriptions[i]
+        for i in range(len(complexes)):
+            name, protein_path, ligand_paths = complexes[i]
 
-            if not os.path.exists(os.path.join(self.protein_dir, name)) and ligand is None:
-                logging.warning(f"Folder not found: {name}")
-                return [], []
+            lm_embedding_chain = [
+                torch.load(file)
+                for file in sorted(glob.glob(os.path.join(self.data_config.esm_embeddings_path, f"{name}_chain_*.pt")))
+            ]
+            if len(lm_embedding_chain) == 0:
+                logging.warning(
+                    f'ESM embedding is missing for {name} in folder {self.data_config.esm_embeddings_path}, skipping'
+                )
+                continue
 
-            if ligand is not None:
-                rec_model = parse_pdb_from_path(name)
-                name = f"{name}____{ligand_description}"
-                ligs = [ligand]
-            else:
+            try:
+                rec_model = parse_pdb_from_path(os.path.join(self.data_config.data_dir, protein_path))
+            except Exception as e:
+                logging.error(f"Skipping {name} because of the error:")
+                logging.error(e)
+                continue
+
+            lig = None
+            for ligand_path in ligand_paths.split(','):
                 try:
-                    rec_model = parse_receptor(name, self.protein_dir)
-                except Exception as e:
-                    logging.error(f"Skipping {name} because of the error:")
-                    logging.error(e)
-                    return [], []
-
-                ligs = read_mols(self.protein_dir, name, remove_hs=False)
-            complex_graphs = []
-            failed_indices = []
-            for i, lig in enumerate(ligs):
-                if self.max_lig_size is not None and lig.GetNumHeavyAtoms() > self.max_lig_size:
-                    logging.warning(
-                        f"Ligand with {lig.GetNumHeavyAtoms()} heavy atoms is larger than max_lig_size {self.max_lig_size}. Not including {name} in preprocessed data."
+                    lig = read_molecule(
+                        os.path.join(self.data_config.data_dir, ligand_path), remove_hs=False, sanitize=True
                     )
-                    continue
-                complex_graph = HeteroData()
-                complex_graph["name"] = name
-                try:
-                    get_lig_graph_with_matching(
-                        lig,
-                        complex_graph,
-                        self.popsize,
-                        self.maxiter,
-                        self.matching,
-                        self.keep_original,
-                        self.num_conformers,
-                        remove_hs=self.remove_hs,
-                        seed=self.seed,
-                        generate_conformer_max_iterations=self.generate_conformer_max_iterations,
-                        generate_conformer_enforce_chirality=self.generate_conformer_enforce_chirality,
-                    )
-                    rec, rec_coords, c_alpha_coords, n_coords, c_coords, lm_embeddings = extract_receptor_structure(
-                        copy.deepcopy(rec_model), lig, lm_embedding_chains=lm_embedding_chain
-                    )
-                    if lm_embeddings is not None and len(c_alpha_coords) != len(lm_embeddings):
-                        logging.warning(
-                            f"LM embeddings for complex {name} did not have the right length for the protein. Skipping {name}."
-                        )
-                        failed_indices.append(i)
-                        continue
-
-                    get_rec_graph(
-                        rec,
-                        rec_coords,
-                        c_alpha_coords,
-                        n_coords,
-                        c_coords,
-                        complex_graph,
-                        rec_radius=self.receptor_radius,
-                        c_alpha_max_neighbors=self.c_alpha_max_neighbors,
-                        all_atoms=self.all_atoms,
-                        atom_radius=self.atom_radius,
-                        atom_max_neighbors=self.atom_max_neighbors,
-                        remove_hs=self.remove_hs,
-                        lm_embeddings=lm_embeddings,
-                    )
-
-                except Exception as e:
-                    logging.error(f"Skipping {name} because of the error: {e}")
-                    failed_indices.append(i)
-                    continue
-
-                protein_center = torch.mean(complex_graph["receptor"].pos, dim=0, keepdim=True)
-                complex_graph["receptor"].pos -= protein_center
-                if self.all_atoms:
-                    complex_graph["atom"].pos -= protein_center
-
-                if (not self.matching) or self.num_conformers == 1:
-                    complex_graph["ligand"].pos -= protein_center
-                else:
-                    for p in complex_graph["ligand"].pos:
-                        p -= protein_center
-
-                complex_graph.original_center = protein_center
-                complex_graphs.append(complex_graph)
-            for idx_to_delete in sorted(failed_indices, reverse=True):
-                del ligs[idx_to_delete]
-
-            while True:
-                try:
-                    hetero_store = HeterographStore(os.path.join(self.full_cache_path, "heterographs.sqlite3"))
-                    for lig, complex_graph in zip(ligs, complex_graphs):
-                        hetero_store.insert(lig, complex_graph)
-                    hetero_store.commit()
-                    hetero_store.conn.close()
                     break
                 except Exception as e:
-                    logging.warning(f"Retrying to commit to sqlite because error: {e}")
+                    logging.error(f"Skipping ligand file {ligand_path} because of the error:")
+                    logging.error(e)
+                    continue
+            if lig is None:
+                logging.warning(f"Fail to read ligand molecule {name} in {ligand_paths}, skipping")
+                continue
 
-            total_complexes += len(complex_graphs)
-            total_ligands += len(ligs)
+            if self.data_config.max_lig_size is not None and lig.GetNumHeavyAtoms() > self.data_config.max_lig_size:
+                logging.warning(
+                    f"Ligand with {lig.GetNumHeavyAtoms()} heavy atoms is larger than max_lig_size {self.data_config.max_lig_size}. Not including {name} in preprocessed data."
+                )
+                continue
+            complex_graph = HeteroData()
+            complex_graph["name"] = name
+            try:
+                get_lig_graph_with_matching(
+                    lig,
+                    complex_graph,
+                    self.data_config.matching_popsize,
+                    self.data_config.matching_maxiter,
+                    self.data_config.matching,
+                    self.data_config.keep_original,
+                    self.data_config.num_conformers,
+                    remove_hs=self.data_config.remove_hs,
+                    seed=self.data_config.seed,
+                    generate_conformer_max_iterations=self.data_config.generate_conformer_max_iterations,
+                    generate_conformer_enforce_chirality=self.data_config.generate_conformer_enforce_chirality,
+                )
+                rec, rec_coords, c_alpha_coords, n_coords, c_coords, lm_embeddings = extract_receptor_structure(
+                    copy.deepcopy(rec_model), lig, lm_embedding_chains=lm_embedding_chain
+                )
+                if lm_embeddings is not None and len(c_alpha_coords) != len(lm_embeddings):
+                    logging.warning(
+                        f"LM embeddings for complex {name} did not have the right length for the protein {len(c_alpha_coords)} != {len(lm_embeddings)}. Skipping {name}."
+                    )
+                    continue
+
+                get_rec_graph(
+                    rec,
+                    rec_coords,
+                    c_alpha_coords,
+                    n_coords,
+                    c_coords,
+                    complex_graph,
+                    rec_radius=self.data_config.receptor_radius,
+                    c_alpha_max_neighbors=self.data_config.c_alpha_max_neighbors,
+                    all_atoms=self.data_config.all_atoms,
+                    atom_radius=self.data_config.atom_radius,
+                    atom_max_neighbors=self.data_config.atom_max_neighbors,
+                    remove_hs=self.data_config.remove_hs,
+                    lm_embeddings=lm_embeddings,
+                )
+
+            except Exception as e:
+                logging.error(f"Skipping {name} because of the error: {e}")
+                continue
+
+            protein_center = torch.mean(complex_graph["receptor"].pos, dim=0, keepdim=True)
+            complex_graph["receptor"].pos -= protein_center
+            if self.data_config.all_atoms:
+                complex_graph["atom"].pos -= protein_center
+
+            if (not self.data_config.matching) or self.data_config.num_conformers == 1:
+                complex_graph["ligand"].pos -= protein_center
+            else:
+                for p in complex_graph["ligand"].pos:
+                    p -= protein_center
+
+            complex_graph.original_center = protein_center
+            complex_graph.mol = lig
+            with open(os.path.join(self.full_cache_path, f"{name}.HeteroData.pyd"), 'wb') as f:
+                pickle.dump(complex_graph, f)
+
+            total_complexes += 1
+            total_ligands += 1
+
         return total_ligands, total_complexes
 
 
-def read_mol(protein_dir, name, remove_hs=False):
-    lig = read_molecule(os.path.join(protein_dir, name, f"{name}_ligand.sdf"), remove_hs=remove_hs, sanitize=True)
+def read_mol(protein_dir, name, remove_hs=False, ligand_file_name_suffix='_ligand.sdf'):
+    filename = name + ligand_file_name_suffix
+    lig = read_molecule(os.path.join(protein_dir, name, filename), remove_hs=remove_hs, sanitize=True)
     if lig is None:  # read mol2 file if sdf file cannot be sanitized
-        lig = read_molecule(os.path.join(protein_dir, name, f"{name}_ligand.mol2"), remove_hs=remove_hs, sanitize=True)
+        lig = read_molecule(
+            os.path.join(protein_dir, name, filename[:-4] + ".mol2"), remove_hs=remove_hs, sanitize=True
+        )
     return lig
 
 
@@ -462,74 +512,46 @@ def read_mols(protein_dir, name, remove_hs=False):
     return ligs
 
 
-def diffdock_build_dataset(data_config, t_to_sigma, _num_conformers=True, mode="train"):
-    transform = NoiseTransform(
-        t_to_sigma=t_to_sigma, no_torsion=data_config.no_torsion, all_atom=data_config.all_atoms
-    )
-    common_args = {
-        "transform": transform,
-        "root": data_config.data_dir,
-        "limit_complexes": data_config.limit_complexes,
-        "receptor_radius": data_config.receptor_radius,
-        "c_alpha_max_neighbors": data_config.c_alpha_max_neighbors,
-        "remove_hs": data_config.remove_hs,
-        "max_lig_size": data_config.max_lig_size,
-        "matching": not data_config.no_torsion,
-        "popsize": data_config.matching_popsize,
-        "maxiter": data_config.matching_maxiter,
-        "num_workers": data_config.num_workers,
-        "all_atoms": data_config.all_atoms,
-        "atom_radius": data_config.atom_radius,
-        "atom_max_neighbors": data_config.atom_max_neighbors,
-        "esm_embeddings_path": data_config.esm_embeddings_path,
-        "chunk_size": data_config.get("chunk_size", 5),
-        "seed": data_config.get("seed"),
-    }
-    if mode == "train":
-        if _num_conformers:
-            dataset = ProteinLigandDockingDataset(
-                cache_path=data_config.cache_path,
-                split_path=data_config.split_train,
-                keep_original=True,
-                num_conformers=data_config.num_conformers,
-                **common_args,
-            )
-        else:
-            dataset = ProteinLigandDockingDataset(
-                cache_path=data_config.cache_path,
-                split_path=data_config.split_train,
-                keep_original=True,
-                **common_args,
-            )
+class DataSplit(Enum):
+    train = 'train'
+    validation = 'validation'
+    test = 'test'
 
-    elif mode == "validation":
-        if _num_conformers:
-            dataset = ProteinLigandDockingDataset(
-                cache_path=data_config.cache_path,
-                split_path=data_config.split_val,
-                keep_original=True,
-                num_conformers=data_config.num_conformers,
-                **common_args,
-            )
-        else:
-            dataset = ProteinLigandDockingDataset(
-                cache_path=data_config.cache_path, split_path=data_config.split_val, keep_original=True, **common_args
-            )
 
-    elif mode == "test":
-        if _num_conformers:
-            dataset = ProteinLigandDockingDataset(
-                cache_path=data_config.cache_path,
-                split_path=data_config.split_test,
-                keep_original=True,
-                num_conformers=data_config.num_conformers,
-                **common_args,
-            )
-        else:
-            dataset = ProteinLigandDockingDataset(
-                cache_path=data_config.cache_path, split_path=data_config.split_test, keep_original=True, **common_args
-            )
+def diffdock_build_dataset(
+    data_config: DictConfig,
+    split_config: DictConfig,
+    t_to_sigma: Callable,
+    _num_conformers: bool = True,
+    mode: DataSplit = DataSplit("train"),
+) -> ProteinLigandDockingDataset:
+    """Build heterograph dataset for protein-ligand complexes for DiffDock Score model training
+
+    Args:
+        data_config (DictConfig): hydra config cfg.data section
+        split_config (DictConfig): hydra config cfg.model.[train_ds, validation_ds, test_ds] section
+        t_to_sigma (Callable): function to embed diffusion time
+        _num_conformers (bool, optional): whether to generate multiple conformers from RDKit rather than default 1 conformer. Defaults to True.
+        mode (DataSplit, optional): mode of the dataset, could be DataSplit("train"), DataSplit("validation") or DataSplit("test"). Defaults to DataSplit("train").
+
+    Returns:
+        ProteinLigandDockingDataset: Protein Ligand Docking Dataset
+    """
+
+    if t_to_sigma is not None:
+        transform = NoiseTransform(
+            t_to_sigma=t_to_sigma, no_torsion=data_config.no_torsion, all_atom=data_config.all_atoms
+        )
     else:
-        dataset = None
+        transform = None
 
-    return dataset
+    config = HeteroGraphDataConfig.init_from_hydra_config(data_config)
+    config.split_path = split_config.split_val if 'val' in mode.name else split_config.get(f"split_{mode.name}")
+    config.num_conformers = split_config.num_conformers if _num_conformers else 1
+    config.min_num_shards = split_config.get('min_num_shards')
+
+    return ProteinLigandDockingDataset(
+        data_config=config,
+        transform=transform,
+        num_workers=split_config.num_workers,
+    )

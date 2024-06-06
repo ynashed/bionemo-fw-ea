@@ -8,21 +8,12 @@ do_preprocessing: False # prepare the complex graphs needed for training as inpu
 do_training: True # set to false if data preprocessing steps must be completed
 do_testing: False # set to true to run evaluation on test data after training, requires test_dataset section
 seed: 42
-restore_from_path: null # used when starting from a .nemo file
-cluster_type: None # set to 'BCP' if needed
 
-target: bionemo.model.molecule.diffdock.models.nemo_model.DiffdockTensorProductScoreModelAllAtom  # path to model class to load
-infer_target: bionemo.model.molecule.diffdock.infer.DiffDockModelInference # path to inferende class to load
-
-
-#---------------------- Confidence-Specific Configs
-transfer_weights: false # ???
-#-----------------------
 
 data:
   score_model_name: ${score_infer.name}
   num_workers: 24
-  pin_memory: False
+  pin_memory: True
   limit_complexes: 0
   all_atoms: true
   multiplicity: 1
@@ -38,20 +29,24 @@ data:
   num_conformers: 1
   no_torsion: ${model.diffusion.no_torsion}
   world_size: ${multiply:${trainer.devices}, ${trainer.num_nodes}}
-  esm_embeddings_path: ${training_data.esm_embeddings_path} # If this is set then the LM embeddings at that path will be used for the receptor features
-  data_dir: ${training_data.protein_data_dir} # Folder containing original structures
+  esm_embeddings_path: ${protein_data.esm_embeddings_path} # If this is set then the LM embeddings at that path will be used for the receptor features
+  data_dir: ${protein_data.protein_data_dir} # Folder containing original structures
+  protein_ligand_csv: ${protein_data.protein_ligand_csv} # csv file with complex_names, protein and ligand paths
+                                                         # refer to embedding_preprocess.yaml for more details
   split_train: ${oc.env:BIONEMO_HOME}/data/splits/split_train # Path of file defining the split.
   split_val: ${oc.env:BIONEMO_HOME}/data/splits/split_val # Path of file defining the split
   split_test: ${oc.env:BIONEMO_HOME}/data/splits/split_test # Path of file defining the split
   cache_path: ${oc.env:BIONEMO_HOME}/data/data_cache # Folder from where to load/restore cached dataset
-  chunk_size: 5 # Number of samples as a chunk given to each process to process each time when preparing the dataset in class ProteinLigandDockingDataset, default is 5
-  use_original_model_cache: false # If this is true, the same dataset as in the original model will be used. Otherwise, the dataset parameters are used
-  cache_ids_to_combine: null # RMSD value below which a prediction is considered a positive. This can also be multiple cutoffs
-  cache_creation_id: null # number of times that inference is run on the full dataset before concatenating it and coming up with the full confidence dataset
+  num_chunks: ${data.num_workers} # split the data samples to ${num_chunks}
+                                  # each chunk will have `total number of complex / ${num_chunks}` complex samples.
+                                  # each chunk is given to a process to process at one time when preparing the dataset in class ProteinLigandDockingDataset
+                                  # default is ${data.num_workers}, i.e. one worker will get one chunk
+  generate_conformer_max_iterations: 10  # maximal number of iterations for RDkit to generate conformers, if failed, start with random coordinates
+  generate_conformer_enforce_chirality: False  # whether keep enforcing chirality if failed with ${generate_conformer_max_iterations} iterations for RDkit to generate conformers.
   samples_per_complex: 7
   balance: false # If this is true than we do not force the samples seen during training to be the same amount of negatives as positives
   rmsd_prediction: false
-  # rmsd_classification_cutoff: 2.0 # RMSD value below which a prediction is considered a postitive. This can also be multiple cutoffs
+  # rmsd_classification_cutoff: 2.0 # RMSD value below which a prediction is considered a positive. This can also be multiple cutoffs
   rmsd_classification_cutoff:
     - 2.0
 
@@ -71,8 +66,6 @@ trainer:
   gradient_clip_val: 1.0
   logger: False # logger is provided by NeMo exp_manager
   enable_checkpointing: False # checkpointing is done by NeMo exp_manager
-  use_distributed_sampler: False # set to False if using custom sampler
-  reload_dataloaders_every_n_epochs: 100000 # Set to a non-negative integer to reload dataloaders every n epochs. Default: ``0``.
   accumulate_grad_batches: 1
 
 
@@ -92,7 +85,7 @@ model:
   confidence_mode: True # False: train score model; True: train confidence model
   num_conv_layers: 5 # Number of interaction layers
   max_radius: 5.0 # Radius cutoff for geometric graph
-  scale_by_sigma: true # Whether to normalise the score
+  scale_by_sigma: true # Whether to normalize the score
   ns: 24 # Number of hidden features per node of order 0
   nv: 6 # Number of hidden features per node of order >0
   distance_embed_dim: 32
@@ -149,101 +142,49 @@ model:
   train_ds:
     micro_batch_size: ${model.micro_batch_size}
     pin_memory: ${data.pin_memory}
-    seed: ${seed}
-    no_torsion: ${model.diffusion.no_torsion}
-    all_atoms: ${data.all_atoms}
-    data_dir: ${data.data_dir}
-    limit_complexes: ${data.limit_complexes}
-    receptor_radius: ${data.receptor_radius}
-    c_alpha_max_neighbors: ${data.c_alpha_max_neighbors}
-    remove_hs: ${data.remove_hs}
-    max_lig_size: ${data.max_lig_size}
-    matching_popsize: ${data.matching_popsize}
-    matching_maxiter: ${data.matching_maxiter}
     num_workers: ${data.num_workers}
-    atom_radius: ${data.atom_radius}
-    atom_max_neighbors: ${data.atom_max_neighbors}
-    esm_embeddings_path: ${data.esm_embeddings_path}
-    world_size: ${multiply:${trainer.devices}, ${trainer.num_nodes}}
-    cache_path: ${data.cache_path}
-    num_conformers: ${data.num_conformers}
     split_train: ${data.split_train}
-    chunk_size: ${data.chunk_size}
     samples_per_complex: ${data.samples_per_complex}
     balance: ${data.balance}
     rmsd_classification_cutoff: ${data.rmsd_classification_cutoff}
-    use_original_model_cache: ${data.use_original_model_cache}
-    cache_creation_id: ${data.cache_creation_id}
-    cache_ids_to_combine: ${data.cache_ids_to_combine}
-    score_model_name: ${data.score_model_name}
+    min_num_shards: null # number of shards for webdataset (shard is the tar file for webdataset)
+    # shard file size is set to be around 100 MB, each shard roughly contains 25 samples
+    # if min_num_shards is not set, the num. of shards is: ~ num. of samples in the split / 25 .
+    # if you are using a small dataset like few hundreds samples, strongly suggest to manually set this value to have many shards,
+    # suggest to be several times larger than num_gpus * num_nodes * num_workers used during training.
 
   validation_ds:
     micro_batch_size: ${model.micro_batch_size}
     pin_memory: ${data.pin_memory}
-    seed: ${seed}
-    no_torsion: ${model.diffusion.no_torsion}
-    all_atoms: ${data.all_atoms}
-    data_dir: ${data.data_dir}
-    limit_complexes: ${data.limit_complexes}
-    receptor_radius: ${data.receptor_radius}
-    c_alpha_max_neighbors: ${data.c_alpha_max_neighbors}
-    remove_hs: ${data.remove_hs}
-    max_lig_size: ${data.max_lig_size}
-    matching_popsize: ${data.matching_popsize}
-    matching_maxiter: ${data.matching_maxiter}
     num_workers: ${data.num_workers}
-    atom_radius: ${data.atom_radius}
-    atom_max_neighbors: ${data.atom_max_neighbors}
-    esm_embeddings_path: ${data.esm_embeddings_path}
-    world_size: ${multiply:${trainer.devices}, ${trainer.num_nodes}}
-    cache_path: ${data.cache_path}
-    num_conformers: ${data.num_conformers}
     split_val: ${data.split_val}
-    chunk_size: ${data.chunk_size}
     samples_per_complex: ${data.samples_per_complex}
     balance: ${data.balance}
     rmsd_classification_cutoff: ${data.rmsd_classification_cutoff}
-    use_original_model_cache: ${data.use_original_model_cache}
-    cache_creation_id: ${data.cache_creation_id}
-    cache_ids_to_combine: ${data.cache_ids_to_combine}
-    score_model_name: ${data.score_model_name}
+    min_num_shards: null # number of shards for webdataset (shard is the tar file for webdataset)
+    # shard file size is set to be around 100 MB, each shard roughly contains 25 samples
+    # if min_num_shards is not set, the num. of shards is: ~ num. of samples in the split / 25 .
+    # if you are using a small dataset like few hundreds samples, strongly suggest to manually set this value to have many shards,
+    # suggest to be several times larger than num_gpus * num_nodes * num_workers used during training.
 
   test_ds:
     micro_batch_size: ${model.micro_batch_size}
     pin_memory: ${data.pin_memory}
-    seed: ${seed}
-    no_torsion: ${model.diffusion.no_torsion}
-    all_atoms: ${data.all_atoms}
-    data_dir: ${data.data_dir}
-    limit_complexes: ${data.limit_complexes}
-    receptor_radius: ${data.receptor_radius}
-    c_alpha_max_neighbors: ${data.c_alpha_max_neighbors}
-    remove_hs: ${data.remove_hs}
-    max_lig_size: ${data.max_lig_size}
-    matching_popsize: ${data.matching_popsize}
-    matching_maxiter: ${data.matching_maxiter}
     num_workers: ${data.num_workers}
-    atom_radius: ${data.atom_radius}
-    atom_max_neighbors: ${data.atom_max_neighbors}
-    esm_embeddings_path: ${data.esm_embeddings_path}
-    world_size: ${multiply:${trainer.devices}, ${trainer.num_nodes}}
-    cache_path: ${data.cache_path}
-    num_conformers: ${data.num_conformers}
     split_test: ${data.split_test}
-    chunk_size: ${data.chunk_size}
     samples_per_complex: ${data.samples_per_complex}
     balance: ${data.balance}
     rmsd_classification_cutoff: ${data.rmsd_classification_cutoff}
-    use_original_model_cache: ${data.use_original_model_cache}
-    cache_creation_id: ${data.cache_creation_id}
-    cache_ids_to_combine: ${data.cache_ids_to_combine}
-    score_model_name: ${data.score_model_name}
-
+    min_num_shards: null # number of shards for webdataset (shard is the tar file for webdataset)
+    # shard file size is set to be around 100 MB, each shard roughly contains 25 samples
+    # if min_num_shards is not set, the num. of shards is: ~ num. of samples in the split / 25 .
+    # if you are using a small dataset like few hundreds samples, strongly suggest to manually set this value to have many shards,
+    # suggest to be several times larger than num_gpus * num_nodes * num_workers used during training.
 
 exp_manager:
   name: ${name}
   # checkpoint reloading and saving
-  resume_if_exists: True # autmatically resume if checkpoint exists
+  resume_if_exists: True # automatically resume if checkpoint exists
   resume_ignore_no_checkpoint: True # leave as True, will start new training if resume_if_exists is True but no checkpoint exists
   create_checkpoint_callback: True # leave as True, use exp_manger for checkpoints
   checkpoint_callback_params:

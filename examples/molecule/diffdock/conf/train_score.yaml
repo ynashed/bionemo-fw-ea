@@ -7,15 +7,11 @@ do_preprocessing: False # prepare the complex graphs needed for training as inpu
 do_training: True # set to false if data preprocessing steps must be completed
 do_testing: False # set to true to run evaluation on test data after training, requires test_dataset section
 seed: 42
-cluster_type: None # set to 'BCP' if needed
 
-restore_from_path: null # used when starting from a .nemo file
-target: bionemo.model.molecule.diffdock.models.nemo_model.DiffdockTensorProductScoreModel  # path to model class to load
-infer_target: bionemo.model.molecule.diffdock.infer.ScoreModelInference # path to inferende class to load
 
 data:
-  num_workers: ${multiply:${trainer.devices}, 4}
-  pin_memory: False
+  num_workers: 4
+  pin_memory: True
   limit_complexes: 0
   all_atoms: False
   receptor_radius: 15
@@ -26,15 +22,23 @@ data:
   matching_maxiter: 20
   max_lig_size: null
   remove_hs: True
+  no_torsion: ${model.diffusion.no_torsion}
   num_conformers: 1
-  world_size: ${multiply:${trainer.devices}, ${trainer.num_nodes}}
-  esm_embeddings_path: ${training_data.esm_embeddings_path}
-  data_dir: ${training_data.protein_data_dir} # Folder containing original structures
+  esm_embeddings_path: ${protein_data.esm_embeddings_path}
+  data_dir: ${protein_data.protein_data_dir} # Folder containing original structures
+  protein_ligand_csv: ${protein_data.protein_ligand_csv} # csv file with complex_names, protein and ligand paths
+                                                         # refer to embedding_preprocess.yaml for more details
   split_train: ${oc.env:BIONEMO_HOME}/data/splits/split_train # Path of file defining the split.
   split_val: ${oc.env:BIONEMO_HOME}/data/splits/split_val # Path of file defining the split
   split_test: ${oc.env:BIONEMO_HOME}/data/splits/split_test # Path of file defining the split
   cache_path: ${oc.env:BIONEMO_HOME}/data/data_cache # Folder from where to load/restore cached dataset
-  chunk_size: 5 # Number of samples as a chunk given to each process to process each time when preparing the dataset in class ProteinLigandDockingDataset, default is 5
+  num_chunks: ${data.num_workers} # split the data samples to ${num_chunks}
+                                  # each chunk will have `total number of complex / ${num_chunks}` complex samples.
+                                  # each chunk is given to a process to process at one time when preparing the dataset in class ProteinLigandDockingDataset
+                                  # default is ${data.num_workers}, i.e. one worker will get one chunk
+  generate_conformer_max_iterations: 10  # maximal number of iterations for RDkit to generate conformers, if failed, start with random coordinates
+  generate_conformer_enforce_chirality: False  # whether keep enforcing chirality if failed with ${generate_conformer_max_iterations} iterations for RDkit to generate conformers.
+
 
 trainer:
   devices: 1
@@ -52,8 +56,6 @@ trainer:
   gradient_clip_val: 1.0
   logger: False # logger is provided by NeMo exp_manager
   enable_checkpointing: False # checkpointing is done by NeMo exp_manager
-  use_distributed_sampler: False # set to False if using custom sampler                                                                  >> Marta<>Pouria discussion
-  reload_dataloaders_every_n_epochs: 100000 # Set to a non-negative integer to reload dataloaders every n epochs. Default: ``0``.
   accumulate_grad_batches: 1
 
 model:
@@ -61,22 +63,21 @@ model:
   esm_embeddings_path: ${data.esm_embeddings_path}
   seed: ${seed}
   # data parallelism
-  # To avoid the OOM issue, use batch_sampler: SizeAwareBatchSampler,
+  # To avoid the OOM issue, set apply_size_control: True,
   #      together with adjusting micro_batch_size, max_total_size, max_element_size, and num_batches(in each dataset config)
   # How to adjust and set proper values for these number:
   #                     sif getting info like "Only 99 out of 100 samples are used", increase max_total_size or num_batches slightly
   #                     if having OOM, reduce max_total_size
   #                     if OOM is from a batch with only one sample, set max_element_size to a finite number to skip these samples
   micro_batch_size: 16 # number of samples per batch, 
-                      # if batch_sampler is SizeAwareBatchSampler, only used to estimate and set default value for num_batches
-                      # if using other batch_sampler, this will be the exact mirco batch size
+                      # if apply_size_control is True, only used to estimate and set default value for num_batches
+                      # if apply_size_control is False, this will be the exact micro batch size
   global_batch_size: null # this will be set automatically by the `setup_trainer(cfg)`
-  batch_sampler: SizeAwareBatchSampler # null, SizeAwareBatchSampler
-  max_total_size: null    # only used for batch_sampler is SizeAwareBatchSampler, upper bound of memory usage, unit MiB
-                          # as memory usage changes as diffusion step changes, so in the SizeAwareBatchSampler, 
+  apply_size_control: True
+  max_total_size: null    # only used for apply_size_control is True. this is the upper bound of memory usage, unit MiB
+                          # as memory usage changes as diffusion step changes 
                           # we use a upper bound for maximal memory usage when generating each batch of samples
                           # this can be slightly larger than model.estimate_memory_usage.maximal, 1.1 ~ 1.15 * model.estimate_memory_usage.maximal
-                          # 42000 on A6000, 70000 on A100, 18000 on RTX3090
                           # if null, default to use 0.85 * total memory of cuda:0
   estimate_memory_usage:
     # estimated memory usage will be: total_memory = coeff_ligand_num_nodes * num_nodes(ligand) + coeff_ligand_num_edges * num_edges(ligand) + ... + bias
@@ -94,7 +95,6 @@ model:
     maximal: null    # skip the batch if estimated memory is lager than this number, unit MiB 
                      # in the forward call of the score model, forward diffusion is done, we can get an accurate estimation of memory usage
                      # so here we have a much tighter memory threshold, if memory is over maximal, most likely it will lead to crash due to OOM
-                     # 37000 on A6000, 60000 on A100, 17000 on RTX3090
                      # if null, use 0.75 * total memory of cuda:0
     estimate_num_cross_edges: 
       # estimate the upper bound of the number of cross edges
@@ -153,7 +153,7 @@ model:
   val_denoising_inference_freq: 5 # Frequency of epochs for which to run expensive denoising inference on val data
   denoising_inference_steps: 20 # Number of denoising steps for inference on val
   num_denoising_inference_complexes: 500 # number of samples from validation dataset to run expensive denoising inference
-  inference_earlystop_metric: 'valinf_rmsds_lt2' # valinf_rmsds_lt2: percentage of RMSD < 2 from denosing inference on validation dataset
+  inference_earlystop_metric: 'valinf_rmsds_lt2' # valinf_rmsds_lt2: percentage of RMSD < 2 from denoising inference on validation dataset
   inference_earlystop_goal: 'max'
   find_unused_parameters: True # the model has certain parameters may not be used during training in some batches
                                # set to True so for multi-gpu training, if unused parameters are found, the gradient Reducer will only wait for unready parameters
@@ -180,78 +180,50 @@ model:
 
   train_ds:
     num_batches: null
+    micro_batch_size: ${model.micro_batch_size}
     pin_memory: ${data.pin_memory}
-    seed: ${seed}
-    no_torsion: ${model.diffusion.no_torsion}
-    all_atoms: ${data.all_atoms}
-    data_dir: ${data.data_dir}
-    limit_complexes: ${data.limit_complexes}
-    receptor_radius: ${data.receptor_radius}
-    c_alpha_max_neighbors: ${data.c_alpha_max_neighbors}
-    remove_hs: ${data.remove_hs}
-    max_lig_size: ${data.max_lig_size}
-    matching_popsize: ${data.matching_popsize}
-    matching_maxiter: ${data.matching_maxiter}
     num_workers: ${data.num_workers}
-    atom_radius: ${data.atom_radius}
-    atom_max_neighbors: ${data.atom_max_neighbors}
-    esm_embeddings_path: ${data.esm_embeddings_path}
-    cache_path: ${data.cache_path}
     num_conformers: ${data.num_conformers}
     split_train: ${data.split_train}
-    chunk_size: ${data.chunk_size}
+    apply_size_control: ${model.apply_size_control}
+    min_num_shards: null # number of shards for webdataset (shard is the tar file for webdataset)
+    # shard file size is set to be around 100 MB, each shard roughly contains 25 samples
+    # if min_num_shards is not set, the num. of shards is: ~ num. of samples in the split / 25 .
+    # if you are using a small dataset like few hundreds samples, strongly suggest to manually set this value to have many shards,
+    # suggest to be several times larger than num_gpus * num_nodes * num_workers used during training.
 
   validation_ds:
     num_batches: null
+    micro_batch_size: ${model.micro_batch_size}
     pin_memory: ${data.pin_memory}
-    seed: ${seed}
-    no_torsion: ${model.diffusion.no_torsion}
-    all_atoms: ${data.all_atoms}
-    data_dir: ${data.data_dir}
-    limit_complexes: ${data.limit_complexes}
-    receptor_radius: ${data.receptor_radius}
-    c_alpha_max_neighbors: ${data.c_alpha_max_neighbors}
-    remove_hs: ${data.remove_hs}
-    max_lig_size: ${data.max_lig_size}
-    matching_popsize: ${data.matching_popsize}
-    matching_maxiter: ${data.matching_maxiter}
     num_workers: ${data.num_workers}
-    atom_radius: ${data.atom_radius}
-    atom_max_neighbors: ${data.atom_max_neighbors}
-    esm_embeddings_path: ${data.esm_embeddings_path}
-    cache_path: ${data.cache_path}
     num_conformers: ${data.num_conformers}
     split_val: ${data.split_val}
-    chunk_size: ${data.chunk_size}
+    apply_size_control: False
+    min_num_shards: null # number of shards for webdataset (shard is the tar file for webdataset)
+    # shard file size is set to be around 100 MB, each shard roughly contains 25 samples
+    # if min_num_shards is not set, the num. of shards is: ~ num. of samples in the split / 25 .
+    # if you are using a small dataset like few hundreds samples, strongly suggest to manually set this value to have many shards,
+    # suggest to be several times larger than num_gpus * num_nodes * num_workers used during training.
 
   test_ds:
     num_batches: null # ${model.num_batches}
+    micro_batch_size: ${model.micro_batch_size}
     pin_memory: ${data.pin_memory}
-    seed: ${seed}
-    no_torsion: ${model.diffusion.no_torsion}
-    all_atoms: ${data.all_atoms}
-    data_dir: ${data.data_dir}
-    limit_complexes: ${data.limit_complexes}
-    receptor_radius: ${data.receptor_radius}
-    c_alpha_max_neighbors: ${data.c_alpha_max_neighbors}
-    remove_hs: ${data.remove_hs}
-    max_lig_size: ${data.max_lig_size}
-    matching_popsize: ${data.matching_popsize}
-    matching_maxiter: ${data.matching_maxiter}
     num_workers: ${data.num_workers}
-    atom_radius: ${data.atom_radius}
-    atom_max_neighbors: ${data.atom_max_neighbors}
-    esm_embeddings_path: ${data.esm_embeddings_path}
-    cache_path: ${data.cache_path}
     num_conformers: ${data.num_conformers}
     split_test: ${data.split_test}
-    chunk_size: ${data.chunk_size}
-
+    apply_size_control: False
+    min_num_shards: null # number of shards for webdataset (shard is the tar file for webdataset)
+    # shard file size is set to be around 100 MB, each shard roughly contains 25 samples
+    # if min_num_shards is not set, the num. of shards is: ~ num. of samples in the split / 25 .
+    # if you are using a small dataset like few hundreds samples, strongly suggest to manually set this value to have many shards,
+    # suggest to be several times larger than num_gpus * num_nodes * num_workers used during training.
 
 exp_manager:
   name: ${name}
   # checkpoint reloading and saving
-  resume_if_exists: True # autmatically resume if checkpoint exists
+  resume_if_exists: True # automatically resume if checkpoint exists
   resume_ignore_no_checkpoint: True # leave as True, will start new training if resume_if_exists is True but no checkpoint exists
   create_checkpoint_callback: True # leave as True, use exp_manger for checkpoints
   checkpoint_callback_params:

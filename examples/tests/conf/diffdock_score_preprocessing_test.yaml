@@ -5,18 +5,21 @@ hydra:
   searchpath:
      - ${oc.env:BIONEMO_HOME}/examples/molecule/diffdock/conf
 
+seed: 42
 
-training_data:
+protein_data:
+  protein_ligand_csv: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/preprocessing_test/protein_ligand.csv
   protein_data_dir:  ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/preprocessing_test/posebusters_benchmark_subset
   output_fasta_file: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/preprocessing_test/ref/pdb_sequences.fasta
-  esm_embeddings_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/preprocessing_test/ref/esm2_embeddings.sqlite3
+  esm_embeddings_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/preprocessing_test/ref/esm2_embeddings
+
+data:
+  num_workers: 1
+  seed: ${seed}
 
 model:
   train_ds:
-    num_workers: 1
-    chunk_size: 1
     split_train: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/preprocessing_test/train_split
-    seed: 42
 
-train_graph_folder_name: torsion_limit0_INDEXtrain_split_maxLigSizeNone_H0_recRad15_recMax24_esmEmbeddings
-ref_train_graph_file: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/preprocessing_test/ref/data_cache/${train_graph_folder_name}/heterographs.sqlite3
+ref_train_graph_folder_name: torsion_limit0_maxLigSizeNone_H0_recRad15_recMax24_esmEmbeddings
+ref_train_graph_file: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/preprocessing_test/ref/data_cache/${ref_train_graph_folder_name}/

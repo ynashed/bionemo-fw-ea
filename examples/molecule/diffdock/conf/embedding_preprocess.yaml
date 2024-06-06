@@ -1,7 +1,13 @@
-training_data:
-  protein_path: null
-  protein_ligand_csv: null
-  protein_data_dir: ${oc.env:BIONEMO_HOME}/data/PDB_processed
+protein_data:
+  protein_ligand_csv: ${oc.env:BIONEMO_HOME}/data/PDB_processed/protein_ligand.csv
+  # the csv file has this following format: <complex_name>,<protein_path>,<ligand_paths>
+  # complex_names should be unique as used as keys for dataset, and better not to have "." inside the name
+  # paths here are relative path, based on ${protein_data.protein_data_dir}
+  # multiple ligand files can be specified in one entry, but only 1 will be used. So if failed to parse, then try next one
+  # like: 6T88_MWQ,6T88_MWQ/6T88_MWQ_protein.pdb,"6T88_MWQ/6T88_MWQ_ligand.sdf,6T88_MWQ/6T88_MWQ_ligand.mol2"
+  # same protein path can be used across multiple entries,
+  # so if you want to use multiple ligands with one same protein, just specify in each entry with different complex_name
+  protein_data_dir: ${oc.env:BIONEMO_HOME}/data/PDB_processed   # absolute path, used for protein_ligand_csv file
   output_fasta_file: ${oc.env:BIONEMO_HOME}/data/pdb_sequences.fasta
-  esm_embeddings_path: ${oc.env:BIONEMO_HOME}/data/esm2_embeddings.sqlite3
-  chain_cutoff: 10
+  esm_embeddings_path: ${oc.env:BIONEMO_HOME}/data/esm2_embeddings
+  num_workers: null # number of workers for extracting protein sequence from pdb files, if null, all processors are used

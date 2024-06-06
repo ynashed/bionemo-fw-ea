@@ -10,10 +10,9 @@
 
 import multiprocessing
 import os
-import pickle
 from multiprocessing import Pool
 from threading import Lock
-from typing import List
+from typing import List, Tuple, Union
 
 import pandas as pd
 import torch
@@ -25,10 +24,6 @@ from esm import FastaBatchedDataset, pretrained
 from nemo.utils import logging
 from omegaconf import OmegaConf
 from omegaconf.dictconfig import DictConfig
-from omegaconf.errors import ConfigAttributeError
-from tqdm import tqdm
-
-from bionemo.data.diffdock.embedding_store import EmbeddingStore
 
 
 class ThreadSafeList:
@@ -103,14 +98,26 @@ amino_acid_seq_three_to_one = {
 }
 
 
-def get_sequences_from_pdbfile(file_path, to_fasta=True):
-    """pickable conversion function for multithreading; don't refactor into the class!"""
+def get_sequences_from_pdbfile(protein_data: Union[List, Tuple], to_fasta: bool = True) -> Union[List, str]:
+    """Extract protein sequence from protein pdb file
+
+    Args:
+        protein_data (Union[List, Tuple]): list/tuple with 2 elements: (complex name, path to the protein pdb file).
+            complex name is used as key for sequence. Required if to_fasta is True.
+        to_fasta (bool, optional): if save to fasta file. Defaults to True.
+
+    Returns:
+        Union[List, str]: List of Bio.SeqRecord.SeqRecord if to_fasta is True, else string of sequence
+    """
+
+    complex_name, protein_path = protein_data
+
     if to_fasta:
         records = []
     else:
         sequence = None
     biopython_parser = PDBParser()
-    structure = biopython_parser.get_structure("random_id", file_path)
+    structure = biopython_parser.get_structure("random_id", protein_path)
     structure = structure[0]
     for i, chain in enumerate(structure):
         seq = ""
@@ -131,10 +138,10 @@ def get_sequences_from_pdbfile(file_path, to_fasta=True):
                 except KeyError:
                     seq += "-"
                     logging.warning(
-                        f"encountered unknown AA: {residue.get_resname()} in the complex {file_path}. Replacing it with a dash - ."
+                        f"encountered unknown AA: {residue.get_resname()} in the complex {protein_path}. Replacing it with a dash - ."
                     )
         if to_fasta:
-            index = f"{os.path.basename(os.path.dirname(file_path))}_chain_{i}"
+            index = f"{complex_name}_chain_{i}"
             record = SeqRecord(Seq(seq), str(index))
             record.description = ""
             records.append(record)
@@ -149,11 +156,11 @@ def get_sequences_from_pdbfile(file_path, to_fasta=True):
         return sequence
 
 
-def compute_ESM_embeddings(model, alphabet, dataset, embedding_store=None):
+def compute_ESM_embeddings(model, alphabet, dataset, store_path=None):
     # settings used
     toks_per_batch = 4096
     repr_layers = [33]
-    truncation_seq_length = 4096
+    truncation_seq_length = toks_per_batch * 2
 
     batches = dataset.get_batch_indices(toks_per_batch, extra_toks_per_seq=1)
     data_loader = torch.utils.data.DataLoader(
@@ -162,7 +169,7 @@ def compute_ESM_embeddings(model, alphabet, dataset, embedding_store=None):
 
     assert all(-(model.num_layers + 1) <= i <= model.num_layers for i in repr_layers)
     repr_layers = [(i + model.num_layers + 1) % (model.num_layers + 1) for i in repr_layers]
-    if embedding_store is None:
+    if store_path is None:
         embeddings = {}
 
     with torch.no_grad():
@@ -177,13 +184,12 @@ def compute_ESM_embeddings(model, alphabet, dataset, embedding_store=None):
             for i, label in enumerate(labels):
                 truncate_len = min(truncation_seq_length, len(strs[i]))
                 value = representations[33][i, 1 : truncate_len + 1].clone()
-                if embedding_store is None:
+                if store_path is None:
                     embeddings[label] = value
                 else:
-                    embedding_store.insert(label, pickle.dumps(value.cpu().numpy()))
-            if embedding_store is not None:
-                embedding_store.commit()
-    if embedding_store is None:
+                    torch.save(value, os.path.join(store_path, f'{label}.pt'))
+
+    if store_path is None:
         return embeddings
 
 
@@ -191,12 +197,11 @@ class DataPreprocess(object):
     def __init__(self, cfg: DictConfig) -> None:
         self.cfg = cfg
         self.three_to_one = amino_acid_seq_three_to_one
-        self.embedding_store = EmbeddingStore(
-            db_path=self.cfg.esm_embeddings_path,
-        )
-        try:
-            self.num_cores = cfg.data.num_workers
-        except ConfigAttributeError:
+        self.num_cores = cfg.get('num_workers')
+        self.esm_embeddings_path = cfg.esm_embeddings_path
+        os.makedirs(self.esm_embeddings_path, exist_ok=True)
+
+        if self.num_cores is None:
             self.num_cores = multiprocessing.cpu_count()
             logging.warning(
                 f"using all available {self.num_cores} cpu cores for multiprocessing the pdb to fasta conversion"
@@ -205,57 +210,26 @@ class DataPreprocess(object):
     def get_pdb_files(self) -> List[str]:
         """load all the pdb files specified in the embedding_preprocess.yaml
 
-        Raises:
-            ValueError: protein files not specified
-
         Returns:
             List[str]: path to individual *.pdb files
         """
         file_paths = []
+        df = pd.read_csv(self.cfg.protein_ligand_csv)
 
-        if self.cfg.protein_path is not None:
-            file_paths = [self.cfg.protein_path]
-        elif self.cfg.protein_ligand_csv is not None:
-            df = pd.read_csv(self.cfg.protein_ligand_csv)
-            file_paths = list(set(df["protein_path"].tolist()))
-            if not os.path.exists(file_paths[0]):
-                cur_dir = os.path.split(os.path.realpath(__file__))[0]
-                if os.path.exists(os.path.join(cur_dir, file_paths[0])):
-                    file_paths = [os.path.join(cur_dir, file_path) for file_path in file_paths]
-        elif self.cfg.protein_data_dir is not None:
-            names = os.listdir(self.cfg.protein_data_dir)
-            for name in tqdm(names):
-                if name == ".DS_Store":
-                    continue
-                if os.path.exists(os.path.join(self.cfg.protein_data_dir, name, f"{name}_protein_processed.pdb")):
-                    rec_path = os.path.join(self.cfg.protein_data_dir, name, f"{name}_protein_processed.pdb")
-                elif os.path.exists(os.path.join(self.cfg.protein_data_dir, name, f"{name}_protein.pdb")):
-                    rec_path = os.path.join(self.cfg.protein_data_dir, name, f"{name}_protein.pdb")
-                else:
-                    continue
-                if self.cfg.chain_cutoff > 10:
-                    rec_path = os.path.join(
-                        self.cfg.protein_data_dir,
-                        name,
-                        f"{name}_protein_obabel_reduce.pdb",
-                    )
-                    if not os.path.exists(rec_path):
-                        rec_path = os.path.join(self.cfg.protein_data_dir, name, f"{name}_protein.pdb")
-                file_paths.append(rec_path)
-        else:
-            raise ValueError("PDB files were not specified")
+        for complex_name, protein_path in df[['complex_name', 'protein_path']].values.tolist():
+            file_paths.append((complex_name, os.path.join(self.cfg.protein_data_dir, protein_path)))
+
         return file_paths
 
     def pdb2fasta(self) -> None:
         """Convert pdb files to fasta files, will be multithreaded if possible"""
         file_paths = self.get_pdb_files()
         record_pieces = ThreadSafeList()
-        p = Pool(self.num_cores)
-        p.__enter__()
-        map_fn = p.imap_unordered if self.num_cores > 1 else map
-        for records in map_fn(get_sequences_from_pdbfile, file_paths):
-            record_pieces.extend(records)
-        p.__exit__(None, None, None)
+
+        with Pool(self.num_cores) as p:
+            map_fn = p.imap_unordered if self.num_cores > 1 else map
+            for records in map_fn(get_sequences_from_pdbfile, file_paths):
+                record_pieces.extend(records)
 
         if self.cfg.output_fasta_file is not None:
             logging.info(f"writing records to file at {self.cfg.output_fasta_file}")
@@ -270,9 +244,7 @@ class DataPreprocess(object):
             model = model.cuda()
 
         dataset = FastaBatchedDataset.from_file(self.cfg.output_fasta_file)
-        compute_ESM_embeddings(model, alphabet, dataset, self.embedding_store)
-        self.embedding_store.commit()
-        self.embedding_store.conn.close()
+        compute_ESM_embeddings(model, alphabet, dataset, self.esm_embeddings_path)
         del model
         torch.cuda.empty_cache()
 
@@ -281,10 +253,7 @@ def prep_embedding(cfg: DictConfig) -> None:
     logging.info("\n\n********* Preprocess protein structures ******")
     logging.info(f"\n{OmegaConf.to_yaml(cfg)}")
 
-    if "training_data" in cfg:
-        dpp = DataPreprocess(cfg.training_data)
-    else:
-        dpp = DataPreprocess(cfg)
+    dpp = DataPreprocess(cfg)
 
     logging.info("Converting pdb files to fasta")
     dpp.pdb2fasta()

@@ -9,7 +9,6 @@
 # its affiliates is strictly prohibited.
 
 import copy
-import os
 import warnings
 from typing import Optional
 
@@ -211,7 +210,7 @@ def lig_atom_featurizer(mol):
         atom_features_list.append(
             [
                 safe_index(allowable_features['possible_atomic_num_list'], atom.GetAtomicNum()),
-                allowable_features['possible_chirality_list'].index(str(atom.GetChiralTag())),
+                safe_index(allowable_features['possible_chirality_list'], str(atom.GetChiralTag())),
                 safe_index(allowable_features['possible_degree_list'], atom.GetTotalDegree()),
                 safe_index(allowable_features['possible_formal_charge_list'], atom.GetFormalCharge()),
                 safe_index(allowable_features['possible_implicit_valence_list'], atom.GetImplicitValence()),
@@ -245,11 +244,6 @@ def safe_index(l, e):
         return l.index(e)
     except Exception:
         return len(l) - 1
-
-
-def parse_receptor(pdbid, protein_dir):
-    rec_path = os.path.join(protein_dir, pdbid, f'{pdbid}_protein_processed.pdb')
-    return parse_pdb_from_path(rec_path)
 
 
 def parse_pdb_from_path(path):
@@ -392,7 +386,7 @@ def generate_conformer(
             Suggest setting this to 10, so it can fail quickly and try with random coordinates.
             Defaults to 0.
         enforce_chirality (bool, optional): whether enforce chirality check after failure from first try without using random coordinates.
-            Most failures are due to incorrect charities, suggest to set to False. Defaults to True.
+            Most failures are due to incorrect chirality, suggest to set to False. Defaults to True.
     """
     ps = AllChem.ETKDGv2()
     if seed is not None:
@@ -427,9 +421,9 @@ def get_lig_graph_with_matching(
         if keep_original:
             complex_graph['ligand'].orig_pos = mol_maybe_noh.GetConformer().GetPositions()
 
-        rotable_bonds = get_torsion_angles(mol_maybe_noh)
-        if not rotable_bonds:
-            logging.info("no_rotable_bonds but still using it")
+        rotable_bonds, is_connected = get_torsion_angles(mol_maybe_noh)
+        if not is_connected:
+            raise RuntimeError("Molecule is not connected")
 
         for i in range(num_conformers):
             mol_rdkit = copy.deepcopy(mol_)

@@ -70,7 +70,7 @@ def do_inference_sampling(
     Args:
         cfg (DictConfig): Inference conf
         model (LightningModule): Score model loaded in the diffdock inference model
-        confidence_model (LightningModule): Confidence model loaded in the diffdocks inference model
+        confidence_model (LightningModule): Confidence model loaded in the diffdock inference model
         complex_name_list (List): List of complex names for inference
         test_loader (DataLoader): Dataloader for inference
         test_dataset (Dataset): Dataset for score model inference
