@@ -175,6 +175,16 @@ COPY setup/requirements*.txt /tmp/
 COPY setup/install_lmdb.sh /tmp/install_lmdb.sh
 RUN --mount=type=secret,id=GITLAB_TOKEN GITLAB_TOKEN=$(cat /run/secrets/GITLAB_TOKEN) pip install -r /tmp/requirements-dev.txt
 RUN pip install -r /tmp/requirements-test.txt
+
+# FIXME [mgreaves] unknown why installing fw2nim doesn't work
+#    39 35.05 ERROR: Could not find a version that satisfies the requirement fw2nim==0.1.0 (from versions: none)
+#    39 35.05 ERROR: No matching distribution found for fw2nim==0.1.0
+#    39 ERROR: executor failed running [/bin/sh -c GITLAB_TOKEN=$(cat /run/secrets/GITLAB_TOKEN) pip install -r /tmp/requirements.txt]: exit code: 1
+# but infra-bionemo does:
+#    37 3.282 Collecting infra-bionemo==0.1.0 (from -r /tmp/requirements-dev.txt (line 7))
+#    37 3.366   Downloading https://gitlab-master.nvidia.com/api/v4/projects/118589/packages/pypi/files/487d2342614e85a010143523f44fcee5058ff71b90b5e10a0d4a0ce259f66230/infra_bionemo-0.1.0-py3-none-any.whl (29 kB) 
+# NOTE that doing a local docker run w/ personal API token **does work**, it's the gitlab RO API token that does not work
+# THIS IS ONLY A GITLAB CI PROBLEM !!!
 RUN --mount=type=secret,id=GITLAB_TOKEN GITLAB_TOKEN=$(cat /run/secrets/GITLAB_TOKEN) pip install -r /tmp/requirements.txt
 # need special install for lmdb: it cannot be installed via pip, but be built from source
 # but unfortunately, https://github.com/jnwatson/py-lmdb.git isn't PEP-512 compliant, so we have to manually run setup.py

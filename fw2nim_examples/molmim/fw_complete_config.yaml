@@ -1,0 +1,114 @@
+service:
+  command:
+    - python
+    - -m
+    - bionemo.triton.serve_bionemo_model
+    - --config-path
+    - /workspace/bionemo/examples/molecule/molmim/conf
+    - --config-name
+    - infer.yaml
+    - --embedding
+    - molmim_embeddings
+    - --hidden
+    - molmim_hidden
+    - --decode
+    - molmim_decode
+    - --sampling
+    - molmim_sampling
+    - --controlled-generation
+    - molmim_generation
+  port: 8008
+  inference:
+    - api:
+        endpoint_name: /embedding
+        input_type: molmim_fw2nim.molmim_types.MolMimSequences
+        output_type: molmim_fw2nim.molmim_types.MolMimEmbeddings
+        spec:
+          api_summary: "example api summary"
+          api_description: "example api description"
+          x_nvai_meta:
+            name: "name to show"
+            returns: "describe the return type from inference"
+            path: "TODO: IDK what this means!"
+      triton:
+        triton_model_name: molmim_embeddings
+        triton_model_version: 1
+    - api:
+        endpoint_name: /hidden
+        input_type: molmim_fw2nim.molmim_types.MolMimSequences
+        output_type: molmim_fw2nim.molmim_types.MolMimHiddens
+        spec:
+          api_summary: "example api summary"
+          api_description: "example api description"
+          x_nvai_meta:
+            name: "name to show"
+            returns: "describe the return type from inference"
+            path: "TODO: IDK what this means!"
+      triton:
+        triton_model_name: molmim_hidden
+        triton_model_version: 1
+    - api:
+        endpoint_name: /decode
+        input_type: molmim_fw2nim.molmim_types.MolMimHiddens
+        output_type: molmim_fw2nim.molmim_types.MolMimSequences
+        spec:
+          api_summary: "example api summary"
+          api_description: "example api description"
+          x_nvai_meta:
+            name: "name to show"
+            returns: "describe the return type from inference"
+            path: "TODO: IDK what this means!"
+      triton:
+        triton_model_name: molmim_decode
+        triton_model_version: 1
+    - api:
+        endpoint_name: /sampling
+        input_type: molmim_fw2nim.molmim_types.MolMimSequences
+        output_type: molmim_fw2nim.molmim_types.MolMimGenerated
+        spec:
+          api_summary: "example api summary"
+          api_description: "example api description"
+          x_nvai_meta:
+            name: "name to show"
+            returns: "describe the return type from inference"
+            path: "TODO: IDK what this means!"
+      triton:
+        triton_model_name: molmim_sampling
+        triton_model_version: 1
+    - api:
+        endpoint_name: /generate
+        input_type: molmim_fw2nim.molmim_types.MolMimControlOptIn
+        output_type: molmim_fw2nim.molmim_types.MolMimControlOptOut
+        spec:
+          api_summary: "example api summary"
+          api_description: "example api description"
+          x_nvai_meta:
+            name: "name to show"
+            returns: "describe the return type from inference"
+            path: "TODO: IDK what this means!"
+      triton:
+        triton_model_name: molmim_generation
+        triton_model_version: 1
+  spec:
+    api_semver: "0.1.0"
+    pretty_model_name: "example model title"
+    license:
+      name: 'BSD'
+      url: "https://nvidia.com"
+
+# data:
+
+deploy:
+  image:
+    image_name: nvcr.io/yrthnbrndebc/testing-fw2nim
+    image_tag: bionemo-molmim-fw2nim-demo--28d51184386448dcdd3f39595fcee01b1debcff9
+  function_name_prefix: molmim-bionemo-fw2nim
+  function_version: ~
+  organization: yrthnbrndebc
+  team: no-team
+  deployment_type:
+    gpu: L40
+    backend: GFN
+    instance_type: gl40_1.br20_2xlarge
+    min_instances: 1
+    max_instances: 1

@@ -20,6 +20,7 @@ from pytriton.triton import Triton
 
 from bionemo.model.core.infer import M
 from bionemo.triton import decodes
+from bionemo.triton.controlled_generations import triton_controlled_generation_infer_fn
 from bionemo.triton.embeddings import nav_triton_embedding_infer_fn, triton_embedding_infer_fn
 from bionemo.triton.hiddens import triton_hidden_infer_fn
 from bionemo.triton.samplings import triton_sampling_infer_fn
@@ -38,6 +39,7 @@ from bionemo.triton.utils import (
     load_nav_package_for_model,
     load_navigated_model_for_inference,
     model_navigator_filepath,
+    register_controlled_generation_infer_fn,
     register_masked_decode_infer_fn,
     register_str_embedding_infer_fn,
 )
@@ -81,6 +83,16 @@ __all_: Sequence[str] = (
 @click.option(
     '--hidden', type=str, help="Triton model name for sequence -> hidden state inference. Only active is present."
 )
+@click.option(
+    '--controlled-generation',
+    type=str,
+    help="Triton model name for controlled generation inference. Only active is present.",
+)
+@click.option(
+    '--override-name',
+    is_flag=True,
+    help="If present, must also only have one Triton model specified: will override the name to 'bionemo_moddel'.",
+)
 def entrypoint(
     config_path: str,
     config_name: str,
@@ -89,6 +101,8 @@ def entrypoint(
     sampling: Optional[str],
     decode: Optional[str],
     hidden: Optional[str],
+    controlled_generation: Optional[str],
+    override_name: bool = False,
 ) -> None:  # pragma: no cover
     def take(x: Optional[str], default: str) -> Optional[str]:
         if x is not None:
@@ -97,16 +111,30 @@ def entrypoint(
             return x
         return None
 
-    main(
-        config_path,
-        config_name,
-        nav,
-        embedding=take(embedding, EMBEDDINGS),
-        sampling=take(sampling, SAMPLINGS),
-        decode=take(decode, DECODES),
-        hidden=take(hidden, HIDDENS),
-        allow_override_name=True,
-    )
+    if override_name:
+        main(
+            config_path,
+            config_name,
+            nav,
+            embedding=take(embedding, EMBEDDINGS),
+            sampling=take(sampling, SAMPLINGS),
+            decode=take(decode, DECODES),
+            hidden=take(hidden, HIDDENS),
+            controlled_generation=take(controlled_generation, "generated"),
+            allow_override_name=True,
+        )
+    else:
+        main(
+            config_path,
+            config_name,
+            nav,
+            embedding=embedding,
+            sampling=sampling,
+            decode=decode,
+            hidden=hidden,
+            controlled_generation=controlled_generation,
+            allow_override_name=False,
+        )
 
 
 def main(
@@ -117,20 +145,27 @@ def main(
     sampling: Optional[str] = None,
     decode: Optional[str] = None,
     hidden: Optional[str] = None,
+    controlled_generation: Optional[str] = None,
     allow_override_name: bool = False,
 ) -> None:
     config_file = Path(config_path) / config_name
-    print(f"Loading config from:             {str(config_file)}")
-    print(f"Using model navigator runtimes?: {nav}")
-    print(f"Starting embedding inference?:   {embedding}")
-    print(f"Starting sampling inference?:    {sampling}")
-    print(f"Starting decode inference?:      {decode}")
-    print(f"Starting hidden inference?:      {hidden}")
+    print(f"Loading config from:                        {str(config_file)}")
+    print(f"Using model navigator runtimes?:            {nav}")
+    print(f"Starting embedding inference?:              {embedding}")
+    print(f"Starting sampling inference?:               {sampling}")
+    print(f"Starting decode inference?:                 {decode}")
+    print(f"Starting hidden inference?:                 {hidden}")
+    print(f"Starting controlled generation inference?:  {controlled_generation}")
+    print(f"Override name?:                             {allow_override_name}")
     print('-' * 80)
 
-    models_to_enable: List[bool] = [x is not None and len(x) > 0 for x in [embedding, sampling, decode, hidden]]
+    models_to_enable: List[bool] = [
+        x is not None and len(x) > 0 for x in [embedding, sampling, decode, hidden, controlled_generation]
+    ]
     if not any(models_to_enable):
-        raise ValueError(f"Need at least one of --{embedding=}, --{sampling=}, --{decode=}, --{hidden=}")
+        raise ValueError(
+            f"Need at least one of --{embedding=}, --{sampling=}, --{decode=}, --{hidden=}, --{controlled_generation=}"
+        )
 
     override_model_name = BIONEMO_MODEL if allow_override_name and sum(models_to_enable) == 1 else None
 
@@ -153,6 +188,7 @@ def main(
             (sampling, bind_sampling),
             (decode, bind_decode),
             (hidden, bind_hidden),
+            (controlled_generation, bind_controlled_generation),
         ]:
             if maybe_triton_model_name is not None:
                 bind_fn(triton, cfg, maybe_model, nav, override_model_name or maybe_triton_model_name)
@@ -234,6 +270,29 @@ def bind_hidden(
         output_masks=True,
         in_name=in_name,
         out=out,
+        verbose=True,
+    )
+
+
+def bind_controlled_generation(
+    triton: Triton, cfg: DictConfig, preloaded_model: Optional[M], ignore_nav: bool, triton_model_name: str
+) -> None:
+    print(f"Binding Triton **CONTROLLED GENERATION** inference under '{triton_model_name}' (smi -> samples)")
+    if ignore_nav is True:
+        print("WARNING: ignoring nav! No model navigator function for controlled generation!")
+
+    infer_fn = _make_infer_fn(
+        nav=False,
+        cfg=cfg,
+        preloaded_model=preloaded_model,
+        dev_triton_infer=triton_controlled_generation_infer_fn,
+        nav_triton_infer=None,
+    )
+
+    register_controlled_generation_infer_fn(
+        triton,
+        infer_fn,
+        triton_model_name,
         verbose=True,
     )
 

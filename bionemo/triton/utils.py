@@ -11,7 +11,7 @@
 from contextlib import ExitStack
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Callable, Generic, List, Optional, Sequence, Tuple, Union
+from typing import Callable, Generic, List, Optional, Sequence, Tuple, TypeVar, Union
 
 import model_navigator
 import numpy as np
@@ -41,6 +41,7 @@ __all__: Sequence[str] = (
     # binding inference functions to Triton
     "register_str_embedding_infer_fn",
     "register_masked_decode_infer_fn",
+    "register_controlled_generation_infer_fn",
     # loading a model's configuration object
     # loading a base encode-decode model for inference, w/ or w/o model navigator support
     "load_model_for_inference",
@@ -149,6 +150,77 @@ def register_masked_decode_infer_fn(
     )
 
 
+def register_controlled_generation_infer_fn(
+    triton: Triton,
+    infer_fn: Callable[[NamedArrays], NamedArrays],
+    triton_model_name: str,
+    *,
+    # intput
+    in_smi: str = "smi",
+    in_algorithm: str = "algorithm",
+    in_num_molecules: str = "num_molecules",
+    in_property_name: str = "property_name",
+    in_minimize: str = "minimize",
+    in_min_similarity: str = "min_similarity",
+    in_particles: str = "particles",
+    in_iterations: str = "iterations",
+    in_radius: str = "radius",
+    # output
+    out_samples: str = "samples",
+    out_scores: str = "scores",
+    out_score_type: str = "score_type",
+    # triton
+    max_batch_size: int = 1,
+    verbose: bool = True,
+) -> None:
+    if verbose:
+        logging.info(
+            f"Binding new inference function in Triton under '{triton_model_name}'\n"
+            f"Inference fn. docs: {infer_fn.__doc__} ({type(infer_fn)=})\n"
+            f"Input, batched, single utf8 text, named:    {in_smi}\n"
+            f"Input, single, utf8 text:                   {in_algorithm}\n"
+            f"Input, single, int:                         {in_num_molecules}\n"
+            f"Input, single, utf8 text:                   {in_property_name}\n"
+            f"Input, single, bool:                        {in_minimize}\n"
+            f"Input, single, float:                       {in_min_similarity}\n"
+            f"Input, single, int:                         {in_particles}\n"
+            f"Input, single, int:                         {in_iterations}\n"
+            f"Input, single, float:                       {in_radius}\n"
+            f"Output, batched, single utf8 text, named:   {out_score_type}\n"
+            f"Output, batched, floats, named:             {out_scores}\n"
+            f"Output, batched, multiple utf8 text, named: {out_samples}"
+        )
+    if any((len(x) == 0 for x in [out_samples, in_smi, triton_model_name])):
+        raise ValueError(f"Need non-empty values, not {in_smi=}, {out_samples=}, {triton_model_name=}")
+    if max_batch_size < 1:
+        raise ValueError(f"Need positive {max_batch_size=}")
+
+    triton.bind(
+        model_name=triton_model_name,
+        infer_func=infer_fn,
+        inputs=[
+            # Tensor(name=in_smi, dtype=bytes, shape=(-1,)),
+            Tensor(name=in_smi, dtype=bytes, shape=(1,)),
+            Tensor(name=in_algorithm, dtype=bytes, shape=(1,)),
+            Tensor(name=in_num_molecules, dtype=np.int32, shape=(1,)),
+            Tensor(name=in_property_name, dtype=bytes, shape=(1,)),
+            Tensor(name=in_minimize, dtype=np.bool_, shape=(1,)),
+            Tensor(name=in_min_similarity, dtype=np.float32, shape=(1,)),
+            Tensor(name=in_particles, dtype=np.int32, shape=(1,)),
+            Tensor(name=in_iterations, dtype=np.int32, shape=(1,)),
+            Tensor(name=in_radius, dtype=np.float32, shape=(1,)),
+        ],
+        outputs=[
+            # Tensor(name=out_samples, dtype=bytes, shape=(-1,)),
+            # Tensor(name=out_scores, dtype=np.float32, shape=(-1,)),
+            Tensor(name=out_samples, dtype=bytes, shape=(1,)),
+            Tensor(name=out_scores, dtype=np.float32, shape=(1,)),
+            Tensor(name=out_score_type, dtype=bytes, shape=(1,)),
+        ],
+        config=ModelConfig(max_batch_size=1, batching=True),
+    )
+
+
 def load_model_for_inference(cfg: DictConfig, *, interactive: bool = False, **kwargs) -> M:
     """Loads a bionemo encoder-decoder model from a complete configuration, preparing it only for inference."""
     if not hasattr(cfg, "infer_target"):
@@ -222,8 +294,8 @@ def load_nav_package_for_model(
 
 def decode_str_batch(sequences: np.ndarray) -> List[str]:
     """Decodes a utf8 byte array into a batch of string sequences."""
-    seqs = np.char.decode(sequences.astype("bytes"), "utf-8")
-    seqs = seqs.squeeze(1)
+    seqs = np.char.decode(sequences.astype("bytes"), "utf-8")  # N x 1
+    seqs = seqs.squeeze(1)  # N
     return seqs.tolist()
 
 
@@ -238,6 +310,60 @@ def encode_str_batch(sequences: SeqsOrBatch) -> np.ndarray:
         # assume List[List[str]] case
         seqs = sequences
     return np.char.encode(np.array(seqs), encoding='utf-8')
+
+
+def decode_str_batch_rows(sequences: np.ndarray) -> List[str]:
+    """Decodes a utf8 byte array into a batch of string sequences."""
+    seqs = np.char.decode(sequences.astype("bytes"), "utf-8")  # 1 x N
+    seqs = seqs.squeeze(0)
+    return seqs.tolist()
+
+
+def encode_str_batch_rows(sequences: SeqsOrBatch) -> np.ndarray:
+    """Encodes a batch of string sequences as a dense utf8 byte array."""
+    encoded_colwise = encode_str_batch(sequences)
+    return encoded_colwise.reshape(1, -1)
+
+
+def decode_str_single(single_string: np.ndarray) -> str:
+    x = np.char.decode(single_string.astype("bytes"), encoding='utf-8')
+    assert len(x) == 1
+    return x.reshape(-1)[0]
+
+
+def encode_str_single(single_string: str) -> np.ndarray:
+    return np.char.encode(np.array([single_string]), encoding='utf-8').reshape(1, 1)
+
+
+def encode_single(val: float | int | bool) -> np.ndarray:
+    if isinstance(val, bool):
+        dtype = np.bool_
+    elif isinstance(val, int):
+        dtype = np.int32
+    elif isinstance(val, float):
+        dtype = np.float32
+    else:
+        raise ValueError(f"Unknown type for value: {type(val)} ({val})")
+    return np.array([[val]], dtype=dtype)
+
+
+N = TypeVar('N', float, int, bool)
+
+
+def decode_single(val: np.ndarray, t: type[N]) -> N:
+    assert len(val) == 1
+    assert val.shape == (1, 1)
+
+    x = val[0][0]
+
+    if issubclass(t, bool):
+        return bool(x)
+    elif issubclass(t, int):
+        return int(x)
+    elif issubclass(t, float):
+        return float(x)
+    else:
+        raise ValueError(f"Unexpected type: {t}")
 
 
 def read_bytes_from_filepath(filepath: Union[str, Path]) -> bytes:

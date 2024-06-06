@@ -196,7 +196,7 @@ class PDBProtein(object):
             'element': np.array(self.element, dtype=np.int_),
             'molecule_name': self.title,
             'pos': np.array(self.pos, dtype=np.float32),
-            'is_backbone': np.array(self.is_backbone, dtype=np.bool),
+            'is_backbone': np.array(self.is_backbone, dtype=np.bool_),
             'atom_name': self.atom_name,
             'atom_to_aa_type': np.array(self.atom_to_aa_type, dtype=np.int_),
         }

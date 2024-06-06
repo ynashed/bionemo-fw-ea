@@ -247,7 +247,7 @@ build-bionemo-image:
     - echo "Cache target container pull time:" $ELAPSED
     - export DOCKER_BUILDKIT=1
     - BUILD_START=$(date +%s)
-    - docker build
+    - docker buildx build
       --network host ${base}
       --label com.nvidia.bionemo.short_git_sha=${CI_COMMIT_SHORT_SHA}
       --label com.nvidia.bionemo.git_sha=${CI_COMMIT_SHA}
@@ -255,7 +255,7 @@ build-bionemo-image:
       --label com.nvidia.bionemo.branch=${CI_COMMIT_BRANCH}
       --label com.nvidia.bionemo.pipeline_id=${CI_PIPELINE_ID}
       --label com.nvidia.bionemo.merge_request_id=${CI_MERGE_REQUEST_IID}
-      --secret id=GITLAB_TOKEN,env=RO_API_TOKEN
+      --secret id=GITLAB_TOKEN,env=CI_JOB_TOKEN
       --cache-from nvcr.io/nvidian/cvai_bnmo_trng/bionemo:cache-py23.10
       --build-arg BUILDKIT_INLINE_CACHE=1
       -t "${IMAGE_NAME}"
