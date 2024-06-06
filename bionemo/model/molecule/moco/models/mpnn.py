@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 from torch_geometric.nn import MessagePassing, knn_graph
 from torch_geometric.nn.norm import LayerNorm as BatchLayerNorm
-from torch_scatter import scatter
+from torch_scatter import scatter, scatter_sum
 from torch_sparse import SparseTensor
 
 
@@ -29,6 +29,7 @@ class MLP(nn.Module):
         num_hidden_layers: int = 0,
         activation: str = 'silu',
         dropout: float = 0.0,
+        last_act: str = None,
     ):
         """
         Initialize the MLP.
@@ -66,6 +67,8 @@ class MLP(nn.Module):
 
         # Output layer
         layers.append(nn.Linear(hidden_size, output_dim))
+        if last_act:
+            layers.append(NONLINEARITIES[last_act])
 
         # Combine all layers into a sequential module
         self.layers = nn.Sequential(*layers)
@@ -228,6 +231,60 @@ def get_triplet(edge_index: torch.Tensor, num_nodes: int):
     return input_edge_index, idx_i, idx_j, idx_k, idx_kj, idx_ji
 
 
+class EnBaseLayer(nn.Module):
+    def __init__(self, hidden_dim, edge_feat_dim, num_r_gaussian=0, update_x=True, act_fn='silu', norm=False):
+        super().__init__()
+        self.r_min = 0.0
+        self.r_max = 10.0
+        self.hidden_dim = hidden_dim
+        self.num_r_gaussian = num_r_gaussian
+        self.edge_feat_dim = edge_feat_dim
+        self.update_x = update_x
+        self.act_fn = act_fn
+        self.norm = norm
+
+        self.edge_mlp = MLP(2 * hidden_dim + edge_feat_dim + 1, hidden_dim, hidden_dim, activation=act_fn)
+        self.edge_inf = nn.Sequential(nn.Linear(hidden_dim, 1), nn.Sigmoid())
+        if self.update_x:
+            # self.x_mlp = MLP(hidden_dim, 1, hidden_dim, num_layer=2, norm=norm, act_fn=act_fn)
+            x_mlp = [nn.Linear(hidden_dim, hidden_dim), NONLINEARITIES[act_fn]]
+            layer = nn.Linear(hidden_dim, 1, bias=False)
+            torch.nn.init.xavier_uniform_(layer.weight, gain=0.001)
+            x_mlp.append(layer)
+            x_mlp.append(nn.Tanh())
+            self.x_mlp = nn.Sequential(*x_mlp)
+
+        self.node_mlp = MLP(2 * hidden_dim, hidden_dim, hidden_dim, activation=act_fn)
+
+    def forward(self, h, x, edge_index, edge_attr=None):
+        src, dst = edge_index
+        hi, hj = h[dst], h[src]
+        # \phi_e in Eq(3)
+        rel_x = x[dst] - x[src]
+        d_sq = torch.sum(rel_x**2, -1, keepdim=True)
+
+        d_feat = d_sq
+        if edge_attr is not None:
+            edge_feat = torch.cat([d_feat, edge_attr], -1)
+        else:
+            edge_feat = d_sq
+
+        mij = self.edge_mlp(torch.cat([hi, hj, edge_feat], -1))
+        eij = self.edge_inf(mij)
+        mi = scatter_sum(mij * eij, dst, dim=0, dim_size=h.shape[0])
+
+        # h update in Eq(6)
+        h = h + self.node_mlp(torch.cat([mi, h], -1))
+        if self.update_x:
+            # x update in Eq(4)
+            xi, xj = x[dst], x[src]
+            # (xi - xj) / (\|xi - xj\| + C) to make it more stable
+            delta_x = scatter_sum((xi - xj) / (torch.sqrt(d_sq + 1e-8) + 1) * self.x_mlp(mij), dst, dim=0)
+            x = x + delta_x  # * mask_ligand[:, None]  # only ligand positions will be updated
+
+        return h, x
+
+
 class EGNN(MessagePassing):
     def __init__(
         self,
@@ -240,21 +297,22 @@ class EGNN(MessagePassing):
         self.edge_lin = MLP(2 * invariant_edge_feat_dim + 3, invariant_edge_feat_dim, invariant_edge_feat_dim)
         self.message_input_size = invariant_node_feat_dim + invariant_node_feat_dim + 1 + invariant_edge_feat_dim
         self.phi_message = MLP(self.message_input_size, invariant_node_feat_dim, invariant_node_feat_dim)
-        self.message_gate = MLP(invariant_node_feat_dim, invariant_node_feat_dim, 1)
-        self.phi_x = MLP(invariant_node_feat_dim, invariant_node_feat_dim, equivariant_node_feature_dim)
+        self.message_gate = MLP(invariant_node_feat_dim, invariant_node_feat_dim, 1, last_act="sigmoid")
+        self.phi_x = MLP(invariant_node_feat_dim, invariant_node_feat_dim, 1)
         self.h_input_size = 2 * invariant_node_feat_dim
         self.phi_h = MLP(self.h_input_size, invariant_node_feat_dim, invariant_node_feat_dim)
         self.coor_update_clamp_value = 10.0
         # self.reset_parameters()
         self.h_norm = BatchLayerNorm(invariant_node_feat_dim)
-        self.apply(self.init_)
 
-    # def reset_parameters(self):
-    def init_(self, module):
-        if type(module) in {nn.Linear}:
-            # seems to be needed to keep the network from exploding to NaN with greater depths
-            nn.init.xavier_normal_(module.weight)
-            nn.init.zeros_(module.bias)
+    #     self.apply(self.init_)
+
+    # # def reset_parameters(self):
+    # def init_(self, module): #! this made it worse
+    #     if type(module) in {nn.Linear}:
+    #         # seems to be needed to keep the network from exploding to NaN with greater depths
+    #         nn.init.xavier_normal_(module.weight)
+    #         nn.init.zeros_(module.bias)
 
     def mix_edges(self, batch, X, E, k=4):
         num_nodes = X.size(0)
@@ -302,48 +360,50 @@ class EGNN(MessagePassing):
 
     def forward(self, batch, X, H, edge_index, edge_attr):
         # import ipdb; ipdb.set_trace()
-        edge_attr = self.pre_edge(edge_attr)
-        edge_attr = self.mix_edges(batch, X, edge_attr, k=4)
+        edge_attr = self.mix_edges(batch, X, self.pre_edge(edge_attr), k=4)
         source, target = edge_index
         rel_coors = X[source] - X[target]
         rel_dist = (rel_coors**2).sum(dim=-1, keepdim=True)
         edge_attr_feat = torch.cat([edge_attr, rel_dist], dim=-1)
         # m_i, m_ij = self.propagate(edge_index=edge_index, X=X, X_rel=rel_coors, H=H, edge_attr=edge_attr_feat, batch=batch)
-        m_ij = self.propagate(edge_index=edge_index, X=X, X_rel=rel_coors, H=H, edge_attr=edge_attr_feat, batch=batch)
+        #
+        m_ij = self.phi_message(torch.cat([H[target], H[source], edge_attr_feat], dim=-1))
         coor_wij = self.phi_x(m_ij)  # E x 3
         if self.coor_update_clamp_value:
             coor_wij.clamp_(min=-self.coor_update_clamp_value, max=self.coor_update_clamp_value)
-        X_rel_norm = rel_coors / (rel_coors.norm(dim=-1, keepdim=True).clamp(min=1e-8))  # TODO: add 1 + dij
+        X_rel_norm = rel_coors / (1 + torch.sqrt(rel_dist + 1e-8))
         x_update = scatter(
-            X_rel_norm * coor_wij, index=target, dim=0, reduce='mean', dim_size=X.shape[0]
+            X_rel_norm * coor_wij, index=target, dim=0, reduce='sum', dim_size=X.shape[0]
         )  # sum over all the src since its src to target
         X_out = X + x_update  # TODO: add cross product like FlowMol and DiffSBDD
         # m_i, m_ij = self.aggregate(inputs = m_ij * self.message_gate(m_ij), index = i, dim_size = X.shape[0])
-        m_i = scatter(m_ij * self.message_gate(m_ij), index=target, dim=0, reduce='mean', dim_size=X.shape[0])
+        m_i = scatter(
+            m_ij * self.message_gate(m_ij), index=target, dim=0, reduce='sum', dim_size=X.shape[0]
+        )  #! Sigmoid over the gate matters a lot
         # import ipdb; ipdb.set_trace()
-        # H_out = H + self.phi_h(torch.cat([H, m_i], dim = -1)) #self.h_norm(H, batch)
-        H_out = self.h_norm(
-            H + self.phi_h(torch.cat([H, m_i], dim=-1)), batch
-        )  # self.h_norm(H, batch) #! the use of LN here prevents H blow up similar to FlowMol
-        #! is the fact that FABind uses attention so a sfotmax weight (0,1) to scale before doing the residual update prevent explosion?
+        H_out = H + self.phi_h(torch.cat([H, m_i], dim=-1))  # self.h_norm(H, batch)
+        # H_out = self.h_norm(
+        # H + self.phi_h(torch.cat([H, m_i], dim=-1)), batch
+        # )  # self.h_norm(H, batch) #! the use of LN here prevents H blow up similar to FlowMol
+        #! is the fact that FABind uses attention so a softmax weight (0,1) to scale before doing the residual update prevent explosion?
         #! We use target as the index since we are aaggregating over i [1, 0] and [2, 0] we want to argegat over the 0 so we use its edge index
         return X_out, H_out, edge_attr
 
-    def message(self, H_i, H_j, edge_attr):
-        # edge_attr already has the norm of distances
-        mij = self.phi_message(torch.cat([H_i, H_j, edge_attr], dim=-1))  # E x D
-        return mij
+    # def message(self, H_i, H_j, edge_attr):
+    #     # edge_attr already has the norm of distances
+    #     mij = self.phi_message(torch.cat([H_i, H_j, edge_attr], dim=-1))  # E x D
+    #     return mij
 
-    def aggregate(
-        self,
-        inputs,
-        index,
-        dim_size=None,
-    ):
-        # import ipdb; ipdb.set_trace()
-        # mi = scatter(inputs, index=index, dim=0, reduce="add", dim_size=dim_size) # index here is target
-        # return mi, inputs
-        return inputs
+    # def aggregate(
+    #     self,
+    #     inputs,
+    #     index,
+    #     dim_size=None,
+    # ):
+    #     # import ipdb; ipdb.set_trace()
+    #     # mi = scatter(inputs, index=index, dim=0, reduce="add", dim_size=dim_size) # index here is target
+    #     # return mi, inputs
+    #     return inputs
 
     #  def coord2radial(self, coord, edge_index):
     #     row, col = edge_index
@@ -577,11 +637,15 @@ if __name__ == "__main__":
     E = edge_embedder(E.float())
 
     # import ipdb; ipdb.set_trace()
-    model = EGNN()
+    model = EGNN()  #! Layer norm forces stable.
     print(X.sum(), H.sum(), E.sum())
-    for i in range(10):
+    for i in range(25):
         X, H, E = model(batch_ligand, X, H, E_idx, E)
         print(X.sum(), H.sum(), E.sum())
 
+    # model = EnBaseLayer(64, 5) #! Stable but increasing
+    # for i in range(25):
+    #     H, X = model(H, X, E_idx, E)
+    #     print(X.sum(), H.sum(), E.sum())
     # import ipdb; ipdb.set_trace()
     print("Success")
