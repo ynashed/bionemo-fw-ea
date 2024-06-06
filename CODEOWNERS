@@ -86,6 +86,14 @@ docs/readme-images/dnabert1xa100.png @skothenhill
 docs/readme-images/dnabert8xa100.png @skothenhill
 
 ##
+## dsmbind @menliu
+##
+bionemo/model/molecule/dsmbind @farhadr @menliu
+examples/molecule/dsmbind @farhadr @menliu
+tests/test_dsmbind.py @farhadr @menliu
+# MISSING DOCS
+
+##
 ## enformer @srabhi (TODO FIXME: requires handoff to member of bionemo team!!!)
 ##
 bionemo/model/dna/enformer @srabhi
