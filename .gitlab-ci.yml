@@ -551,7 +551,7 @@ bionemo2-build:
   rules:
     - if: $BIONEMO2_ONLY == "true"
       when: always
-  script: 
+  script:
     - echo "Building bionemo2 image..."
     - docker buildx version
     - docker buildx build
@@ -560,7 +560,7 @@ bionemo2-build:
       -f bionemo2/Dockerfile .
     - echo "Now pushing container"
     - docker push "${IMAGE_NAME}${SUFFIX_DEV}"
-  
+
 bionemo2-test:
   stage: test
   extends:
@@ -599,7 +599,7 @@ bionemo2-test:
   artifacts:
     reports:
       dotenv: jet.env
-  
+
 
 
 jet-configure:
@@ -722,7 +722,7 @@ jet-trigger:
     - if: $BIONEMO2_ONLY == "true"
       when: never
     - when: on_success
-    
+
 
 
 jet-test:
@@ -747,6 +747,19 @@ jet-test:
     - echo "CI_PROJECT_ID=${CI_PROJECT_ID}, CI_PIPELINE_ID=${CI_PIPELINE_ID}"
     - bash $CI_PROJECT_DIR/internal/jet/scripts/run_jet_test.sh
 
+
+# triggering an update of the dashboard for convergence tests when the tests are finished
+# Repository with the dashboard deployment: https://gitlab-master.nvidia.com/clara-discovery/dashboards
+dashboard-update-trigger:
+  stage: jet
+  needs: [jet-trigger]
+  rules:
+    - if: $JET_CONV_TEST == "true" && $CI_COMMIT_BRANCH == "dev"
+      when: always
+  trigger:
+    project: clara-discovery/dashboards
+    branch: main
+    strategy: depend
 
 
 qa-deploy:
