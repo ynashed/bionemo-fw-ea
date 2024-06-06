@@ -1,4 +1,8 @@
 # Release Notes
+## BioNeMo Framework v1.6
+### New Features
+* [Inference] `model.freeze_layers` inference config parameter added to freeze a specified number of layers. Thank you to github user [@nehap25](https://github.com/nehap25)!
+
 ## BioNeMo Framework v1.5
 ### New Models
 * [Geneformer](https://www.nature.com/articles/s41586-023-06139-9) is out of **Beta** status. This release includes newly trained checkpoints and benchmarks, including a variant based on the publication with 10M parameters, and the largest variant of geneformer publically available to date with 106M parameters.
