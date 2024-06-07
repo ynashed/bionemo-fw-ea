@@ -45,8 +45,8 @@ model:
   megatron_amp_O2: False # Set to True to go fast
   precision: bf16-mixed
 exp_manager:
-  explicit_log_dir: null
   exp_dir: ${oc.env:BIONEMO_HOME}/results/nemo_experiments/${.name}/${.wandb_logger_kwargs.name}
+  explicit_log_dir: ${.exp_dir}
   name: dnabert
   create_wandb_logger: True
   wandb_logger_kwargs:

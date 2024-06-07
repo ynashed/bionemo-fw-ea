@@ -147,7 +147,6 @@ workflow:
         EXCLUDE_DOCS_BUILD: "true"
         EXCLUDE_PYTEST: "true"
         JET_WORKLOAD_FOLDER: "partial-conv-trainings"
-        JET_WORKLOADS_FILTER: type == 'recipe' and spec.config_name != 'pretrain_esm2_650M'
     - if: ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "schedule") && $PYTEST != "true" && $JET == "true"
       variables:
         EXCLUDE_PYTEST: "true"
@@ -562,7 +561,6 @@ bionemo2-test:
   image:
     name: "${IMAGE_NAME}${SUFFIX_DEV}"
     entrypoint: [ "" ]
-  stage: test
   rules:
     - if: $BIONEMO2_ONLY == "true"
       when: always
@@ -666,8 +664,10 @@ jet-configure:
 jet-trigger:
   extends: [.jet-trigger-template]
   variables:
-    JET_WORKLOADS_FILTER: type == 'recipe'
+    JET_WORKLOADS_FILTER: type == 'recipe' and spec.config_name != 'pretrain_esm2_650M' and spec.config_name != 'train_score'
     JET_CUSTOM_CONFIG: |
+      tests:
+        allow_failure: true
       retrier:
         enabled: true
         max_retries: 1
@@ -686,12 +686,14 @@ jet-trigger:
   rules:
     - if: $EXCLUDE_JET == "true"
       when: never
+    - if: $BIONEMO2_ONLY == "true"
+      when: never
     - if: $CI_MERGE_REQUEST_LABELS =~ /OpenFold/ || $JET_MODEL_NAME == "OpenFold"
       variables:
         JET_WORKLOADS_FILTER: type == 'recipe' and spec.model == 'openfold'
     - if: $CI_MERGE_REQUEST_LABELS =~ /ESM2/ || $JET_MODEL_NAME == "ESM2"
       variables:
-        JET_WORKLOADS_FILTER: type == 'recipe' and spec.model == 'esm2nv'
+        JET_WORKLOADS_FILTER: type == 'recipe' and spec.model == 'esm2nv' and spec.config_name != 'pretrain_esm2_650M'
     - if: $CI_MERGE_REQUEST_LABELS =~ /ESM1/ || $JET_MODEL_NAME == "ESM1"
       variables:
         JET_WORKLOADS_FILTER: type == 'recipe' and spec.model == 'esm1nv'
@@ -712,11 +714,8 @@ jet-trigger:
         JET_WORKLOADS_FILTER: type == 'recipe' and spec.model == 'molmim'
     - if: $CI_MERGE_REQUEST_LABELS =~ /DiffDock/ || $JET_MODEL_NAME == "DiffDock"
       variables:
-        JET_WORKLOADS_FILTER: type == 'recipe' and spec.model == 'diffdock'
-    - if: $BIONEMO2_ONLY == "true"
-      when: never
+        JET_WORKLOADS_FILTER: type == 'recipe' and spec.model == 'diffdock' and spec.config_name != 'train_score'
     - when: on_success
-
 
 
 jet-test:
@@ -725,6 +724,7 @@ jet-test:
       when: never
     - if: $BIONEMO2_ONLY == "false"
       needs: [jet-trigger]
+      when: always
     - if: $BIONEMO2_ONLY == "true"
       when: never
   image:

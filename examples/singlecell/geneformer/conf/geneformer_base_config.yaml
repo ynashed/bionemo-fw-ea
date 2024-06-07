@@ -22,7 +22,7 @@ trainer:
   benchmark: False
 
 exp_manager:
-  explicit_log_dir: null
+  explicit_log_dir: ${.exp_dir}
   exp_dir: ${oc.env:BIONEMO_HOME}/results/nemo_experiments/${.name}/${.wandb_logger_kwargs.name}
   name: geneformer
   create_wandb_logger: False

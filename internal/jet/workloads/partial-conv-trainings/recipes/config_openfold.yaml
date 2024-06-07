@@ -21,8 +21,8 @@ launchers:
     ntasks_per_node: '{gpus}'
   name:dgxa100_dracooci:
     mounts:
-      /workspace/bionemo/models: /lustre/fsw/portfolios/convai/projects/convai_bionemo_training/jet/models
-      /workspace/bionemo/data/: /lustre/fsw/portfolios/convai/projects/convai_bionemo_training/jet/data/openfold
+      /workspace/bionemo/models: /lustre/fsw/portfolios/healthcareeng/projects/healthcareeng_bionemo/jet/models
+      /workspace/bionemo/data/: /lustre/fsw/portfolios/healthcareeng/projects/healthcareeng_bionemo/jet/data/openfold
 spec:
   build: bionemo
   BIONEMO_HOME: "/workspace/bionemo"
@@ -38,6 +38,7 @@ spec:
   extra_overwrites: ""
   script: |-
     cd {BIONEMO_HOME};
+    mkdir -p {tensorboard_dir};
     if [ "$SLURM_LOCALID" = "0" ]; then bash examples/protein/openfold/scripts/install_third_party.sh; fi;
     export WANDB_API_KEY=$BIONEMO_WANDB_API_KEY;
     model_tag={model}__{variant}__{config_name};
@@ -46,7 +47,7 @@ spec:
     trainer.max_steps={max_steps} model.num_steps_in_one_epoch={max_steps} model.micro_batch_size={batch_size} \
     trainer.val_check_interval={val_check_interval} \
     {default_overwrites} {extra_overwrites} \
-    ++exp_manager.exp_dir={assets_dir} \
+    ++exp_manager.exp_dir={tensorboard_dir} \
     ++exp_manager.wandb_logger_kwargs.project={wandb_project_name} \
     ++exp_manager.wandb_logger_kwargs.group=${{model_tag}} \
     ++exp_manager.wandb_logger_kwargs.job_type={pipeline_label} \
@@ -55,23 +56,9 @@ spec:
     ++dllogger_callbacks_kwargs.use_existing_dllogger=True ++dllogger_callbacks_kwargs.warmup={warmup} \
     ++dllogger_callbacks_kwargs.json_file={dllogger_file} ++trainer_metric_callback_kwargs.log_path={assets_dir} \
     ++logs_dir={logs_dir};
-    if [ -z $SLURM_LOCALID ] || [ $SLURM_LOCALID = 0 ]
-    then
-      mkdir -p {tensorboard_dir}
-      find {assets_dir} -type f -name "events.out.tfevents*" -exec cp {{}} {tensorboard_dir} \;
-      latest_log="{assets_dir}/run_0/output_script-0.log";
-      [ ! -f "$latest_log" ] && {{ echo "File $latest_log does not exist. Exiting with error."; exit 1; }};
-      experiment_link=$(grep -o "View run at https://wandb.ai/[^']*" "$latest_log" | awk 'NR==1 {{print $4}}');
-      project_link=$(grep -o "View project at https://wandb.ai/[^']*" "$latest_log" | awk 'NR==1 {{print $4}}');
-      echo "{{WANDB_RUN_LINK: \"$experiment_link\", WANDB_PROJECT_LINK: \"$project_link\"}}" > {logs_dir}/extra.yaml
-    fi
   time_limit: 14400
   artifacts: {}
 metrics:
-  throughput_train:
-    goal: maximize
-    tags: [ performance ]
-    key: primary
   val_lddt_ca:
     goal: maximize
     tags: [accuracy]
@@ -92,3 +79,13 @@ products:
     precision: [32]
     seed: [44]
     val_check_interval: [50]
+tests_spec:
+  - logic_type: static
+    logic_spec:
+      exit_codes:
+        - 0
+      baselines:
+        val_lddt_ca:
+          operator: range
+          max: 13.0
+          min: 11.0

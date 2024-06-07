@@ -44,7 +44,7 @@ model:
     lr: 0.1
 
 exp_manager:
-  explicit_log_dir: null
+  explicit_log_dir: ${.exp_dir}
   exp_dir: ${oc.env:BIONEMO_HOME}/results/nemo_experiments/${.name}/${.wandb_logger_kwargs.name}
   name: dnabert-splicesite
   create_wandb_logger: True
