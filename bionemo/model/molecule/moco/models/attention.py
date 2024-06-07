@@ -33,7 +33,7 @@ class AttentionLayer(nn.Module):
         self.right_z = MLP(invariant_node_feat_dim, invariant_node_feat_dim, invariant_node_feat_dim)
         self.joint_z = MLP(invariant_node_feat_dim, invariant_node_feat_dim, invariant_node_feat_dim)
         self.phi_e = MLP(
-            2 * invariant_node_feat_dim + equivariant_node_feature_dim + self.num_heads,
+            2 * invariant_node_feat_dim + equivariant_node_feature_dim + invariant_edge_feat_dim + self.num_heads,
             invariant_edge_feat_dim,
             invariant_edge_feat_dim,
         )
@@ -86,7 +86,7 @@ class AttentionLayer(nn.Module):
         Z_out = Z + z_update
         # E update
         # import ipdb; ipdb.set_trace()
-        e_inputs = torch.cat([alpha_ij, X_rel_norm, H[src], H[dst]], dim=-1)
+        e_inputs = torch.cat([alpha_ij, X_rel_norm, H[src], H[dst], E], dim=-1)
         e_update = self.phi_e(e_inputs)
         E_out = E + e_update
 

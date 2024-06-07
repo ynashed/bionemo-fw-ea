@@ -32,7 +32,8 @@ class LossFunction(nn.Module):
             self.f_discrete = nn.CrossEntropyLoss(weight=discrete_class_weight, reduction='none')
             #! We can up weight certain bonds to make sure this is correct
 
-    def forward(self, batch, logits, data, weight=None, continuous=True):
+    def forward(self, batch, logits, data, batch_weight=None, element_weight=None, continuous=True, scale=1.0):
+        # d (λx, λh, λe) = (3, 0.4, 2)
         batch_size = len(batch.unique())
         if continuous:
             loss = self.f_continuous(logits, data)
@@ -40,10 +41,26 @@ class LossFunction(nn.Module):
         else:
             loss = self.f_discrete(logits, data)
             output = torch.argmax(logits, dim=-1)
+        if element_weight:
+            loss = loss * element_weight
         loss = scatter_mean(loss, index=batch, dim=0, dim_size=batch_size)
-        if weight:
-            loss = loss * weight
-        loss = loss.mean()
+        if batch_weight:
+            loss = loss * batch_weight
+        loss = scale * loss.mean()
+        return loss, output
+
+    def edge_loss(self, batch, logits, data, index, num_atoms, batch_weight=None, element_weight=None, scale=1.0):
+        # d (λx, λh, λe) = (3, 0.4, 2)
+        batch_size = len(batch.unique())
+        loss = self.f_discrete(logits, data)
+        loss = 0.5 * scatter_mean(loss, index=index, dim=0, dim_size=num_atoms)
+        output = torch.argmax(logits, dim=-1)
+        if element_weight:
+            loss = loss * element_weight
+        loss = scatter_mean(loss, index=batch, dim=0, dim_size=batch_size)
+        if batch_weight:
+            loss = loss * batch_weight
+        loss = scale * loss.mean()
         return loss, output
 
     def distance_loss(self, batch, X_true, X_pred, Z_pred):

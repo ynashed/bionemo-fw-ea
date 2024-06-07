@@ -26,6 +26,31 @@ from bionemo.model.molecule.moco.models.scheduler import (
 )
 
 
+def build_interpolant(params):
+    if params.interpolant_type == "continuous_diffusion":
+        return ContinuousDiffusionInterpolant(params.schedule_params, params.prior_type, "sde", params.timesteps)
+    elif params.interpolant_type == "continuous_flow_matching":
+        return ContinuousFlowMatchingInterpolant(
+            params.schedule_params, params.prior_type, params.update_weight_type, "ode", params.timesteps, params.min_t
+        )
+    elif params.interpolant_type == "discrete_diffusion":
+        return DiscreteDiffusionInterpolant(
+            params.schedule_params, params.prior_type, "sde", params.timesteps, params.num_classes
+        )
+    elif params.interpolant_type == "continuous_diffusion":
+        return DiscreteFlowMatchingInterpolant(
+            params.schedule_params,
+            params.prior_type,
+            params.update_weight_type,
+            "ode",
+            params.timesteps,
+            params.num_classes,
+            params.min_t,
+        )
+    else:
+        raise NotImplementedError('Interpolant not supported: %s' % params.interpolant_type)
+
+
 class Interpolant:
     def __init__(
         self,
