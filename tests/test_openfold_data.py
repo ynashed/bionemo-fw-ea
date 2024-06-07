@@ -405,7 +405,7 @@ def test_sample_data_exists():
     """Test whether sample data for OpenFold unittest exists"""
     if not os.path.exists(SAMPLE_DATA_PATH):
         raise FileNotFoundError(
-            'Before testing, users must download openfold sample data through examples/protein/openfold/scripts/download_sample_data.sh.'
+            'Before testing, users must download openfold sample data through download_artifacts.py.'
         )
 
 

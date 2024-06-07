@@ -68,7 +68,7 @@ srun --mpi=pmix \
   ./examples/protein/openfold/scripts/install_third_party.sh &&
   echo 'launch_qa_testcase_03.sh - after install_third_party.sh' &&  
   echo 'launch_qa_testcase_03.sh - before download_artifacts.py' &&                                                          
-  python download_artifacts.py --source pbss --download_dir models --models openfold_initial_training_inhouse &&                  
+  python download_artifacts.py --source pbss --model_dir models --models openfold_initial_training_inhouse &&                  
   echo 'launch_qa_testcase_03.sh - after download_artifacts.py' &&                                                           
   echo 'launch_qa_testcase_03.sh - before train.py' &&
   python examples/protein/openfold/train.py \

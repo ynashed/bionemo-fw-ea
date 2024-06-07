@@ -77,7 +77,7 @@ srun --mpi=pmix \
          echo "'date=$(date +'%Y%m%dT%H%M')'" &&
          cd /workspace/bionemo &&
          echo 'launch_qa_testcase_05.sh - before download_artifacts.py' &&
-         python download_artifacts.py --source pbss --download_dir models --models openfold_finetuning_inhouse &&
+         python download_artifacts.py --source pbss --model_dir models --models openfold_finetuning_inhouse &&
          echo 'launch_qa_testcase_05.sh - before download_artifacts.py' &&
 	 python examples/protein/openfold/infer.py \
 	 sequences=\"[HHAGLHHLLCHACLGLHLMG, ALKKMAKHMCKKAGGLCMHL, AHLGMLHMMLHMCGAHCGLL, HAHMMLCHHGLAAHLLKLHA, MMGGLKMLKCCHHHHHKCKC, CCLHMKMCHHAHCGKCGHLL, KHLGLCCGMKAALKKAKHGA, MHKKAHGALMGLGGAGKMML, CCCHCMLMMAMKGKGCGMAA, LAKKALCMCHAKACLLKAMH]\" \

@@ -131,7 +131,7 @@ export NGC_CLI_ORG=nvidian
 export NGC_CLI_TEAM=clara-lifesciences
 export NGC_CLI_FORMAT_TYPE=ascii
 export MODEL_PATH=/model
-python download_artifacts.py --models all --download_dir ${MODEL_PATH} --verbose
+python download_artifacts.py --models all --model_dir ${MODEL_PATH} --verbose
 python examples/molecule/megamolbart/pretrain.py --config-path $BIONEMO_HOME/examples/tests/conf/ --config-name megamolbart_test \
 trainer.num_nodes=1 trainer.devices=8 trainer.precision=32 model.micro_batch_size=32 \
 ++model.dwnstr_task_validation.enabled=False \

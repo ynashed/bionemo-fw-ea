@@ -75,8 +75,7 @@ srun --mpi=pmix \
          echo "'date=$(date +'%Y%m%dT%H%M')'" &&
          cd /workspace/bionemo &&
          echo 'launch_qa_testcase_02.sh - before download_artifacts.py' &&
-         python download_artifacts.py  --download_dir  /workspace/bionemo --data openfold_training --source pbss --verbose  &&
-         python download_artifacts.py --source pbss --download_dir models  --models openfold_initial_training_inhouse &&                                                          
+         python download_artifacts.py  --data_dir  /workspace/bionemo --data openfold_training --source pbss --verbose -- model_dir models  --models openfold_initial_training_inhouse &&
          echo 'launch_qa_testcase_02.sh - after download_artifacts.py' &&                                                                                         
          echo 'launch_qa_testcase_02.sh - before install_third_party.sh' &&                                                                                       
          ./examples/protein/openfold/scripts/install_third_party.sh &&                                                                                                 

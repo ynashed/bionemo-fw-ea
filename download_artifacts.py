@@ -227,12 +227,13 @@ def download_artifacts(
             raise ValueError(f"Failed to download {download_artifact=}! {stderr=}")
         if artifact_type == "data":
             tar_file = f"{str(complete_download_dir)}/{file_name}"
-            with tarfile.open(tar_file) as tar:
-                extract_path = f"{str(complete_download_dir)}"
-                if conf[download_artifact].untar_dir:
-                    extract_path = f"{extract_path}/{conf[download_artifact].untar_dir}"
-                tar.extractall(path=extract_path)
-            Path(tar_file).unlink()
+            if Path(tar_file).is_file():
+                with tarfile.open(tar_file) as tar:
+                    extract_path = f"{str(complete_download_dir)}"
+                    if conf[download_artifact].untar_dir:
+                        extract_path = f"{extract_path}/{conf[download_artifact].untar_dir}"
+                    tar.extractall(path=extract_path)
+                Path(tar_file).unlink()
 
         # Create symlinks, if necessary
         if conf[download_artifact].symlink:
@@ -283,10 +284,17 @@ def main():
     )
 
     parser.add_argument(
-        '--download_dir',
+        '--model_dir',
         default='.',
         type=str,
-        help='Directory into which download and symlink the model or data.',
+        help='Directory into which download and symlink the model.',
+    )
+
+    parser.add_argument(
+        '--data_dir',
+        default='.',
+        type=str,
+        help='Directory into which download and symlink the data.',
     )
 
     parser.add_argument(
@@ -302,15 +310,16 @@ def main():
             download_list = all_models_list
         else:
             download_list = args.models
+
         download_artifacts(
-            config, download_list, args.source, Path(args.download_dir), args.verbose, artifact_type="model"
+            config, download_list, args.source, Path(args.model_dir), args.verbose, artifact_type="model"
         )
     if args.data:
         if ALL_KEYWORD in args.data:
             download_list = all_data_list
         else:
             download_list = args.data
-        download_artifacts(config, download_list, args.source, Path(args.download_dir), args.verbose, "data")
+        download_artifacts(config, download_list, args.source, Path(args.data_dir), args.verbose, "data")
 
     if not (args.models or args.data):
         print("No models or data were selected to download.")

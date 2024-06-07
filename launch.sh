@@ -221,16 +221,13 @@ download() {
         pip install $(cat setup/requirements.txt | grep pydantic)
     fi
     mkdir -p ${MODEL_PATH}
-    python download_artifacts.py --models all --source ngc --download_dir ${MODEL_PATH} --verbose
+    python download_artifacts.py --models all --source ngc --model_dir ${MODEL_PATH} --verbose
 }
 
 download_test_data() {
-    echo 'Downloading test data for openfold...'
-    source python $BIONEMO_HOME/download_artifacts.py --data all --source pbss --verbose
-    echo 'Openfold data download complete.'
-    echo 'Downloading test data for diffdock...'
-    source $BIONEMO_HOME/examples/molecule/diffdock/scripts/download_data_sample.sh
-    echo 'Diffdock data download complete.'
+    echo 'Downloading all test data...'
+    python $BIONEMO_HOME/download_artifacts.py --data all --source pbss --verbose
+    echo 'Data download complete.'
     echo 'Unzipping ESM2 test data...'
     unzip $BIONEMO_HOME/examples/tests/test_data/uniref202104_esm2_qc_test200_val200.zip -d $BIONEMO_HOME/examples/tests/test_data/
     echo 'ESM2 test data unzipped.'

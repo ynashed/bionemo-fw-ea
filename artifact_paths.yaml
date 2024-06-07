@@ -187,3 +187,18 @@ data:
         pbss: "s3://bionemo-ci/test-data/openfold/openfold_vprocessed_sample_cif_pt/openfold_training_samples.tar.gz"
         relative_download_dir: "examples/tests/test_data/"
         untar_dir: "openfold_data"
+    single_cell:
+        pbss: "s3://bionemo-ci/test-data/singlecell/singlecell-testdata-20240506.tar.gz"
+        relative_download_dir: "examples/tests/test_data/"
+    diffdock_sample:
+        pbss: "s3://bionemo-ci/test-data/diffdock/diffdock_vprocessed_sample_05022024/"
+        relative_download_dir: "examples/tests/test_data/molecule/diffdock"
+        extra_args: "--recursive"
+    diffdock_test:
+        pbss: "s3://bionemo-ci/test-data/diffdock/diffdock_vpreprocessing_test_05022024/"
+        relative_download_dir: "examples/tests/test_data/molecule/diffdock"
+        extra_args: "--recursive"
+    diffdick_cugraph:
+        pbss: "s3://bionemo-ci/test-data/diffdock/diffdock_vmodel_io_03042024_cugraph/"
+        relative_download_dir: "examples/tests/test_data/molecule/diffdock"
+        extra_args: "--recursive"

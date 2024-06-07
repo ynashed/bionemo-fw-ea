@@ -33,8 +33,7 @@ To trigger the openfold-specific pytests, run one of the two following commands.
 
 ```bash
 cd /workspace/bionemo
-python download_models.py openfold_initial_training_public openfold_finetuning_4_public openfold_initial_training_inhouse openfold_finetuning_inhouse --source pbss --download_dir $MODEL_PATH --verbose
-bash ./examples/protein/openfold/scripts/download_data_sample.sh -data_path $BIONEMO_HOME/examples/tests/test_data/ -pbss
+python download_artifacts.py --models openfold_initial_training_public openfold_finetuning_4_public openfold_initial_training_inhouse openfold_finetuning_inhouse --source pbss --model_dir $MODEL_PATH --data openfold_sample openfold_training  --verbose
 pytest -k test_openfold
 ```
 
@@ -43,8 +42,8 @@ or
 ```bash
 # inside bionemo container
 cd /workspace/bionemo
-python download_models.py openfold_initial_training_public openfold_finetuning_4_public openfold_initial_training_inhouse openfold_finetuning_inhouse --source pbss --download_dir $MODEL_PATH --verbose
-bash ./examples/protein/openfold/scripts/download_data_sample.sh -data_path $BIONEMO_HOME/examples/tests/test_data/ -pbss
+python download_artifacts.py --models openfold_initial_training_public openfold_finetuning_4_public openfold_initial_training_inhouse openfold_finetuning_inhouse --\
+source pbss --model_dir $MODEL_PATH --data openfold_sample openfold_training  --verbose
 pytest tests/test_openfold_inference.py 
 pytest tests/test_openfold_checkpoint.py
 ```

@@ -76,8 +76,7 @@ srun --mpi=pmix \
          echo "'date=$(date +'%Y%m%dT%H%M')'" &&
          cd /workspace/bionemo &&
          echo 'launch_qa_testcase_06.sh - before download_artifacts.py' &&
-         python download_artifacts.py --download_dir  /workspace/bionemo --data openfold_sample --source pbss --verbose  &&
-	 python download_artifacts.py --source pbss --download_dir models --models openfold_finetuning_inhouse &&
+         python download_artifacts.py --data_dir  /workspace/bionemo --data openfold_sample --source pbss --verbose  --model_dir models --models openfold_finetuning_inhouse &&
          echo 'launch_qa_testcase_06.sh - before download_artifacts.py' &&
 	 python examples/protein/openfold/infer.py \
 	 restore_from_path=models/protein/openfold/openfold_finetuning_inhouse_checkpoint.nemo \
