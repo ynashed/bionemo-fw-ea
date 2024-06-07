@@ -13,12 +13,20 @@ from pathlib import Path
 import torch
 from chemprop.features import mol2graph
 from rdkit import Chem
+from torch.utils.data import DataLoader
 
+from bionemo.data.dsmbind.dataset import DSMBindDataset
+from bionemo.model.molecule.dsmbind.dsmbind_model import DSMBind
 from bionemo.model.molecule.dsmbind.fann import FANN, MultiHeadAttention, TransformerEncoderLayer
 from bionemo.model.molecule.dsmbind.mpn import MPNEncoder
 from bionemo.utils.hydra import load_model_config
 
 from .inference_shared_test_code import get_config_dir
+
+
+def dsmbind_test_data_path(bionemo_home) -> str:
+    path = bionemo_home / "tests" / "dsmbind_test_data" / "test_complexes.pkl"
+    return str(path)
 
 
 def test_multihead_attention_layer(bionemo_home: Path):
@@ -109,3 +117,41 @@ def test_mpn(bionemo_home: Path):
     output = mpn(mol_graph_batch)
     expected_shape = (len(smiles_list), max_atoms, cfg_model.hidden_size)
     assert output.shape == expected_shape, "Output tensor shape of MPN is incorrect."
+
+
+def test_dsmbind_forward(bionemo_home: Path):
+    config_path = get_config_dir(bionemo_home, "dsmbind")
+    cfg = load_model_config(config_name="train", config_path=config_path)
+    processed_data_path = dsmbind_test_data_path(bionemo_home)
+    dataset = DSMBindDataset(
+        processed_data_path=processed_data_path,
+        aa_size=cfg.model.aa_size,
+        max_residue_atoms=cfg.model.max_residue_atoms,
+    )
+    dataloader = DataLoader(dataset, batch_size=cfg.train.batch_size, collate_fn=dataset.pl_collate_fn, shuffle=False)
+    data_iterator = iter(dataloader)
+    batched_binder, batched_target = next(data_iterator)  # first batch
+
+    cfg_model = cfg.model
+    dsmbind_model = DSMBind(cfg_model)
+    dsm_loss = dsmbind_model(batched_binder, batched_target)
+    assert dsm_loss.shape == torch.Size([]), "Shape of the DSM loss value is incorrect."
+
+
+def test_dsmbind_predict(bionemo_home: Path):
+    config_path = get_config_dir(bionemo_home, "dsmbind")
+    cfg = load_model_config(config_name="train", config_path=config_path)
+    processed_data_path = dsmbind_test_data_path(bionemo_home)
+    dataset = DSMBindDataset(
+        processed_data_path=processed_data_path,
+        aa_size=cfg.model.aa_size,
+        max_residue_atoms=cfg.model.max_residue_atoms,
+    )
+    dataloader = DataLoader(dataset, batch_size=cfg.train.batch_size, collate_fn=dataset.pl_collate_fn, shuffle=False)
+    data_iterator = iter(dataloader)
+    batched_binder, batched_target = next(data_iterator)  # first batch
+
+    cfg_model = cfg.model
+    dsmbind_model = DSMBind(cfg_model)
+    dsm_loss = dsmbind_model.predict(batched_binder, batched_target)
+    assert dsm_loss.shape == torch.Size([cfg.train.batch_size]), "Shape of the prediction output is incorrect."

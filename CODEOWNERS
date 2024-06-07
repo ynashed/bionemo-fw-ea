@@ -89,8 +89,11 @@ docs/readme-images/dnabert8xa100.png @skothenhill
 ## dsmbind @menliu
 ##
 bionemo/model/molecule/dsmbind @farhadr @menliu
+bionemo/data/dsmbind @farhadr @menliu
 examples/molecule/dsmbind @farhadr @menliu
-tests/test_dsmbind.py @farhadr @menliu
+tests/test_dsmbind_data_utils.py @farhadr @menliu
+tests/test_dsmbind_model.py @farhadr @menliu
+tests/dsmbind_test_data @farhadr @menliu
 # MISSING DOCS
 
 ##
