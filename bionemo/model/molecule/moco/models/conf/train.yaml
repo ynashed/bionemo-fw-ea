@@ -1,0 +1,59 @@
+run_name: 'NAME'
+outdir: ./moco_results
+resume: null
+ema_resume: null
+wandb_params:
+  mode: 'disabled'  # disabled, offline, online
+  entity: 'clara-discovery'
+  group: 'config_demo'
+  project: 'MoCo'
+
+data:
+  name: GEOM-DRUGS
+
+interpolants:
+  timesteps: &timesteps 500
+  variables:
+    - variable_name: 'x'
+      interpolant_type: 'continuous_diffusion'
+      prior_type: 'gaussian'
+      timesteps: *timesteps
+      num_classes: 13
+    - variable_name: 'h'
+      interpolant_type: 'discrete_diffusion'
+      prior_type: 'uniform'
+      timesteps: *timesteps
+      num_classes: 13
+    - variable_name: 'edge_attr'
+      interpolant_type: 'discrete_diffusion'
+      prior_type: 'uniform'
+      timesteps: *timesteps
+      num_classes: 5
+
+  
+dynamics:
+  model_args: None
+
+
+train:
+  coordinate_loss_scale: 3.0
+  atom_type_los_scale: 0.4
+  edge_attr:_loss_scale: 2
+  seed: 2024
+  batch_size: 800
+  gpus: 4
+  n_epochs: 1000
+
+#! The below are taken from EQGAT
+optimizer:
+  type: adamw
+  lr: 2.e-4
+  weight_decay: 1.e-12
+  amsgrad: True
+
+scheduler:
+  type: plateau
+  factor: 0.75
+  patience: 20
+  min_lr: 5.e-5
+  cooldown: 5

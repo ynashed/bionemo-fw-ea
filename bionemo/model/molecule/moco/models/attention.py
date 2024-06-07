@@ -87,7 +87,7 @@ class AttentionLayer(nn.Module):
         # E update
         # import ipdb; ipdb.set_trace()
         e_inputs = torch.cat([alpha_ij, X_rel_norm, H[src], H[dst], E], dim=-1)
-        e_update = self.phi_e(e_inputs)
+        e_update = self.phi_e(e_inputs)  #! can also do MLP(MLP(me + e)) like in EQ
         E_out = E + e_update
 
         return H_out, X_out, Z_out, E_out
