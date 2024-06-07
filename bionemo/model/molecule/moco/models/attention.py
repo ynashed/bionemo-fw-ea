@@ -11,7 +11,7 @@ class AttentionLayer(nn.Module):
         self,
         equivariant_node_feature_dim=3,
         invariant_node_feat_dim=64,
-        invariant_edge_feat_dim=5,
+        invariant_edge_feat_dim=32,
         num_heads=4,
     ):
         super().__init__()
@@ -290,9 +290,11 @@ if __name__ == "__main__":
     # r_norm = torch.div(r, (1.0 + d.unsqueeze(-1)))  # E x 3
     E = A[source, target]  # E x 5
     # E_all = torch.cat((d.unsqueeze(1), a.unsqueeze(1), r_norm, E), dim=-1)  # E x 10
-    edge_embedder = nn.Linear(5, 5)
+    edge_embedder = nn.Linear(5, 32)
     E = edge_embedder(E.float())
+    import ipdb
 
+    ipdb.set_trace()
     # model = AttentionLayer()
     # print(X.sum().item(), H.sum().item(), E.sum().item(), Z.sum().item())
     # for i in range(25):
