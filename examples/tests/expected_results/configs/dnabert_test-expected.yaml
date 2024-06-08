@@ -20,7 +20,7 @@ trainer:
   gradient_clip_val: 1.0
   benchmark: false
 exp_manager:
-  explicit_log_dir: null
+  explicit_log_dir: ${.exp_dir}
   exp_dir: ${oc.env:BIONEMO_HOME}/test_results/nemo_experiments/dnabert_pretrain
   name: dnabert
   create_wandb_logger: false
