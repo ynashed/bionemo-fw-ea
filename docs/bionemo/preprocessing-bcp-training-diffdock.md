@@ -90,9 +90,26 @@ ngc batch run --name "DiffDock_Protein_Embedding" --priority NORMAL --preempt RU
 
 Then, do the graph preprocessing for score model:
 ```bash
-ngc batch run --name "DiffDock_Complex_Graph_Preprocessing_Score" --priority NORMAL --preempt RUNONCE --ace nv-us-east-2 --instance dgxa100.80g.2.norm --commandline "ln -s /bionemo_diffdock/data \\${BIONEMO_HOME}/data; bcprun --debug --nnodes=1 --npernode=1 -w /workspace/bionemo --cmd 'python examples/molecule/diffdock/train.py do_preprocessing=True do_training=False data.num_workers=20 '" --result /results --image ${BIONEMO_IMAGE} --org ${NGC_CLI_ORG} --team ${NGC_CLI_TEAM} --workspace ${WKSP_ID}:/bionemo_diffdock:RW --label ml__bionemo
+ngc batch run \
+  --name "DiffDock_Complex_Graph_Preprocessing_Score" \
+  --priority NORMAL --preempt RUNONCE --ace nv-us-east-2 \
+  --instance dgxa100.80g.2.norm \
+  --commandline "ln -s /bionemo_diffdock/data \\${BIONEMO_HOME}/data; bcprun --debug --nnodes=1 --npernode=1 -w /workspace/bionemo --cmd \
+  'python examples/molecule/diffdock/train.py do_preprocessing=True do_training=False\
+     data.num_workers=20 \
+     ++model.train_ds.min_num_shards=64 \
+     ++model.val_ds.min_num_shards=64 \
+     ++model.test_ds.min_num_shards=64'"\
+  --result /results --image ${BIONEMO_IMAGE} --org ${NGC_CLI_ORG} --team ${NGC_CLI_TEAM} --workspace ${WKSP_ID}:/bionemo_diffdock:RW --label ml__bionemo
 ```
 
+**NOTE:** the `model.{train,val,test}_ds.min_num_shards` options tell the
+preprocessing workflow to attempt to create at least `64` webdataset shards for
+the respective train, validation and test datasets. The user can replace the
+number `64` with their own value, **with the constraint being this value needs to
+be larger than `num_workers * num_GPUs` later in training, where `num_workers`
+is the number of pytorch dataloader worker processes and `num_GPUs` is the
+total number of GPUs used to train the model**
 
 ### Step 6 : Verify that the data pre-processing is successful in Step 5
 You can re-mount your workspace after running through all the steps above and be able to see pre-processed data. Follow Step 3 to mount the workspace onto your local workstation.'
@@ -115,9 +132,9 @@ ls ~/diffdock_data/data/data_cache
 
 It will show following files:
 ```
-torsion_limit0_INDEXsplit_train_maxLigSizeNone_H0_recRad15_recMax24_esmEmbeddings
-torsion_limit0_INDEXsplit_val_maxLigSizeNone_H0_recRad15_recMax24_esmEmbeddings
-torsion_limit0_INDEXsplit_test_maxLigSizeNone_H0_recRad15_recMax24_esmEmbeddings
+torsion_limit0_maxLigSizeNone_H0_recRad15_recMax24_esmEmbeddings_INDEXsplit_train
+torsion_limit0_maxLigSizeNone_H0_recRad15_recMax24_esmEmbeddings_INDEXsplit_val
+torsion_limit0_maxLigSizeNone_H0_recRad15_recMax24_esmEmbeddings_INDEXsplit_test
 ```
 
 
@@ -136,13 +153,31 @@ export DIFFDOCK_SCORE_MODEL=models/small_score_model.nemo
 
 we can do the data preprocessing for confidence model:
 ```bash
-ngc batch run --name "DiffDock_Complex_Graph_Preprocessing_Confidence" --priority NORMAL --preempt RUNONCE --ace nv-us-east-2 --instance dgxa100.80g.2.norm --commandline "ln -s /bionemo_diffdock/data \\${BIONEMO_HOME}/data; bcprun --debug --nnodes=1 --npernode=1 -w /workspace/bionemo --cmd 'python examples/molecule/diffdock/train.py --config-name=train_confidence do_preprocessing=True do_training=False data.num_workers=20 score_infer.restore_from_path=/workspace/bionemo/${DIFFDOCK_SCORE_MODEL} '" --result /results --image ${BIONEMO_IMAGE} --org ${NGC_CLI_ORG} --team ${NGC_CLI_TEAM} --workspace ${WKSP_ID}:/bionemo_diffdock:RW --label ml__bionemo
+ngc batch run --name "DiffDock_Complex_Graph_Preprocessing_Confidence" \
+  --priority NORMAL --preempt RUNONCE --ace nv-us-east-2 \
+  --instance dgxa100.80g.2.norm \
+  --commandline "ln -s /bionemo_diffdock/data \\${BIONEMO_HOME}/data; bcprun --debug --nnodes=1 --npernode=1 -w /workspace/bionemo --cmd \
+  'python examples/molecule/diffdock/train.py --config-name=train_confidence do_preprocessing=True do_training=False \
+     data.num_workers=20 \
+     score_infer.restore_from_path=/workspace/bionemo/${DIFFDOCK_SCORE_MODEL} \
+     ++model.train_ds.min_num_shards=64 \
+     ++model.val_ds.min_num_shards=64 \
+     ++model.test_ds.min_num_shards=64'" \
+     --result /results --image ${BIONEMO_IMAGE} --org ${NGC_CLI_ORG} --team ${NGC_CLI_TEAM} --workspace ${WKSP_ID}:/bionemo_diffdock:RW --label ml__bionemo
 ```
+
+**NOTE:** the `model.{train,val,test}_ds.min_num_shards` options tell the
+preprocessing workflow to attempt to create at least `64` webdataset shards for
+the respective train, validation and test datasets. The user can replace the
+number `64` with their own value, **with the constraint being this value needs to
+be larger than `num_workers * num_GPUs` later in training, where `num_workers`
+is the number of pytorch dataloader worker processes and `num_GPUs` is the
+total number of GPUs used to train the model**
 
 If you want to use the score model checkpoint converted from [public diffdock](https://github.com/gcorso/DiffDock/tree/main/workdir/paper_score_model), replace the setting of small score model with following commands:
 ```bash
-ngc registry model download-version nvidian/clara-lifesciences/diffdock:paper_score.23.08 --dest  ~/
-cp ~/diffdock_vpaper_score.23.08/diffdock_score.nemo ~/diffdock_data/models/
+ngc registry model download-version nvidia/clara/diffdock_score:1.5 --dest  ~/
+cp ~/diffdock_score.nemo ~/diffdock_data/models/
 export DIFFDOCK_SCORE_MODEL=models/diffdock_score.nemo
 ```
 And use the same ```ngc batch run``` command above

@@ -41,8 +41,8 @@ This donor model was not owned or developed by NVIDIA. This model has been devel
 * [Windows] <br>
 
 ## Model Version(s): 
-diffdock_score_v24.02_cugraph.nemo, version: 1.5
-diffdock_confidence_v24.02_cugraph.nemo, version: 1.5
+diffdock_score.nemo, version: 1.5
+diffdock_confidence.nemo, version: 1.5
 
 **NOTE**: previous version of checkpoint files, i.e., version 1.1, can be converted to the current version by running the scripts:
 
@@ -50,7 +50,7 @@ diffdock_confidence_v24.02_cugraph.nemo, version: 1.5
 python ${BIONEMO_HOME}/examples/molecule/diffdock/scripts/convert_nemo_chkpt_cugraph-equiv.py previous_checkpoint.nemo new_checkpoint.nemo --swap_mlp_weight_blocks
 ```
 where `previous_checkpoint.nemo` is the previous checkpoint version 1.1 and
-the script outputs the new checkpoint for version 24.05 to
+the script outputs the new checkpoint for version 1.5 to
 `new_checkpoint.nemo` as specified in the command line.
 
 ## Change Log:
@@ -97,6 +97,7 @@ Training speed was tested on DGX-A100 systems GPUs with 80GB of memory. Three it
 |2023-09|Size Aware Batch Sampling (first version in BioNeMo FW) |0.41|400|1.1296244|354.1|NV-PDBData|96|8|
 |2023-11|Fast Tensor Product Kernel Integration|1.09|400|2.965159377|134.9|NV-PDBData|96|8|
 |2024-04|Cugraph-equivariant Integration|1.32|400|3.613369467|110.7|NV-PDBData|96|8|
+|2024-06|Training with webdataset|1.57|400|4.293949006|93.2|NV-PDBData|96|8|
 
 ## Limitations
 DiffDock is currently restricted to static snapshot understanding of single ligand and protein interactions. For more involved systems included multi-ligands in a single protein pocket, multiple protein pockets without a ligand blocker, DiffDock inference may perform poorly due to the unaware implications of ligand-ligand interactions in solvent.
