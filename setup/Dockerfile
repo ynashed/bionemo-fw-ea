@@ -260,6 +260,18 @@ RUN pip uninstall -y opencv-python opencv fonttools \
 # BioNeMo Build
 #########################################################################################
 
+# directory permissioning commands:
+#   - openfold training requires the installation of libraries via
+#   ./examples/protein/openfold/scripts/install_third_party.sh,
+#   at container run time, rather than image build time.
+#   - the installers require the user submitting the install commands
+#   to have access to certain locations, where typically root has access
+#   but the user does not.
+RUN chmod a+rwx /usr/local /usr/local/lib /usr/local/include /usr/local/bin
+RUN mkdir -p /usr/local/scripts /usr/local/lib/cmake/
+RUN chmod a+rwx /usr/local/scripts /usr/local/lib/cmake/
+
+
 ### The location of the installed library in the container. Set BIONEMO_HOME env to change this for development purposes.
 ARG BIONEMO_HOME=/workspace/bionemo
 ENV BIONEMO_HOME=${BIONEMO_HOME}
