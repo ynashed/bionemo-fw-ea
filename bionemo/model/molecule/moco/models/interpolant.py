@@ -28,6 +28,12 @@ from bionemo.model.molecule.moco.models.scheduler import (
 
 
 def build_interpolant(params):
+    """
+    This function builds the Interpolant.
+
+    It also assumes that the set up for uniform and absorbing is the same and we will control the +1 mask state.
+    This allows the number of classes to never change in the config as it represents the real number of classes that is desired to model.
+    """
     if params.interpolant_type == "continuous_diffusion":
         return ContinuousDiffusionInterpolant(params.schedule_params, params.prior_type, "sde", params.timesteps)
     elif params.interpolant_type == "continuous_flow_matching":
@@ -35,10 +41,14 @@ def build_interpolant(params):
             params.schedule_params, params.prior_type, params.update_weight_type, "ode", params.timesteps, params.min_t
         )
     elif params.interpolant_type == "discrete_diffusion":
+        if params.prior_type in ["absorb", "mask"]:
+            params.num_classes = params.num_classes + 1
         return DiscreteDiffusionInterpolant(
             params.schedule_params, params.prior_type, "sde", params.timesteps, params.num_classes
         )
     elif params.interpolant_type == "discrete_flow_matching":
+        if params.prior_type in ["absorb", "mask"]:
+            params.num_classes = params.num_classes + 1
         return DiscreteFlowMatchingInterpolant(
             params.schedule_params,
             params.prior_type,
@@ -985,6 +995,9 @@ def test_discrete_diffusion(h, batch):
     for i in tqdm(time_seq, desc='discrete diffusion absorb interpolation', total=len(time_seq)):
         t_idx = interpolant.sample_time(4, method='stab_mode')
         data_scale, _ = interpolant.forward_schedule(t_idx, batch_ligand)
+        import ipdb
+
+        ipdb.set_trace()
         x1, xt, probs = interpolant.interpolate(h, batch, t_idx=t_idx)
     probs[:, -1] = 0
     assert all(torch.argmax(probs, 1) == x1)
