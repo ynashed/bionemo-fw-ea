@@ -10,6 +10,7 @@
 import numpy as np
 import torch
 import torch.nn.functional as F
+from torch_geometric.utils import sort_edge_index
 from torch_scatter import scatter_mean
 
 from bionemo.model.molecule.moco.models.interpolant_utils import (
@@ -37,7 +38,7 @@ def build_interpolant(params):
         return DiscreteDiffusionInterpolant(
             params.schedule_params, params.prior_type, "sde", params.timesteps, params.num_classes
         )
-    elif params.interpolant_type == "continuous_diffusion":
+    elif params.interpolant_type == "discrete_flow_matching":
         return DiscreteFlowMatchingInterpolant(
             params.schedule_params,
             params.prior_type,
@@ -64,6 +65,12 @@ class Interpolant:
         self.timesteps = timesteps
         self.solver_type = solver_type
 
+    def sample_time(self, num_samples, method, device='cpu', mean=0, scale=0.81, min_t=0):
+        if self.time_type == "continuous":
+            return self.sample_time_continuous(num_samples, method, device, mean, scale, min_t)
+        else:
+            return self.sample_time_idx(num_samples, method, device, mean, scale)
+
     def sample_time_idx(self, num_samples, method, device='cpu', mean=0, scale=0.81):
         if method == 'symmetric':
             time_step = torch.randint(0, self.timesteps, size=(num_samples // 2 + 1,))
@@ -87,7 +94,7 @@ class Interpolant:
             raise ValueError
         return time_step.to(device)
 
-    def sample_time(self, num_samples, method, device='cpu', mean=0, scale=0.81, min_t=0):
+    def sample_time_continuous(self, num_samples, method, device='cpu', mean=0, scale=0.81, min_t=0):
         if method == 'symmetric':
             time_step = torch.rand(num_samples // 2 + 1)
             time_step = torch.cat([time_step, 1 - time_step], dim=0)[:num_samples]
@@ -133,7 +140,7 @@ class ContinuousDiffusionInterpolant(Interpolant):
 
     def __init__(
         self,
-        schedule_params: dict = None,
+        schedule_params: dict = {'time_type': 'discrete'},
         prior_type: str = 'gaussian',
         solver_type: str = "sde",
         timesteps: int = 500,
@@ -142,6 +149,7 @@ class ContinuousDiffusionInterpolant(Interpolant):
         self.init_schedulers(schedule_params, timesteps)
 
     def init_schedulers(self, schedule_params, timesteps):
+        self.time_type = schedule_params['time_type']
         self.alphas, self.betas = cosine_beta_schedule_eq(
             schedule_params, timesteps
         )  # cosine_beta_schedule(schedule_params, timesteps, return_alpha=True)
@@ -236,7 +244,7 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
 
     def __init__(
         self,
-        schedule_params: dict = {'type': 'linear', 'time': 'uniform'},
+        schedule_params: dict = {'type': 'linear', 'time': 'uniform', 'time_type': 'continuous'},
         prior_type: str = 'gaussian',
         update_weight_type: str = "constant",
         solver_type: str = "ode",
@@ -250,6 +258,7 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
 
     def init_schedulers(self, schedule_params, timesteps):
         self.schedule_type = schedule_params['type']
+        self.time_type = schedule_params['time_type']
         if schedule_params['type'] == "linear":  #! vpe_linear is just linear with an update weight of recip_time_to_go
             self.discrete_time_only = False
             self.time = torch.linspace(self.min_t, 1, self.timesteps)
@@ -358,14 +367,16 @@ class DiscreteDiffusionInterpolant(Interpolant):
 
     def __init__(
         self,
-        schedule_params: dict = {'type': 'd3pm'},
+        schedule_params: dict = {'type': 'd3pm', 'time_type': 'discrete'},
         prior_type: str = "uniform",
         solver_type: str = "sde",
         timesteps: int = 500,
         num_classes: int = 12,
+        custom_prior: torch.Tensor = None,
     ):
         super(DiscreteDiffusionInterpolant, self).__init__(schedule_params, prior_type, solver_type, timesteps)
         self.num_classes = num_classes
+        self.custom_prior = custom_prior
         self.init_schedulers(schedule_params, timesteps)
 
     def get_Qt(self, terminal_distribution: torch.Tensor):
@@ -388,6 +399,8 @@ class DiscreteDiffusionInterpolant(Interpolant):
         elif self.prior_type == "mask" or self.prior_type == "absorb":
             prior_dist = torch.zeros((self.num_classes))
             prior_dist[-1] = 1.0
+        elif self.prior_type in ["custom", "data"]:
+            prior_dist = self.custom_prior
         assert torch.sum(prior_dist).item() - 1.0 < 1e-5
         Qt = self.get_Qt(prior_dist)
         Qt_prev = torch.eye(self.num_classes)
@@ -405,6 +418,7 @@ class DiscreteDiffusionInterpolant(Interpolant):
 
     def init_schedulers(self, schedule_params, timesteps):
         self.schedule_type = schedule_params['type']
+        self.time_type = schedule_params['time_type']
         self.alphas, self.betas = cosine_beta_schedule(schedule_params, timesteps, return_alpha=True)
         self.log_alpha = torch.log(self.alphas)
         self.log_alpha_bar = torch.cumsum(self.log_alpha, dim=0)
@@ -458,6 +472,19 @@ class DiscreteDiffusionInterpolant(Interpolant):
 
         return x1, xt, None
 
+    def interpolate_edges(self, x1, x1_index, batch, t=None, t_idx=None):
+        """
+        Interpolate using discrete interpolation method.
+        Similar to sample_edges_categorical https://github.com/tuanle618/eqgat-diff/blob/68aea80691a8ba82e00816c82875347cbda2c2e5/eqgat_diff/experiments/diffusion/categorical.py#L242
+        """
+        j, i = x1_index
+        mask = j < i
+        mask_i = i[mask]
+        edge_attr_triu = x1[mask]
+        _, edge_attr_t, upper_probs = self.interpolate(edge_attr_triu, batch[mask_i], t, t_idx)
+        edge_index_global_perturbed, edge_attr_global_perturbed = self.clean_edges(x1_index, edge_attr_t)
+        return x1, edge_attr_global_perturbed, _
+
     def prior(self, shape, batch, device, one_hot=False):
         """
         Returns discrete index (num_samples,) or one hot if True (num_samples, num_classes)
@@ -467,11 +494,33 @@ class DiscreteDiffusionInterpolant(Interpolant):
             x0 = torch.ones((num_samples,)).to(torch.int64) * (self.num_classes - 1)
         elif self.prior_type == "uniform":
             x0 = torch.randint(0, self.num_classes, (num_samples,)).to(torch.int64)
+        elif self.prior_type in ["custom", "data"]:
+            x0 = torch.multinomial(self.custom_prior, num_samples, replacement=True).to(torch.int64)
         else:
             raise ValueError("Only uniform and mask are supported")
         if one_hot:
             x0 = F.one_hot(x0, num_classes=self.num_classes)
         return x0.to(device)
+
+    def prior_edges(self, shape, index, batch, device, one_hot=False, return_masks=False):
+        """
+        Returns discrete index (num_samples,) or one hot if True (num_samples, num_classes)
+        similar to initialize_edge_attrs_reverse https://github.com/tuanle618/eqgat-diff/blob/68aea80691a8ba82e00816c82875347cbda2c2e5/eqgat_diff/experiments/diffusion/utils.py#L18
+        """
+        num_samples = shape[0]
+        j, i = index
+        mask = j < i
+        mask_i = i[mask]
+        num_upper_E = len(mask_i)
+        num_samples = num_upper_E
+        edge_attr_triu = self.prior((num_samples, shape[1:]), batch, device)
+        edge_index_global, edge_attr_global, mask, mask_i = self.clean_edges(index, edge_attr_triu, return_masks=True)
+        if one_hot:
+            edge_attr_global = F.one_hot(edge_attr_global, num_classes=self.num_classes).float()
+        if return_masks:
+            return edge_attr_global.to(device), edge_index_global.to(device), mask, mask_i
+        else:
+            return edge_attr_global.to(device), edge_index_global.to(device)
 
     def step(
         self,
@@ -522,6 +571,40 @@ class DiscreteDiffusionInterpolant(Interpolant):
 
         return x_next
 
+    def step_edges(
+        self, edge_index, edge_attr_t, edge_attr_hat, batch, t_idx, mask=None, mask_i=None, return_masks=False
+    ):
+        if mask is None or mask_i is None:
+            j, i = edge_index
+            mask = j < i
+            mask_i = i[mask]
+        edge_attr_t = edge_attr_t[mask]
+        edge_attr_hat = edge_attr_hat[mask]
+        edge_attr_next = self.step(edge_attr_t, edge_attr_hat, batch[mask_i], t_idx)
+        return self.clean_edges(edge_index, edge_attr_next, return_masks=return_masks)
+
+    def clean_edges(self, edge_index, edge_attr_next, one_hot=False, return_masks=False):
+        j, i = edge_index
+        mask = j < i
+        mask_i = i[mask]
+        mask_j = j[mask]
+        j = torch.concat([mask_j, mask_i])
+        i = torch.concat([mask_i, mask_j])
+        edge_index_global = torch.stack([j, i], dim=0)
+        edges_triu = F.one_hot(edge_attr_next, self.num_classes).float()
+        edge_attr_global = torch.concat([edges_triu, edges_triu], dim=0)
+        edge_index_global, edge_attr_global = sort_edge_index(
+            edge_index=edge_index_global,
+            edge_attr=edge_attr_global,
+            sort_by_row=False,
+        )
+        if not one_hot:
+            edge_attr_global = edge_attr_global.argmax(1)
+        if return_masks:
+            return edge_index_global, edge_attr_global, mask, mask_i
+        else:
+            return edge_index_global, edge_attr_global
+
 
 class DiscreteFlowMatchingInterpolant(Interpolant):
     """
@@ -537,22 +620,25 @@ class DiscreteFlowMatchingInterpolant(Interpolant):
 
     def __init__(
         self,
-        schedule_params: dict = {'type': 'linear'},
+        schedule_params: dict = {'type': 'linear', 'time': 'uniform', 'time_type': 'continuous'},
         prior_type: str = "uniform",
         update_weight_type: str = "d3pm",
         solver_type: str = "ode",
         timesteps: int = 500,
         num_classes: int = 10,
         min_t: float = 1e-2,
+        custom_prior: torch.Tensor = None,
     ):
         super(DiscreteFlowMatchingInterpolant, self).__init__(schedule_params, prior_type, solver_type, timesteps)
         self.num_classes = num_classes
         self.update_weight_type = update_weight_type
         self.min_t = min_t
+        self.custom_prior = custom_prior
         self.init_schedulers(schedule_params, timesteps)
 
     def init_schedulers(self, schedule_params, timesteps):
         self.schedule_type = schedule_params['type']
+        self.time_type = schedule_params['time_type']
         if schedule_params['type'] == "linear":  #! vpe_linear is just linear with an update weight of recip_time_to_go
             self.discrete_time_only = False
             time = torch.linspace(self.min_t, 1, self.timesteps)
@@ -639,11 +725,31 @@ class DiscreteFlowMatchingInterpolant(Interpolant):
             x0 = torch.ones((num_samples,)).to(torch.int64) * (self.num_classes - 1)
         elif self.prior_type == "uniform":
             x0 = torch.randint(0, self.num_classes, (num_samples,)).to(torch.int64)
+        elif self.prior_type in ["custom", "data"]:
+            x0 = torch.multinomial(self.custom_prior, num_samples, replacement=True).to(torch.int64)
         else:
             raise ValueError("Only uniform and mask/absorb are supported")
         if one_hot:
             x0 = F.one_hot(x0, num_classes=self.num_classes)
         return x0.to(device)
+
+    def clean_edges(self, edge_index, edge_attr_next):
+        assert False
+        j, i = edge_index
+        mask = j < i
+        mask_i = i[mask]
+        mask_j = j[mask]
+        j = torch.concat([mask_j, mask_i])
+        i = torch.concat([mask_i, mask_j])
+        edge_index_global = torch.stack([j, i], dim=0)
+        edges_triu = F.one_hot(edge_attr_next, self.num_classes).float()
+        edge_attr_global = torch.concat([edges_triu, edges_triu], dim=0)
+        edge_index_global, edge_attr_global = sort_edge_index(
+            edge_index=edge_index_global,
+            edge_attr=edge_attr_global,
+            sort_by_row=False,
+        )
+        return edge_index_global, edge_attr_global, mask, mask_i
 
     def step(
         self,
@@ -673,7 +779,7 @@ class DiscreteFlowMatchingInterpolant(Interpolant):
             dt = t_next - t
             dt = dt[batch].unsqueeze(1)
         t = t[batch].unsqueeze(1)
-        if self.prior_type == "uniform":
+        if self.prior_type in ["uniform", "data", "custom"]:
             logits_1 = x_hat
             if last_step:
                 x_next = torch.argmax(logits_1, dim=-1)
@@ -773,7 +879,7 @@ def test_continuous_diffusion(ligand_pos, batch_ligand):
     pos_interpolant = ContinuousDiffusionInterpolant()
     time_seq = list(range(0, 500))
     for i in tqdm(time_seq, desc='continuous diffusion interpolation', total=len(time_seq)):
-        t_idx = pos_interpolant.sample_time_idx(4, method='stab_mode')
+        t_idx = pos_interpolant.sample_time(4, method='stab_mode')
         data_scale, noise_scale = pos_interpolant.forward_schedule(t_idx, batch_ligand)
         x1, xt, x0 = pos_interpolant.interpolate(ligand_pos, batch_ligand, t_idx=t_idx, com_free=True)
 
@@ -794,9 +900,12 @@ def test_continuous_flowmatching(ligand_pos, batch_ligand):
         t = pos_interpolant.sample_time(4, method='uniform', min_t=pos_interpolant.min_t)
         data_scale, noise_scale = pos_interpolant.forward_schedule(t=t, batch=batch_ligand)
         x1, xt, x0 = pos_interpolant.interpolate(ligand_pos, batch_ligand, t=t, com_free=True)
-
+    pos_interpolant = ContinuousFlowMatchingInterpolant(
+        update_weight_type='recip_time_to_go',
+        schedule_params={'type': 'linear', 'time': 'uniform', 'time_type': 'discrete'},
+    )
     for i in tqdm(time_seq, desc='continuous time_idx interpolation', total=len(time_seq)):
-        t_idx = pos_interpolant.sample_time_idx(4, method='uniform')
+        t_idx = pos_interpolant.sample_time(4, method='uniform')
         data_scale, noise_scale = pos_interpolant.forward_schedule(t_idx=t_idx, batch=batch_ligand)
         x1, xt, x0 = pos_interpolant.interpolate(ligand_pos, batch_ligand, t_idx=t_idx, com_free=True)
 
@@ -813,6 +922,7 @@ def test_continuous_flowmatching(ligand_pos, batch_ligand):
         xt = x_tp1
         check.append(torch.sum((ligand_pos - xt) ** 2))
     # import ipdb; ipdb.set_trace()
+    pos_interpolant = ContinuousFlowMatchingInterpolant(update_weight_type='recip_time_to_go')
     xt = pos_interpolant.prior(x1.shape, batch_ligand, com_free=True, device=x1.device)
     dt = 1 / 500
     check = [torch.sum((ligand_pos - xt) ** 2)]
@@ -854,7 +964,7 @@ def test_discrete_diffusion(h, batch):
     interpolant = DiscreteDiffusionInterpolant(num_classes=num_classes)
     time_seq = list(range(0, 500))
     for i in tqdm(time_seq, desc='discrete diffusion interpolation', total=len(time_seq)):
-        t_idx = interpolant.sample_time_idx(4, method='stab_mode')
+        t_idx = interpolant.sample_time(4, method='stab_mode')
         data_scale, _ = interpolant.forward_schedule(t_idx, batch_ligand)
         x1, xt, probs = interpolant.interpolate(h, batch, t_idx=t_idx)
     assert all(torch.argmax(probs, 1) == x1)
@@ -873,7 +983,7 @@ def test_discrete_diffusion(h, batch):
     interpolant = DiscreteDiffusionInterpolant(num_classes=num_classes, prior_type="absorb")
     time_seq = list(range(0, 500))
     for i in tqdm(time_seq, desc='discrete diffusion absorb interpolation', total=len(time_seq)):
-        t_idx = interpolant.sample_time_idx(4, method='stab_mode')
+        t_idx = interpolant.sample_time(4, method='stab_mode')
         data_scale, _ = interpolant.forward_schedule(t_idx, batch_ligand)
         x1, xt, probs = interpolant.interpolate(h, batch, t_idx=t_idx)
     probs[:, -1] = 0
@@ -889,13 +999,17 @@ def test_discrete_diffusion(h, batch):
 
 
 def test_discrete_flowmatching(h, batch):
-    print("DiscreteDiffusionInterpolant-Uniform: ONLY WORKS with DISCRETE TIME")
+    print("DiscreteFlowMatchingInterpolant-Uniform")
     num_classes = 13
 
-    interpolant = DiscreteFlowMatchingInterpolant(num_classes=num_classes, prior_type="uniform")
+    interpolant = DiscreteFlowMatchingInterpolant(
+        num_classes=num_classes,
+        prior_type="uniform",
+        schedule_params={'type': 'linear', 'time': 'uniform', 'time_type': 'discrete'},
+    )
     time_seq = list(range(0, 500))
     for i in tqdm(time_seq, desc='discrete flowmatching interpolation', total=len(time_seq)):
-        t_idx = interpolant.sample_time_idx(4, method='stab_mode')
+        t_idx = interpolant.sample_time(4, method='stab_mode')
         data_scale, _ = interpolant.forward_schedule(t_idx, batch_ligand)
         x1, xt, x0 = interpolant.interpolate(h, batch, t_idx=t_idx)
 
@@ -907,6 +1021,11 @@ def test_discrete_flowmatching(h, batch):
         x_tp1 = interpolant.step(xt, x_hat, batch, t_idx=t_idx, dt=1 / 500)
         xt = x_tp1
 
+    interpolant = DiscreteFlowMatchingInterpolant(
+        num_classes=num_classes,
+        prior_type="uniform",
+        schedule_params={'type': 'linear', 'time': 'uniform', 'time_type': 'continuous'},
+    )
     xt = interpolant.prior(h.shape, batch, device=h.device)
     dt = 1 / 500
     time_seq = torch.linspace(1e-2, 1, 500)  # min_t used in multi flow
@@ -940,10 +1059,14 @@ def test_discrete_flowmatching(h, batch):
     print("DiscreteDiffusionInterpolant-Absorb")
     num_classes = 14
 
-    interpolant = DiscreteFlowMatchingInterpolant(num_classes=num_classes, prior_type="absorb")
+    interpolant = DiscreteFlowMatchingInterpolant(
+        num_classes=num_classes,
+        prior_type="absorb",
+        schedule_params={'type': 'linear', 'time': 'uniform', 'time_type': 'discrete'},
+    )
     time_seq = list(range(0, 500))
     for i in tqdm(time_seq, desc='discrete diffusion absorb interpolation', total=len(time_seq)):
-        t_idx = interpolant.sample_time_idx(4, method='stab_mode')
+        t_idx = interpolant.sample_time(4, method='stab_mode')
         data_scale, _ = interpolant.forward_schedule(t_idx, batch_ligand)
         x1, xt, x0 = interpolant.interpolate(h, batch, t_idx=t_idx)
 
@@ -954,6 +1077,12 @@ def test_discrete_flowmatching(h, batch):
         x_hat = F.one_hot(xt01, num_classes)
         x_tp1 = interpolant.step(xt, x_hat, batch, t_idx=t_idx, dt=1 / 500)
         xt = x_tp1
+
+    interpolant = DiscreteFlowMatchingInterpolant(
+        num_classes=num_classes,
+        prior_type="absorb",
+        schedule_params={'type': 'linear', 'time': 'uniform', 'time_type': 'continuous'},
+    )
 
     xt = interpolant.prior(h.shape, batch, device=h.device)
     dt = 1 / 500
@@ -984,6 +1113,46 @@ def test_discrete_flowmatching(h, batch):
             x_tp1 = interpolant.step(xt, x_hat, batch, t=t, t_next=t_next)
         xt = x_tp1
     assert all(x1 == xt)
+
+
+def test_discrete_edge_diffusion(E, E_idx, batch):
+    print("DiscreteDiffusionInterpolant-Uniform: ONLY WORKS with DISCRETE TIME")
+    num_classes = 5
+
+    interpolant = DiscreteDiffusionInterpolant(num_classes=num_classes)
+    time_seq = list(range(0, 500))
+    for i in tqdm(time_seq, desc='discrete diffusion interpolation', total=len(time_seq)):
+        t_idx = interpolant.sample_time(4, method='stab_mode')
+        data_scale, _ = interpolant.forward_schedule(t_idx, batch_ligand)
+        x1, xt, probs = interpolant.interpolate_edges(E, E_idx, batch, t_idx=t_idx)
+
+    xt, xt_index = interpolant.prior_edges(E.shape, E_idx, batch, device=E.device)
+    # MASK = mask.clone()
+    for i in tqdm(time_seq, desc='discrete diffusion step', total=len(time_seq)):
+        t_idx = torch.full(size=(4,), fill_value=i, dtype=torch.int64, device='cpu')
+        x1, xt01, probs = interpolant.interpolate_edges(E, E_idx, batch, t_idx=t_idx)
+        x_hat = xt01
+        xt_index, x_tp1 = interpolant.step_edges(
+            xt_index, xt, x_hat, batch, t_idx
+        )  #! The mask's do not change its alwasy fully connected here
+        xt = x_tp1
+
+    num_classes = 6
+
+    interpolant = DiscreteDiffusionInterpolant(num_classes=num_classes, prior_type="absorb")
+    time_seq = list(range(0, 500))
+    for i in tqdm(time_seq, desc='discrete diffusion interpolation', total=len(time_seq)):
+        t_idx = interpolant.sample_time(4, method='stab_mode')
+        data_scale, _ = interpolant.forward_schedule(t_idx, batch_ligand)
+        x1, xt, probs = interpolant.interpolate_edges(E, E_idx, batch, t_idx=t_idx)
+
+    xt, xt_index = interpolant.prior_edges(E.shape, E_idx, batch, device=E.device)
+    for i in tqdm(time_seq, desc='discrete diffusion step', total=len(time_seq)):
+        t_idx = torch.full(size=(4,), fill_value=i, dtype=torch.int64, device='cpu')
+        x1, xt01, probs = interpolant.interpolate_edges(E, E_idx, batch, t_idx=t_idx)
+        x_hat = xt01
+        xt_index, x_tp1 = interpolant.step_edges(xt_index, xt, x_hat, batch, t_idx)
+        xt = x_tp1
 
 
 if __name__ == "__main__":
@@ -1150,6 +1319,43 @@ if __name__ == "__main__":
         ]
     ).to(torch.int64)
 
+    num_classes = 13
+    # Initialize the adjacency matrix with zeros
+    adj_matrix = torch.zeros((75, 75, 5), dtype=torch.int64)
+    no_bond = torch.zeros(5)
+    no_bond[0] = 1
+    # Using broadcasting to create the adjacency matrix
+    adj_matrix[batch_ligand.unsqueeze(1) == batch_ligand] = 1
+    for idx, i in enumerate(batch_ligand):
+        for jdx, j in enumerate(batch_ligand):
+            if idx == jdx:
+                adj_matrix[idx][jdx] = no_bond
+            elif i == j:
+                # import ipdb; ipdb.set_trace()
+                adj_matrix[idx][jdx] = torch.nn.functional.one_hot(torch.randint(0, 5, (1,)), 5).squeeze(0)
+    # print(adj_matrix)
+
+    # atom_embedder = nn.Linear(num_classes, 64)
+    X = ligand_pos
+    H = F.one_hot(ligand_feats, num_classes).float()  # atom_embedder(F.one_hot(ligand_feats, num_classes).float())
+    A = adj_matrix
+    mask = batch_ligand.unsqueeze(1) == batch_ligand.unsqueeze(0)  # Shape: (75, 75)
+    E_idx = mask.nonzero(as_tuple=False).t()
+    self_loops = E_idx[0] != E_idx[1]
+    E_idx = E_idx[:, self_loops]
+
+    source, target = E_idx
+    E = A[source, target]  # E x 5
+    E = E.argmax(1)  # E
+    E_idx, E = sort_edge_index(
+        edge_index=E_idx,
+        edge_attr=E,
+        sort_by_row=False,
+    )
+    # edge_embedder = nn.Linear(5, 32)
+    # E = edge_embedder(E.float())
+    # import ipdb; ipdb.set_trace()
+    test_discrete_edge_diffusion(E, E_idx, batch_ligand)
     test_continuous_diffusion(ligand_pos, batch_ligand)
     test_continuous_flowmatching(ligand_pos, batch_ligand)
     test_discrete_diffusion(ligand_feats, batch_ligand)

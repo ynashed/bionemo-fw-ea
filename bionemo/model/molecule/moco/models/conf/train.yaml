@@ -19,16 +19,28 @@ interpolants:
       prior_type: 'gaussian'
       timesteps: *timesteps
       num_classes: 13
+      scheduler:
+        - schedule_type: "cosine_adaptive"
+        - time_type: "discrete"
+        - nu: 2.0
     - variable_name: 'h'
       interpolant_type: 'discrete_diffusion'
       prior_type: 'uniform'
       timesteps: *timesteps
       num_classes: 13
+      scheduler:
+        - schedule_type: "cosine_adaptive"
+        - time_type: "discrete"
+        - nu: 1.0
     - variable_name: 'edge_attr'
       interpolant_type: 'discrete_diffusion'
       prior_type: 'uniform'
       timesteps: *timesteps
       num_classes: 5
+      scheduler:
+        - schedule_type: "cosine_adaptive"
+        - time_type: "discrete"
+        - nu: 1.5
 
   
 dynamics:
