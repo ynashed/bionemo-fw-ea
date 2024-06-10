@@ -187,8 +187,13 @@ class NoiseTransform(BaseTransform):
             if torsion_updates is None
             else torsion_updates
         )
-        torsion_updates = None if self.no_torsion or data["ligand"].edge_mask.sum() == 0 else torsion_updates
-        modify_conformer(data, tr_update, torch.from_numpy(rot_update).float(), torsion_updates)
+        torsion_updates = None if self.no_torsion else torsion_updates
+        modify_conformer(
+            data,
+            tr_update,
+            torch.from_numpy(rot_update).float(),
+            None if data["ligand"].edge_mask.sum() == 0 else torsion_updates,
+        )
 
         data.tr_score = -tr_update / tr_sigma**2
         data.rot_score = torch.from_numpy(so3.score_vec(vec=rot_update, eps=rot_sigma)).float().unsqueeze(0)

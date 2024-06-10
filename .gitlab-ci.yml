@@ -664,7 +664,7 @@ jet-configure:
 jet-trigger:
   extends: [.jet-trigger-template]
   variables:
-    JET_WORKLOADS_FILTER: type == 'recipe' and spec.config_name != 'pretrain_esm2_650M' and spec.config_name != 'train_score'
+    JET_WORKLOADS_FILTER: type == 'recipe' and spec.config_name != 'pretrain_esm2_650M'
     JET_CUSTOM_CONFIG: |
       tests:
         allow_failure: true
@@ -714,7 +714,7 @@ jet-trigger:
         JET_WORKLOADS_FILTER: type == 'recipe' and spec.model == 'molmim'
     - if: $CI_MERGE_REQUEST_LABELS =~ /DiffDock/ || $JET_MODEL_NAME == "DiffDock"
       variables:
-        JET_WORKLOADS_FILTER: type == 'recipe' and spec.model == 'diffdock' and spec.config_name != 'train_score'
+        JET_WORKLOADS_FILTER: type == 'recipe' and spec.model == 'diffdock'
     - when: on_success
 
 
