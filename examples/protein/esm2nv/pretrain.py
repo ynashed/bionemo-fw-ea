@@ -61,17 +61,16 @@ def main(cfg) -> None:
 
         if not os.path.exists(cfg.model.data.train.uf50_datapath):
             raise FileNotFoundError(
-                "input argument ++cfg.model.data.train.uf50_datapath: {cfg.model.data.train.uf50_datapath} is not found."
+                f"input argument ++cfg.model.data.train.uf50_datapath: {cfg.model.data.train.uf50_datapath} is not found."
             )
         if not os.path.exists(cfg.model.data.train.uf90_datapath):
             raise FileNotFoundError(
-                "input argument ++cfg.model.data.train.uf90_datapath: {cfg.model.data.train.uf90_datapath} is not found."
+                f"input argument ++cfg.model.data.train.uf90_datapath: {cfg.model.data.train.uf90_datapath} is not found."
             )
         if not os.path.exists(cfg.model.data.train.cluster_mapping_tsv):
             raise FileNotFoundError(
-                "input argument ++cfg.model.data.train.cluster_mapping_tsv: {cfg.model.data.train.cluster_mapping_tsv} is not found."
+                f"input argument ++cfg.model.data.train.cluster_mapping_tsv: {cfg.model.data.train.cluster_mapping_tsv} is not found."
             )
-
         preprocessor.prepare_dataset(
             uf50_datapath=cfg.model.data.train.uf50_datapath,
             uf90_datapath=cfg.model.data.train.uf90_datapath,
@@ -85,12 +84,12 @@ def main(cfg) -> None:
         # Make sure the dataset was created.
         if not os.path.isdir(cfg.model.data.train.dataset_path):
             raise ValueError(
-                "Attempted to create a dataset output directory: {cfg.model.data.train.dataset_path} but it failed and was not created."
+                f"Attempted to create a dataset output directory: {cfg.model.data.train.dataset_path} but it failed and was not created."
             )
         # Check input arguments for val run.
         if not os.path.exists(cfg.model.data.val.uf50_datapath):
             raise FileNotFoundError(
-                "input argument ++cfg.model.data.val.uf50_datapath: {cfg.model.data.val.uf50_datapath} is not found."
+                f"input argument ++cfg.model.data.val.uf50_datapath: {cfg.model.data.val.uf50_datapath} is not found."
             )
         preprocessor.prepare_dataset(
             uf50_datapath=cfg.model.data.val.uf50_datapath,
@@ -101,13 +100,13 @@ def main(cfg) -> None:
         # Make sure the dataset was created.
         if not os.path.isdir(cfg.model.data.val.dataset_path):
             raise ValueError(
-                "Attempted to create a dataset output directory: {cfg.model.data.val.dataset_path} but it failed and was not created."
+                f"Attempted to create a dataset output directory: {cfg.model.data.val.dataset_path} but it failed and was not created."
             )
 
         # Check input arguments for test.
         if not os.path.exists(cfg.model.data.test.uf50_datapath):
             raise FileNotFoundError(
-                "input argument ++cfg.model.data.test.uf50_datapath: {cfg.model.data.test.uf50_datapath} is not found."
+                f"input argument ++cfg.model.data.test.uf50_datapath: {cfg.model.data.test.uf50_datapath} is not found."
             )
 
         preprocessor.prepare_dataset(
@@ -119,7 +118,7 @@ def main(cfg) -> None:
         # Make sure the dataset was created.
         if not os.path.isdir(cfg.model.data.test.dataset_path):
             raise ValueError(
-                "Attempted to create a dataset output directory: {cfg.model.data.test.dataset_path} but it failed and was not created."
+                f"Attempted to create a dataset output directory: {cfg.model.data.test.dataset_path} but it failed and was not created."
             )
 
         # Downloading and preprocessing data for downstream task validation

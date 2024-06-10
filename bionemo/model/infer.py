@@ -19,12 +19,20 @@ from pathlib import Path
 from typing import Sequence
 from uuid import uuid4
 
+import h5py
+import numpy as np
 from nemo.core.config import hydra_runner
 from nemo.utils import logging
 from omegaconf import DictConfig
+from tqdm import tqdm
 
 from bionemo.model.loading import setup_inference
-from bionemo.model.run_inference import extract_output_filename, predict_ddp, validate_output_filename
+from bionemo.model.run_inference import (
+    extract_output_filename,
+    extract_output_format,
+    predict_ddp,
+    validate_output_filename,
+)
 
 
 __all__: Sequence[str] = ()  # pragma: no cover
@@ -46,20 +54,27 @@ def entrypoint(cfg: DictConfig) -> None:
             logging.warning("No exp_manager.exp_dir in configuration! Must write output to current directory.")
             output_fname = f"./{filename}"
 
+    try:
+        output_format: str = extract_output_format(cfg)
+    except ValueError:  # backward compatibility: default to pickle
+        output_format = "pkl"
+
+    if output_format not in ["pkl", "h5"]:
+        raise ValueError(f'Users must specify either pkl or h5 output format but {output_format} is given')
+
     if os.path.exists(output_fname):
-        output_fname += f"--{uuid4()}.pkl"
-        logging.warning(
-            "Configuration's output filename already exists! " f"Making unique with filename suffix: {output_fname=}"
-        )
+        if output_format == "pkl":
+            output_fname += f"--{uuid4()}.{output_format}"
+            logging.warning(f"Configuration's output filename already exists: {output_fname}!")
+        elif output_format == "h5":
+            for emb in cfg.model.downstream_task.outputs:
+                output_embeddings_path = f"{output_fname}_{emb}.h5"
+                logging.warning(f"Configuration's output filename already exists: {output_embeddings_path}!")
     else:
         output_folderpath: str = os.path.dirname(output_fname)
         if not os.path.exists(output_folderpath):
             os.makedirs(output_folderpath, exist_ok=True)
             print(f"Directory of output filename '{output_folderpath}' created")
-
-    if not output_fname.endswith(".pkl"):
-        output_fname += ".pkl"
-        logging.warning(f"Ensuring that output filename has .pkl extension: {output_fname}")
 
     validate_output_filename(output_fname, overwrite=False)
 
@@ -71,8 +86,26 @@ def entrypoint(cfg: DictConfig) -> None:
     # from here only rank 0 should continue
 
     logging.info(f"Saving {len(predictions)} samples to {output_fname}")
-    with open(output_fname, "wb") as wb:
-        pickle.dump(predictions, wb)
+    if output_format == "pkl":
+        with open(output_fname, "wb") as wb:
+            pickle.dump(predictions, wb)
+    elif output_format == "h5":
+        # pack embeddings into h5 instead of pickle
+        for emb in cfg.model.downstream_task.outputs:
+            values_dict = {sample['id']: sample[emb] for sample in predictions}
+            output_embeddings_path = f"{output_fname}_{emb}.h5"
+            with h5py.File(output_embeddings_path, "w") as output_embeddings_file:
+                for idx, (seq_id, values) in enumerate(tqdm(values_dict.items(), f"converting {emb} to h5 format")):
+                    if emb == "hiddens":
+                        maxshape = values.shape
+                    elif emb == "embeddings":
+                        maxshape = len(values)
+                    output_embeddings_file.create_dataset(
+                        str(idx), data=np.array(values), compression="gzip", chunks=True, maxshape=(maxshape)
+                    )
+                    output_embeddings_file[str(idx)].attrs["original_id"] = seq_id
+    else:
+        raise ValueError(f'Users must specify either pkl or h5 output format but {output_format} is given')
 
 
 if __name__ == '__main__':

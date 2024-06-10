@@ -28,6 +28,7 @@ model:
     perturb_percent: 0.1 # Of the modify_percent, what fraction of characters are to be replaced with another amino acid.
     mask_percent: 0.8 # Of the modify_percent, what fraction of characters are to be replaced with a mask token.
     identity_percent: 0.1 # Of the modify_percent, what fraction of characters are to be unchanged as the original amino acid.
+    output_format: pkl  # support either pkl or h5
 
 target: bionemo.model.protein.esm1nv.esm1nv_model.ESM1nvModel  # path to model class to load
 infer_target: bionemo.model.protein.esm1nv.infer.ESM1nvInference # path to inferende class to load
