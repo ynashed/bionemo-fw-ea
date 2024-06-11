@@ -9,7 +9,7 @@ class MoCo(nn.Module):
     def __init__(self, atom_classes=16, atom_features=64, edge_classes=5, edge_features=32, num_layers=2):
         super(MoCo, self).__init__()
         self.atom_embedder = nn.Linear(atom_classes, atom_features)
-        self.edge_embedder = nn.Linear(edge_classes, atom_features)
+        self.edge_embedder = nn.Linear(edge_classes, edge_features)
         self.layers = nn.ModuleList(
             [
                 EquivariantMessagePassingLayer(3, atom_features, edge_features),
@@ -27,8 +27,11 @@ class MoCo(nn.Module):
         H = self.atom_embedder(F.one_hot(H, self.num_atom_classes).float())
         E = self.edge_embedder(F.one_hot(E, self.num_edge_classes).float())
         te = self.time_embedding(t, batch)  # B x D
-        H = self.ada_ln(H, te, batch)  # error
+        H = self.ada_ln(H, te, batch)  # N x D
         for layer in self.layers:
+            import ipdb
+
+            ipdb.set_trace()
             X, H, E, m_ij = layer(batch, X, H, E_idx, E)
 
         h_logits, h_pred = self.atom_type_head(batch, H)

@@ -147,9 +147,6 @@ class AdaLN(nn.Module):
         """
         # scale = 1 + self.scale_mlp(t)
         # shift = self.shift_mlp(t)
-        import ipdb
-
-        ipdb.set_trace()
         scale, shift = self.scale_shift_mlp(t).chunk(2, dim=-1)
         return (1 + scale[batch]) * self.layernorm(h, batch) + shift[batch]
 
