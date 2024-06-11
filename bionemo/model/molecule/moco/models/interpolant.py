@@ -58,6 +58,9 @@ def build_interpolant(params):
             params.num_classes,
             params.min_t,
         )
+    elif params.interpolant_type is None:
+        #! This is to allow variables we just want to pass in and not noise/denoise
+        return None
     else:
         raise NotImplementedError('Interpolant not supported: %s' % params.interpolant_type)
 

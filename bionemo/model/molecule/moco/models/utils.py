@@ -13,6 +13,7 @@ class PredictionHead(nn.Module):
         self.discrete = discrete
         self.projection = MLP(feat_dim, feat_dim, num_classes)
 
+    #! Even if we have a masking state we still predict it but always mask it even on the forward pass as done in MultiFlow. The loss is taken over teh logits so its not masked
     def forward(self, H, batch):
         logits = self.projection(H)
         if self.discrete:
@@ -22,8 +23,8 @@ class PredictionHead(nn.Module):
         return logits, probs
 
 
-class LossFunction(nn.Module):
-    def __init__(self, discrete_class_weight=None):
+class InterpolantLossFunction(nn.Module):
+    def __init__(self, use_distance: str = None, discrete_class_weight=None):
         super().__init__()
         self.f_continuous = nn.MSELoss(reduction='none')  # can also use HuberLoss
         if discrete_class_weight is None:
@@ -31,6 +32,7 @@ class LossFunction(nn.Module):
         else:
             self.f_discrete = nn.CrossEntropyLoss(weight=discrete_class_weight, reduction='none')
             #! We can up weight certain bonds to make sure this is correct
+        self.use_distance = use_distance
 
     def forward(self, batch, logits, data, batch_weight=None, element_weight=None, continuous=True, scale=1.0):
         # d (λx, λh, λe) = (3, 0.4, 2)
@@ -63,30 +65,48 @@ class LossFunction(nn.Module):
         loss = scale * loss.mean()
         return loss, output
 
-    def distance_loss(self, batch, X_true, X_pred, Z_pred):
-        true_distance = torch.tensor([], device=X_true.device)
-        x_pred_distance = torch.tensor([], device=X_true.device)
-        z_pred_distance = torch.tensor([], device=X_true.device)
-        batch_size = len(batch.unique())
-        c_batch = []
-        for element in range(batch_size):
-            x_true = X_true[batch == element]
-            x_pred = X_pred[batch == element]
-            c_batch.extend([element] * x_true.size(0) * x_true.size(0))
-            dist = torch.cdist(x_true, x_true).flatten()
-            dist_pred = torch.cdist(x_pred, x_pred).flatten()
-            dist_z = Z_pred[batch == element][:, batch == element].flatten()
-            true_distance = torch.cat([true_distance, dist], dim=-1)
-            x_pred_distance = torch.cat([x_pred_distance, dist_pred], dim=-1)
-            z_pred_distance = torch.cat([z_pred_distance, dist_z], dim=-1)
-        c_batch = torch.Tensor(c_batch).to(torch.int64).to(X_true.device)
-        A = self.f_continuous(true_distance, x_pred_distance)
-        B = self.f_continuous(true_distance, z_pred_distance)
-        C = self.f_continuous(x_pred_distance, z_pred_distance)
-        A = scatter_mean(A, c_batch, dim=0, dim_size=batch_size).mean()
-        B = scatter_mean(B, c_batch, dim=0, dim_size=batch_size).mean()
-        C = scatter_mean(C, c_batch, dim=0, dim_size=batch_size).mean()
-        return A, B, C
+    def distance_loss(self, batch, X_true, X_pred, Z_pred=None):
+        if Z_pred is None:
+            true_distance = torch.tensor([], device=X_true.device)
+            x_pred_distance = torch.tensor([], device=X_true.device)
+            batch_size = len(batch.unique())
+            c_batch = []
+            for element in range(batch_size):
+                x_true = X_true[batch == element]
+                x_pred = X_pred[batch == element]
+                c_batch.extend([element] * x_true.size(0) * x_true.size(0))
+                dist = torch.cdist(x_true, x_true).flatten()
+                dist_pred = torch.cdist(x_pred, x_pred).flatten()
+                true_distance = torch.cat([true_distance, dist], dim=-1)
+                x_pred_distance = torch.cat([x_pred_distance, dist_pred], dim=-1)
+            c_batch = torch.Tensor(c_batch).to(torch.int64).to(X_true.device)
+            A = self.f_continuous(true_distance, x_pred_distance)
+            A = scatter_mean(A, c_batch, dim=0, dim_size=batch_size).mean()
+            return A, 0, 0
+        else:
+            true_distance = torch.tensor([], device=X_true.device)
+            x_pred_distance = torch.tensor([], device=X_true.device)
+            z_pred_distance = torch.tensor([], device=X_true.device)
+            batch_size = len(batch.unique())
+            c_batch = []
+            for element in range(batch_size):
+                x_true = X_true[batch == element]
+                x_pred = X_pred[batch == element]
+                c_batch.extend([element] * x_true.size(0) * x_true.size(0))
+                dist = torch.cdist(x_true, x_true).flatten()
+                dist_pred = torch.cdist(x_pred, x_pred).flatten()
+                dist_z = Z_pred[batch == element][:, batch == element].flatten()
+                true_distance = torch.cat([true_distance, dist], dim=-1)
+                x_pred_distance = torch.cat([x_pred_distance, dist_pred], dim=-1)
+                z_pred_distance = torch.cat([z_pred_distance, dist_z], dim=-1)
+            c_batch = torch.Tensor(c_batch).to(torch.int64).to(X_true.device)
+            A = self.f_continuous(true_distance, x_pred_distance)
+            B = self.f_continuous(true_distance, z_pred_distance)
+            C = self.f_continuous(x_pred_distance, z_pred_distance)
+            A = scatter_mean(A, c_batch, dim=0, dim_size=batch_size).mean()
+            B = scatter_mean(B, c_batch, dim=0, dim_size=batch_size).mean()
+            C = scatter_mean(C, c_batch, dim=0, dim_size=batch_size).mean()
+            return A, B, C
 
 
 if __name__ == "__main__":
@@ -283,6 +303,6 @@ if __name__ == "__main__":
     edge_embedder = nn.Linear(5, 32)
     E = edge_embedder(E.float())
 
-    loss_function = LossFunction()
+    loss_function = InterpolantLossFunction()
     # import ipdb; ipdb.set_trace()
     out = loss_function.distance_loss(batch_ligand, X, X, Z.sum(-1))

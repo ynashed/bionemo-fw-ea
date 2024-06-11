@@ -11,6 +11,9 @@ wandb_params:
 data:
   name: GEOM-DRUGS
 
+loss:
+  distance: null #'single' 'triple'
+
 interpolants:
   timesteps: &timesteps 500
   variables:
@@ -41,6 +44,8 @@ interpolants:
         - schedule_type: "cosine_adaptive"
         - time_type: "discrete"
         - nu: 1.5
+    # - variable_name: 'charge'
+    #   interpolant_type: null
 
   
 dynamics:
