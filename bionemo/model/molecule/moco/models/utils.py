@@ -14,7 +14,7 @@ class PredictionHead(nn.Module):
         self.projection = MLP(feat_dim, feat_dim, num_classes)
 
     #! Even if we have a masking state we still predict it but always mask it even on the forward pass as done in MultiFlow. The loss is taken over teh logits so its not masked
-    def forward(self, H, batch):
+    def forward(self, batch, H):
         logits = self.projection(H)
         if self.discrete:
             probs = scatter_softmax(logits, index=batch, dim=0, dim_size=H.size(0))

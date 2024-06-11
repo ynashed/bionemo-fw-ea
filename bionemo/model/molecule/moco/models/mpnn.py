@@ -114,7 +114,7 @@ class TimestepEmbedder(nn.Module):
             embedding = torch.cat([embedding, torch.zeros_like(embedding[:, :1])], dim=-1)
         return embedding
 
-    def forward(self, t):
+    def forward(self, t, batch):
         t_freq = self.timestep_embedding(t, self.frequency_embedding_size)
         t_emb = self.mlp(t_freq)
         return t_emb
@@ -147,6 +147,9 @@ class AdaLN(nn.Module):
         """
         # scale = 1 + self.scale_mlp(t)
         # shift = self.shift_mlp(t)
+        import ipdb
+
+        ipdb.set_trace()
         scale, shift = self.scale_shift_mlp(t).chunk(2, dim=-1)
         return (1 + scale[batch]) * self.layernorm(h, batch) + shift[batch]
 
@@ -363,7 +366,9 @@ class EquivariantMessagePassingLayer(MessagePassing):
         return E
 
     def forward(self, batch, X, H, edge_index, edge_attr):
-        # import ipdb; ipdb.set_trace()
+        import ipdb
+
+        ipdb.set_trace()
         edge_attr = self.mix_edges(batch, X, edge_index, self.pre_edge(edge_attr), k=4)
         source, target = edge_index
         rel_coors = X[source] - X[target]

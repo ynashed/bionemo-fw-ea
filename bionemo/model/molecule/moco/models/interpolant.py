@@ -10,6 +10,7 @@
 import numpy as np
 import torch
 import torch.nn.functional as F
+from torch import nn
 from torch_geometric.utils import sort_edge_index
 from torch_scatter import scatter_mean
 
@@ -44,6 +45,7 @@ def build_interpolant(
     num_classes: int = 10,
     min_t: float = 1e-2,
     custom_prior: torch.Tensor = None,
+    variable_name: str = None,
 ):
     """
     This function builds the Interpolant.
@@ -101,7 +103,7 @@ def build_interpolant(
         raise NotImplementedError('Interpolant not supported: %s' % interpolant_type)
 
 
-class Interpolant:
+class Interpolant(nn.Module):
     def __init__(
         self,
         prior_type: str,
@@ -109,6 +111,7 @@ class Interpolant:
         timesteps: int = 500,
         time_type: str = 'discrete',
     ):
+        super(Interpolant, self).__init__()
         self.prior_type = prior_type
         self.timesteps = timesteps
         self.solver_type = solver_type
@@ -203,24 +206,33 @@ class ContinuousDiffusionInterpolant(Interpolant):
 
     def init_schedulers(self, timesteps, scheduler_type, s, sqrt, nu, clip):
         self.scheduler = build_scheduler(scheduler_type, timesteps, s, sqrt, nu, clip)
-        self.alphas, self.betas = self.scheduler.get_alphas_and_betas()
-        log_alpha = torch.log(self.alphas)
+        alphas, betas = self.scheduler.get_alphas_and_betas()
+        log_alpha = torch.log(alphas)
         log_alpha_bar = torch.cumsum(log_alpha, dim=0)
-        self.alpha_bar = alphas_cumprod = torch.exp(log_alpha_bar)
-        self.alpha_bar_prev = alphas_cumprod_prev = torch.nn.functional.pad(alphas_cumprod[:-1], (1, 0), value=1.0)
-        self.posterior_variance = self.betas * (1.0 - alphas_cumprod_prev) / (1.0 - alphas_cumprod)
-        self.posterior_mean_c0_coef = self.betas * torch.sqrt(alphas_cumprod_prev) / (1.0 - alphas_cumprod)
-        self.posterior_mean_ct_coef = (1.0 - alphas_cumprod_prev) * np.sqrt(self.alphas) / (1.0 - alphas_cumprod)
+        alpha_bar = alphas_cumprod = torch.exp(log_alpha_bar)
+        alpha_bar_prev = alphas_cumprod_prev = torch.nn.functional.pad(alphas_cumprod[:-1], (1, 0), value=1.0)
+        posterior_variance = betas * (1.0 - alphas_cumprod_prev) / (1.0 - alphas_cumprod)
+        posterior_mean_c0_coef = betas * torch.sqrt(alphas_cumprod_prev) / (1.0 - alphas_cumprod)
+        posterior_mean_ct_coef = (1.0 - alphas_cumprod_prev) * np.sqrt(alphas) / (1.0 - alphas_cumprod)
         # log calculation clipped because the posterior variance is 0 at the beginning of the diffusion chain
-        self.posterior_logvar = torch.log(
-            torch.nn.functional.pad(self.posterior_variance[:-1], (1, 0), value=self.posterior_variance[0])
+        posterior_logvar = torch.log(
+            torch.nn.functional.pad(posterior_variance[:-1], (1, 0), value=posterior_variance[0])
         )
 
-        self.forward_data_schedule = torch.sqrt(self.alpha_bar)
-        self.forward_noise_schedule = torch.sqrt(1 - self.alpha_bar)
-        self.reverse_data_schedule = self.posterior_mean_c0_coef
-        self.reverse_noise_schedule = self.posterior_mean_ct_coef
-        self.log_var = self.posterior_logvar
+        self.register_buffer('alphas', alphas)
+        self.register_buffer('betas', betas)
+        self.register_buffer('alpha_bar', alpha_bar)
+        self.register_buffer('alpha_bar_prev', alpha_bar_prev)
+        self.register_buffer('posterior_variance', posterior_variance)
+        self.register_buffer('posterior_mean_c0_coef', posterior_mean_c0_coef)
+        self.register_buffer('posterior_mean_ct_coef', posterior_mean_ct_coef)
+        self.register_buffer('posterior_logvar', posterior_logvar)
+
+        self.register_buffer('forward_data_schedule', torch.sqrt(alpha_bar))
+        self.register_buffer('forward_noise_schedule', torch.sqrt(1 - alpha_bar))
+        self.register_buffer('reverse_data_schedule', posterior_mean_c0_coef)
+        self.register_buffer('reverse_noise_schedule', posterior_mean_ct_coef)
+        self.register_buffer('log_var', posterior_logvar)
 
     def forward_schedule(self, t_idx, batch):
         # t = 1 - t
@@ -248,7 +260,7 @@ class ContinuousDiffusionInterpolant(Interpolant):
 
     def prior(self, shape, batch, com_free, device):
         if self.prior_type == "gaussian" or self.prior_type == "normal":
-            x0 = torch.randn(shape)
+            x0 = torch.randn(shape).to(device)
             if com_free:
                 x0 = x0 - scatter_mean(x0, batch, dim=0)[batch]
         else:
@@ -310,9 +322,10 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
         self.schedule_type = scheduler_type
         if scheduler_type == "linear":  #! vpe_linear is just linear with an update weight of recip_time_to_go
             self.discrete_time_only = False
-            self.time = torch.linspace(self.min_t, 1, self.timesteps)
-            self.forward_data_schedule = self.time
-            self.forward_noise_schedule = 1.0 - self.time
+            time = torch.linspace(self.min_t, 1, self.timesteps)
+            self.register_buffer("time", time)
+            self.register_buffer("forward_data_schedule", time)
+            self.register_buffer("forward_noise_schedule", 1.0 - time)
         elif scheduler_type == "vpe":
             # ! Doing this enforces discrete_time_only
             self.discrete_time_only = True
@@ -321,10 +334,15 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
             # )  # FlowMol defines alpha as 1 - cos ^2
             # self.forward_data_schedule = self.alphas
             self.scheduler = build_scheduler(scheduler_type, timesteps, s, sqrt, nu, clip)
-            self.alphas, self.betas = self.scheduler.get_alphas_and_betas()
-            self.reverse_data_schedule = 1.0 - self.alphas
-            self.derivative_forward_data_schedule = self.alphas_prime
-            self.alpha_bar = self.alphas  # For SNR
+            alphas, betas = self.scheduler.get_alphas_and_betas()
+            # self.reverse_data_schedule = 1.0 - self.alphas
+            # self.derivative_forward_data_schedule = self.alphas_prime
+            # self.alpha_bar = self.alphas  # For SNR
+            self.register_buffer('alphas', alphas)
+            self.register_buffer('betas', betas)
+            self.register_buffer('alpha_bar', alphas)
+            self.register_buffer('forward_data_schedule', alphas)
+            self.register_buffer('reverse_data_schedule', 1.0 - self.alphas)
 
     def snr_loss_weight(self, t_idx=None, t=None):
         if t_idx is not None:
@@ -381,7 +399,7 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
 
     def prior(self, shape, batch, com_free, device):
         if self.prior_type == "gaussian" or self.prior_type == "normal":
-            x0 = torch.randn(shape)
+            x0 = torch.randn(shape).to(device)
             if com_free:
                 x0 = x0 - scatter_mean(x0, batch, dim=0)[batch]
         else:
@@ -476,18 +494,24 @@ class DiscreteDiffusionInterpolant(Interpolant):
     def init_schedulers(self, timesteps, scheduler_type, s, sqrt, nu, clip):
         self.schedule_type = scheduler_type
         self.scheduler = build_scheduler(scheduler_type, timesteps, s, sqrt, nu, clip)
-        self.alphas, self.betas = self.scheduler.get_alphas_and_betas()
-        self.log_alpha = torch.log(self.alphas)
-        self.log_alpha_bar = torch.cumsum(self.log_alpha, dim=0)
-        self.alpha_bar = alphas_cumprod = torch.exp(self.log_alpha_bar)
-        self.alpha_bar_prev = torch.nn.functional.pad(alphas_cumprod[:-1], (1, 0), value=1.0)
+        alphas, betas = self.scheduler.get_alphas_and_betas()
+        log_alpha = torch.log(alphas)
+        log_alpha_bar = torch.cumsum(log_alpha, dim=0)
+        alpha_bar = torch.exp(log_alpha_bar)
+        # alpha_bar_prev = torch.nn.functional.pad(alphas_cumprod[:-1], (1, 0), value=1.0)
+
+        self.register_buffer('alphas', alphas)
+        self.register_buffer('alpha_bar', alpha_bar)
         if self.diffusion_type == "d3pm":  # MIDI and EQ
-            self.Qt, self.Qt_bar, self.Qt_prev_bar = self.d3pm_setup()
-            self.forward_data_schedule = self.Qt_bar
-            self.forward_noise_schedule = self.Qt_bar
+            Qt, Qt_bar, Qt_prev_bar = self.d3pm_setup()
+            self.register_buffer('forward_data_schedule', Qt_bar)
+            self.register_buffer('forward_noise_schedule', Qt_bar)
+            self.register_buffer('Qt', Qt)
+            self.register_buffer('Qt_bar', Qt_bar)
+            self.register_buffer('Qt_prev_bar', Qt_prev_bar)
         elif self.diffusion_type == "argmax":  # TargetDiff
-            self.forward_data_schedule = self.log_alpha_bar
-            self.forward_noise_schedule = log_1_min_a(self.log_alpha_bar)
+            self.register_buffer('forward_data_schedule', log_alpha_bar)
+            self.register_buffer('forward_noise_schedule', log_1_min_a(log_alpha_bar))
 
     def forward_schedule(self, t_idx, batch):
         # t = 1 - t
@@ -703,16 +727,22 @@ class DiscreteFlowMatchingInterpolant(Interpolant):
         if scheduler_type == "linear":  #! vpe_linear is just linear with an update weight of recip_time_to_go
             self.discrete_time_only = False
             time = torch.linspace(self.min_t, 1, self.timesteps)
-            self.forward_data_schedule = time
-            self.forward_noise_schedule = 1.0 - time
+            self.register_buffer("time", time)
+            self.register_buffer("forward_data_schedule", time)
+            self.register_buffer("forward_noise_schedule", 1.0 - time)
         elif scheduler_type == "vpe":
             self.scheduler = build_scheduler(scheduler_type, timesteps, s, sqrt, nu, clip)
-            self.alphas, self.betas = self.scheduler.get_alphas_and_betas()
+            alphas, betas = self.scheduler.get_alphas_and_betas()
             # FlowMol defines alpha as 1 - cos ^2
-            self.forward_data_schedule = self.alphas
-            self.reverse_data_schedule = 1.0 - self.alphas
-            self.derivative_forward_data_schedule = self.alphas_prime
-            self.alpha_bar = self.alphas
+            # self.forward_data_schedule = self.alphas
+            # self.reverse_data_schedule = 1.0 - self.alphas
+            # self.derivative_forward_data_schedule = self.alphas_prime
+            # self.alpha_bar = self.alphas
+            self.register_buffer('alphas', alphas)
+            self.register_buffer('betas', betas)
+            self.register_buffer('alpha_bar', alphas)
+            self.register_buffer('forward_data_schedule', alphas)
+            self.register_buffer('reverse_data_schedule', 1.0 - self.alphas)
 
     def snr_loss_weight(self, t_idx=None, t=None):
         if t_idx is not None:

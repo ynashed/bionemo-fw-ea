@@ -9,41 +9,52 @@ wandb_params:
   project: 'MoCo'
 
 data:
-  name: GEOM-DRUGS
+  dataset_root: "/workspace/bionemo/data/pyg_geom_drug"
+  processed_folder: "processed_tiny"
+  batch_size: 4
+  inference_batch_size: 5
+  num_workers: 4
+  remove_hs: False
+  select_train_subset: 100
 
 loss:
-  distance: null #'single' 'triple'
+  use_distance: null #'single' 'triple'
+  loss_scale:
+   - x: 3.0
+     h: 0.4
+     edge_attr: 2.0
 
 interpolants:
   timesteps: &timesteps 500
+  time_type: &time_type "discrete"
+  scheduler_type: &scheduler_type "cosine_adaptive"
+  sample_time_method: "uniform"
+  sample_time_mean: 0
+  sample_time_scale: 0.81
   variables:
-    - variable_name: 'x'
+    - variable_name: 'x' #'pos' #'x'
       interpolant_type: 'continuous_diffusion'
       prior_type: 'gaussian'
       timesteps: *timesteps
-      num_classes: 13
-      scheduler:
-        - schedule_type: "cosine_adaptive"
-        - time_type: "discrete"
-        - nu: 2.0
-    - variable_name: 'h'
+      scheduler_type: *scheduler_type
+      time_type: *time_type
+      nu: 2.0
+    - variable_name: 'h' #'x' #'h'
       interpolant_type: 'discrete_diffusion'
       prior_type: 'uniform'
       timesteps: *timesteps
-      num_classes: 13
-      scheduler:
-        - schedule_type: "cosine_adaptive"
-        - time_type: "discrete"
-        - nu: 1.0
+      num_classes: 16
+      scheduler_type: *scheduler_type
+      time_type: *time_type
+      nu: 1.0
     - variable_name: 'edge_attr'
       interpolant_type: 'discrete_diffusion'
       prior_type: 'uniform'
       timesteps: *timesteps
       num_classes: 5
-      scheduler:
-        - schedule_type: "cosine_adaptive"
-        - time_type: "discrete"
-        - nu: 1.5
+      scheduler_type: *scheduler_type
+      time_type: *time_type
+      nu: 1.5
     # - variable_name: 'charge'
     #   interpolant_type: null
 
