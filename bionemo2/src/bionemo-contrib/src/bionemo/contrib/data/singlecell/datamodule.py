@@ -17,11 +17,11 @@ import pytorch_lightning as pl
 from nemo.lightning.pytorch.plugins import MegatronDataSampler
 from nemo.utils import logging
 from pytorch_lightning.utilities.types import EVAL_DATALOADERS, TRAIN_DATALOADERS
+from tokenizers import Tokenizer
 from torch.utils.data import DataLoader
 
 from bionemo.contrib.data.mapped_dataset import ResamplingMappedDataset
 from bionemo.contrib.data.singlecell.dataset import SingleCellDataset
-from tokenizers import Tokenizer
 
 
 class SingleCellDataModule(pl.LightningDataModule):

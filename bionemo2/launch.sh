@@ -1,4 +1,4 @@
-# #!/bin/bash
+#!/usr/bin/env bash
 
 # # Name of the Docker image
 # IMAGE_NAME=${IMAGE_NAME:=nvcr.io/nvidian/cvai_bnmo_trng/bionemo}
@@ -43,7 +43,7 @@ fi
 
 #Name of the Docker image
 IMAGE_NAME=${IMAGE_NAME:=nvcr.io/nvidian/cvai_bnmo_trng/bionemo}
-IMAGE_TAG=bionemo2
+IMAGE_TAG=$(git rev-parse HEAD)
 
 
 #Function to build the Docker image
@@ -76,8 +76,9 @@ build() {
     echo "Building Docker image..."
     local DOCKER_BUILD_CMD="docker buildx build \
         -t ${IMAGE_NAME}:${IMAGE_TAG} \
-        --cache-to type=inline
-        -f bionemo2/Dockerfile"
+        --cache-to type=inline \
+	--cache-from nvcr.io/nvidian/cvai_bnmo_trng/bionemo:bionemo2 \
+        -f ./Dockerfile"
     echo $DOCKER_BUILD_CMD
     $DOCKER_BUILD_CMD .
     echo "Docker build completed successfully."
@@ -86,7 +87,7 @@ build() {
 #Function to run the Docker container
 run() {
     echo "running docker container"
-    docker run --ipc=host --shm-size=512m --gpus all -it $IMAGE_NAME:$IMAGE_TAG /bin/bash
+    docker run --ipc=host --net=host --shm-size=512m --gpus all --rm -it --entrypoint /bin/bash ${IMAGE_NAME}:${IMAGE_TAG} 
 }
 
 case "$1" in

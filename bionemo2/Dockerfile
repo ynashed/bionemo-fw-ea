@@ -13,6 +13,8 @@ RUN git clone https://github.com/NVIDIA/Megatron-LM.git && \
   git checkout a5534c8f3e2c49ad8ce486f5cba3408e14f5fcc2 && \
   pip install .
 
+# RUN git clone --branch core_r0.6.0 https://github.com/NVIDIA/Megatron-LM.git /workspace/megatron-lm
+
 RUN git clone https://github.com/NVIDIA/apex.git && \
   cd apex && \
   git checkout f058162b215791b15507bb542f22ccfde49c872d && \
@@ -42,11 +44,7 @@ RUN git clone https://github.com/NVIDIA/NeMo.git && \
     pip install ".[nlp]"
 
 # RUN pip uninstall megatron_core
-
 # RUN pip install megatron_core
-
-WORKDIR /workspace/bionemo
-COPY ./bionemo2/requirements.txt /workspace/bionemo/bionemo2/requirements.txt
 
 # Install any additional dependencies
 RUN apt-get update && apt-get install -y \
@@ -54,22 +52,70 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-ARG BIONEMO_HOME=/workspace/bionemo
-ENV BIONEMO_HOME=${BIONEMO_HOME}
+WORKDIR /workspace/bionemo2
 
-# Install the dependencies from the requirements file
-RUN pip install --no-cache-dir -r ${BIONEMO_HOME}/bionemo2/requirements.txt
+# install devtools and test dependencies
+COPY ./requirements-dev.txt .
+RUN pip install -r requirements-dev.txt
 
-# Remove the requirements file
-RUN rm ${BIONEMO_HOME}/bionemo2/requirements.txt
+COPY ./requirements-test.txt .
+RUN pip install -r requirements-test.txt
 
-# Clone the megatron-LM Repository
-RUN git clone --branch core_r0.6.0 https://github.com/NVIDIA/Megatron-LM.git /workspace/megatron-lm
+#
+# install dependencies of all bionemo namespace packages
+#
 
-# Copy the rest of your application code into the container
-COPY ./bionemo2 ${BIONEMO_HOME}/bionemo2
+COPY ./src/bionemo-core/requirements.txt ./src/bionemo-core/requirements.txt
+RUN pip install -r ./src/bionemo-core/requirements.txt
 
-# Set the working directory
-WORKDIR ${BIONEMO_HOME}/bionemo2
+# TODO: install reqs of feature package(s)
+# --
+# COPY ./src/bionemo-.../requirements.txt ./src/bionemo-.../requirements.txt
+# RUN pip install -r ./src/bionemo-.../requirements.txt
+# ...
 
-RUN pip install -e .
+COPY ./src/bionemo-fw/requirements.txt ./src/bionemo-fw/requirements.txt
+RUN pip install -r ./src/bionemo-fw/requirements.txt
+
+COPY ./src/bionemo-contrib/requirements.txt ./src/bionemo-contrib/requirements.txt
+RUN pip install -r ./src/bionemo-contrib/requirements.txt
+
+#
+# install all bionemo namespaced code
+#
+
+# NOTE: We do not install from the `_requirements.txt` file, which contains each namespaced packages'
+#       inter-dependent bionemo2 subpackage relationships. This is because we manually install each
+#       subpackage's code independently. This speeds up the image building significantly.
+
+WORKDIR /workspace/bionemo2/
+COPY ./src/bionemo-core/ ./src/bionemo-core/
+WORKDIR /workspace/bionemo2/src/bionemo-core
+# already installed dependencies
+RUN pip install --no-deps -e .
+
+# TODO install code of feature package(s)
+# --
+# WORKDIR /workspace/bionemo2/
+# COPY ./src/bionemo-... ./src/bionemo-...
+# WORKDIR /workspace/bionemo2/src/bionemo-...
+# RUN pip install -r _requirements.txt
+# RUN pip install --no-deps -e .
+# ...
+
+WORKDIR /workspace/bionemo2/
+COPY ./src/bionemo-fw/ ./src/bionemo-fw/
+WORKDIR /workspace/bionemo2/src/bionemo-fw/
+#RUN pip install -r _requirements.txt
+RUN pip install --no-deps -e .
+
+WORKDIR /workspace/bionemo2/
+COPY ./src/bionemo-contrib/ ./src/bionemo-contrib/
+WORKDIR /workspace/bionemo2/src/bionemo-contrib/
+#RUN pip install -r _requirements.txt
+RUN pip install --no-deps -e .
+
+# Copy the rest of the bionemo2 project
+WORKDIR /workspace/
+# COPY . /workspace/bionemo2/
+WORKDIR /workspace/bionemo2/

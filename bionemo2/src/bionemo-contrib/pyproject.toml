@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bionemo-contrib"
+version = "2.0.0"
+license.file = "LICENSE"
+readme = "README.md"
+description = "BioNeMo Contrib: Preview of In-Development Features and Landing Ground for External Contributions. Breaking changes expected! No API stability guarentees!"
+authors = [
+    { name = "John St. John", email = "jstjohn@nvidia.com" },
+    { name = "Malcolm Greaves", email = "mgreaves@nvidia.com" },
+]
+dynamic = ["dependencies"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+# TODO: how to specify bionemo-fw ???
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include=["bionemo.*"]
+namespaces = true
+exclude = ["test*."]
+

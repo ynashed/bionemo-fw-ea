@@ -10,7 +10,6 @@ default:
 stages:
   - code_format
   - build
-  - bionemo2-build
   - test
   - jet
   - deploy
@@ -41,6 +40,7 @@ variables:
   # image tags, or used therein
   PIPELINE_TAG: "pipeline-${CI_PIPELINE_ID}"
   IMAGE_TAG: "${CI_COMMIT_SHA}"
+  SUFFIX_BIONEMO2: "-bionemo2"
   SUFFIX_DEV: "-devel"
   SUFFIX_DOCS: "-docs"
   SUFFIX_QA: "-qa"
@@ -137,6 +137,9 @@ workflow:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_LABELS =~ /JET_NOT_REQUIRED/
       variables:
         EXCLUDE_JET: "true"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_LABELS =~ /BIONEMO2_ONLY/
+      variables:
+        BIONEMO2_ONLY: "true"
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
     ## NOTE: Convergence test are run using JET via CI. They can be triggered from any branch but only from the Run pipeline page
     ## (https://gitlab-master.nvidia.com/clara-discovery/bionemo/-/pipelines) by clicking Run pipeline button and setting JET_CONV_TEST=true
@@ -190,21 +193,24 @@ workflow:
 
 
 code_format:
+  image: nvcr.io/nvidian/cvai_bnmo_trng/bionemo-linter:latest
   stage: code_format
   rules:
     - if: $JET_CONV_TEST == "true"
       when: never
     - when: always
-  script:
-    - pre-commit run --all-files --show-diff-on-failure
-  image: nvcr.io/nvidian/cvai_bnmo_trng/bionemo-linter:latest
   tags:
    - generic
-
+  script:
+    - pre-commit run --all-files --show-diff-on-failure
 
 license_check:
   image: python:3.10.13-slim
   stage: code_format
+  rules:
+    - if: $JET_CONV_TEST == "true"
+      when: never
+    - when: always
   tags:
    - generic
   script:
@@ -428,6 +434,7 @@ pytest:
     name: "${IMAGE_NAME}${SUFFIX_DEV}"
     entrypoint: [ "" ]
   stage: test
+  needs: [build-bionemo-image]
   rules:
     - if: $EXCLUDE_PYTEST == "true"
       when: never
@@ -480,6 +487,7 @@ pytest-fork:
     name: "${IMAGE_NAME}${SUFFIX_DEV}"
     entrypoint: [ "" ]
   stage: test
+  needs: [build-bionemo-image]
   rules:
     - if: $EXCLUDE_PYTEST == "true"
       when: never
@@ -510,6 +518,7 @@ pytest-internal:
     name: "${IMAGE_NAME}${SUFFIX_DEV}"
     entrypoint: [ "" ]
   stage: test
+  needs: [build-bionemo-image]
   allow_failure: false
   rules:
     - if: $EXCLUDE_PYTEST == "true"
@@ -536,44 +545,64 @@ pytest-internal:
 # Build cache reference images like this:
 # docker buildx build --cache-to type=inline  -t <your-image-name>  -f bionemo2/Dockerfile .
 # If you build using `bash bionemo2/launch.sh build` this will be done automatically.
-bionemo2-build:
-  stage: bionemo2-build
+bionemo2-build-image:
   extends:
   # Note: We need to use this docker version `docker:26.0.2-dind` or higher for buildx inline caching.ds:
     - .docker-setup-bionemo2
+  stage: build
   rules:
     - if: $BIONEMO2_ONLY == "true"
       when: always
+    - if: $BIONEMO2_ONLY == "false"
+      when: never
+    - when: on_success
   script:
     - echo "Building bionemo2 image..."
+    - cd ./bionemo2/
     - docker buildx version
     - docker buildx build
       --cache-from nvcr.io/nvidian/cvai_bnmo_trng/bionemo:bionemo2
-      -t "${IMAGE_NAME}${SUFFIX_DEV}"
-      -f bionemo2/Dockerfile .
+      -t "${IMAGE_NAME}${SUFFIX_BIONEMO2}"
+      -f Dockerfile .
     - echo "Now pushing container"
-    - docker push "${IMAGE_NAME}${SUFFIX_DEV}"
+    - docker push "${IMAGE_NAME}${SUFFIX_BIONEMO2}"
 
-bionemo2-test:
-  stage: test
-  extends:
-    - .common_pytest_before_script
+bionemo2-pytest:
   image:
-    name: "${IMAGE_NAME}${SUFFIX_DEV}"
+    name: "${IMAGE_NAME}${SUFFIX_BIONEMO2}"
     entrypoint: [ "" ]
+  stage: test
+  needs: [bionemo2-build-image]
+  allow_failure: false
   rules:
     - if: $BIONEMO2_ONLY == "true"
       when: always
+    - if: $BIONEMO2_ONLY == "false"
+      when: never
+    - if: $CI_MERGE_REQUEST_LABELS =~ /SKIP_CI/
+      when: never
+    - when: on_success
   tags:
     - gpu
   script:
+    - nvidia-smi
+    - df -Thl
+    - pwd
+    - ls -l
+    - ln -s /builds/bionemo/bionemo2 /workspace/bionemo2
+    - cd ./bionemo2/
     - echo "Running BFW tests..."
     - pwd
-    - echo ${BIONEMO_HOME}
-    - ls ${BIONEMO_HOME} -al
-    - ls ${BIONEMO_HOME}/bionemo2 -al
-    - cd ${BIONEMO_HOME}
-    - pytest -v bionemo2/
+    - ls -l .
+    - pushd ./src/bionemo-core
+    - pytest -v .
+    - popd
+    - pushd ./src/bionemo-fw
+    - pytest -v .
+    - popd
+    - pushd ./src/bionemo-contrib
+    - pytest -v .
+    - popd
 
 
 .jet-configure:
@@ -683,6 +712,7 @@ jet-trigger:
       - EXCLUDE_JET
       - JET_MODEL_NAME
       - CI_MERGE_REQUEST_LABELS
+      - BIONEMO2_ONLY
   rules:
     - if: $EXCLUDE_JET == "true"
       when: never
