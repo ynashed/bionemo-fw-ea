@@ -49,3 +49,19 @@ def test_ngc_pbss_data_sync(download_models_for_test):
     stdout, stderr, retcode = streamed_subprocess_call(f"diff {ngc_download_path} {pbss_download_path}")
     if retcode != 0:
         raise ValueError(f"Models between NGC and PBSS differ! {stdout=}, {stderr=}")
+
+
+@pytest.mark.internal
+@pytest.mark.integration_test
+def test_ngc_paths_are_public():
+    """Tests that all NGC paths are public facing.
+
+    Internal data should be stored on PBSS only.
+    """
+    STARTS_WITH_KEYWORD = "nvidia/clara/"
+    config = load_config()
+    ngc_models = get_available_models(config, "ngc")
+    for model in ngc_models:
+        ngc_path = config.models[model].ngc
+        if not ngc_path.startswith(STARTS_WITH_KEYWORD):
+            raise ValueError(f"Expected {ngc_path} for {model} to begin with {STARTS_WITH_KEYWORD}")

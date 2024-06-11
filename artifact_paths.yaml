@@ -11,6 +11,9 @@
 # be downloaded.
 # "extra_args" specifies any extra arguments that should be passed the ngc download or
 # s3 download commands.
+#
+# All models with an `ngc` path are publically available. Those with only a `pbss` path
+# are currently in internal NVIDIA development.
 
 models:
     esm1nv:
@@ -88,26 +91,22 @@ models:
         symlink:
             source: "../../esm2nv_3B_converted.nemo"
             target: "protein/esm2nv/esm2nv_3B_converted.nemo"
-    openfold_initial_training_public: # DO NOT RELEASE
-        ngc: "nvidian/cvai_bnmo_trng/openfold:openfold_initial_training_public_checkpoint"
+    openfold_initial_training_public:
         pbss: "s3://bionemo-ci/models/openfold_initial_training_public_checkpoint.nemo"
         symlink:
             source: "../../openfold_initial_training_public_checkpoint.nemo"
             target: "protein/openfold/openfold_initial_training_public_checkpoint.nemo"
-    openfold_finetuning_4_public: # DO NOT RELEASE
-        ngc: "nvidian/cvai_bnmo_trng/openfold:openfold_finetuning_4_public_checkpoint"
+    openfold_finetuning_4_public:
         pbss: "s3://bionemo-ci/models/openfold_finetuning_4_public_checkpoint.nemo"
         symlink:
             source: "../../openfold_finetuning_4_public_checkpoint.nemo"
             target: "protein/openfold/openfold_finetuning_4_public_checkpoint.nemo"
-    openfold_initial_training_inhouse: # DO NOT RELEASE
-        ngc: "nvidian/cvai_bnmo_trng/openfold:openfold_initial_training_inhouse_checkpoint"
+    openfold_initial_training_inhouse:
         pbss: "s3://bionemo-ci/models/openfold_initial_training_inhouse_checkpoint.nemo"
         symlink:
             source: "../../openfold_initial_training_inhouse_checkpoint.nemo"
             target: "protein/openfold/openfold_initial_training_inhouse_checkpoint.nemo"
     openfold_finetuning_inhouse:
-        ngc: "nvidian/cvai_bnmo_trng/openfold:openfold_finetuning_inhouse_checkpoint"
         pbss: "s3://bionemo-ci/models/openfold_finetuning_inhouse_checkpoint.nemo"
         symlink:
             source: "../../openfold_finetuning_inhouse_checkpoint.nemo"
@@ -155,25 +154,21 @@ models:
             target: "singlecell/geneformer/geneformer-qa.nemo"
     enformer_finetuned16:
         pbss: "s3://bionemo-ci/models/dna/enformer/enformer_finetuned16/0.1.0/enformer_finetuned16.nemo"
-        ngc: "nvidian/clara-lifesciences/enformer_finetuned16:0.1.0"
         symlink:
             source: "../../enformer_finetuned16.nemo"
             target: "dna/enformer/enformer_finetuned16.nemo"
     enformer_finetuned32:
         pbss: "s3://bionemo-ci/models/dna/enformer/enformer_finetuned32/0.1.0/enformer_finetuned32.nemo"
-        ngc: "nvidian/clara-lifesciences/enformer_finetuned32:0.1.0"
         symlink:
             source: "../../enformer_finetuned32.nemo"
             target: "dna/enformer/enformer_finetuned32.nemo"
     enformer_pretrained16:
         pbss: "s3://bionemo-ci/models/dna/enformer/enformer_pretrained16/0.1.0/enformer_pretrained16.nemo"
-        ngc: "nvidian/clara-lifesciences/enformer_pretrained16:0.1.0"
         symlink:
             source: "../../enformer_pretrained16.nemo"
             target: "dna/enformer/enformer_pretrained16.nemo"
     enformer_pretrained32:
         pbss: "s3://bionemo-ci/models/dna/enformer/enformer_pretrained32/0.1.0/enformer_pretrained32.nemo"
-        ngc: "nvidian/clara-lifesciences/enformer_pretrained32:0.1.0"
         relative_download_dir: "dna/enformer/"
         symlink:
             source: "../../enformer_pretrained32.nemo"
