@@ -55,7 +55,7 @@ build() {
 
     # Check Docker version
     docker_version=$(docker --version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
-    required_docker_version="26.0.1"
+    required_docker_version="23.0.1"
 
     if ! version_ge "$docker_version" "$required_docker_version"; then
         echo "Error: Docker version $required_docker_version or higher is required. Current version: $docker_version"
@@ -64,7 +64,7 @@ build() {
 
     # Check Buildx version
     buildx_version=$(docker buildx version | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
-    required_buildx_version="0.13.1"
+    required_buildx_version="0.10.2"
 
     if ! version_ge "$buildx_version" "$required_buildx_version"; then
         echo "Error: Docker Buildx version $required_buildx_version or higher is required. Current version: $buildx_version"

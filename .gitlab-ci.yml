@@ -26,7 +26,6 @@ variables:
   DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
   DOCKER_TLS_VERIFY: 1
   DOCKER_TLS_CERTDIR: "/certs"
-  DOCKER_BUILDKIT: 1
   BUILDKIT_PROGRESS: plain
   # image repositories
   NGC_REPO_NAME: "nvcr.io/nvidian/cvai_bnmo_trng/bionemo"
@@ -167,20 +166,8 @@ workflow:
       variables:
         EXCLUDE_DEPLOY: "false"
 
-
-.docker-setup:
-  services:
-    - docker:20.10.16-dind
-  tags:
-    - dind
-  before_script:
-    - until docker info; do sleep 1; done
-    - mkdir -p $HOME/.docker
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - docker login -u '$oauthtoken' -p $NGC_CLI_API_KEY nvcr.io
-
 # Note: We need to use this docker version `docker:26.0.2-dind` or higher for buildx inline caching.
-.docker-setup-bionemo2:
+.docker-setup:
   services:
     - docker:26.0.2-dind
   tags:
@@ -245,13 +232,11 @@ build-bionemo-image:
     #      done
     # TODO [mgreaves] This had --no-cache on it before. Why would we want this?
 
-    - PULL_START=$(date +%s)
-    - docker pull nvcr.io/nvidian/cvai_bnmo_trng/bionemo:cache-py23.10
-    - PULL_END=$(date +%s)
-    - ELAPSED=$(( PULL_END - PULL_START ))
-    - echo "Cache target container pull time:" $ELAPSED
-    - export DOCKER_BUILDKIT=1
+    # Build cache reference images like this:
+    # docker buildx build --cache-to type=inline  -t <your-image-name>  -f Dockerfile .
+    # If you build using `bash launch.sh build` this will be done automatically.
     - BUILD_START=$(date +%s)
+    - docker buildx version
     - docker buildx build
       --network host ${base}
       --label com.nvidia.bionemo.short_git_sha=${CI_COMMIT_SHORT_SHA}
@@ -261,13 +246,12 @@ build-bionemo-image:
       --label com.nvidia.bionemo.pipeline_id=${CI_PIPELINE_ID}
       --label com.nvidia.bionemo.merge_request_id=${CI_MERGE_REQUEST_IID}
       --secret id=GITLAB_TOKEN,env=CI_JOB_TOKEN
-      --cache-from nvcr.io/nvidian/cvai_bnmo_trng/bionemo:cache-py23.10
-      --build-arg BUILDKIT_INLINE_CACHE=1
+      --cache-from nvcr.io/nvidian/cvai_bnmo_trng/bionemo:cached-06-05-2024
       -t "${IMAGE_NAME}"
       -f setup/Dockerfile .
     - BUILD_END=$(date +%s)
     - ELAPSED=$(( BUILD_END - BUILD_START ))
-    - echo "container build time using cached nvcr.io/nvidian/cvai_bnmo_trng/bionemo:cache-py23.10" $ELAPSED
+    - echo "container build time using cached nvcr.io/nvidian/cvai_bnmo_trng/bionemo:cached-06-05-2024" $ELAPSED
     - df -h
     - docker push "${IMAGE_NAME}"
     # tag with short commit too
@@ -548,8 +532,7 @@ pytest-internal:
 bionemo2-build-image:
   extends:
   # Note: We need to use this docker version `docker:26.0.2-dind` or higher for buildx inline caching.ds:
-    - .docker-setup-bionemo2
-  stage: build
+    - .docker-setup
   rules:
     - if: $BIONEMO2_ONLY == "true"
       when: always
