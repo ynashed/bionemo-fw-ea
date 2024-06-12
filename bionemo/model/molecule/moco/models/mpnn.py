@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.nn import MessagePassing, knn_graph
 from torch_geometric.nn.norm import LayerNorm as BatchLayerNorm
-from torch_scatter import scatter, scatter_sum
+from torch_scatter import scatter, scatter_mean, scatter_sum
 from torch_sparse import SparseTensor
 
 
@@ -19,6 +19,28 @@ NONLINEARITIES = {
     "gelu_tanh": nn.GELU(approximate='tanh'),
     "sigmoid": nn.Sigmoid(),
 }
+
+
+class E3Norm(nn.Module):
+    def __init__(self, eps: float = 1e-5):
+        super().__init__()
+        self.eps = eps
+        self.weight = nn.Parameter(torch.ones((1, 1)))
+        self.reset_parameters()
+
+    def reset_parameters(self) -> None:
+        torch.nn.init.ones_(self.weight)
+
+    def forward(
+        self,
+        pos: torch.Tensor,
+        batch: torch.Tensor,
+    ):
+        norm = torch.norm(pos, dim=-1, keepdim=True)
+        batch_size = int(batch.max()) + 1
+        mean_norm = scatter_mean(norm, batch, dim=0, dim_size=batch_size)
+        new_pos = self.weight * pos / (mean_norm[batch] + self.eps)
+        return new_pos
 
 
 class MLP(nn.Module):
@@ -308,6 +330,7 @@ class EquivariantMessagePassingLayer(MessagePassing):
         self.use_cross_product = True
         if self.use_cross_product:
             self.phi_x_cross = MLP(invariant_node_feat_dim, invariant_node_feat_dim, 1)
+        self.x_norm = E3Norm()
 
     #     self.apply(self.init_)
 
@@ -363,9 +386,8 @@ class EquivariantMessagePassingLayer(MessagePassing):
         return E
 
     def forward(self, batch, X, H, edge_index, edge_attr):
-        import ipdb
-
-        ipdb.set_trace()
+        X = self.x_norm(X, batch)
+        H = self.h_norm(H, batch)
         edge_attr = self.mix_edges(batch, X, edge_index, self.pre_edge(edge_attr), k=4)
         source, target = edge_index
         rel_coors = X[source] - X[target]
@@ -389,7 +411,7 @@ class EquivariantMessagePassingLayer(MessagePassing):
             coor_wij_cross = self.phi_x_cross(m_ij)
             if self.coor_update_clamp_value:
                 coor_wij_cross.clamp_(min=-self.coor_update_clamp_value, max=self.coor_update_clamp_value)
-            x_update_cross = scatter(cross * coor_wij, index=target, dim=0, reduce='sum', dim_size=X.shape[0])
+            x_update_cross = scatter(cross * coor_wij_cross, index=target, dim=0, reduce='sum', dim_size=X.shape[0])
             X_out = X_out + x_update_cross
 
         # m_i, m_ij = self.aggregate(inputs = m_ij * self.message_gate(m_ij), index = i, dim_size = X.shape[0])

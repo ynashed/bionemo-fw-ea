@@ -24,7 +24,7 @@ loss:
      h: 0.4
      edge_attr: 2.0
 
-interpolants:
+interpolant:
   timesteps: &timesteps 500
   time_type: &time_type "discrete"
   scheduler_type: &scheduler_type "cosine_adaptive"
@@ -64,13 +64,12 @@ dynamics:
 
 
 train:
-  coordinate_loss_scale: 3.0
-  atom_type_los_scale: 0.4
-  edge_attr:_loss_scale: 2
   seed: 2024
   batch_size: 800
-  gpus: 4
+  gpus: 1 #4
   n_epochs: 1000
+  enable_progress_bar: True
+  gradient_clip_value: 10.0
 
 #! The below are taken from EQGAT
 optimizer:
@@ -79,9 +78,12 @@ optimizer:
   weight_decay: 1.e-12
   amsgrad: True
 
-scheduler:
+lr_scheduler:
   type: plateau
   factor: 0.75
   patience: 20
   min_lr: 5.e-5
   cooldown: 5
+  monitor: train-loss
+  interval: epoch
+  frequency: 5

@@ -30,15 +30,18 @@ class Graph3DInterpolantModel(pl.LightningModule):
         self,
         loss_params: DictConfig,
         optimizer_params: DictConfig,
+        lr_scheduler_params: DictConfig,
         dynamics_params: DictConfig,
         interpolant_params: DictConfig,
     ):
         # import ipdb; ipdb.set_trace()
         super(Graph3DInterpolantModel, self).__init__()
         self.optimizer_params = optimizer_params
+        self.lr_scheduler_params = lr_scheduler_params
         self.dynamics_params = dynamics_params
         self.interpolant_params = interpolant_params
-        self.loss_params = loss_params.loss_scale
+        self.loss_scalar = loss_params.loss_scale[0]
+        # import ipdb; ipdb.set_trace()
         self.loss_function = InterpolantLossFunction(use_distance=loss_params.use_distance)
         self.interpolants = self.initialize_interpolants()
         self.dynamics = MoCo()
@@ -65,7 +68,31 @@ class Graph3DInterpolantModel(pl.LightningModule):
         else:
             raise NotImplementedError('Optimizer not supported: %s' % self.optimizer_params.type)
 
-        return optimizer
+        if self.lr_scheduler_params:
+            if self.lr_scheduler_params.type == "plateau":
+                scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+                    optimizer,
+                    factor=self.lr_scheduler_params.factor,
+                    patience=self.lr_scheduler_params.patience,
+                    min_lr=self.lr_scheduler_params.min_lr,
+                    cooldown=self.lr_scheduler_params.cooldown,
+                )
+            else:
+                raise NotImplementedError('LR Scheduler not supported: %s' % self.lr_scheduler_params.type)
+            return {
+                "optimizer": optimizer,
+                "lr_scheduler": {
+                    "scheduler": scheduler,
+                    "interval": self.lr_scheduler_params.interval,
+                    "monitor": self.lr_scheduler_params.monitor,
+                    "frequency": self.lr_scheduler_params.frequency,
+                    "strict": False,
+                },
+            }
+        else:
+            return {
+                "optimizer": optimizer,
+            }
 
     def sample_time(self, batch):
         batch_size = int(batch.batch.max()) + 1
@@ -167,11 +194,20 @@ class Graph3DInterpolantModel(pl.LightningModule):
         # TODO how do we handle the charge and other H add on logic
         return results
 
+    def validation_step(self, batch, batch_idx):
+        val_loss = self.training_step(batch, batch_idx)
+        self.log("val-loss", val_loss)
+        return val_loss
+
     def training_step(self, batch, batch_idx):
+        batch.h = batch.x
+        batch.x = batch.pos
+        batch.pos = None
+        #! Swapping names for now
         out, time = self(batch)
         batch_geo = batch.batch
         # TODO turn this in to an iterative loop where if the interpolant is non None we take a loss
-        ws_t = self.interpolants['x'].snr_loss_weight(time)
+
         # loss = 0
         # for var_name, interpolant in self.interpolants.items():
         #     if 'edge' in var_name:
@@ -179,22 +215,27 @@ class Graph3DInterpolantModel(pl.LightningModule):
         #     else:
         #         loss_component, pred = self.loss_function(batch_geo, out[f'{var_name}_hat'], out[f'{var_name}'], batch_weight = ws_t, scale = self.loss_scalar[f'{var_name}'])
         #     loss += loss_component
+        # import ipdb; ipdb.set_trace()
+        ws_t = self.interpolants['x'].snr_loss_weight(time)
         x_loss, x_pred = self.loss_function(
-            batch_geo, out['x_hat'], out['x'], batch_weight=ws_t, scale=self.loss_scalar['x']
+            batch_geo, out['x_hat'], batch['x'], batch_weight=ws_t, scale=self.loss_scalar['x']
         )
         h_loss, h_out = self.loss_function(
-            batch_geo, out['h_hat'], out['h'], continuous=False, batch_weight=ws_t, scale=self.loss_scalar['h']
+            batch_geo, out['h_hat'], batch['h'], continuous=False, batch_weight=ws_t, scale=self.loss_scalar['h']
         )
         edge_loss, edge_attr_out = self.loss_function.edge_loss(
             batch_geo,
             out['edge_attr_hat'],
-            out['edge_attr'],
+            batch['edge_attr'],
             index=batch['edge_index'][1],
             num_atoms=x_pred.size(0),
             batch_weight=ws_t,
             scale=self.loss_scalar['edge_attr'],
         )
         loss = x_loss + h_loss + edge_loss
+        print("X Loss", x_loss)
+        print("H Loss", h_loss)
+        print("E Loss", edge_loss)
         if self.loss_function.use_distance:
             if "Z_hat" in out.keys() and self.loss_function.use_distance == "triple":
                 z_hat = out["Z_hat"]
@@ -205,6 +246,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
             )
             distance_loss = distance_loss_tp + distance_loss_tz + distance_loss_pz
             loss = loss + distance_loss
+        self.log("train-loss", loss)
         return loss
 
     def forward(self, batch):
@@ -223,9 +265,6 @@ class Graph3DInterpolantModel(pl.LightningModule):
         batch = self.interpolate(batch, time)
         #    batch = self.initialize_pair_embedding(batch) #! Do in the dynamics
         batch = self.aggregate_discrete_variables(batch)
-        import ipdb
-
-        ipdb.set_trace()
         out = self.dynamics(
             batch=batch.batch,
             X=batch["x_t"],
@@ -237,6 +276,15 @@ class Graph3DInterpolantModel(pl.LightningModule):
         out = self.separate_discrete_variables(out)
         return out, time
 
+    # def on_after_backward(self) -> None:
+    # useful for debugging
+    #     print("on_after_backward enter")
+    #     for name, p in self.named_parameters():
+    #         if p.grad is None:
+    #             print(name, p.shape)
+    #     print("on_after_backward exit")
+    #     import ipdb; ipdb.set_trace(0)
+
 
 @hydra_runner(config_path="conf", config_name="train")
 def main(cfg: DictConfig):
@@ -244,28 +292,18 @@ def main(cfg: DictConfig):
     datamodule = MoleculeDataModule(cfg.data)
     train_dataloader = datamodule.test_dataloader()
     device = 'cuda:0'
-    model = Graph3DInterpolantModel(cfg.loss, cfg.optimizer, cfg.dynamics, cfg.interpolants).to(device)
+    model = Graph3DInterpolantModel(cfg.loss, cfg.optimizer, cfg.dynamics, cfg.interpolant).to(device)
     model.setup("fit")  #! this has to be called after model is moved to device for everything to propagate
-    import ipdb
-
-    ipdb.set_trace()
     for batch in train_dataloader:
-        batch.h = batch.x
-        batch.x = batch.pos
-        batch.pos = None
+        # batch.h = batch.x
+        # batch.x = batch.pos
+        # batch.pos = None
 
         batch = batch.to(device)
         print(batch)
-        out, time = model(batch)
-        # batch = batch.batch,
-        #                   X = batch.x_t,
-        #                   H = batch.h_t,
-        #                   E = batch.edge_attr_t,
-        #                   E_idx = batch.edge_index,
-        #                   t = time
-        import ipdb
-
-        ipdb.set_trace()
+        # out, time = model(batch)
+        # print(time)
+        model.training_step(batch, 0)
 
 
 if __name__ == "__main__":

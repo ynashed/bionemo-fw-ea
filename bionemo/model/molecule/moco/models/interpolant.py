@@ -169,10 +169,6 @@ class Interpolant(nn.Module):
             time_step = time_step * (1 - 2 * min_t) + min_t
         return time_step.to(device)
 
-    def snr(self, t_idx):
-        abar = self.alpha_bar[t_idx]
-        return abar / (1 - abar)
-
     def snr_loss_weight(self, t_idx):
         # return min(0.05, max(1.5, self.snr(t_idx)))
         return torch.clamp(self.snr(t_idx), min=0.05, max=1.5)
@@ -285,6 +281,11 @@ class ContinuousDiffusionInterpolant(Interpolant):
             raise ValueError("Only SDE Implemented")
 
         return x_next
+
+    def snr(self, t_idx):
+        t_idx = self.timesteps - 1 - t_idx
+        abar = self.alpha_bar[t_idx]
+        return abar / (1 - abar)
 
 
 class ContinuousFlowMatchingInterpolant(Interpolant):
@@ -406,15 +407,23 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
             raise ValueError("Only Gaussian is supported")
         return x0.to(device)
 
-    def step(self, xt, x_hat, batch, t_idx=None, t=None, dt=None, t_next=None, last_step=False):
+    def step(
+        self, xt, x_hat, batch, x0=None, t_idx=None, t=None, dt=None, t_next=None, last_step=False, noise_sigma=0
+    ):
         """
         Perform a euler step in the continuous flow matching method.
         """
         # x_next = xt + self.update_weight(t) * dt * (x_hat - xt)
-        if last_step:
-            return x_hat  # xt + timesteps*1/timesteps * (x_hat - xt)
-        data_scale, noise_scale = self.reverse_schedule(batch, t_idx, t, t_next, dt)
-        x_next = data_scale * x_hat + noise_scale * xt
+        if x0 is None:
+            if last_step:
+                return x_hat  # xt + timesteps*1/timesteps * (x_hat - xt)
+            data_scale, noise_scale = self.reverse_schedule(batch, t_idx, t, t_next, dt)
+            x_next = data_scale * x_hat + noise_scale * xt
+        else:
+            data_scale, noise_scale = self.reverse_schedule(batch, t_idx, t, t_next, dt)
+            x_next = xt + data_scale * (x_hat - x0)
+        if noise_sigma > 0:
+            x_next += torch.randn_like(x_hat) * noise_sigma
         return x_next
 
 

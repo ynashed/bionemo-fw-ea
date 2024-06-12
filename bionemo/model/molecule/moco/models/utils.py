@@ -1,26 +1,51 @@
 import torch
 import torch.nn.functional as F
 from torch import nn
-from torch_scatter import scatter_mean, scatter_softmax
+from torch_scatter import scatter_mean
 
 from bionemo.model.molecule.moco.models.mpnn import MLP
 
 
 class PredictionHead(nn.Module):
-    def __init__(self, num_classes, feat_dim, discrete=True):
+    def __init__(self, num_classes, feat_dim, discrete=True, edge_prediction=False, distance_prediction=False):
         super().__init__()
         self.num_classes = num_classes
         self.discrete = discrete
         self.projection = MLP(feat_dim, feat_dim, num_classes)
+        if edge_prediction:
+            self.post_process = MLP(num_classes, num_classes, num_classes)
+        if distance_prediction:
+            self.post_process = MLP(feat_dim, feat_dim, num_classes, last_act="sigmoid")
+            self.embedding = MLP(feat_dim, feat_dim, feat_dim)
 
     #! Even if we have a masking state we still predict it but always mask it even on the forward pass as done in MultiFlow. The loss is taken over teh logits so its not masked
     def forward(self, batch, H):
         logits = self.projection(H)
         if self.discrete:
-            probs = scatter_softmax(logits, index=batch, dim=0, dim_size=H.size(0))
+            probs = F.softmax(logits, dim=-1)  # scatter_softmax(logits, index=batch, dim=0, dim_size=H.size(0))
         else:
             probs = H - scatter_mean(H, index=batch, dim=0)[batch]
         return logits, probs
+
+    def predict_edges(self, batch, E, E_idx):
+        #! EQGAT also uses hi hj and Xi-Xj along with f(E) see coordsatomsbonds.py line 121 https://github.com/tuanle618/eqgat-diff/blob/68aea80691a8ba82e00816c82875347cbda2c2e5/eqgat_diff/e3moldiffusion/coordsatomsbonds.py#L121C32-L121C44
+        # import ipdb; ipdb.set_trace()
+        E = self.projection(E)
+        src, dst = E_idx
+        N = batch.size(0)
+        e_dense = torch.zeros(N, N, E.size(-1), device=E.device)
+        e_dense[src, dst, :] = E
+        e_dense = 0.5 * (e_dense + e_dense.permute(1, 0, 2))
+        e = e_dense[src, dst, :]  # E x 5
+        logits = self.post_process(e)  # E x 5
+        probs = F.softmax(logits, dim=-1)
+        return logits, probs
+
+    def predict_distances(self, batch, Z):
+        input = Z + Z.permute(1, 0, 2)
+        logits = self.post_process(input) * self.embedding(input)
+        logits = self.projection(logits).squeeze(-1)
+        return logits
 
 
 class InterpolantLossFunction(nn.Module):
@@ -38,30 +63,29 @@ class InterpolantLossFunction(nn.Module):
         # d (λx, λh, λe) = (3, 0.4, 2)
         batch_size = len(batch.unique())
         if continuous:
-            loss = self.f_continuous(logits, data)
+            loss = self.f_continuous(logits, data).sum(1)  # [N]
             output = logits
         else:
             loss = self.f_discrete(logits, data)
             output = torch.argmax(logits, dim=-1)
-        if element_weight:
+        if element_weight is not None:
             loss = loss * element_weight
         loss = scatter_mean(loss, index=batch, dim=0, dim_size=batch_size)
-        if batch_weight:
-            loss = loss * batch_weight
+        if batch_weight is not None:
+            loss = loss * batch_weight.unsqueeze(1)
         loss = scale * loss.mean()
         return loss, output
 
     def edge_loss(self, batch, logits, data, index, num_atoms, batch_weight=None, element_weight=None, scale=1.0):
-        # d (λx, λh, λe) = (3, 0.4, 2)
         batch_size = len(batch.unique())
         loss = self.f_discrete(logits, data)
-        loss = 0.5 * scatter_mean(loss, index=index, dim=0, dim_size=num_atoms)
+        loss = 0.5 * scatter_mean(loss, index=index, dim=0, dim_size=num_atoms)  # Aggregate on the bonds first
         output = torch.argmax(logits, dim=-1)
         if element_weight:
             loss = loss * element_weight
         loss = scatter_mean(loss, index=batch, dim=0, dim_size=batch_size)
-        if batch_weight:
-            loss = loss * batch_weight
+        if batch_weight is not None:
+            loss = loss * batch_weight.unsqueeze(1)
         loss = scale * loss.mean()
         return loss, output
 

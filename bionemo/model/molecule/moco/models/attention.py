@@ -19,7 +19,6 @@ class AttentionLayer(nn.Module):
         self.invariant_node_feat_dim = invariant_node_feat_dim
         self.invariant_edge_feat_dim = invariant_edge_feat_dim
         self.num_heads = num_heads
-        self.dist_proj = MLP(equivariant_node_feature_dim, invariant_node_feat_dim, invariant_node_feat_dim)
         self.KV = MLP(
             invariant_node_feat_dim + 1, 2 * invariant_node_feat_dim, 2 * invariant_node_feat_dim * self.num_heads
         )
@@ -29,9 +28,10 @@ class AttentionLayer(nn.Module):
         self.phi_h = MLP(invariant_node_feat_dim * self.num_heads, invariant_node_feat_dim, invariant_node_feat_dim)
         self.phi_x = MLP(invariant_node_feat_dim * self.num_heads, invariant_node_feat_dim, 1)
         self.coor_update_clamp_value = 10.0
-        self.left_z = MLP(invariant_node_feat_dim, invariant_node_feat_dim, invariant_node_feat_dim)
-        self.right_z = MLP(invariant_node_feat_dim, invariant_node_feat_dim, invariant_node_feat_dim)
-        self.joint_z = MLP(invariant_node_feat_dim, invariant_node_feat_dim, invariant_node_feat_dim)
+        # TODO: Bring back once Z pipeline is done
+        # self.left_z = MLP(invariant_node_feat_dim, invariant_node_feat_dim, invariant_node_feat_dim)
+        # self.right_z = MLP(invariant_node_feat_dim, invariant_node_feat_dim, invariant_node_feat_dim)
+        # self.joint_z = MLP(invariant_node_feat_dim, invariant_node_feat_dim, invariant_node_feat_dim)
         self.phi_e = MLP(
             2 * invariant_node_feat_dim + equivariant_node_feature_dim + invariant_edge_feat_dim + self.num_heads,
             invariant_edge_feat_dim,
@@ -39,7 +39,7 @@ class AttentionLayer(nn.Module):
         )
         # self.reset_parameters()
 
-    def forward(self, batch, X, H, E, E_idx, Z):
+    def forward(self, batch, X, H, E_idx, E, Z):
         # Compute Q, K, V
         # import ipdb; ipdb.set_trace()
         src, dst = E_idx
@@ -81,16 +81,17 @@ class AttentionLayer(nn.Module):
         )
         X_out = X + x_update
         # Z update
-        alpha = scatter(alpha_ij.mean(1), index=dst, dim=0, reduce='sum', dim_size=X.shape[0]).unsqueeze(1)
-        z_update = self.joint_z(alpha * torch.einsum("...ik,...jk->...ijk", self.left_z(H), self.right_z(H)))
-        Z_out = Z + z_update
+        scatter(alpha_ij.mean(1), index=dst, dim=0, reduce='sum', dim_size=X.shape[0]).unsqueeze(1)
+        #! Skipping Z for now since not using it in the loss function yet
+        # z_update = self.joint_z(alpha * torch.einsum("...ik,...jk->...ijk", self.left_z(H), self.right_z(H)))
+        Z_out = Z  # + z_update
         # E update
         # import ipdb; ipdb.set_trace()
         e_inputs = torch.cat([alpha_ij, X_rel_norm, H[src], H[dst], E], dim=-1)
         e_update = self.phi_e(e_inputs)  #! can also do MLP(MLP(me + e)) like in EQ
         E_out = E + e_update
 
-        return H_out, X_out, Z_out, E_out
+        return X_out, H_out, E_out, Z_out
 
 
 if __name__ == "__main__":
@@ -309,7 +310,7 @@ if __name__ == "__main__":
     for i in range(25):
         X, H, E, m_ij = mpnn(batch_ligand, X, H, E_idx, E)
         print("MPNN", X.sum().item(), H.sum().item(), E.sum().item(), Z.sum().item())
-        H, X, Z, E = model(batch_ligand, X, H, E, E_idx, Z)
+        X, H, E, Z = model(batch_ligand, X, H, E_idx, E, Z)
         print("ATTN", X.sum().item(), H.sum().item(), E.sum().item(), Z.sum().item())
     print("MPNN Params", sum(p.numel() for p in mpnn.parameters() if p.requires_grad))
     print("ATTN Params", sum(p.numel() for p in model.parameters() if p.requires_grad))
