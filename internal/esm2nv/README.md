@@ -140,6 +140,41 @@ Users can then compare the metrics in the output json to the golden values on [t
 Additional comments:
 1. Apparently secondary_structure task is a more stable metric compared to others due to larger amount of data.
 
+## (0) NeMo know-how
+Check out [this tutorial](https://github.com/NVIDIA/Megatron-LM/blob/main/megatron/core/QuickStart.md) for an excellent summary of how Megatron Core models should be written.
+
+### (0.1) Gradiant accumulation
+Inherited from [MegatronLM](https://github.com/NVIDIA/Megatron-LM), gradient accumulate in NeMo is done by expanding global_batch_size in [get_forward_backward_func](https://github.com/NVIDIA/Megatron-LM/blob/main/megatron/core/pipeline_parallel/schedules.py#L19) wrapper.
+
+> While this is single GPU training, the batch size specified by --micro-batch-size is a single forward-backward path batch-size and the code will perform gradient accumulation steps until it reaches global-batch-size which is the batch size per iteration.
+> 
+> — MegatronLM front page README
+
+Therefore `accumulate_grad_batches` should always be set to 1 in vanilla NeMo. However, unlike NeMo where the actual gradient accumulation is inferred from global batch size, world size and parallelism, in [BioNeMo](https://gitlab-master.nvidia.com/clara-discovery/bionemo/-/blame/dev/bionemo/model/utils.py?ref_type=heads#L118), we infer global batch size from `accumulate_grad_batches` and the rest instead.
+
+### (0.2) Controlling forward step
+[get_forward_backward_func](https://github.com/NVIDIA/Megatron-LM/blob/main/megatron/core/pipeline_parallel/schedules.py#L19) takes a `forward_step_func` and a `loss_func` to return a parallelism-aware wrapped forward function. Copy-pasting from the docstring directly,
+
+```
+        def loss_func(loss_mask, output_tensor):
+            losses = output_tensor.float()
+            loss_mask = loss_mask.view(-1).float()
+            loss = torch.sum(losses.view(-1) * loss_mask) / loss_mask.sum()
+
+            # Reduce loss for logging.
+            averaged_loss = average_losses_across_data_parallel_group([loss])
+
+            return loss, {'lm loss': averaged_loss[0]}
+
+        def forward_step(data_iterator, model):
+            data, loss_mask = next(data_iterator)
+            output = model(data)
+            return output, partial(loss_func, loss_mask)
+
+
+        forward_backward_func(forward_step_func=forward_step, ...)
+```
+
 ## References
 For the ESM-2 language model and ESMFold:
 ```bibtex

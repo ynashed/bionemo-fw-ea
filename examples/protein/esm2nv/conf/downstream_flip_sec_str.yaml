@@ -29,6 +29,7 @@ model:
   micro_batch_size: 64 # NOTE: adjust to occupy ~ 90% of GPU memory
   global_batch_size: null # if null will be computed automatically
   tensor_model_parallel_size: 1  # model parallelism
+  accumulate_grad_batches: 1  # gradient accumulation
   dropout_rate: 0.25 # dropout rate for downstream task
   cnn_dim: 32 # output channels in the downstream convolution layer
   data:

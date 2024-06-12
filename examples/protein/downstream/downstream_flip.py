@@ -35,9 +35,9 @@ def main(cfg) -> None:
         preprocessor.prepare_all_datasets(output_dir=cfg.model.data.preprocessed_data_path)
 
     # Load model
-    with open_dict(cfg):
-        cfg.model.encoder_cfg = cfg
     trainer = setup_trainer(cfg, builder=None)
+    with open_dict(cfg):  # reconfigure after trainer instantiation for gradient accumulation
+        cfg.model.encoder_cfg = cfg
     if cfg.restore_from_path:
         logging.info("\nRestoring model from .nemo file " + cfg.restore_from_path)
         model = FineTuneProteinModel.restore_from(

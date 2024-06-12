@@ -39,7 +39,6 @@ try:
     from apex.transformer.pipeline_parallel.utils import (
         _reconfigure_microbatch_calculator,
         get_micro_batch_size,
-        get_num_microbatches,
     )
 
     HAVE_APEX = True
@@ -283,6 +282,7 @@ class ESM1nvModel(ESMnvMegatronBertModel):
         """
         # TODO: upstream the `encode` function to NeMo as the current BERT class does not have one
 
+        # TODO [sichu] Potential duplication to bionemo/model/utils.py
         # Check whether the DDP is initialized. This is needed when running inference outside of the training loop.
         if parallel_state.is_unitialized():
 
@@ -308,16 +308,17 @@ class ESM1nvModel(ESMnvMegatronBertModel):
         global_batch_per_gpu = tokens_enc.size(0)
         encoder_seq_length = tokens_enc.size(1)
 
-        num_micro_batches_before_encode = get_num_microbatches()
         # Reconfigure microbatch calculator here to set num microbatches as expected by the encoding step.
         if reconfigure_microbatch:
+            global_batch_size = self.cfg.global_batch_size // self.cfg.micro_batch_size * global_batch_per_gpu
             _reconfigure_microbatch_calculator(
                 rank=app_state.global_rank,
                 rampup_batch_size=None,
-                global_batch_size=global_batch_per_gpu * parallel_state.get_data_parallel_world_size(),
+                global_batch_size=global_batch_size,
                 micro_batch_size=global_batch_per_gpu,  # Make sure that there is no "grad acc" while encoding.
                 data_parallel_size=parallel_state.get_data_parallel_world_size(),
             )
+
         tensor_shape = [
             encoder_seq_length,
             global_batch_per_gpu,
@@ -371,8 +372,8 @@ class ESM1nvModel(ESMnvMegatronBertModel):
             _reconfigure_microbatch_calculator(
                 rank=app_state.global_rank,
                 rampup_batch_size=None,
-                global_batch_size=global_batch_per_gpu * parallel_state.get_data_parallel_world_size(),
-                micro_batch_size=global_batch_per_gpu // num_micro_batches_before_encode,
+                global_batch_size=global_batch_size,
+                micro_batch_size=global_batch_per_gpu,
                 data_parallel_size=parallel_state.get_data_parallel_world_size(),
             )
 
