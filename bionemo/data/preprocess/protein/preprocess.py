@@ -14,7 +14,7 @@ import pathlib
 import shutil
 import tempfile
 from multiprocessing import Pool
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 
 import numpy as np
 import pyfastx
@@ -25,37 +25,31 @@ from nemo.utils import logging
 from bionemo.data.utils import download_registry_from_ngc, get_ngc_registry_file_list, verify_checksum_matches
 
 
-__all__ = ['UniRef50Preprocess']
+__all__ = ['FastaPreprocess', 'UniRef50Preprocess', 'ESM2Preprocess']
 
-ROOT_DIR = '/tmp/uniref50'
-MD5_CHECKSUM = 'e619d3689749562d743f8ecf29a7a7c2'
-
-
-class UniRef50Preprocess:
-    def __init__(self, root_directory: Optional[str] = ROOT_DIR, checksum: Optional[str] = MD5_CHECKSUM) -> None:
-        """Prepocess UniRef50 data for pre-training.
-
-        Args:
-            root_directory (Optional[str]): Directory for download. Defaults to /tmp/uniref50.
-            checksum (Optional[str]): Checksum for file
+UNIREF50_ROOT_DIR = '/tmp/uniref50'
+UNIREF50_MD5_CHECKSUM = 'e619d3689749562d743f8ecf29a7a7c2'
 
 
-        Data are downloaded to root_directory/raw (/tmp/uniref50/raw). The split data can be found in
-        root_directory/processed.
+class PreprocessMixin:
+    def prepare_dataset(self, *args, **kwargs):
+        """Prepare dataset with the following requirement(s).
+
+        1. (Optional) download dataset
+        2. Preprocess dataset in pyfastx.Fasta
+        3. Split samples into train/validate/test portions
         """
-        super().__init__()
-        self.root_directory = pathlib.Path(root_directory)
-        self.checksum = checksum
+        raise NotImplementedError
 
-    def _process_file(self, url, download_dir):
-        """Download UniRef50 file and unzip
+    def _download_and_extract_fasta_gz(self, url, download_dir):
+        """Download fasta.gz from url and unzip
 
         Args:
-            url (str): URL for UniRef50 location.
-            download_dir (str): Download directory for UniRef50 file.
+            url (str): URL for fasta.gz location.
+            download_dir (str): Download directory
 
         Returns:
-            str: Path to UniRef50 FASTA file
+            str: Path to unzipped FASTA file
         """
         assert url.endswith('.fasta.gz'), AssertionError(f'Expected URL to end with `.fasta.gz`, got {url}..')
 
@@ -104,6 +98,183 @@ class UniRef50Preprocess:
                 logging.error(f'Could not download file {url}: {e.response.status_code}')
                 raise e
 
+    @staticmethod
+    def _index_fasta_data(fasta_indexer, val_size, test_size, random_seed):
+        """Create index lists for train, validation, and test splits
+
+        Args:
+            fasta_indexer (pyfastx): Memory mapped index of FASTA file
+            val_size (int): Number of protein sequences to put in validation set.
+            test_size (int): Numter of protein sequences to put in test set.
+            random_seed (int): Random seed.
+            ordered_splits (bool): sorts the resulting array of samples.
+
+        Returns:
+            List of indexes: list of train, validation, test indexes
+        """
+        sample_list = np.arange(len(fasta_indexer))
+
+        rng = np.random.default_rng(random_seed)
+        rng.shuffle(sample_list)
+
+        val_samples = sample_list[:val_size]
+        test_samples = sample_list[val_size : val_size + test_size]
+        train_samples = sample_list[val_size + test_size :]
+        assert len(val_samples) == val_size, AssertionError('Validation dataset is not the correct size.')
+        assert len(test_samples) == test_size, AssertionError('Test dataset is not the correct size.')
+        assert len(fasta_indexer) - len(val_samples) - len(test_samples) == len(train_samples), AssertionError(
+            'Train dataset is not the correct size.'
+        )
+        return train_samples, val_samples, test_samples
+
+    @staticmethod
+    def _protein_sequence_filewriter_map(args):
+        '''enables p.map'''
+        ordered_args = (
+            args['fasta_indexer'],
+            args['record_id_list'],
+            args['file_index'],
+            args['split_name'],
+            args['output_dir'],
+            args['delimiter'],
+        )
+        return PreprocessMixin._protein_sequence_filewriter(*ordered_args)
+
+    @staticmethod
+    def _protein_sequence_filewriter(fasta_indexer, record_id_list, file_index, split_name, output_dir, delimiter=','):
+        """CSV file writer for FASTA data
+
+        Args:
+            fasta_indexer (Union[pyfastx, str]): Memory mapped index of FASTA file or name of fasta file to open.
+                if intended to be use with multiprocessing.Pool, pass in a filename.
+            record_id_list (Numpy array): array of file indexes for the splits
+            file_index (int): Index number of the filename.
+            split_name (str): Directory name for the split -- "train", "val", "test"
+            output_dir (str): Output directory for CSV data.
+            delimiter (str, optional): CSV delimiter. Defaults to ','.
+        """
+
+        split_path = os.path.join(output_dir, split_name)
+        pathlib.Path(split_path).mkdir(parents=True, exist_ok=True)
+        file_name = os.path.join(split_path, f'x{str(file_index).zfill(3)}.csv')
+
+        if isinstance(fasta_indexer, str):
+            # NOTE pass a string if you want to use with Pool.map
+            _idx = pyfastx.Fasta(
+                fasta_indexer,
+                build_index=True,
+                uppercase=True,
+                key_func=lambda x: x.split()[0][len("UniRef90_") :],  # TODO (sichu): clean up UniRef90_
+            )
+            fasta_indexer = _idx
+
+        with open(file_name, 'w') as fh:
+            header_str = delimiter.join(['record_id', 'record_name', 'sequence_length', 'sequence'])
+            fh.write(header_str + '\n')
+            for record_id in record_id_list:
+                record = fasta_indexer[record_id]
+                output = delimiter.join([str(record.id), record.name, str(len(record.seq)), record.seq])
+                fh.write(output + '\n')
+        return
+
+    def train_val_test_split(self, train_samples, val_samples, test_samples, num_csv_files, fasta_indexer, output_dir):
+        """Create CSV files for train, val, test data
+
+        Args:
+            train_samples (numpy array): Array of index numbers for training data.
+            val_samples (numpy array): Array of index numbers for validation data
+            test_samples (numpy array): Array of index numbers for test data
+            num_csv_files (int): Number of CSV files to create for each train/val/test split.
+            fasta_indexer (pyfastx): Memory mapped index of FASTA file
+            output_dir (str): Output directory for CSV data.
+        """
+
+        for split_name, record_id_list in zip(['train', 'val', 'test'], [train_samples, val_samples, test_samples]):
+            logging.info(f'Creating {split_name} split...')
+
+            for file_index, record_id_split in enumerate(np.array_split(record_id_list, num_csv_files)):
+                logging.debug(f'Writing file number {file_index}...')
+                self._protein_sequence_filewriter(
+                    record_id_list=record_id_split,
+                    file_index=file_index,
+                    split_name=split_name,
+                    fasta_indexer=fasta_indexer,
+                    output_dir=output_dir,
+                )
+
+        if not os.path.isdir(output_dir):
+            raise ValueError(
+                f"Attempted to create a dataset output directory: {output_dir} but it failed and was not created."
+            )
+
+
+class FastaPreprocess(PreprocessMixin):
+    def __init__(self, root_directory: Union[str, pathlib.Path]) -> None:
+        """Prepocess fasta file for pre-training.
+
+        Args:
+            root_directory (Union[str, pathlib.Path]): Directory for download.
+
+        The split data can be found in root_directory.
+        """
+        super().__init__()
+        self.root_directory = pathlib.Path(root_directory)
+
+    def prepare_dataset(
+        self,
+        fasta_path: Union[str, pathlib.Path],
+        mode: str,
+        num_csv_files: int = 50,
+        output_dir: Union[str, pathlib.Path, None] = None,
+    ) -> None:
+        """
+        Prepares and splits the dataset into train/test/validation subsets, converts the fasta file to CSV format.
+
+        Args:
+            fasta_path (Union[str, pathlib.Path]): Single fasta for pretraining.
+            mode (str): Either "train", "val" and "test" to create dataset for specific split.
+            num_csv_files (int): Number of csv broken down from fasta dataset.
+            output_dir (Union[str, pathlib.Path, None]): Output directory of processed dataset. Default: root_directory / "processed"
+            random_seed (int): Random seed used in train-val-test split.
+        """
+        if output_dir is None:
+            output_dir = self.root_directory
+        os.makedirs(output_dir, exist_ok=True)
+
+        logging.info(f'Indexing custom dataset from {fasta_path}.')
+
+        fasta_path = str(fasta_path)
+        fasta_indexer = pyfastx.Fasta(fasta_path, build_index=True, uppercase=True)
+        record_id_list = np.arange(len(fasta_indexer))
+
+        for file_index, record_id_split in enumerate(np.array_split(record_id_list, num_csv_files)):
+            logging.debug(f'Writing file number {file_index}...')
+            self._protein_sequence_filewriter(
+                record_id_list=record_id_split,
+                file_index=file_index,
+                split_name=mode,
+                fasta_indexer=fasta_path,  # pass fasta_path to support Pool.map
+                output_dir=output_dir,
+            )
+
+
+class UniRef50Preprocess(PreprocessMixin):
+    def __init__(
+        self, root_directory: str = UNIREF50_ROOT_DIR, checksum: Optional[str] = UNIREF50_MD5_CHECKSUM
+    ) -> None:
+        """Prepocess UniRef50 data for pre-training.
+
+        Args:
+            root_directory (str): Directory for download. Defaults to /tmp/uniref50.
+            checksum (Optional[str]): Checksum for file
+
+
+        Data are downloaded to root_directory/raw (/tmp/uniref50/raw). The split data can be found in
+        root_directory/processed.
+        """
+        self.root_directory = pathlib.Path(root_directory)
+        self.checksum = checksum
+
     def process_files_uniprot(self, url, download_dir):
         """Download the UniRef50 fasta file and decompress it.
 
@@ -117,7 +288,7 @@ class UniRef50Preprocess:
         logging.info(f'Downloading file from {url}...')
 
         os.makedirs(download_dir, exist_ok=True)
-        file_path = self._process_file(url=url, download_dir=download_dir)
+        file_path = self._download_and_extract_fasta_gz(url=url, download_dir=download_dir)
         return file_path
 
     @staticmethod
@@ -163,118 +334,17 @@ class UniRef50Preprocess:
 
         return output_path
 
-    @staticmethod
-    def _index_fasta_data(fasta_indexer, val_size, test_size, random_seed):
-        """Create index lists for train, validation, and test splits
-
-        Args:
-            fasta_indexer (pyfastx): Memory mapped index of UniRef50 FASTA file
-            val_size (int): Number of protein sequences to put in validation set.
-            test_size (int): Numter of protein sequences to put in test set.
-            random_seed (int): Random seed.
-            ordered_splits (bool): sorts the resulting array of samples.
-
-        Returns:
-            List of indexes: list of train, validation, test indexes
-        """
-        sample_list = np.arange(len(fasta_indexer))
-
-        rng = np.random.default_rng(random_seed)
-        rng.shuffle(sample_list)
-
-        val_samples = sample_list[:val_size]
-        test_samples = sample_list[val_size : val_size + test_size]
-        train_samples = sample_list[val_size + test_size :]
-        assert len(val_samples) == val_size, AssertionError('Validation dataset is not the correct size.')
-        assert len(test_samples) == test_size, AssertionError('Test dataset is not the correct size.')
-        assert len(fasta_indexer) - len(val_samples) - len(test_samples) == len(train_samples), AssertionError(
-            'Train dataset is not the correct size.'
-        )
-        return train_samples, val_samples, test_samples
-
-    @staticmethod
-    def _protein_sequence_filewriter_map(args):
-        '''enables p.map'''
-        ordered_args = (
-            args['fasta_indexer'],
-            args['record_id_list'],
-            args['file_index'],
-            args['split_name'],
-            args['output_dir'],
-            args['delimiter'],
-        )
-        return UniRef50Preprocess._protein_sequence_filewriter(*ordered_args)
-
-    @staticmethod
-    def _protein_sequence_filewriter(fasta_indexer, record_id_list, file_index, split_name, output_dir, delimiter=','):
-        """CSV file writer for FASTA data
-
-        Args:
-            fasta_indexer (Union[pyfastx, str]): Memory mapped index of UniRef50 FASTA file or name of fasta file to open.
-                if intended to be use with multiprocessing.Pool, pass in a filename.
-            record_id_list (Numpy array): array of file indexes for the splits
-            file_index (int): Index number of the filename.
-            split_name (str): Directory name for the split -- "train", "val", "test"
-            output_dir (str): Output directory for CSV data.
-            delimiter (str, optional): CSV delimiter. Defaults to ','.
-        """
-
-        split_path = os.path.join(output_dir, split_name)
-        pathlib.Path(split_path).mkdir(parents=True, exist_ok=True)
-        file_name = os.path.join(split_path, f'x{str(file_index).zfill(3)}.csv')
-
-        if isinstance(fasta_indexer, str):
-            # NOTE pass a string if you want to use with Pool.map
-            _idx = pyfastx.Fasta(
-                fasta_indexer, build_index=True, uppercase=True, key_func=lambda x: x.split()[0][len("UniRef90_") :]
-            )
-            fasta_indexer = _idx
-
-        with open(file_name, 'w') as fh:
-            header_str = delimiter.join(['record_id', 'record_name', 'sequence_length', 'sequence'])
-            fh.write(header_str + '\n')
-            for record_id in record_id_list:
-                record = fasta_indexer[record_id]
-                output = delimiter.join([str(record.id), record.name, str(len(record.seq)), record.seq])
-                fh.write(output + '\n')
-        return
-
-    def train_val_test_split(self, train_samples, val_samples, test_samples, num_csv_files, fasta_indexer, output_dir):
-        """Create CSV files for train, val, test data
-
-        Args:
-            train_samples (numpy array): Array of index numbers for training data.
-            val_samples (numpy array): Array of index numbers for validation data
-            test_samples (numpy array): Array of index numbers for test data
-            num_csv_files (int): Number of CSV files to create for each train/val/test split.
-            fasta_indexer (pyfastx): Memory mapped index of UniRef50 FASTA file
-            output_dir (str): Output directory for CSV data.
-        """
-
-        for split_name, record_id_list in zip(['train', 'val', 'test'], [train_samples, val_samples, test_samples]):
-            logging.info(f'Creating {split_name} split...')
-
-            for file_index, record_id_split in enumerate(np.array_split(record_id_list, num_csv_files)):
-                logging.debug(f'Writing file number {file_index}...')
-                self._protein_sequence_filewriter(
-                    record_id_list=record_id_split,
-                    file_index=file_index,
-                    split_name=split_name,
-                    fasta_indexer=fasta_indexer,
-                    output_dir=output_dir,
-                )
-
     def prepare_dataset(
         self,
+        output_dir: Optional[pathlib.Path] = None,
         ngc_registry_target=None,
         ngc_registry_version=None,
-        url='https://ftp.uniprot.org/pub/databases/uniprot/uniref/uniref50/uniref50.fasta.gz',
-        source='ngc',
-        output_dir=None,
-        num_csv_files=50,
-        val_size=5000,
-        test_size=1000000,
-        random_seed=0,
+        url: str = 'https://ftp.uniprot.org/pub/databases/uniprot/uniref/uniref50/uniref50.fasta.gz',
+        source: str = 'ngc',
+        num_csv_files: int = 50,
+        val_size: int = 5000,
+        test_size: int = 1000000,
+        random_seed: int = 0,
     ):
         """Download UniRef50 dataset and split into train, valid, and test sets.
 
@@ -381,6 +451,15 @@ class ESM2Preprocess(UniRef50Preprocess):
         if mode != "train" and uf90_datapath is not None:
             raise ValueError("Currently, only training mode utilizes the uf90 datapaths.")
 
+        if mode in ['train', 'val', 'test'] and not os.path.exists(uf50_datapath):
+            raise FileNotFoundError(f"input argument uf50_datapath: {uf50_datapath} is not found in mode {mode}.")
+        if mode in ['train'] and not os.path.exists(uf90_datapath):
+            raise FileNotFoundError(f"input argument uf90_datapath: {uf90_datapath} is not found in mode {mode}.")
+        if mode in ['train'] and not os.path.exists(cluster_mapping_tsv):
+            raise FileNotFoundError(
+                f"input argument cluster_mapping_tsv: {cluster_mapping_tsv} is not found in mode {mode}."
+            )
+
         logging.info('Indexing UniRef50 dataset.')
         uf50_fasta_indexer = pyfastx.Fasta(uf50_datapath, build_index=True, uppercase=True)
 
@@ -451,6 +530,11 @@ class ESM2Preprocess(UniRef50Preprocess):
                         for file_index, record_id_split in enumerate(np.array_split(record_id_list, num_csv_files))
                     ],
                 )
+
+        if not os.path.isdir(split_path):
+            raise ValueError(
+                f"Attempted to create a dataset output directory: {split_path} in mode {mode} but it failed and was not created."
+            )
 
     @staticmethod
     def _make_local_memmaps(

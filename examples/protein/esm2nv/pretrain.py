@@ -22,7 +22,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import os
 
 from nemo.core.config import hydra_runner
 from nemo.utils import logging
@@ -30,7 +29,7 @@ from omegaconf.omegaconf import OmegaConf
 
 from bionemo.callbacks import setup_dwnstr_task_validation_callbacks
 from bionemo.data import FLIPPreprocess
-from bionemo.data.preprocess.protein.preprocess import ESM2Preprocess
+from bionemo.data.preprocess.protein.preprocess import ESM2Preprocess, FastaPreprocess
 from bionemo.model.protein.esm1nv import esm1nv_model
 from bionemo.model.utils import setup_trainer
 from bionemo.utils.connectors import BioNeMoSaveRestoreConnector
@@ -57,68 +56,61 @@ def main(cfg) -> None:
         logging.info("************** Finished Training ***********")
     else:
         logging.info("************** Starting Preprocessing ***********")
-        preprocessor = ESM2Preprocess()
+        use_default_esm_pretraining_strategy = cfg.model.data.train.custom_pretraining_fasta_path is None
 
-        if not os.path.exists(cfg.model.data.train.uf50_datapath):
-            raise FileNotFoundError(
-                f"input argument ++cfg.model.data.train.uf50_datapath: {cfg.model.data.train.uf50_datapath} is not found."
-            )
-        if not os.path.exists(cfg.model.data.train.uf90_datapath):
-            raise FileNotFoundError(
-                f"input argument ++cfg.model.data.train.uf90_datapath: {cfg.model.data.train.uf90_datapath} is not found."
-            )
-        if not os.path.exists(cfg.model.data.train.cluster_mapping_tsv):
-            raise FileNotFoundError(
-                f"input argument ++cfg.model.data.train.cluster_mapping_tsv: {cfg.model.data.train.cluster_mapping_tsv} is not found."
-            )
-        preprocessor.prepare_dataset(
-            uf50_datapath=cfg.model.data.train.uf50_datapath,
-            uf90_datapath=cfg.model.data.train.uf90_datapath,
-            cluster_mapping_tsv=cfg.model.data.train.cluster_mapping_tsv,
-            uf50_output_dir=cfg.model.data.train.dataset_path,
-            uf90_output_dir=cfg.model.data.train.uf90.uniref90_path,
-            sort_fastas=cfg.model.data.train.sort_fastas,
-            mode="train",
-            num_preprocess_workers=cfg.model.data.preprocessing.num_preprocess_workers,
-        )
-        # Make sure the dataset was created.
-        if not os.path.isdir(cfg.model.data.train.dataset_path):
-            raise ValueError(
-                f"Attempted to create a dataset output directory: {cfg.model.data.train.dataset_path} but it failed and was not created."
-            )
-        # Check input arguments for val run.
-        if not os.path.exists(cfg.model.data.val.uf50_datapath):
-            raise FileNotFoundError(
-                f"input argument ++cfg.model.data.val.uf50_datapath: {cfg.model.data.val.uf50_datapath} is not found."
-            )
-        preprocessor.prepare_dataset(
-            uf50_datapath=cfg.model.data.val.uf50_datapath,
-            uf50_output_dir=cfg.model.data.val.dataset_path,
-            sort_fastas=False,
-            mode="val",
-        )
-        # Make sure the dataset was created.
-        if not os.path.isdir(cfg.model.data.val.dataset_path):
-            raise ValueError(
-                f"Attempted to create a dataset output directory: {cfg.model.data.val.dataset_path} but it failed and was not created."
+        if use_default_esm_pretraining_strategy:
+            # Pretraining on uniref90 sequences sampled from uniref50 clusters
+            # ref: https://www.biorxiv.org/content/10.1101/2022.07.20.500902v1.full.pdf
+            preprocessor = ESM2Preprocess()
+
+            # Prepare training dataset
+            preprocessor.prepare_dataset(
+                uf50_datapath=cfg.model.data.train.uf50_datapath,
+                uf90_datapath=cfg.model.data.train.uf90_datapath,
+                cluster_mapping_tsv=cfg.model.data.train.cluster_mapping_tsv,
+                uf50_output_dir=cfg.model.data.train.dataset_path,
+                uf90_output_dir=cfg.model.data.train.uf90.uniref90_path,
+                sort_fastas=cfg.model.data.train.sort_fastas,
+                mode="train",
+                num_preprocess_workers=cfg.model.data.preprocessing.num_preprocess_workers,
             )
 
-        # Check input arguments for test.
-        if not os.path.exists(cfg.model.data.test.uf50_datapath):
-            raise FileNotFoundError(
-                f"input argument ++cfg.model.data.test.uf50_datapath: {cfg.model.data.test.uf50_datapath} is not found."
+            # Prepare val dataset
+            preprocessor.prepare_dataset(
+                uf50_datapath=cfg.model.data.val.uf50_datapath,
+                uf50_output_dir=cfg.model.data.val.dataset_path,
+                sort_fastas=False,
+                mode="val",
             )
 
-        preprocessor.prepare_dataset(
-            uf50_datapath=cfg.model.data.test.uf50_datapath,
-            uf50_output_dir=cfg.model.data.test.dataset_path,
-            sort_fastas=False,
-            mode="test",
-        )
-        # Make sure the dataset was created.
-        if not os.path.isdir(cfg.model.data.test.dataset_path):
-            raise ValueError(
-                f"Attempted to create a dataset output directory: {cfg.model.data.test.dataset_path} but it failed and was not created."
+            # Prepare test dataset
+            preprocessor.prepare_dataset(
+                uf50_datapath=cfg.model.data.test.uf50_datapath,
+                uf50_output_dir=cfg.model.data.test.dataset_path,
+                sort_fastas=False,
+                mode="test",
+            )
+        else:
+            preprocessor = FastaPreprocess(
+                root_directory=cfg.model.data.dataset_path,
+            )
+
+            # Prepare training dataset
+            preprocessor.prepare_dataset(
+                fasta_path=cfg.model.data.train.custom_pretraining_fasta_path,
+                mode='train',
+            )
+
+            # Prepare val dataset
+            preprocessor.prepare_dataset(
+                fasta_path=cfg.model.data.val.custom_pretraining_fasta_path,
+                mode='val',
+            )
+
+            # Prepare test dataset
+            preprocessor.prepare_dataset(
+                fasta_path=cfg.model.data.test.custom_pretraining_fasta_path,
+                mode='test',
             )
 
         # Downloading and preprocessing data for downstream task validation

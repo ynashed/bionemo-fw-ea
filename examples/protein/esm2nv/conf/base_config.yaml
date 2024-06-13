@@ -1,3 +1,6 @@
+defaults:
+  - _self_
+
 name: esm2nv
 do_training: True # set to false if data preprocessing steps must be completed
 do_testing: False # set to true to run evaluation on test data after training, requires test_dataset section
@@ -165,8 +168,9 @@ model:
       uf50_datapath: ${model.data.dataset_path}/uniref50_train_filt.fasta
       uf90_datapath: ${model.data.dataset_path}/uniref90membersandreps_ur50trainfiltreps.fasta
       cluster_mapping_tsv: ${model.data.dataset_path}/uniref50_mapper_to_uniref90clustermembers_andselfuniref50.tsv
-      dataset_path: ${model.data.dataset_path}/uf50 # parent directory for data, contains  train folder. Requires write for for index creation.
+      dataset_path: ${model.data.dataset_path}/uf50 # parent directory for data, contains  train folder. Requires write for index creation.
       sort_fastas: True # If true, assumes the input files are not sorted, and sorts them before creating the cluster mapping. Unsorted fastas will break the cluster map.
+      # supported only in ESM2 default pretraining strategy
       num_workers: ${model.data.num_workers}
       uf90:
         uniref90_path: ${model.data.dataset_path}/uf90 # created and populated my preprocessing
@@ -174,59 +178,44 @@ model:
           uf90_csvs: x[000..049] # created and populated by preprocessing, this key is a directory inside uniref90_path
         data_impl: 'csv_fields_mmap'
         data_impl_kwargs:
-          csv_fields_mmap:
+          csv_fields_mmap: &csv_fields_mmap
             header_lines: 1
             newline_int: 10 # byte-value of newline
             workers: ${model.data.train.num_workers} # number of workers when creating missing index files (null defaults to cpu_num // 2)
             sort_dataset_paths: True # if True datasets will be sorted by name
             data_sep: ',' # string to split text into columns
-            data_fields:
+            data_fields: &csv_fields_mmap_data_fields
               sequence: 3
               sequence_id: 1
         index_mapping_dir: ${model.data.index_mapping_dir}
       index_mapping_dir: ${model.data.index_mapping_dir}
       max_seq_length: ${model.seq_length} # Maximum input sequence length. Longer sequences are truncated
       seed: ${model.seed} # Random seed
-    val:
+      custom_pretraining_fasta_path: null  # specific if want to have separate custom training fasta
+    val: &val_cfg
       use_upsampling: False
       range: x[000..049]
       uf50_datapath: ${model.data.dataset_path}/uniref50_train_filt.fasta
-      dataset_path: ${model.data.dataset_path}/uf50 # holds validation data.
-      data_impl: 'csv_fields_mmap'
+      dataset_path: ${model.data.train.dataset_path} # holds validation data.
+      data_impl: ${model.data.train.uf90.data_impl}
       num_workers: ${model.data.num_workers}
       data_impl_kwargs:
         csv_fields_mmap:
-          header_lines: 1
-          newline_int: 10 # byte-value of newline
+          <<: *csv_fields_mmap  # (yaml only supports shallow merge)
           workers: ${model.data.val.num_workers} # number of workers when creating missing index files (null defaults to cpu_num // 2)
-          sort_dataset_paths: True # if True datasets will be sorted by name
-          data_sep: ',' # string to split text into columns
-          data_fields:
-            sequence: 3
-            sequence_id: 1
+          data_fields: ${model.data.train.uf90.data_impl_kwargs.csv_fields_mmap.data_fields}
       index_mapping_dir: ${model.data.index_mapping_dir}
       max_seq_length: ${model.seq_length} # Maximum input sequence length. Longer sequences are truncated
       seed: ${model.seed} # Random seed
+      custom_pretraining_fasta_path: null  # specific if want to have separate custom validation fasta
     test:
-      use_upsampling: False
-      range: x[000..049]
-      uf50_datapath: ${model.data.dataset_path}/uniref50_train_filt.fasta
-      dataset_path: ${model.data.dataset_path}/uf50 # holds testing data.
-      data_impl: 'csv_fields_mmap'
-      num_workers: ${model.data.num_workers}
+      <<: *val_cfg
       data_impl_kwargs:
         csv_fields_mmap:
-          header_lines: 1
-          newline_int: 10 # byte-value of newline
+          <<: *csv_fields_mmap
           workers: ${model.data.test.num_workers} # number of workers when creating missing index files (null defaults to cpu_num // 2)
-          sort_dataset_paths: True # if True datasets will be sorted by name
-          data_sep: ',' # string to split text into columns
-          data_fields:
-            sequence: 3
-            sequence_id: 1
-      index_mapping_dir: ${model.data.index_mapping_dir}
-      max_seq_length: ${model.seq_length} # Maximum input sequence length. Longer sequences are truncated
-      seed: ${model.seed} # Random seed
+          data_fields: ${model.data.train.uf90.data_impl_kwargs.csv_fields_mmap.data_fields}
+      custom_pretraining_fasta_path: null  # specific if want to have separate custom testing fasta
     
     # These control the MLM token probabilities. The following settings are commonly used in literature.
     modify_percent: 0.15 # Fraction of characters in a protein sequence to modify. (Modification means replacing with another amino acid or with a mask token)

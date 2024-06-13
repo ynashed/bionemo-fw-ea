@@ -163,12 +163,13 @@ model:
       index_mapping_dir: ${model.data.index_mapping_dir}
       max_seq_length: ${model.seq_length}
       seed: ${model.seed}
+      custom_pretraining_fasta_path: null
     val:
       use_upsampling: false
       range: x[000..049]
       uf50_datapath: ${model.data.dataset_path}/uniref50_train_filt.fasta
-      dataset_path: ${model.data.dataset_path}/uf50
-      data_impl: csv_fields_mmap
+      dataset_path: ${model.data.train.dataset_path}
+      data_impl: ${model.data.train.uf90.data_impl}
       num_workers: ${model.data.num_workers}
       data_impl_kwargs:
         csv_fields_mmap:
@@ -177,18 +178,17 @@ model:
           workers: ${model.data.val.num_workers}
           sort_dataset_paths: true
           data_sep: ','
-          data_fields:
-            sequence: 3
-            sequence_id: 1
+          data_fields: ${model.data.train.uf90.data_impl_kwargs.csv_fields_mmap.data_fields}
       index_mapping_dir: ${model.data.index_mapping_dir}
       max_seq_length: ${model.seq_length}
       seed: ${model.seed}
+      custom_pretraining_fasta_path: null
     test:
       use_upsampling: false
       range: x[000..049]
       uf50_datapath: ${model.data.dataset_path}/uniref50_train_filt.fasta
-      dataset_path: ${model.data.dataset_path}/uf50
-      data_impl: csv_fields_mmap
+      dataset_path: ${model.data.train.dataset_path}
+      data_impl: ${model.data.train.uf90.data_impl}
       num_workers: ${model.data.num_workers}
       data_impl_kwargs:
         csv_fields_mmap:
@@ -197,12 +197,11 @@ model:
           workers: ${model.data.test.num_workers}
           sort_dataset_paths: true
           data_sep: ','
-          data_fields:
-            sequence: 3
-            sequence_id: 1
+          data_fields: ${model.data.train.uf90.data_impl_kwargs.csv_fields_mmap.data_fields}
       index_mapping_dir: ${model.data.index_mapping_dir}
       max_seq_length: ${model.seq_length}
       seed: ${model.seed}
+      custom_pretraining_fasta_path: null
     modify_percent: 0.15
     perturb_percent: 0.1
     mask_percent: 0.8

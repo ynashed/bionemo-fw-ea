@@ -32,6 +32,7 @@ _DATA_IMPL_TYPE_CLS = {
 }
 
 
+# TODO (@sichu): raise exception if cannot read the dataset properly
 def build_typed_dataset(
     dataset_paths: Union[str, List[str]],
     data_impl: str,

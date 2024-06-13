@@ -13,7 +13,7 @@ cd examples/tests/test_data && \
 unzip uniref202104_esm2_qc_test200_val200.zip && \
 cd ${BIONEMO_HOME}
 
-# preprocess dataset
+# preprocess example uniref50-90 dataset
 python examples/protein/esm2nv/pretrain.py \
   --config-path=conf \
   ++do_training=False \
@@ -25,8 +25,21 @@ python examples/protein/esm2nv/pretrain.py \
   ++model.data.dataset_path=/workspace/bionemo/examples/tests/test_data/uniref202104_esm2_qc_test200_val200
 ```
 
+Instead of the default uniref50-90 sequences, users can pretrain on custom train, val and test sets by the following.
+```bash
+
+# preprocess example NVIDIA fasta
+python examples/protein/esm2nv/pretrain.py \
+  --config-path=conf \
+  ++do_training=False \
+  ++model.data.train.custom_pretraining_fasta_path=${BIONEMO_HOME}/examples/tests/test_data/protein/esm2nv/example_train.fasta \
+  ++model.data.val.custom_pretraining_fasta_path=${BIONEMO_HOME}/examples/tests/test_data/protein/esm2nv/example_val.fasta \
+  ++model.data.test.custom_pretraining_fasta_path=${BIONEMO_HOME}/examples/tests/test_data/protein/esm2nv/example_test.fasta \
+  ++model.data.dataset_path=${BIONEMO_HOME}/examples/tests/test_data/protein/esm2nv/example_dataset
+```
+
 ## (2) Pretraining
-Pretraining ESM2 on sample dataset. 
+Pretraining ESM2 on sample dataset using uniref50-90 dataset.
 
 ```bash
 # training on multiple devices with tensor model parallelism
@@ -41,10 +54,31 @@ python examples/protein/esm2nv/pretrain.py \
   ++model.micro_batch_size=4 \
   ++trainer.max_steps=100 \
   ++trainer.val_check_interval=10 \
-   ++exp_manager.create_wandb_logger=False \
+  ++exp_manager.create_wandb_logger=False \
   ++exp_manager.checkpoint_callback_params.save_top_k=5
 #   ++model.dwnstr_task_validation.enabled=True \
 #   ++model.dwnstr_task_validation.dataset.dataset_path=examples/tests/test_data/protein/downstream
+```
+
+Pretraining ESM2 on custom dataset requires additional overrides.
+```bash
+python examples/protein/esm2nv/pretrain.py \
+  --config-path=conf \
+  --config-name=pretrain_esm2_8M \
+  ++do_training=True \
+  ++do_testing=False \
+  ++trainer.devices=2 \
+  ++model.tensor_model_parallel_size=2 \
+  ++model.micro_batch_size=4 \
+  ++trainer.max_steps=100 \
+  ++trainer.val_check_interval=10 \
+  ++exp_manager.create_wandb_logger=False \
+  ++exp_manager.checkpoint_callback_params.save_top_k=5 \
+  ++model.data.train.custom_pretraining_fasta_path=${BIONEMO_HOME}/examples/tests/test_data/protein/esm2nv/example_train.fasta \
+  ++model.data.val.custom_pretraining_fasta_path=${BIONEMO_HOME}/examples/tests/test_data/protein/esm2nv/example_val.fasta \
+  ++model.data.test.custom_pretraining_fasta_path=${BIONEMO_HOME}/examples/tests/test_data/protein/esm2nv/example_test.fasta \
+  ++model.data.dataset_path=${BIONEMO_HOME}/examples/tests/test_data/protein/esm2nv/example_dataset \
+  ++model.data.train.dataset_path=${BIONEMO_HOME}/examples/tests/test_data/protein/esm2nv/example_dataset
 ```
 
 Known issue(s)
