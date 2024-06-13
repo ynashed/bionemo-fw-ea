@@ -619,11 +619,14 @@ class AlphaFold(ModelPT):
         )
 
         # (3) custom val metrics data structures
-        self._update_val_metrics_this_validation_step(val_batch, val_metrics_this_step_this_rank)
+        # update only if validation computation was successful
+        if val_metrics_this_step_this_rank is not None:
+            self._update_val_metrics_this_validation_step(val_batch, val_metrics_this_step_this_rank)
 
     def on_validation_start(self):
         log_with_nemo_at_level("AlphaFold.on_validation_start(), begin", self)
         super(AlphaFold, self).on_validation_start()
+        self.eval()  # docs: https://pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module.eval
         log_with_nemo_at_level("AlphaFold.on_validation_start(), end", self)
 
     def on_validation_epoch_end(self):
@@ -693,6 +696,7 @@ class AlphaFold(ModelPT):
             self,
         )
         super(AlphaFold, self).on_validation_end()
+        self.train()  # docs: https://pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module.train
         log_with_nemo_at_level(
             """AlphaFold.on_validation_end(), end, checkpoints have been saved""",
             self,
@@ -732,6 +736,7 @@ class AlphaFold(ModelPT):
     def _compute_validation_metrics_this_validation_step(self, val_batch: Dict, val_batch_idx: int):
         val_outputs = self(val_batch)
         val_batch = map_tensor_tree(lambda t: t[..., -1], val_batch)
+
         val_metrics_this_step_this_rank = compute_validation_metrics(
             predicted_atom_positions=val_outputs["final_atom_positions"],
             target_atom_positions=val_batch["all_atom_positions"],
@@ -828,7 +833,6 @@ class AlphaFold(ModelPT):
             self,
         )
         # (2) aggregate metrics from gathered tensors
-        #
         has_val_example = ptl_gathered_val_metrics_as_tensors[VAL_EXAMPLE_ID] != -1
         num_nondistinct_val_example_ids_this_epoch = torch.sum(has_val_example)
         num_distinct_val_example_ids_this_epoch = len(

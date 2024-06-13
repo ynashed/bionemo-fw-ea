@@ -415,11 +415,14 @@ class SelfAttentionWithGate(nn.Module):
                 return AttnBiasJIT(query, key, value, mask, bias, self.inf)
             elif mha.is_enabled() and bias is None and self.training:
                 return AttnNoBiasJIT(query, key, value, mask, self.inf)
+            elif not self.training:  # set for all child modules of a nn.Module when calling self.eval/self.train
+                # source: https://pytorch.org/docs/stable/_modules/torch/nn/modules/module.html#Module.train
+                return _attention_eager(query, key, value, mask, bias, self.inf)
+            else:
+                return _attention_jit(query, key, value, mask, bias, self.inf)
             # elif dist.is_async_val_enabled() and dist.is_val_rank():
             #     # TODO: we met illegal memory access on eval node when enable async eval
             #     return _attention_eager(query, key, value, mask, bias, self.inf)
-            else:
-                return _attention_jit(query, key, value, mask, bias, self.inf)
         else:
             return _attention_chunked(query, key, value, mask, bias, self.inf, self.chunk_size)
 
@@ -546,8 +549,11 @@ class CrossAttentionNoGate(nn.Module):
             # TODO: we met illegal memory access on eval node when enable async eval
             # if dist.is_async_val_enabled() and dist.is_val_rank():
             #     return _attention_eager(query, key, value, mask, bias, self.inf)
-            # else:
-            return _attention_jit(query, key, value, mask, bias, self.inf)
+            if not self.training:  # set for all child modules of a nn.Module when calling self.eval/self.train
+                # source: https://pytorch.org/docs/stable/_modules/torch/nn/modules/module.html#Module.train
+                return _attention_eager(query, key, value, mask, bias, self.inf)
+            else:
+                return _attention_jit(query, key, value, mask, bias, self.inf)
         else:
             return _attention_chunked(query, key, value, mask, bias, self.inf, self.chunk_size)
 
