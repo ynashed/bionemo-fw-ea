@@ -103,7 +103,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
             mean=self.interpolant_params.sample_time_mean,
             scale=self.interpolant_params.sample_time_scale,
         )
-        return batch_size, time
+        return time
 
     def pre_format_molecules(self, batch, batch_size):
         batch['x'] = batch['x'] - scatter_mean(batch['x'], index=batch.batch, dim=0, dim_size=batch_size)[batch.batch]
@@ -159,23 +159,14 @@ class Graph3DInterpolantModel(pl.LightningModule):
             if interpolant is None:
                 batch[f"{interp_param.variable_name}_t"] = batch[f"{interp_param.variable_name}"]
             if interp_param.variable_name == "edge_attr":
-                if self.interpolant_params.time_type == "discrete":
-                    _, batch[f"{interp_param.variable_name}_t"], _ = interpolant.interpolate_edges(
-                        batch[f"{interp_param.variable_name}"], batch["edge_index"], batch.batch, t_idx=time
-                    )
-                elif self.interpolant_params.time_type == "continuous":
-                    _, batch[f"{interp_param.variable_name}_t"], _ = interpolant.interpolate_edges(
-                        batch[f"{interp_param.variable_name}"], batch["edge_index"], batch.batch, t=time
-                    )
+                _, batch[f"{interp_param.variable_name}_t"], _ = interpolant.interpolate_edges(
+                    batch.batch, batch[f"{interp_param.variable_name}"], batch["edge_index"], time
+                )
             else:
-                if self.interpolant_params.time_type == "discrete":
-                    _, batch[f"{interp_param.variable_name}_t"], _ = interpolant.interpolate(
-                        batch[f"{interp_param.variable_name}"], batch.batch, t_idx=time
-                    )
-                elif self.interpolant_params.time_type == "continuous":
-                    _, batch[f"{interp_param.variable_name}_t"], _ = interpolant.interpolate(
-                        batch[f"{interp_param.variable_name}"], batch.batch, t=time
-                    )
+                _, batch[f"{interp_param.variable_name}_t"], _ = interpolant.interpolate(
+                    batch.batch, batch[f"{interp_param.variable_name}"], time
+                )
+
         return batch
 
     # def inject_time(self, batch, batch_time):
@@ -190,9 +181,18 @@ class Graph3DInterpolantModel(pl.LightningModule):
         # TODO how do we handle the charge and other H add on logic
         return results
 
-    def separate_discrete_variables(self, results):
+    def separate_discrete_variables(self, out):
         # TODO how do we handle the charge and other H add on logic
-        return results
+        for interp_param in self.interpolant_params.variables:
+            if "discrete" in interp_param.interpolant_type:
+                key = interp_param.variable_name
+                if self.interpolants[key].prior_type in ["absorb", "mask"]:
+                    logits = out[f"{key}_logits"].clone()
+                    logits[:, -1] = -1e9
+                    out[f"{key}_hat"] = logits.argmax(dim=-1)
+                else:
+                    out[f"{key}_hat"] = out[f"{key}_logits"].argmax(dim=-1)
+        return out
 
     def validation_step(self, batch, batch_idx):
         val_loss = self.training_step(batch, batch_idx)
@@ -204,7 +204,8 @@ class Graph3DInterpolantModel(pl.LightningModule):
         batch.x = batch.pos
         batch.pos = None
         #! Swapping names for now
-        out, time = self(batch)
+        time = self.sample_time(batch)
+        out, time = self(batch, time)
         batch_geo = batch.batch
         # TODO turn this in to an iterative loop where if the interpolant is non None we take a loss
 
@@ -221,11 +222,11 @@ class Graph3DInterpolantModel(pl.LightningModule):
             batch_geo, out['x_hat'], batch['x'], batch_weight=ws_t, scale=self.loss_scalar['x']
         )
         h_loss, h_out = self.loss_function(
-            batch_geo, out['h_hat'], batch['h'], continuous=False, batch_weight=ws_t, scale=self.loss_scalar['h']
+            batch_geo, out['h_logits'], batch['h'], continuous=False, batch_weight=ws_t, scale=self.loss_scalar['h']
         )
         edge_loss, edge_attr_out = self.loss_function.edge_loss(
             batch_geo,
-            out['edge_attr_hat'],
+            out['edge_attr_logits'],
             batch['edge_attr'],
             index=batch['edge_index'][1],
             num_atoms=x_pred.size(0),
@@ -249,7 +250,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
         self.log("train-loss", loss)
         return loss
 
-    def forward(self, batch):
+    def forward(self, batch, time):
         """
         This forward function assumes we are doing some form (including none) of interpolation on positions X, node features H, and edge attributes edge_attr.
         1. Sample time from the distribution that is defined via the X interpolant params
@@ -260,7 +261,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
         5. Dynamics forward pass to predict clean data given noisy data.
         6. Seperate the aggregated discrete predictions for easier loss calculation.
         """
-        batch_size, time = self.sample_time(batch)
+        batch_size = int(batch.batch.max()) + 1
         batch = self.pre_format_molecules(batch, batch_size)
         batch = self.interpolate(batch, time)
         #    batch = self.initialize_pair_embedding(batch) #! Do in the dynamics
@@ -284,6 +285,75 @@ class Graph3DInterpolantModel(pl.LightningModule):
     #             print(name, p.shape)
     #     print("on_after_backward exit")
     #     import ipdb; ipdb.set_trace(0)
+    def sample(self, num_samples, timesteps=500, time_discretization="linear", node_distribution=None):
+        time_type = self.interpolants['x'].time_type
+        if time_type == "continuous":
+            if time_discretization == "linear":
+                timeline = torch.linspace(0, 1, timesteps + 1).tolist()  # [0, 1.0] timestpes + 1
+            elif time_discretization == "log":
+                timeline = (
+                    (1 - torch.logspace(-2, 0, timesteps + 1)).flip(dims=[0]).tolist()
+                )  # [0, 0.99] #timestpes + 1
+            # timeline = torch.logspace(-2, 0, timesteps + 1) #[0.01, 1.0]
+            DT = [t1 - t0 for t0, t1 in zip(timeline[:-1], timeline[1:])]  # timesteps
+        else:
+            timeline = torch.arange(timesteps + 1)
+            DT = [1 / timesteps] * timesteps
+
+        if node_distribution:
+            num_atoms = torch.multinomial(
+                input=node_distribution,
+                num_samples=num_samples,
+                replacement=True,
+            )
+        else:
+            num_atoms = torch.randint(20, 55, (num_samples,)).to(torch.int64)
+        batch = torch.repeat_interleave(torch.arange(num_samples), num_atoms).to(self.device)
+
+        edge_index = torch.eq(batch.unsqueeze(0), batch.unsqueeze(-1)).int().fill_diagonal_(0).to(self.device)  # N x N
+        edge_index, _ = dense_to_sparse(edge_index)  # 2 x E
+        edge_index = sort_edge_index(edge_index, sort_by_row=False)
+
+        data, prior = {}, {}
+        total_num_atoms = num_atoms.sum().item()
+        for key, interpolant in self.interpolants.items():
+            if "edge" in key:
+                shape = (edge_index.size(1), interpolant.num_classes)
+                prior[key], edge_index = interpolant.prior_edges(batch, shape, edge_index, self.device)
+                data[f"{key}_t"] = prior[key]
+            else:
+                shape = (total_num_atoms, interpolant.num_classes)
+                data[f"{key}_t"] = prior[key] = interpolant.prior(batch, shape, self.device)
+        for t, dt in zip(timeline, DT):
+            import ipdb
+
+            ipdb.set_trace()
+            time = torch.tensor([t] * num_samples).to(self.device)
+            data = self.aggregate_discrete_variables(data)
+            out = self.dynamics(
+                batch=batch,
+                X=data["x_t"],
+                H=data["h_t"],
+                E=data["edge_attr_t"],
+                E_idx=edge_index,
+                t=time,
+            )
+            out = self.separate_discrete_variables(out)
+            for key, interpolant in self.interpolants.items():
+                if "edge" in key:
+                    data[f"{key}_t"], edge_index = interpolant.step_edges(
+                        batch,
+                        edge_index=edge_index,
+                        edge_attr_t=data[f"{key}_t"],
+                        edge_attr_hat=out[f"{key}_hat"],
+                        time=time,
+                    )
+                else:
+                    data[f"{key}_t"] = interpolant.step(
+                        xt=data[f"{key}_t"], x_hat=out[f"{key}_hat"], x0=prior[key], batch=batch, time=time, dt=dt
+                    )
+
+        return {key: data[f"{key}_t"] for key in self.interpolants.keys()}
 
 
 @hydra_runner(config_path="conf", config_name="train")
@@ -292,8 +362,16 @@ def main(cfg: DictConfig):
     datamodule = MoleculeDataModule(cfg.data)
     train_dataloader = datamodule.test_dataloader()
     device = 'cuda:0'
-    model = Graph3DInterpolantModel(cfg.loss, cfg.optimizer, cfg.dynamics, cfg.interpolant).to(device)
+    model = Graph3DInterpolantModel(
+        loss_params=cfg.loss,
+        optimizer_params=cfg.optimizer,
+        lr_scheduler_params=cfg.lr_scheduler,
+        dynamics_params=cfg.dynamics,
+        interpolant_params=cfg.interpolant,
+    ).to(device)
     model.setup("fit")  #! this has to be called after model is moved to device for everything to propagate
+
+    model.sample(10)
     for batch in train_dataloader:
         # batch.h = batch.x
         # batch.x = batch.pos

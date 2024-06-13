@@ -10,9 +10,9 @@ wandb_params:
 
 data:
   dataset_root: "/workspace/bionemo/data/pyg_geom_drug"
-  processed_folder: "processed_tiny"
-  batch_size: 4
-  inference_batch_size: 5
+  processed_folder: "processed" #"processed_tiny"
+  batch_size: 16 #4
+  inference_batch_size: 16 #5
   num_workers: 4
   remove_hs: False
   select_train_subset: 100
@@ -36,6 +36,7 @@ interpolant:
       interpolant_type: 'continuous_diffusion'
       prior_type: 'gaussian'
       timesteps: *timesteps
+      num_classes: 3
       scheduler_type: *scheduler_type
       time_type: *time_type
       nu: 2.0

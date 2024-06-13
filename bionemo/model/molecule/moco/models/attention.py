@@ -20,10 +20,14 @@ class AttentionLayer(nn.Module):
         self.invariant_edge_feat_dim = invariant_edge_feat_dim
         self.num_heads = num_heads
         self.KV = MLP(
-            invariant_node_feat_dim + 1, 2 * invariant_node_feat_dim, 2 * invariant_node_feat_dim * self.num_heads
+            invariant_node_feat_dim + 1,
+            2 * invariant_node_feat_dim * self.num_heads,
+            2 * invariant_node_feat_dim * self.num_heads,
         )
-        self.Q = MLP(invariant_node_feat_dim, invariant_node_feat_dim, invariant_node_feat_dim * self.num_heads)
-        self.pair_bias = MLP(invariant_node_feat_dim, invariant_node_feat_dim, 1 * self.num_heads)
+        self.Q = MLP(
+            invariant_node_feat_dim, invariant_node_feat_dim * self.num_heads, invariant_node_feat_dim * self.num_heads
+        )
+        self.pair_bias = MLP(invariant_node_feat_dim, 4 * invariant_node_feat_dim, 1 * self.num_heads)
         self.gate = MLP(invariant_edge_feat_dim, invariant_edge_feat_dim, 1 * self.num_heads, last_act='sigmoid')
         self.phi_h = MLP(invariant_node_feat_dim * self.num_heads, invariant_node_feat_dim, invariant_node_feat_dim)
         self.phi_x = MLP(invariant_node_feat_dim * self.num_heads, invariant_node_feat_dim, 1)

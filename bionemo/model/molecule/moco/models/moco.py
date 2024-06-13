@@ -57,14 +57,14 @@ class MoCo(nn.Module):
             X, H, E, Z = layer(batch, X, H, E_idx, E, Z)
             # print(X.shape, H.shape, E.shape, E_idx.shape, Z.shape)
             # print(X.sum().item(), H.sum().item(), E.sum().item(), Z.sum().item())
-        h_logits, h_pred = self.atom_type_head(batch, H)  #! These values look weird H values blown up
-        e_logits, e_pred = self.edge_type_head.predict_edges(batch, E, E_idx)
+        h_logits, h_prob = self.atom_type_head(batch, H)  #! These values look weird H values blown up
+        e_logits, e_prob = self.edge_type_head.predict_edges(batch, E, E_idx)
         z_logits = None  # self.distance_head.predict_distances(batch, Z)
         return {
             "x_hat": X,
-            "h_hat": h_logits,
-            "h_pred": h_pred,
-            "edge_attr_hat": e_logits,
-            "edge_attr_pred": e_pred,
+            "h_logits": h_logits,
+            # "h_hat": h_logits.argmax(dim=-1),
+            "edge_attr_logits": e_logits,
+            # "edge_attr_hat":  e_logits.argmax(dim=-1),
             "Z_hat": z_logits,
         }

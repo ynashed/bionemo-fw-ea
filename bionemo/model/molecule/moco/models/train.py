@@ -69,7 +69,7 @@ def main(cfg: DictConfig) -> None:
         accelerator='gpu',
         devices=1,  # cfg.train.gpus,
         strategy=('ddp' if cfg.train.gpus > 1 else 'auto'),
-        val_check_interval=1,  # cfg.train.val_freq,
+        check_val_every_n_epoch=1,  # cfg.train.val_freq,
         gradient_clip_val=cfg.train.gradient_clip_value,
     )
 
