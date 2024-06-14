@@ -46,6 +46,7 @@ class MoCo(nn.Module):
         # self.distance_head = PredictionHead(1, atom_features, distance_prediction=True)
 
     def forward(self, batch, X, H, E_idx, E, t):
+        # import ipdb; ipdb.set_trace()
         H = self.atom_embedder(F.one_hot(H, self.num_atom_classes).float())
         E = self.edge_embedder(F.one_hot(E, self.num_edge_classes).float())
         te = self.time_embedding(t, batch)  # B x D

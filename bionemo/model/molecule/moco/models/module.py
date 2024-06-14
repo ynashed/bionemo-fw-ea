@@ -16,6 +16,7 @@ from omegaconf import DictConfig
 from torch_geometric.utils import dense_to_sparse, sort_edge_index
 from torch_scatter import scatter_mean
 from torch_sparse import coalesce
+from tqdm import tqdm
 
 from bionemo.model.molecule.moco.data.molecule_datamodule import MoleculeDataModule
 from bionemo.model.molecule.moco.models.interpolant import build_interpolant
@@ -316,6 +317,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
 
         data, prior = {}, {}
         total_num_atoms = num_atoms.sum().item()
+
         for key, interpolant in self.interpolants.items():
             if "edge" in key:
                 shape = (edge_index.size(1), interpolant.num_classes)
@@ -324,10 +326,9 @@ class Graph3DInterpolantModel(pl.LightningModule):
             else:
                 shape = (total_num_atoms, interpolant.num_classes)
                 data[f"{key}_t"] = prior[key] = interpolant.prior(batch, shape, self.device)
-        for t, dt in zip(timeline, DT):
-            import ipdb
-
-            ipdb.set_trace()
+        for idx in tqdm(list(range(len(DT))), total=len(DT)):
+            t = timeline[idx]
+            dt = DT[idx]
             time = torch.tensor([t] * num_samples).to(self.device)
             data = self.aggregate_discrete_variables(data)
             out = self.dynamics(
@@ -341,7 +342,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
             out = self.separate_discrete_variables(out)
             for key, interpolant in self.interpolants.items():
                 if "edge" in key:
-                    data[f"{key}_t"], edge_index = interpolant.step_edges(
+                    edge_index, data[f"{key}_t"] = interpolant.step_edges(
                         batch,
                         edge_index=edge_index,
                         edge_attr_t=data[f"{key}_t"],
@@ -352,7 +353,9 @@ class Graph3DInterpolantModel(pl.LightningModule):
                     data[f"{key}_t"] = interpolant.step(
                         xt=data[f"{key}_t"], x_hat=out[f"{key}_hat"], x0=prior[key], batch=batch, time=time, dt=dt
                     )
+        import ipdb
 
+        ipdb.set_trace()
         return {key: data[f"{key}_t"] for key in self.interpolants.keys()}
 
 
@@ -370,8 +373,9 @@ def main(cfg: DictConfig):
         interpolant_params=cfg.interpolant,
     ).to(device)
     model.setup("fit")  #! this has to be called after model is moved to device for everything to propagate
-
-    model.sample(10)
+    model.eval()
+    with torch.no_grad():
+        model.sample(10)
     for batch in train_dataloader:
         # batch.h = batch.x
         # batch.x = batch.pos
