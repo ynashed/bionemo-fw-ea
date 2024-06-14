@@ -45,6 +45,7 @@ def build_interpolant(
     num_classes: int = 10,
     min_t: float = 1e-2,
     custom_prior: torch.Tensor = None,
+    com_free: bool = True,
     variable_name: str = None,
     # TODO: here is where we add all the possible things that could go into any interpolant class
 ):
@@ -56,7 +57,7 @@ def build_interpolant(
     """
     if interpolant_type == "continuous_diffusion":
         return ContinuousDiffusionInterpolant(
-            prior_type, solver_type, timesteps, time_type, num_classes, scheduler_type, s, sqrt, nu, clip
+            prior_type, solver_type, timesteps, time_type, num_classes, scheduler_type, s, sqrt, nu, clip, com_free
         )
     elif interpolant_type == "continuous_flow_matching":
         return ContinuousFlowMatchingInterpolant(
@@ -72,6 +73,7 @@ def build_interpolant(
             sqrt,
             nu,
             clip,
+            com_free,
         )
     elif interpolant_type == "discrete_diffusion":
         if prior_type in ["absorb", "mask"]:

@@ -41,15 +41,24 @@ class Graph3DInterpolantModel(pl.LightningModule):
         self.lr_scheduler_params = lr_scheduler_params
         self.dynamics_params = dynamics_params
         self.interpolant_params = interpolant_params
-        self.loss_scalar = loss_params.loss_scale[0]
+        self.loss_params = loss_params
         # import ipdb; ipdb.set_trace()
-        self.loss_function = InterpolantLossFunction(use_distance=loss_params.use_distance)
+        self.loss_functions = self.initialize_loss_functions()
         self.interpolants = self.initialize_interpolants()
         self.dynamics = MoCo()
 
     def setup(self, stage):
         for interpolant in self.interpolants.values():
             interpolant.to(self.device)
+
+    def initialize_loss_functions(self):
+        loss_functions = {}
+        for loss_params in self.loss_params.variables:
+            index = loss_params.variable_name
+            loss_functions[index] = InterpolantLossFunction(
+                loss_scale=loss_params.loss_scale, aggregation=loss_params.aggregate, continuous=loss_params.continuous
+            )
+        return loss_functions
 
     def initialize_interpolants(self):
         interpolants = {}
@@ -209,42 +218,45 @@ class Graph3DInterpolantModel(pl.LightningModule):
         out, time = self(batch, time)
         batch_geo = batch.batch
         # TODO turn this in to an iterative loop where if the interpolant is non None we take a loss
-
-        # loss = 0
-        # for var_name, interpolant in self.interpolants.items():
-        #     if 'edge' in var_name:
-        #         loss_component, edge_attr_out = self.loss_function.edge_loss(batch_geo, out['edge_attr_hat'], out['edge_attr'],index = batch['edge_index'][1], num_atoms=x_pred.size(0), batch_weight = ws_t, scale = self.loss_scalar['edge_attr'])
-        #     else:
-        #         loss_component, pred = self.loss_function(batch_geo, out[f'{var_name}_hat'], out[f'{var_name}'], batch_weight = ws_t, scale = self.loss_scalar[f'{var_name}'])
-        #     loss += loss_component
-        # import ipdb; ipdb.set_trace()
         ws_t = self.interpolants['x'].snr_loss_weight(time)
-        x_loss, x_pred = self.loss_function(
-            batch_geo, out['x_hat'], batch['x'], batch_weight=ws_t, scale=self.loss_scalar['x']
-        )
-        h_loss, h_out = self.loss_function(
-            batch_geo, out['h_logits'], batch['h'], continuous=False, batch_weight=ws_t, scale=self.loss_scalar['h']
-        )
-        edge_loss, edge_attr_out = self.loss_function.edge_loss(
-            batch_geo,
-            out['edge_attr_logits'],
-            batch['edge_attr'],
-            index=batch['edge_index'][1],
-            num_atoms=x_pred.size(0),
-            batch_weight=ws_t,
-            scale=self.loss_scalar['edge_attr'],
-        )
-        loss = x_loss + h_loss + edge_loss
-        print("X Loss", x_loss)
-        print("H Loss", h_loss)
-        print("E Loss", edge_loss)
-        if self.loss_function.use_distance:
+        loss = 0
+        predictions = {}
+        for key, loss_fn in self.loss_functions.items():
+            if "edge" in key:
+                sub_loss, sub_pred = loss_fn.edge_loss(
+                    batch_geo,
+                    out['edge_attr_logits'],
+                    batch['edge_attr'],
+                    index=batch['edge_index'][1],
+                    num_atoms=batch_geo.size(0),
+                    batch_weight=ws_t,
+                )
+            else:
+                if loss_fn.continuous:
+                    sub_loss, sub_pred = loss_fn(batch_geo, out[f'{key}_hat'], batch[f'{key}'], batch_weight=ws_t)
+                else:
+                    sub_loss, sub_pred = loss_fn(batch_geo, out[f'{key}_logits'], batch[f'{key}'], batch_weight=ws_t)
+            print(key, sub_loss)
+            loss = loss + sub_loss
+            predictions[f'{key}'] = sub_pred
+        # x_loss, x_pred = self.loss_function(
+        #     batch_geo, out['x_hat'], batch['x'], batch_weight=ws_t, scale=self.loss_scalar['x']
+        # )
+        # h_loss, h_out = self.loss_function(
+        #     batch_geo, out['h_logits'], batch['h'], continuous=False, batch_weight=ws_t, scale=self.loss_scalar['h']
+        # )
+
+        # loss = x_loss + h_loss + edge_loss
+        # print("X Loss", x_loss)
+        # print("H Loss", h_loss)
+        # print("E Loss", edge_loss)
+        if self.loss_params.use_distance:
             if "Z_hat" in out.keys() and self.loss_function.use_distance == "triple":
                 z_hat = out["Z_hat"]
             else:
                 z_hat = None
             distance_loss_tp, distance_loss_tz, distance_loss_pz = self.loss_function.distance_loss(
-                batch_geo, batch['x'], x_pred, z_hat
+                batch_geo, batch['x'], predictions['x'], z_hat
             )
             distance_loss = distance_loss_tp + distance_loss_tz + distance_loss_pz
             loss = loss + distance_loss
@@ -377,14 +389,8 @@ def main(cfg: DictConfig):
     with torch.no_grad():
         model.sample(10)
     for batch in train_dataloader:
-        # batch.h = batch.x
-        # batch.x = batch.pos
-        # batch.pos = None
-
         batch = batch.to(device)
         print(batch)
-        # out, time = model(batch)
-        # print(time)
         model.training_step(batch, 0)
 
 

@@ -49,20 +49,24 @@ class PredictionHead(nn.Module):
 
 
 class InterpolantLossFunction(nn.Module):
-    def __init__(self, use_distance: str = None, discrete_class_weight=None):
+    def __init__(self, continuous=True, aggregation='mean', loss_scale=1.0, discrete_class_weight=None):
         super().__init__()
-        self.f_continuous = nn.MSELoss(reduction='none')  # can also use HuberLoss
-        if discrete_class_weight is None:
-            self.f_discrete = nn.CrossEntropyLoss(reduction='none')
+        if continuous:
+            self.f_continuous = nn.MSELoss(reduction='none')  # can also use HuberLoss
         else:
-            self.f_discrete = nn.CrossEntropyLoss(weight=discrete_class_weight, reduction='none')
-            #! We can up weight certain bonds to make sure this is correct
-        self.use_distance = use_distance
+            if discrete_class_weight is None:
+                self.f_discrete = nn.CrossEntropyLoss(reduction='none')
+            else:
+                self.f_discrete = nn.CrossEntropyLoss(weight=discrete_class_weight, reduction='none')
+                #! We can up weight certain bonds to make sure this is correct
+        self.continuous = continuous
+        self.aggregation = aggregation
+        self.scale = loss_scale
 
-    def forward(self, batch, logits, data, batch_weight=None, element_weight=None, continuous=True, scale=1.0):
+    def forward(self, batch, logits, data, batch_weight=None, element_weight=None):
         # d (λx, λh, λe) = (3, 0.4, 2)
         batch_size = len(batch.unique())
-        if continuous:
+        if self.continuous:
             loss = self.f_continuous(logits, data).sum(1)  # [N]
             output = logits
         else:
@@ -73,10 +77,13 @@ class InterpolantLossFunction(nn.Module):
         loss = scatter_mean(loss, index=batch, dim=0, dim_size=batch_size)
         if batch_weight is not None:
             loss = loss * batch_weight.unsqueeze(1)
-        loss = scale * loss.mean()
+        if self.aggregation == "mean":
+            loss = self.scale * loss.mean()
+        elif self.aggregation == "sum":
+            loss = self.scale * loss.sum()
         return loss, output
 
-    def edge_loss(self, batch, logits, data, index, num_atoms, batch_weight=None, element_weight=None, scale=1.0):
+    def edge_loss(self, batch, logits, data, index, num_atoms, batch_weight=None, element_weight=None):
         batch_size = len(batch.unique())
         loss = self.f_discrete(logits, data)
         loss = 0.5 * scatter_mean(loss, index=index, dim=0, dim_size=num_atoms)  # Aggregate on the bonds first
@@ -86,7 +93,10 @@ class InterpolantLossFunction(nn.Module):
         loss = scatter_mean(loss, index=batch, dim=0, dim_size=batch_size)
         if batch_weight is not None:
             loss = loss * batch_weight.unsqueeze(1)
-        loss = scale * loss.mean()
+        if self.aggregation == "mean":
+            loss = self.scale * loss.mean()
+        elif self.aggregation == "sum":
+            loss = self.scale * loss.sum()
         return loss, output
 
     def distance_loss(self, batch, X_true, X_pred, Z_pred=None):

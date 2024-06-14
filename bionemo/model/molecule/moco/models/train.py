@@ -8,7 +8,10 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
+import os
+from pathlib import Path
 
+import wandb
 from lightning import pytorch as pl
 from lightning.pytorch.callbacks import LearningRateMonitor, ModelCheckpoint
 from nemo.core.config import hydra_runner
@@ -19,6 +22,9 @@ from bionemo.model.molecule.moco.data.molecule_datamodule import MoleculeDataMod
 from bionemo.model.molecule.moco.models.module import Graph3DInterpolantModel
 
 
+# from bionemo.model.molecule.moco.models.utils_train import EMACallback
+
+
 @hydra_runner(config_path="conf", config_name="train")
 def main(cfg: DictConfig) -> None:
     """
@@ -27,7 +33,8 @@ def main(cfg: DictConfig) -> None:
     logging.info("\n\n************** Experiment Configuration ***********")
     pl.seed_everything(cfg.train.seed)
     logging.info(f"\n{OmegaConf.to_yaml(cfg)}")
-
+    os.makedirs(cfg.outdir, exist_ok=True)
+    os.makedirs(os.path.join(cfg.outdir, 'checkpoints'), exist_ok=True)
     if cfg.resume:
         pl_module = Graph3DInterpolantModel.load_from_checkpoint(cfg.resume)
     else:
@@ -39,31 +46,31 @@ def main(cfg: DictConfig) -> None:
             interpolant_params=cfg.interpolant,
         )
 
-    # logger = pl.loggers.WandbLogger(
-    #     save_dir=cfg.outdir,
-    #     project=cfg.wandb_params.project,
-    #     group=cfg.wandb_params.group,
-    #     name=cfg.run_name,
-    #     id=wandb.util.generate_id(),
-    #     resume='must' if cfg.resume is not None else False,
-    #     entity=cfg.wandb_params.entity,
-    #     mode=cfg.wandb_params.mode,
-    # )
-    # logger.log_hyperparams(cfg)
-    # checkpoint_callback = pl.callbacks.ModelCheckpoint(
-    #     dirpath=Path(out_dir, 'checkpoints'),
-    #     filename="best-model-{epoch:04d}",
-    #     monitor="val/loss_epoch",
-    #     save_top_k=1,
-    #     save_last=True,
-    #     mode="min",
-    # )
+    logger = pl.loggers.WandbLogger(
+        save_dir=cfg.outdir,
+        project=cfg.wandb_params.project,
+        group=cfg.wandb_params.group,
+        name=cfg.run_name,
+        id=wandb.util.generate_id(),
+        resume='must' if cfg.resume is not None else False,
+        entity=cfg.wandb_params.entity,
+        mode=cfg.wandb_params.mode,
+    )
+    logger.log_hyperparams(cfg)
+
     lr_monitor = LearningRateMonitor(logging_interval="step")
-    checkpointing = ModelCheckpoint(every_n_epochs=1, monitor="train-loss", mode="min", save_last=True)
+    checkpointing = ModelCheckpoint(
+        dirpath=Path(cfg.outdir, 'checkpoints'),
+        filename="best-model-{epoch:04d}",
+        every_n_epochs=1,
+        monitor="train-loss",
+        mode="min",
+        save_last=True,
+    )
 
     trainer = pl.Trainer(
         max_epochs=cfg.train.n_epochs,
-        # logger=logger,
+        logger=logger,
         callbacks=[lr_monitor, checkpointing],
         enable_progress_bar=cfg.train.enable_progress_bar,
         accelerator='gpu',

@@ -1,5 +1,5 @@
-run_name: 'NAME'
-outdir: ./moco_results
+run_name: 'MoCo_Local_Test_Tiny'
+outdir: /workspace/bionemo/bionemo/model/molecule/moco/models/moco_results
 resume: null
 ema_resume: null
 wandb_params:
@@ -10,19 +10,28 @@ wandb_params:
 
 data:
   dataset_root: "/workspace/bionemo/data/pyg_geom_drug"
-  processed_folder: "processed" #"processed_tiny"
-  batch_size: 16 #4
-  inference_batch_size: 16 #5
+  processed_folder: "processed_tiny" #"processed" #
+  batch_size: 4 #16
+  inference_batch_size: 5 #16
   num_workers: 4
   remove_hs: False
   select_train_subset: 100
 
 loss:
   use_distance: null #'single' 'triple'
-  loss_scale:
-   - x: 3.0
-     h: 0.4
-     edge_attr: 2.0
+  variables:
+    - variable_name: 'x'
+      loss_scale: 3.0
+      aggregate: 'mean'
+      continuous: True
+    - variable_name: 'h'
+      loss_scale: 0.4
+      aggregate: 'mean'
+      continuous: False
+    - variable_name: 'edge_attr'
+      loss_scale: 2.0
+      aggregate: 'mean'
+      continuous: False
 
 interpolant:
   timesteps: &timesteps 500
@@ -40,6 +49,7 @@ interpolant:
       scheduler_type: *scheduler_type
       time_type: *time_type
       nu: 2.0
+      com_free: True
     - variable_name: 'h' #'x' #'h'
       interpolant_type: 'discrete_diffusion'
       prior_type: 'uniform'
