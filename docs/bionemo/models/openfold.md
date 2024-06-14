@@ -5,15 +5,19 @@
 We provide example training and inference scripts under `examples/protein/openfold` and their configuration files under the subdirectory `conf`. Users can download 4 different checkpoints: a pair of initial-training and fintuining from the public OpenFold repository and converted to .nemo format, and another pair of in-house trained checkpoints, with the following command.
 
 ```bash
-python download_models.py openfold_finetuning_inhouse --download_dir models  # NGC setup is required
+python download_artifacts.py --models openfold_finetuning_inhouse --model_dir models  # NGC setup is required
 ```
 
 If users are interested in diving into BioNeMo in details, users can refer to `bionemo/model/protein/openfold` for the model class and `bionemo/data/protein/openfold` for data utilities. Configuration parsing is handled by [hydra config](https://hydra.cc/docs/intro/) and default parameters are stored in yaml format.
 
 ### Inference
-Users can initiate inference with `examples/protein/openfold/infer.py` and provide the input sequence(s) and optional multiple sequence alignment(s) (MSA) for inference. Users can download example inference data through `scripts/download_sample_data.sh`, and follow a step-by-step guidance in jupyter notebook in `nbs/inference.ipynb` if desired.
+Users can initiate inference with `examples/protein/openfold/infer.py` and provide the input sequence(s) and optional multiple sequence alignment(s) (MSA) for inference. There is MSA data in ${model.data.dataset_path}/inference/msas/, and users can follow a step-by-step guidance in jupyter notebook in `nbs/inference.ipynb` if desired. If the notebook fails due to a timeout error, increate inference_timeout_s to 300 at `ModelClient("localhost", "bionemo_openfold", inference_timeout_s= 180)`.
 
-For additional template-based inference, users would provide template hhr or generate templates on-the-fly after installing the necessary alignment software under `scripts/install_third_party.sh`. Users might also have to download pdb70 database. More details are available in `conf/infer.yaml`.
+For additional template-based inference, users would provide template hhr or generate templates on-the-fly after installing the necessary alignment software under `scripts/install_third_party.sh`. Alternatively, users can download the pdb70 database. To do this, download http://wwwuser.gwdg.de/~compbiol/data/hhsuite/databases/hhsuite_dbs/old-releases/pdb70_from_mmcif_200401.tar.gz. Then, perform alignments on the desired sequences with `scripts/precompute_alignments`. Then, generate_templates_if_missing should be set to True and the value pdb70_database_path in conf/infer.yaml to should be set to the pdb directory. 
+
+More details are available in `conf/infer.yaml`.
+
+
 
 ### Training
 OpenFold training is a two-stage process, broken down into (1) initial training and (2) fine-tuning. Dataset download and preprocessing for both training stages is handled by the command
