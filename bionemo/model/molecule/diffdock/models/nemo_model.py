@@ -118,9 +118,13 @@ class TensorProductScoreModelBase(ModelPT):
                 f"there are {len(pyg_ds.webdataset_urls)} shards in the folder {os.path.dirname(pyg_ds.webdataset_urls[0])}, "
                 f"which is smaller than total number of workers {self.world_size * data_config.num_workers} "
                 f"= num. devices({self.world_size}) * num. workers per device({data_config.num_workers}).\n"
-                f"Adjust the `num_workers` and `min_num_shards` in model data config, to make sure: num_workers * total num. devices >= num. shards\n"
-                f"if changing `min_num_shards`, remove files in {os.path.dirname(pyg_ds.webdataset_urls[0])}, "
-                f"and run with `do_preprocessing=True do_training=False` first to re-pack the shard files."
+                f"To make sure: num. shards >= (better to be few times larger than)  num_workers * total num. devices, \n"
+                f"you can reduce the `num_workers` in `data.num_workers` and `model.*_ds.num_workers`, "
+                f"to set `num_workers` <= {len(pyg_ds.webdataset_urls)//self.world_size}, "
+                f"recommend to set as <= {max(len(pyg_ds.webdataset_urls)//self.world_size//4, 1)}"
+                f"Or you can increase `model.*_ds.min_num_shards` to be >= {self.world_size * data_config.num_workers}, "
+                f"for this you can remove files in {os.path.dirname(pyg_ds.webdataset_urls[0])}, "
+                f"and run with `do_preprocessing=True do_training=False` first to re-pack the shard files before doing training."
             )
         num_samples = len(pyg_ds)
         random.seed(self.cfg.seed)

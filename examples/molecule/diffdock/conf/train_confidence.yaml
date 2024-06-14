@@ -12,7 +12,7 @@ seed: 42
 
 data:
   score_model_name: ${score_infer.name}
-  num_workers: 24
+  num_workers: 2
   pin_memory: True
   limit_complexes: 0
   all_atoms: true
