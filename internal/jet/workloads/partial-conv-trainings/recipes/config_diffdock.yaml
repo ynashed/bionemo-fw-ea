@@ -45,6 +45,7 @@ spec:
     model_tag={model}__{variant}__{config_name};
     python examples/{domain}/{model}/{variant}.py --config-name {config_name} \
     trainer.num_nodes={nodes} trainer.devices={gpus} trainer.precision={precision} seed={seed} \
+    data.num_workers={num_workers} \
     trainer.max_epochs={max_epochs} model.micro_batch_size={batch_size} \
     data.cache_path={BIONEMO_HOME}/data/diffdock_conv_test_data/data_cache \
     data.split_train={BIONEMO_HOME}/data/diffdock_conv_test_data/splits/train \
@@ -85,11 +86,14 @@ products:
     model: [diffdock]
     nodes: [1]
     gpus: [8]
-    config_name: [train_score]
-    max_epochs: [80]
-    batch_size: [12]
-    precision: [32]
-    seed: [42]
+    max_epochs: [ 80 ]
+    batch_size: [ 12 ]
+    precision: [ 32 ]
+    seed: [ 42 ]
+    num_workers: [4]
+    products:
+      - config_name: [train_score]
+      - config_name: [train_confidence]
 tests_spec:
   - logic_type: static
     logic_spec:
@@ -113,3 +117,23 @@ tests_spec:
           operator: range
           max: 0.3145
           min: 0.2315
+    product_identifier: {'config_name': 'train_score'}
+  - logic_type: static
+    logic_spec:
+      exit_codes:
+        - 0
+      baselines:
+        # mean -/+ 5 * std
+        train_loss_epoch:
+          operator: range
+          max: 0.0905
+          min: 0.0695
+        train_loss_step:
+          operator: range
+          max: 0.215
+          min: 0
+        val_loss:
+          operator: range
+          max: 0.1475
+          min: 0.1165
+    product_identifier: {'config_name': 'train_confidence' }
