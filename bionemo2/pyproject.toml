@@ -1,32 +1,3 @@
-[build-system]
-requires = ["setuptools", "wheel"]
-build-backend = "setuptools.build_meta"
-
-[project]
-name = "bionemo"
-version = "2.0.0"
-license.file = "LICENSE"
-readme = "README.md"
-description = "BioNeMo"
-authors = [
-    { name = "John St. John", email = "jstjohn@nvidia.com" },
-    { name = "Malcolm Greaves", email = "mgreaves@nvidia.com" },
-]
-# dependencies are defined w/in namespace packages
-dependencies = [
-  "bionemo-fw",
-  "bionemo-contrib",
-]
-
-[tool.setuptools.packages.find]
-where = ["src"]
-include=["bionemo.*"]
-namespaces = true
-exclude = ["test*."]
-
-[tool.coverage.run]
-source = ["bionemo", "examples"]
-
 [tool.black]
 line-length = 119
 target-version = ['py310']

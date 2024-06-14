@@ -4,6 +4,8 @@ To get started, please build the docker container using
 ./launch.sh build
 ```
 
+All `bionemo2` code is partitioned into independently installable namespace packages. These live under the `sub-packages/` directory.
+
 
 # TODO: Finish this.
 

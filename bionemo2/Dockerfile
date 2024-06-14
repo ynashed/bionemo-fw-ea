@@ -65,20 +65,17 @@ RUN pip install -r requirements-test.txt
 # install dependencies of all bionemo namespace packages
 #
 
-COPY ./src/bionemo-core/requirements.txt ./src/bionemo-core/requirements.txt
-RUN pip install -r ./src/bionemo-core/requirements.txt
-
 # TODO: install reqs of feature package(s)
 # --
-# COPY ./src/bionemo-.../requirements.txt ./src/bionemo-.../requirements.txt
-# RUN pip install -r ./src/bionemo-.../requirements.txt
+# COPY ./sub-packages/bionemo-.../requirements.txt ./sub-packages/bionemo-.../requirements.txt
+# RUN pip install -r ./sub-packages/bionemo-.../requirements.txt
 # ...
 
-COPY ./src/bionemo-fw/requirements.txt ./src/bionemo-fw/requirements.txt
-RUN pip install -r ./src/bionemo-fw/requirements.txt
+COPY ./sub-packages/bionemo-fw/requirements.txt ./sub-packages/bionemo-fw/requirements.txt
+RUN pip install -r ./sub-packages/bionemo-fw/requirements.txt
 
-COPY ./src/bionemo-contrib/requirements.txt ./src/bionemo-contrib/requirements.txt
-RUN pip install -r ./src/bionemo-contrib/requirements.txt
+COPY ./sub-packages/bionemo-contrib/requirements.txt ./sub-packages/bionemo-contrib/requirements.txt
+RUN pip install -r ./sub-packages/bionemo-contrib/requirements.txt
 
 #
 # install all bionemo namespaced code
@@ -88,30 +85,24 @@ RUN pip install -r ./src/bionemo-contrib/requirements.txt
 #       inter-dependent bionemo2 subpackage relationships. This is because we manually install each
 #       subpackage's code independently. This speeds up the image building significantly.
 
-WORKDIR /workspace/bionemo2/
-COPY ./src/bionemo-core/ ./src/bionemo-core/
-WORKDIR /workspace/bionemo2/src/bionemo-core
-# already installed dependencies
-RUN pip install --no-deps -e .
-
 # TODO install code of feature package(s)
 # --
 # WORKDIR /workspace/bionemo2/
-# COPY ./src/bionemo-... ./src/bionemo-...
-# WORKDIR /workspace/bionemo2/src/bionemo-...
+# COPY ./sub-packages/bionemo-... ./sub-packages/bionemo-...
+# WORKDIR /workspace/bionemo2/sub-packages/bionemo-...
 # RUN pip install -r _requirements.txt
 # RUN pip install --no-deps -e .
 # ...
 
 WORKDIR /workspace/bionemo2/
-COPY ./src/bionemo-fw/ ./src/bionemo-fw/
-WORKDIR /workspace/bionemo2/src/bionemo-fw/
+COPY ./sub-packages/bionemo-fw/ ./sub-packages/bionemo-fw/
+WORKDIR /workspace/bionemo2/sub-packages/bionemo-fw/
 #RUN pip install -r _requirements.txt
 RUN pip install --no-deps -e .
 
 WORKDIR /workspace/bionemo2/
-COPY ./src/bionemo-contrib/ ./src/bionemo-contrib/
-WORKDIR /workspace/bionemo2/src/bionemo-contrib/
+COPY ./sub-packages/bionemo-contrib/ ./sub-packages/bionemo-contrib/
+WORKDIR /workspace/bionemo2/sub-packages/bionemo-contrib/
 #RUN pip install -r _requirements.txt
 RUN pip install --no-deps -e .
 

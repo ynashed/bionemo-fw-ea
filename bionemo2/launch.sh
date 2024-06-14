@@ -1,49 +1,9 @@
 #!/usr/bin/env bash
 
-# # Name of the Docker image
-# IMAGE_NAME=${IMAGE_NAME:=nvcr.io/nvidian/cvai_bnmo_trng/bionemo}
-# IMAGE_TAG=bfw
-
-# local created_at="$(date --iso-8601=seconds -u)"
-
-
-# # Build the Docker image
-# echo "Building Docker image..."
-# echo GITLAB_TOKEN=${GITLAB_TOKEN} \# This needs to be created via your gitlab account as a personal access token with API access enabled. >> $LOCAL_ENV
-
-# local created_at="$(date --iso-8601=seconds -u)"
-# DOCKER_BUILD_CMD="docker build --network host \
-#     --no-cache \
-#     -t ${IMAGE_NAME}:${IMAGE_TAG} \
-#     --secret id=GITLAB_TOKEN,env=GITLAB_TOKEN \
-#     --label com.nvidia.bionemo.short_git_sha=${BIONEMO_SHORT_GIT_HASH} \
-#     --label com.nvidia.bionemo.git_sha=${BIONEMO_GIT_HASH} \
-#     --label com.nvidia.bionemo.created_at=${created_at} \
-#     -f bfw/Dockerfile"
-
-# echo $DOCKER_BUILD_CMD
-# $DOCKER_BUILD_CMD .
-
-# echo "Docker build completed successfully."
-
-# # Run the Docker container
-# docker run --ipc=host --shm-size=512m --gpus all -it $IMAGE_NAME:$IMAGE_TAG /bin/bash
-
-
-#!/bin/bash
-current_script="$0"
-
-# Check if the script is executable
-if [ ! -x "$current_script" ]; then
-    # If not, make it executable
-    echo "This script is not executable. Making it executable..."
-    chmod +x "$current_script"
-    echo "Done."
-fi
-
 #Name of the Docker image
 IMAGE_NAME=${IMAGE_NAME:=nvcr.io/nvidian/cvai_bnmo_trng/bionemo}
-IMAGE_TAG=$(git rev-parse HEAD)
+COMMIT=$(git rev-parse HEAD)
+IMAGE_TAG="bionemo2-${COMMIT}"
 
 
 #Function to build the Docker image
@@ -77,9 +37,11 @@ build() {
     local DOCKER_BUILD_CMD="docker buildx build \
         -t ${IMAGE_NAME}:${IMAGE_TAG} \
         --cache-to type=inline \
-	--cache-from nvcr.io/nvidian/cvai_bnmo_trng/bionemo:bionemo2 \
+	    --cache-from nvcr.io/nvidian/cvai_bnmo_trng/bionemo:bionemo2 \
+        --label com.nvidia.bionemo.git_sha=${COMMIT} \
+        --label com.nvidia.bionemo.created_at=${created_at} \
         -f ./Dockerfile"
-    echo $DOCKER_BUILD_CMD
+    echo "$DOCKER_BUILD_CMD"
     $DOCKER_BUILD_CMD .
     echo "Docker build completed successfully."
 }

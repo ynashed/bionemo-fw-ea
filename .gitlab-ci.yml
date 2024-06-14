@@ -5,7 +5,7 @@ default:
     VAULT_JWT_TOKEN:
       aud: https://stg.vault.nvidia.com
 
-       
+
 
 stages:
   - code_format
@@ -105,7 +105,7 @@ variables:
     options:
       - "false"
       - "true"
-    description: "a flag that determines whether to built & push a docker image for QA. Set to 'false' by default. Remark that only the docker image build and deploy is executed during this pipeline 
+    description: "a flag that determines whether to built & push a docker image for QA. Set to 'false' by default. Remark that only the docker image build and deploy is executed during this pipeline
     resulting in images being pushed to both GitLab and NGC repositories, each tagged with the suffix '${CI_COMMIT_BRANCH}--${DATE_YMD}--${CI_COMMIT_SHA}-qa'"
 
 # TODO(dorotat) solution with SKIP_CI flag is error-prone and should be replaced with better logic!!!!
@@ -530,8 +530,10 @@ pytest-internal:
 # docker buildx build --cache-to type=inline  -t <your-image-name>  -f bionemo2/Dockerfile .
 # If you build using `bash bionemo2/launch.sh build` this will be done automatically.
 bionemo2-build-image:
+  stage: build
+  # Note: We need to use this docker version `docker:26.0.2-dind` or
+  # higher for buildx inline caching.ds:
   extends:
-  # Note: We need to use this docker version `docker:26.0.2-dind` or higher for buildx inline caching.ds:
     - .docker-setup
   rules:
     - if: $BIONEMO2_ONLY == "true"
@@ -550,7 +552,7 @@ bionemo2-build-image:
     - echo "Now pushing container"
     - docker push "${IMAGE_NAME}${SUFFIX_BIONEMO2}"
 
-bionemo2-pytest:
+bionemo2-pytest-fw:
   image:
     name: "${IMAGE_NAME}${SUFFIX_BIONEMO2}"
     entrypoint: [ "" ]
@@ -572,18 +574,58 @@ bionemo2-pytest:
     - df -Thl
     - pwd
     - ls -l
-    - ln -s /builds/bionemo/bionemo2 /workspace/bionemo2
+    # gitlab CI checks-out the repository under `/builds/<repository name>`
+    # this checked-out code is volume-mounted into the container (it is also on a largish drive)
+    # our image is built by putting the code under `/workspace/<...>`
+    # Specifically, our code is under `/workspace/bionemo2` and the volume-mounted code is `/builds/bionemo/bionemo2`.
+    # We need to "overwrite" the code in the image with the volume-mounted code --> we use a symlink!
+    #        ln -s <location of code> <where we put the symlink>
+    - mv /workspace/bionemo2 /builds/bionemo2
+    - ln -s /builds/bionemo2 /workspace/bionemo2
     - cd ./bionemo2/
     - echo "Running BFW tests..."
     - pwd
     - ls -l .
-    - pushd ./src/bionemo-core
+    - pushd ./sub-packages/bionemo-fw
     - pytest -v .
     - popd
-    - pushd ./src/bionemo-fw
-    - pytest -v .
-    - popd
-    - pushd ./src/bionemo-contrib
+
+
+bionemo2-pytest-contrib:
+  image:
+    name: "${IMAGE_NAME}${SUFFIX_BIONEMO2}"
+    entrypoint: [ "" ]
+  stage: test
+  needs: [bionemo2-build-image]
+  allow_failure: false
+  rules:
+    - if: $BIONEMO2_ONLY == "true"
+      when: always
+    - if: $BIONEMO2_ONLY == "false"
+      when: never
+    - if: $CI_MERGE_REQUEST_LABELS =~ /SKIP_CI/
+      when: never
+    - when: on_success
+  tags:
+    - gpu
+  script:
+    - nvidia-smi
+    - df -Thl
+    - pwd
+    - ls -l
+    # gitlab CI checks-out the repository under `/builds/<repository name>`
+    # this checked-out code is volume-mounted into the container (it is also on a largish drive)
+    # our image is built by putting the code under `/workspace/<...>`
+    # Specifically, our code is under `/workspace/bionemo2` and the volume-mounted code is `/builds/bionemo/bionemo2`.
+    # We need to "overwrite" the code in the image with the volume-mounted code --> we use a symlink!
+    #        ln -s <location of code> <where we put the symlink>
+    - mv /workspace/bionemo2 /builds/bionemo2
+    - ln -s /builds/bionemo2 /workspace/bionemo2
+    - cd ./bionemo2/
+    - echo "Running BFW tests..."
+    - pwd
+    - ls -l .
+    - pushd ./sub-packages/bionemo-contrib
     - pytest -v .
     - popd
 
@@ -642,9 +684,9 @@ jet-configure:
           yq e ".labels.bionemo_ci_pipeline_id = \"${CI_PIPELINE_ID}\"" -i ${file};
           yq e ".labels.bionemo_commit_sha = \"${CI_COMMIT_SHORT_SHA}\"" -i ${file};
           yq e ".spec.scope = \"${JET_WORKLOAD_FOLDER}\"" -i ${file};
-          if [[ $JET_CONV_TEST = true ]] & [[ $file == *"recipe"* ]]; then   
+          if [[ $JET_CONV_TEST = true ]] & [[ $file == *"recipe"* ]]; then
             yq e ".spec.wandb_project_name = \"${WANDB_PROJECT_NAME_BASE}--${CUSTOM_BRANCH_NAME}\"" -i ${file};
-            yq e ".spec.pipeline_label = \"${CI_PIPELINE_CREATED_AT}_${CI_COMMIT_SHORT_SHA}_${CI_PIPELINE_ID}\"" -i ${file};       
+            yq e ".spec.pipeline_label = \"${CI_PIPELINE_CREATED_AT}_${CI_COMMIT_SHORT_SHA}_${CI_PIPELINE_ID}\"" -i ${file};
           fi;
           cat ${file};
        done'
