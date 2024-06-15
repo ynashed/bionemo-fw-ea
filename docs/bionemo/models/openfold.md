@@ -167,8 +167,46 @@ The following parameters are described and configured in the current version of 
 - model.optimisations
 - trainer.precision
 
+#### Optimisations
+
+In the BioNeMo - OpenFold project, we integrate optimisations from the NVIDIA team that submits code to [MLPerf benchmarks](https://mlcommons.org/benchmarks/training-hpc/). Here we give more detail on the specific optimisations available in the BioNeMo Project. 
+
+| optimisation setting                     | integrated        | employed in training speed benchmark|
+| :--------------------------------------: | :---------------: | :---------------------------: |
+| model.optimisations=[mha_fused_gemm]     |       yes         |       no                      |
+| model.optimisations=[dataloader_pq]      |       yes         |       no                      |
+| trainer.precision=bf16-mixed precision   |       yes         |       yes                     |
+| model.optimisations=[layernorm_inductor] |       yes         |       yes                     |
+| model.optimisations=[layernorm_triton]   |       yes         |       yes                     |
+| model.optimisations=[mha_triton]         |       yes         |       yes                     |
+| model.optimisations=[FusedAdamSWA]       |       yes         |       no                      |
 
 ### Initial Training
+
+In the table below, we show the results of initial training benchmarks, with the following protocol.  
+We run training with a large value of 'trainer.max_steps' and when we see the validation metric (lddt-ca) for 
+the EMA model above 89%, we manually end the training job.  As a post-processing step we compute metrics
+
+$$ \text{crossing-step}  = \text{the first training step when the validation metric is larger than 89\%} $$
+
+$$ \text{time-wo-val-days } = \text{ training time without validation phase, in days, until the crossing-step } $$
+$$ \text{time-wi-val-days } = \text{ training time with validation phase, in days, until the crossing-step } $$
+$$ \text{training-speed-kpi} = \frac{\text{sum of training step times with no optimizations, until the crossing-step}}{\text{sum of training step times with optimization setting X, until the crossing-step}} $$
+
+These training jobs are conducted with the settings in the config file 
+`examples/protein/openfold/config/openfold_initial_training.yaml`, 
+with certain parameters having the override values in the table.  Each training 
+job is a sequence of sub-jobs, each sub-job managed by 
+[slurm](https://slurm.schedmd.com/sbatch.html) with a 4h walltime.
+
+| model.optimisations                             | trainer.precision | machine spec | job completion date | level | crossing-step | training step time [secs] |time-wo-val-days | time-wi-val-days  | training-speed-kpi |
+| :----------------------------------------------: | :------: | :----: | :----: | :--:| :----: | :----: | :----: | :----: | :----: |
+| []                                               |   32   | O| 2024-05-28 | 89.0 | 44773 | 7.28 | 3.77 |  3.92 | 1 |
+| [layernorm_inductor,layernorm_triton,mha_triton] |   bf16-mixed   | O | 2024-06-13 | 89.0 | 44372 | 6.21 | 3.19 | 3.34 | 1.18 |
+
+
+and in another set of runs:
+
 
 | model.optimisations                             | trainer.precision | model.num_steps_per_epoch | machine spec | LDDT-CA [%] | job-completion date |
 | :------------------------------------------------: | :------: | :----: | :----: | :--:| :----: |
