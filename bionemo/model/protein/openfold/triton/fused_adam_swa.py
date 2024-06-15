@@ -13,15 +13,21 @@
 
 from __future__ import annotations
 
+import math
 from collections import defaultdict
 from itertools import chain
-from typing import List
+from typing import List, Tuple
 
 import torch
 import torch.nn as nn
 import triton
 import triton.language as tl
+from torch import Tensor  # noqa
 from torch.optim import Adam, Optimizer
+
+from bionemo.model.protein.openfold.utils.logging_utils import (
+    log_with_nemo_at_level,
+)
 
 
 # The most common parameter size in open-fold.
@@ -51,36 +57,71 @@ kPyTorchAdam = 2
 
 @triton.jit
 def _adam_math(
-    param,
-    grad,
-    moment,
-    velocity,
-    beta1,
-    beta2,
-    beta1_correction,
-    beta2_correction,
-    eps,
-    lr,
-    weight_decay,
+    param: Tensor,
+    grad: Tensor,
+    moment: Tensor,
+    velocity: Tensor,
+    beta1: float,
+    beta2: float,
+    beta1_correction: float,
+    beta2_correction: float,
+    eps: float,
+    lr: float,
+    weight_decay: float,
     adam_math_mode: tl.constexpr,
-):
-    if adam_math_mode == tl.constexpr(kApexAdam):
+) -> Tuple[Tensor]:
+    return _adam_math_0(
+        param,
+        grad,
+        moment,
+        velocity,
+        beta1,
+        beta2,
+        beta1_correction,
+        beta2_correction,
+        eps,
+        lr,
+        weight_decay,
+        adam_math_mode,
+    )
+
+
+def _adam_math_0(
+    param: Tensor,
+    grad: Tensor,
+    moment: Tensor,
+    velocity: Tensor,
+    beta1: float,
+    beta2: float,
+    beta1_correction: float,
+    beta2_correction: float,
+    eps: float,
+    lr: float,
+    weight_decay: float,
+    adam_math_mode: tl.constexpr,
+    compilation_mode: str = "triton",
+) -> Tuple[Tensor]:
+    sqrt_tensor_fn = tl.math.sqrt if compilation_mode == "triton" else torch.sqrt
+    sqrt_scalar_fn = tl.math.sqrt if compilation_mode == "triton" else math.sqrt
+    const_fn = tl.constexpr if compilation_mode == "triton" else int
+
+    if adam_math_mode == const_fn(kApexAdam):
         grad += weight_decay * param
         moment *= beta1
         moment += (1.0 - beta1) * grad
         velocity *= beta2
         velocity += (1.0 - beta2) * grad * grad
-        update = (moment / beta1_correction) / (tl.math.sqrt(velocity / beta2_correction) + eps)
+        update = (moment / beta1_correction) / (sqrt_tensor_fn(velocity / beta2_correction) + eps)
         param -= lr * update
-    elif adam_math_mode == tl.constexpr(kApexAdamW):
+    elif adam_math_mode == const_fn(kApexAdamW):
         moment *= beta1
         moment += (1.0 - beta1) * grad
         velocity *= beta2
         velocity += (1.0 - beta2) * grad * grad
-        update = (moment / beta1_correction) / (tl.math.sqrt(velocity / beta2_correction) + eps)
+        update = (moment / beta1_correction) / (sqrt_tensor_fn(velocity / beta2_correction) + eps)
         update += weight_decay * param
         param -= lr * update
-    elif adam_math_mode == tl.constexpr(kPyTorchAdam):
+    elif adam_math_mode == const_fn(kPyTorchAdam):
         grad += weight_decay * param
         moment *= beta1
         moment += (1.0 - beta1) * grad
@@ -88,8 +129,8 @@ def _adam_math(
         velocity += (1.0 - beta2) * grad * grad
         # PyTorch computes step_size and denominator separately so it can use addcdiv later.
         step_size = -lr / beta1_correction
-        beta2_correction_sqrt = tl.math.sqrt(beta2_correction)
-        denom = tl.math.sqrt(velocity) / beta2_correction_sqrt + eps
+        beta2_correction_sqrt = sqrt_scalar_fn(beta2_correction)
+        denom = sqrt_tensor_fn(velocity) / beta2_correction_sqrt + eps
         param += step_size * (moment / denom)
     else:
         raise ValueError(f"Unknown Adam math mode: {adam_math_mode}")
@@ -99,11 +140,20 @@ def _adam_math(
 # OpenFold model doesn't use buffers, so only update parameters.
 @triton.jit
 def _swa_math(
-    param,
-    swa_param,
-    decay_rate,
-    n_averaged,
-):
+    param: Tensor,
+    swa_param: Tensor,
+    decay_rate: float,
+    n_averaged: int,
+) -> Tensor:
+    return _swa_math_0(param, swa_param, decay_rate, n_averaged)
+
+
+def _swa_math_0(
+    param: Tensor,
+    swa_param: Tensor,
+    decay_rate: float,
+    n_averaged: int,
+) -> Tensor:
     if n_averaged == 0:
         swa_param = param
     else:
@@ -219,6 +269,7 @@ class FusedAdamSWA(Optimizer):
         capturable=False,
         master_weights=False,
     ):
+        log_with_nemo_at_level("""FusedAdamSWA.__init__, begin""")
         if not isinstance(params, list):
             params = list(params)
         if not isinstance(compute_params, list):
@@ -268,6 +319,7 @@ class FusedAdamSWA(Optimizer):
         # We assume that parameter and buffer pointers won't change throughout the training, only
         # gradients could be re-allocated due to set_grad_none.
         self._pointer_buffers_initialized = False
+        log_with_nemo_at_level("""FusedAdamSWA.__init__, end""")
 
     def _build_pointer_buffers(self):
         # Loading checkpoint to optimizer re-allocates param and states, so pointer logic should be
@@ -419,7 +471,6 @@ class FusedAdamSWA(Optimizer):
             )
 
         swa_group["n_averaged"] += 1
-
         return loss
 
     @classmethod
