@@ -597,8 +597,10 @@ bionemo2-build-image:
     - echo "Building bionemo2 image..."
     - cd ./bionemo2/
     - docker buildx version
+    # Pull down the cached image from the previous pipeline run
+    - docker pull nvcr.io/nvidian/cvai_bnmo_trng/bionemo:bionemo2-latest || true
     - docker buildx build
-      --cache-from nvcr.io/nvidian/cvai_bnmo_trng/bionemo:bionemo2
+      --cache-from nvcr.io/nvidian/cvai_bnmo_trng/bionemo:bionemo2-latest
       -t "${IMAGE_NAME}${SUFFIX_BIONEMO2}"
       -f Dockerfile .
     - echo "Now pushing container"

@@ -9,7 +9,6 @@
 # its affiliates is strictly prohibited.
 
 
-import os
 from pathlib import Path
 from typing import List, Optional
 
@@ -20,7 +19,7 @@ from pytorch_lightning.utilities.types import EVAL_DATALOADERS, TRAIN_DATALOADER
 from tokenizers import Tokenizer
 from torch.utils.data import DataLoader
 
-from bionemo.contrib.data.mapped_dataset import ResamplingMappedDataset
+from bionemo.contrib.data.resamplers import PRNGDatasetShuffler
 from bionemo.contrib.data.singlecell.dataset import SingleCellDataset
 
 
@@ -90,6 +89,7 @@ class SingleCellDataModule(pl.LightningDataModule):
         self._test_dataset_ori = SingleCellDataset(self.data_path_test, self.tokenizer, self.median_dict, self.max_len)
 
         # This is needed here, or you need to specify it in the megatron adapter thing TODO name?
+        #  Note that this sampler is sequential, meaning it does not do any shuffling. Let's wrap our data in a shuffler.
         self.data_sampler = MegatronDataSampler(
             seq_len=self.max_len,
             micro_batch_size=micro_batch_size,
@@ -154,14 +154,8 @@ class SingleCellDataModule(pl.LightningDataModule):
 
         """
         # This is where re-sampling occurs.
-        os.makedirs(self.index_mapping_dir, exist_ok=True)
-        return ResamplingMappedDataset(
+        return PRNGDatasetShuffler(
             dataset,
-            data_prefix=self.index_mapping_dir,
             num_samples=num_samples,
-            max_seq_length=self.max_len,
-            cfg=None,
             seed=self.seed + len(stage),
-            name=f'{stage}_{num_samples}',
-            index_mapping_dir=self.index_mapping_dir,
         )

@@ -7,82 +7,46 @@
 # disclosure or distribution of this material and related documentation
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
-
 import os
-from importlib.metadata import version
-from typing import Literal, Optional
+from dataclasses import dataclass
+from typing import Callable, Literal, Optional, Type, TypedDict, Union
 
 import torch
-import transformer_engine as te
 from megatron.core import parallel_state, tensor_parallel
+from megatron.core.fusions.fused_bias_dropout import get_bias_dropout_add
+from megatron.core.models.bert.bert_lm_head import BertLMHead
 from megatron.core.models.bert.pooler import Pooler
 from megatron.core.models.common.embeddings.language_model_embedding import LanguageModelEmbedding
 from megatron.core.models.common.embeddings.rotary_pos_embedding import RotaryEmbedding
 from megatron.core.models.common.language_module.language_module import LanguageModule
-from megatron.core.transformer.enums import ModelType
-
-# from megatron.core.fusions.fused_layer_norm import FusedLayerNorm
-from megatron.core.transformer.module import MegatronModule
+from megatron.core.transformer.attention import SelfAttention, SelfAttentionSubmodules
+from megatron.core.transformer.custom_layers.transformer_engine import (
+    TEDotProductAttention,
+    TELayerNormColumnParallelLinear,
+    TERowParallelLinear,
+)
+from megatron.core.transformer.enums import AttnMaskType, ModelType
+from megatron.core.transformer.identity_op import IdentityOp
+from megatron.core.transformer.mlp import MLP, MLPSubmodules
 from megatron.core.transformer.spec_utils import ModuleSpec
 from megatron.core.transformer.transformer_block import TransformerBlock
 from megatron.core.transformer.transformer_config import TransformerConfig
+from megatron.core.transformer.transformer_layer import TransformerLayer, TransformerLayerSubmodules
 from megatron.core.transformer.utils import get_linear_layer
-from pkg_resources import packaging
+from nemo.lightning import get_vocab_size
+from nemo.lightning.megatron_parallel import (
+    MegatronLossReduction,
+)
 from torch import Tensor
+from torch.optim import Optimizer
+
+from bionemo.contrib.model.layers import TELayerNorm
+from bionemo.contrib.model.loss import BERTMLMLossWithReduction
 
 
-_te_version = packaging.version.Version(version("transformer-engine"))
-
-
-def _get_extra_te_kwargs(config: TransformerConfig):
-    extra_transformer_engine_kwargs = {
-        "params_dtype": config.params_dtype,
-    }
-
-    if _te_version >= packaging.version.Version("0.12.0"):
-        if config.use_cpu_initialization:
-            extra_transformer_engine_kwargs["device"] = 'cpu'
-        else:
-            extra_transformer_engine_kwargs["device"] = torch.cuda.current_device()
-    return extra_transformer_engine_kwargs
-
-
-class BertLMHead(MegatronModule):
-    """Masked LM head for Bert.
-
-    Args:
-        hidden_size: hidden size
-        config (TransformerConfig): TransformerConfig object
-    """
-
-    def __init__(
-        self,
-        hidden_size: int,
-        config: TransformerConfig,
-    ):
-        super().__init__(config=config)
-
-        # TODO: Should switch this to TE ?
-        self.dense = get_linear_layer(hidden_size, hidden_size, config.init_method, config.perform_initialization)
-
-        setattr(self.dense.weight, 'sequence_parallel', config.sequence_parallel)
-        setattr(self.dense.bias, 'sequence_parallel', config.sequence_parallel)
-
-        self.layer_norm = te.pytorch.LayerNorm(
-            hidden_size=hidden_size,
-            eps=config.layernorm_epsilon,
-            sequence_parallel=config.sequence_parallel,
-            zero_centered_gamma=config.layernorm_zero_centered_gamma,
-            **_get_extra_te_kwargs(config),
-        )
-
-        self.gelu = torch.nn.functional.gelu
-
-    def forward(self, hidden_states: Tensor) -> Tensor:
-        hidden_states = self.dense(hidden_states)
-        hidden_states = self.gelu(hidden_states)
-        hidden_states = self.layer_norm(hidden_states)
-        return hidden_states
+class BioBertOutput(TypedDict):
+    token_logits: Tensor
+    binary_logits: Optional[Tensor]
 
 
 class MegatronBioBertModel(LanguageModule):
@@ -128,10 +92,10 @@ class MegatronBioBertModel(LanguageModule):
         self.add_binary_head = add_binary_head
         if return_embeddings:
             assert self.post_process and self.add_binary_head
-
-        assert (
-            os.getenv('NVTE_ALLOW_NONDETERMINISTIC_ALGO') == '0' or os.getenv('NVTE_FLASH_ATTN') == '0'
-        ), "Bert currently does not support flash attention. Please set env variable NVTE_FLASH_ATTN=0 or set NVTE_ALLOW_NONDETERMINISTIC_ALGO=0"
+        # `b` = batch, `s` = sequence.
+        # The old flash attention mechanism apparently wants you to use a b x 1 x s x s attention mask while
+        #  the new one wants a b x 1 x 1 x s attention mask. This is a hack to allow us to switch between the two.
+        self.use_full_attention_mask = os.getenv('NVTE_FLASH_ATTN') == '0'
 
         self.config: TransformerConfig = config
         self.transformer_layer_spec: ModuleSpec = transformer_layer_spec
@@ -202,7 +166,6 @@ class MegatronBioBertModel(LanguageModule):
                 )
 
                 self.pooler = Pooler(config.hidden_size, config.init_method, config, config.sequence_parallel)
-
         if self.pre_process or self.post_process:
             self.setup_embeddings_and_output_layer()
 
@@ -217,17 +180,27 @@ class MegatronBioBertModel(LanguageModule):
         Returns:
             Tensor: The extended binary attention mask
         """
+
         # We create a 3D attention mask from a 2D tensor mask.
         # [b, 1, s]
         attention_mask_b1s = attention_mask.unsqueeze(1)
-        # [b, s, 1]
-        attention_mask_bs1 = attention_mask.unsqueeze(2)
-        # [b, s, s]
-        attention_mask_bss = attention_mask_b1s * attention_mask_bs1
-        # [b, 1, s, s]
-        extended_attention_mask = attention_mask_bss.unsqueeze(1)
 
-        # Convert attention mask to binary:
+        if self.use_full_attention_mask:
+            # [b, s, 1]
+            attention_mask_bs1 = attention_mask.unsqueeze(2)
+            # [b, s, s]
+            attention_mask_bss = attention_mask_b1s * attention_mask_bs1
+            # [b, 1, s, s]
+            extended_attention_mask = attention_mask_bss.unsqueeze(1)
+        else:
+            # Tensor Engine requires a 1x1xS attention mask which it internally
+            #  converts into a 1xSxS mask.
+            # [b, 1, 1, s]
+            extended_attention_mask = attention_mask_b1s.unsqueeze(1)
+
+        # Convert attention mask to binary, and flip the values from 0 to 1 and vice versa so that
+        #  extended_attention_mask._mask_fill(-1000) that megatron does internally result in
+        #  masking out pad positions.
         extended_attention_mask = extended_attention_mask < 0.5
 
         return extended_attention_mask
@@ -263,7 +236,7 @@ class MegatronBioBertModel(LanguageModule):
         tokentype_ids: Tensor = None,
         lm_labels: Tensor = None,
         inference_params=None,
-    ):
+    ) -> Union[BioBertOutput, Tensor]:
         """Forward function of BERT model
 
         Forward function of the BERT Model This function passes the input tensors
@@ -272,6 +245,9 @@ class MegatronBioBertModel(LanguageModule):
 
         It either returns the Loss values if labels are given  or the final hidden units
         """
+        # TODO! If we upgrade to TE 1.7 why does bit flipping back to 1 help the loss in TE 1.7? It claimed that they now follow standards, did
+        #  nemo/megatron flip again internally to be compatible wtih TE somewhere?
+        #  change the following line to ~self.bert... and see if it helps if we upgrade to TE 1.7 and NeMo/Megatron have not compensated.
         extended_attention_mask = self.bert_extended_attention_mask(attention_mask)
 
         if parallel_state.is_pipeline_first_stage():
@@ -335,10 +311,85 @@ class MegatronBioBertModel(LanguageModule):
         if self.binary_head is not None:
             binary_logits = self.binary_head(pooled_output)
 
-        if lm_labels is None:
-            # [s b h] => [b s h]
-            return logits.transpose(0, 1).contiguous(), binary_logits
+        # [s b h] => [b s h]  # move batch to the first dimension after forward
+        logits = logits.transpose(0, 1).contiguous()
+        return {"token_logits": logits, "binary_logits": binary_logits}
 
-        loss = self.compute_language_model_loss(lm_labels, logits)
 
-        return loss, binary_logits
+@dataclass
+class BioBertConfig(TransformerConfig):
+    # From megatron.core.models.gpt.bert_model.GPTModel
+    fp16_lm_cross_entropy: bool = False
+    parallel_output: bool = True
+    share_embeddings_and_output_weights: bool = False  # try True
+    make_vocab_size_divisible_by: int = 128
+    position_embedding_type: Literal["learned_absolute", "rope"] = "learned_absolute"
+    rotary_base: int = 10000
+    rotary_percent: float = 1.0
+    seq_len_interpolation_factor: Optional[float] = None
+    seq_length: int = 1024
+
+    # TODO: Move this to better places?
+    get_attention_mask_from_fusion: bool = False
+
+    optimizer_fn: Optional[Callable[["MegatronBioBertModel"], Optimizer]] = None
+
+    def configure_model(self, tokenizer) -> "MegatronBioBertModel":
+        vp_size = self.virtual_pipeline_model_parallel_size
+        if vp_size:
+            p_size = self.pipeline_model_parallel_size
+            assert (
+                self.num_layers // p_size
+            ) % vp_size == 0, "Make sure the number of model chunks is the same across all pipeline stages."
+
+        # Use this spec to use lower level Transformer Engine modules (required for fp8 training)
+        #  from megatron.core.models.bert.bert_layer_specs import bert_layer_with_transformer_engine_spec
+        #  copies the above but enables qk_layernorm
+        bert_layer_with_transformer_engine_spec = ModuleSpec(
+            module=TransformerLayer,
+            submodules=TransformerLayerSubmodules(
+                self_attention=ModuleSpec(
+                    module=SelfAttention,
+                    params={"attn_mask_type": AttnMaskType.padding},
+                    submodules=SelfAttentionSubmodules(
+                        linear_qkv=TELayerNormColumnParallelLinear,
+                        core_attention=TEDotProductAttention,
+                        linear_proj=TERowParallelLinear,
+                        q_layernorm=TELayerNorm if self.qk_layernorm else IdentityOp,
+                        k_layernorm=TELayerNorm if self.qk_layernorm else IdentityOp,
+                    ),
+                ),
+                self_attn_bda=get_bias_dropout_add,
+                mlp=ModuleSpec(
+                    module=MLP,
+                    submodules=MLPSubmodules(
+                        linear_fc1=TELayerNormColumnParallelLinear,
+                        linear_fc2=TERowParallelLinear,
+                    ),
+                ),
+                mlp_bda=get_bias_dropout_add,
+            ),
+        )
+
+        do_next_sentence = False
+        return MegatronBioBertModel(
+            self,
+            transformer_layer_spec=bert_layer_with_transformer_engine_spec,
+            num_tokentypes=2 if do_next_sentence else 0,
+            vocab_size=get_vocab_size(self, tokenizer.vocab_size, self.make_vocab_size_divisible_by),
+            max_sequence_length=self.seq_length,
+            fp16_lm_cross_entropy=self.fp16_lm_cross_entropy,
+            parallel_output=self.parallel_output,
+            share_embeddings_and_output_weights=self.share_embeddings_and_output_weights,
+            position_embedding_type=self.position_embedding_type,
+            rotary_percent=self.rotary_percent,
+            seq_len_interpolation_factor=self.seq_len_interpolation_factor,
+            return_embeddings=False,
+            pre_process=parallel_state.is_pipeline_first_stage(),
+            post_process=parallel_state.is_pipeline_last_stage(),  # set to False for inference
+            add_binary_head=do_next_sentence,
+        )
+
+    def get_loss_reduction_class(self) -> Type[MegatronLossReduction]:
+        # You could optionally return a different loss reduction class here based on the config settings.
+        return BERTMLMLossWithReduction
