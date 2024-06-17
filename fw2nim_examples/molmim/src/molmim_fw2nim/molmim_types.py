@@ -25,7 +25,12 @@ __all__: Sequence[str] = (
 
 
 class MolMimSequences(BaseModel):
-    sequences: list[str] = Field(..., numpy_dtype="bytes", triton_shape=(-1,))
+    sequences: list[str] = Field(
+        ...,
+        numpy_dtype="bytes",
+        shape_for_triton=(-1, 1),
+        reshape_from_triton=(-1,),
+    )
 
 
 class MolMimEmbeddings(BaseModel):
@@ -45,15 +50,16 @@ class MolMimGenerated(BaseModel):
 
 
 class MolMimHiddens(BaseModel):
-    hiddens: list[list[list[float]]] = Field(
+    hiddens: list[list[float]] = Field(
         ...,
         numpy_dtype="float32",
-        triton_shape=(-1, 512),
+        shape_for_triton=(-1, 1, 512),
+        reshape_from_triton=(-1, 512),
     )
     mask: list[list[bool]] = Field(
         ...,
         numpy_dtype="bool",
-        triton_shape=(-1,),
+        triton_shape=(-1, 1),
     )
 
 
@@ -61,7 +67,6 @@ class MolMimControlOptIn(BaseModel):
     smi: str = Field(
         ...,
         numpy_dtype="bytes",
-        rows=True,
     )
     algorithm: str = Field(..., numpy_dtype="bytes", triton_shape=(1, 1))
     num_molecules: int = Field(..., numpy_dtype="int32", triton_shape=(1, 1))
@@ -77,12 +82,12 @@ class MolMimControlOptOut(BaseModel):
     samples: list[str] = Field(
         ...,
         numpy_dtype="bytes",
-        rows=True,
+        reshape_from_triton=(-1,),
     )
     scores: list[float] = Field(
         ...,
         numpy_dtype="float32",
         triton_shape=(-1,),
-        rows=True,
+        reshape_from_triton=(-1,),
     )
     score_type: str = Field(..., numpy_dtype="bytes", triton_shape=(1, 1))

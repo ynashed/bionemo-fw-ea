@@ -393,6 +393,26 @@ build-docs:
         - docs_build
       expire_in: 1 week
 
+.common_pytest_no_gpu_before_script: &common_before_script
+  before_script:
+    - df -Thl
+    - pwd
+    - export BIONEMO_HOME="${BIONEMO_HOME:-/workspace/bionemo}"
+    - echo "Copying $BIONEMO_HOME to /builds/bionemo"
+    - ls $BIONEMO_HOME
+    - mkdir -p /builds/bionemo/
+    - cp -av "${BIONEMO_HOME}" /builds/
+    - rm -rf "${BIONEMO_HOME}"
+    - ln -s /builds/bionemo "${BIONEMO_HOME}"
+    - export BIONEMO_HOME="/builds/bionemo"
+    - echo "Updated BIONEMO_HOME to $BIONEMO_HOME"
+    - echo "Current storage drive utilization:"
+    - ls -lts /
+    - df -Thl
+    - cd "${BIONEMO_HOME}"
+    - ls -ltr
+    - pwd
+
 .common_pytest_before_script: &common_before_script
   before_script:
     - nvidia-smi
@@ -410,6 +430,9 @@ build-docs:
     - ls -ltr
     - ls -lts /
     - df -Thl
+    # maybe possible to "inherit" another?
+    # https://stackoverflow.com/a/76372616/362021
+    # - !reference [".common_pytest_no_gpu_before_script", "before_script"]
 
 pytest:
   extends:
@@ -461,6 +484,33 @@ pytest:
         path: coverage.xml
     paths:
       - heatmaps
+
+pytest-nim-examples:
+  extends:
+    - .common_pytest_no_gpu_before_script
+  image:
+    # requires -dev image because fw2nim_examples/ is *not* included in release image
+    name: "${IMAGE_NAME}${SUFFIX_DEV}"
+    entrypoint: [ "" ]
+  stage: test
+  needs: [build-bionemo-image]
+  rules:
+    - if: $EXCLUDE_PYTEST == "true"
+      when: never
+    - if: $BIONEMO2_ONLY == "true"
+      when: never
+    - when: on_success
+  tags:
+    - generic
+  variables:
+    GIT_STRATEGY: none
+    GIT_CHECKOUT: "false"
+  script:
+    # test each NIM example
+    - pushd fw2nim_examples/molmim
+    - pip install --no-deps -e .
+    - pytest -v .
+    - popd
 
 
 
@@ -525,6 +575,8 @@ pytest-internal:
     - rm -rf ./.pytest_cache/
     - pytest -m "internal" -v --durations=0 --cov=bionemo --cov-report term --cov-report xml:coverage.xml -k "not test_model_training"
     - df -Thl
+
+
 
 # Build cache reference images like this:
 # docker buildx build --cache-to type=inline  -t <your-image-name>  -f bionemo2/Dockerfile .

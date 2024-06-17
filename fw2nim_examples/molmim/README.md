@@ -47,7 +47,7 @@ curl --request POST \
 curl --request POST \
     localhost:8008/embedding \
     --header 'Content-Type: application/json' \
-    --data-raw '{"sequences": [1,20,100, "CN1C=NC2=C1C(=O)N(C(=O)N2C)C", "CN1C=NC2=C1C(=O)N(C(=O)N2C)C"]}'
+    --data-raw '{"sequences": ["CN1C=NC2=C1C(=O)N(C(=O)N2C)C", "CN1C=NC2=C1C(=O)N(C(=O)N2C)C"]}'
 ```
 
 ### Hiddens
@@ -55,7 +55,7 @@ curl --request POST \
 curl --request POST \
     localhost:8008/hidden \
     --header 'Content-Type: application/json' \
-    --data-raw '{"sequences": [1,20,100, "CN1C=NC2=C1C(=O)N(C(=O)N2C)C", "CN1C=NC2=C1C(=O)N(C(=O)N2C)C"]}' | jq '.' -c > local-hidden
+    --data-raw '{"sequences": ["CN1C=NC2=C1C(=O)N(C(=O)N2C)C", "CN1C=NC2=C1C(=O)N(C(=O)N2C)C"]}' > local-hidden
 ```
 
 ### Decode
