@@ -98,9 +98,10 @@ optimizer:
 lr_scheduler:
   type: plateau
   factor: 0.75
-  patience: 20
+  patience: 50
   min_lr: 5.e-5
-  cooldown: 5
+  cooldown: 0
   monitor: train/loss
   interval: epoch
-  frequency: 5
+  frequency: 5 #not in config but this is default
+
