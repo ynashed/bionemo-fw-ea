@@ -646,8 +646,8 @@ class AlphaFold(ModelPT):
         super().on_fit_start()
         log_with_nemo_at_level(
             f"""
-                AlphaFold.on_fit_start(), end,
-                model_cfg.optimisations={self.cfg.optimisations}
+                AlphaFold.on_fit_start(), end
+                model_cfg.optimisations={self.cfg.get("optimisations", None)}
                 self.trainer.callbacks={[str(x) for x in self.trainer.callbacks]}
                 """,
             self,
