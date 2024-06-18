@@ -1,5 +1,5 @@
 # Use the specified base image
-ARG BASE_IMAGE=nvcr.io/nvidia/pytorch:24.05-py3
+ARG BASE_IMAGE=nvcr.io/nvidia/pytorch:24.02-py3
 FROM ${BASE_IMAGE}
 
 # Set the working directory
@@ -42,7 +42,7 @@ RUN git clone https://github.com/Dao-AILab/causal-conv1d.git && \
 #  this commit allows the latest mcore to be used: https://github.com/NVIDIA/NeMo/pull/9478
 RUN git clone https://github.com/NVIDIA/NeMo.git && \
     cd NeMo && \
-    git checkout 54e4988d7da4f12f0f81fcff33604bbcc0de1c84 && \
+    git checkout fd871450a22bfdc4e16d25d0e2323265180c9b13 && \
     ./reinstall.sh
 
 # Install any additional dependencies

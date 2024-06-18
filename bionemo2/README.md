@@ -30,9 +30,14 @@ aws s3 cp \
 ```
 #### Running
 ```bash
-NVTE_APPLY_QK_LAYER_SCALING=1 \
-  python scripts/singlecell/geneformer/pretrain.py \
-    --data-dir /workspace/bionemo2/data/cellxgene_2023-12-15_small/processed_data \
-    --num-gpus 1 \
-    --num-nodes 1
+NVTE_APPLY_QK_LAYER_SCALING=1   \
+  python scripts/singlecell/geneformer/pretrain.py     \
+  --data-dir /workspace/bionemo2/data/cellxgene_2023-12-15_small/processed_data     \
+  --num-gpus 1     \
+  --num-nodes 1 \
+  --val-check-interval 10 \
+  --num-dataset-workers 0 \
+  --num-steps 100 \
+  --limit-val-batches 2 \
+  --micro-batch-size 32
 ```

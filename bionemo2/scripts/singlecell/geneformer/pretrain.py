@@ -60,6 +60,20 @@ if __name__ == "__main__":
         help="Number of steps to use for training. Default is 10000.",
     )
     parser.add_argument(
+        "--num-dataset-workers",
+        type=int,
+        required=False,
+        default=0,
+        help="Number of steps to use for training. Default is 0.",
+    )
+    parser.add_argument(
+        "--val-check-interval",
+        type=int,
+        required=False,
+        default=10000,
+        help="Number of steps to use for training. Default is 10000.",
+    )
+    parser.add_argument(
         "--limit-val-batches",
         type=int,
         required=False,
@@ -85,7 +99,11 @@ if __name__ == "__main__":
 
     pipeline_model_parallel_size = 1
     strategy = nl.MegatronStrategy(
-        tensor_model_parallel_size=1, pipeline_model_parallel_size=pipeline_model_parallel_size
+        tensor_model_parallel_size=1,
+        pipeline_model_parallel_size=pipeline_model_parallel_size,
+        ddp="megatron",
+        find_unused_parameters=True,
+        enable_nemo_ckpt_io=False,
     )
 
     precision = "bf16-mixed"
@@ -96,7 +114,7 @@ if __name__ == "__main__":
         accelerator="gpu",
         strategy=strategy,
         limit_val_batches=args.limit_val_batches,  # This controls upsampling and downsampling
-        val_check_interval=args.num_steps,  # TODO(@jstjohn) Checkpoint saving is currently broken, fix and change this.
+        val_check_interval=args.val_check_interval,  # TODO(@jstjohn) Checkpoint saving is currently broken, fix and change this.
         num_nodes=num_nodes,
         callbacks=[LossLoggingCallback()],
         plugins=nl.MegatronMixedPrecision(precision=precision, amp_O2=False),
@@ -124,8 +142,10 @@ if __name__ == "__main__":
         median_dict=median_dict,
         micro_batch_size=micro_batch_size,
         global_batch_size=micro_batch_size * int(devices / pipeline_model_parallel_size),
-        persistent_workers=False,
+        # persistent workers is supported when num_dataset_workers > 0
+        persistent_workers=args.num_dataset_workers > 0,
         pin_memory=False,
+        num_workers=args.num_dataset_workers,
     )
     geneformer_config = BioBertConfig(
         num_layers=6,
