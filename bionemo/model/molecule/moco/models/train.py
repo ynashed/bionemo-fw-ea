@@ -20,9 +20,7 @@ from omegaconf import DictConfig, OmegaConf
 
 from bionemo.model.molecule.moco.data.molecule_datamodule import MoleculeDataModule
 from bionemo.model.molecule.moco.models.module import Graph3DInterpolantModel
-
-
-# from bionemo.model.molecule.moco.models.utils_train import EMACallback
+from bionemo.model.molecule.moco.models.utils_train import EMACallback
 
 
 @hydra_runner(config_path="conf", config_name="train")
@@ -33,6 +31,7 @@ def main(cfg: DictConfig) -> None:
     logging.info("\n\n************** Experiment Configuration ***********")
     pl.seed_everything(cfg.train.seed)
     logging.info(f"\n{OmegaConf.to_yaml(cfg)}")
+    cfg.outdir = os.path.join(cfg.outdir, cfg.run_name)
     os.makedirs(cfg.outdir, exist_ok=True)
     os.makedirs(os.path.join(cfg.outdir, 'checkpoints'), exist_ok=True)
     if cfg.resume:
@@ -60,25 +59,27 @@ def main(cfg: DictConfig) -> None:
     logger.log_hyperparams(cfg)
 
     lr_monitor = LearningRateMonitor(logging_interval="step")
-    checkpointing = ModelCheckpoint(
+
+    checkpoint_callback = ModelCheckpoint(
         dirpath=Path(cfg.outdir, 'checkpoints'),
-        filename="best-model-{epoch:04d}",
-        every_n_epochs=1,
-        monitor="train-loss",
-        mode="min",
+        save_top_k=3,
+        monitor="val/loss",
         save_last=True,
     )
+
+    ema_callback = EMACallback(pl_module.parameters(), dirpath=os.path.join(cfg.outdir, 'checkpoints'))
 
     trainer = pl.Trainer(
         max_epochs=cfg.train.n_epochs,
         logger=logger,
-        callbacks=[lr_monitor, checkpointing],
+        callbacks=[lr_monitor, checkpoint_callback, ema_callback],
         enable_progress_bar=cfg.train.enable_progress_bar,
         accelerator='gpu',
         devices=1,  # cfg.train.gpus,
         strategy=('ddp' if cfg.train.gpus > 1 else 'auto'),
         check_val_every_n_epoch=1,  # cfg.train.val_freq,
         gradient_clip_val=cfg.train.gradient_clip_value,
+        log_every_n_steps=1,  # for train steps
     )
 
     datamodule = MoleculeDataModule(cfg.data)

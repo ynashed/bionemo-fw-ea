@@ -1,11 +1,11 @@
 run_name: 'MoCo_Local_Test_Tiny'
-outdir: /workspace/bionemo/bionemo/model/molecule/moco/models/moco_results
+outdir: /workspace/bionemo/bionemo/model/molecule/moco/results
 resume: null
 ema_resume: null
 wandb_params:
-  mode: 'disabled'  # disabled, offline, online
+  mode: 'online'  # disabled, offline, online
   entity: 'clara-discovery'
-  group: 'config_demo'
+  group: 'testing'
   project: 'MoCo'
 
 data:
@@ -81,7 +81,7 @@ sample:
   node_distribution: "/workspace/bionemo/data/pyg_geom_drug/processed_tiny/train_n_h.pickle" # null
 
 train:
-  seed: 2024
+  seed: 42
   batch_size: 800
   gpus: 1 #4
   n_epochs: 1000

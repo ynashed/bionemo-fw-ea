@@ -261,6 +261,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
 
     def calculate_loss(self, batch, out, time, stage="train"):
         batch_geo = batch.batch
+        batch_size = int(batch.batch.max()) + 1
         ws_t = self.interpolants[self.global_variable].snr_loss_weight(time)
         loss = 0
         predictions = {}
@@ -285,8 +286,8 @@ class Graph3DInterpolantModel(pl.LightningModule):
                         else:
                             true_data = true_data.argmax(dim=-1)
                     sub_loss, sub_pred = loss_fn(batch_geo, out[f'{key}_logits'], true_data, batch_weight=ws_t)
-            print(key, sub_loss)
-            self.log(f"{stage}/{key}_loss", sub_loss)
+            # print(key, sub_loss)
+            self.log(f"{stage}/{key}_loss", sub_loss, batch_size=batch_size)
             loss = loss + sub_loss
             predictions[f'{key}'] = sub_pred
 
@@ -299,13 +300,12 @@ class Graph3DInterpolantModel(pl.LightningModule):
                 batch_geo, batch['x'], predictions['x'], z_hat
             )
             distance_loss = distance_loss_tp + distance_loss_tz + distance_loss_pz
-            self.log(f"{stage}/distance_loss", distance_loss)
-            self.log(f"{stage}/distance_loss_tp", distance_loss_tp)
-            self.log(f"{stage}/distance_loss_tz", distance_loss_tz)
-            self.log(f"{stage}/distance_loss_pz", distance_loss_pz)
+            self.log(f"{stage}/distance_loss", distance_loss, batch_size=batch_size)
+            self.log(f"{stage}/distance_loss_tp", distance_loss_tp, batch_size=batch_size)
+            self.log(f"{stage}/distance_loss_tz", distance_loss_tz, batch_size=batch_size)
+            self.log(f"{stage}/distance_loss_pz", distance_loss_pz, batch_size=batch_size)
             loss = loss + distance_loss
-        self.log("train-loss", loss)
-        self.log(f"{stage}/loss", loss)
+        self.log(f"{stage}/loss", loss, batch_size=batch_size)
         return loss, predictions
 
     def forward(self, batch, time):
