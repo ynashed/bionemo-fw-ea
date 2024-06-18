@@ -9,6 +9,7 @@
 # its affiliates is strictly prohibited.
 
 
+import numpy as np
 import torch
 import torch.nn.functional as F
 from lightning import pytorch as pl
@@ -62,12 +63,22 @@ class Graph3DInterpolantModel(pl.LightningModule):
             )
         return loss_functions
 
+    def load_prior(self, fpath):
+        if fpath[-3:] == "npy":
+            array = np.load(fpath)
+            tensor = torch.tensor(array)  # .to(self.device)
+        else:
+            raise ValueError("Currently only supports numpy prior arrays")
+        return tensor
+
     def initialize_interpolants(self):
         interpolants = {}
         for interpolant_idx, interp_param in enumerate(self.interpolant_params.variables):
             index = interp_param.variable_name
             if interp_param.prior_type in ["mask", "absorb"]:
                 interp_param.num_classes += 1
+            elif interp_param.prior_type in ["custom", "data"]:
+                interp_param.custom_prior = self.load_prior(interp_param.custom_prior)
             interpolants[index] = build_interpolant(**interp_param)
         return interpolants
 

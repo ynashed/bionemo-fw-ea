@@ -157,6 +157,9 @@ class Interpolant(nn.Module):
             time_step = float_time_to_index(
                 torch.sigmoid(torch.normal(mean=mean, std=scale, size=(num_samples,))), self.timesteps
             )
+        elif method == "beta":
+            dist = torch.distributions.Beta(2.0, 1.0)
+            time_step = float_time_to_index(dist.sample([num_samples]), self.timesteps)
         else:
             raise ValueError
         return time_step.to(device)
@@ -178,6 +181,9 @@ class Interpolant(nn.Module):
             method == 'logit_normal'
         ):  # see Figure 11 https://stabilityai-public-packages.s3.us-west-2.amazonaws.com/Stable+Diffusion+3+Paper.pdf
             time_step = torch.sigmoid(torch.normal(mean=mean, std=scale, size=(num_samples,)))
+        elif method == "beta":  # From MolFlow
+            dist = torch.distributions.Beta(2.0, 1.0)
+            time_step = dist.sample([num_samples])
         else:
             raise ValueError
         if min_t > 0:

@@ -53,7 +53,8 @@ interpolant:
       com_free: True
     - variable_name: 'h'
       interpolant_type: 'discrete_diffusion' #["discrete_diffusion", "discrete_flow_matching"]
-      prior_type: 'uniform'
+      prior_type: 'custom' #['uniform', 'mask', 'custom']
+      custom_prior: '/workspace/bionemo/data/pyg_geom_drug/processed_tiny/train_types_h.npy'
       timesteps: *timesteps
       num_classes: 16 # if using masking the system will increase by 1 automatically
       scheduler_type: *scheduler_type
@@ -61,7 +62,8 @@ interpolant:
       nu: 1.0
     - variable_name: 'edge_attr'
       interpolant_type: 'discrete_diffusion' #["discrete_diffusion", "discrete_flow_matching"]
-      prior_type: 'uniform'
+      prior_type: 'custom'
+      custom_prior: '/workspace/bionemo/data/pyg_geom_drug/processed_tiny/train_bond_types_h.npy'
       timesteps: *timesteps
       num_classes: 5
       scheduler_type: *scheduler_type
