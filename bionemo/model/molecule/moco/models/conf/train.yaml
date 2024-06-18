@@ -69,6 +69,7 @@ interpolant:
       nu: 1.5
     # - variable_name: 'charge'
     #   interpolant_type: null
+    #   concat: 'h'
 
   
 dynamics:
@@ -96,6 +97,6 @@ lr_scheduler:
   patience: 20
   min_lr: 5.e-5
   cooldown: 5
-  monitor: train-loss
+  monitor: train/loss
   interval: epoch
   frequency: 5

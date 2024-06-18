@@ -218,9 +218,14 @@ class Graph3DInterpolantModel(pl.LightningModule):
         return out, batch
 
     def validation_step(self, batch, batch_idx):
-        val_loss = self.training_step(batch, batch_idx)
-        self.log("val-loss", val_loss)
-        return val_loss
+        batch.h = batch.x
+        batch.x = batch.pos
+        batch.pos = None
+        #! Swapping names for now
+        time = self.sample_time(batch)
+        out, batch, time = self(batch, time)
+        loss, predictions = self.calculate_loss(batch, out, time, "val")
+        return loss
 
     def training_step(self, batch, batch_idx):
         batch.h = batch.x
