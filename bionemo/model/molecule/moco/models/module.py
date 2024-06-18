@@ -138,7 +138,9 @@ class Graph3DInterpolantModel(pl.LightningModule):
             #     batch["h"].device
             # )
             batch["h"] = self.add_adsorbtion_state(batch["h"])
-        batch['h'] = F.one_hot(batch["h"], self.interpolants['h'].num_classes).float()
+
+        # batch['h'] = F.one_hot(batch["h"], self.interpolants['h'].num_classes).float()
+
         # Load bond information from the dataloader
         bond_edge_index, bond_edge_attr = sort_edge_index(
             edge_index=batch.edge_index, edge_attr=batch.edge_attr, sort_by_row=False
@@ -168,7 +170,8 @@ class Graph3DInterpolantModel(pl.LightningModule):
 
         batch['edge_attr'] = edge_attr_global
         batch['edge_index'] = edge_index_global
-        batch['edge_attr'] = F.one_hot(batch["edge_attr"], self.interpolants['edge_attr'].num_classes).float()
+
+        # batch['edge_attr'] = F.one_hot(batch["edge_attr"], self.interpolants['edge_attr'].num_classes).float()
 
         # TODO: anymore specfic shifting of molecule only data
         return batch
@@ -192,6 +195,13 @@ class Graph3DInterpolantModel(pl.LightningModule):
                 _, batch[f"{interp_param.variable_name}_t"], _ = interpolant.interpolate(
                     batch.batch, batch[f"{interp_param.variable_name}"], time
                 )
+            if "discrete" in interp_param.interpolant_type:
+                batch[f"{interp_param.variable_name}_t"] = F.one_hot(
+                    batch[f"{interp_param.variable_name}_t"], interp_param.num_classes
+                ).float()
+                batch[f"{interp_param.variable_name}"] = F.one_hot(
+                    batch[f"{interp_param.variable_name}"], interp_param.num_classes
+                ).float()
 
         return batch
 
