@@ -78,7 +78,8 @@ class Graph3DInterpolantModel(pl.LightningModule):
             if interp_param.prior_type in ["mask", "absorb"]:
                 interp_param.num_classes += 1
             elif interp_param.prior_type in ["custom", "data"]:
-                interp_param.custom_prior = self.load_prior(interp_param.custom_prior)
+                interp_param = dict(interp_param)
+                interp_param["custom_prior"] = self.load_prior(interp_param["custom_prior"]).float()
             interpolants[index] = build_interpolant(**interp_param)
         return interpolants
 
@@ -199,27 +200,20 @@ class Graph3DInterpolantModel(pl.LightningModule):
                 batch[f"{interp_param.variable_name}_t"] = F.one_hot(
                     batch[f"{interp_param.variable_name}_t"], interp_param.num_classes
                 ).float()
-                batch[f"{interp_param.variable_name}"] = F.one_hot(
-                    batch[f"{interp_param.variable_name}"], interp_param.num_classes
-                ).float()
+                # batch[f"{interp_param.variable_name}"] = F.one_hot(
+                #     batch[f"{interp_param.variable_name}"], interp_param.num_classes
+                # ).float() #! I don't think we need to onehot this since for CE loss this can be classes
 
         return batch
 
-    # def inject_time(self, batch, batch_time):
-    #     #! For now tis function only puts the time into H
-    #     for interpolant_idx, interp_param in enumerate(self.interpolant_params.variables):
-    #         if interp_param.variable_name.lower() == "h":
-    #             time_embedding = self.time_embedding(batch_time[interpolant_idx][batch.batch])
-    #             batch[f"{interp_param.variable_name}_t"] = self.adaptive_layer_norm(batch[f"{interp_param.variable_name}_t"], time_embedding)
-    #     return batch
-
     def aggregate_discrete_variables(self, batch):
         # TODO how do we handle the charge and other H add on logic
+        # ! Concat the interpolated data onto its target to pass into the dynamics
         for interp_param in self.interpolant_params:
             if 'concat' in interp_param and interp_param['concat'] is not None:
-                batch[f"{interp_param.concat}_og"] = batch[f"{interp_param.concat}"]
-                batch[f"{interp_param.concat}"] = torch.concat(
-                    [batch[f"{interp_param.concat}"], batch[f"{interp_param.variable_name}"]], dim=-1
+                batch[f"{interp_param.concat}_og"] = batch[f"{interp_param.concat}_t"]
+                batch[f"{interp_param.concat}_t"] = torch.concat(
+                    [batch[f"{interp_param.concat}_t"], batch[f"{interp_param.variable_name}_t"]], dim=-1
                 )
         return batch
 
@@ -229,7 +223,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
             if "discrete" in interp_param.interpolant_type:
                 key = interp_param.variable_name
                 if f"{key}_og" in batch:
-                    batch[f"{key}"] = batch[f"{key}_og"]
+                    batch[f"{key}_t"] = batch[f"{key}_og"]
                 if self.interpolants[key].prior_type in ["absorb", "mask"]:
                     logits = out[f"{key}_logits"].clone()
                     logits[:, -1] = -1e9
@@ -320,7 +314,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
         """
         batch_size = int(batch.batch.max()) + 1
         batch = self.pre_format_molecules(batch, batch_size)
-        batch = self.interpolate(batch, time)
+        batch = self.interpolate(batch, time)  #! discrete variables are one hot after this point
         #    batch = self.initialize_pair_embedding(batch) #! Do in the dynamics
         batch = self.aggregate_discrete_variables(batch)
         out = self.dynamics(
@@ -342,6 +336,16 @@ class Graph3DInterpolantModel(pl.LightningModule):
     #             print(name, p.shape)
     #     print("on_after_backward exit")
     #     import ipdb; ipdb.set_trace(0)
+    def one_hot(self, batch):
+        for interpolant_idx, interp_param in enumerate(self.interpolant_params.variables):
+            if "discrete" in interp_param.interpolant_type:
+                batch[f"{interp_param.variable_name}_t"] = F.one_hot(
+                    batch[f"{interp_param.variable_name}_t"], interp_param.num_classes
+                ).float()
+        return batch
+
+        return batch
+
     def sample(self, num_samples, timesteps=500, time_discretization="linear", node_distribution=None):
         time_type = self.interpolants[self.global_variable].time_type
         if time_type == "continuous":
@@ -386,6 +390,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
             t = timeline[idx]
             dt = DT[idx]
             time = torch.tensor([t] * num_samples).to(self.device)
+            data = self.one_hot(data)
             data = self.aggregate_discrete_variables(data)
             out = self.dynamics(
                 batch=batch,
