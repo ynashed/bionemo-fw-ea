@@ -78,7 +78,7 @@ dynamics:
   model_args: None
 
 sample:
-  node_distribution: "workspace/bionemo/data/pyg_geom_drug/processed_tiny/train_n_h.pickle" # null
+  node_distribution: "/workspace/bionemo/data/pyg_geom_drug/processed_tiny/train_n_h.pickle" # null
 
 train:
   seed: 2024

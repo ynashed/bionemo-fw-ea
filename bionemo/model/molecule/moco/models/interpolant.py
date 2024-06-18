@@ -278,7 +278,7 @@ class ContinuousDiffusionInterpolant(Interpolant):
         data_scale, noise_scale = self.forward_schedule(batch, time)
         return x1, data_scale * x1 + noise_scale * x0, x0
 
-    def prior(self, batch, shape, device):
+    def prior(self, batch, shape, device, x1=None):
         if self.prior_type == "gaussian" or self.prior_type == "normal":
             x0 = torch.randn(shape).to(device)
             if self.com_free:
@@ -422,7 +422,7 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
         data_scale, noise_scale = self.forward_schedule(batch, time)
         return x1, data_scale * x1 + noise_scale * x0, x0
 
-    def prior(self, batch, shape, device):
+    def prior(self, batch, shape, device, x1=None):
         if self.prior_type == "gaussian" or self.prior_type == "normal":
             x0 = torch.randn(shape).to(device)
             if self.com_free:
@@ -641,9 +641,12 @@ class DiscreteDiffusionInterpolant(Interpolant):
         if self.solver_type == "sde" and self.diffusion_type == "d3pm":
             assert self.discrete_time_only
             # TODO: Verify that this is correct
-            x_hat = F.one_hot(x_hat, num_classes=self.num_classes).float()
+            #! already one hot
+            if len(x_hat.shape) <= 1:
+                x_hat = F.one_hot(x_hat, num_classes=self.num_classes).float()
             # import ipdb; ipdb.set_trace(0)
-            xt = F.one_hot(xt, num_classes=self.num_classes).float()
+            if len(xt.shape) <= 1:
+                xt = F.one_hot(xt, num_classes=self.num_classes).float()
             t_idx = self.timesteps - 1 - time[batch]
 
             # a = torch.einsum("nj, nji -> ni", [xt, self.Qt[t_idx].transpose(-2, -1)])
@@ -871,8 +874,8 @@ class DiscreteFlowMatchingInterpolant(Interpolant):
     def step(
         self,
         batch,
-        xt,
-        x_hat,
+        xt,  #! if takes in one hot it will convert it
+        x_hat,  #! assumes input is logits
         time,
         dt,
         x0=None,
@@ -887,6 +890,8 @@ class DiscreteFlowMatchingInterpolant(Interpolant):
         # TODO: Take a look at FlowMol since we can remove this last step stuff and clean_up the code can change it to if time == 1 then we do armax
         # TODO: take all arguments that are not x time and batch and set them up as class variables
         assert False
+        if len(xt.shape) > 1:
+            xt = xt.argmax(dim=-1)
         N = stochasticity
         S = self.num_classes
         MASK_TOKEN_INDEX = S - 1

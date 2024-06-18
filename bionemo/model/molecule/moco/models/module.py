@@ -221,7 +221,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
         return batch
 
     def separate_discrete_variables(self, out, batch):
-        # TODO how do we handle the charge and other H add on logic
+        # TODO can fold the logits vs variable logic into the interpolant class
         for interp_param in self.interpolant_params.variables:
             if "discrete" in interp_param.interpolant_type:
                 key = interp_param.variable_name
@@ -230,9 +230,13 @@ class Graph3DInterpolantModel(pl.LightningModule):
                 if self.interpolants[key].prior_type in ["absorb", "mask"]:
                     logits = out[f"{key}_logits"].clone()
                     logits[:, -1] = -1e9
-                    out[f"{key}_hat"] = logits.argmax(dim=-1)
                 else:
-                    out[f"{key}_hat"] = out[f"{key}_logits"].argmax(dim=-1)
+                    logits = out[f"{key}_logits"]
+                if "diffusion" in interp_param.interpolant_type:  #! Diffusion operates over the selected option
+                    out[f"{key}_hat"] = logits.argmax(dim=-1)
+                else:  #! DFM assumes that you operate over the logits
+                    out[f"{key}_hat"] = out[f"{key}_logits"]
+
         return out, batch
 
     def validation_step(self, batch, batch_idx):
@@ -309,7 +313,6 @@ class Graph3DInterpolantModel(pl.LightningModule):
         This forward function assumes we are doing some form (including none) of interpolation on positions X, node features H, and edge attributes edge_attr.
         1. Sample time from the distribution that is defined via the X interpolant params
         2. Shift X to 0 CoM, add absorbing state for H, create fully connected graph and edge features for edge_attr
-                - TODO: Also want to do any charge/other feature preprocessing eventaullly
         3. Interpolate all needed variables which are defined by "string" args in the config.
         4. Aggregate all the discrete non edge features in the H variable for modeling.
         5. Dynamics forward pass to predict clean data given noisy data.
@@ -376,7 +379,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
             timeline = torch.arange(timesteps + 1)
             DT = [1 / timesteps] * timesteps
 
-        if self.node_distribution:
+        if self.node_distribution is not None:
             num_atoms = torch.multinomial(
                 input=self.node_distribution,
                 num_samples=num_samples,
@@ -384,9 +387,11 @@ class Graph3DInterpolantModel(pl.LightningModule):
             )
         else:
             num_atoms = torch.randint(20, 55, (num_samples,)).to(torch.int64)
-        batch = torch.repeat_interleave(torch.arange(num_samples), num_atoms).to(self.device)
-
-        edge_index = torch.eq(batch.unsqueeze(0), batch.unsqueeze(-1)).int().fill_diagonal_(0).to(self.device)  # N x N
+        batch_index = torch.repeat_interleave(torch.arange(num_samples), num_atoms).to(self.device)
+        # import ipdb; ipdb.set_trace()
+        edge_index = (
+            torch.eq(batch_index.unsqueeze(0), batch_index.unsqueeze(-1)).int().fill_diagonal_(0).to(self.device)
+        )  # N x N
         edge_index, _ = dense_to_sparse(edge_index)  # 2 x E
         edge_index = sort_edge_index(edge_index, sort_by_row=False)
 
@@ -396,30 +401,31 @@ class Graph3DInterpolantModel(pl.LightningModule):
         for key, interpolant in self.interpolants.items():
             if "edge" in key:
                 shape = (edge_index.size(1), interpolant.num_classes)
-                prior[key], edge_index = interpolant.prior_edges(batch, shape, edge_index, self.device)
+                prior[key], edge_index = interpolant.prior_edges(batch_index, shape, edge_index, self.device)
                 data[f"{key}_t"] = prior[key]
             else:
                 shape = (total_num_atoms, interpolant.num_classes)
-                data[f"{key}_t"] = prior[key] = interpolant.prior(batch, shape, self.device)
+                data[f"{key}_t"] = prior[key] = interpolant.prior(batch_index, shape, self.device)
         for idx in tqdm(list(range(len(DT))), total=len(DT)):
             t = timeline[idx]
             dt = DT[idx]
             time = torch.tensor([t] * num_samples).to(self.device)
             data = self.one_hot(data)
             data = self.aggregate_discrete_variables(data)
+            data['batch'] = batch_index
             out = self.dynamics(
-                batch=batch,
+                batch=batch_index,
                 X=data["x_t"],
                 H=data["h_t"],
                 E=data["edge_attr_t"],
                 E_idx=edge_index,
                 t=time,
             )
-            out, batch = self.separate_discrete_variables(out, batch)
+            out, data = self.separate_discrete_variables(out, data)
             for key, interpolant in self.interpolants.items():
                 if "edge" in key:
                     edge_index, data[f"{key}_t"] = interpolant.step_edges(
-                        batch,
+                        batch_index,
                         edge_index=edge_index,
                         edge_attr_t=data[f"{key}_t"],
                         edge_attr_hat=out[f"{key}_hat"],
@@ -427,11 +433,13 @@ class Graph3DInterpolantModel(pl.LightningModule):
                     )
                 else:
                     data[f"{key}_t"] = interpolant.step(
-                        xt=data[f"{key}_t"], x_hat=out[f"{key}_hat"], x0=prior[key], batch=batch, time=time, dt=dt
+                        xt=data[f"{key}_t"],
+                        x_hat=out[f"{key}_hat"],
+                        x0=prior[key],
+                        batch=batch_index,
+                        time=time,
+                        dt=dt,
                     )
-        import ipdb
-
-        ipdb.set_trace()
         return {key: data[f"{key}_t"] for key in self.interpolants.keys()}
 
 
@@ -447,6 +455,7 @@ def main(cfg: DictConfig):
         lr_scheduler_params=cfg.lr_scheduler,
         dynamics_params=cfg.dynamics,
         interpolant_params=cfg.interpolant,
+        sampling_params=cfg.sample,
     ).to(device)
     model.setup("fit")  #! this has to be called after model is moved to device for everything to propagate
     model.eval()
