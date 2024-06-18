@@ -35,14 +35,15 @@ loss:
 
 interpolant:
   timesteps: &timesteps 500
-  time_type: &time_type "discrete"
-  scheduler_type: &scheduler_type "cosine_adaptive"
-  sample_time_method: "uniform"
-  sample_time_mean: 0
-  sample_time_scale: 0.81
+  time_type: &time_type "discrete" #["discrete, "continuous]
+  scheduler_type: &scheduler_type "cosine_adaptive" #["cosine_adaptive, "linear"]
+  sample_time_method: "uniform" # ["symmetric", "uniform", "stab_mode", "logit_normal"]
+  sample_time_mean: 0 # Used in stab_mode and logit_normal
+  sample_time_scale: 0.81 # Used in stab_mode and logit_normal
+  global_variable_name: 'x' # variable that is specficed below to be used for sampling time and loss sampling
   variables:
-    - variable_name: 'x' #'pos' #'x'
-      interpolant_type: 'continuous_diffusion'
+    - variable_name: 'x' 
+      interpolant_type: 'continuous_diffusion' #["continuous_diffusion", "continuous_flow_matching"]
       prior_type: 'gaussian'
       timesteps: *timesteps
       num_classes: 3
@@ -50,16 +51,16 @@ interpolant:
       time_type: *time_type
       nu: 2.0
       com_free: True
-    - variable_name: 'h' #'x' #'h'
-      interpolant_type: 'discrete_diffusion'
+    - variable_name: 'h'
+      interpolant_type: 'discrete_diffusion' #["discrete_diffusion", "discrete_flow_matching"]
       prior_type: 'uniform'
       timesteps: *timesteps
-      num_classes: 16
+      num_classes: 16 # if using masking the system will increase by 1 automatically
       scheduler_type: *scheduler_type
       time_type: *time_type
       nu: 1.0
     - variable_name: 'edge_attr'
-      interpolant_type: 'discrete_diffusion'
+      interpolant_type: 'discrete_diffusion' #["discrete_diffusion", "discrete_flow_matching"]
       prior_type: 'uniform'
       timesteps: *timesteps
       num_classes: 5

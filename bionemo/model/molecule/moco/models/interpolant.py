@@ -47,6 +47,7 @@ def build_interpolant(
     custom_prior: torch.Tensor = None,
     com_free: bool = True,
     variable_name: str = None,
+    concat: str = None,
     # TODO: here is where we add all the possible things that could go into any interpolant class
 ):
     """

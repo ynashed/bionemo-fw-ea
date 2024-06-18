@@ -1,4 +1,3 @@
-import torch.nn.functional as F
 from torch import nn
 from torch_scatter import scatter_mean
 
@@ -29,9 +28,21 @@ class EquivariantTransformerBlock(nn.Module):
 
 
 class MoCo(nn.Module):
-    def __init__(self, atom_classes=16, atom_features=64, edge_classes=5, edge_features=32, num_layers=10):
+    def __init__(
+        self,
+        atom_classes=16,
+        atom_features=64,
+        edge_classes=5,
+        edge_features=32,
+        extra_discrete_classes=None,
+        num_layers=10,
+    ):
         super(MoCo, self).__init__()
-        self.atom_embedder = nn.Linear(atom_classes, atom_features)
+        if extra_discrete_classes:
+            num_extra_discrete = sum(extra_discrete_classes.values())
+        else:
+            num_extra_discrete = 0
+        self.atom_embedder = nn.Linear(atom_classes + num_extra_discrete, atom_features)
         self.edge_embedder = nn.Linear(edge_classes, edge_features)
         self.layers = []
         for i in range(num_layers):
@@ -43,12 +54,20 @@ class MoCo(nn.Module):
         self.num_edge_classes = edge_classes
         self.atom_type_head = PredictionHead(atom_classes, atom_features)
         self.edge_type_head = PredictionHead(edge_classes, edge_features, edge_prediction=True)
+        if num_extra_discrete > 0:
+            self.discrete_pred_heads = {}
+            for key, dim in extra_discrete_classes.items():
+                self.discrete_pred_heads[key] = PredictionHead(dim, atom_features)
+        self.num_extra_discrete = num_extra_discrete
         # self.distance_head = PredictionHead(1, atom_features, distance_prediction=True)
 
     def forward(self, batch, X, H, E_idx, E, t):
         # import ipdb; ipdb.set_trace()
-        H = self.atom_embedder(F.one_hot(H, self.num_atom_classes).float())
-        E = self.edge_embedder(F.one_hot(E, self.num_edge_classes).float())
+        # H = self.atom_embedder(F.one_hot(H, self.num_atom_classes).float())
+        # E = self.edge_embedder(F.one_hot(E, self.num_edge_classes).float())
+        #! Now we assume the data is always 1 hot inputs
+        H = self.atom_embedder(H)
+        E = self.edge_embedder(E)
         te = self.time_embedding(t, batch)  # B x D
         H = self.ada_ln(H, te, batch)  # N x D
         Z = H.unsqueeze(1) * H.unsqueeze(0)
@@ -61,7 +80,7 @@ class MoCo(nn.Module):
         h_logits, h_prob = self.atom_type_head(batch, H)  #! These values look weird H values blown up
         e_logits, e_prob = self.edge_type_head.predict_edges(batch, E, E_idx)
         z_logits = None  # self.distance_head.predict_distances(batch, Z)
-        return {
+        out = {
             "x_hat": X,
             "h_logits": h_logits,
             # "h_hat": h_logits.argmax(dim=-1),
@@ -69,3 +88,8 @@ class MoCo(nn.Module):
             # "edge_attr_hat":  e_logits.argmax(dim=-1),
             "Z_hat": z_logits,
         }
+        if self.num_extra_discrete > 0:
+            for key, predictor in self.discrete_pred_heads.items():
+                out
+
+        return out

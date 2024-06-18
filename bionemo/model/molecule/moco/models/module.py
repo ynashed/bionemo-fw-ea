@@ -10,6 +10,7 @@
 
 
 import torch
+import torch.nn.functional as F
 from lightning import pytorch as pl
 from nemo.core.config import hydra_runner
 from omegaconf import DictConfig
@@ -41,6 +42,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
         self.lr_scheduler_params = lr_scheduler_params
         self.dynamics_params = dynamics_params
         self.interpolant_params = interpolant_params
+        self.global_variable = interpolant_params.global_variable_name
         self.loss_params = loss_params
         # import ipdb; ipdb.set_trace()
         self.loss_functions = self.initialize_loss_functions()
@@ -64,6 +66,8 @@ class Graph3DInterpolantModel(pl.LightningModule):
         interpolants = {}
         for interpolant_idx, interp_param in enumerate(self.interpolant_params.variables):
             index = interp_param.variable_name
+            if interp_param.prior_type in ["mask", "absorb"]:
+                interp_param.num_classes += 1
             interpolants[index] = build_interpolant(**interp_param)
         return interpolants
 
@@ -119,9 +123,11 @@ class Graph3DInterpolantModel(pl.LightningModule):
         batch['x'] = batch['x'] - scatter_mean(batch['x'], index=batch.batch, dim=0, dim_size=batch_size)[batch.batch]
 
         if self.interpolants['h'].prior_type in ["mask", "absorb"]:
-            batch["h"] = torch.cat((batch["h"], torch.zeros((batch["h"].size(0), 1)).to(batch["h"].device)), dim=1).to(
-                batch["h"].device
-            )
+            # batch["h"] = torch.cat((batch["h"], torch.zeros((batch["h"].size(0), 1)).to(batch["h"].device)), dim=1).to(
+            #     batch["h"].device
+            # )
+            batch["h"] = self.add_adsorbtion_state(batch["h"])
+        batch['h'] = F.one_hot(batch["h"], self.interpolants['h'].num_classes).float()
         # Load bond information from the dataloader
         bond_edge_index, bond_edge_attr = sort_edge_index(
             edge_index=batch.edge_index, edge_attr=batch.edge_attr, sort_by_row=False
@@ -144,8 +150,6 @@ class Graph3DInterpolantModel(pl.LightningModule):
         edge_index_global, edge_attr_global = sort_edge_index(
             edge_index=edge_index_global, edge_attr=edge_attr_global, sort_by_row=False
         )
-        if self.interpolants['h'].prior_type in ["mask", "absorb"]:
-            batch["h"] = self.add_absorbption_state(batch["h"])
 
         if self.interpolants['edge_attr'].prior_type in ["mask", "absorb"]:
             # TODO: should we use the no bond state as the mask? or create an extra dim
@@ -153,6 +157,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
 
         batch['edge_attr'] = edge_attr_global
         batch['edge_index'] = edge_index_global
+        batch['edge_attr'] = F.one_hot(batch["edge_attr"], self.interpolants['edge_attr'].num_classes).float()
 
         # TODO: anymore specfic shifting of molecule only data
         return batch
@@ -187,22 +192,30 @@ class Graph3DInterpolantModel(pl.LightningModule):
     #             batch[f"{interp_param.variable_name}_t"] = self.adaptive_layer_norm(batch[f"{interp_param.variable_name}_t"], time_embedding)
     #     return batch
 
-    def aggregate_discrete_variables(self, results):
+    def aggregate_discrete_variables(self, batch):
         # TODO how do we handle the charge and other H add on logic
-        return results
+        for interp_param in self.interpolant_params:
+            if 'concat' in interp_param and interp_param['concat'] is not None:
+                batch[f"{interp_param.concat}_og"] = batch[f"{interp_param.concat}"]
+                batch[f"{interp_param.concat}"] = torch.concat(
+                    [batch[f"{interp_param.concat}"], batch[f"{interp_param.variable_name}"]], dim=-1
+                )
+        return batch
 
-    def separate_discrete_variables(self, out):
+    def separate_discrete_variables(self, out, batch):
         # TODO how do we handle the charge and other H add on logic
         for interp_param in self.interpolant_params.variables:
             if "discrete" in interp_param.interpolant_type:
                 key = interp_param.variable_name
+                if f"{key}_og" in batch:
+                    batch[f"{key}"] = batch[f"{key}_og"]
                 if self.interpolants[key].prior_type in ["absorb", "mask"]:
                     logits = out[f"{key}_logits"].clone()
                     logits[:, -1] = -1e9
                     out[f"{key}_hat"] = logits.argmax(dim=-1)
                 else:
                     out[f"{key}_hat"] = out[f"{key}_logits"].argmax(dim=-1)
-        return out
+        return out, batch
 
     def validation_step(self, batch, batch_idx):
         val_loss = self.training_step(batch, batch_idx)
@@ -215,10 +228,13 @@ class Graph3DInterpolantModel(pl.LightningModule):
         batch.pos = None
         #! Swapping names for now
         time = self.sample_time(batch)
-        out, time = self(batch, time)
+        out, batch, time = self(batch, time)
+        loss, predictions = self.calculate_loss(batch, out, time, "train")
+        return loss
+
+    def calculate_loss(self, batch, out, time, stage="train"):
         batch_geo = batch.batch
-        # TODO turn this in to an iterative loop where if the interpolant is non None we take a loss
-        ws_t = self.interpolants['x'].snr_loss_weight(time)
+        ws_t = self.interpolants[self.global_variable].snr_loss_weight(time)
         loss = 0
         predictions = {}
         for key, loss_fn in self.loss_functions.items():
@@ -235,21 +251,18 @@ class Graph3DInterpolantModel(pl.LightningModule):
                 if loss_fn.continuous:
                     sub_loss, sub_pred = loss_fn(batch_geo, out[f'{key}_hat'], batch[f'{key}'], batch_weight=ws_t)
                 else:
-                    sub_loss, sub_pred = loss_fn(batch_geo, out[f'{key}_logits'], batch[f'{key}'], batch_weight=ws_t)
+                    true_data = batch[f'{key}']
+                    if len(true_data.shape) > 1:
+                        if true_data.size(1) == 1:
+                            true_data = true_data.unsqueeze(1)
+                        else:
+                            true_data = true_data.argmax(dim=-1)
+                    sub_loss, sub_pred = loss_fn(batch_geo, out[f'{key}_logits'], true_data, batch_weight=ws_t)
             print(key, sub_loss)
+            self.log(f"{stage}/{key}_loss", sub_loss)
             loss = loss + sub_loss
             predictions[f'{key}'] = sub_pred
-        # x_loss, x_pred = self.loss_function(
-        #     batch_geo, out['x_hat'], batch['x'], batch_weight=ws_t, scale=self.loss_scalar['x']
-        # )
-        # h_loss, h_out = self.loss_function(
-        #     batch_geo, out['h_logits'], batch['h'], continuous=False, batch_weight=ws_t, scale=self.loss_scalar['h']
-        # )
 
-        # loss = x_loss + h_loss + edge_loss
-        # print("X Loss", x_loss)
-        # print("H Loss", h_loss)
-        # print("E Loss", edge_loss)
         if self.loss_params.use_distance:
             if "Z_hat" in out.keys() and self.loss_function.use_distance == "triple":
                 z_hat = out["Z_hat"]
@@ -259,9 +272,14 @@ class Graph3DInterpolantModel(pl.LightningModule):
                 batch_geo, batch['x'], predictions['x'], z_hat
             )
             distance_loss = distance_loss_tp + distance_loss_tz + distance_loss_pz
+            self.log(f"{stage}/distance_loss", distance_loss)
+            self.log(f"{stage}/distance_loss_tp", distance_loss_tp)
+            self.log(f"{stage}/distance_loss_tz", distance_loss_tz)
+            self.log(f"{stage}/distance_loss_pz", distance_loss_pz)
             loss = loss + distance_loss
         self.log("train-loss", loss)
-        return loss
+        self.log(f"{stage}/loss", loss)
+        return loss, predictions
 
     def forward(self, batch, time):
         """
@@ -287,8 +305,8 @@ class Graph3DInterpolantModel(pl.LightningModule):
             E_idx=batch["edge_index"],
             t=time,
         )
-        out = self.separate_discrete_variables(out)
-        return out, time
+        out, batch = self.separate_discrete_variables(out, batch)
+        return out, batch, time
 
     # def on_after_backward(self) -> None:
     # useful for debugging
@@ -299,7 +317,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
     #     print("on_after_backward exit")
     #     import ipdb; ipdb.set_trace(0)
     def sample(self, num_samples, timesteps=500, time_discretization="linear", node_distribution=None):
-        time_type = self.interpolants['x'].time_type
+        time_type = self.interpolants[self.global_variable].time_type
         if time_type == "continuous":
             if time_discretization == "linear":
                 timeline = torch.linspace(0, 1, timesteps + 1).tolist()  # [0, 1.0] timestpes + 1
@@ -351,7 +369,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
                 E_idx=edge_index,
                 t=time,
             )
-            out = self.separate_discrete_variables(out)
+            out, batch = self.separate_discrete_variables(out, batch)
             for key, interpolant in self.interpolants.items():
                 if "edge" in key:
                     edge_index, data[f"{key}_t"] = interpolant.step_edges(
