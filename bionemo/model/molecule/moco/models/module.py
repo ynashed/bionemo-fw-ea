@@ -9,6 +9,8 @@
 # its affiliates is strictly prohibited.
 
 
+import pickle
+
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -23,8 +25,6 @@ from tqdm import tqdm
 from bionemo.model.molecule.moco.data.molecule_datamodule import MoleculeDataModule
 from bionemo.model.molecule.moco.models.interpolant import build_interpolant
 from bionemo.model.molecule.moco.models.moco import MoCo
-
-# from bionemo.model.molecule.moco.models.mpnn import TimestepEmbedder, AdaLsN
 from bionemo.model.molecule.moco.models.utils import InterpolantLossFunction
 
 
@@ -36,6 +36,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
         lr_scheduler_params: DictConfig,
         dynamics_params: DictConfig,
         interpolant_params: DictConfig,
+        sampling_params: DictConfig,
     ):
         # import ipdb; ipdb.set_trace()
         super(Graph3DInterpolantModel, self).__init__()
@@ -48,6 +49,8 @@ class Graph3DInterpolantModel(pl.LightningModule):
         # import ipdb; ipdb.set_trace()
         self.loss_functions = self.initialize_loss_functions()
         self.interpolants = self.initialize_interpolants()
+        self.sampling_params = sampling_params
+        self.node_distribution = self.initialize_inference()
         self.dynamics = MoCo()
 
     def setup(self, stage):
@@ -344,9 +347,21 @@ class Graph3DInterpolantModel(pl.LightningModule):
                 ).float()
         return batch
 
-        return batch
+    def initialize_inference(self):
+        if self.sampling_params.node_distribution:
+            with open(self.sampling_params.node_distribution, "rb") as f:
+                node_dict = pickle.load(f)
+            max_n_nodes = max(node_dict.keys())
+            n_nodes = torch.zeros(max_n_nodes + 1, dtype=torch.long)
+            for key, value in node_dict.items():
+                n_nodes[key] += value
 
-    def sample(self, num_samples, timesteps=500, time_discretization="linear", node_distribution=None):
+            n_nodes = n_nodes / n_nodes.sum()
+        else:
+            n_nodes = None
+        return n_nodes
+
+    def sample(self, num_samples, timesteps=500, time_discretization="linear"):
         time_type = self.interpolants[self.global_variable].time_type
         if time_type == "continuous":
             if time_discretization == "linear":
@@ -361,9 +376,9 @@ class Graph3DInterpolantModel(pl.LightningModule):
             timeline = torch.arange(timesteps + 1)
             DT = [1 / timesteps] * timesteps
 
-        if node_distribution:
+        if self.node_distribution:
             num_atoms = torch.multinomial(
-                input=node_distribution,
+                input=self.node_distribution,
                 num_samples=num_samples,
                 replacement=True,
             )

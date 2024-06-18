@@ -44,6 +44,7 @@ def main(cfg: DictConfig) -> None:
             lr_scheduler_params=cfg.lr_scheduler,
             dynamics_params=cfg.dynamics,
             interpolant_params=cfg.interpolant,
+            sampling_params=cfg.sample,
         )
 
     logger = pl.loggers.WandbLogger(
