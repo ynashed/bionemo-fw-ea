@@ -187,5 +187,5 @@ if __name__ == "__main__":
 
     # TODO(@jstjohn) Doesnt work right now. Get this working.
     # TypeError: `model` must be a `LightningModule` or `torch._dynamo.OptimizedModule`, got `MegatronParallel`
-    results = trainer.predict(trainer.model, dataloaders=data.test_dataloader())
+    results = trainer.predict(dataloaders=data.test_dataloader())
     print(results[0])

@@ -11,13 +11,23 @@
 
 import json
 from pathlib import Path
-from typing import Any, Optional, TypedDict
+from typing import Any, Dict, Optional, Tuple, TypedDict
 
 import numpy as np
+from nemo.utils import logging
 from torch.utils.data import Dataset
 
 from bionemo.contrib.data.singlecell.utils import sample_or_truncate_plus_pad
 from bionemo.contrib.tokenizer.gene_tokenizer import GeneTokenizer
+
+
+class Item(TypedDict):
+    text: np.ndarray
+    types: np.ndarray
+    padding_mask: np.ndarray
+    labels: np.ndarray
+    loss_mask: np.ndarray
+    is_random: np.ndarray
 
 
 class SingleCellDataset(Dataset):
@@ -87,14 +97,14 @@ class SingleCellDataset(Dataset):
         path = Path(data_path)
 
         # - metadata
-        self.metadata = json.load(open(path / 'metadata.json', 'r'))
+        metadata = json.load(open(path / 'metadata.json', 'r'))
 
         # - median dict
         self.gene_medians = median_dict
 
         # - train/val idxs sampled contiguously
-        total_el = sum([v["num_el"] for _, v in self.metadata.items()])
-        self.num_samples = sum([v["shape"][0] for _, v in self.metadata.items()])
+        total_el = sum([v["num_el"] for _, v in metadata.items()])
+        self.num_samples = sum([v["shape"][0] for _, v in metadata.items()])
         # - load data
         self.gene_data = np.memmap(path / 'gene_expression_data.npy', dtype='float32', mode='r', shape=(total_el,))
 
@@ -106,30 +116,61 @@ class SingleCellDataset(Dataset):
             path / 'gene_expression_ptr.npy', dtype='int64', mode='r', shape=(self.num_samples + 1,)
         )
         self.tokenizer = tokenizer
+        rnd_key = next(iter(metadata))
+        feature_ids = np.array(metadata[rnd_key]["feature_ids"])
 
-        # map row indices to dataset id
-        self.dataset_ccum = np.zeros(
-            len(self.metadata),
-        )
-        # Maps dataset ids to dataset names (used in the metadata dict)
-        self.dataset_map = {}
-        count = 0
-        for i, k in enumerate(self.metadata.keys()):
-            self.dataset_ccum[i] = count
-            self.dataset_map[i] = k
-            count += self.metadata[k]["shape"][0]
-        self.dataset_ccum[0] = -1
+        # Determine if we need to store the full metadata (per file feature_ids) or just a single feature_id
+        #  vector for all files. If we can do the later this is much more memory efficient.
+        #  without this change, if num_workers>0, we seem to hit a memory leak after a relatively small number
+        #  of steps. Online discussion points to native python objects like dictionaries of a lot of data
+        #  being a primary culprit behind large RAM usage in dataloaders that use multiprocessing.
+        features_all_same = True
+        for m in metadata.values():
+            if np.any(np.char.not_equal(np.array(m['feature_ids']), feature_ids)):
+                features_all_same = False
+                break
+
+        if not features_all_same:
+            # We need to store per-file metadata of feature_ids. Make sure you run with a lot of RAM or few dataset workers.
+            #  we need to store per-file metadata in this case because some of the files have different subsets of the
+            #  feature_ids.
+            logging.warning(
+                "Feature ids are not the same across datasets. This can cause heavy RAM usage "
+                "for large datasets, try setting num_workers to 0."
+            )
+            self.metadata = metadata
+            self.feature_ids = None
+
+            # map row indices to dataset id
+            self.dataset_ccum = np.zeros(
+                len(self.metadata),
+            )
+            # Maps dataset ids to dataset names (used in the metadata dict)
+            self.dataset_map = {}
+            count = 0
+            for i, k in enumerate(self.metadata):
+                self.dataset_ccum[i] = count
+                self.dataset_map[i] = k
+                count += self.metadata[k]["shape"][0]
+            self.dataset_ccum[0] = -1
+        else:
+            # We can store a single feature_id vector for all datasets, and do not need to store the full metadata array.
+            logging.warning(
+                "Feature ids are the same across datasets. This is good, using the same feature_ids for all datasets."
+            )
+            self.feature_ids = feature_ids
+            self.metadata = None
 
     def __len__(self):
         return self.num_samples
 
-    def metadata_lookup(self, idx) -> dict:
+    def metadata_lookup(self, idx) -> Dict[str, np.ndarray]:
         """Go from a cell idx to the file-level metadata associated with that cell."""
         did = sum(~(self.dataset_ccum > idx)) - 1
         metadata = self.metadata[self.dataset_map[did]]
         return metadata
 
-    def lookup_cell_by_idx(self, idx) -> tuple[np.array, np.array, dict]:
+    def lookup_cell_by_idx(self, idx) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         ptr = slice(int(self.gene_data_ptr[idx]), int(self.gene_data_ptr[idx + 1]))
         # col idxs poin to offsets in the original sparse metadata, this is for looking up metadata eg gene names
         col_idxs = np.asarray(self.gene_data_indices[ptr]).astype(int)  # keyed by ptr
@@ -138,16 +179,21 @@ class SingleCellDataset(Dataset):
             if not np.all(is_increasing):
                 raise ValueError(f"Column indices are not increasing for {np.sum(~is_increasing)} pairs of genes")
         gene_data = np.asarray(self.gene_data[ptr]).astype(int)  # keyed by ptr
-        metadata = self.metadata_lookup(idx)
-        return gene_data, col_idxs, metadata
+        # Get feature_ids for this particular cell. Eitehr lookup by index if we need to, or if we already verified that
+        #  metadata is not needed because feature_ids are the same for every file, then we can just use the single feature_ids
+        #  vector instead.
+        feature_ids: np.ndarray = (
+            self.feature_ids if self.metadata is None else self.metadata_lookup(idx)['feature_ids']
+        )
+        return gene_data, col_idxs, feature_ids
 
-    def __getitem__(self, idx: int) -> dict[str, Any]:
+    def __getitem__(self, idx: int) -> Item:
         '''Performs a lookup and the required transformation for the model'''
-        gene_data, col_idxs, metadata = self.lookup_cell_by_idx(idx)
+        gene_data, col_idxs, feature_ids = self.lookup_cell_by_idx(idx)
         return process_item(
             gene_data,
             col_idxs,
-            metadata,
+            feature_ids,
             self.tokenizer,
             gene_median=self.gene_medians,
             max_len=self.max_len,
@@ -158,19 +204,10 @@ class SingleCellDataset(Dataset):
         )
 
 
-class Item(TypedDict):
-    text: np.array
-    types: np.array
-    padding_mask: np.array
-    labels: np.array
-    loss_mask: np.array
-    is_random: np.array
-
-
 def process_item(
-    gene_data: np.array,
-    gene_idxs: np.array,
-    metadata: dict[str, float],
+    gene_data: np.ndarray,
+    gene_idxs: np.ndarray,
+    feature_ids: np.ndarray,
     tokenizer: GeneTokenizer,
     gene_median: dict,
     max_len: int = 1024,
@@ -189,7 +226,7 @@ def process_item(
     Args:
         gene_data (list): List of gene data, these are expression counts.
         gene_idxs (list): List of gene indices, these are keys in 'metadata['feature_ids']' and correspdong the CSR entry. These are computed by sc_memmap.
-        metadata (dict): Metadata dictionary.
+        feature_ids (list): Feature ids for the full dataset.
         tokenizer (Tokenizer): Tokenizer object.
         gene_median (optional(dict)): Dictionary of gene medians. Defaults to None. Expects ensembl IDs to be keys.
         max_len (int): Maximum length of the item. Defaults to 1024. Applies padding to any sequence shorter than max_len and truncates any sequence longer than max_len.
@@ -224,7 +261,7 @@ def process_item(
 
     max_len = max_len - 1  # - minus 1 for [CLS] token
 
-    gene_names = [metadata["feature_ids"][idx] for idx in gene_idxs]
+    gene_names = [feature_ids[idx] for idx in gene_idxs]
     genes, tokens, medians = [], [], []
     for tok, gene in zip(gene_names, gene_data):
         if tok in tokenizer.vocab:
