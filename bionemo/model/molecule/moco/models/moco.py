@@ -45,7 +45,7 @@ class MoCo(nn.Module):
         edge_classes=5,
         edge_features=32,
         extra_discrete_classes=None,
-        num_layers=10,
+        num_layers=5,
     ):
         super(MoCo, self).__init__()
         if extra_discrete_classes:
@@ -62,6 +62,7 @@ class MoCo(nn.Module):
         self.ada_ln = AdaLN(atom_features, atom_features)
         self.num_atom_classes = atom_classes
         self.num_edge_classes = edge_classes
+        #! TODO do we need coord prediction head which is mlp then 0 CoM?
         self.atom_type_head = PredictionHead(atom_classes, atom_features)
         self.edge_type_head = PredictionHead(edge_classes, edge_features, edge_prediction=True)
         if num_extra_discrete > 0:

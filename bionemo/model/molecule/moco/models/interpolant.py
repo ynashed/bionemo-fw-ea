@@ -557,6 +557,11 @@ class DiscreteDiffusionInterpolant(Interpolant):
             self.log_var[t_idx].unsqueeze(1),
         )
 
+    def snr(self, time):
+        t_idx = self.timesteps - 1 - time
+        abar = self.alpha_bar[t_idx]
+        return abar / (1 - abar)
+
     def interpolate(self, batch, x1, time):
         """
         Interpolate using discrete interpolation method.

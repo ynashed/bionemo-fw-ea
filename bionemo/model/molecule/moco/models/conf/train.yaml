@@ -1,4 +1,4 @@
-run_name: 'MoCo_Local_Test_Tiny'
+run_name: 'MoCo_Local_Test'
 outdir: /workspace/bionemo/bionemo/model/molecule/moco/results
 resume: null
 ema_resume: null
@@ -10,10 +10,10 @@ wandb_params:
 
 data:
   dataset_root: "/workspace/bionemo/data/pyg_geom_drug"
-  processed_folder: "processed_tiny" #"processed" #
-  batch_size: 4 #16
-  inference_batch_size: 5 #16
-  num_workers: 4
+  processed_folder: "processed" #_tiny" #"processed" #
+  batch_size: 25 #16
+  inference_batch_size: 25 #16
+  num_workers: 12 #4
   remove_hs: False
   select_train_subset: 100
 
@@ -22,15 +22,15 @@ loss:
   variables:
     - variable_name: 'x'
       loss_scale: 3.0
-      aggregate: 'mean'
+      aggregate: 'sum'
       continuous: True
     - variable_name: 'h'
       loss_scale: 0.4
-      aggregate: 'mean'
+      aggregate: 'sum'
       continuous: False
     - variable_name: 'edge_attr'
       loss_scale: 2.0
-      aggregate: 'mean'
+      aggregate: 'sum'
       continuous: False
 
 interpolant:
@@ -40,7 +40,7 @@ interpolant:
   sample_time_method: "uniform" # ["symmetric", "uniform", "stab_mode", "logit_normal"]
   sample_time_mean: 0 # Used in stab_mode and logit_normal
   sample_time_scale: 0.81 # Used in stab_mode and logit_normal
-  global_variable_name: 'x' # variable that is specficed below to be used for sampling time and loss sampling
+  global_variable_name: 'h' # variable that is specficed below to be used for sampling time and loss sampling
   variables:
     - variable_name: 'x' 
       interpolant_type: 'continuous_diffusion' #["continuous_diffusion", "continuous_flow_matching"]
@@ -49,12 +49,12 @@ interpolant:
       num_classes: 3
       scheduler_type: *scheduler_type
       time_type: *time_type
-      nu: 2.0
+      nu: 2.5
       com_free: True
     - variable_name: 'h'
       interpolant_type: 'discrete_diffusion' #["discrete_diffusion", "discrete_flow_matching"]
       prior_type: 'custom' #['uniform', 'mask', 'custom']
-      custom_prior: '/workspace/bionemo/data/pyg_geom_drug/processed_tiny/train_types_h.npy'
+      custom_prior: '/workspace/bionemo/data/pyg_geom_drug/processed/train_types_h.npy'
       timesteps: *timesteps
       num_classes: 16 # if using masking the system will increase by 1 automatically
       scheduler_type: *scheduler_type
@@ -63,12 +63,12 @@ interpolant:
     - variable_name: 'edge_attr'
       interpolant_type: 'discrete_diffusion' #["discrete_diffusion", "discrete_flow_matching"]
       prior_type: 'custom'
-      custom_prior: '/workspace/bionemo/data/pyg_geom_drug/processed_tiny/train_bond_types_h.npy'
+      custom_prior: '/workspace/bionemo/data/pyg_geom_drug/processed/train_bond_types_h.npy'
       timesteps: *timesteps
       num_classes: 5
       scheduler_type: *scheduler_type
       time_type: *time_type
-      nu: 1.5
+      nu: 1.5 
     # - variable_name: 'charge'
     #   interpolant_type: null
     #   concat: 'h'
@@ -78,11 +78,11 @@ dynamics:
   model_args: None
 
 sample:
-  node_distribution: "/workspace/bionemo/data/pyg_geom_drug/processed_tiny/train_n_h.pickle" # null
+  node_distribution: "/workspace/bionemo/data/pyg_geom_drug/processed/train_n_h.pickle" # null
 
 train:
   seed: 42
-  batch_size: 800
+  # batch_size: 800
   gpus: 1 #4
   n_epochs: 1000
   enable_progress_bar: True

@@ -77,7 +77,7 @@ class InterpolantLossFunction(nn.Module):
         # d (λx, λh, λe) = (3, 0.4, 2)
         batch_size = len(batch.unique())
         if self.continuous:
-            loss = self.f_continuous(logits, data).sum(1)  # [N]
+            loss = self.f_continuous(logits, data).mean(-1)  # [N]
             output = logits
         else:
             loss = self.f_discrete(logits, data)
