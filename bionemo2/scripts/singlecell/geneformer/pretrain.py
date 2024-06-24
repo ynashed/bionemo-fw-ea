@@ -25,7 +25,7 @@ from bionemo.contrib.data.singlecell.datamodule import SingleCellDataModule
 from bionemo.contrib.data.singlecell.preprocess import GeneformerPreprocess
 from bionemo.contrib.lightning import LossLoggingCallback
 from bionemo.contrib.model.biobert.lightning import BioBertLightningModule
-from bionemo.contrib.model.biobert.model import BioBertConfig
+from bionemo.contrib.model.biobert.model import BioBertConfig, BiobertSpecOption
 from bionemo.contrib.utils.dtypes import get_autocast_dtype
 
 
@@ -86,6 +86,14 @@ if __name__ == "__main__":
         required=False,
         default=64,
         help="Micro-batch size. Global batch size is inferred from this.",
+    )
+    parser.add_argument(
+        "--biobert-spec-option",
+        type=BiobertSpecOption,
+        choices=[e.value for e in BiobertSpecOption],
+        required=False,
+        default=BiobertSpecOption.bert_layer_local_spec.value,
+        help="Biobert spec option to use for the model. Default is 'bert_layer_local_spec'.",
     )
 
     args = parser.parse_args()
@@ -153,7 +161,7 @@ if __name__ == "__main__":
         ffn_hidden_size=512,
         num_attention_heads=4,
         seq_length=seq_length,
-        fp32_residual_connection=True,  # TODO(@jstjohn) check this
+        fp32_residual_connection=False,  # TODO(@jstjohn) check this
         hidden_dropout=0.02,
         init_method_std=0.02,
         kv_channels=None,
@@ -176,6 +184,7 @@ if __name__ == "__main__":
         attention_dropout=0.1,
         share_embeddings_and_output_weights=True,
         enable_autocast=True,  # This has to be set to True if we use the mixed precision plugin
+        biobert_spec_option=args.biobert_spec_option,
     )
 
     # The lightning class owns a copy of the actual model, and a loss function, both of which are configured

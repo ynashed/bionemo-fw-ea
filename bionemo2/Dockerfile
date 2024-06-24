@@ -42,7 +42,7 @@ RUN git clone https://github.com/Dao-AILab/causal-conv1d.git && \
 #  this commit allows the latest mcore to be used: https://github.com/NVIDIA/NeMo/pull/9478
 RUN git clone https://github.com/NVIDIA/NeMo.git && \
     cd NeMo && \
-    git checkout fd871450a22bfdc4e16d25d0e2323265180c9b13 && \
+    git checkout b78926f6ddb90269c1243c8f23e02b65dfbfa2a1 && \
     ./reinstall.sh
 
 # Install any additional dependencies

@@ -88,6 +88,8 @@ celerybeat-schedule
 .env.*
 .ssh
 .ssh/*
+.triton
+.triton/*
 
 # virtualenv
 venv/

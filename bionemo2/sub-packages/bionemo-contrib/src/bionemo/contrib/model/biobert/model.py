@@ -13,25 +13,15 @@ from typing import Callable, Literal, Optional, Type, TypedDict, Union
 
 import torch
 from megatron.core import parallel_state, tensor_parallel
-from megatron.core.fusions.fused_bias_dropout import get_bias_dropout_add
 from megatron.core.models.bert.bert_lm_head import BertLMHead
 from megatron.core.models.bert.pooler import Pooler
 from megatron.core.models.common.embeddings.language_model_embedding import LanguageModelEmbedding
 from megatron.core.models.common.embeddings.rotary_pos_embedding import RotaryEmbedding
 from megatron.core.models.common.language_module.language_module import LanguageModule
-from megatron.core.transformer.attention import SelfAttention, SelfAttentionSubmodules
-from megatron.core.transformer.custom_layers.transformer_engine import (
-    TEDotProductAttention,
-    TELayerNormColumnParallelLinear,
-    TERowParallelLinear,
-)
-from megatron.core.transformer.enums import AttnMaskType, ModelType
-from megatron.core.transformer.identity_op import IdentityOp
-from megatron.core.transformer.mlp import MLP, MLPSubmodules
-from megatron.core.transformer.spec_utils import ModuleSpec
+from megatron.core.transformer import spec_utils
+from megatron.core.transformer.enums import ModelType
 from megatron.core.transformer.transformer_block import TransformerBlock
 from megatron.core.transformer.transformer_config import TransformerConfig
-from megatron.core.transformer.transformer_layer import TransformerLayer, TransformerLayerSubmodules
 from megatron.core.transformer.utils import get_linear_layer
 from nemo.lightning import get_vocab_size
 from nemo.lightning.megatron_parallel import (
@@ -40,7 +30,7 @@ from nemo.lightning.megatron_parallel import (
 from torch import Tensor
 from torch.optim import Optimizer
 
-from bionemo.contrib.model.layers import TELayerNorm
+from bionemo.contrib.model.biobert.transformer_specs import BiobertSpecOption, get_biobert_spec
 from bionemo.contrib.model.loss import BERTMLMLossWithReduction
 
 
@@ -73,7 +63,7 @@ class MegatronBioBertModel(LanguageModule):
         self,
         config: TransformerConfig,
         num_tokentypes: int,
-        transformer_layer_spec: ModuleSpec,
+        transformer_layer_spec: spec_utils.ModuleSpec,
         vocab_size: int,
         max_sequence_length: int,
         pre_process: bool = True,
@@ -86,6 +76,7 @@ class MegatronBioBertModel(LanguageModule):
         seq_len_interpolation_factor: Optional[float] = None,
         add_binary_head=True,
         return_embeddings=False,
+        use_full_attention_mask=False,
     ):
         super(MegatronBioBertModel, self).__init__(config=config)
         self.post_process = post_process
@@ -95,10 +86,9 @@ class MegatronBioBertModel(LanguageModule):
         # `b` = batch, `s` = sequence.
         # The old flash attention mechanism apparently wants you to use a b x 1 x s x s attention mask while
         #  the new one wants a b x 1 x 1 x s attention mask. This is a hack to allow us to switch between the two.
-        self.use_full_attention_mask = os.getenv('NVTE_FLASH_ATTN') == '0'
-
+        self.use_full_attention_mask = use_full_attention_mask
         self.config: TransformerConfig = config
-        self.transformer_layer_spec: ModuleSpec = transformer_layer_spec
+        self.transformer_layer_spec: spec_utils.ModuleSpec = transformer_layer_spec
         self.vocab_size = vocab_size
         self.max_sequence_length = max_sequence_length
         self.pre_process = pre_process
@@ -328,6 +318,7 @@ class BioBertConfig(TransformerConfig):
     rotary_percent: float = 1.0
     seq_len_interpolation_factor: Optional[float] = None
     seq_length: int = 1024
+    biobert_spec_option: BiobertSpecOption = BiobertSpecOption.bert_layer_local_spec
 
     # TODO: Move this to better places?
     get_attention_mask_from_fusion: bool = False
@@ -342,39 +333,17 @@ class BioBertConfig(TransformerConfig):
                 self.num_layers // p_size
             ) % vp_size == 0, "Make sure the number of model chunks is the same across all pipeline stages."
 
-        # Use this spec to use lower level Transformer Engine modules (required for fp8 training)
-        #  from megatron.core.models.bert.bert_layer_specs import bert_layer_with_transformer_engine_spec
-        #  copies the above but enables qk_layernorm
-        bert_layer_with_transformer_engine_spec = ModuleSpec(
-            module=TransformerLayer,
-            submodules=TransformerLayerSubmodules(
-                self_attention=ModuleSpec(
-                    module=SelfAttention,
-                    params={"attn_mask_type": AttnMaskType.padding},
-                    submodules=SelfAttentionSubmodules(
-                        linear_qkv=TELayerNormColumnParallelLinear,
-                        core_attention=TEDotProductAttention,
-                        linear_proj=TERowParallelLinear,
-                        q_layernorm=TELayerNorm if self.qk_layernorm else IdentityOp,
-                        k_layernorm=TELayerNorm if self.qk_layernorm else IdentityOp,
-                    ),
-                ),
-                self_attn_bda=get_bias_dropout_add,
-                mlp=ModuleSpec(
-                    module=MLP,
-                    submodules=MLPSubmodules(
-                        linear_fc1=TELayerNormColumnParallelLinear,
-                        linear_fc2=TERowParallelLinear,
-                    ),
-                ),
-                mlp_bda=get_bias_dropout_add,
-            ),
-        )
+        # The local specs all require the standard full attention mask. For transformer engine only the NVTE_FLASH_ATTN=0
+        #  option requires this full attention mask.
+        use_full_attention_mask: bool = os.getenv('NVTE_FLASH_ATTN') == '0' or self.biobert_spec_option in {
+            BiobertSpecOption.bert_layer_local_spec,
+            BiobertSpecOption.bert_layer_local_spec_with_qk_ln,
+        }
 
         do_next_sentence = False
         return MegatronBioBertModel(
             self,
-            transformer_layer_spec=bert_layer_with_transformer_engine_spec,
+            transformer_layer_spec=get_biobert_spec(self.biobert_spec_option, qk_layernorm=self.qk_layernorm),
             num_tokentypes=2 if do_next_sentence else 0,
             vocab_size=get_vocab_size(self, tokenizer.vocab_size, self.make_vocab_size_divisible_by),
             max_sequence_length=self.seq_length,
@@ -388,6 +357,7 @@ class BioBertConfig(TransformerConfig):
             pre_process=parallel_state.is_pipeline_first_stage(),
             post_process=parallel_state.is_pipeline_last_stage(),  # set to False for inference
             add_binary_head=do_next_sentence,
+            use_full_attention_mask=use_full_attention_mask,
         )
 
     def get_loss_reduction_class(self) -> Type[MegatronLossReduction]:
