@@ -772,7 +772,7 @@ jet-configure:
 jet-trigger:
   extends: [.jet-trigger-template]
   variables:
-    JET_WORKLOADS_FILTER: type == 'recipe' and spec.config_name != 'pretrain_esm2_650M'
+    JET_WORKLOADS_FILTER: type == 'recipe'
     JET_CUSTOM_CONFIG: |
       tests:
         allow_failure: true
@@ -802,7 +802,7 @@ jet-trigger:
         JET_WORKLOADS_FILTER: type == 'recipe' and spec.model == 'openfold'
     - if: $CI_MERGE_REQUEST_LABELS =~ /ESM2/ || $JET_MODEL_NAME == "ESM2"
       variables:
-        JET_WORKLOADS_FILTER: type == 'recipe' and spec.model == 'esm2nv' and spec.config_name != 'pretrain_esm2_650M'
+        JET_WORKLOADS_FILTER: type == 'recipe' and spec.model == 'esm2nv'
     - if: $CI_MERGE_REQUEST_LABELS =~ /ESM1/ || $JET_MODEL_NAME == "ESM1"
       variables:
         JET_WORKLOADS_FILTER: type == 'recipe' and spec.model == 'esm1nv'
