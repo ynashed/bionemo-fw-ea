@@ -17,7 +17,9 @@
 import argparse
 from pathlib import Path
 
+from megatron.core.optimizer import OptimizerConfig
 from nemo import lightning as nl
+from nemo.lightning.pytorch.opt.megatron import MegatronOptimizerModule
 from nemo.utils import logging
 from torch.nn import functional as F
 
@@ -37,6 +39,13 @@ if __name__ == "__main__":
         required=True,
         help='Path to the data base directory, for example this might be '
         '/workspace/bionemo2/data/cellxgene_2023-12-15_small',
+    )
+    parser.add_argument(
+        '--lr',
+        type=float,
+        required=False,
+        default=1e-4,
+        help='Learning rate for training. Default is 1e-4. With bigger global batches try 1e-3',
     )
     parser.add_argument(
         '--num-gpus',
@@ -189,7 +198,19 @@ if __name__ == "__main__":
 
     # The lightning class owns a copy of the actual model, and a loss function, both of which are configured
     #  and lazily returned by the `geneformer_config` object defined above.
-    model = BioBertLightningModule(geneformer_config, tokenizer=tokenizer)
+    model = BioBertLightningModule(
+        geneformer_config,
+        tokenizer=tokenizer,
+        optimizer=MegatronOptimizerModule(
+            config=OptimizerConfig(
+                lr=args.lr,
+                # TODO(@jstjohn) try decoupled_lr
+                optimizer="adam",
+                use_distributed_optimizer=True,
+            ),
+            # TODO(@jstjohn) try setting CosineAnnealing as the scheduler here
+        ),
+    )
     trainer.fit(model, data)
     checkpoint_path = Path(trainer.logger.log_dir) / "ckpt"
     trainer.save_checkpoint(checkpoint_path)

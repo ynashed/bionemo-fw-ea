@@ -34,6 +34,9 @@ class BioBertLightningModule(
         config: BioBertConfig,
         # TODO: Add transformer_layer_spec when we update mcore
         tokenizer: Optional[TokenizerSpec] = None,
+        optimizer: MegatronOptimizerModule = MegatronOptimizerModule(
+            config=OptimizerConfig(lr=1e-4, optimizer="adam", use_distributed_optimizer=True),
+        ),
     ):
         """A pytorch lightning module for BioBert-derived models. This module is designed to be used with the Megatron-LM strategy and nemo 2.0 conventions.
         To change the your loss, pass in a different config object that returns a different loss reduction class. To change your model and what it outputs,
@@ -48,9 +51,7 @@ class BioBertLightningModule(
         # TODO replace the self.configure_optimizer call with the optimizer below
         #  once it all works. This is the future direction for how things are going.
 
-        self.optim = MegatronOptimizerModule(
-            config=OptimizerConfig(lr=1e-4, optimizer="adam", use_distributed_optimizer=True),
-        )
+        self.optim = optimizer
         self.optim.connect(self)  # This will bind the `configure_optimizers` method
 
     def configure_model(self) -> None:
