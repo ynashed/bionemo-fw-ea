@@ -1,13 +1,16 @@
-# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+# Copyright (c) 2020-2021, NVIDIA CORPORATION.
 #
-# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
-# property and proprietary rights in and to this material, related
-# documentation and any modifications thereto. Any use, reproduction,
-# disclosure or distribution of this material and related documentation
-# without an express license agreement from NVIDIA CORPORATION or
-# its affiliates is strictly prohibited.
-
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 # A workflow to trigger ci on hybrid infra (github + self hosted runner)
 name: Blossom-CI
@@ -31,8 +34,7 @@ jobs:
       
     # This job only runs for pull request comments
     if: |
-         contains( 'ravitestgit,', format('{0},', github.actor)) && 
-         github.event.comment.body == '/blossom-ci'  
+         github.event.comment.body == '/build-ci' && (github.actor == 'ohadmo' || github.actor == 'trvachov')
     steps:
       - name: Check if comment is issued by authorized person
         run: blossom-ci
@@ -88,15 +90,14 @@ jobs:
           CI_SERVER: ${{ secrets.CI_SERVER }}
           REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               
-  Post-processing:
-    name: Post processing
+  Upload-Log:
+    name: Upload log
     runs-on: blossom
     if : github.event_name == 'workflow_dispatch'
     steps:
-      - name: Start post processing
+      - name: Jenkins log for pull request ${{ fromJson(github.event.inputs.args).pr }} (click here)
         run: blossom-ci
         env:
           OPERATION: 'POST-PROCESSING'
           CI_SERVER: ${{ secrets.CI_SERVER }}
           REPO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
