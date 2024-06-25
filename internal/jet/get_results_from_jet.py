@@ -166,7 +166,7 @@ def log_detailed_job_info(df: pd.DataFrame) -> None:
             f'{job_info["job_key"]} with status: {job_info["jet_ci_job_status"]} '
             f'\nJET pipeline id: {job_info["jet_ci_pipeline_id"]}, BioNeMo pipeline id: {job_info["bionemo_ci_pipeline_id"]} '
             f'JET job id: {job_info["jet_ci_job_id"]}, '
-            f'job duration: {job_info["jet_ci_job_duration"]}, script duration: {job_info["script_duration"]}'
+            f'\nscript duration in sec: {round(job_info["script_duration"],2)}, job duration in sec (SLURM queue + JET setup + script duration): {round(job_info["jet_ci_job_duration"], 2)}'
             f'\nJET job id logs: https://gitlab-master.nvidia.com/dl/jet/ci/-/jobs/{job_info["jet_ci_job_id"]}'
         )
 
@@ -288,6 +288,9 @@ def get_job_results(
     save_dir: Optional[str] = None,
     all_jobs: bool = False,
 ) -> Tuple[Optional[pd.DataFrame], Optional[dict]]:
+    """
+    Queries and outputs results of jet jobs run in JET given related pipeline id in JET CI, job id or pipeline type.
+    """
     results_jobs = query_jet_jobs(
         jet_instance=jet_instance,
         jet_workloads_ref=jet_workloads_ref,
@@ -298,12 +301,8 @@ def get_job_results(
         limit=limit,
         only_completed=only_completed,
     )
-    """
-    Queries and outputs results of jet jobs run in JET given related pipeline id in JET CI, job id or pipeline type.
-    """
     if len(results_jobs) == 0:
-        logging.warning("No results found.")
-        return None, None
+        raise ValueError("No entries matched the requested query in the JET logs.")
 
     logging.info(f'Getting {len(results_jobs)} jobs from Kibana... \n')
     output = []
@@ -442,7 +441,8 @@ def get_results_from_jet(
     )
 
     df_test = get_test_results(jet_instance=jet_instance, pipeline_ids=list(pipelines_info.keys()))
-    df = pd.merge(df, df_test, on='jet_ci_workload_id', how='left')
+    if df_test.shape[0] > 0:
+        df = pd.merge(df, df_test, on='jet_ci_workload_id', how='left')
 
     if verbosity_level >= 2:
         print_table_with_results(df=df)

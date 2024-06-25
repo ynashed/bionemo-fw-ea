@@ -1,6 +1,7 @@
 status=0
 
-jet_pipeline_id=$(curl --silent --header "PRIVATE-TOKEN: ${RO_API_TOKEN}" "https://gitlab-master.nvidia.com/api/v4/projects/${CI_PROJECT_ID}/pipelines/${CI_PIPELINE_ID}/bridges" | jq '.[0].downstream_pipeline.id')
+jet_pipeline_id=$(curl --silent --header "PRIVATE-TOKEN: ${RO_API_TOKEN}" "https://gitlab-master.nvidia.com//api/v4/projects/${CI_PROJECT_ID}/pipelines/${CI_PIPELINE_ID}/bridges" | jq '.[] | select(.name == "jet-trigger") | .downstream_pipeline.id')
+
 echo "JET_PIPELINE_ID=${jet_pipeline_id}"
 python internal/jet/get_results_from_jet.py --pipeline_id $jet_pipeline_id  --save_dir . -vvv
 
