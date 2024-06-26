@@ -203,7 +203,10 @@ license_check:
   script:
     - INFRA_BIONEMO_DEP=$(cat setup/requirements-dev.txt | grep "infra-bionemo==")
     - pip install --index-url "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab-master.nvidia.com/api/v4/projects/118589/packages/pypi/simple" "${INFRA_BIONEMO_DEP}"
-    - license-check -c .
+    # the bionemo codebase requires the default proprietary license
+    - license-check -c setup.py -c bionemo -c tests -c examples -c internal -c hydra_plugins -c fw2nim_examples -c download_artifacts.py -c docs
+    # the bionemo2 codebase requires a different, open source license
+    - license-check -c bionemo2/ --license-header ./bionemo2/license_header
 
 build-bionemo-image:
   extends:

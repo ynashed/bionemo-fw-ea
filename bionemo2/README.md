@@ -41,3 +41,11 @@ NVTE_APPLY_QK_LAYER_SCALING=1   \
   --limit-val-batches 2 \
   --micro-batch-size 32
 ```
+
+#### Updating License Header on Python Files
+Make sure you have installed [`license-check`](https://gitlab-master.nvidia.com/clara-discovery/infra-bionemo),
+which is defined in the development dependencies. If you add new Python (`.py`) files, be sure to run as:
+```bash
+license-check --license-header ./license_header --check . --modify --replace
+```
+
