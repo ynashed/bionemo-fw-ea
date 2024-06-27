@@ -46,6 +46,7 @@ variables:
   DATE: "${CI_PIPELINE_CREATED_AT}"
   # fully-qualified image names
   IMAGE_NAME: "${IMAGE_REPO_NAME}:${IMAGE_TAG}"
+  IMAGE_CACHE: "${IMAGE_REPO_NAME}:cache"
   NEMO_NIGHTLY_IMAGE: "nvcr.io/nvidian/nemo-nightly:latest-nightly-main"
   NGC_CLI_FORMAT_TYPE: ascii
   NGC_CLI_ORG: nvidian
@@ -169,15 +170,31 @@ workflow:
 # Note: We need to use this docker version `docker:26.0.2-dind` or higher for buildx inline caching.
 .docker-setup:
   services:
-    - docker:26.0.2-dind
+    - name: docker:26.0.2-dind
+      command: ["--mtu=1372"]
   tags:
     - dind
   before_script:
     - until docker info; do sleep 1; done
     - mkdir -p $HOME/.docker
+    # Prodsec hosts a pull-through cache to speed up builds in kamino cluster. The following config
+    # makes buildkit aware of this registry.
+    - |
+      cat > buildkit.toml <<'EOF'
+      debug = false
+      EOF
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     - docker login -u '$oauthtoken' -p $NGC_CLI_API_KEY nvcr.io
-
+    - docker context create kamino-context
+    - docker buildx create
+        --config buildkit.toml
+        --driver docker-container
+        --use
+        --name kamino
+        --bootstrap
+        --use --buildkitd-flags '--allow-insecure-entitlement network.host'
+        kamino-context
+    - docker buildx inspect
 
 code_format:
   image: nvcr.io/nvidian/cvai_bnmo_trng/bionemo-linter:latest
@@ -225,8 +242,7 @@ build-bionemo-image:
       else
       base="";
       fi
-    # maybe we built this image on a previous pipeline run -- if so, we don't need to remake it!
-    - docker pull ${IMAGE_NAME} || true
+
     # or maybe we built an image for the previous commit that we can use as a layer cache
     # TODO [mgreaves] There's no `git` in DIND :( Odd though -- how does it checkout the code!?
     #    - >
@@ -238,9 +254,17 @@ build-bionemo-image:
     # Build cache reference images like this:
     # docker buildx build --cache-to type=inline  -t <your-image-name>  -f Dockerfile .
     # If you build using `bash launch.sh build` this will be done automatically.
+    - DATE_YMD="$(echo ${DATE} | cut -f1 -d'T')"
+    - TAG_DATE_SHORT_COMMIT="${CI_COMMIT_SHORT_SHA}--${DATE_YMD}"
+    - TAG_MR="mr--${CI_MERGE_REQUEST_IID}--${TAG_DATE_SHORT_COMMIT}"
+    - if [[ "${CI_MERGE_REQUEST_IID}" != "" ]]; then
+        TAG_MR_BUILD_STRING="-t${IMAGE_REPO_NAME}:${TAG_MR}";
+        echo "MR docker tag:${IMAGE_REPO_NAME}:${TAG_MR}";
+      fi
     - BUILD_START=$(date +%s)
     - docker buildx version
     - docker buildx build
+      --progress plain
       --network host ${base}
       --label com.nvidia.bionemo.short_git_sha=${CI_COMMIT_SHORT_SHA}
       --label com.nvidia.bionemo.git_sha=${CI_COMMIT_SHA}
@@ -249,34 +273,32 @@ build-bionemo-image:
       --label com.nvidia.bionemo.pipeline_id=${CI_PIPELINE_ID}
       --label com.nvidia.bionemo.merge_request_id=${CI_MERGE_REQUEST_IID}
       --secret id=GITLAB_TOKEN,env=CI_JOB_TOKEN
-      --cache-from nvcr.io/nvidian/cvai_bnmo_trng/bionemo:cached-06-05-2024
+      --cache-from="${IMAGE_NAME}"
+      --cache-from="${IMAGE_CACHE}"
+      --cache-to=type=registry,mode=min,ref="${IMAGE_CACHE}"
       -t "${IMAGE_NAME}"
+      -t "${IMAGE_CACHE}"
+      -t "${IMAGE_REPO_NAME}:${CI_COMMIT_SHORT_SHA}"
+      -t "${IMAGE_REPO_NAME}:${PIPELINE_TAG}"
+      -t "${IMAGE_REPO_NAME}:${TAG_DATE_SHORT_COMMIT}"
+      "${TAG_MR_BUILD_STRING:- }"
       -f setup/Dockerfile .
+      --push
     - BUILD_END=$(date +%s)
     - ELAPSED=$(( BUILD_END - BUILD_START ))
-    - echo "container build time using cached nvcr.io/nvidian/cvai_bnmo_trng/bionemo:cached-06-05-2024" $ELAPSED
+    - echo "container build time using cached ${IMAGE_CACHE}" $ELAPSED
     - df -h
-    - docker push "${IMAGE_NAME}"
     # tag with short commit too
-    - docker tag "${IMAGE_NAME}" "${IMAGE_REPO_NAME}:${CI_COMMIT_SHORT_SHA}"
-    - docker push "${IMAGE_REPO_NAME}:${CI_COMMIT_SHORT_SHA}"
     # Re-tag with prior pipeline ID format for backwards compatability
-    - docker tag "${IMAGE_NAME}" "${IMAGE_REPO_NAME}:${PIPELINE_TAG}"
-    - docker push "${IMAGE_REPO_NAME}:${PIPELINE_TAG}"
     # Also tag this image with a format that uses the date of creation:
     #       YYYY-MM-DD--CCCCCCCC
     # Where 'C..C' are the first 8 characters of the commit
-    - DATE_YMD="$(echo ${DATE} | cut -f1 -d'T')"
-    - TAG_DATE_SHORT_COMMIT="${CI_COMMIT_SHORT_SHA}--${DATE_YMD}"
-    - docker tag "${IMAGE_NAME}" "${IMAGE_REPO_NAME}:${TAG_DATE_SHORT_COMMIT}"
-    - docker push "${IMAGE_REPO_NAME}:${TAG_DATE_SHORT_COMMIT}"
+
     # For merge request branches only, also tag the image with the merge request number:
     #       mr--MMMM--YYYY-MM-DD--CCCCCCCC
     # Where 'M..M' is the merge request number. Note it is variable-sized.
-    - TAG_MR="mr--${CI_MERGE_REQUEST_IID}--${TAG_DATE_SHORT_COMMIT}"
-    - if [[ "${CI_MERGE_REQUEST_IID}" != "" ]]; then
-      docker tag "${IMAGE_NAME}" "${IMAGE_REPO_NAME}:${TAG_MR}" && docker push "${IMAGE_REPO_NAME}:${TAG_MR}" && echo "MR docker tag:" "${IMAGE_REPO_NAME}:${TAG_MR}";
-      fi
+
+
     #
     # FIXME [mgreaves] See note in internal/Dockerfile-devel about this (it is commented as another 'FIXME').
     #                  tl;dr Secuirty leak: passing in CI_JOB_TOKEN as a build-arg persists its value in the image!
@@ -293,7 +315,12 @@ build-bionemo-image:
     # As in, ensure that the CI_JOB_TOKEN makes it way via --secret, not --build-arg.
     #
     # TODO [mgreaves] This had --no-cache on it before. Why would we want this?
-    - docker build
+    - if [[ "${CI_MERGE_REQUEST_IID}" != "" ]]; then
+        TAG_MR_BUILD_STRING="-t${IMAGE_REPO_NAME}:${TAG_MR}${SUFFIX_DEV}";
+        echo "MR docker tag:${IMAGE_REPO_NAME}:${TAG_MR}${SUFFIX_DEV}";
+      fi
+    - docker buildx build
+      --progress plain
       --network host
       --build-arg BIONEMO_IMAGE="$IMAGE_NAME"
       --build-arg TPL_REPO=https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab-master.nvidia.com/dl/gwe/torch_performance_linter
@@ -303,22 +330,19 @@ build-bionemo-image:
       --label com.nvidia.bionemo.branch=${CI_COMMIT_BRANCH}
       --label com.nvidia.bionemo.pipeline_id=${CI_PIPELINE_ID}
       --label com.nvidia.bionemo.merge_request_id=${CI_MERGE_REQUEST_IID}
+      --cache-from="${IMAGE_NAME}"
+      --cache-from="${IMAGE_CACHE}"
+      --cache-from="${IMAGE_NAME}${SUFFIX_DEV}-cache"
       -t "${IMAGE_NAME}${SUFFIX_DEV}"
+      -t "${IMAGE_NAME}${SUFFIX_DEV}-cache"
+      -t "${IMAGE_REPO_NAME}:${CI_COMMIT_SHORT_SHA}${SUFFIX_DEV}"
+      -t "${IMAGE_REPO_NAME}:${PIPELINE_TAG}${SUFFIX_DEV}"
+      -t "${IMAGE_REPO_NAME}:${TAG_DATE_SHORT_COMMIT}${SUFFIX_DEV}"
+      "${TAG_MR_BUILD_STRING}"
+      --cache-to=type=registry,mode=min,ref="${IMAGE_NAME}${SUFFIX_DEV}-cache"
       -f internal/Dockerfile-devel .
+      --push
     - df -h
-    - docker push "${IMAGE_NAME}${SUFFIX_DEV}"
-    # tag with short commit too
-    - docker tag "${IMAGE_NAME}" "${IMAGE_REPO_NAME}:${CI_COMMIT_SHORT_SHA}${SUFFIX_DEV}"
-    - docker push "${IMAGE_REPO_NAME}:${CI_COMMIT_SHORT_SHA}${SUFFIX_DEV}"
-    # Re-tag with prior pipeline ID format for backwards compatability
-    - docker tag "${IMAGE_NAME}${SUFFIX_DEV}" "${IMAGE_REPO_NAME}:${PIPELINE_TAG}${SUFFIX_DEV}"
-    - docker push "${IMAGE_REPO_NAME}:${PIPELINE_TAG}${SUFFIX_DEV}"
-    # Re-tag with date & short commit too
-    - docker tag "${IMAGE_NAME}${SUFFIX_DEV}" "${IMAGE_REPO_NAME}:${TAG_DATE_SHORT_COMMIT}${SUFFIX_DEV}"
-    - docker push "${IMAGE_REPO_NAME}:${TAG_DATE_SHORT_COMMIT}${SUFFIX_DEV}"
-    - if [[ "${CI_MERGE_REQUEST_IID}" != "" ]]; then
-      docker tag "${IMAGE_NAME}${SUFFIX_DEV}" "${IMAGE_REPO_NAME}:${TAG_MR}${SUFFIX_DEV}" && docker push "${IMAGE_REPO_NAME}:${TAG_MR}${SUFFIX_DEV}";
-      fi
 
 build-docs-image:
   extends:
