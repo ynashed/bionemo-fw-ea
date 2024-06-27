@@ -1,4 +1,4 @@
-run_name: 'EQGAT_FW_TEST_6_24'
+run_name: 'EQGAT_FW_TEST_6_27'
 outdir: /workspace/bionemo/bionemo/model/molecule/moco/models/results/eqgatdiff
 resume: null
 ema_resume: null
@@ -17,7 +17,7 @@ data:
   data_loader_type: "midi"
 
 loss:
-  use_distance: null #'single' 'triple'
+  use_distance: null #'single' 'triple' #TODO factor this is to the loss itself
   variables:
     - variable_name: 'x'
       loss_scale: 3.0
@@ -36,11 +36,10 @@ interpolant:
   timesteps: &timesteps 500
   time_type: &time_type "discrete" #["discrete, "continuous]
   scheduler_type: &scheduler_type "cosine_adaptive" #["cosine_adaptive, "linear"]
-  sample_time_method: "uniform" # ["symmetric", "uniform", "stab_mode", "logit_normal"]
+  sample_time_method: "uniform" # ["symmetric", "uniform", "stab_mode", "logit_normal", "beta"]
   sample_time_mean: 0 # Used in stab_mode and logit_normal
   sample_time_scale: 0.81 # Used in stab_mode and logit_normal
   global_variable_name: 'h' # variable that is specficed below to be used for sampling time and loss sampling
-  # scheduler_cut: &scheduler_cut False
   variables:
     - variable_name: 'x' 
       interpolant_type: 'continuous_diffusion' #["continuous_diffusion", "continuous_flow_matching"]
@@ -111,7 +110,6 @@ train:
   log_freq: 50
   val_freq: 5
 
-#! The below are taken from EQGAT
 optimizer:
   type: adamw
   lr: 2.e-4

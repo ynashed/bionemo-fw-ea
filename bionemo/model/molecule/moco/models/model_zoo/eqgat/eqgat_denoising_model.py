@@ -20,7 +20,7 @@ from torch_geometric.typing import OptTensor
 from torch_scatter import scatter, scatter_mean, scatter_softmax
 from torch_sparse import SparseTensor
 
-from bionemo.model.molecule.moco.models.model_zoo.eqgat_modules import (
+from bionemo.bionemo.model.molecule.moco.models.model_zoo.eqgat.eqgat_modules import (
     AdaptiveLayerNorm,
     DenseLayer,
     GatedEquivBlock,
@@ -874,3 +874,24 @@ class DenoisingEdgeNetwork(nn.Module):
         )
 
         return out
+
+
+if __name__ == "__main__":
+    model = DenoisingEdgeNetwork(num_atom_features=5, num_bond_types=3, edge_mp=True, use_cross_product=True)
+    t = torch.rand((6, 1))
+    x = torch.rand((6, 5))
+    pos = torch.rand((6, 3))
+    edge_index_global = torch.tensor([[0, 1, 2, 3, 4, 5], [1, 2, 0, 4, 5, 3]])
+    edge_attr_global = torch.tensor([[0, 1, 0], [0, 0, 1], [1, 0, 0], [0, 1, 0], [0, 0, 1], [1, 0, 0]]).float()
+    batch = torch.tensor([0, 0, 0, 1, 1, 1])
+    batch_edge_global = torch.tensor([0, 0, 0, 1, 1, 1])
+    out = model(
+        t=t,
+        x=x,
+        pos=pos,
+        edge_index_global=edge_index_global,
+        batch=batch,
+        batch_edge_global=batch_edge_global,
+        edge_attr_global=edge_attr_global,
+    )
+    print(out)

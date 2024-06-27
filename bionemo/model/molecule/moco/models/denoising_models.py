@@ -8,8 +8,8 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
+from bionemo.bionemo.model.molecule.moco.models.model_zoo.eqgat.eqgat_denoising_model import DenoisingEdgeNetwork
 from bionemo.model.molecule.moco.models.moco import MoCo
-from bionemo.model.molecule.moco.models.model_zoo.eqgat_denoising_model import DenoisingEdgeNetwork
 
 
 class ModelBuilder:

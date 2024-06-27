@@ -1227,14 +1227,14 @@ def test_discrete_diffusion(h, batch):
     time_seq = list(range(0, 500))
     for i in tqdm(time_seq, desc='discrete diffusion interpolation', total=len(time_seq)):
         t_idx = interpolant.sample_time(4, method='stab_mode')
-        data_scale, _ = interpolant.forward_schedule(t_idx, batch_ligand)
+        data_scale, _ = interpolant.forward_schedule(t_idx, batch)
         x1, xt, probs = interpolant.interpolate(h, batch, t_idx=t_idx)
     assert all(torch.argmax(probs, 1) == x1)
 
     xt = interpolant.prior(h.shape, batch, device=h.device)
     for i in tqdm(time_seq, desc='discrete diffusion step', total=len(time_seq)):
         t_idx = torch.full(size=(4,), fill_value=i, dtype=torch.int64, device='cpu')
-        x1, xt01, probs = interpolant.interpolate(h, batch_ligand, t_idx=t_idx)
+        x1, xt01, probs = interpolant.interpolate(h, batch, t_idx=t_idx)
         x_hat = xt01
         x_tp1 = interpolant.step(xt, x_hat, batch, t_idx)
         xt = x_tp1
@@ -1246,7 +1246,7 @@ def test_discrete_diffusion(h, batch):
     time_seq = list(range(0, 500))
     for i in tqdm(time_seq, desc='discrete diffusion absorb interpolation', total=len(time_seq)):
         t_idx = interpolant.sample_time(4, method='stab_mode')
-        data_scale, _ = interpolant.forward_schedule(t_idx, batch_ligand)
+        data_scale, _ = interpolant.forward_schedule(t_idx, batch)
         x1, xt, probs = interpolant.interpolate(h, batch, t_idx=t_idx)
     probs[:, -1] = 0
     assert all(torch.argmax(probs, 1) == x1)
@@ -1254,7 +1254,7 @@ def test_discrete_diffusion(h, batch):
     xt = interpolant.prior(h.shape, batch, device=h.device)
     for i in tqdm(time_seq, desc='discrete diffusion absorb step', total=len(time_seq)):
         t_idx = torch.full(size=(4,), fill_value=i, dtype=torch.int64, device='cpu')
-        x1, xt01, probs = interpolant.interpolate(h, batch_ligand, t_idx=t_idx)
+        x1, xt01, probs = interpolant.interpolate(h, batch, t_idx=t_idx)
         x_hat = xt01
         x_tp1 = interpolant.step(xt, x_hat, batch, t_idx)
         xt = x_tp1
@@ -1273,13 +1273,13 @@ def test_discrete_flowmatching(h, batch):
     time_seq = list(range(0, 500))
     for i in tqdm(time_seq, desc='discrete flowmatching interpolation', total=len(time_seq)):
         t_idx = interpolant.sample_time(4, method='stab_mode')
-        data_scale, _ = interpolant.forward_schedule(t_idx, batch_ligand)
+        data_scale, _ = interpolant.forward_schedule(t_idx, batch)
         x1, xt, x0 = interpolant.interpolate(h, batch, t_idx=t_idx)
 
     xt = interpolant.prior(h.shape, batch, device=h.device)
     for i in tqdm(time_seq, desc='discrete diffusion step', total=len(time_seq)):
         t_idx = torch.full(size=(4,), fill_value=i, dtype=torch.int64, device='cpu')
-        x1, xt01, x0 = interpolant.interpolate(h, batch_ligand, t_idx=t_idx)
+        x1, xt01, x0 = interpolant.interpolate(h, batch, t_idx=t_idx)
         x_hat = F.one_hot(xt01, num_classes)
         x_tp1 = interpolant.step(xt, x_hat, batch, t_idx=t_idx, dt=1 / 500)
         xt = x_tp1
@@ -1332,13 +1332,13 @@ def test_discrete_flowmatching(h, batch):
     time_seq = list(range(0, 500))
     for i in tqdm(time_seq, desc='discrete diffusion absorb interpolation', total=len(time_seq)):
         t_idx = interpolant.sample_time(4, method='stab_mode')
-        data_scale, _ = interpolant.forward_schedule(t_idx, batch_ligand)
+        data_scale, _ = interpolant.forward_schedule(t_idx, batch)
         x1, xt, x0 = interpolant.interpolate(h, batch, t_idx=t_idx)
 
     xt = interpolant.prior(h.shape, batch, device=h.device)
     for i in tqdm(time_seq, desc='discrete diffusion absorb step', total=len(time_seq)):
         t_idx = torch.full(size=(4,), fill_value=i, dtype=torch.int64, device='cpu')
-        x1, xt01, x0 = interpolant.interpolate(h, batch_ligand, t_idx=t_idx)
+        x1, xt01, x0 = interpolant.interpolate(h, batch, t_idx=t_idx)
         x_hat = F.one_hot(xt01, num_classes)
         x_tp1 = interpolant.step(xt, x_hat, batch, t_idx=t_idx, dt=1 / 500)
         xt = x_tp1
@@ -1389,7 +1389,7 @@ def test_discrete_edge_diffusion(E, E_idx, batch):
     time_seq = list(range(0, 500))
     for i in tqdm(time_seq, desc='discrete diffusion interpolation', total=len(time_seq)):
         t_idx = interpolant.sample_time(4, method='stab_mode')
-        data_scale, _ = interpolant.forward_schedule(t_idx, batch_ligand)
+        data_scale, _ = interpolant.forward_schedule(t_idx, batch)
         x1, xt, probs = interpolant.interpolate_edges(E, E_idx, batch, t_idx=t_idx)
 
     xt, xt_index = interpolant.prior_edges(E.shape, E_idx, batch, device=E.device)
@@ -1409,7 +1409,7 @@ def test_discrete_edge_diffusion(E, E_idx, batch):
     time_seq = list(range(0, 500))
     for i in tqdm(time_seq, desc='discrete diffusion interpolation', total=len(time_seq)):
         t_idx = interpolant.sample_time(4, method='stab_mode')
-        data_scale, _ = interpolant.forward_schedule(t_idx, batch_ligand)
+        data_scale, _ = interpolant.forward_schedule(t_idx, batch)
         x1, xt, probs = interpolant.interpolate_edges(E, E_idx, batch, t_idx=t_idx)
 
     xt, xt_index = interpolant.prior_edges(E.shape, E_idx, batch, device=E.device)
@@ -1425,205 +1425,205 @@ if __name__ == "__main__":
     from tqdm import tqdm
 
     print("TODO fix tests after refactor of the time element and batch first arg calling")
-    assert False
-    print("TEST")
-    ligand_pos = torch.rand((75, 3))
-    batch_ligand = torch.Tensor(
-        [
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            1,
-            2,
-            2,
-            2,
-            2,
-            2,
-            2,
-            2,
-            2,
-            2,
-            2,
-            2,
-            2,
-            3,
-            3,
-            3,
-            3,
-            3,
-            3,
-            3,
-            3,
-            3,
-            3,
-            3,
-            3,
-            3,
-            3,
-            3,
-            3,
-            3,
-            3,
-            3,
-            3,
-            3,
-        ]
-    ).to(torch.int64)
-    ligand_feats = torch.Tensor(
-        [
-            2,
-            4,
-            2,
-            4,
-            2,
-            4,
-            4,
-            3,
-            2,
-            2,
-            1,
-            1,
-            1,
-            1,
-            1,
-            5,
-            1,
-            3,
-            1,
-            1,
-            1,
-            2,
-            4,
-            2,
-            4,
-            2,
-            4,
-            4,
-            3,
-            2,
-            2,
-            1,
-            1,
-            1,
-            1,
-            1,
-            5,
-            1,
-            3,
-            1,
-            1,
-            1,
-            2,
-            2,
-            2,
-            2,
-            12,
-            2,
-            5,
-            2,
-            3,
-            5,
-            1,
-            5,
-            2,
-            4,
-            2,
-            4,
-            2,
-            4,
-            4,
-            3,
-            2,
-            2,
-            1,
-            1,
-            1,
-            1,
-            1,
-            5,
-            1,
-            3,
-            1,
-            1,
-            1,
-        ]
-    ).to(torch.int64)
+    # assert False
+    # print("TEST")
+    # ligand_pos = torch.rand((75, 3))
+    # batch_ligand = torch.Tensor(
+    #     [
+    #         0,
+    #         0,
+    #         0,
+    #         0,
+    #         0,
+    #         0,
+    #         0,
+    #         0,
+    #         0,
+    #         0,
+    #         0,
+    #         0,
+    #         0,
+    #         0,
+    #         0,
+    #         0,
+    #         0,
+    #         0,
+    #         0,
+    #         0,
+    #         0,
+    #         1,
+    #         1,
+    #         1,
+    #         1,
+    #         1,
+    #         1,
+    #         1,
+    #         1,
+    #         1,
+    #         1,
+    #         1,
+    #         1,
+    #         1,
+    #         1,
+    #         1,
+    #         1,
+    #         1,
+    #         1,
+    #         1,
+    #         1,
+    #         1,
+    #         2,
+    #         2,
+    #         2,
+    #         2,
+    #         2,
+    #         2,
+    #         2,
+    #         2,
+    #         2,
+    #         2,
+    #         2,
+    #         2,
+    #         3,
+    #         3,
+    #         3,
+    #         3,
+    #         3,
+    #         3,
+    #         3,
+    #         3,
+    #         3,
+    #         3,
+    #         3,
+    #         3,
+    #         3,
+    #         3,
+    #         3,
+    #         3,
+    #         3,
+    #         3,
+    #         3,
+    #         3,
+    #         3,
+    #     ]
+    # ).to(torch.int64)
+    # ligand_feats = torch.Tensor(
+    #     [
+    #         2,
+    #         4,
+    #         2,
+    #         4,
+    #         2,
+    #         4,
+    #         4,
+    #         3,
+    #         2,
+    #         2,
+    #         1,
+    #         1,
+    #         1,
+    #         1,
+    #         1,
+    #         5,
+    #         1,
+    #         3,
+    #         1,
+    #         1,
+    #         1,
+    #         2,
+    #         4,
+    #         2,
+    #         4,
+    #         2,
+    #         4,
+    #         4,
+    #         3,
+    #         2,
+    #         2,
+    #         1,
+    #         1,
+    #         1,
+    #         1,
+    #         1,
+    #         5,
+    #         1,
+    #         3,
+    #         1,
+    #         1,
+    #         1,
+    #         2,
+    #         2,
+    #         2,
+    #         2,
+    #         12,
+    #         2,
+    #         5,
+    #         2,
+    #         3,
+    #         5,
+    #         1,
+    #         5,
+    #         2,
+    #         4,
+    #         2,
+    #         4,
+    #         2,
+    #         4,
+    #         4,
+    #         3,
+    #         2,
+    #         2,
+    #         1,
+    #         1,
+    #         1,
+    #         1,
+    #         1,
+    #         5,
+    #         1,
+    #         3,
+    #         1,
+    #         1,
+    #         1,
+    #     ]
+    # ).to(torch.int64)
 
-    num_classes = 13
-    # Initialize the adjacency matrix with zeros
-    adj_matrix = torch.zeros((75, 75, 5), dtype=torch.int64)
-    no_bond = torch.zeros(5)
-    no_bond[0] = 1
-    # Using broadcasting to create the adjacency matrix
-    adj_matrix[batch_ligand.unsqueeze(1) == batch_ligand] = 1
-    for idx, i in enumerate(batch_ligand):
-        for jdx, j in enumerate(batch_ligand):
-            if idx == jdx:
-                adj_matrix[idx][jdx] = no_bond
-            elif i == j:
-                adj_matrix[idx][jdx] = torch.nn.functional.one_hot(torch.randint(0, 5, (1,)), 5).squeeze(0)
-    # print(adj_matrix)
+    # num_classes = 13
+    # # Initialize the adjacency matrix with zeros
+    # adj_matrix = torch.zeros((75, 75, 5), dtype=torch.int64)
+    # no_bond = torch.zeros(5)
+    # no_bond[0] = 1
+    # # Using broadcasting to create the adjacency matrix
+    # adj_matrix[batch_ligand.unsqueeze(1) == batch_ligand] = 1
+    # for idx, i in enumerate(batch_ligand):
+    #     for jdx, j in enumerate(batch_ligand):
+    #         if idx == jdx:
+    #             adj_matrix[idx][jdx] = no_bond
+    #         elif i == j:
+    #             adj_matrix[idx][jdx] = torch.nn.functional.one_hot(torch.randint(0, 5, (1,)), 5).squeeze(0)
+    # # print(adj_matrix)
 
-    # atom_embedder = nn.Linear(num_classes, 64)
-    X = ligand_pos
-    H = F.one_hot(ligand_feats, num_classes).float()  # atom_embedder(F.one_hot(ligand_feats, num_classes).float())
-    A = adj_matrix
-    mask = batch_ligand.unsqueeze(1) == batch_ligand.unsqueeze(0)  # Shape: (75, 75)
-    E_idx = mask.nonzero(as_tuple=False).t()
-    self_loops = E_idx[0] != E_idx[1]
-    E_idx = E_idx[:, self_loops]
+    # # atom_embedder = nn.Linear(num_classes, 64)
+    # X = ligand_pos
+    # H = F.one_hot(ligand_feats, num_classes).float()  # atom_embedder(F.one_hot(ligand_feats, num_classes).float())
+    # A = adj_matrix
+    # mask = batch_ligand.unsqueeze(1) == batch_ligand.unsqueeze(0)  # Shape: (75, 75)
+    # E_idx = mask.nonzero(as_tuple=False).t()
+    # self_loops = E_idx[0] != E_idx[1]
+    # E_idx = E_idx[:, self_loops]
 
-    source, target = E_idx
-    E = A[source, target]  # E x 5
-    E = E.argmax(1)  # E
-    E_idx, E = sort_edge_index(
-        edge_index=E_idx,
-        edge_attr=E,
-        sort_by_row=False,
-    )
-    # edge_embedder = nn.Linear(5, 32)
-    # E = edge_embedder(E.float())
-    test_discrete_edge_diffusion(E, E_idx, batch_ligand)
-    test_continuous_diffusion(ligand_pos, batch_ligand)
-    test_continuous_flowmatching(ligand_pos, batch_ligand)
-    test_discrete_diffusion(ligand_feats, batch_ligand)
-    test_discrete_flowmatching(ligand_feats, batch_ligand)
-    print("SUCCESS")
+    # source, target = E_idx
+    # E = A[source, target]  # E x 5
+    # E = E.argmax(1)  # E
+    # E_idx, E = sort_edge_index(
+    #     edge_index=E_idx,
+    #     edge_attr=E,
+    #     sort_by_row=False,
+    # )
+    # # edge_embedder = nn.Linear(5, 32)
+    # # E = edge_embedder(E.float())
+    # test_discrete_edge_diffusion(E, E_idx, batch_ligand)
+    # test_continuous_diffusion(ligand_pos, batch_ligand)
+    # test_continuous_flowmatching(ligand_pos, batch_ligand)
+    # test_discrete_diffusion(ligand_feats, batch_ligand)
+    # test_discrete_flowmatching(ligand_feats, batch_ligand)
+    # print("SUCCESS")
