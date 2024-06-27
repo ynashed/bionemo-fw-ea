@@ -1,21 +1,20 @@
-run_name: 'MoCo_Local_Test'
-outdir: /workspace/bionemo/bionemo/model/molecule/moco/results
+run_name: 'EQGAT_FW_TEST_6_24'
+outdir: /workspace/bionemo/bionemo/model/molecule/moco/models/results/eqgatdiff
 resume: null
 ema_resume: null
 wandb_params:
   mode: 'online'  # disabled, offline, online
   entity: 'clara-discovery'
-  group: 'testing'
+  group: 'danny-testing'
   project: 'MoCo'
 
 data:
   dataset_root: "/workspace/bionemo/data/pyg_geom_drug"
-  processed_folder: "processed" #_tiny" #"processed" #
-  batch_size: 25 #16
-  inference_batch_size: 25 #16
-  num_workers: 12 #4
-  remove_hs: False
-  select_train_subset: 100
+  processed_folder: "processed"
+  batch_size: &batch_size 150
+  inference_batch_size: 150
+  removed_h: False
+  data_loader_type: "midi"
 
 loss:
   use_distance: null #'single' 'triple'
@@ -41,13 +40,16 @@ interpolant:
   sample_time_mean: 0 # Used in stab_mode and logit_normal
   sample_time_scale: 0.81 # Used in stab_mode and logit_normal
   global_variable_name: 'h' # variable that is specficed below to be used for sampling time and loss sampling
+  # scheduler_cut: &scheduler_cut False
   variables:
     - variable_name: 'x' 
       interpolant_type: 'continuous_diffusion' #["continuous_diffusion", "continuous_flow_matching"]
+      diffusion_type: 'vdm'
       prior_type: 'gaussian'
       timesteps: *timesteps
       num_classes: 3
       scheduler_type: *scheduler_type
+      scheduler_cut: False
       time_type: *time_type
       nu: 2.5
       com_free: True
@@ -56,8 +58,9 @@ interpolant:
       prior_type: 'custom' #['uniform', 'mask', 'custom']
       custom_prior: '/workspace/bionemo/data/pyg_geom_drug/processed/train_types_h.npy'
       timesteps: *timesteps
-      num_classes: 16 # if using masking the system will increase by 1 automatically
+      num_classes: &num_atoms 16
       scheduler_type: *scheduler_type
+      scheduler_cut: False
       time_type: *time_type
       nu: 1.0
     - variable_name: 'edge_attr'
@@ -67,26 +70,46 @@ interpolant:
       timesteps: *timesteps
       num_classes: 5
       scheduler_type: *scheduler_type
+      scheduler_cut: False
       time_type: *time_type
-      nu: 1.5 
+      nu: 1.5
     # - variable_name: 'charge'
     #   interpolant_type: null
     #   concat: 'h'
 
   
 dynamics:
-  model_args: None
+  model_name: "eqgat"
+  model_args:
+    hn_dim: [256, 256]
+    num_layers: 12
+    use_cross_product: False
+    num_atom_features: *num_atoms # + *num_charges
+    num_bond_types: 5
+    edge_dim: 128
+    vector_aggr: "mean"
+    fully_connected: True
+    recompute_edge_attributes: True
+    edge_mp: False
+    context_mapping: False
+    num_context_features: 0
+    bond_prediction: False
+    coords_param: data
+  wrapper_args:
+    timesteps: *timesteps
+    time_type: *time_type
 
 sample:
   node_distribution: "/workspace/bionemo/data/pyg_geom_drug/processed/train_n_h.pickle" # null
 
 train:
   seed: 42
-  # batch_size: 800
-  gpus: 1 #4
-  n_epochs: 1000
+  gpus: 1
+  n_epochs: 40
   enable_progress_bar: True
   gradient_clip_value: 10.0
+  log_freq: 50
+  val_freq: 5
 
 #! The below are taken from EQGAT
 optimizer:

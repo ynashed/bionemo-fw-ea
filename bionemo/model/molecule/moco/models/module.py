@@ -23,8 +23,15 @@ from torch_sparse import coalesce
 from tqdm import tqdm
 
 from bionemo.model.molecule.moco.data.molecule_datamodule import MoleculeDataModule
+from bionemo.model.molecule.moco.data.molecule_dataset import full_atom_decoder
+from bionemo.model.molecule.moco.metrics.metrics import (
+    BasicMolecularMetrics,
+    get_molecules,
+)
+
+#!TODO later on can create a Inference Class like Model Builder to handle all specfic benchmarking
+from bionemo.model.molecule.moco.models.denoising_models import ModelBuilder
 from bionemo.model.molecule.moco.models.interpolant import build_interpolant
-from bionemo.model.molecule.moco.models.moco import MoCo
 from bionemo.model.molecule.moco.models.utils import InterpolantLossFunction
 
 
@@ -38,24 +45,22 @@ class Graph3DInterpolantModel(pl.LightningModule):
         interpolant_params: DictConfig,
         sampling_params: DictConfig,
     ):
-        # import ipdb; ipdb.set_trace()
         super(Graph3DInterpolantModel, self).__init__()
+        self.save_hyperparameters()
         self.optimizer_params = optimizer_params
         self.lr_scheduler_params = lr_scheduler_params
         self.dynamics_params = dynamics_params
         self.interpolant_params = interpolant_params
         self.global_variable = interpolant_params.global_variable_name
         self.loss_params = loss_params
-        # import ipdb; ipdb.set_trace()
         self.loss_functions = self.initialize_loss_functions()
         self.interpolants = self.initialize_interpolants()
         self.sampling_params = sampling_params
         self.node_distribution = self.initialize_inference()
-        self.dynamics = MoCo()
-
-    def setup(self, stage):
-        for interpolant in self.interpolants.values():
-            interpolant.to(self.device)
+        self.dynamics = ModelBuilder().create_model(
+            dynamics_params.model_name, dynamics_params.model_args, dynamics_params.wrapper_args
+        )
+        self.mol_metrics = BasicMolecularMetrics({"atom_decoder": full_atom_decoder})
 
     def initialize_loss_functions(self):
         loss_functions = {}
@@ -75,7 +80,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
         return tensor
 
     def initialize_interpolants(self):
-        interpolants = {}
+        interpolants = torch.nn.ModuleDict()
         for interpolant_idx, interp_param in enumerate(self.interpolant_params.variables):
             index = interp_param.variable_name
             if interp_param.prior_type in ["mask", "absorb"]:
@@ -210,8 +215,9 @@ class Graph3DInterpolantModel(pl.LightningModule):
         return batch
 
     def aggregate_discrete_variables(self, batch):
-        # TODO how do we handle the charge and other H add on logic
-        # ! Concat the interpolated data onto its target to pass into the dynamics
+        """
+        Concatenate the flagged variable on its target and save the original in the batch via _og.
+        """
         for interp_param in self.interpolant_params:
             if 'concat' in interp_param and interp_param['concat'] is not None:
                 batch[f"{interp_param.concat}_og"] = batch[f"{interp_param.concat}_t"]
@@ -221,7 +227,13 @@ class Graph3DInterpolantModel(pl.LightningModule):
         return batch
 
     def separate_discrete_variables(self, out, batch):
-        # TODO can fold the logits vs variable logic into the interpolant class
+        """
+        Iterates throgh all outputs and restores interpolation for any aggregated variables.
+        Converts output logits to the input necessary for Interpolant.step()
+            - Discrete Diffusion Models assume class probabilities are given
+            - Discrete Flow Models operate on the raw logits.
+        Produces [Variable]_hat
+        """
         for interp_param in self.interpolant_params.variables:
             if "discrete" in interp_param.interpolant_type:
                 key = interp_param.variable_name
@@ -233,7 +245,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
                 else:
                     logits = out[f"{key}_logits"]
                 if "diffusion" in interp_param.interpolant_type:  #! Diffusion operates over the selected option
-                    out[f"{key}_hat"] = logits.argmax(dim=-1)
+                    out[f"{key}_hat"] = logits.softmax(dim=-1)  # logits.argmax(dim=-1)
                 else:  #! DFM assumes that you operate over the logits
                     out[f"{key}_hat"] = out[f"{key}_logits"]
 
@@ -247,7 +259,22 @@ class Graph3DInterpolantModel(pl.LightningModule):
         time = self.sample_time(batch)
         out, batch, time = self(batch, time)
         loss, predictions = self.calculate_loss(batch, out, time, "val")
+        # self.sample(100)
+        # import ipdb; ipdb.set_trace()
         return loss
+
+    def on_validation_epoch_end(self) -> None:
+        try:
+            mol_dict = self.sample(100)
+            # TODO: put this into the wrapper since its assumes many things but can leave for now
+            mols = get_molecules(mol_dict, {"atom_decoder": full_atom_decoder})
+            stab_dict, valid_dict, stat_dict, valid_smi, stable_mols, valid_mols = self.mol_metrics(mols)
+            res = {**stab_dict, **valid_dict, **stat_dict}
+            print(res)
+            self.log_dict(res)
+        except Exception as e:
+            print(f"The sampling has been failed with the error {e}")
+        return super().on_validation_epoch_end()
 
     def training_step(self, batch, batch_idx):
         batch.h = batch.x
@@ -287,7 +314,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
                             true_data = true_data.argmax(dim=-1)
                     sub_loss, sub_pred = loss_fn(batch_geo, out[f'{key}_logits'], true_data, batch_weight=ws_t)
             # print(key, sub_loss)
-            self.log(f"{stage}/{key}_loss", sub_loss, batch_size=batch_size)
+            self.log(f"{stage}/{key}_loss", sub_loss, batch_size=batch_size, prog_bar=True)
             loss = loss + sub_loss
             predictions[f'{key}'] = sub_pred
 
@@ -323,26 +350,14 @@ class Graph3DInterpolantModel(pl.LightningModule):
         batch = self.interpolate(batch, time)  #! discrete variables are one hot after this point
         #    batch = self.initialize_pair_embedding(batch) #! Do in the dynamics
         batch = self.aggregate_discrete_variables(batch)
-        out = self.dynamics(
-            batch=batch.batch,
-            X=batch["x_t"],
-            H=batch["h_t"],
-            E=batch["edge_attr_t"],
-            E_idx=batch["edge_index"],
-            t=time,
-        )
+        out = self.dynamics(batch, time)
         out, batch = self.separate_discrete_variables(out, batch)
         return out, batch, time
 
-    # def on_after_backward(self) -> None:
-    # useful for debugging
-    #     print("on_after_backward enter")
-    #     for name, p in self.named_parameters():
-    #         if p.grad is None:
-    #             print(name, p.shape)
-    #     print("on_after_backward exit")
-    #     import ipdb; ipdb.set_trace(0)
     def one_hot(self, batch):
+        """
+        Convert class indices to one hot vectors.
+        """
         for interpolant_idx, interp_param in enumerate(self.interpolant_params.variables):
             if "discrete" in interp_param.interpolant_type:
                 batch[f"{interp_param.variable_name}_t"] = F.one_hot(
@@ -388,7 +403,6 @@ class Graph3DInterpolantModel(pl.LightningModule):
         else:
             num_atoms = torch.randint(20, 55, (num_samples,)).to(torch.int64)
         batch_index = torch.repeat_interleave(torch.arange(num_samples), num_atoms).to(self.device)
-        # import ipdb; ipdb.set_trace()
         edge_index = (
             torch.eq(batch_index.unsqueeze(0), batch_index.unsqueeze(-1)).int().fill_diagonal_(0).to(self.device)
         )  # N x N
@@ -412,15 +426,9 @@ class Graph3DInterpolantModel(pl.LightningModule):
             time = torch.tensor([t] * num_samples).to(self.device)
             data = self.one_hot(data)
             data = self.aggregate_discrete_variables(data)
-            data['batch'] = batch_index
-            out = self.dynamics(
-                batch=batch_index,
-                X=data["x_t"],
-                H=data["h_t"],
-                E=data["edge_attr_t"],
-                E_idx=edge_index,
-                t=time,
-            )
+            data["batch"] = batch_index
+            data["edge_index"] = edge_index
+            out = self.dynamics(data, time)
             out, data = self.separate_discrete_variables(out, data)
             for key, interpolant in self.interpolants.items():
                 if "edge" in key:
@@ -440,12 +448,14 @@ class Graph3DInterpolantModel(pl.LightningModule):
                         time=time,
                         dt=dt,
                     )
-        return {key: data[f"{key}_t"] for key in self.interpolants.keys()}
+        samples = {key: data[f"{key}_t"] for key in self.interpolants.keys()}
+        samples["batch"] = batch_index
+        samples["edge_index"] = edge_index
+        return samples
 
 
 @hydra_runner(config_path="conf", config_name="train")
 def main(cfg: DictConfig):
-    # import ipdb; ipdb.set_trace()
     datamodule = MoleculeDataModule(cfg.data)
     train_dataloader = datamodule.test_dataloader()
     device = 'cuda:0'
@@ -457,7 +467,6 @@ def main(cfg: DictConfig):
         interpolant_params=cfg.interpolant,
         sampling_params=cfg.sample,
     ).to(device)
-    model.setup("fit")  #! this has to be called after model is moved to device for everything to propagate
     model.eval()
     with torch.no_grad():
         model.sample(10)

@@ -75,17 +75,18 @@ def main(cfg: DictConfig) -> None:
         callbacks=[lr_monitor, checkpoint_callback, ema_callback],
         enable_progress_bar=cfg.train.enable_progress_bar,
         accelerator='gpu',
-        devices=1,  # cfg.train.gpus,
+        devices=cfg.train.gpus,
         strategy=('ddp' if cfg.train.gpus > 1 else 'auto'),
-        check_val_every_n_epoch=1,  # cfg.train.val_freq,
+        check_val_every_n_epoch=cfg.train.val_freq,
         gradient_clip_val=cfg.train.gradient_clip_value,
-        log_every_n_steps=1,  # for train steps
+        log_every_n_steps=cfg.train.log_freq,  # for train steps
+        num_sanity_val_steps=0,  # skip sanity for debugging
     )
 
-    datamodule = MoleculeDataModule(cfg.data)
+    datamodule = MoleculeDataModule(**cfg.data)
     train_loader = datamodule.train_dataloader()
     val_loader = datamodule.val_dataloader()
-    trainer.fit(model=pl_module, train_dataloaders=train_loader, val_dataloaders=val_loader)
+    trainer.fit(model=pl_module, train_dataloaders=train_loader, val_dataloaders=val_loader, ckpt_path=cfg.resume)
 
 
 if __name__ == "__main__":

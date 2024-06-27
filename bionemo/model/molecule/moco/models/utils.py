@@ -86,7 +86,7 @@ class InterpolantLossFunction(nn.Module):
             loss = loss * element_weight
         loss = scatter_mean(loss, index=batch, dim=0, dim_size=batch_size)
         if batch_weight is not None:
-            loss = loss * batch_weight.unsqueeze(1)
+            loss = loss * batch_weight  # .unsqueeze(1)
         if self.aggregation == "mean":
             loss = self.scale * loss.mean()
         elif self.aggregation == "sum":
@@ -102,7 +102,7 @@ class InterpolantLossFunction(nn.Module):
             loss = loss * element_weight
         loss = scatter_mean(loss, index=batch, dim=0, dim_size=batch_size)
         if batch_weight is not None:
-            loss = loss * batch_weight.unsqueeze(1)
+            loss = loss * batch_weight  # .unsqueeze(1)
         if self.aggregation == "mean":
             loss = self.scale * loss.mean()
         elif self.aggregation == "sum":
