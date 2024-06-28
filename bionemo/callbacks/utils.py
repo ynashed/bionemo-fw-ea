@@ -18,12 +18,17 @@ from pytorch_lightning.callbacks import ProgressBar
 
 from bionemo.callbacks.bnmo_progress_bar import BnmoTQDMProgressBar
 from bionemo.callbacks.logging_callbacks import PerfLoggingCallback, SaveTrainerFinalMetricCallback
+from bionemo.callbacks.metric_collector import MetricCollector
 from bionemo.callbacks.testing_callbacks import (
     KillAfterSignalCallback,
     MetadataSaveCallback,
     TestCheckpointIntegrityCallback,
 )
 from bionemo.utils.dllogger import DLLogger
+
+
+CREATE_METRIC_COLLECTOR = "create_metric_collector"
+METRIC_COLLECTOR_KWARGS = "metrics_collector_kwargs"
 
 
 __all__: Sequence[str] = (
@@ -128,6 +133,13 @@ def add_training_callbacks(cfg: DictConfig, callbacks: List[Callback]) -> List[C
             callback_kwargs = dict(deepcopy(callback_cfg))
             callback_cls = callback_kwargs.pop('class')
             callbacks.append(import_class_by_path(callback_cls)(**callback_kwargs))
+
+    if CREATE_METRIC_COLLECTOR in cfg:
+        if METRIC_COLLECTOR_KWARGS in cfg:
+            kwargs = dict(deepcopy(cfg.get(METRIC_COLLECTOR_KWARGS)))
+        else:
+            kwargs = {}
+        callbacks.append(MetricCollector(**kwargs))
 
 
 def add_progress_bar_callback(cfg: DictConfig, callbacks: List[Callback]) -> List[Callback]:

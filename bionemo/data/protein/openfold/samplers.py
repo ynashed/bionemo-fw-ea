@@ -24,7 +24,7 @@ from bionemo.data.protein.openfold.datasets import (
     ValidationDataset,
 )
 from bionemo.data.protein.openfold.helpers import get_seed_from_string
-from bionemo.model.protein.openfold.utils.logging_utils import log_with_nemo_at_level
+from bionemo.utils.logging_utils import log_with_nemo_at_level
 
 
 class InitialTrainingSampler(Sampler[Tuple[int, int]]):

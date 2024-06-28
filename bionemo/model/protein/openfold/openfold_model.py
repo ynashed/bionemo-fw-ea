@@ -59,13 +59,13 @@ from bionemo.model.protein.openfold.template_pair_embedder import TemplatePairEm
 from bionemo.model.protein.openfold.template_pair_stack import TemplatePairStack
 from bionemo.model.protein.openfold.template_pointwise_attention import TemplatePointwiseAttention
 from bionemo.model.protein.openfold.triton.fused_adam_swa import FusedAdamSWA
-from bionemo.model.protein.openfold.utils.logging_utils import (
-    environ_as_multiline_str,
-    log_with_nemo_at_level,
-)
 from bionemo.model.protein.openfold.utils.time_utils import StopWhenCloseToSlurmJobEnd
 from bionemo.model.protein.openfold.utils.torch_utils import map_tensor_tree
 from bionemo.model.protein.openfold.validation_metrics import compute_validation_metrics
+from bionemo.utils.logging_utils import (
+    environ_as_multiline_str,
+    log_with_nemo_at_level,
+)
 
 
 VAL_EXAMPLE_ID = "val_example_id"
