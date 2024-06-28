@@ -131,6 +131,10 @@ workflow:
         EXCLUDE_DOCS_BUILD: "true"
         EXCLUDE_PYTEST: "true"
         EXCLUDE_JET: "true"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_LABELS =~ /PYTEST_NOT_REQUIRED/ && $CI_MERGE_REQUEST_LABELS =~ /JET_NOT_REQUIRED/
+      variables:
+        EXCLUDE_PYTEST: "true"
+        EXCLUDE_JET: "true"
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_LABELS =~ /PYTEST_NOT_REQUIRED/
       variables:
         EXCLUDE_PYTEST: "true"
