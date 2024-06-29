@@ -22,6 +22,7 @@ from torch_scatter import scatter_mean
 from torch_sparse import coalesce
 from tqdm import tqdm
 
+# TODO create general data module class that can do 3dmg, sbdd, docking etc
 from bionemo.model.molecule.moco.data.molecule_datamodule import MoleculeDataModule
 from bionemo.model.molecule.moco.data.molecule_dataset import full_atom_decoder
 from bionemo.model.molecule.moco.metrics.metrics import (
@@ -29,7 +30,7 @@ from bionemo.model.molecule.moco.metrics.metrics import (
     get_molecules,
 )
 
-#!TODO later on can create a Inference Class like Model Builder to handle all specfic benchmarking
+# TODO later on can create a Inference Class like Model Builder to handle all specfic benchmarking
 from bionemo.model.molecule.moco.models.denoising_models import ModelBuilder
 from bionemo.model.molecule.moco.models.interpolant import build_interpolant
 from bionemo.model.molecule.moco.models.utils import InterpolantLossFunction
@@ -66,9 +67,19 @@ class Graph3DInterpolantModel(pl.LightningModule):
         loss_functions = {}
         for loss_params in self.loss_params.variables:
             index = loss_params.variable_name
-            loss_functions[index] = InterpolantLossFunction(
-                loss_scale=loss_params.loss_scale, aggregation=loss_params.aggregate, continuous=loss_params.continuous
-            )
+            if "use_distance" in loss_params:
+                loss_functions[index] = InterpolantLossFunction(
+                    loss_scale=loss_params.loss_scale,
+                    aggregation=loss_params.aggregate,
+                    continuous=loss_params.continuous,
+                    use_distance=loss_params.use_distance,
+                )
+            else:
+                loss_functions[index] = InterpolantLossFunction(
+                    loss_scale=loss_params.loss_scale,
+                    aggregation=loss_params.aggregate,
+                    continuous=loss_params.continuous,
+                )
         return loss_functions
 
     def load_prior(self, fpath):
@@ -83,12 +94,18 @@ class Graph3DInterpolantModel(pl.LightningModule):
         interpolants = torch.nn.ModuleDict()
         for interpolant_idx, interp_param in enumerate(self.interpolant_params.variables):
             index = interp_param.variable_name
+            if not interp_param.interpolant_type:
+                interpolants[index] = None
+                continue
             if interp_param.prior_type in ["mask", "absorb"]:
                 interp_param.num_classes += 1
             elif interp_param.prior_type in ["custom", "data"]:
                 interp_param = dict(interp_param)
                 interp_param["custom_prior"] = self.load_prior(interp_param["custom_prior"]).float()
             interpolants[index] = build_interpolant(**interp_param)
+        self.interpolant_param_variables = {
+            interp_param.variable_name: interp_param for interp_param in self.interpolant_params.variables
+        }
         return interpolants
 
     def configure_optimizers(self):
@@ -140,49 +157,51 @@ class Graph3DInterpolantModel(pl.LightningModule):
         return time
 
     def pre_format_molecules(self, batch, batch_size):
-        batch['x'] = batch['x'] - scatter_mean(batch['x'], index=batch.batch, dim=0, dim_size=batch_size)[batch.batch]
+        # for interpolant_idx, interp_param in enumerate(self.interpolant_params.variables):
+        for index, interp_param in self.interpolant_param_variables.items():
+            # index = interp_param.variable_name
+            if index == "x":
+                batch['x'] = (
+                    batch['x'] - scatter_mean(batch['x'], index=batch.batch, dim=0, dim_size=batch_size)[batch.batch]
+                )
+            elif index == "h":
+                if interp_param.prior_type in ["mask", "absorb"]:
+                    batch["h"] = self.add_adsorbtion_state(batch["h"])
+            elif index == "edge_attr":
+                # Load bond information from the dataloader
+                bond_edge_index, bond_edge_attr = sort_edge_index(
+                    edge_index=batch.edge_index, edge_attr=batch.edge_attr, sort_by_row=False
+                )
+                # Create Fully Connected Graph instead
+                edge_index_global = (
+                    torch.eq(batch.batch.unsqueeze(0), batch.batch.unsqueeze(-1)).int().fill_diagonal_(0)
+                )
+                edge_index_global, _ = dense_to_sparse(edge_index_global)
+                edge_index_global = sort_edge_index(edge_index_global, sort_by_row=False)
+                edge_attr_tmp = torch.full(
+                    size=(edge_index_global.size(-1),),
+                    fill_value=0,
+                    device=edge_index_global.device,
+                    dtype=torch.long,
+                )
+                edge_index_global = torch.cat([edge_index_global, bond_edge_index], dim=-1)
+                edge_attr_tmp = torch.cat([edge_attr_tmp, bond_edge_attr], dim=0)
+                edge_index_global, edge_attr_global = coalesce(
+                    index=edge_index_global, value=edge_attr_tmp, m=batch['x'].size(0), n=batch['x'].size(0), op="max"
+                )
+                edge_index_global, edge_attr_global = sort_edge_index(
+                    edge_index=edge_index_global, edge_attr=edge_attr_global, sort_by_row=False
+                )
 
-        if self.interpolants['h'].prior_type in ["mask", "absorb"]:
-            # batch["h"] = torch.cat((batch["h"], torch.zeros((batch["h"].size(0), 1)).to(batch["h"].device)), dim=1).to(
-            #     batch["h"].device
-            # )
-            batch["h"] = self.add_adsorbtion_state(batch["h"])
+                if interp_param.prior_type in ["mask", "absorb"]:
+                    # TODO: should we use the no bond state as the mask? or create an extra dim
+                    edge_attr_global = self.add_absorbption_state(edge_attr_global)
 
-        # batch['h'] = F.one_hot(batch["h"], self.interpolants['h'].num_classes).float()
+                batch['edge_attr'] = edge_attr_global
+                batch['edge_index'] = edge_index_global
 
-        # Load bond information from the dataloader
-        bond_edge_index, bond_edge_attr = sort_edge_index(
-            edge_index=batch.edge_index, edge_attr=batch.edge_attr, sort_by_row=False
-        )
-        # Create Fully Connected Graph instead
-        edge_index_global = torch.eq(batch.batch.unsqueeze(0), batch.batch.unsqueeze(-1)).int().fill_diagonal_(0)
-        edge_index_global, _ = dense_to_sparse(edge_index_global)
-        edge_index_global = sort_edge_index(edge_index_global, sort_by_row=False)
-        edge_attr_tmp = torch.full(
-            size=(edge_index_global.size(-1),),
-            fill_value=0,
-            device=edge_index_global.device,
-            dtype=torch.long,
-        )
-        edge_index_global = torch.cat([edge_index_global, bond_edge_index], dim=-1)
-        edge_attr_tmp = torch.cat([edge_attr_tmp, bond_edge_attr], dim=0)
-        edge_index_global, edge_attr_global = coalesce(
-            index=edge_index_global, value=edge_attr_tmp, m=batch['x'].size(0), n=batch['x'].size(0), op="max"
-        )
-        edge_index_global, edge_attr_global = sort_edge_index(
-            edge_index=edge_index_global, edge_attr=edge_attr_global, sort_by_row=False
-        )
-
-        if self.interpolants['edge_attr'].prior_type in ["mask", "absorb"]:
-            # TODO: should we use the no bond state as the mask? or create an extra dim
-            edge_attr_global = self.add_absorbption_state(edge_attr_global)
-
-        batch['edge_attr'] = edge_attr_global
-        batch['edge_index'] = edge_index_global
-
-        # batch['edge_attr'] = F.one_hot(batch["edge_attr"], self.interpolants['edge_attr'].num_classes).float()
-
-        # TODO: anymore specfic shifting of molecule only data
+            elif index == "charges":
+                batch['charges'] = batch['charges'] + interp_param.offset
         return batch
 
     def add_adsorbtion_state(self, h):
@@ -192,25 +211,25 @@ class Graph3DInterpolantModel(pl.LightningModule):
         return torch.cat([h, zeros_column], dim=1)
 
     def interpolate(self, batch, time):
-        for interpolant_idx, interp_param in enumerate(self.interpolant_params.variables):
+        # for interpolant_idx, interp_param in enumerate(self.interpolant_params.variables):
+        for index, interp_param in self.interpolant_param_variables.items():
             interpolant = self.interpolants[f"{interp_param.variable_name}"]
             if interpolant is None:
                 batch[f"{interp_param.variable_name}_t"] = batch[f"{interp_param.variable_name}"]
-            if interp_param.variable_name == "edge_attr":
-                _, batch[f"{interp_param.variable_name}_t"], _ = interpolant.interpolate_edges(
-                    batch.batch, batch[f"{interp_param.variable_name}"], batch["edge_index"], time
-                )
             else:
-                _, batch[f"{interp_param.variable_name}_t"], _ = interpolant.interpolate(
-                    batch.batch, batch[f"{interp_param.variable_name}"], time
-                )
-            if "discrete" in interp_param.interpolant_type:
+                if interp_param.variable_name == "edge_attr":
+                    _, batch[f"{interp_param.variable_name}_t"], _ = interpolant.interpolate_edges(
+                        batch.batch, batch[f"{interp_param.variable_name}"], batch["edge_index"], time
+                    )
+                else:
+                    _, batch[f"{interp_param.variable_name}_t"], _ = interpolant.interpolate(
+                        batch.batch, batch[f"{interp_param.variable_name}"], time
+                    )
+
+            if "concat" in interp_param or "discrete" in interp_param.interpolant_type:
                 batch[f"{interp_param.variable_name}_t"] = F.one_hot(
                     batch[f"{interp_param.variable_name}_t"], interp_param.num_classes
                 ).float()
-                # batch[f"{interp_param.variable_name}"] = F.one_hot(
-                #     batch[f"{interp_param.variable_name}"], interp_param.num_classes
-                # ).float() #! I don't think we need to onehot this since for CE loss this can be classes
 
         return batch
 
@@ -218,7 +237,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
         """
         Concatenate the flagged variable on its target and save the original in the batch via _og.
         """
-        for interp_param in self.interpolant_params:
+        for interp_param in self.interpolant_params.variables:
             if 'concat' in interp_param and interp_param['concat'] is not None:
                 batch[f"{interp_param.concat}_og"] = batch[f"{interp_param.concat}_t"]
                 batch[f"{interp_param.concat}_t"] = torch.concat(
@@ -235,19 +254,32 @@ class Graph3DInterpolantModel(pl.LightningModule):
         Produces [Variable]_hat
         """
         for interp_param in self.interpolant_params.variables:
-            if "discrete" in interp_param.interpolant_type:
+            if "concat" in interp_param or "discrete" in interp_param.interpolant_type:
                 key = interp_param.variable_name
-                if f"{key}_og" in batch:
-                    batch[f"{key}_t"] = batch[f"{key}_og"]
-                if self.interpolants[key].prior_type in ["absorb", "mask"]:
-                    logits = out[f"{key}_logits"].clone()
-                    logits[:, -1] = -1e9
-                else:
-                    logits = out[f"{key}_logits"]
-                if "diffusion" in interp_param.interpolant_type:  #! Diffusion operates over the selected option
-                    out[f"{key}_hat"] = logits.softmax(dim=-1)  # logits.argmax(dim=-1)
-                else:  #! DFM assumes that you operate over the logits
-                    out[f"{key}_hat"] = out[f"{key}_logits"]
+                combined_keys = [key]
+                interpolant_type = interp_param.interpolant_type
+                if "concat" in interp_param:
+                    target = interp_param.concat
+                    combined_keys.append(target)
+                    K = interp_param.num_classes
+                    N = out[f"{target}_logits"].shape[-1]
+                    out[f"{target}_logits"], out[f"{key}_logits"] = torch.split(
+                        out[f"{target}_logits"], [N - K, K], dim=-1
+                    )
+                    interpolant_type = self.interpolant_param_variables[target].interpolant_type
+
+                for _key in combined_keys:
+                    if f"{_key}_og" in batch:
+                        batch[f"{_key}_t"] = batch[f"{_key}_og"]
+                    if self.interpolants[_key] and self.interpolants[_key].prior_type in ["absorb", "mask"]:
+                        logits = out[f"{_key}_logits"].clone()
+                        logits[:, -1] = -1e9
+                    else:
+                        logits = out[f"{_key}_logits"]
+                    if "diffusion" in interpolant_type:  #! Diffusion operates over the probability
+                        out[f"{_key}_hat"] = logits.softmax(dim=-1)
+                    else:  #! DFM assumes that you operate over the logits
+                        out[f"{_key}_hat"] = out[f"{_key}_logits"]
 
         return out, batch
 
@@ -260,7 +292,6 @@ class Graph3DInterpolantModel(pl.LightningModule):
         out, batch, time = self(batch, time)
         loss, predictions = self.calculate_loss(batch, out, time, "val")
         # self.sample(100)
-        # import ipdb; ipdb.set_trace()
         return loss
 
     def on_validation_epoch_end(self) -> None:
@@ -318,20 +349,21 @@ class Graph3DInterpolantModel(pl.LightningModule):
             loss = loss + sub_loss
             predictions[f'{key}'] = sub_pred
 
-        if self.loss_params.use_distance:
-            if "Z_hat" in out.keys() and self.loss_function.use_distance == "triple":
-                z_hat = out["Z_hat"]
-            else:
-                z_hat = None
-            distance_loss_tp, distance_loss_tz, distance_loss_pz = self.loss_function.distance_loss(
-                batch_geo, batch['x'], predictions['x'], z_hat
-            )
-            distance_loss = distance_loss_tp + distance_loss_tz + distance_loss_pz
-            self.log(f"{stage}/distance_loss", distance_loss, batch_size=batch_size)
-            self.log(f"{stage}/distance_loss_tp", distance_loss_tp, batch_size=batch_size)
-            self.log(f"{stage}/distance_loss_tz", distance_loss_tz, batch_size=batch_size)
-            self.log(f"{stage}/distance_loss_pz", distance_loss_pz, batch_size=batch_size)
-            loss = loss + distance_loss
+            if loss_fn.use_distance in ["single", "triple"]:
+                if "Z_hat" in out.keys() and loss_fn.use_distance == "triple":
+                    z_hat = out["Z_hat"]
+                else:
+                    z_hat = None
+                distance_loss_tp, distance_loss_tz, distance_loss_pz = loss_fn.distance_loss(
+                    batch_geo, out[f'{key}_hat'], batch[f'{key}'], z_hat
+                )
+                distance_loss = distance_loss_tp + distance_loss_tz + distance_loss_pz
+                self.log(f"{stage}/distance_loss", distance_loss, batch_size=batch_size)
+                self.log(f"{stage}/distance_loss_tp", distance_loss_tp, batch_size=batch_size)
+                self.log(f"{stage}/distance_loss_tz", distance_loss_tz, batch_size=batch_size)
+                self.log(f"{stage}/distance_loss_pz", distance_loss_pz, batch_size=batch_size)
+                loss = loss + distance_loss
+
         self.log(f"{stage}/loss", loss, batch_size=batch_size)
         return loss, predictions
 
@@ -359,7 +391,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
         Convert class indices to one hot vectors.
         """
         for interpolant_idx, interp_param in enumerate(self.interpolant_params.variables):
-            if "discrete" in interp_param.interpolant_type:
+            if interp_param.interpolant_type is not None and "discrete" in interp_param.interpolant_type:
                 batch[f"{interp_param.variable_name}_t"] = F.one_hot(
                     batch[f"{interp_param.variable_name}_t"], interp_param.num_classes
                 ).float()
@@ -413,6 +445,14 @@ class Graph3DInterpolantModel(pl.LightningModule):
         total_num_atoms = num_atoms.sum().item()
 
         for key, interpolant in self.interpolants.items():
+            if interpolant is None:
+                # TODO: remove the hard coded and switch interpolant_params to a dict and repkace the iterations
+                data[f"{key}_t"] = torch.zeros(
+                    (total_num_atoms, self.interpolant_param_variables[key].num_classes)
+                ).to(self.device)
+                if "offset" in self.interpolant_param_variables[key]:
+                    data[f"{key}_t"] += self.interpolant_param_variables[key].offset
+                continue
             if "edge" in key:
                 shape = (edge_index.size(1), interpolant.num_classes)
                 prior[key], edge_index = interpolant.prior_edges(batch_index, shape, edge_index, self.device)
@@ -431,6 +471,8 @@ class Graph3DInterpolantModel(pl.LightningModule):
             out = self.dynamics(data, time)
             out, data = self.separate_discrete_variables(out, data)
             for key, interpolant in self.interpolants.items():
+                if interpolant is None:
+                    continue
                 if "edge" in key:
                     edge_index, data[f"{key}_t"] = interpolant.step_edges(
                         batch_index,
@@ -451,6 +493,9 @@ class Graph3DInterpolantModel(pl.LightningModule):
         samples = {key: data[f"{key}_t"] for key in self.interpolants.keys()}
         samples["batch"] = batch_index
         samples["edge_index"] = edge_index
+        for interp_params in self.interpolant_params.variables:
+            if "offset" in interp_params:
+                samples[interp_params.variable_name] -= interp_params.offset
         return samples
 
 

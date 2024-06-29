@@ -10,6 +10,7 @@
 import numpy as np
 import torch
 import torch.nn.functional as F
+from scipy.optimize import linear_sum_assignment
 from torch import nn
 from torch_geometric.utils import sort_edge_index
 from torch_scatter import scatter_mean
@@ -22,6 +23,7 @@ from bionemo.model.molecule.moco.models.interpolant_utils import (
     log_add_exp,
     log_sample_categorical,
 )
+from bionemo.model.molecule.moco.models.ot import align_structures, pairwise_distances, permute_and_slice
 
 
 def build_interpolant(
@@ -44,6 +46,9 @@ def build_interpolant(
     com_free: bool = True,
     variable_name: str = None,
     concat: str = None,
+    offset: int = 0,
+    noise_sigma: float = 0.0,
+    optimal_transport: str = None
     # TODO: here is where we add all the possible things that could go into any interpolant class
 ):
     """
@@ -135,6 +140,8 @@ def build_interpolant(
             nu,
             clip,
             com_free,
+            noise_sigma,
+            optimal_transport,
         )
     elif interpolant_type == "discrete_diffusion":
         if prior_type in ["absorb", "mask"]:
@@ -470,12 +477,16 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
         nu: float = 1.0,
         clip: bool = True,
         com_free: bool = True,
+        noise_sigma: float = 0.0,
+        optimal_transport: str = None,
     ):
         super(ContinuousFlowMatchingInterpolant, self).__init__(prior_type, solver_type, timesteps, time_type)
         self.num_classes = num_classes
         self.update_weight_type = update_weight_type
         self.min_t = min_t
         self.com_free = com_free
+        self.noise_sigma = noise_sigma
+        self.optimal_transport = optimal_transport
         self.init_schedulers(timesteps, scheduler_type, s, sqrt, nu, clip)
 
     def init_schedulers(self, timesteps, scheduler_type, s, sqrt, nu, clip):
@@ -523,7 +534,7 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
             if self.schedule_type == "linear":
                 return time[batch].unsqueeze(1), (1.0 - time)[batch].unsqueeze(1)
             else:
-                raise NotImplementedError("Continuoys time is only implemented with linear schedule")
+                raise NotImplementedError("Continuous time is only implemented with linear schedule")
         else:
             return (
                 self.forward_data_schedule[time].unsqueeze(1)[batch],
@@ -547,42 +558,89 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
 
         return data_scale.unsqueeze(1), (1 - data_scale).unsqueeze(1)
 
+    def equivariant_ot_prior(self, batch, data_chunk):
+        """Permute the from_mols batch so that it forms an approximate mini-batch OT map with to_mols"""
+        #! prior has to be as big as the largets input and then we throw stuff away
+        #! noise_batch is a list of beath elements of max atom num x 3
+        batch_size = int(max(batch) + 1)
+        data_batch = [data_chunk[batch == idx] for idx in range(batch_size)]
+        max_num_atoms = max([x.shape[0] for x in data_batch])
+        noise_batch = [self.prior(None, (max_num_atoms, 3), data_chunk.device) for _ in range(batch_size)]
+        # if scale:
+        #      noise_batch = [x*0.2*np.log(max_num_atoms + 1) for x in noise_batch]
+        mol_matrix = []
+        cost_matrix = []
+
+        # Create matrix with data on outer axis and noise on inner axis
+        for data in data_batch:
+            best_noise = [permute_and_slice(noise, data) for noise in noise_batch]
+            sub_batch = torch.arange(len(noise_batch)).repeat_interleave(data.shape[0])
+            best_noise = align_structures(torch.cat(best_noise, dim=1), sub_batch, data, broadcast_reference=True)
+            best_noise = best_noise.reshape((len(noise_batch), data.shape[0], 3))
+            best_costs = pairwise_distances(
+                best_noise, data.repeat(len(noise_batch), 1).reshape(len(noise_batch), data.shape[0], 3)
+            )[
+                :, 0
+            ]  # B x 1
+            mol_matrix.append(best_noise)  # B x N x 3
+            cost_matrix.append(best_costs.numpy())
+
+        row_indices, col_indices = linear_sum_assignment(np.array(cost_matrix))
+        optimal_noise = [mol_matrix[r][c] for r, c in zip(row_indices, col_indices)]
+        return torch.cat(optimal_noise, dim=-1)  #! returns N tot x 3 where this matches data_chunk
+
     def interpolate(self, batch, x1, time):
         """
         Interpolate using continuous flow matching method.
         """
-        x0 = self.prior(batch, x1.shape, x1.device)
+        if self.optimal_transport in ["equivariant_ot", "scale_ot"]:
+            x0 = self.equivariant_ot_prior(batch, x1)
+        else:
+            x0 = self.prior(batch, x1.shape, x1.device)
         data_scale, noise_scale = self.forward_schedule(batch, time)
-        return x1, data_scale * x1 + noise_scale * x0, x0
+        if self.noise_sigma > 0:
+            interp_noise = self.prior(batch, x1.shape, x1.device) * self.noise_sigma
+        else:
+            interp_noise = 0
+        return x1, data_scale * x1 + noise_scale * x0 + interp_noise, x0
 
     def prior(self, batch, shape, device, x1=None):
         if self.prior_type == "gaussian" or self.prior_type == "normal":
             x0 = torch.randn(shape).to(device)
             if self.com_free:
-                x0 = x0 - scatter_mean(x0, batch, dim=0)[batch]
+                if batch:
+                    x0 = x0 - scatter_mean(x0, batch, dim=0)[batch]
+                else:
+                    x0 = x0 - x0.mean(0)
         else:
             raise ValueError("Only Gaussian is supported")
+        if self.optimal_transport == "scale_ot":
+            if batch:
+                scale = 0.2 * torch.log(torch.bincount(batch) + 1)[batch]
+            else:
+                scale = 0.2 * torch.log(x0.shape[0] + 1)
+            x0 = x0 * scale
         return x0.to(device)
 
-    def step(self, batch, xt, x_hat, time, x0=None, dt=None, last_step=False, noise_sigma=0):
+    def step(self, batch, xt, x_hat, time, x0=None, dt=None, last_step=False):
         """
         Perform a euler step in the continuous flow matching method.
         Here we allow two options for the choic of vector field
-         A) VF = x1 - xt /(1-t) --> x_next = xt + self.update_weight(t) * dt * (x_hat - xt) see Lipman et al. https://arxiv.org/pdf/2210.02747
-         B) Linear with dynamics as data prediction VF = x1 - x0 --> x_next = xt + self.update_weight(t) * dt * (x_hat - x0) see Tong et al. https://arxiv.org/pdf/2302.00482
+         A) VF = x1 - xt /(1-t) --> x_next = xt + 1/(1-t) * dt * (x_hat - xt) see Lipman et al. https://arxiv.org/pdf/2210.02747
+         B) Linear with dynamics as data prediction VF = x1 - x0 --> x_next = xt +  dt * (x_hat - x0) see Tong et al. https://arxiv.org/pdf/2302.00482
         Both of which can add additional noise.
         """
         # x_next = xt + self.update_weight(t) * dt * (x_hat - xt)
         if x0 is None:
-            if last_step:
+            if last_step:  #! this is what happens when T = 1 since xt's cancel
                 return x_hat  # xt + timesteps*1/timesteps * (x_hat - xt)
             data_scale, noise_scale = self.reverse_schedule(batch, time, dt)
             x_next = data_scale * x_hat + noise_scale * xt
         else:
             data_scale, _ = self.reverse_schedule(batch, time, dt)
             x_next = xt + data_scale * (x_hat - x0)
-        if noise_sigma > 0:
-            x_next += torch.randn_like(x_hat) * noise_sigma  # TODO: refactor to include this as a config element
+        if self.noise_sigma > 0:
+            x_next += self.prior(batch, x_hat.shape, x_hat.device) * self.noise_sigma  # torch.randn_like(x_hat)
         return x_next
 
 

@@ -1,9 +1,9 @@
-run_name: 'EQGAT_FW_TEST_6_27'
+run_name: 'EQGAT_FW_TEST_6_28_charges_live_interpolant'
 outdir: /workspace/bionemo/bionemo/model/molecule/moco/models/results/eqgatdiff
 resume: null
 ema_resume: null
 wandb_params:
-  mode: 'online'  # disabled, offline, online
+  mode: 'disabled'  # disabled, offline, online
   entity: 'clara-discovery'
   group: 'danny-testing'
   project: 'MoCo'
@@ -17,18 +17,22 @@ data:
   data_loader_type: "midi"
 
 loss:
-  use_distance: null #'single' 'triple' #TODO factor this is to the loss itself
   variables:
     - variable_name: 'x'
       loss_scale: 3.0
       aggregate: 'sum'
       continuous: True
+      use_distance: null
     - variable_name: 'h'
       loss_scale: 0.4
       aggregate: 'sum'
       continuous: False
     - variable_name: 'edge_attr'
       loss_scale: 2.0
+      aggregate: 'sum'
+      continuous: False
+    - variable_name: 'charges'
+      loss_scale: 0.4
       aggregate: 'sum'
       continuous: False
 
@@ -72,9 +76,19 @@ interpolant:
       scheduler_cut: False
       time_type: *time_type
       nu: 1.5
-    # - variable_name: 'charge'
-    #   interpolant_type: null
-    #   concat: 'h'
+    - variable_name: 'charges'
+      interpolant_type: 'discrete_diffusion' #["discrete_diffusion", "discrete_flow_matching"]
+      prior_type: 'custom'
+      custom_prior: '/workspace/bionemo/data/pyg_geom_drug/processed/train_charges_prior.npy' #! had to manually create the marginal (h_prior*charge_h_prior[:, None]).sum(0)
+      timesteps: *timesteps
+      scheduler_type: *scheduler_type
+      scheduler_cut: False
+      time_type: *time_type
+      nu: 1.0
+      # interpolant_type: null
+      concat: 'h'
+      num_classes: 6
+      offset: 2
 
   
 dynamics:
@@ -83,7 +97,7 @@ dynamics:
     hn_dim: [256, 256]
     num_layers: 12
     use_cross_product: False
-    num_atom_features: *num_atoms # + *num_charges
+    num_atom_features: 22 # *num_atoms # + *num_charges
     num_bond_types: 5
     edge_dim: 128
     vector_aggr: "mean"
@@ -124,4 +138,4 @@ lr_scheduler:
   cooldown: 0
   monitor: val/loss
   interval: epoch
-  frequency: 5 #not in config but this is default
+  frequency: 5 #not in config but this is the default

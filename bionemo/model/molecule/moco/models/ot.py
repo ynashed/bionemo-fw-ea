@@ -33,7 +33,7 @@ def equivariant_ot_prior(self, data_chunk, batch):
     for data in data_batch:
         best_noise = [permute_and_slice(noise, data) for noise in noise_batch]
         sub_batch = torch.arange(len(noise_batch)).repeat_interleave(data.shape[0])
-        best_noise = align_structures(torch.cat(best_noise, dim=1), sub_batch, data, broadcast_reference=True)
+        best_noise = align_structures(torch.cat(best_noise, dim=0), sub_batch, data, broadcast_reference=True)
         best_noise = best_noise.reshape((len(noise_batch), data.shape[0], 3))
         best_costs = pairwise_distances(
             best_noise, data.repeat(len(noise_batch), 1).reshape(len(noise_batch), data.shape[0], 3)
@@ -45,7 +45,7 @@ def equivariant_ot_prior(self, data_chunk, batch):
 
     row_indices, col_indices = linear_sum_assignment(np.array(cost_matrix))
     optimal_noise = [mol_matrix[r][c] for r, c in zip(row_indices, col_indices)]
-    return torch.cat(optimal_noise, dim=-1)  #! returns N tot x 3 where this matches data_chunk
+    return torch.cat(optimal_noise, dim=0)  #! returns N tot x 3 where this matches data_chunk
 
 
 def pairwise_distances(tensor1, tensor2):
@@ -68,7 +68,7 @@ def pairwise_distances(tensor1, tensor2):
 def permute_and_slice(noise, data):
     N = noise.shape[0]
     M = data.shape[0]
-    assert M >= N
+    assert M <= N
     noise_indices = torch.arange(M)
     noise = noise[noise_indices, :]
     cost_matrix = torch.cdist(noise, data) ** 2

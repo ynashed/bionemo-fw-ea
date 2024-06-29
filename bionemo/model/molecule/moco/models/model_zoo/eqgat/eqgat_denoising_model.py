@@ -20,7 +20,7 @@ from torch_geometric.typing import OptTensor
 from torch_scatter import scatter, scatter_mean, scatter_softmax
 from torch_sparse import SparseTensor
 
-from bionemo.bionemo.model.molecule.moco.models.model_zoo.eqgat.eqgat_modules import (
+from bionemo.model.molecule.moco.models.model_zoo.eqgat.eqgat_modules import (
     AdaptiveLayerNorm,
     DenseLayer,
     GatedEquivBlock,
