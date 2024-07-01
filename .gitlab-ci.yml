@@ -724,6 +724,10 @@ bionemo2-pytest-contrib:
       optional: true
     - job: pytest
       optional: true
+    - job: pytest-fork
+      optional: true
+    - job: pytest-internal
+      optional: true
   after_script:
     - echo "JET_WORKLOADS_PROJECT=$CI_PROJECT_ID" >> jet.env
     - echo "JET_WORKLOADS_JOB=$CI_JOB_ID" >> jet.env
@@ -809,8 +813,8 @@ jet-trigger:
         allow_failure: true
       retrier:
         enabled: true
-        max_retries: 1
-        retry_on: ['1.2', '1.2.1', '1.2.1.2']
+        max_retries: 2
+        retry_on: ['1.2', '1.2*']
         waiting_time: 60
         environment: jet-api
       launchers:
@@ -859,14 +863,13 @@ jet-trigger:
 
 
 jet-test:
+  needs: [jet-trigger]
   rules:
-    - if: $EXCLUDE_JET == "true"
+    - if: $BIONEMO2_ONLY == "true" || $EXCLUDE_JET == "true"
       when: never
-    - if: $BIONEMO2_ONLY == "false"
-      needs: [jet-trigger]
-      when: always
-    - if: $BIONEMO2_ONLY == "true"
-      when: never
+    - if: $BIONEMO2_ONLY == "false" && $CI_JOB_STATUS == 'failed'
+      when: on_failure
+    - when: on_success
   image:
     name: gitlab-master.nvidia.com:5005/dl/jet/api:latest
     entrypoint: [ "" ]
