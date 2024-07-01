@@ -170,7 +170,6 @@ workflow:
     - if: $CI_COMMIT_BRANCH == "dev" && $CI_PIPELINE_SOURCE == "push"
       variables:
         EXCLUDE_DEPLOY: "false"
-
 # Note: We need to use this docker version `docker:26.0.2-dind` or higher for buildx inline caching.
 .docker-setup:
   services:
@@ -201,33 +200,33 @@ workflow:
     - docker buildx inspect
 
 code_format:
-  image: nvcr.io/nvidian/cvai_bnmo_trng/bionemo-linter:latest
-  stage: code_format
-  rules:
-    - if: $JET_CONV_TEST == "true"
-      when: never
-    - when: always
-  tags:
-   - generic
-  script:
-    - pre-commit run --all-files --show-diff-on-failure
+ image: nvcr.io/nvidian/cvai_bnmo_trng/bionemo-linter:latest
+ stage: code_format
+ rules:
+   - if: $JET_CONV_TEST == "true"
+     when: never
+   - when: always
+ tags:
+  - generic
+ script:
+   - pre-commit run --all-files --show-diff-on-failure
 
 license_check:
-  image: python:3.10.13-slim
-  stage: code_format
-  rules:
-    - if: $JET_CONV_TEST == "true"
-      when: never
-    - when: always
-  tags:
-   - generic
-  script:
-    - INFRA_BIONEMO_DEP=$(cat setup/requirements-dev.txt | grep "infra-bionemo==")
-    - pip install --index-url "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab-master.nvidia.com/api/v4/projects/118589/packages/pypi/simple" "${INFRA_BIONEMO_DEP}"
-    # the bionemo codebase requires the default proprietary license
-    - license-check -c setup.py -c bionemo -c tests -c examples -c internal -c hydra_plugins -c fw2nim_examples -c download_artifacts.py -c docs
-    # the bionemo2 codebase requires a different, open source license
-    - license-check -c bionemo2/ --license-header ./bionemo2/license_header
+ image: python:3.10.13-slim
+ stage: code_format
+ rules:
+   - if: $JET_CONV_TEST == "true"
+     when: never
+   - when: always
+ tags:
+  - generic
+ script:
+   - INFRA_BIONEMO_DEP=$(cat setup/requirements-dev.txt | grep "infra-bionemo==")
+   - pip install --index-url "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab-master.nvidia.com/api/v4/projects/118589/packages/pypi/simple" "${INFRA_BIONEMO_DEP}"
+   # the bionemo codebase requires the default proprietary license
+   - license-check -c setup.py -c bionemo -c tests -c examples -c internal -c hydra_plugins -c fw2nim_examples -c download_artifacts.py -c docs
+   # the bionemo2 codebase requires a different, open source license
+   - license-check -c bionemo2/ --license-header ./bionemo2/license_header
 
 build-bionemo-image:
   extends:
@@ -262,11 +261,16 @@ build-bionemo-image:
     - TAG_DATE_SHORT_COMMIT="${CI_COMMIT_SHORT_SHA}--${DATE_YMD}"
     - TAG_MR="mr--${CI_MERGE_REQUEST_IID}--${TAG_DATE_SHORT_COMMIT}"
     - if [[ "${CI_MERGE_REQUEST_IID}" != "" ]]; then
-        TAG_MR_BUILD_STRING="-t${IMAGE_REPO_NAME}:${TAG_MR}";
-        echo "MR docker tag:${IMAGE_REPO_NAME}:${TAG_MR}";
+        TAG_MR_IMAGE_NAME="${IMAGE_REPO_NAME}:${TAG_MR}"
+        TAG_MR_BUILD_STRING="-t ${TAG_MR_IMAGE_NAME}";
+        echo "MR docker tag:${TAG_MR_BUILD_STRING}";
+      else
+        TAG_MR_IMAGE_NAME="";
+        TAG_MR_BUILD_STRING="";
       fi
     - BUILD_START=$(date +%s)
     - docker buildx version
+    - set -x
     - docker buildx build
       --progress plain
       --network host ${base}
@@ -281,13 +285,13 @@ build-bionemo-image:
       --cache-from="${IMAGE_CACHE}"
       --cache-to=type=registry,mode=min,ref="${IMAGE_CACHE}"
       -t "${IMAGE_NAME}"
-      -t "${IMAGE_CACHE}"
       -t "${IMAGE_REPO_NAME}:${CI_COMMIT_SHORT_SHA}"
       -t "${IMAGE_REPO_NAME}:${PIPELINE_TAG}"
       -t "${IMAGE_REPO_NAME}:${TAG_DATE_SHORT_COMMIT}"
-      "${TAG_MR_BUILD_STRING:- }"
-      -f setup/Dockerfile .
+      ${TAG_MR_BUILD_STRING}
       --push
+      -f setup/Dockerfile .
+    - set +x
     - BUILD_END=$(date +%s)
     - ELAPSED=$(( BUILD_END - BUILD_START ))
     - echo "container build time using cached ${IMAGE_CACHE}" $ELAPSED
@@ -320,32 +324,36 @@ build-bionemo-image:
     #
     # TODO [mgreaves] This had --no-cache on it before. Why would we want this?
     - if [[ "${CI_MERGE_REQUEST_IID}" != "" ]]; then
-        TAG_MR_BUILD_STRING="-t${IMAGE_REPO_NAME}:${TAG_MR}${SUFFIX_DEV}";
-        echo "MR docker tag:${IMAGE_REPO_NAME}:${TAG_MR}${SUFFIX_DEV}";
+        TAG_MR_IMAGE_NAME="${IMAGE_REPO_NAME}:${TAG_MR}${SUFFIX_DEV}";
+        TAG_MR_BUILD_STRING="-t ${TAG_MR_IMAGE_NAME}";
+        echo "MR docker tag:${TAG_MR_BUILD_STRING}";
+      else
+        TAG_MR_IMAGE_NAME="";
+        TAG_MR_BUILD_STRING="";
       fi
+    - set -x
     - docker buildx build
-      --progress plain
-      --network host
-      --build-arg BIONEMO_IMAGE="$IMAGE_NAME"
-      --build-arg TPL_REPO=https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab-master.nvidia.com/dl/gwe/torch_performance_linter
-      --label com.nvidia.bionemo.short_git_sha=${CI_COMMIT_SHORT_SHA}
-      --label com.nvidia.bionemo.git_sha=${CI_COMMIT_SHA}
-      --label com.nvidia.bionemo.created_at=${DATE}
-      --label com.nvidia.bionemo.branch=${CI_COMMIT_BRANCH}
-      --label com.nvidia.bionemo.pipeline_id=${CI_PIPELINE_ID}
-      --label com.nvidia.bionemo.merge_request_id=${CI_MERGE_REQUEST_IID}
-      --cache-from="${IMAGE_NAME}"
-      --cache-from="${IMAGE_CACHE}"
-      --cache-from="${IMAGE_NAME}${SUFFIX_DEV}-cache"
-      -t "${IMAGE_NAME}${SUFFIX_DEV}"
-      -t "${IMAGE_NAME}${SUFFIX_DEV}-cache"
-      -t "${IMAGE_REPO_NAME}:${CI_COMMIT_SHORT_SHA}${SUFFIX_DEV}"
-      -t "${IMAGE_REPO_NAME}:${PIPELINE_TAG}${SUFFIX_DEV}"
-      -t "${IMAGE_REPO_NAME}:${TAG_DATE_SHORT_COMMIT}${SUFFIX_DEV}"
-      "${TAG_MR_BUILD_STRING}"
-      --cache-to=type=registry,mode=min,ref="${IMAGE_NAME}${SUFFIX_DEV}-cache"
-      -f internal/Dockerfile-devel .
-      --push
+        --progress plain
+        --network host
+        --build-arg BIONEMO_IMAGE="$IMAGE_NAME"
+        --build-arg TPL_REPO=https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab-master.nvidia.com/dl/gwe/torch_performance_linter
+        --label com.nvidia.bionemo.short_git_sha=${CI_COMMIT_SHORT_SHA}
+        --label com.nvidia.bionemo.git_sha=${CI_COMMIT_SHA}
+        --label com.nvidia.bionemo.created_at=${DATE}
+        --label com.nvidia.bionemo.branch=${CI_COMMIT_BRANCH}
+        --label com.nvidia.bionemo.pipeline_id=${CI_PIPELINE_ID}
+        --label com.nvidia.bionemo.merge_request_id=${CI_MERGE_REQUEST_IID}
+        --cache-from="${IMAGE_NAME}"
+        --cache-from="${IMAGE_NAME}${SUFFIX_DEV}-cache"
+        --cache-to=type=registry,mode=min,ref="${IMAGE_NAME}${SUFFIX_DEV}-cache"
+        -t "${IMAGE_NAME}${SUFFIX_DEV}"
+        -t "${IMAGE_REPO_NAME}:${CI_COMMIT_SHORT_SHA}${SUFFIX_DEV}"
+        -t "${IMAGE_REPO_NAME}:${PIPELINE_TAG}${SUFFIX_DEV}"
+        -t "${IMAGE_REPO_NAME}:${TAG_DATE_SHORT_COMMIT}${SUFFIX_DEV}"
+        ${TAG_MR_BUILD_STRING}
+        --push
+        -f internal/Dockerfile-devel .
+    - set +x
     - df -h
 
 build-docs-image:
