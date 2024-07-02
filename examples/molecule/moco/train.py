@@ -35,33 +35,26 @@ def main(cfg: DictConfig) -> None:
     cfg.outdir = os.path.join(cfg.outdir, cfg.run_name)
     os.makedirs(cfg.outdir, exist_ok=True)
     os.makedirs(os.path.join(cfg.outdir, 'checkpoints'), exist_ok=True)
-    if cfg.resume:
-        if cfg.resume[-4:] != 'ckpt':
-            pl_module = Graph3DInterpolantModel.load_from_checkpoint(os.path.join(cfg.resume, 'last.ckpt'))
-            ema_path = cfg.resume
-        else:
-            pl_module = Graph3DInterpolantModel.load_from_checkpoint(cfg.resume)
-            ema_path = os.path.dirname(cfg.resume)
 
+    if cfg.resume:
+        if os.path.isdir(cfg.resume):
+            cfg.resume = f"{cfg.resume}/last.ckpt"
+        ema_dir = os.path.dirname(cfg.resume)
         if not cfg.ema_resume:
             latest_epoch = max(
                 [
                     int(re.search(r"ema_parameters_epoch_(\d+)\.pt", f).group(1))
-                    for f in os.listdir(ema_path)
+                    for f in os.listdir(ema_dir)
                     if re.search(r"ema_parameters_epoch_(\d+)\.pt", f)
                 ],
                 default=-1,
             )
-            ema_callback = EMACallback(
-                torch.load(os.path.join(cfg.resume, f'ema_parameters_epoch_{latest_epoch}.pt'))['parameters'],
-                dirpath=os.path.join(cfg.outdir, 'checkpoints'),
-            )
-        else:
-            ema_callback = EMACallback(
-                torch.load(cfg.ema_resume)['parameters'],
-                dirpath=os.path.join(cfg.outdir, 'checkpoints'),
-            )
-
+            cfg.ema_resume = f"{ema_dir}/ema_parameters_epoch_{latest_epoch}.pt"
+        pl_module = Graph3DInterpolantModel.load_from_checkpoint(cfg.resume)
+        ema_callback = EMACallback(
+            torch.load(cfg.ema_resume)['parameters'],
+            dirpath=os.path.join(cfg.outdir, 'checkpoints'),
+        )
     else:
         pl_module = Graph3DInterpolantModel(
             loss_params=cfg.loss,
@@ -78,7 +71,7 @@ def main(cfg: DictConfig) -> None:
         project=cfg.wandb_params.project,
         group=cfg.wandb_params.group,
         name=cfg.run_name,
-        id=cfg.run_name,  # wandb.util.generate_id(),
+        id=cfg.run_name,
         resume='must' if cfg.resume is not None else False,
         entity=cfg.wandb_params.entity,
         mode=cfg.wandb_params.mode,

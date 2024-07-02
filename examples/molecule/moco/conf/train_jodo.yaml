@@ -1,0 +1,146 @@
+run_name: 'JODO_CHARGES'
+outdir: /workspace/bionemo/results/jodo
+resume: null
+ema_resume: null
+wandb_params:
+  mode: 'disabled'  # disabled, offline, online
+  entity: 'clara-discovery'
+  group: 'filipp-dev'
+  project: 'MoCo'
+
+data:
+  dataset_root: "/workspace/bionemo/data/pyg_geom_drug"
+  processed_folder: "processed"
+  batch_size: &batch_size 200
+  inference_batch_size: 200
+  removed_h: False
+  data_loader_type: "midi"
+
+loss:
+  use_distance: null #'single' 'triple'
+  variables:
+    - variable_name: 'x'
+      loss_scale: 3.0
+      aggregate: 'sum'
+      continuous: True
+    - variable_name: 'h'
+      loss_scale: 0.4
+      aggregate: 'sum'
+      continuous: False
+    - variable_name: 'edge_attr'
+      loss_scale: 2.0
+      aggregate: 'sum'
+      continuous: False
+    - variable_name: 'charges'
+      loss_scale: 0.4
+      aggregate: 'sum'
+      continuous: False
+
+interpolant:
+  timesteps: &timesteps 500
+  time_type: &time_type "discrete" #["discrete, "continuous]
+  scheduler_type: &scheduler_type "cosine_adaptive" #["cosine_adaptive, "linear"]
+  sample_time_method: "uniform" # ["symmetric", "uniform", "stab_mode", "logit_normal"]
+  sample_time_mean: 0 # Used in stab_mode and logit_normal
+  sample_time_scale: 0.81 # Used in stab_mode and logit_normal
+  global_variable_name: 'h' # variable that is specficed below to be used for sampling time and loss sampling
+  # scheduler_cut: &scheduler_cut False
+  variables:
+    - variable_name: 'x' 
+      interpolant_type: 'continuous_diffusion' #["continuous_diffusion", "continuous_flow_matching"]
+      diffusion_type: 'vdm'
+      prior_type: 'gaussian'
+      timesteps: *timesteps
+      num_classes: 3
+      scheduler_type: *scheduler_type
+      scheduler_cut: False
+      time_type: *time_type
+      nu: 2.5
+      com_free: True
+    - variable_name: 'h'
+      interpolant_type: 'discrete_diffusion' #["discrete_diffusion", "discrete_flow_matching"]
+      prior_type: 'custom' #['uniform', 'mask', 'custom']
+      custom_prior: '/workspace/bionemo/data/pyg_geom_drug/processed/train_types_h.npy'
+      timesteps: *timesteps
+      num_classes: &num_atoms 16
+      scheduler_type: *scheduler_type
+      scheduler_cut: False
+      time_type: *time_type
+      nu: 1.0
+    - variable_name: 'edge_attr'
+      interpolant_type: 'discrete_diffusion' #["discrete_diffusion", "discrete_flow_matching"]
+      prior_type: 'custom'
+      custom_prior: '/workspace/bionemo/data/pyg_geom_drug/processed/train_bond_types_h.npy'
+      timesteps: *timesteps
+      num_classes: 5
+      scheduler_type: *scheduler_type
+      scheduler_cut: False
+      time_type: *time_type
+      nu: 1.5
+    - variable_name: 'charges'
+      interpolant_type: 'discrete_diffusion' #["discrete_diffusion", "discrete_flow_matching"]
+      prior_type: 'custom'
+      custom_prior: '/workspace/bionemo/data/pyg_geom_drug/processed/train_charges_prior.npy' #! had to manually create the marginal (h_prior*charge_h_prior[:, None]).sum(0)
+      timesteps: *timesteps
+      scheduler_type: *scheduler_type
+      scheduler_cut: False
+      time_type: *time_type
+      nu: 1.0
+      concat: 'h'
+      num_classes: &num_charges 6
+      offset: 2
+
+  
+dynamics:
+  model_name: "jodo"
+  model_args:
+    num_h_features: 22
+    edge_ch: 5  # input edge channels
+    nf: 256  # node hidden channels
+    n_layers: 10  # number of blocks
+    n_heads: 16  # number of attention heads
+    dropout: 0.1
+    cond_time: True
+    dist_gbf: True
+    gbf_name: 'CondGaussianLayer'
+
+    edge_quan_th: 0.  # edge quantization threshold
+    n_extra_heads: 2  # attention heads from adjacency matrices
+    CoM: True  # keep each layer output in CoM
+    mlp_ratio: 4  # FFN channel ratio
+    spatial_cut_off: 3.  # distance threshold for spatial adjacency matrix
+    softmax_inf: True
+    trans_name: 'TransMixLayer'
+
+  wrapper_args:
+    timesteps: *timesteps
+    time_type: *time_type
+
+sample:
+  node_distribution: "/workspace/bionemo/data/pyg_geom_drug/processed/train_n_h.pickle" # null
+
+train:
+  seed: 42
+  gpus: 1
+  n_epochs: 800
+  enable_progress_bar: True
+  gradient_clip_value: 10.0
+  log_freq: 50
+  val_freq: 5
+
+#! The below are taken from EQGAT
+optimizer:
+  type: adamw
+  lr: 2.e-4
+  weight_decay: 1.e-12
+  amsgrad: True
+
+lr_scheduler:
+  type: plateau
+  factor: 0.75
+  patience: 50
+  min_lr: 5.e-5
+  cooldown: 0
+  monitor: val/loss
+  interval: epoch
+  frequency: 5 #not in config but this is default

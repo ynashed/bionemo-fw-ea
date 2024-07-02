@@ -256,15 +256,25 @@ class BasicMolecularMetrics:
 
 
 class Molecule:
-    def __init__(self, atom_types, bond_types, positions, dataset_info, charges=None):
-        self.atom_types = torch.tensor(atom_types, dtype=torch.long)
-        self.bond_types = torch.tensor(bond_types, dtype=torch.long)
-        self.positions = torch.tensor(positions, dtype=torch.float64)  # Ensure positions are float64
-        self.charges = (
-            torch.tensor(charges, dtype=torch.long)
-            if charges is not None
-            else torch.zeros(len(atom_types), dtype=torch.long)
-        )
+    def __init__(self, atom_types, bond_types, positions, dataset_info, charges=None, device="cpu"):
+        if not torch.is_tensor(atom_types):
+            atom_types = torch.tensor(atom_types, device=device)
+
+        if not torch.is_tensor(bond_types):
+            bond_types = torch.tensor(bond_types, device=device)
+
+        if not torch.is_tensor(positions):
+            positions = torch.tensor(positions, device=device)
+
+        if charges is not None and not torch.is_tensor(charges):
+            charges = torch.tensor(charges, device=device)
+        elif charges is None:
+            charges = torch.zeros_like(atom_types)
+
+        self.atom_types = atom_types.long()
+        self.bond_types = bond_types.long()
+        self.positions = positions
+        self.charges = charges.long()
         self.dataset_info = dataset_info
         self.rdkit_mol = self.build_rdkit_mol()
 
@@ -299,7 +309,7 @@ class Molecule:
         conf = Chem.Conformer(mol.GetNumAtoms())
         for i in range(mol.GetNumAtoms()):
             try:
-                pos = self.positions[i].numpy()
+                pos = self.positions[i].cpu().numpy()
                 conf.SetAtomPosition(i, Point3D(float(pos[0]), float(pos[1]), float(pos[2])))
             except Exception as e:
                 print(f"Error setting atom position: {e}")
@@ -318,12 +328,16 @@ def get_molecules(mol_dict, dataset_info):
     edge_attr = mol_dict["edge_attr"]
     h = mol_dict["h"]
     x = mol_dict["x"]
-
+    if "charges" in mol_dict:
+        charges = mol_dict["charges"]
+    else:
+        charges = torch.zeros_like(h)
     molecule_list = []
     for idx in torch.unique(batch):
         idx_mask = batch == idx
         atom_types = h[idx_mask]
         positions = x[idx_mask]
+        ch = charges[idx_mask]
 
         # Create bond matrix
         edge_mask = (edge_index[0] >= idx_mask.nonzero(as_tuple=True)[0].min()) & (
@@ -335,16 +349,16 @@ def get_molecules(mol_dict, dataset_info):
         # Adjust bond indices to local molecule
         local_bond_indices = bond_indices - bond_indices[0].min()
 
-        bond_matrix = torch.zeros((len(atom_types), len(atom_types)), dtype=torch.long)
+        bond_matrix = torch.zeros((len(atom_types), len(atom_types)), dtype=torch.long, device=atom_types.device)
         for src, dst, bond in zip(local_bond_indices[0], local_bond_indices[1], bonds):
             bond_matrix[src, dst] = bond
             bond_matrix[dst, src] = bond
 
         molecule = Molecule(
-            atom_types=atom_types.tolist(),
-            bond_types=bond_matrix.tolist(),
-            positions=positions.tolist(),
-            charges=None,
+            atom_types=atom_types,
+            bond_types=bond_matrix,
+            positions=positions,
+            charges=ch,
             dataset_info=dataset_info,
         )
         molecule_list.append(molecule)

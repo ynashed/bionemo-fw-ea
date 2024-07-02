@@ -15,7 +15,6 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from lightning import pytorch as pl
-from nemo.core.config import hydra_runner
 from omegaconf import DictConfig
 from torch_geometric.utils import dense_to_sparse, sort_edge_index
 from torch_scatter import scatter_mean
@@ -23,7 +22,6 @@ from torch_sparse import coalesce
 from tqdm import tqdm
 
 # TODO create general data module class that can do 3dmg, sbdd, docking etc
-from bionemo.model.molecule.moco.data.molecule_datamodule import MoleculeDataModule
 from bionemo.model.molecule.moco.data.molecule_dataset import full_atom_decoder
 from bionemo.model.molecule.moco.metrics.metrics import (
     BasicMolecularMetrics,
@@ -61,7 +59,6 @@ class Graph3DInterpolantModel(pl.LightningModule):
         self.dynamics = ModelBuilder().create_model(
             dynamics_params.model_name, dynamics_params.model_args, dynamics_params.wrapper_args
         )
-        self.mol_metrics = BasicMolecularMetrics({"atom_decoder": full_atom_decoder})
 
     def initialize_loss_functions(self):
         loss_functions = {}
@@ -299,7 +296,8 @@ class Graph3DInterpolantModel(pl.LightningModule):
             mol_dict = self.sample(100)
             # TODO: put this into the wrapper since its assumes many things but can leave for now
             mols = get_molecules(mol_dict, {"atom_decoder": full_atom_decoder})
-            stab_dict, valid_dict, stat_dict, valid_smi, stable_mols, valid_mols = self.mol_metrics(mols)
+            mol_metrics = BasicMolecularMetrics({"atom_decoder": full_atom_decoder}, device=self.device)
+            stab_dict, valid_dict, stat_dict, valid_smi, stable_mols, valid_mols = mol_metrics(mols)
             res = {**stab_dict, **valid_dict, **stat_dict}
             print(res)
             self.log_dict(res)
@@ -497,29 +495,3 @@ class Graph3DInterpolantModel(pl.LightningModule):
             if "offset" in interp_params:
                 samples[interp_params.variable_name] -= interp_params.offset
         return samples
-
-
-@hydra_runner(config_path="conf", config_name="train")
-def main(cfg: DictConfig):
-    datamodule = MoleculeDataModule(cfg.data)
-    train_dataloader = datamodule.test_dataloader()
-    device = 'cuda:0'
-    model = Graph3DInterpolantModel(
-        loss_params=cfg.loss,
-        optimizer_params=cfg.optimizer,
-        lr_scheduler_params=cfg.lr_scheduler,
-        dynamics_params=cfg.dynamics,
-        interpolant_params=cfg.interpolant,
-        sampling_params=cfg.sample,
-    ).to(device)
-    model.eval()
-    with torch.no_grad():
-        model.sample(10)
-    for batch in train_dataloader:
-        batch = batch.to(device)
-        print(batch)
-        model.training_step(batch, 0)
-
-
-if __name__ == "__main__":
-    main()

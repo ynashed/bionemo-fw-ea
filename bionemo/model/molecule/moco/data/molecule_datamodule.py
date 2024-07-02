@@ -112,7 +112,7 @@ class MoleculeDataModule(LightningDataModule):
         elif self.data_loader_type == "dynamic":
             sampler = DynamicBatchSampler(dataset, **self.sampler_kwargs)
         elif self.data_loader_type == "midi":
-            return MiDiDataloader(dataset, reference_batch_size=batch_size, shuffle=shuffle, **self.sampler_kwargs)
+            return MiDiDataloader(dataset, batch_size=batch_size, shuffle=shuffle, **self.sampler_kwargs)
         else:
             sampler = None
 

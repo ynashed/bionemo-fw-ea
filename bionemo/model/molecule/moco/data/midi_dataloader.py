@@ -21,11 +21,11 @@ from bionemo.model.molecule.moco.data.adaptive_dataloader import effective_batch
 
 
 class AdaptiveCollater:
-    def __init__(self, follow_batch, exclude_keys, reference_batch_size, reference_size):
+    def __init__(self, follow_batch, exclude_keys, batch_size, reference_size):
         """Copypaste from pyg.loader.Collater + small changes"""
         self.follow_batch = follow_batch
         self.exclude_keys = exclude_keys
-        self.reference_bs = reference_batch_size
+        self.reference_bs = batch_size
         self.reference_size = reference_size
 
     def __call__(self, batch):
@@ -116,7 +116,7 @@ class MiDiDataloader(torch.utils.data.DataLoader):
     def __init__(
         self,
         dataset: Union[Dataset, List[BaseData]],
-        reference_batch_size: int = 1,
+        batch_size: int = 1,
         reference_size: int = 20,
         shuffle: bool = False,
         follow_batch: Optional[List[str]] = None,
@@ -132,12 +132,12 @@ class MiDiDataloader(torch.utils.data.DataLoader):
 
         super().__init__(
             dataset,
-            batch_size=reference_batch_size,
+            batch_size,
             shuffle=shuffle,
             collate_fn=AdaptiveCollater(
                 follow_batch,
                 exclude_keys,
-                reference_batch_size=reference_batch_size,
+                batch_size,
                 reference_size=reference_size,
             ),
             **kwargs,
