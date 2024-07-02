@@ -29,6 +29,14 @@ from bionemo.utils.hydra import load_model_config
 from bionemo.utils.tests import teardown_apex_megatron_cuda
 
 
+# some pytorch functions use cuBlas or cuDNN with TF32 enabled for acceleration,
+# which can potentially result in the loss of precision of the returned values.
+# This in turn affect comparing pytorch results with our tp results. Turn off
+# TF32 here to make sure we get precise result to compare with
+os.environ["NVIDIA_TF32_OVERRIDE"] = "0"
+# This works in parallel with torch.use_deterministic_algorithms
+# see: https://docs.nvidia.com/cuda/cublas/index.html#results-reproducibility
+os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
 e3nn.set_optimization_defaults(optimize_einsums=False)
 torch.use_deterministic_algorithms(True, warn_only=True)
 torch.backends.cudnn.benchmark = False
