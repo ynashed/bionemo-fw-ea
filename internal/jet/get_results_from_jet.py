@@ -11,9 +11,10 @@
 import datetime
 import logging
 import os
+import textwrap
 from argparse import ArgumentParser
 from collections import OrderedDict
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
 import tqdm
@@ -24,6 +25,39 @@ from tabulate import tabulate
 
 # using logging not from NeMo to run this script outside a container
 logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
+
+
+# ANSI escape sequences for colors and formatting
+class AnsiCodes:
+    RED = '\033[31m'
+    GREEN = '\033[32m'
+    BOLD = '\033[1m'
+    RESET = '\033[0m'
+
+
+def _apply_color_str(text: str, color: str) -> str:
+    """
+    Incorporates colouring to string and resets it at the end of string.
+    Args:
+        text: some string
+        color: intended color of the string in ANSI colour format
+    Returns: a coloured string with the reset colour appended
+
+    """
+    return color + text + AnsiCodes.RESET
+
+
+def _wrap_text(text: str, width: int = 90) -> str:
+    """
+    Adds text wrapper around string to ensure it will break across many lines
+    Args:
+        text: a string
+        width: max number of elements in string in a single line
+    Returns: a string with additional "\n" indicating line breaking
+
+    """
+    wrapped_text = textwrap.fill(text, width=width)
+    return wrapped_text
 
 
 def filter_out_failed_and_rerun_jobs(df: pd.DataFrame, n_all_results: int) -> pd.DataFrame:
@@ -44,22 +78,45 @@ def print_table_with_results(df: pd.DataFrame) -> None:
     """
     Print table with essential information about the jobs to the console table
     """
-    table_dict = OrderedDict()
-    table_dict["JET job ID"] = df.jet_ci_job_id
-    table_dict["Job Type"] = df.job_type
-    table_dict["Job Key"] = df.job_key.str.split("/", expand=True)[1]
-    table_dict["Status"] = df.jet_ci_job_status
-    if "jet_test_status" in df:
-        table_dict["Test"] = df.jet_test_status
-    table = tabulate(table_dict, headers=list(table_dict.keys()), tablefmt="psql")
+    table_list = []
+    for _, row in df.iterrows():
+        table_dict = OrderedDict()
+        table_dict["JET job ID"] = row["jet_ci_job_id"]
+        table_dict["Job Type"] = row["job_type"]
+        table_dict["Job Key"] = _wrap_text(text=row["job_key"].split("/")[1])
+        table_dict["Job Status"] = row["jet_ci_job_status"].lower()
 
+        # Determine condition for failure
+        if "jet_test_status" in row:
+            table_dict["Test Status"] = (
+                row["jet_test_status"].lower() if isinstance(row["jet_test_status"], str) else ""
+            )
+            condition = table_dict["Test Status"] == "failed"
+        else:
+            condition = table_dict["Job Status"] == "failed"
+
+        # Apply red color if the status is 'failed'
+        if condition:
+            for key in table_dict:
+                table_dict[key] = _apply_color_str(str(table_dict[key]), color=AnsiCodes.RED)
+
+        table_list.append(table_dict)
+
+    # Creating table with tabulate
+    table = tabulate(table_list, headers="keys", tablefmt="grid")
     print(table)
-    if not all(df.exit_code == 0):
+
+    if any(df.jet_ci_job_status.str.lower() != "success"):
         logging.error(
             "Some jobs failed to complete successfully. Detailed information about jobs is available by appending -vv\n"
         )
     else:
         logging.info("All jobs completed successfully!")
+
+    if "jet_test_status" in df and any(df.dropna(subset=['jet_test_status']).jet_test_status.str.lower() != "success"):
+        logging.error("Some tests failed. Detailed information about tests is available by appending -vv\n")
+    else:
+        logging.info("All tests completed successfully!")
 
 
 def get_duration_stats(
@@ -162,34 +219,41 @@ def log_detailed_job_info(df: pd.DataFrame) -> None:
     logging.info('Additional information about jobs in JET listed below')
 
     for _, job_info in df.iterrows():
-        msg = (
-            f'{job_info["job_key"]} with status: {job_info["jet_ci_job_status"]} '
-            f'\nJET pipeline id: {job_info["jet_ci_pipeline_id"]}, BioNeMo pipeline id: {job_info["bionemo_ci_pipeline_id"]} '
-            f'JET job id: {job_info["jet_ci_job_id"]}, '
-            f'\nscript duration in sec: {round(job_info["script_duration"],2)}, job duration in sec (SLURM queue + JET setup + script duration): {round(job_info["jet_ci_job_duration"], 2)}'
-            f'\nJET job id logs: https://gitlab-master.nvidia.com/dl/jet/ci/-/jobs/{job_info["jet_ci_job_id"]}'
-        )
-
         if job_info["job_type"] == "build":
-            msg = f"DOCKER BUILD {msg}"
+            header_str = f'DOCKER BUILD {job_info["job_key"]} with JOB status: {job_info["jet_ci_job_status"]}'
+            color = AnsiCodes.RED if job_info["jet_ci_job_status"].lower() == "failed" else AnsiCodes.GREEN
+            msg = f"{_apply_color_str(text=header_str, color=color)}"
             for k, v in job_info[job_info.index.str.startswith('docker_')].items():
                 msg += f"\nDocker info: \n{k}: {v}\n"
 
         elif job_info["job_type"] == "recipe":
             if "conv" in job_info["job_key"]:
-                prefix = "CONVERGENCE TEST"
+                prefix = "CONVERGENCE TEST: "
             elif "perf" in job_info["job_key"]:
-                prefix = "PERFORMANCE TEST"
+                prefix = "PERFORMANCE TEST: "
             else:
-                prefix = "TEST"
-            msg = f'{prefix} {msg}'
+                prefix = "SMOKE TEST: "
+            color = AnsiCodes.RED if job_info["jet_test_status"].lower() == "failed" else AnsiCodes.GREEN
+            header_str = f'{prefix}{job_info["job_key"]} with {AnsiCodes.BOLD}TEST status: {job_info["jet_test_status"].lower()}{AnsiCodes.BOLD}, JOB status: {job_info["jet_ci_job_status"].lower()}'
+
+            msg = (
+                f'{_apply_color_str(text=header_str, color=color)}'
+                f'\nTEST: {job_info["jest_test_check"]}\n'
+                f'\nJET pipeline id: {job_info["jet_ci_pipeline_id"]}, BioNeMo pipeline id: {job_info["bionemo_ci_pipeline_id"]} '
+                f'JET job id: {job_info["jet_ci_job_id"]}, '
+                f'\nscript duration in sec: {round(job_info["script_duration"],2)}, job duration in sec (SLURM queue + JET setup + script duration): {round(job_info["jet_ci_job_duration"], 2)}'
+                f'\nJET job id logs: https://gitlab-master.nvidia.com/dl/jet/ci/-/jobs/{job_info["jet_ci_job_id"]}'
+            )
 
             for k, v in job_info[job_info.index.str.startswith('log_')].items():
                 msg += f'\n{k.replace("log_", "")}: {v}'
 
             if job_info["exit_code"] != 0:
                 msg += f"\n\nScript:\n {job_info['script']}\n\n"
-        logging.info(msg + '\n')
+        if color in AnsiCodes.RED:
+            logging.info(_apply_color_str(msg, color=AnsiCodes.RED) + '\n')
+        else:
+            logging.info(msg + '\n')
 
 
 def get_docker_info(docker_info: dict) -> dict:
@@ -258,6 +322,8 @@ def get_job_info(job_raw_result: dict, save_dir: Optional[str]) -> dict:
     )
     if "recipe" in job_info["job_key"]:
         job_info["script"] = obj_workload['obj_spec'].get('s_script', None)
+        if "conv" in job_info["job_key"]:
+            job_info["wandb_project_name"] = obj_workload['obj_spec'].get('s_wandb_project_name', None)
 
     if job_info["job_type"] == "build":
         docker_info = get_docker_info(docker_info=obj_workload["obj_spec"]["obj_source"])
@@ -333,6 +399,22 @@ def get_job_results(
     return df, pipelines_info
 
 
+def _get_tests_check_str(check_dict: Dict[str, str]) -> str:
+    """
+    Converts standard dict with JET test checks information to string
+    Args:
+        check_dict: dict with keys s_name, s_status and, in case a check failure, s_status_message
+    Returns: str
+
+    """
+    check_str = f"{check_dict['s_name']}: {check_dict['s_status']}"
+
+    # Append the status message if it is present in the dictionary
+    if 's_status_message' in check_dict:
+        check_str += f" ({check_dict['s_status_message']})"
+    return f"[{check_str}]"
+
+
 def get_test_results(jet_instance: JETInstance, pipeline_ids: List[str]) -> Optional[pd.DataFrame]:
     """
     Queries and outputs results of jet test jobs run in JET given related pipeline id.
@@ -342,7 +424,7 @@ def get_test_results(jet_instance: JETInstance, pipeline_ids: List[str]) -> Opti
         tests_raw = query_jet_jobs(
             jet_instance=jet_instance,
             pipeline_id=int(pipeline_id),
-            fields_select=["s_status", "obj_ci.l_pipeline_id", "s_workload_logs"],
+            fields_select=["s_status", "obj_ci.l_pipeline_id", "s_workload_logs", "nested_checks"],
             job_type="test",
             label=None,
         )
@@ -359,8 +441,16 @@ def get_test_results(jet_instance: JETInstance, pipeline_ids: List[str]) -> Opti
             continue
         test_dict["jet_ci_workload_id"] = test_raw["s_workload_logs"][0]
         test_dict["jet_test_status"] = "Success" if test_raw["s_status"] == "pass" else "FAILED"
+        test_dict["jest_test_check"] = " AND ".join([_get_tests_check_str(d) for d in test_raw["nested_checks"]])
         output.append(test_dict)
     return pd.DataFrame(output)
+
+
+def log_wandb_project_links(project_names: List[str]):
+    print(project_names)
+    logging.info(
+        f'Training curves available at {", ".join(["https://wandb.ai/clara-discovery/"+name for name in project_names if isinstance(name, str)])}\n'
+    )
 
 
 def get_results_from_jet(
@@ -446,6 +536,9 @@ def get_results_from_jet(
 
     if verbosity_level >= 2:
         print_table_with_results(df=df)
+
+    if verbosity_level >= 2 and "wandb_project_name" in df:
+        log_wandb_project_links(project_names=df["wandb_project_name"].unique())
 
     # Calculating duration-related analytics (overall, pipeline and job specific)
     if verbosity_level > 0 and df.shape[0] > 2:

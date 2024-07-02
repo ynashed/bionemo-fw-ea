@@ -101,6 +101,17 @@ variables:
       - "MolMIM"
       - "DiffDock"
     description: "A flag that specifies the model for which the JET pipeline should run. Defaults to all models."
+  WANDB_PROJECT_SUFFIX:
+    value: ""
+    description: "A variable that overrides the default suffix in the wandb project name during the jet-configure stage, 
+    used for logging training curves in convergence tests. When not set, the suffix is set to the branch name. 
+    The wandb project name is constructed as ${WANDB_PROJECT_NAME_BASE}--${WANDB_PROJECT_SUFFIX} and 
+    must comply with the regex pattern [a-zA-Z0-9-] to ensure valid naming conventions. 
+    For more information, refer to internal/jet/README.md or the jet-configure stage implementation."
+  WANDB_RUN_SUFFIX:
+     value: ""
+     description: "A variable that prepends suffix in the wandb run name during the jet-configure stage, used for logging training curves in convergence tests. 
+     By default, the wandb run name is set to ${CI_PIPELINE_CREATED_AT}_${CI_COMMIT_SHORT_SHA}_${CI_PIPELINE_ID}. For further details, please refer to the WANDB_PROJECT_SUFFIX description"
   QA_DOCKER_DEPLOY:
     value: "false"
     options:
@@ -751,7 +762,7 @@ jet-configure:
     JET_WORKLOADS_REF_BASE: "bionemo"
     JET_WORKLOADS_REF: "${JET_WORKLOADS_REF_BASE}/${CI_COMMIT_BRANCH}"
     WANDB_PROJECT_NAME_BASE: "jet--${JET_WORKLOAD_FOLDER}"
-    WANDB_PROJECT_NAME: "${WANDB_PROJECT_NAME_BASE}--${CI_COMMIT_BRANCH}"
+    WANDB_RUN_NAME: "${CI_PIPELINE_CREATED_AT}_${CI_COMMIT_SHORT_SHA}_${CI_PIPELINE_ID}"
   artifacts:
     paths:
       - $JET_WORKLOADS_DIR
@@ -767,12 +778,24 @@ jet-configure:
     - when: on_success
   before_script:
     - apk update && apk add git yq
-    - 'if [[ $CI_PIPELINE_SOURCE == "merge_request_event" ]]; then
-      CUSTOM_BRANCH_NAME=$(echo "$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME" | tr "/" "__");
+    - |
+      if [[ $CI_PIPELINE_SOURCE == "merge_request_event" ]]; then
+        CUSTOM_BRANCH_NAME=$(echo "$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME" | tr "/" "__")
       else
-      CUSTOM_BRANCH_NAME=$(echo "$CI_COMMIT_BRANCH" | tr "/" "__");
-      fi'
-    - export CUSTOM_BRANCH_NAME
+        CUSTOM_BRANCH_NAME=$(echo "$CI_COMMIT_BRANCH" | tr "/" "__")
+      fi
+    - |
+      if [ -z "${WANDB_PROJECT_SUFFIX}" ]; then
+        WANDB_PROJECT_SUFFIX="${CUSTOM_BRANCH_NAME}"
+      fi
+    - export WANDB_PROJECT_NAME="${WANDB_PROJECT_NAME_BASE}--${WANDB_PROJECT_SUFFIX}"
+    - |
+      if [ -n "${WANDB_RUN_SUFFIX}" ]; then
+        WANDB_RUN_NAME="${WANDB_RUN_SUFFIX}--${WANDB_RUN_NAME}"
+      fi
+    - export WANDB_RUN_NAME
+    - echo "WANDB_PROJECT_NAME is set to ${WANDB_PROJECT_NAME}"
+    - echo "WANDB_RUN_NAME is set to ${WANDB_RUN_NAME}"
   script:
     - yq e ".spec.source.image = \"${IMAGE_NAME}\"" -i ${JET_WORKLOADS_DIR}/builds/bionemo.yaml
     - 'find "$JET_WORKLOADS_DIR" -type f -name "*.yaml" -print0 | while IFS= read -r -d "" file; do
@@ -782,8 +805,8 @@ jet-configure:
           yq e ".labels.bionemo_commit_sha = \"${CI_COMMIT_SHORT_SHA}\"" -i ${file};
           yq e ".spec.scope = \"${JET_WORKLOAD_FOLDER}\"" -i ${file};
           if [[ $JET_CONV_TEST = true ]] & [[ $file == *"recipe"* ]]; then
-            yq e ".spec.wandb_project_name = \"${WANDB_PROJECT_NAME_BASE}--${CUSTOM_BRANCH_NAME}\"" -i ${file};
-            yq e ".spec.pipeline_label = \"${CI_PIPELINE_CREATED_AT}_${CI_COMMIT_SHORT_SHA}_${CI_PIPELINE_ID}\"" -i ${file};
+            yq e ".spec.wandb_project_name = \"${WANDB_PROJECT_NAME}\"" -i ${file};
+            yq e ".spec.pipeline_label = \"${WANDB_RUN_NAME}\"" -i ${file};
           fi;
           cat ${file};
        done'

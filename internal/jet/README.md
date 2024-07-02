@@ -169,13 +169,73 @@ tests_spec:
           max: 13.0
           min: 11.0
 ```
+
 Visit [JET Documentation](https://jet.nvidia.com/docs/tutorials/jet-tests/jet-tests-in-jet-scripts/) for more details.
-### 2.4 Dashboard for regression tracking & reporting
-The tests results are displayed, summarised and tracked in the [dashboard](http://clara-discovery.gitlab-master-pages.nvidia.com/dashboards) deployed by [BioNeMo's dashboard repository](https://gitlab-master.nvidia.com/clara-discovery/dashboards).
+
+### 2.4 How often the convergence tests are run on `dev` branch
+The convergence tests pipeline on `dev` branch runs every second day. It is scheduled in using [GitLab pipeline scheduler](https://gitlab-master.nvidia.com/clara-discovery/bionemo/-/pipeline_schedules) - the schedule name: `conv-tests-bidaily`.
+THe tests for other branches need to be triggered manually using GitLab pipeline creator website, see section 3.1.2.
+
+### 2.5 Are training curves accessible from the convergence test pipeline?
+Yes! The default behavior of the convergence test pipelines is to log training data to wandb. 
+The project name used for these logs follows the format `jet--partial-conv-trainings--${WANDB_PROJECT_SUFFIX}`. 
+Here, the `WANDB_PROJECT_SUFFIX` variable defaults to the name of the branch that triggers the pipeline, or to the source branch name in case of merge requests.
+The wandb run name defaults to `${CI_PIPELINE_CREATED_AT}_${CI_COMMIT_SHORT_SHA}_${CI_PIPELINE_ID}`. A user can prepend a suffix to the run name by setting `WANDB_RUN_SUFFIX`.
+
+For instance, to view the training curve logged to wandb for the dev branch, see [jet--partial-conv-trainings--dev](https://wandb.ai/clara-discovery/jet--partial-conv-trainings--dev?nw=nwuserdorotat_nv) project at wandb.
+
+To customize the `WANDB_PROJECT_SUFFIX` or `WANDB_RUN_SUFFIX`, users can modify this variables through the GitLab pipeline configuration interface. 
+This can be done by visiting the [GitLab pipeline creation page](https://gitlab-master.nvidia.com/clara-discovery/bionemo/-/pipelines/new), 
+scrolling to the bottom of the page, and entering `WANDB_PROJECT_SUFFIX` or `WANDB_RUN_SUFFIX` in the `Input variable key` field. Users should then provide their desired suffix in the `Input variable value field`. 
+Note that the project names in wandb must adhere to the regex pattern [a-zA-Z0-9-] to ensure valid naming conventions.
+
+
+### 2.6 How to track and compare results from convergence tests
+The dashboard for convergence tracking & reporting is available for `dev` branch, see section 2.5.1. For all branches, a user can see the tests results in `jet-test` stage and training curves which are logged to wandb, see section 2.5.
+#### 2.6.1 Test results displayed in `jet-test` stage
+You can identify failed tests by reviewing the GitLab job log, accessible through the information provided in the `jet-test` stage job log. 
+This stage aggregates details from both GitLab jobs and associated test executions. 
+Rows corresponding to failed tests or job scripts are highlighted in red. 
+Below is an example of such an output:
+```
+2024-07-01 16:44:26,886 - CONVERGENCE TESTrecipe/diffdock_train_bionemo_partial-conv-trainings_32_nodes-1_gpus-8_bs-12_seed-42_config-train-confidence_domain-molecule_mepochs-80_warmup-200 with TEST status: failed, job status: success
+TEST: [train_loss_epoch between 0.0695 and 0.0905: pass] AND [train_loss_step between 0.0 and 0.215: pass] AND [val_loss between 0.1165 and 0.1475: fail (value 0.15271605551242828 is greater then 0.1475)] AND [exit code is 0: pass]
+
+JET pipeline id: 16054872, BioNeMo pipeline id: 16052340 JET job id: 98530000, 
+script duration in sec: 4933.25, job duration in sec (SLURM queue + JET setup + script duration): 5272.79
+JET job id logs: https://gitlab-master.nvidia.com/dl/jet/ci/-/jobs/98530000
+dllogger: https://pbss.s8k.io/v1/AUTH_team-jet-logs/f16137ab012f49d7a75830affbd60cfe/dllogger.json
+output_script: https://pbss.s8k.io/v1/AUTH_team-jet-logs/f16137ab012f49d7a75830affbd60cfe/output_script-0.log
+trainer_logs: https://pbss.s8k.io/v1/AUTH_team-jet-logs/f16137ab012f49d7a75830affbd60cfe/trainer_logs.json
+
+2024-07-01 16:44:26,887 - CONVERGENCE TESTrecipe/diffdock_train_bionemo_partial-conv-trainings_32_nodes-1_gpus-8_bs-12_seed-42_config-train-score_domain-molecule_mepochs-80_warmup-200 with TEST status: success, job status: success
+TEST: [train_loss_epoch between 0.6215 and 0.6505: pass] AND [train_loss_step between 0.6065 and 0.6875: pass] AND [valinf_rmsds_lt2 between 0.0415 and 0.0925: pass] AND [valinf_rmsds_lt5 between 0.2315 and 0.3145: pass] AND [exit code is 0: pass]
+
+JET pipeline id: 16054872, BioNeMo pipeline id: 16052340 JET job id: 98530004, 
+script duration in sec: 7024.04, job duration in sec (SLURM queue + JET setup + script duration): 7358.01
+JET job id logs: https://gitlab-master.nvidia.com/dl/jet/ci/-/jobs/98530004
+dllogger: https://pbss.s8k.io/v1/AUTH_team-jet-logs/7faea47c21204628b617ed07a987ee77/dllogger.json
+output_script: https://pbss.s8k.io/v1/AUTH_team-jet-logs/7faea47c21204628b617ed07a987ee77/output_script-0.log
+trainer_logs: https://pbss.s8k.io/v1/AUTH_team-jet-logs/7faea47c21204628b617ed07a987ee77/trainer_logs.json
+```
+#### 2.6.2 Dashboard for regression tracking & reporting on `dev` branch
+The source of truth for  `dev` branch. The tests results are displayed, summarised and tracked in the [dashboard](http://clara-discovery.gitlab-master-pages.nvidia.com/dashboards) deployed by [BioNeMo's dashboard repository](https://gitlab-master.nvidia.com/clara-discovery/dashboards).
 
 Every convergence test pipeline in BioNeMo CI ends with the automatic dashboard update regardless of the tests results. 
-The stage `dashboard-update-trigger` triggers deploy pipeline in the dashboard repository. 
+The stage `dashboard-update-trigger` triggers deploy pipeline in the dashboard repository, regardless whether the tests succeeded or failed. 
 See [.gitlab-ci.yml](https://gitlab-master.nvidia.com/clara-discovery/bionemo/-/blob/dev/.gitlab-ci.yml?ref_type=heads) for details.
+
+### 2.7 How to compare convergence tests results between different gitlab branches
+The dashboard is available only for the `dev` branch but one can compare convergence training pipelines between different branches in two ways. 
+#### 2.7.1 Comparing tests results for the same convergence tests
+If test definition sections in the jet configurations file located at `internal/jet/workloads/partial-conv-trainings/recipes` are identical on every branch, 
+a user can verify in the jet-test stage of each branch-specific convergence tests pipeline whether tests pass for the same job key.
+#### 2.7.2 Comparing training curves of convergence tests 
+A user can maintain a single wandb project name with branch-specific wandb run names, which are utilized to log training curves during the convergence tests pipeline. 
+This configuration is achievable by initiating the convergence tests pipeline from the [GitLab pipeline creation page]([GitLab pipeline creation page](https://gitlab-master.nvidia.com/clara-discovery/bionemo/-/pipelines/new)) 
+and setting the `WANDB_PROJECT_SUFFIX` and `WANDB_RUN_SUFFIX` variables through the GitLab pipeline configuration interface. 
+To ensure all training curves from different convergence test pipelines log under the same wandb project, the `WANDB_PROJECT_SUFFIX` must remain consistent. 
+To distinguish training curves across various branches, the `WANDB_RUN_SUFFIX` should be configured to reflect branch-specific identifiers.
 
 ## 3. How to trigger JET testing pipeline
 JET pipeline can be triggered using BioNeMo CI. This section outlines the most common approaches. 
