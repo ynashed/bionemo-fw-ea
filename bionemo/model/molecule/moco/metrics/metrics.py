@@ -158,6 +158,19 @@ def calculateScore(m):
     return min(max(sascore, 1.0), 10.0)
 
 
+def get_mols_list(smiles_list):
+    mols = []
+    for i in smiles_list:
+        try:
+            mol = Chem.MolFromSmiles(i)
+            Chem.SanitizeMol(mol)
+            if mol is not None:
+                mols.append(mol)
+        except Exception:
+            pass
+    return mols
+
+
 class BasicMolecularMetrics:
     def __init__(self, dataset_info, device="cpu"):
         self.atom_decoder = (
@@ -216,9 +229,8 @@ class BasicMolecularMetrics:
         }
         valid_smiles, valid_molecules, validity = self.evaluate(molecules)
         validity_dict = {"validity": validity}
-
-        if valid_molecules:
-            mols = [mol.rdkit_mol for mol in valid_molecules]
+        mols = get_mols_list(valid_smiles)
+        if mols:
             qed_scores = [self.calculate_qed(mol) for mol in mols]
             sa_scores = [self.calculate_sa(mol) for mol in mols]
             logp_scores = [self.calculate_logp(mol) for mol in mols]
