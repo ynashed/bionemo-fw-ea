@@ -1,0 +1,22 @@
+data:
+  processed_training_data_path: ${oc.env:BIONEMO_HOME}/data/nv_pdbdock_processed.pkl
+model:
+  hidden_size: 256
+  mpn_depth: 3
+  num_heads: 4
+  dropout: 0.1
+  threshold: 10.0
+  vocab_size: 38
+  aa_size: 21
+  max_residue_atoms: 14
+train:
+  num_gpus: 1
+  seed: 7
+  max_epochs: 30
+  batch_size: 4
+  ckpt_dir: ${oc.env:BIONEMO_HOME}/test_results/${name}
+  ckpt_interval: 1
+  lr: 0.0005
+  anneal_rate: 0.95
+  clip_norm: 1.0
+name: dsmbind_training_test

@@ -73,5 +73,5 @@ meeko==0.1.dev3
 # vina==1.2.5 # base container issues with libbost. Note that this is installed in the image manually.
 git+https://github.com/Valdes-Tresanco-MS/AutoDockTools_py3@1.5.7.post1
 lightning==2.2.1
-# DSMBind and DSMBind-anchor
+# DSMBind
 chemprop==1.6.1

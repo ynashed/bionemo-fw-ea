@@ -37,6 +37,7 @@ from bionemo.model.molecule.diffdock.models.nemo_model import (
 from bionemo.model.molecule.diffdock.models.nemo_model import (
     DiffdockTensorProductScoreModelAllAtom as DiffdockConfidenceModel,
 )
+from bionemo.model.molecule.dsmbind.dsmbind_model import DSMBind
 from bionemo.model.molecule.megamolbart import FineTuneMegaMolBART, MegaMolBARTModel, MegaMolBARTRetroModel
 from bionemo.model.molecule.molmim import MolMIMModel
 from bionemo.model.protein.downstream import FineTuneProteinModel
@@ -201,6 +202,13 @@ TEST_PARAMS: List[TrainingTestParams] = [
     #     "model_cls": FineTuneGeneformerModel,
     #     "model_size": 15549510,
     # },
+    # TODO test_model_training for DSMBind should be customized
+    {
+        "config_name": 'dsmbind_training_test',
+        "script_path": "examples/molecule/dsmbind/train.py",
+        "model_cls": DSMBind,
+        "model_size": 1019136,
+    },
 ]
 
 CONFIG_NAME = [params["config_name"] for params in TEST_PARAMS]
@@ -238,7 +246,6 @@ def test_config_parameters(config_name: str, expected_configs_path: str, config_
         assert False, msg
 
     expected_cfg = load_model_config(config_name=expected_cfg_name, config_path=expected_configs_path)
-
     assert resolve_cfg(expected_cfg) == resolve_cfg(cfg), (
         f"Mismatch in config {expected_configs_path}/{expected_cfg_name}."
         f"\nIn order to update please use the folllowing command:\n UPDATE_EXPECTED_CFG=1 pytest examples/tests/test_model_pretrain_and_downstream.py"
@@ -256,8 +263,9 @@ def test_model_size(config_name: str, model_class: LightningModule, model_parame
 
     cfg = load_model_config(config_name=config_name, config_path=config_path_for_tests)
     with distributed_model_parallel_state():
-        callbacks = setup_dwnstr_task_validation_callbacks(cfg)
-        trainer = setup_trainer(cfg, callbacks=callbacks)
+        if model_class != DSMBind:  # DSMBind is not a LightningModule
+            callbacks = setup_dwnstr_task_validation_callbacks(cfg)
+            trainer = setup_trainer(cfg, callbacks=callbacks)
         if model_class == FineTuneProteinModel or model_class == FineTuneMegaMolBART:
             with open_dict(cfg):
                 cfg.model.encoder_cfg = cfg  # TODO: why do we have to do this?
@@ -276,16 +284,24 @@ def test_model_size(config_name: str, model_class: LightningModule, model_parame
                 with open_dict(cfg):
                     cfg.model.encoder_cfg = cfg  # TODO: why do we have to do this?
             model = model_class(cfg.model, trainer)
+        elif model_class == DSMBind:
+            model = model_class(cfg.model)
+            model.num_weights = sum(p.numel() for p in model.parameters())
         else:
             model = model_class(cfg.model, trainer)
         assert model.num_weights == model_parameters
+
+
+config_to_test = [
+    (config, script) for config, script in zip(CONFIG_NAME, TRAINING_SCRIPT_PATH) if config != 'dsmbind_training_test'
+]  # Skip the DSMBind training test for now since (1) we don't have validation setup and (2) DSMBind is not dependent on nemo.core.ModelPT.
 
 
 @pytest.mark.slow
 @pytest.mark.needs_gpu
 @pytest.mark.parametrize(
     'config_name, script_path',
-    list(zip(CONFIG_NAME, TRAINING_SCRIPT_PATH)),
+    config_to_test,
 )
 def test_model_training(
     config_name: str, script_path: str, tmp_path: Path, expected_training_logs_path: str, config_path_for_tests

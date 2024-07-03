@@ -83,7 +83,9 @@ def resolve_cfg(cfg: DictConfig):
     """
     OmegaConf.resolve(cfg)
     with open_dict(cfg):
-        cfg.exp_manager.wandb_logger_kwargs.pop('notes', None)
+        # Check if the key `exp_manager` and the nested key `wandb_logger_kwargs` exist
+        if 'exp_manager' in cfg and 'wandb_logger_kwargs' in cfg.exp_manager:
+            cfg.exp_manager.wandb_logger_kwargs.pop('notes', None)
     cfg_str = yaml.load(OmegaConf.to_yaml(cfg), Loader=yaml.BaseLoader)
     return cfg_str
 

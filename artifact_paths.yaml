@@ -174,6 +174,12 @@ models:
             source: "../../enformer_pretrained32.nemo"
             target: "dna/enformer/enformer_pretrained32.nemo"
         relative_download_dir: "dna/enformer/"
+    dsmbind:
+        ngc: null
+        pbss: "s3://bionemo-ci/models/dsmbind.pth"
+        symlink:
+            source: "../../dsmbind.pth"
+            target: "molecule/dsmbind/dsmbind.pth"
 data:
     openfold_sample:
         pbss: "s3://bionemo-ci/test-data/openfold/openfold_vprocessed_sample/openfold_sample_data.tar.gz"

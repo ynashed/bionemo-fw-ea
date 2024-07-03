@@ -50,7 +50,14 @@ def featurize_tgt(batch, vocab=ALPHABET):
 
 
 class DSMBindDataset(Dataset):
-    def __init__(self, processed_data_path: str, aa_size: int, max_residue_atoms: int = 14, patch_size: int = 50):
+    def __init__(
+        self,
+        processed_data_path: str,
+        aa_size: int,
+        max_residue_atoms: int = 14,
+        patch_size: int = 50,
+        affinity_label: bool = False,
+    ):
         """
         A dataset class for DSMBind training.
 
@@ -59,6 +66,7 @@ class DSMBindDataset(Dataset):
             aa_size (int): number of residue types.
             max_residue_atoms (int): maximum number of atoms of residues.
             patch_size (int): number of residues to be considered as in pocket.
+            affinity_label (bool): if affinity labels are provided.
         """
         with open(processed_data_path, 'rb') as f:
             data = pickle.load(f)
@@ -66,6 +74,7 @@ class DSMBindDataset(Dataset):
         self.data = []
         self.aa_size = aa_size
         self.max_residue_atoms = max_residue_atoms
+        self.affinity_label = affinity_label
         for entry in tqdm(data):
             entry['target_coords'] = torch.tensor(entry['target_coords']).float()
             entry['target_atypes'] = torch.tensor(
@@ -81,6 +90,8 @@ class DSMBindDataset(Dataset):
             entry['pocket_seq'] = ''.join([entry['target_seq'][i] for i in idx.tolist()])
             entry['pocket_coords'] = entry['target_coords'][idx]
             entry['pocket_atypes'] = entry['target_atypes'][idx]
+            if affinity_label:
+                entry['affinity'] = torch.tensor(entry['affinity'])
             self.data.append(entry)
 
     def __len__(self):
@@ -99,6 +110,7 @@ class DSMBindDataset(Dataset):
         Returns:
             batched_binder (Tuple[torch.Tensor, List[Mol], torch.Tensor]): the batched ligand info. The first tensor is the ligand atom coordinates. The second list is a list of RDKit molecules. The third tensor is a mask for indicating ligand atoms.
             batched_target (Tuple[torch.Tensor, torch.Tensor, torch.Tensor]): the batched target pocket info. The first tensor is the target atom coordinates. The second tensor is a one-hot residue embedding. The third tensor represents all target atoms in the pocket.
+            affinity (Optional[torch.Tensor]): the batched affinity values.
         """
         mols = [entry['binder_mol'] for entry in batch]
         N = max([mol.GetNumAtoms() for mol in mols])
@@ -117,4 +129,8 @@ class DSMBindDataset(Dataset):
             tgt_S[i, :L] = residue_embedding
         batched_binder = (bind_X, mols, bind_A)
         batched_target = (tgt_X, tgt_S, tgt_A)
-        return batched_binder, batched_target
+        if self.affinity_label:
+            affinity = torch.stack([entry['affinity'] for entry in batch])
+            return batched_binder, batched_target, affinity
+        else:
+            return batched_binder, batched_target

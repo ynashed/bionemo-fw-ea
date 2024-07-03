@@ -91,9 +91,10 @@ docs/readme-images/dnabert8xa100.png @skothenhill
 bionemo/model/molecule/dsmbind @farhadr @menliu
 bionemo/data/dsmbind @farhadr @menliu
 examples/molecule/dsmbind @farhadr @menliu
+examples/tests/test_data/molecule/dsmbind @farhadr @menliu
 tests/test_dsmbind_data_utils.py @farhadr @menliu
 tests/test_dsmbind_model.py @farhadr @menliu
-tests/dsmbind_test_data @farhadr @menliu
+tests/test_dsmbind_inference.py @farhadr @menliu
 # MISSING DOCS
 
 ##

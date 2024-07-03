@@ -1,0 +1,24 @@
+data:
+  processed_training_data_path: ${oc.env:BIONEMO_HOME}/data/nv_pdbdock_processed.pkl # path to processed training data
+
+model:
+  hidden_size: 256 # number of hidden dimensions
+  mpn_depth: 3 # depth of the message passing network
+  num_heads: 4 # number of attention heads in the Transformer encoder layer
+  dropout: 0.1 # dropout rate
+  threshold: 10.0 # distance cutoff threshold
+  vocab_size: 38 # number of atom types, vocab_size=len(ATOM_TYPES)
+  aa_size: 21 # number of residue types, aa_size=len(ALPHABET)
+  max_residue_atoms: 14 # max number of residue atoms
+
+train:
+  num_gpus: 1  # number of GPUs
+  seed: 7 # random seed
+  max_epochs: 30 # numbder of epochs
+  batch_size: 4 # batch size
+  ckpt_dir: ${oc.env:BIONEMO_HOME}/results/ # directory to checkpoints
+  ckpt_interval: 1 # interval to save checkpoints
+  lr: 5e-4 # learning rate
+  anneal_rate: 0.95 # multiplicative factor of learning rate decay
+  clip_norm: 1.0 # max norm of the gradients
+
