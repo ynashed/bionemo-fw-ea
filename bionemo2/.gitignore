@@ -1,3 +1,8 @@
+# Lightning and project output files
+test_data
+lightning_logs
+models
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

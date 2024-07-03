@@ -645,6 +645,9 @@ bionemo2-build-image:
     - when: on_success
   script:
     - echo "Building bionemo2 image..."
+    - echo $IMAGE_NAME
+    - echo $SUFFIX_BIONEMO2
+    - echo ${IMAGE_NAME}${SUFFIX_BIONEMO2}
     - cd ./bionemo2/
     - docker buildx version
     # Pull down the cached image from the previous pipeline run
@@ -652,7 +655,8 @@ bionemo2-build-image:
     - docker buildx build
       --cache-from nvcr.io/nvidian/cvai_bnmo_trng/bionemo:bionemo2-latest
       -t "${IMAGE_NAME}${SUFFIX_BIONEMO2}"
-      -f Dockerfile .
+      -f Dockerfile
+      --load .
     - echo "Now pushing container"
     - docker push "${IMAGE_NAME}${SUFFIX_BIONEMO2}"
 
@@ -729,6 +733,9 @@ bionemo2-pytest-contrib:
     - echo "Running BFW tests..."
     - pwd
     - ls -l .
+    - mkdir -p ./models  # for the download_artifacts.py script to place models
+    - mkdir -p ./test_data  # for the download_artifacts.py script to place test data
+    - python scripts/download_artifacts.py --models all --model_dir ./models --data all --data_dir ./ --verbose --source pbss
     - pushd ./sub-packages/bionemo-contrib
     - pytest -v .
     - popd

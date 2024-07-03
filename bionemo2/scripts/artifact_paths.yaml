@@ -1,0 +1,32 @@
+# This file specifies the source locations of pretrained models, and what
+# the target locations to which they should be downloaded.
+#
+# The model source can be from either NGC (for internal nvidia + external customer use)
+# or from SwiftStack (aka PBSS) for internal nvidia use.
+#
+# The download_models.py script requires the download directory be specified, but there
+# are two extra parameters here that can further specify what to do with the downloaded file.
+# "symlink" is used to specify if any symlinking operation needs to happen after download.
+# "relative_download_dir" is used to specify the subdirectory to which the files should
+# be downloaded.
+# "extra_args" specifies any extra arguments that should be passed the ngc download or
+# s3 download commands.
+#
+# All models with an `ngc` path are publically available. Those with only a `pbss` path
+# are currently in internal NVIDIA development.
+
+models:
+    # OLD nemo models from bionemo1
+    geneformer_10M_240530:
+        # A pretrained 10.3M parameter geneformer (BERT) on 23M unique single cells and 25429 ENSG based tokens,
+        #   padded to a final shape of 25472 for GPU efficiency.
+        # See https://wandb.ai/clara-discovery/scFM_v9/runs/4ij9ghox
+        ngc: null
+        pbss: "s3://bionemo-ci/models/geneformer-10M-240530-step-115430-wandb-4ij9ghox.nemo"
+        symlink:
+            source: "../../geneformer-10M-240530-step-115430-wandb-4ij9ghox.nemo"
+            target: "singlecell/geneformer/geneformer-10M-240530.nemo"
+data:
+    single_cell:
+        pbss: "s3://bionemo-ci/test-data/singlecell/singlecell-testdata-20240506.tar.gz"
+        relative_download_dir: "test_data/"

@@ -15,11 +15,13 @@
 
 
 from contextlib import contextmanager
+from typing import Optional
 
 import apex
 import pytorch_lightning as pl
 import torch
 from megatron.core import parallel_state
+from megatron.core.tensor_parallel import random as tp_random
 from nemo.utils import logging
 
 
@@ -92,7 +94,7 @@ def _initialize_distributed_parallel_state(
 
 
 @contextmanager
-def distributed_model_parallel_state():
+def distributed_model_parallel_state(seed: Optional[int] = 42):
     """Context manager for handling creating and cleaning up distributed model parallel state for tests.
     Use like:
     with distributed_model_parallel_state():
@@ -102,6 +104,36 @@ def distributed_model_parallel_state():
     try:
         _teardown_apex_megatron_cuda()
         _initialize_distributed_parallel_state()
+        # Our goal is to set required state on entry, and then restore current state on exit for the RNGs.
+        #  there are two possibilities that are handled below:
+        # 1. If the RNG state is not initialized, we need to set it up and then
+        #     unset it on exit to restore the current state. We track that this is the case when `initial_states` is `None`.
+        # 2. If the RNG state is initialized, we need to track this state and reset it on exit to be what it was on entry.
+        #    We track that this is the case when `initial_states` is not `None`.
+        if tp_random.get_cuda_rng_tracker().is_initialized():
+            initial_states = tp_random.get_cuda_rng_tracker().get_states()
+        else:
+            initial_states = None
+        if seed is not None:
+            # Set the seed if provided, this case is valid whether or not the RNG had state previously.
+            #  on exit the RNG state will be restored to what it was on entry.
+            tp_random.model_parallel_cuda_manual_seed(seed)
+        else:
+            # This is the case where the RNG state is not initialized and no seed was provided.
+            #  We need to raise an error in this case, as we cannot restore the RNG state on exit and we need a seed
+            #  to initialize the RNG state to. This only happens if the user overrides the default seed and sets it
+            #  to None, and additionally if the RNG state was not initialized externally, as there is a default seed of 42.
+            if initial_states is None:
+                raise ValueError(
+                    "You must provide a seed if the initial parallel state is unset. "
+                    "Either provide a seed or leave the default seed (rather setting to None) "
+                    "or initialize the RNG state externally."
+                )
         yield
     finally:
+        if initial_states is not None:
+            tp_random.get_cuda_rng_tracker().set_states(initial_states)
+        else:
+            # Reset to the unset state
+            tp_random.get_cuda_rng_tracker().reset()
         _teardown_apex_megatron_cuda()

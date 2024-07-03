@@ -165,7 +165,9 @@ DOCKER_CMD="docker run \
     -p ${JUPYTER_PORT}:8888 \
     --shm-size=4g \
     -e TMPDIR=/tmp/ \
-    -e NUMBA_CACHE_DIR=/tmp/ "
+    -e NUMBA_CACHE_DIR=/tmp/ \
+    -e AWS_SECRET_ACCESS_KEY \
+    -e AWS_ACCESS_KEY_ID "
 
 setup() {
     # mkdir -p ${DATA_PATH}
