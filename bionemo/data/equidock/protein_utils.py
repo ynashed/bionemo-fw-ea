@@ -98,8 +98,8 @@ def get_rot_mat(euler_angles):
     yaw = euler_angles[1]
     pitch = euler_angles[2]
 
-    tensor_0 = torch.zeros([])
-    tensor_1 = torch.ones([])
+    tensor_0 = torch.zeros([], device=euler_angles.device, dtype=euler_angles.dtype)
+    tensor_1 = torch.ones([], device=euler_angles.device, dtype=euler_angles.dtype)
     cos = torch.cos
     sin = torch.sin
 

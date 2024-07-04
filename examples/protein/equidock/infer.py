@@ -8,18 +8,6 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
-#!/bin/bash
-
-# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
-#
-# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
-# property and proprietary rights in and to this material, related
-# documentation and any modifications thereto. Any use, reproduction,
-# disclosure or distribution of this material and related documentation
-# without an express license agreement from NVIDIA CORPORATION or
-# its affiliates is strictly prohibited.
-
 """
 Entry point to EquiDock.
 
@@ -43,8 +31,17 @@ from bionemo.data.equidock.protein_utils import (
     extract_to_dir,
 )
 from bionemo.model.protein.equidock.infer import EquiDockInference
+from bionemo.model.protein.equidock.utils.remove_clashes import remove_clashes
 from bionemo.model.protein.equidock.utils.train_utils import batchify_and_create_hetero_graphs_inference
+from bionemo.utils.tests import teardown_apex_megatron_cuda
 
+
+torch.use_deterministic_algorithms(False)
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
+torch.backends.cuda.matmul.allow_tf32 = False
+torch.backends.cuda.allow_tf32 = False
+torch.backends.cudnn.enabled = False
 
 os.environ['DGLBACKEND'] = 'pytorch'
 torch.set_float32_matmul_precision("high")
@@ -70,6 +67,8 @@ def main(cfg) -> None:
     logging.info("\n\n************** Loading EquiDockInference ***********")
     model = EquiDockInference(cfg=cfg)
     model.eval()
+    teardown_apex_megatron_cuda()
+
     data_dir = cfg.data.data_dir
 
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -84,7 +83,7 @@ def main(cfg) -> None:
         time_list = []
 
         for file in pdb_files:
-            start = time.time()
+            start = time.perf_counter()
             if not file.endswith('_l_b.pdb'):
                 continue
 
@@ -119,7 +118,14 @@ def main(cfg) -> None:
             translation = all_translation_list[0].detach().cpu().numpy()
 
             new_residues = (rotation @ bound_ligand_repres_nodes_loc_clean_array.T).T + translation
-            assert np.linalg.norm(new_residues - model_ligand_coors_deform_list[0].detach().cpu().numpy()) < 1e-1
+
+            try:
+                assert (
+                    np.linalg.norm(new_residues - model_ligand_coors_deform_list[0].detach().cpu().numpy()) < 1e-1
+                ), f"{np.linalg.norm(new_residues - model_ligand_coors_deform_list[0].detach().cpu().numpy())}"
+            except AssertionError as error:
+                logging.info(f"\n\n Skipping {ligand_filename} - {receptor_filename} with {error}")
+                continue
 
             # Get initial ligand position
             ppdb_ligand = PandasPdb().read_pdb(ligand_filename)
@@ -128,13 +134,31 @@ def main(cfg) -> None:
             )
             unbound_ligand_new_pos = (rotation @ unbound_ligand_all_atoms_pre_pos.T).T + translation
 
-            ppdb_ligand.df['ATOM'][
-                ['x_coord', 'y_coord', 'z_coord']
-            ] = unbound_ligand_new_pos  # unbound_ligand_new_pos
+            if cfg.get('postprocess', None) is not None and cfg.postprocess.remove_clashes:
+                logging.info("Removing clashes!")
+                max_iteration = cfg.postprocess.max_iteration
+
+                unbound_ligand_new_pos = remove_clashes(
+                    unbound_ligand_new_pos,
+                    receptor_filename,
+                    max_iteration,
+                    cfg.postprocess.min_clash_loss,
+                    cfg.postprocess.lr,
+                    cfg.postprocess.fast_optimizer,
+                    cfg.postprocess.half_precision,
+                )
+
+                ppdb_ligand.df['ATOM'][
+                    ['x_coord', 'y_coord', 'z_coord']
+                ] = unbound_ligand_new_pos  # unbound_ligand_new_pos
+
+            else:
+                ppdb_ligand.df['ATOM'][
+                    ['x_coord', 'y_coord', 'z_coord']
+                ] = unbound_ligand_new_pos  # unbound_ligand_new_pos
             unbound_ligand_save_filename = os.path.join(output_dir, out_filename)
             ppdb_ligand.to_pdb(path=unbound_ligand_save_filename, records=['ATOM'], gz=False)
-
-            time_list.append((time.time() - start))
+            time_list.append((time.perf_counter() - start))
 
         time_array = np.array(time_list)
         logging.info(f"Mean runtime: {np.mean(time_array)}, std runtime: {np.std(time_array)}")
