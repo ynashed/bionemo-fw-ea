@@ -905,8 +905,8 @@ jet-test:
   rules:
     - if: $BIONEMO2_ONLY == "true" || $EXCLUDE_JET == "true"
       when: never
-    - if: $BIONEMO2_ONLY == "false" && $CI_JOB_STATUS == 'failed'
-      when: on_failure
+    - if: $BIONEMO2_ONLY == "false" && $CI_JOB_STATUS != 'skipped'
+      when: always
     - when: on_success
   image:
     name: gitlab-master.nvidia.com:5005/dl/jet/api:latest

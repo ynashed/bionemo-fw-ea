@@ -24,7 +24,7 @@ echo "==========================================================================
 for (( i=1; i<${#test_status[@]}; ++i)); do
   jet_test_status=${test_status[$i]}
   job_key=${job_keys[$i]}
-  if [[ "${job_key}" == recipe/* && "${jet_test_status}" != "Success" ]]; then
+  if [[ "${job_key}" == recipe/* && "${jet_test_status}" != "success" ]]; then
       echo -e "\nJOB_KEY: ${job_key}, TEST: ${jet_test_status}"
       status+=1
   fi

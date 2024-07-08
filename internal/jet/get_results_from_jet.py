@@ -219,10 +219,18 @@ def log_detailed_job_info(df: pd.DataFrame) -> None:
     logging.info('Additional information about jobs in JET listed below')
 
     for _, job_info in df.iterrows():
+        error_line = (
+            f"\nJET job error code: {job_info['jet_ci_job_status_code']}, JET job error msg: "
+            f"{job_info['jet_ci_job_status']}"
+            if job_info["jet_ci_job_status"].lower() != "success"
+            else ""
+        )
+        jet_job_status = "success" if job_info["jet_ci_job_status"].lower() == "success" else "failed"
         if job_info["job_type"] == "build":
-            header_str = f'DOCKER BUILD {job_info["job_key"]} with JOB status: {job_info["jet_ci_job_status"]}'
+            header_str = f'DOCKER BUILD {job_info["job_key"]}\nJOB status: {jet_job_status}'
             color = AnsiCodes.RED if job_info["jet_ci_job_status"].lower() == "failed" else AnsiCodes.GREEN
             msg = f"{_apply_color_str(text=header_str, color=color)}"
+            msg += f"{error_line}"
             for k, v in job_info[job_info.index.str.startswith('docker_')].items():
                 msg += f"\nDocker info: \n{k}: {v}\n"
 
@@ -234,26 +242,32 @@ def log_detailed_job_info(df: pd.DataFrame) -> None:
             else:
                 prefix = "SMOKE TEST: "
             color = AnsiCodes.RED if job_info["jet_test_status"].lower() == "failed" else AnsiCodes.GREEN
-            header_str = f'{prefix}{job_info["job_key"]} with {AnsiCodes.BOLD}TEST status: {job_info["jet_test_status"].lower()}{AnsiCodes.BOLD}, JOB status: {job_info["jet_ci_job_status"].lower()}'
-
+            header_str = (
+                f'{prefix}{job_info["job_key"]}\n{AnsiCodes.BOLD}'
+                f'TEST status: {job_info["jet_test_status"].lower()}{AnsiCodes.BOLD}, JOB status: {jet_job_status}'
+            )
+            test_job_log = (
+                f'\nJET test job id log: https://gitlab-master.nvidia.com/dl/jet/ci/-/jobs/{job_info["jet_ci_job_id_test"]}'
+                if job_info["jet_ci_job_id_test"] != "nan"
+                else ""
+            )
             msg = (
                 f'{_apply_color_str(text=header_str, color=color)}'
-                f'\nTEST: {job_info["jest_test_check"]}\n'
-                f'\nJET pipeline id: {job_info["jet_ci_pipeline_id"]}, BioNeMo pipeline id: {job_info["bionemo_ci_pipeline_id"]} '
-                f'JET job id: {job_info["jet_ci_job_id"]}, '
-                f'\nscript duration in sec: {round(job_info["script_duration"],2)}, job duration in sec (SLURM queue + JET setup + script duration): {round(job_info["jet_ci_job_duration"], 2)}'
-                f'\nJET job id logs: https://gitlab-master.nvidia.com/dl/jet/ci/-/jobs/{job_info["jet_ci_job_id"]}'
+                f'\nTEST: {job_info["jest_test_check"]}'
+                f'{error_line}\n'
+                f'\nJET pipeline id: {job_info["jet_ci_pipeline_id"]}, BioNeMo pipeline id: {job_info["bionemo_ci_pipeline_id"]}'
+                f'JET job id: {job_info["jet_ci_job_id"]}, JET test job id: {job_info["jet_ci_job_id_test"] if job_info["jet_ci_job_id_test"] else "N/A"}'
+                f'\nJET job id log: https://gitlab-master.nvidia.com/dl/jet/ci/-/jobs/{job_info["jet_ci_job_id"]}'
+                f'{test_job_log}'
+                f'\nscript duration in sec: {round(job_info["script_duration"], 2)}, job duration in sec (SLURM queue + JET setup + script duration): {round(job_info["jet_ci_job_duration"], 2)}'
             )
 
             for k, v in job_info[job_info.index.str.startswith('log_')].items():
                 msg += f'\n{k.replace("log_", "")}: {v}'
 
-            if job_info["exit_code"] != 0:
+            if job_info["jet_ci_job_status"].lower() != "success":
                 msg += f"\n\nScript:\n {job_info['script']}\n\n"
-        if color in AnsiCodes.RED:
-            logging.info(_apply_color_str(msg, color=AnsiCodes.RED) + '\n')
-        else:
-            logging.info(msg + '\n')
+        logging.info(msg + '\n')
 
 
 def get_docker_info(docker_info: dict) -> dict:
@@ -424,7 +438,7 @@ def get_test_results(jet_instance: JETInstance, pipeline_ids: List[str]) -> Opti
         tests_raw = query_jet_jobs(
             jet_instance=jet_instance,
             pipeline_id=int(pipeline_id),
-            fields_select=["s_status", "obj_ci.l_pipeline_id", "s_workload_logs", "nested_checks"],
+            fields_select=["s_status", "obj_ci.l_pipeline_id", "obj_ci.l_job_id", "s_workload_logs", "nested_checks"],
             job_type="test",
             label=None,
         )
@@ -440,8 +454,11 @@ def get_test_results(jet_instance: JETInstance, pipeline_ids: List[str]) -> Opti
         if "s_workload_logs" not in test_raw:
             continue
         test_dict["jet_ci_workload_id"] = test_raw["s_workload_logs"][0]
-        test_dict["jet_test_status"] = "Success" if test_raw["s_status"] == "pass" else "FAILED"
+        test_dict["jet_test_status"] = "success" if test_raw["s_status"] == "pass" else "failed"
         test_dict["jest_test_check"] = " AND ".join([_get_tests_check_str(d) for d in test_raw["nested_checks"]])
+        test_dict["jet_ci_job_id_test"] = (
+            str(test_raw["obj_ci"]["l_job_id"]) if test_raw["obj_ci"].get("l_job_id", None) else None
+        )
         output.append(test_dict)
     return pd.DataFrame(output)
 
@@ -533,7 +550,7 @@ def get_results_from_jet(
     df_test = get_test_results(jet_instance=jet_instance, pipeline_ids=list(pipelines_info.keys()))
     if df_test.shape[0] > 0:
         df = pd.merge(df, df_test, on='jet_ci_workload_id', how='left')
-
+    df.loc[(df["job_key"].str.contains("recipe")) & (df["jet_test_status"].isna()), "jet_test_status"] = "failed"
     if verbosity_level >= 2:
         print_table_with_results(df=df)
 
