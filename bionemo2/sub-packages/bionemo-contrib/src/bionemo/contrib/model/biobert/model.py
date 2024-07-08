@@ -69,8 +69,8 @@ class MegatronBioBertModel(LanguageModule):
     def __init__(
         self,
         config: TransformerConfig,
-        num_tokentypes: int,
         transformer_layer_spec: spec_utils.ModuleSpec,
+        lm_embedding: LanguageModelEmbedding,
         vocab_size: int,
         max_sequence_length: int,
         pre_process: bool = True,
@@ -112,13 +112,7 @@ class MegatronBioBertModel(LanguageModule):
 
         # Embeddings.
         if self.pre_process:
-            self.embedding = LanguageModelEmbedding(
-                config=self.config,
-                vocab_size=self.vocab_size,
-                max_sequence_length=self.max_sequence_length,
-                position_embedding_type=position_embedding_type,
-                num_tokentypes=num_tokentypes,
-            )
+            self.embedding = lm_embedding
 
         if self.position_embedding_type == 'rope':
             self.rotary_pos_emb = RotaryEmbedding(
@@ -316,6 +310,7 @@ class MegatronBioBertModel(LanguageModule):
 @dataclass
 class BioBertConfig(TransformerConfig):
     # From megatron.core.models.gpt.bert_model.GPTModel
+    embed_module_cls: Type[LanguageModelEmbedding] = LanguageModelEmbedding
     fp16_lm_cross_entropy: bool = False
     parallel_output: bool = True
     share_embeddings_and_output_weights: bool = False  # try True
@@ -332,6 +327,24 @@ class BioBertConfig(TransformerConfig):
 
     optimizer_fn: Optional[Callable[["MegatronBioBertModel"], Optimizer]] = None
 
+    def configure_embedding(self, vocab_size, do_next_sentence=False) -> "LanguageModelEmbedding":
+        """configures and returns an instantiated object of embedding module
+
+        Args:
+            vocab_size (int): size of the vocabulary
+            do_next_sentence (bool, optional): add binary head. Defaults to False.
+
+        Returns:
+            LanguageModelEmbedding: an instantiated object of embedding module
+        """
+        return self.embed_module_cls(
+            config=self,
+            vocab_size=vocab_size,
+            max_sequence_length=self.seq_length,
+            position_embedding_type=self.position_embedding_type,
+            num_tokentypes=2 if do_next_sentence else 0,
+        )
+
     def configure_model(self, tokenizer) -> "MegatronBioBertModel":
         vp_size = self.virtual_pipeline_model_parallel_size
         if vp_size:
@@ -347,12 +360,16 @@ class BioBertConfig(TransformerConfig):
             BiobertSpecOption.bert_layer_local_spec_with_qk_ln,
         }
 
+        # construct an embedding object
         do_next_sentence = False
+        vocab_size = get_vocab_size(self, tokenizer.vocab_size, self.make_vocab_size_divisible_by)
+        lm_embedding = self.configure_embedding(vocab_size, do_next_sentence)
+
         return MegatronBioBertModel(
             self,
             transformer_layer_spec=get_biobert_spec(self.biobert_spec_option, qk_layernorm=self.qk_layernorm),
-            num_tokentypes=2 if do_next_sentence else 0,
-            vocab_size=get_vocab_size(self, tokenizer.vocab_size, self.make_vocab_size_divisible_by),
+            lm_embedding=lm_embedding,
+            vocab_size=vocab_size,
             max_sequence_length=self.seq_length,
             fp16_lm_cross_entropy=self.fp16_lm_cross_entropy,
             parallel_output=self.parallel_output,
