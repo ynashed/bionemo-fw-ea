@@ -26,6 +26,10 @@ export NGC_CLI_ORG=${NGC_CLI_ORG:=nvidian}
 export NGC_CLI_TEAM=${NGC_CLI_TEAM:=NotSpecified}
 export NGC_CLI_FORMAT_TYPE=${NGC_CLI_FORMAT_TYPE:=ascii}
 export GITLAB_TOKEN=${GITLAB_TOKEN:=NotSpecified}
+export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:="team-bionemo"}
+export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:=NotSpecified}
+export AWS_REGION=${AWS_REGION:="us-east-1"}
+export AWS_ENDPOINT_URL=${AWS_ENDPOINT_URL:="https://pbss.s8k.io"}
 # NOTE: Some variables need to be present in the environment of processes this script kicks off.
 #       Most notably, `docker build` requires the GITLAB_TOKEN env var. Otherwise, building fails.
 #
@@ -38,6 +42,7 @@ export GITLAB_TOKEN=${GITLAB_TOKEN:=NotSpecified}
 
 
 # if $LOCAL_ENV file exists, source it to specify my environment
+LOCAL_ENV=.env
 if [ -e ./$LOCAL_ENV ]
 then
     echo sourcing environment from ./$LOCAL_ENV

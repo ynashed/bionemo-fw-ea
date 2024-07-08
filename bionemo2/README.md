@@ -9,6 +9,21 @@ All `bionemo2` code is partitioned into independently installable namespace pack
 
 # TODO: Finish this.
 
+## Downloading artifacts
+Set the AWS access info in your `.env` in the host container prior to running docker:
+
+```bash
+AWS_ACCESS_KEY_ID="team-bionemo"
+AWS_SECRET_ACCESS_KEY=$(grep aws_secret_access_key ~/.aws/config | cut -d' ' -f 3)
+AWS_REGION="us-east-1"
+AWS_ENDPOINT_URL="https://pbss.s8k.io"
+```
+then
+```bash
+python scripts/download_artifacts.py --models all --model_dir ./models --data all --data_dir ./ --verbose --source pbss
+```
+
+
 ## Devloping with nemo+megatron+bionemo
 ```
 export NEMO_HOME=path/to/local/nemo
