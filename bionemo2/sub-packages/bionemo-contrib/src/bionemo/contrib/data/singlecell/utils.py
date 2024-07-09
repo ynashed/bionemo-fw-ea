@@ -47,3 +47,6 @@ def sample_or_truncate_plus_pad(
         pad_tokens = np.full((max_length - len(gene_ids)), pad_token_id, dtype=np.int32)
         gene_ids = np.concatenate([gene_ids, pad_tokens])
         return gene_ids
+
+
+__all__ = ['sample_or_truncate_plus_pad']

@@ -124,3 +124,6 @@ class GeneformerPreprocess:
             tokenizer = None
 
         return {'tokenizer': tokenizer, 'median_dict': median_dict}
+
+
+__all__ = ['GeneformerPreprocess']

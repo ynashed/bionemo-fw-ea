@@ -137,3 +137,6 @@ def distributed_model_parallel_state(seed: Optional[int] = 42):
             # Reset to the unset state
             tp_random.get_cuda_rng_tracker().reset()
         _teardown_apex_megatron_cuda()
+
+
+__all__ = ["distributed_model_parallel_state"]

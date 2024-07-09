@@ -1,2 +1,2 @@
--e ./src/bionemo-fw
--e ./src/bionemo-contrib
+-e ./sub-packages/bionemo-fw
+-e ./sub-packages/bionemo-contrib

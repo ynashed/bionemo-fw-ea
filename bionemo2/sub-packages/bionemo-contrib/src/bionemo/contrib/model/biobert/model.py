@@ -387,3 +387,6 @@ class BioBertConfig(TransformerConfig):
     def get_loss_reduction_class(self) -> Type[MegatronLossReduction]:
         # You could optionally return a different loss reduction class here based on the config settings.
         return BERTMLMLossWithReduction
+
+
+__all__ = ["BioBertConfig", "MegatronBioBertModel"]

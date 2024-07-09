@@ -146,3 +146,6 @@ class FTPRemoteResource(RemoteResource):
 
         self.check_exists()
         return self.fully_qualified_dest_filename
+
+
+__all__ = ["RemoteResource", "FTPRemoteResource"]

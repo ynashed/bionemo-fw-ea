@@ -39,10 +39,9 @@ RUN git clone https://github.com/Dao-AILab/causal-conv1d.git && \
   git checkout v1.2.0.post2  && \
   CAUSAL_CONV1D_FORCE_BUILD=TRUE pip install .
 # Full install of NeMo from source
-#  this commit allows the latest mcore to be used: https://github.com/NVIDIA/NeMo/pull/9478
 RUN git clone https://github.com/NVIDIA/NeMo.git && \
     cd NeMo && \
-    git checkout b78926f6ddb90269c1243c8f23e02b65dfbfa2a1 && \
+    git checkout 17f295beb207a31c3f4dea40e311ccef3cbc08ff && \
     ./reinstall.sh
 
 # Install any additional dependencies

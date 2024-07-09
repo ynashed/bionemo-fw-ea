@@ -164,3 +164,6 @@ class SingleCellDataModule(pl.LightningDataModule):
             num_samples=num_samples,
             seed=self.seed + len(stage),
         )
+
+
+__all__ = ["SingleCellDataModule"]

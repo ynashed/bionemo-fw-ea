@@ -129,3 +129,6 @@ def get_biobert_spec(biobert_spec_option: BiobertSpecOption, qk_layernorm: bool 
             return bert_layer_with_transformer_engine_and_qk_ln_spec
         case _:
             raise NotImplementedError(f"Spec option {biobert_spec_option} not implemented")
+
+
+__all__ = ["BiobertSpecOption", "get_biobert_spec"]

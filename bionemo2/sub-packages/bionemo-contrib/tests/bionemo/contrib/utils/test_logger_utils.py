@@ -12,3 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+from bionemo.contrib.utils.logger_utils import setup_nemo_lightning_logger
+
+
+def test_construct_logger_no_wandb():
+    logger = setup_nemo_lightning_logger("test")
+    assert logger.name == "test"

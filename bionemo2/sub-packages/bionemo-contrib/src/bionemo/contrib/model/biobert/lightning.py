@@ -25,7 +25,7 @@ from megatron.core.packed_seq_params import PackedSeqParams
 from nemo.collections.common.tokenizers.tokenizer_spec import TokenizerSpec
 from nemo.lightning import io as nlio
 from nemo.lightning.megatron_parallel import DataT, MegatronLossReduction
-from nemo.lightning.pytorch.opt import MegatronOptimizerModule
+from nemo.lightning.pytorch.optim import MegatronOptimizerModule
 from torch.optim import Optimizer
 
 from bionemo.contrib.lightning import LightningPassthroughPredictionMixin

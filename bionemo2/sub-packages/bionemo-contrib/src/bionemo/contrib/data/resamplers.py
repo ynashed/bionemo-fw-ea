@@ -102,3 +102,6 @@ class PRNGDatasetShuffler(Dataset):
     def __len__(self) -> int:
         """Returns the total number of samples in the dataset."""
         return self.num_samples
+
+
+__all__ = ["PRNGDatasetShuffler"]

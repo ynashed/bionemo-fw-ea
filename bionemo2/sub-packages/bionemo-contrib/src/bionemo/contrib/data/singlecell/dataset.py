@@ -349,3 +349,6 @@ def process_item(
     }
 
     return item
+
+
+__all__ = ['SingleCellDataset']

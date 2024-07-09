@@ -68,3 +68,6 @@ def nemo1_to_nemo2_biobert_key_mapping(
     if "lm_head.layernorm" in base_rename:
         return base_rename.replace("lm_head.layernorm", "lm_head.layer_norm")
     return base_rename
+
+
+__all__ = ["nemo1_to_nemo2_biobert_key_mapping"]

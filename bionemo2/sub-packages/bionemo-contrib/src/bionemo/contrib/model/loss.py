@@ -199,3 +199,6 @@ class BERTMLMLossWithReduction(_Nemo2CompatibleLossReduceMixin, MegatronLossRedu
         # average the losses across the data parallel group, but also return the unreduced loss
         reduced_loss = average_losses_across_data_parallel_group([loss_for_microbatch])
         return loss_for_microbatch * cp_size, {"avg": reduced_loss}
+
+
+__all__ = ["BERTMLMLossWithReduction"]

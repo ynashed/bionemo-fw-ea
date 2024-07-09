@@ -740,6 +740,45 @@ bionemo2-pytest-contrib:
     - pytest -v .
     - popd
 
+bionemo2-pytest-scripts:
+  image:
+    name: "${IMAGE_NAME}${SUFFIX_BIONEMO2}"
+    entrypoint: [ "" ]
+  stage: test
+  needs: [bionemo2-build-image]
+  allow_failure: false
+  rules:
+    - if: $BIONEMO2_ONLY == "true"
+      when: always
+    - if: $BIONEMO2_ONLY == "false"
+      when: never
+    - if: $CI_MERGE_REQUEST_LABELS =~ /SKIP_CI/
+      when: never
+    - when: on_success
+  tags:
+    - gpu
+  script:
+    - nvidia-smi
+    - df -Thl
+    - pwd
+    - ls -l
+    # gitlab CI checks-out the repository under `/builds/<repository name>`
+    # this checked-out code is volume-mounted into the container (it is also on a largish drive)
+    # our image is built by putting the code under `/workspace/<...>`
+    # Specifically, our code is under `/workspace/bionemo2` and the volume-mounted code is `/builds/bionemo/bionemo2`.
+    # We need to "overwrite" the code in the image with the volume-mounted code --> we use a symlink!
+    #        ln -s <location of code> <where we put the symlink>
+    - mv /workspace/bionemo2 /builds/bionemo2
+    - ln -s /builds/bionemo2 /workspace/bionemo2
+    - cd ./bionemo2/
+    - echo "Running BFW Scripts tests..."
+    - pwd
+    - ls -l .
+    - mkdir -p ./models  # for the download_artifacts.py script to place models
+    - mkdir -p ./test_data  # for the download_artifacts.py script to place test data
+    - python scripts/download_artifacts.py --models all --model_dir ./models --data all --data_dir ./ --verbose --source pbss
+    - pytest -v ./scripts
+
 
 .jet-configure:
   stage: jet
