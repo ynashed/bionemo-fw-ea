@@ -238,9 +238,20 @@ dev() {
 
     local IMAGE_TO_RUN
     IMAGE_TO_RUN=$IMAGE_NAME:$IMAGE_TAG
+    # HACK
+    IMAGE_TO_RUN=$IMAGE_NAME:bionemo2-latest
 
     set -x
     ${DOCKER_CMD}  --name ${DEV_CONT_NAME}  --rm -it ${IMAGE_TO_RUN} ${CMD}
+    set +x
+    exit
+}
+
+pull() {
+    echo "Pulling image called BIONEMO_IMAGE: ${BIONEMO_IMAGE}"
+    docker_login
+    set -x
+    docker pull ${BIONEMO_IMAGE}
     set +x
     exit
 }
@@ -260,7 +271,10 @@ case "$1" in
         ;;
     dev)
         dev
-	;;
+        ;;
+    pull)
+        pull
+        ;;
     update_build_cache)
         update_build_cache
         ;;
@@ -268,7 +282,7 @@ case "$1" in
         build_and_update_cache
         ;;
     *)
-        echo "Usage: $0 {build|update_build_cache|build_and_update_cache|run|dev}"
+        echo "Usage: $0 {build|update_build_cache|build_and_update_cache|run|dev|pull}"
         exit 1
         ;;
 esac

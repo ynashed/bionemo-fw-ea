@@ -12,13 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
-"""
-A collection of megatron compatible loss functions for use with various models.
-"""
-
-
+""" A collection of megatron compatable losses """
 from typing import Dict, List, Tuple, TypedDict, Union
 
 import torch
@@ -53,34 +47,19 @@ class _Nemo2CompatibleLossReduceMixin:
     Since this overrides an abstract parent class, this needs to be put first in the inheritance list to ensure that the correct method is called.
     """
 
-    def reduce(self, losses_reduced_per_micro_batch: List[Union[PerTokenLossDict, SameSizeLossDict]]) -> torch.Tensor:
-        """
-        Reduces the losses across the micro batches processed in this particular parallel step. Each loss output is expected to be a dictionary of strings to tensors.
-          The keys are expected to be either "avg" or "loss_sum_and_ub_size". The "avg" key is used when the micro batches are all the same size,
-          and the "loss_sum_and_microbatch_size".
-        Args:
-            losses_reduced_per_micro_batch (List[Union[PerTokenLossDict, SameSizeLossDict]]): A list of dictionaries, each containing the loss for a microbatch.
-                The dictionary should have a key of "avg" or "loss_sum_and_microbatch_size" and a value of the loss tensor.
-        Taken from: https://github.com/NVIDIA/NeMo/blob/main/nemo/collections/nlp/models/language_modeling/megatron_gpt_model.py#L535-L552 .
-        """
-        # TODO(@jomitchell): Add a unit test for this function, and some raieses.
+    def old_reduce(
+        self, losses_reduced_per_micro_batch: List[Union[PerTokenLossDict, SameSizeLossDict]]
+    ) -> torch.Tensor:
         if losses_reduced_per_micro_batch:
-            # This first simple case happens when the micro batches are all the same size, which is assumed to happen in training.
-            #   but in validation we may have the last batch be smaller, in which case we'll have the "loss_sum_and_ub_size" key rather than the "avg" key.
-            # TODO(@jomitchell): Make sure that 'avg' key is present in all list elements as a precaution.
             if "avg" in losses_reduced_per_micro_batch[0]:
                 loss_tensors_list = [loss_reduced["avg"] for loss_reduced in losses_reduced_per_micro_batch]
                 loss_tensor = torch.concat(loss_tensors_list)
 
                 return loss_tensor.mean()
-            # Get the total loss since micro batches sizes are not uniform
-            # NOTE(@jstjohn): these `ub` referres to micro-batch, and is a standard imposed on these key names by NeMo 2.0.
-            # TODO(@jstjohn): clean up this case and write tests to make sure it actually works. For now assume that this path
-            #  supporting non-same size validation steps is not correct.
+
             loss_sum_tensors_list: List[torch.Tensor] = [
                 loss_sum["loss_sum_and_microbatch_size"]
                 for loss_sum in losses_reduced_per_micro_batch
-                # tensor[1] stores the number of tokens in the microbatch for this particular loss. Only store losses with more than 0 tokens.
                 if loss_sum["loss_sum_and_microbatch_size"][1] > 0
             ]
             dummy_tensor = torch.tensor([0.0, 0.0]).cuda()
@@ -88,8 +67,41 @@ class _Nemo2CompatibleLossReduceMixin:
                 torch.vstack(loss_sum_tensors_list).sum(dim=0) if len(loss_sum_tensors_list) > 0 else dummy_tensor
             )
             return loss_sum
+
+        # If losses_reduced_per_micro_batch is empty, return a dummy tensor.
         dummy_tensor = torch.tensor(0.0).cuda()
         return dummy_tensor
+
+    def reduce(self, losses_reduced_per_micro_batch: List[Union[PerTokenLossDict, SameSizeLossDict]]) -> torch.Tensor:
+        # NOTE(SKH) This requires two passes over the data instead of one in the `loss_sum_and_microbatch_size` case.
+
+        # Expect two elements: losses, num_tokens. We only care about the num_tokens index.
+        NUM_TOKENS_IDX = 1
+
+        if not losses_reduced_per_micro_batch:
+            dummy_tensor = torch.tensor(0.0).cuda()
+            return dummy_tensor
+
+        # do the gather
+        [only_key] = list(losses_reduced_per_micro_batch[0].keys())
+        loss_tensors_list = [loss_reduced[only_key] for loss_reduced in losses_reduced_per_micro_batch]
+        # switch on the keys
+        if only_key == "avg":
+            return torch.concat(loss_tensors_list).mean()
+        elif only_key == "loss_sum_and_microbatch_size":
+            loss_sum_tensors_list = [
+                loss_sum for loss_sum in losses_reduced_per_micro_batch if loss_tensors_list[NUM_TOKENS_IDX] > 0
+            ]
+            if len(loss_sum_tensors_list) == 0:
+                # If we get no result, return zero.
+                dummy_tensor = torch.tensor([0.0, 0.0]).cuda()
+                return dummy_tensor
+            else:
+                # otherwise do a sum reduction.
+                loss_sum = torch.vstack(loss_sum_tensors_list).sum(dim=0)
+                return loss_sum
+        else:
+            raise ValueError(f"Got a key of {only_key=} but expected one of 'avg, losses_reduced_per_micro_batch'")
 
 
 class BERTMLMLossWithReduction(_Nemo2CompatibleLossReduceMixin, MegatronLossReduction):

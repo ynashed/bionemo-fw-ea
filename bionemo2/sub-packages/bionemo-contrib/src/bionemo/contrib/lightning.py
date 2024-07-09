@@ -14,7 +14,7 @@
 # limitations under the License.
 
 
-from typing import Sequence, Tuple
+from typing import Iterable, List, Optional, Tuple, TypeVar, Union
 
 import pytorch_lightning as pl
 import torch
@@ -23,63 +23,91 @@ from megatron.core import parallel_state
 from nemo.lightning.megatron_parallel import DataT, MegatronLossReduction, ReductionT
 
 
+T = TypeVar('T')
+
+
+def some_first(seq: Iterable[Optional[T]]) -> T:
+    '''returns the first non-None value from the sequence or fails'''
+    for s in seq:
+        if s is not None:
+            return s
+    raise ValueError("non-None value not found")
+
+
 def get_dtype_device(torch_object) -> Tuple[torch.dtype, torch.device]:
-    # TODO(@skothenhill): refafactor to use match statement
-    if isinstance(torch_object, torch.Tensor):
-        return torch_object.dtype, torch_object.device
-    elif isinstance(torch_object, torch.nn.Module):
-        # TODO(@skothenhill): handle, or more gracefully error, if parameters() is empty.
-        return next(torch_object.parameters()).dtype, next(torch_object.parameters()).device
-    elif isinstance(torch_object, dict):
-        for torch_object in torch_object.values():
-            if torch_object is not None:
-                return get_dtype_device(torch_object)
-    elif isinstance(torch_object, (list, tuple)):
-        for i in range(len(torch_object)):
-            if torch_object[i] is not None:
-                return get_dtype_device(torch_object[i])
-    else:
-        raise ValueError(f"Unsupported type {type(torch_object)} in get_dtype_device")
+    match torch_object:
+        case []:
+            raise ValueError("Looking up dtype on an empty list")
+        case {**data} if not data:
+            raise ValueError("Looking up dtype on an empty dict")
+        case torch.Tensor(dtype=dtype, device=device):
+            return dtype, device
+        case torch.nn.Module() as m:
+            try:
+                p = next(m.parameters())
+            except StopIteration as e:
+                raise ValueError("Cannot get dtype on a torch module with no parameters.") from e
+            return p.dtype, p.device
+        case dict(keys=_, values=values):
+            val = some_first(values())
+            return get_dtype_device(val)
+        case list() as l:
+            val = some_first(l)
+            return get_dtype_device(val)
+        case _:
+            raise TypeError("Got something we didnt expect")
 
 
-# TODO(@jstjohn): Properly use the Generic for DataT and ReductionT usage. Define our own batch/output types.
-def batch_collator(batches: Sequence[ReductionT]) -> ReductionT:
+# NOTE(SKH): These types are all wrong, but are close. The inner type must always be a torch.Tensor, but the outer container should be generic.
+def batch_collator(batches: Optional[Union[Tuple[ReductionT], List[ReductionT]]]) -> Optional[ReductionT]:
     """Takes a sequence of batches and collates them into a single batch.
         This is distinct from the standard pytorch default_collator since it does
         not add the batch dimension, it's assumed the batch
         dimension is already present in the input, as would be the case when
         parallelizing across minibatches.
 
+    IMPORTANT: The underlying data primitive _must_ be a torch Tensor. The input to this function is a recurisve type,
+    there can be any amount of nesting between dictionaries, tuples, and lists, as long as the inner type is a n-d torch.Tensor.
+
+    Examples:
+        Outer container = Dict:
+            [{'a': torch.tensor([1]), 'b': torch.tensor([2])}, {'a': torch.tensor([2]), 'b': torch.tensor([3])}] -> {'a': torch.tensor([1, 2]), 'b': torch.tensor([2, 3])}
+        Outer container = List:
+            [[torch.tensor([1]), torch.tensor([2])], [torch.tensor([2]), torch.tensor([3])]] -> [torch.tensor([1, 2]), torch.tensor([2, 3])]
+        Outer container = Tuple:
+            ([torch.tensor([1]), torch.tensor([2])], [torch.tensor([2]), torch.tensor([3])]) -> (torch.tensor([1, 2]), torch.tensor([2, 3]))
+
     Args:
-        batches (Sequence[ReductionT]): sequence of batches to collate into a single batch.
+        batches (Optional[Sequence[ReductionT]]): sequence of batches to collate into a single batch.
 
     Returns:
-        A single batch of the same type as one of the elements of your input sequence.
+        A single batch of the same type as the elements of your input sequence.
     """
-    # Class pattern matching (https://docs.python.org/3/reference/compound_stmts.html#class-patterns)
-    # TODO (@skothenhill): Refactor to use the full pattern matching syntax rater than just on element 0.
-    match batches[0]:
-        case torch.Tensor():
+
+    match batches:
+        case [torch.Tensor(), *_]:
             return torch.cat(batches, dim=0)
-        case dict():
+        case [dict(), *_]:
             return {key: batch_collator([batch[key] for batch in batches]) for key in batches[0]}
-        case tuple():
+        case [tuple(), *_]:
             return tuple(batch_collator([batch[i] for batch in batches]) for i in range(len(batches[0])))
-        case list():
+        case [list(), *_]:
             return [batch_collator([batch[i] for batch in batches]) for i in range(len(batches[0]))]
-        case None:  # TODO(@jomitchell): Update the NeMo ReductionT to highlight that some keys can point to None
-            # [None, None, None] -> None
+        case None:
             return None
+        case []:
+            raise ValueError("Cannot process an empty sequence")
         case _:
-            raise ValueError(f"Unsupported type {type(batches[0])} in batch_collator")
+            raise ValueError("Unsupported input structure in batch_collator")
 
 
 # TODO(@jstjohn): Properly use the Generic for DataT and ReductionT usage. Define our own batch/output types.
+# TODO(@skothenhill): Re-think the generics here- the way that `batch_collator` is expressed, `batches` should be a recursive generic type.
 class PassthroughLossReduction(MegatronLossReduction):
     """Internally in NeMo2.0 the forward step is always expected to return a loss reduction class, and forward is expected to return a loss.
     This class hijacks that mechanism to instead pass through the forward output unperturbed as the loss (to enable inference in the predict step), and then the
     reduce method is used to collate the batch of forward outputs into a single batch. This supports the model forward output being a tensor, dict, tuple,
-    or list of tensors.
+    or list of tensors. The inner type _must always be a torch.Tensor_.
     """
 
     def forward(self, batch: DataT, forward_out: DataT) -> Tuple[torch.Tensor, DataT]:
@@ -95,12 +123,12 @@ class PassthroughLossReduction(MegatronLossReduction):
         dtype, device = get_dtype_device(forward_out)
         return torch.zeros(1, device=device, dtype=dtype), forward_out
 
-    def reduce(self, forward_out: Sequence[DataT]) -> DataT:
+    def reduce(self, forward_out: List[DataT]) -> DataT:
         """This overrides the standard reduce with a simplified version that just takes a list of your model's forward outputs
             and collates them togehter into a single output.
 
         Args:
-            forward_out (Sequence[ReductionT]): _description_
+            forward_out (List[ReductionT]): _description_
 
         Returns:
             ReductionT: _description_
@@ -109,6 +137,7 @@ class PassthroughLossReduction(MegatronLossReduction):
 
 
 class LightningPassthroughPredictionMixin:
+
     """A mixin that allows your model to do inference on the predict step by hijacking the nemo loss
     reduction mechanism and passing the model output through.
     """
