@@ -20,6 +20,14 @@ This page contains the Python coding standards for the BioNeMo repository. They 
 ## Coding Style
 
 - We follow the [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html).
+- Our most common issues brought up in review are:
+  - [Docstring](https://google.github.io/styleguide/pyguide.html#381-docstrings)
+  - [Mutable global state](https://google.github.io/styleguide/pyguide.html#25-mutable-global-state)
+  - [Do not use mutable values as default arguments](https://google.github.io/styleguide/pyguide.html#212-default-argument-values)
+  - [Default iterators](https://google.github.io/styleguide/pyguide.html#28-default-iterators-and-operators)
+  - [Bad naming / abbreviation](https://google.github.io/styleguide/pyguide.html#316-naming)
+- The current only exception to the google python style guide is [Module](https://google.github.io/styleguide/pyguide.html#22-imports) imports.
+  - If a module is uniquely named, import the module. Otherwise, import the object.
 - Linting is done through `ruff` and `black`.
 - Unit testing with `pytest`.
 - Write Python 3 code.
