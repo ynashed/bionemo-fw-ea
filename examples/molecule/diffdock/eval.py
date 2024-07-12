@@ -12,6 +12,7 @@ Entry point to DiffDock: evaluating generated ligand poses.
 
 modify parameters from conf/*.yaml
 """
+
 import os
 
 import numpy as np
@@ -29,15 +30,15 @@ from bionemo.model.molecule.diffdock.utils.utils import read_strings_from_txt
 @hydra_runner(config_path="conf", config_name="eval")
 def main(cfg) -> None:
     logging.info("\n\n************** Experiment configuration ***********")
-    logging.info(f'\n{OmegaConf.to_yaml(cfg)}')
+    logging.info(f"\n{OmegaConf.to_yaml(cfg)}")
 
-    logging.info('Reading paths and names.')
+    logging.info("Reading paths and names.")
 
-    if cfg.get('protein_ligand_csv') is not None:
+    if cfg.get("protein_ligand_csv") is not None:
         df = pd.read_csv(cfg.protein_ligand_csv)
-        names = df['complex_name'].tolist()
-        ligand_description_list = df['ligand_description'].tolist()
-        protein_path_list = df['protein_path'].tolist()
+        names = df["complex_name"].tolist()
+        ligand_description_list = df["ligand_description"].tolist()
+        protein_path_list = df["protein_path"].tolist()
     else:
         names = read_strings_from_txt(cfg.data.split_test)
         ligand_description_list = [None for _ in names]
@@ -74,12 +75,12 @@ def main(cfg) -> None:
         if protein_path_list[i] is not None:
             rec_path = protein_path_list[i]
         else:
-            rec_path = os.path.join(cfg.data.data_dir, name, f'{name}_protein_processed.pdb')
+            rec_path = os.path.join(cfg.data.data_dir, name, f"{name}_protein_processed.pdb")
             if not os.path.exists(rec_path):
-                rec_path = os.path.join(cfg.data.data_dir, name, f'{name}_protein_obabel_reduce.pdb')
+                rec_path = os.path.join(cfg.data.data_dir, name, f"{name}_protein_obabel_reduce.pdb")
         rec = PandasPdb().read_pdb(rec_path)
-        rec_df = rec.df['ATOM']
-        receptor_pos = rec_df[['x_coord', 'y_coord', 'z_coord']].to_numpy().squeeze().astype(np.float32)
+        rec_df = rec.df["ATOM"]
+        receptor_pos = rec_df[["x_coord", "y_coord", "z_coord"]].to_numpy().squeeze().astype(np.float32)
         receptor_pos = np.tile(receptor_pos, (cfg.num_predictions, 1, 1))
 
         cross_distances = np.linalg.norm(receptor_pos[:, :, None, :] - ligand_pos[:, None, :, :], axis=-1)
@@ -109,5 +110,5 @@ def main(cfg) -> None:
     logging.info(f"Results are in {cfg.results_path}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

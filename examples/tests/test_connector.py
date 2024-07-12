@@ -26,12 +26,12 @@ from bionemo.utils.tests import teardown_apex_megatron_cuda
 
 
 CONFIG_NAME = [
-    'esm1nv_test_seqlen256',
-    'esm1nv_test_seqlen1024',
-    'prott5nv_test_seqlen256',
-    'prott5nv_test_seqlen1024',
-    'megamolbart_test_seqlen1024',
-    'megamolbart_test_seqlen256',
+    "esm1nv_test_seqlen256",
+    "esm1nv_test_seqlen1024",
+    "prott5nv_test_seqlen256",
+    "prott5nv_test_seqlen1024",
+    "megamolbart_test_seqlen1024",
+    "megamolbart_test_seqlen256",
 ]
 MODEL_CLASS = [ESM1nvModel, ESM1nvModel, ProtT5nvModel, ProtT5nvModel, MegaMolBARTModel, MegaMolBARTModel]
 
@@ -45,10 +45,10 @@ MODEL_PARAMETERS = [
 ]
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope="module")
 def bionemo_home() -> Path:
     try:
-        x = os.environ['BIONEMO_HOME']
+        x = os.environ["BIONEMO_HOME"]
     except KeyError:
         raise ValueError("Need to set BIONEMO_HOME in order to run unit tests! See docs for instructions.")
     else:
@@ -62,11 +62,11 @@ def config_path_for_tests(bionemo_home) -> str:
 
 @pytest.mark.needs_gpu
 @pytest.mark.parametrize(
-    'config_name, model_class, model_parameters',
+    "config_name, model_class, model_parameters",
     list(zip(CONFIG_NAME, MODEL_CLASS, MODEL_PARAMETERS)),
 )
 def test_model_size(config_name: str, model_class: LightningModule, model_parameters: int, config_path_for_tests):
-    '''Check that number of model weights are correct'''
+    """Check that number of model weights are correct"""
     cfg = load_model_config(config_name=config_name, config_path=config_path_for_tests)
     initialize_distributed_parallel_state()
     callbacks = setup_dwnstr_task_validation_callbacks(cfg)

@@ -113,9 +113,9 @@ def centered_linspace(
 # FIXME: add mask for all non-special tokens (add hiddens_tokens_only)
 # TODO: add model-specific prepare_for_inference and release_from_inference methods
 class BaseEncoderInference(LightningModule):
-    '''
+    """
     Base class for inference of models with encoder.
-    '''
+    """
 
     def __init__(
         self,
@@ -130,12 +130,12 @@ class BaseEncoderInference(LightningModule):
         strict_restore_from_path: bool = True,
         needs_warmup: bool = True,
     ):
-        '''
+        """
         Parameters:
             strict_restore_from_path: When the underlying model is restored, requires that all keys are present in the checkpoint.
             Users may want to set this to false when they are modifying the underlying model upon restoring. For example, this is done
             to use the embeddingtoken_types field for Fine tuning on a downstream task.
-        '''
+        """
         super().__init__()
         self.needs_warmup = needs_warmup
         self.cfg = cfg
@@ -227,12 +227,12 @@ class BaseEncoderInference(LightningModule):
             )
 
         # Check for PEFT flag
-        if not OmegaConf.select(cfg, 'model.peft.enabled'):  # skipped if peft.enabled is True
+        if not OmegaConf.select(cfg, "model.peft.enabled"):  # skipped if peft.enabled is True
             if (
-                OmegaConf.select(cfg, 'model.freeze_layers') is not None
+                OmegaConf.select(cfg, "model.freeze_layers") is not None
             ):  # Check whether to freeze individual layers of the model.
                 num_layers = len(model.model.language_model.encoder.layers)
-                freeze_layers = OmegaConf.select(cfg, 'model.freeze_layers')
+                freeze_layers = OmegaConf.select(cfg, "model.freeze_layers")
                 if freeze_layers < 0:  # If freeze_layers < 0, freeze everything but the last `freeze_layers`
                     freeze_layers = num_layers + freeze_layers
                 for i in range(freeze_layers):
@@ -295,7 +295,7 @@ class BaseEncoderInference(LightningModule):
 
         # Validate input sequences length
         if any(len(t) > self.model.cfg.seq_length for t in token_ids):
-            raise ValueError(f'One or more sequence exceeds max length({self.model.cfg.seq_length}).')
+            raise ValueError(f"One or more sequence exceeds max length({self.model.cfg.seq_length}).")
 
         # Set fixed padding when dynamic padding is disabled
         if self.model.cfg.data.get("dynamic_padding") is False:
@@ -358,12 +358,12 @@ class BaseEncoderInference(LightningModule):
             return sequences
         else:
             raise ValueError(
-                f'The shape of the tensor with token_ids is not supported. '
-                f'Supported numbers of dims: {supported_dims}'
+                f"The shape of the tensor with token_ids is not supported. "
+                f"Supported numbers of dims: {supported_dims}"
             )
 
     def seq_to_hiddens(self, sequences: List[str]) -> Tuple[torch.Tensor, torch.Tensor]:
-        '''
+        """
         Transforms Sequences into hidden state.
         This class should be implemented in a child class, since it is model specific.
         This class should return only the hidden states, without the special tokens such as
@@ -375,11 +375,11 @@ class BaseEncoderInference(LightningModule):
         Returns:
             hiddens (torch.Tensor, float):
             enc_mask (torch.Tensor, long): boolean mask for padded sections
-        '''
+        """
         raise NotImplementedError("Please implement in child class")
 
     def hiddens_to_embedding(self, hidden_states: torch.Tensor, enc_mask: torch.Tensor) -> torch.Tensor:
-        '''
+        """
         Transforms hiddens into embedding.
 
         Args:
@@ -388,7 +388,7 @@ class BaseEncoderInference(LightningModule):
 
         Returns:
             embeddings (torch.Tensor, float):
-        '''
+        """
         # compute average on active hiddens
         lengths = enc_mask.sum(dim=1, keepdim=True)
         if (lengths == 0).any():
@@ -450,9 +450,9 @@ class BaseEncoderInference(LightningModule):
 
 
 class BaseEncoderDecoderInference(BaseEncoderInference):
-    '''
+    """
     Base class for inference of models with encoder and decoder.
-    '''
+    """
 
     def __init__(
         self,
@@ -536,7 +536,7 @@ class BaseEncoderDecoderInference(BaseEncoderInference):
         # validate that the samples are of the same length
         if enc_mask.sum(dim=1).unique().shape[0] != 1 and self.model.cfg.encoder.arch != "perceiver":
             logging.warning(
-                'Interpolation may have unexpected behavior when samples have different length, unless you use a Perceiver encoder'
+                "Interpolation may have unexpected behavior when samples have different length, unless you use a Perceiver encoder"
             )
 
         # interpolate between hiddens
@@ -661,7 +661,7 @@ class BaseEncoderDecoderInference(BaseEncoderInference):
         default_sampling_kwarg = self.default_sampling_kwargs
         if sampling_method not in default_sampling_kwarg:
             raise ValueError(
-                f'Invalid samping method {sampling_method}, supported sampling methods are {default_sampling_kwarg.keys()}'
+                f"Invalid samping method {sampling_method}, supported sampling methods are {default_sampling_kwarg.keys()}"
             )
 
         cur_sampling_kwarg = default_sampling_kwarg[sampling_method].copy()
@@ -671,7 +671,7 @@ class BaseEncoderDecoderInference(BaseEncoderInference):
         # execute selected sampling method
         assert (
             sampling_method in default_sampling_kwarg.keys()
-        ), f'Invalid sampling method {sampling_method}, supported sampling methods are {list(default_sampling_kwarg.keys())}'
+        ), f"Invalid sampling method {sampling_method}, supported sampling methods are {list(default_sampling_kwarg.keys())}"
 
         # accept hidden states directly or via sequences
         hiddens = sampling_kwarg.pop("hiddens")
@@ -685,7 +685,7 @@ class BaseEncoderDecoderInference(BaseEncoderInference):
 
             # we enforce providing both hidden states and enc_masks or neither
             if hiddens is None or enc_masks is None:
-                raise ValueError('Either both hiddens and enc_masks should be provided or neither')
+                raise ValueError("Either both hiddens and enc_masks should be provided or neither")
         else:
             if not len(seqs):
                 raise ValueError('No sequences provided for sampling via "seqs" argument')
@@ -709,7 +709,7 @@ class BaseEncoderDecoderInference(BaseEncoderInference):
         )
 
         # Get the sequences from our various search method options.
-        if sampling_method == 'greedy-perturbate':
+        if sampling_method == "greedy-perturbate":
             # Sample the best sequence for each of our perturbed hiddens, using greedy-search (per token) to find the best result.
             samples = self.hiddens_to_seq(
                 perturbed_hiddens,
@@ -718,7 +718,7 @@ class BaseEncoderDecoderInference(BaseEncoderInference):
                 sampling_kwargs={},
                 **hiddens_to_seq_kwargs,
             )
-        elif sampling_method == 'topkp-perturbate':
+        elif sampling_method == "topkp-perturbate":
             # Sample the best sequence for each of our perturbed hiddens, using `topkp-sampling` to find the best result.
             samples = self.hiddens_to_seq(
                 perturbed_hiddens,
@@ -727,7 +727,7 @@ class BaseEncoderDecoderInference(BaseEncoderInference):
                 sampling_kwargs=sampling_kwarg,
                 **hiddens_to_seq_kwargs,
             )
-        elif sampling_method == 'beam-search-perturbate':
+        elif sampling_method == "beam-search-perturbate":
             # Sample the best sequence for each of our perturbed hiddens, using beam-search to find the best result.
             assert sampling_kwarg[
                 "keep_only_best_tokens"
@@ -739,10 +739,10 @@ class BaseEncoderDecoderInference(BaseEncoderInference):
                 sampling_kwargs=sampling_kwarg,
                 **hiddens_to_seq_kwargs,
             )
-        elif sampling_method == 'beam-search-single-sample':
+        elif sampling_method == "beam-search-single-sample":
             # Sample the top num_hiddens sequences given our single perturbed hidden.
             if num_samples is not None:
-                sampling_kwarg['beam_size'] = num_samples
+                sampling_kwarg["beam_size"] = num_samples
             samples = self.hiddens_to_seq(
                 perturbed_hiddens,
                 sample_masks,
@@ -750,7 +750,7 @@ class BaseEncoderDecoderInference(BaseEncoderInference):
                 sampling_kwargs=sampling_kwarg,
                 **hiddens_to_seq_kwargs,
             )
-        elif sampling_method == 'beam-search-perturbate-sample':
+        elif sampling_method == "beam-search-perturbate-sample":
             # Sample the top beam_size sequences given each of our perturbed hiddens
             samples = self.hiddens_to_seq(
                 perturbed_hiddens,
@@ -809,13 +809,13 @@ class BaseEncoderDecoderInference(BaseEncoderInference):
         return result_dict
 
 
-M = TypeVar('M', bound=BaseEncoderDecoderInference)
+M = TypeVar("M", bound=BaseEncoderDecoderInference)
 """Generic type for any model that implements :class:`BaseEncoderDecoderInference`.
 """
 
 
 def to_sequences_ids(
-    sequences: Union[DataFrame, Series, IdedSeqs, List[str]]
+    sequences: Union[DataFrame, Series, IdedSeqs, List[str]],
 ) -> Tuple[List[str], Optional[List[int]]]:
     """Converts supported sequence data formats into a simple list of sequences and their ids.
 

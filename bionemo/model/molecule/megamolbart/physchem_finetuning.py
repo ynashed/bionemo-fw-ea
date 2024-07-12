@@ -91,6 +91,6 @@ class FineTuneMegaMolBART(EncoderFineTuning):
         return input_tensor.float()
 
     def get_target_from_batch(self, batch):
-        ret = batch['target']
+        ret = batch["target"]
 
         return ret.float()

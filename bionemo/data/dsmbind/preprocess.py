@@ -25,7 +25,6 @@ How your raw data should be structured?
     # ...
 """
 
-
 import os
 import pickle
 
@@ -63,8 +62,8 @@ def process_folder(folder: str):
         target_coords (numpy.array): the coordinate array of the target atoms.
     """
     files = os.listdir(folder)
-    pdb_file = [file for file in files if file.endswith('.pdb')][0]
-    sdf_file = [file for file in files if file.endswith('.sdf')][0]
+    pdb_file = [file for file in files if file.endswith(".pdb")][0]
+    sdf_file = [file for file in files if file.endswith(".sdf")][0]
     pdb = os.path.basename(folder)[:4]
 
     parser = PDB.PDBParser()
@@ -78,7 +77,7 @@ def process_folder(folder: str):
         resname = (
             PDB.Polypeptide.three_to_one(residue.resname)
             if residue.resname in PDB.Polypeptide.standard_aa_names
-            else '#'
+            else "#"
         )
         res_index = ALPHABET.index(resname) if resname in ALPHABET else 0
         expected_atoms = RES_ATOM14[res_index]
@@ -86,13 +85,13 @@ def process_folder(folder: str):
         res_coords = get_residue_atoms(residue, expected_atoms)
         coordinates.append(res_coords)
 
-    target_seq = ''.join(sequence)
+    target_seq = "".join(sequence)
     target_coords = np.array(coordinates)  # Shape will be (len(target_seq), 14, 3)
 
     # Load and process the ligand
-    df = PandasTools.LoadSDF(os.path.join(folder, sdf_file), molColName='Molecule', includeFingerprints=False)
+    df = PandasTools.LoadSDF(os.path.join(folder, sdf_file), molColName="Molecule", includeFingerprints=False)
     try:
-        mol = df['Molecule'][0]
+        mol = df["Molecule"][0]
         if mol.GetNumHeavyAtoms() < 3:
             return None
     except Exception as e:
@@ -124,5 +123,5 @@ def preprocess(raw_data_dir: str):
         if entry is not None:
             data.append(entry)
 
-    with open(os.path.join(raw_data_dir, 'processed.pkl'), 'wb') as f:
+    with open(os.path.join(raw_data_dir, "processed.pkl"), "wb") as f:
         pickle.dump(data, f)

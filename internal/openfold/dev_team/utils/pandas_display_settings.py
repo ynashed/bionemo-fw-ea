@@ -11,6 +11,6 @@
 import pandas as pd
 
 
-pd.set_option('display.max_colwidth', 64)
-pd.set_option('display.max_columns', 160)
-pd.set_option('display.width', 180)
+pd.set_option("display.max_colwidth", 64)
+pd.set_option("display.max_columns", 160)
+pd.set_option("display.width", 180)

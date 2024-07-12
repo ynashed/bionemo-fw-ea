@@ -21,9 +21,9 @@ The `./launch.sh` script can be run in a backwards compatible mode using the `-s
 With `-s`, the program will use the tag that's specified in the `.env` file at the repository's root. This flag makes the script mirror its prior behavior.
 
 #### `launch.sh` Using Commit Hash as Image Tag
-Now, `launch.sh` will default to using the current `git` commit hash as the image tag. 
+Now, `launch.sh` will default to using the current `git` commit hash as the image tag.
 
-This change makes it clear to the user what exact version of code is present in the image, eliminating a reoccurring 
+This change makes it clear to the user what exact version of code is present in the image, eliminating a reoccurring
 source of confusion for folks developing and using the BioNeMo FW image. Moreover, the `build` and `push` commands will
 fail fast if there are uncommitted changes to tracked files.
 

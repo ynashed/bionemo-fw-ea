@@ -531,7 +531,7 @@ class AlphaFold(ModelPT):
     def get_dist_setup(self):
         iteration: int = self.get_checkpoint_step()
         return omegaconf.OmegaConf.create(
-            {'rank': self.global_rank, 'world_size': self.world_size, 'iteration': iteration}
+            {"rank": self.global_rank, "world_size": self.world_size, "iteration": iteration}
         )
 
     def setup_training_data(self, train_data_cfg: Union[omegaconf.DictConfig, Dict]):
@@ -587,7 +587,7 @@ class AlphaFold(ModelPT):
             swa_decay_rate=0.999,  # TODO: [optim-hub] replace with config value and align with NeMo's EMA
         )
 
-        self._scheduler['scheduler'].optimizer = self._optimizer
+        self._scheduler["scheduler"].optimizer = self._optimizer
 
     def configure_callbacks(self) -> Union[Sequence[Callback], Callback]:
         """A pytorch lightning mechanism extendsreturn value extends the
@@ -606,7 +606,7 @@ class AlphaFold(ModelPT):
         )
         # The assumption here is made that configure_callbacks is called before setup_optimization.
         # TODO: [optim-hub] explain why
-        if OptimHub.config('FusedAdamSWA'):
+        if OptimHub.config("FusedAdamSWA"):
             # normally, AlphaFoldEMA should replace nemo.collections.common.callbacks.EMA because in newer PTL version
             # lightining.pytorch.trainer.trainer.connectors.callback_connector._CallbackConnector._attach_model_callbacks
             # replaces callbacks checking if model callback is a subclass of trainer callback. In older versions,
@@ -623,12 +623,12 @@ class AlphaFold(ModelPT):
     ):
         super().setup_optimization(optim_config=optim_config, optim_kwargs=optim_kwargs)
 
-        if OptimHub.config('FusedAdamSWA'):
-            if self._cfg.optim.name != 'adam':
+        if OptimHub.config("FusedAdamSWA"):
+            if self._cfg.optim.name != "adam":
                 raise Exception(
                     "FusedAdamSWA requires 'adam' optimizer. Please set the optimizer explicitly in the config."
                 )
-            if self.trainer.precision not in ['bf16', 'bf16-mixed']:
+            if self.trainer.precision not in ["bf16", "bf16-mixed"]:
                 raise Exception(
                     "FusedAdamSWA requires bf16 training. Please set trainer.precision to 'bf16' if you would like to proceed."
                 )
@@ -818,7 +818,7 @@ class AlphaFold(ModelPT):
             """
         )
         # call PTL log method
-        self.log('multisessionstep', multisessionstep, batch_size=1)
+        self.log("multisessionstep", multisessionstep, batch_size=1)
 
     def _compute_validation_metrics_this_validation_step(self, val_batch: Dict, val_batch_idx: int):
         val_outputs = self(val_batch)

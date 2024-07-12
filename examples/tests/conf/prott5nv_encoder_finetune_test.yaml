@@ -16,7 +16,7 @@ infer_target: bionemo.model.protein.prott5nv.infer.ProtT5nvInference
 
 trainer:
   devices: 1 # number of GPUs or CPUs
-  num_nodes: 1 
+  num_nodes: 1
   max_epochs: 1 # # use max_steps instead with NeMo Megatron model
   max_steps: 10 # consumed_samples = global_step * micro_batch_size * data_parallel_size * accumulate_grad_batches
   val_check_interval: 10
@@ -38,8 +38,8 @@ model:
   global_batch_size: null
   tensor_model_parallel_size: 1  # model parallelism
   cnn_dim: 32
-  dropout_rate: 0.25  
-  
+  dropout_rate: 0.25
+
   data:
     task_type: token-level-classification
     emb_batch_size: ${model.micro_batch_size}
@@ -48,13 +48,13 @@ model:
       train: x000
       test: x000
       val: x000
-    sequence_column: "sequence" 
-    target_column: ["3state","8state", "resolved"] 
-    target_sizes: [3, 8, 2] 
+    sequence_column: "sequence"
+    target_column: ["3state","8state", "resolved"]
+    target_sizes: [3, 8, 2]
     mask_column: ["resolved", "resolved", null]
     num_workers: 8
     max_seq_length: ${model.seq_length}
-  
+
   finetuning_optim:
     name: adam
     lr: 0.0001
@@ -69,6 +69,6 @@ model:
       last_epoch: -1
       warmup_steps: 100
       max_steps: 1000
-  
+
   dwnstr_task_validation:
     enabled: False

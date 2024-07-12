@@ -1,6 +1,6 @@
 # Prerequisites for Using BioNeMo Framework
 
-Before you begin using the BioNeMo framework, ensure the following prerequisites are met. 
+Before you begin using the BioNeMo framework, ensure the following prerequisites are met.
 
 BioNeMo is only supported on x86 Linux systems. If you are not on such a system, you must use the project's Docker images to develop and execute BioNeMo code.
 System Requirements:
@@ -22,7 +22,7 @@ Tesla K80
 
 bfloat16 precision requires an Ampere generation GPU or higher.
 
-To request access : 
+To request access :
 
 1. Access to [BioNeMo Framework](https://www.nvidia.com/en-us/gpu-cloud/bionemo/) from NVIDIA.
 2. Access to NVIDIA DGX compute infrastructure ([DGX-Cloud](https://www.nvidia.com/en-us/data-center/dgx-cloud/) or [DGX-Pod](https://www.nvidia.com/en-us/data-center/dgx-basepod/)).

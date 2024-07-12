@@ -34,126 +34,126 @@ from bionemo.model.molecule.diffdock.utils.torsion import get_transformation_mas
 biopython_parser = PDBParser()
 periodic_table = GetPeriodicTable()
 allowable_features = {
-    'possible_atomic_num_list': list(range(1, 119)) + ['misc'],
-    'possible_chirality_list': ['CHI_UNSPECIFIED', 'CHI_TETRAHEDRAL_CW', 'CHI_TETRAHEDRAL_CCW', 'CHI_OTHER'],
-    'possible_degree_list': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 'misc'],
-    'possible_numring_list': [0, 1, 2, 3, 4, 5, 6, 'misc'],
-    'possible_implicit_valence_list': [0, 1, 2, 3, 4, 5, 6, 'misc'],
-    'possible_formal_charge_list': [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 'misc'],
-    'possible_numH_list': [0, 1, 2, 3, 4, 5, 6, 7, 8, 'misc'],
-    'possible_number_radical_e_list': [0, 1, 2, 3, 4, 'misc'],
-    'possible_hybridization_list': ['SP', 'SP2', 'SP3', 'SP3D', 'SP3D2', 'misc'],
-    'possible_is_aromatic_list': [False, True],
-    'possible_is_in_ring3_list': [False, True],
-    'possible_is_in_ring4_list': [False, True],
-    'possible_is_in_ring5_list': [False, True],
-    'possible_is_in_ring6_list': [False, True],
-    'possible_is_in_ring7_list': [False, True],
-    'possible_is_in_ring8_list': [False, True],
-    'possible_amino_acids': [
-        'ALA',
-        'ARG',
-        'ASN',
-        'ASP',
-        'CYS',
-        'GLN',
-        'GLU',
-        'GLY',
-        'HIS',
-        'ILE',
-        'LEU',
-        'LYS',
-        'MET',
-        'PHE',
-        'PRO',
-        'SER',
-        'THR',
-        'TRP',
-        'TYR',
-        'VAL',
-        'HIP',
-        'HIE',
-        'TPO',
-        'HID',
-        'LEV',
-        'MEU',
-        'PTR',
-        'GLV',
-        'CYT',
-        'SEP',
-        'HIZ',
-        'CYM',
-        'GLM',
-        'ASQ',
-        'TYS',
-        'CYX',
-        'GLZ',
-        'misc',
+    "possible_atomic_num_list": list(range(1, 119)) + ["misc"],
+    "possible_chirality_list": ["CHI_UNSPECIFIED", "CHI_TETRAHEDRAL_CW", "CHI_TETRAHEDRAL_CCW", "CHI_OTHER"],
+    "possible_degree_list": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, "misc"],
+    "possible_numring_list": [0, 1, 2, 3, 4, 5, 6, "misc"],
+    "possible_implicit_valence_list": [0, 1, 2, 3, 4, 5, 6, "misc"],
+    "possible_formal_charge_list": [-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, "misc"],
+    "possible_numH_list": [0, 1, 2, 3, 4, 5, 6, 7, 8, "misc"],
+    "possible_number_radical_e_list": [0, 1, 2, 3, 4, "misc"],
+    "possible_hybridization_list": ["SP", "SP2", "SP3", "SP3D", "SP3D2", "misc"],
+    "possible_is_aromatic_list": [False, True],
+    "possible_is_in_ring3_list": [False, True],
+    "possible_is_in_ring4_list": [False, True],
+    "possible_is_in_ring5_list": [False, True],
+    "possible_is_in_ring6_list": [False, True],
+    "possible_is_in_ring7_list": [False, True],
+    "possible_is_in_ring8_list": [False, True],
+    "possible_amino_acids": [
+        "ALA",
+        "ARG",
+        "ASN",
+        "ASP",
+        "CYS",
+        "GLN",
+        "GLU",
+        "GLY",
+        "HIS",
+        "ILE",
+        "LEU",
+        "LYS",
+        "MET",
+        "PHE",
+        "PRO",
+        "SER",
+        "THR",
+        "TRP",
+        "TYR",
+        "VAL",
+        "HIP",
+        "HIE",
+        "TPO",
+        "HID",
+        "LEV",
+        "MEU",
+        "PTR",
+        "GLV",
+        "CYT",
+        "SEP",
+        "HIZ",
+        "CYM",
+        "GLM",
+        "ASQ",
+        "TYS",
+        "CYX",
+        "GLZ",
+        "misc",
     ],
-    'possible_atom_type_2': [
-        'C*',
-        'CA',
-        'CB',
-        'CD',
-        'CE',
-        'CG',
-        'CH',
-        'CZ',
-        'N*',
-        'ND',
-        'NE',
-        'NH',
-        'NZ',
-        'O*',
-        'OD',
-        'OE',
-        'OG',
-        'OH',
-        'OX',
-        'S*',
-        'SD',
-        'SG',
-        'misc',
+    "possible_atom_type_2": [
+        "C*",
+        "CA",
+        "CB",
+        "CD",
+        "CE",
+        "CG",
+        "CH",
+        "CZ",
+        "N*",
+        "ND",
+        "NE",
+        "NH",
+        "NZ",
+        "O*",
+        "OD",
+        "OE",
+        "OG",
+        "OH",
+        "OX",
+        "S*",
+        "SD",
+        "SG",
+        "misc",
     ],
-    'possible_atom_type_3': [
-        'C',
-        'CA',
-        'CB',
-        'CD',
-        'CD1',
-        'CD2',
-        'CE',
-        'CE1',
-        'CE2',
-        'CE3',
-        'CG',
-        'CG1',
-        'CG2',
-        'CH2',
-        'CZ',
-        'CZ2',
-        'CZ3',
-        'N',
-        'ND1',
-        'ND2',
-        'NE',
-        'NE1',
-        'NE2',
-        'NH1',
-        'NH2',
-        'NZ',
-        'O',
-        'OD1',
-        'OD2',
-        'OE1',
-        'OE2',
-        'OG',
-        'OG1',
-        'OH',
-        'OXT',
-        'SD',
-        'SG',
-        'misc',
+    "possible_atom_type_3": [
+        "C",
+        "CA",
+        "CB",
+        "CD",
+        "CD1",
+        "CD2",
+        "CE",
+        "CE1",
+        "CE2",
+        "CE3",
+        "CG",
+        "CG1",
+        "CG2",
+        "CH2",
+        "CZ",
+        "CZ2",
+        "CZ3",
+        "N",
+        "ND1",
+        "ND2",
+        "NE",
+        "NE1",
+        "NE2",
+        "NH1",
+        "NH2",
+        "NZ",
+        "O",
+        "OD1",
+        "OD2",
+        "OE1",
+        "OE2",
+        "OG",
+        "OG1",
+        "OH",
+        "OXT",
+        "SD",
+        "SG",
+        "misc",
     ],
 }
 bonds = {BT.SINGLE: 0, BT.DOUBLE: 1, BT.TRIPLE: 2, BT.AROMATIC: 3}
@@ -163,22 +163,22 @@ lig_feature_dims = (
         map(
             len,
             [
-                allowable_features['possible_atomic_num_list'],
-                allowable_features['possible_chirality_list'],
-                allowable_features['possible_degree_list'],
-                allowable_features['possible_formal_charge_list'],
-                allowable_features['possible_implicit_valence_list'],
-                allowable_features['possible_numH_list'],
-                allowable_features['possible_number_radical_e_list'],
-                allowable_features['possible_hybridization_list'],
-                allowable_features['possible_is_aromatic_list'],
-                allowable_features['possible_numring_list'],
-                allowable_features['possible_is_in_ring3_list'],
-                allowable_features['possible_is_in_ring4_list'],
-                allowable_features['possible_is_in_ring5_list'],
-                allowable_features['possible_is_in_ring6_list'],
-                allowable_features['possible_is_in_ring7_list'],
-                allowable_features['possible_is_in_ring8_list'],
+                allowable_features["possible_atomic_num_list"],
+                allowable_features["possible_chirality_list"],
+                allowable_features["possible_degree_list"],
+                allowable_features["possible_formal_charge_list"],
+                allowable_features["possible_implicit_valence_list"],
+                allowable_features["possible_numH_list"],
+                allowable_features["possible_number_radical_e_list"],
+                allowable_features["possible_hybridization_list"],
+                allowable_features["possible_is_aromatic_list"],
+                allowable_features["possible_numring_list"],
+                allowable_features["possible_is_in_ring3_list"],
+                allowable_features["possible_is_in_ring4_list"],
+                allowable_features["possible_is_in_ring5_list"],
+                allowable_features["possible_is_in_ring6_list"],
+                allowable_features["possible_is_in_ring7_list"],
+                allowable_features["possible_is_in_ring8_list"],
             ],
         )
     ),
@@ -190,17 +190,17 @@ rec_atom_feature_dims = (
         map(
             len,
             [
-                allowable_features['possible_amino_acids'],
-                allowable_features['possible_atomic_num_list'],
-                allowable_features['possible_atom_type_2'],
-                allowable_features['possible_atom_type_3'],
+                allowable_features["possible_amino_acids"],
+                allowable_features["possible_atomic_num_list"],
+                allowable_features["possible_atom_type_2"],
+                allowable_features["possible_atom_type_3"],
             ],
         )
     ),
     0,
 )
 
-rec_residue_feature_dims = (list(map(len, [allowable_features['possible_amino_acids']])), 0)
+rec_residue_feature_dims = (list(map(len, [allowable_features["possible_amino_acids"]])), 0)
 
 
 def lig_atom_featurizer(mol):
@@ -209,22 +209,22 @@ def lig_atom_featurizer(mol):
     for idx, atom in enumerate(mol.GetAtoms()):
         atom_features_list.append(
             [
-                safe_index(allowable_features['possible_atomic_num_list'], atom.GetAtomicNum()),
-                safe_index(allowable_features['possible_chirality_list'], str(atom.GetChiralTag())),
-                safe_index(allowable_features['possible_degree_list'], atom.GetTotalDegree()),
-                safe_index(allowable_features['possible_formal_charge_list'], atom.GetFormalCharge()),
-                safe_index(allowable_features['possible_implicit_valence_list'], atom.GetImplicitValence()),
-                safe_index(allowable_features['possible_numH_list'], atom.GetTotalNumHs()),
-                safe_index(allowable_features['possible_number_radical_e_list'], atom.GetNumRadicalElectrons()),
-                safe_index(allowable_features['possible_hybridization_list'], str(atom.GetHybridization())),
-                allowable_features['possible_is_aromatic_list'].index(atom.GetIsAromatic()),
-                safe_index(allowable_features['possible_numring_list'], ringinfo.NumAtomRings(idx)),
-                allowable_features['possible_is_in_ring3_list'].index(ringinfo.IsAtomInRingOfSize(idx, 3)),
-                allowable_features['possible_is_in_ring4_list'].index(ringinfo.IsAtomInRingOfSize(idx, 4)),
-                allowable_features['possible_is_in_ring5_list'].index(ringinfo.IsAtomInRingOfSize(idx, 5)),
-                allowable_features['possible_is_in_ring6_list'].index(ringinfo.IsAtomInRingOfSize(idx, 6)),
-                allowable_features['possible_is_in_ring7_list'].index(ringinfo.IsAtomInRingOfSize(idx, 7)),
-                allowable_features['possible_is_in_ring8_list'].index(ringinfo.IsAtomInRingOfSize(idx, 8)),
+                safe_index(allowable_features["possible_atomic_num_list"], atom.GetAtomicNum()),
+                safe_index(allowable_features["possible_chirality_list"], str(atom.GetChiralTag())),
+                safe_index(allowable_features["possible_degree_list"], atom.GetTotalDegree()),
+                safe_index(allowable_features["possible_formal_charge_list"], atom.GetFormalCharge()),
+                safe_index(allowable_features["possible_implicit_valence_list"], atom.GetImplicitValence()),
+                safe_index(allowable_features["possible_numH_list"], atom.GetTotalNumHs()),
+                safe_index(allowable_features["possible_number_radical_e_list"], atom.GetNumRadicalElectrons()),
+                safe_index(allowable_features["possible_hybridization_list"], str(atom.GetHybridization())),
+                allowable_features["possible_is_aromatic_list"].index(atom.GetIsAromatic()),
+                safe_index(allowable_features["possible_numring_list"], ringinfo.NumAtomRings(idx)),
+                allowable_features["possible_is_in_ring3_list"].index(ringinfo.IsAtomInRingOfSize(idx, 3)),
+                allowable_features["possible_is_in_ring4_list"].index(ringinfo.IsAtomInRingOfSize(idx, 4)),
+                allowable_features["possible_is_in_ring5_list"].index(ringinfo.IsAtomInRingOfSize(idx, 5)),
+                allowable_features["possible_is_in_ring6_list"].index(ringinfo.IsAtomInRingOfSize(idx, 6)),
+                allowable_features["possible_is_in_ring7_list"].index(ringinfo.IsAtomInRingOfSize(idx, 7)),
+                allowable_features["possible_is_in_ring8_list"].index(ringinfo.IsAtomInRingOfSize(idx, 8)),
             ]
         )
 
@@ -234,7 +234,7 @@ def lig_atom_featurizer(mol):
 def rec_residue_featurizer(rec):
     feature_list = []
     for residue in rec.get_residues():
-        feature_list.append([safe_index(allowable_features['possible_amino_acids'], residue.get_resname())])
+        feature_list.append([safe_index(allowable_features["possible_amino_acids"], residue.get_resname())])
     return torch.tensor(feature_list, dtype=torch.float32)  # (N_res, 1)
 
 
@@ -249,7 +249,7 @@ def safe_index(l, e):
 def parse_pdb_from_path(path):
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=PDBConstructionWarning)
-        structure = biopython_parser.get_structure('random_id', path)
+        structure = biopython_parser.get_structure("random_id", path)
         rec = structure[0]
     return rec
 
@@ -272,17 +272,17 @@ def extract_receptor_structure(rec, lig, lm_embedding_chains=None):
         count = 0
         invalid_res_ids = []
         for res_idx, residue in enumerate(chain):
-            if residue.get_resname() == 'HOH':
+            if residue.get_resname() == "HOH":
                 invalid_res_ids.append(residue.get_id())
                 continue
             residue_coords = []
             c_alpha, n, c = None, None, None
             for atom in residue:
-                if atom.name == 'CA':
+                if atom.name == "CA":
                     c_alpha = list(atom.get_vector())
-                if atom.name == 'N':
+                if atom.name == "N":
                     n = list(atom.get_vector())
-                if atom.name == 'C':
+                if atom.name == "C":
                     c = list(atom.get_vector())
                 residue_coords.append(list(atom.get_vector()))
 
@@ -329,7 +329,7 @@ def extract_receptor_structure(rec, lig, lm_embedding_chains=None):
             valid_c_alpha_coords.append(c_alpha_coords[i])
             if lm_embedding_chains is not None:
                 if i >= len(lm_embedding_chains):
-                    raise ValueError('Encountered valid chain id that was not present in the LM embeddings')
+                    raise ValueError("Encountered valid chain id that was not present in the LM embeddings")
                 valid_lm_embeddings.append(lm_embedding_chains[i])
             valid_n_coords.append(n_coords[i])
             valid_c_coords.append(c_coords[i])
@@ -366,10 +366,10 @@ def get_lig_graph(mol, complex_graph):
     edge_type = torch.tensor(edge_type, dtype=torch.long)
     edge_attr = F.one_hot(edge_type, num_classes=len(bonds)).to(torch.float)
 
-    complex_graph['ligand'].x = atom_feats
-    complex_graph['ligand'].pos = lig_coords
-    complex_graph['ligand', 'lig_bond', 'ligand'].edge_index = edge_index
-    complex_graph['ligand', 'lig_bond', 'ligand'].edge_attr = edge_attr
+    complex_graph["ligand"].x = atom_feats
+    complex_graph["ligand"].pos = lig_coords
+    complex_graph["ligand", "lig_bond", "ligand"].edge_index = edge_index
+    complex_graph["ligand", "lig_bond", "ligand"].edge_attr = edge_attr
     return
 
 
@@ -394,7 +394,7 @@ def generate_conformer(
     ps.maxIterations = max_iterations
     id = AllChem.EmbedMolecule(mol, ps)
     if id == -1:
-        logging.info('rdkit coords could not be generated without using random coords. using random coords now.')
+        logging.info("rdkit coords could not be generated without using random coords. using random coords now.")
         ps.useRandomCoords = True
         ps.enforceChirality = enforce_chirality
         AllChem.EmbedMolecule(mol, ps)
@@ -419,7 +419,7 @@ def get_lig_graph_with_matching(
         if remove_hs:
             mol_maybe_noh = RemoveHs(mol_maybe_noh, sanitize=True)
         if keep_original:
-            complex_graph['ligand'].orig_pos = mol_maybe_noh.GetConformer().GetPositions()
+            complex_graph["ligand"].orig_pos = mol_maybe_noh.GetConformer().GetPositions()
 
         rotable_bonds, is_connected = get_torsion_angles(mol_maybe_noh)
         if not is_connected:
@@ -451,9 +451,9 @@ def get_lig_graph_with_matching(
                 complex_graph.rmsd_matching = rms_list[0]
                 get_lig_graph(mol_rdkit, complex_graph)
             else:
-                if torch.is_tensor(complex_graph['ligand'].pos):
-                    complex_graph['ligand'].pos = [complex_graph['ligand'].pos]
-                complex_graph['ligand'].pos.append(torch.from_numpy(mol_rdkit.GetConformer().GetPositions()).float())
+                if torch.is_tensor(complex_graph["ligand"].pos):
+                    complex_graph["ligand"].pos = [complex_graph["ligand"].pos]
+                complex_graph["ligand"].pos.append(torch.from_numpy(mol_rdkit.GetConformer().GetPositions()).float())
 
     else:  # no matching
         complex_graph.rmsd_matching = 0
@@ -462,8 +462,8 @@ def get_lig_graph_with_matching(
         get_lig_graph(mol_, complex_graph)
 
     edge_mask, mask_rotate = get_transformation_mask(complex_graph)
-    complex_graph['ligand'].edge_mask = torch.tensor(edge_mask)
-    complex_graph['ligand'].mask_rotate = mask_rotate
+    complex_graph["ligand"].edge_mask = torch.tensor(edge_mask)
+    complex_graph["ligand"].mask_rotate = mask_rotate
 
     return
 
@@ -490,8 +490,8 @@ def get_calpha_graph(
         if len(dst) == 0:
             dst = list(np.argsort(distances[i, :]))[1:2]  # choose second because first is i itself
             logging.info(
-                f'The c_alpha_cutoff {cutoff} was too small for one c_alpha such that it had no neighbors. '
-                f'So we connected it to the closest other c_alpha'
+                f"The c_alpha_cutoff {cutoff} was too small for one c_alpha such that it had no neighbors. "
+                f"So we connected it to the closest other c_alpha"
             )
         assert i not in dst
         src = [i] * len(dst)
@@ -499,7 +499,7 @@ def get_calpha_graph(
         dst_list.extend(dst)
         valid_dist_np = distances[i, dst]
         sigma = np.array([1.0, 2.0, 5.0, 10.0, 30.0]).reshape((-1, 1))
-        weights = softmax(-valid_dist_np.reshape((1, -1)) ** 2 / sigma, axis=1)  # (sigma_num, neigh_num)
+        weights = softmax(-(valid_dist_np.reshape((1, -1)) ** 2) / sigma, axis=1)  # (sigma_num, neigh_num)
         assert weights[0].sum() > 1 - 1e-2 and weights[0].sum() < 1.01
         diff_vecs = c_alpha_coords[src, :] - c_alpha_coords[dst, :]  # (neigh_num, 3)
         mean_vec = weights.dot(diff_vecs)  # (sigma_num, 3)
@@ -514,13 +514,13 @@ def get_calpha_graph(
         np.concatenate([np.expand_dims(n_rel_pos, axis=1), np.expand_dims(c_rel_pos, axis=1)], axis=1)
     )
 
-    complex_graph['receptor'].x = (
+    complex_graph["receptor"].x = (
         torch.cat([node_feat, torch.tensor(lm_embeddings)], axis=1) if lm_embeddings is not None else node_feat
     )
-    complex_graph['receptor'].pos = torch.from_numpy(c_alpha_coords).float()
-    complex_graph['receptor'].mu_r_norm = mu_r_norm
-    complex_graph['receptor'].side_chain_vecs = side_chain_vecs.float()
-    complex_graph['receptor', 'rec_contact', 'receptor'].edge_index = torch.from_numpy(
+    complex_graph["receptor"].pos = torch.from_numpy(c_alpha_coords).float()
+    complex_graph["receptor"].mu_r_norm = mu_r_norm
+    complex_graph["receptor"].side_chain_vecs = side_chain_vecs.float()
+    complex_graph["receptor", "rec_contact", "receptor"].edge_index = torch.from_numpy(
         np.asarray([src_list, dst_list])
     )
 
@@ -531,18 +531,18 @@ def rec_atom_featurizer(rec):
     atom_feats = []
     for i, atom in enumerate(rec.get_atoms()):
         atom_name, element = atom.name, atom.element
-        if element == 'CD':
-            element = 'C'
-        assert not element == ''
+        if element == "CD":
+            element = "C"
+        assert not element == ""
         try:
             atomic_num = periodic_table.GetAtomicNumber(element)
         except Exception:
             atomic_num = -1
         atom_feat = [
-            safe_index(allowable_features['possible_amino_acids'], atom.get_parent().get_resname()),
-            safe_index(allowable_features['possible_atomic_num_list'], atomic_num),
-            safe_index(allowable_features['possible_atom_type_2'], (atom_name + '*')[:2]),
-            safe_index(allowable_features['possible_atom_type_3'], atom_name),
+            safe_index(allowable_features["possible_amino_acids"], atom.get_parent().get_resname()),
+            safe_index(allowable_features["possible_atomic_num_list"], atomic_num),
+            safe_index(allowable_features["possible_atom_type_2"], (atom_name + "*")[:2]),
+            safe_index(allowable_features["possible_atom_type_3"], atom_name),
         ]
         atom_feats.append(atom_feat)
 
@@ -627,8 +627,8 @@ def get_fullrec_graph(
         if len(dst) == 0:
             dst = list(np.argsort(distances[i, :]))[1:2]  # choose second because first is i itself
             logging.info(
-                f'The c_alpha_cutoff {c_alpha_cutoff} was too small for one c_alpha such that it had no neighbors. '
-                f'So we connected it to the closest other c_alpha'
+                f"The c_alpha_cutoff {c_alpha_cutoff} was too small for one c_alpha such that it had no neighbors. "
+                f"So we connected it to the closest other c_alpha"
             )
         assert i not in dst
         src = [i] * len(dst)
@@ -636,7 +636,7 @@ def get_fullrec_graph(
         dst_list.extend(dst)
         valid_dist_np = distances[i, dst]
         sigma = np.array([1.0, 2.0, 5.0, 10.0, 30.0]).reshape((-1, 1))
-        weights = softmax(-valid_dist_np.reshape((1, -1)) ** 2 / sigma, axis=1)  # (sigma_num, neigh_num)
+        weights = softmax(-(valid_dist_np.reshape((1, -1)) ** 2) / sigma, axis=1)  # (sigma_num, neigh_num)
         assert 1 - 1e-2 < weights[0].sum() < 1.01
         diff_vecs = c_alpha_coords[src, :] - c_alpha_coords[dst, :]  # (neigh_num, 3)
         mean_vec = weights.dot(diff_vecs)  # (sigma_num, 3)
@@ -651,13 +651,13 @@ def get_fullrec_graph(
         np.concatenate([np.expand_dims(n_rel_pos, axis=1), np.expand_dims(c_rel_pos, axis=1)], axis=1)
     )
 
-    complex_graph['receptor'].x = (
+    complex_graph["receptor"].x = (
         torch.cat([node_feat, torch.tensor(lm_embeddings)], axis=1) if lm_embeddings is not None else node_feat
     )
-    complex_graph['receptor'].pos = torch.from_numpy(c_alpha_coords).float()
-    complex_graph['receptor'].mu_r_norm = mu_r_norm
-    complex_graph['receptor'].side_chain_vecs = side_chain_vecs.float()
-    complex_graph['receptor', 'rec_contact', 'receptor'].edge_index = torch.from_numpy(
+    complex_graph["receptor"].pos = torch.from_numpy(c_alpha_coords).float()
+    complex_graph["receptor"].mu_r_norm = mu_r_norm
+    complex_graph["receptor"].side_chain_vecs = side_chain_vecs.float()
+    complex_graph["receptor", "rec_contact", "receptor"].edge_index = torch.from_numpy(
         np.asarray([src_list, dst_list])
     )
 
@@ -676,10 +676,10 @@ def get_fullrec_graph(
     )
     atom_res_edge_index = torch.from_numpy(np.asarray([np.arange(len(atom_feat)), src_c_alpha_idx])).long()
 
-    complex_graph['atom'].x = atom_feat
-    complex_graph['atom'].pos = atom_coords
-    complex_graph['atom', 'atom_contact', 'atom'].edge_index = atoms_edge_index
-    complex_graph['atom', 'atom_rec_contact', 'receptor'].edge_index = atom_res_edge_index
+    complex_graph["atom"].x = atom_feat
+    complex_graph["atom"].pos = atom_coords
+    complex_graph["atom", "atom_contact", "atom"].edge_index = atoms_edge_index
+    complex_graph["atom", "atom_rec_contact", "receptor"].edge_index = atom_res_edge_index
 
     return
 
@@ -695,24 +695,25 @@ def write_mol_with_coords(mol, new_coords, path):
 
 
 def read_molecule(molecule_file, sanitize=False, calc_charges=False, remove_hs=False):
-    if molecule_file.endswith('.mol2'):
+    if molecule_file.endswith(".mol2"):
         mol = Chem.MolFromMol2File(molecule_file, sanitize=False, removeHs=False)
-    elif molecule_file.endswith('.sdf'):
+    elif molecule_file.endswith(".sdf"):
         supplier = Chem.SDMolSupplier(molecule_file, sanitize=False, removeHs=False)
         mol = supplier[0]
-    elif molecule_file.endswith('.pdbqt'):
+    elif molecule_file.endswith(".pdbqt"):
         with open(molecule_file) as file:
             pdbqt_data = file.readlines()
-        pdb_block = ''
+        pdb_block = ""
         for line in pdbqt_data:
-            pdb_block += '{}\n'.format(line[:66])
+            pdb_block += "{}\n".format(line[:66])
         mol = Chem.MolFromPDBBlock(pdb_block, sanitize=False, removeHs=False)
-    elif molecule_file.endswith('.pdb'):
+    elif molecule_file.endswith(".pdb"):
         mol = Chem.MolFromPDBFile(molecule_file, sanitize=False, removeHs=False)
     else:
         raise ValueError(
-            'Expect the format of the molecule_file to be '
-            'one of .mol2, .sdf, .pdbqt and .pdb, got {}'.format(molecule_file)
+            "Expect the format of the molecule_file to be " "one of .mol2, .sdf, .pdbqt and .pdb, got {}".format(
+                molecule_file
+            )
         )
 
     try:
@@ -724,12 +725,12 @@ def read_molecule(molecule_file, sanitize=False, calc_charges=False, remove_hs=F
             try:
                 AllChem.ComputeGasteigerCharges(mol)
             except Exception as e:
-                logging.warning(f'Unable to compute charges for the molecule with error: {e}')
+                logging.warning(f"Unable to compute charges for the molecule with error: {e}")
 
         if remove_hs:
             mol = Chem.RemoveHs(mol, sanitize=sanitize)
     except Exception as e:
-        logging.warning(f'could not process mol with error: {e}')
+        logging.warning(f"could not process mol with error: {e}")
         return None
 
     return mol

@@ -22,7 +22,7 @@
 #       model.data.uf50_datapath=${dataset_dir_local_full_path}/${UF50_TRAIN_SEQUENCES_BASE_FILENAME}
 #       model.data.uf90_datapath=${dataset_dir_local_full_path}/${UF90_AND_UF50_SEQUENCES_BASE_FILENAME}
 #       model.data.cluster_mapping_tsv=${dataset_dir_local_full_path}/${MAPPING_BASE_FILENAME}
-#       
+#
 #     Output files: program will create and populate these directories
 #       model.data.dataset_path=${dataset_dir_local_full_path}/${UF50}
 #       model.data.uf90.uniref90_path=${dataset_dir_local_full_path}/${UF90}
@@ -121,14 +121,14 @@ if [ ! "${DRY_RUN}" == 'true' ]; then
     printf "${MESSAGE_TEMPLATE}" "entering dir=${BIONEMO_HOME_THIS}"
     pushd "${BIONEMO_HOME_THIS}"
 
-    HYDRA_FULL_ERROR=1  
+    HYDRA_FULL_ERROR=1
     timer_start
     eval "${PYTHON_COMMAND}"
     timer_end
     preproc_delta_seconds="${delta_seconds}"
     popd
     ls -alF "${dataset_dir_local_full_path}"
-    
+
     printf "${MESSAGE_TEMPLATE}" "preprocess raw data read from local hd, end"
 fi
 
@@ -139,7 +139,7 @@ preproc_dataset_copy_seconds=''
 
 dataset_dir_local_full_path_with_preproc_tag="${DATA_DIR_IN_LOCAL_HD}/${DATASET_DIR}_preproc"
 dataset_dir_remote_full_path_with_preproc_tag="${DATA_DIR_IN_REMOTE_HD}/${DATASET_DIR}_preproc"
-mv "${dataset_dir_local_full_path}" "${dataset_dir_local_full_path_with_preproc_tag}" 
+mv "${dataset_dir_local_full_path}" "${dataset_dir_local_full_path_with_preproc_tag}"
 
 # dataset transfer
 timer_start

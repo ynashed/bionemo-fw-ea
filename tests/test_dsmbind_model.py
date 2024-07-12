@@ -108,7 +108,7 @@ def test_mpn(bionemo_home: Path):
     cfg_model = cfg.model
     mpn = MPNEncoder(cfg_model)
 
-    smiles_list = ['C(C(=O)O)N', 'c1ccccc1', 'O=C(C)Oc1ccccc1C(=O)O', 'C1CCCCC1']
+    smiles_list = ["C(C(=O)O)N", "c1ccccc1", "O=C(C)Oc1ccccc1C(=O)O", "C1CCCCC1"]
     molecule_list = [Chem.MolFromSmiles(smile) for smile in smiles_list]
     max_atoms = max(mol.GetNumAtoms() for mol in molecule_list)
     mol_graph_batch = mol2graph(molecule_list)
@@ -126,11 +126,11 @@ def test_dsmbind_forward(bionemo_home: Path):
     preprocess(raw_data_dir=raw_data_dir)
 
     dataset = DSMBindDataset(
-        processed_data_path=os.path.join(raw_data_dir, 'processed.pkl'),
+        processed_data_path=os.path.join(raw_data_dir, "processed.pkl"),
         aa_size=cfg.model.aa_size,
         max_residue_atoms=cfg.model.max_residue_atoms,
     )
-    os.remove(os.path.join(raw_data_dir, 'processed.pkl'))
+    os.remove(os.path.join(raw_data_dir, "processed.pkl"))
     dataloader = DataLoader(dataset, batch_size=2, collate_fn=dataset.pl_collate_fn, shuffle=False)
     data_iterator = iter(dataloader)
     batched_binder, batched_target = next(data_iterator)  # first batch
@@ -149,11 +149,11 @@ def test_dsmbind_predict(bionemo_home: Path):
     preprocess(raw_data_dir=raw_data_dir)
 
     dataset = DSMBindDataset(
-        processed_data_path=os.path.join(raw_data_dir, 'processed.pkl'),
+        processed_data_path=os.path.join(raw_data_dir, "processed.pkl"),
         aa_size=cfg.model.aa_size,
         max_residue_atoms=cfg.model.max_residue_atoms,
     )
-    os.remove(os.path.join(raw_data_dir, 'processed.pkl'))
+    os.remove(os.path.join(raw_data_dir, "processed.pkl"))
     dataloader = DataLoader(dataset, batch_size=2, collate_fn=dataset.pl_collate_fn, shuffle=False)
     data_iterator = iter(dataloader)
     batched_binder, batched_target = next(data_iterator)  # first batch

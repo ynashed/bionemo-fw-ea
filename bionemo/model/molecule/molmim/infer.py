@@ -19,6 +19,6 @@ __all__ = ["MolMIMInference"]
 
 
 class MolMIMInference(MolInference):
-    '''
+    """
     Any MolMIM specific inference methods should go here as they arise. Otherwise add them to the parent class if shared.
-    '''
+    """

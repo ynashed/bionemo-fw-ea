@@ -45,7 +45,7 @@ class KillAfterSignalCallback(Callback):
             logging.info("\nReceived SIGTERM signal, terminating process...\n")
             exit(0)
 
-        pickle_file_path = os.path.join(self.metadata_path, 'checkpoints/metadata.pkl')
+        pickle_file_path = os.path.join(self.metadata_path, "checkpoints/metadata.pkl")
 
         if not trainer.is_global_zero:
             # Sleep the process if not global zero to clean up hanging procs
@@ -81,9 +81,9 @@ class MetadataSaveCallback(Callback):
                 metadata_value = getter_function_map[metadata_key](trainer, pl_module)
                 metadata[metadata_key] = metadata_value
             # prepare paths for metadata save
-            pickle_file_path = os.path.join(self.metadata_path, 'checkpoints/metadata.pkl')
+            pickle_file_path = os.path.join(self.metadata_path, "checkpoints/metadata.pkl")
             os.makedirs(os.path.dirname(pickle_file_path), exist_ok=True)
-            with open(pickle_file_path, 'wb') as metadata_file:
+            with open(pickle_file_path, "wb") as metadata_file:
                 pickle.dump(metadata, metadata_file)
             # check that pickle file was saved correctly
             assert os.path.isfile(pickle_file_path), f"No file found at {pickle_file_path}"
@@ -112,10 +112,10 @@ class TestCheckpointIntegrityCallback(Callback):
 
     def on_train_start(self, trainer: Trainer, pl_module: LightningModule):
         if trainer.is_global_zero:
-            pickle_file_path = os.path.join(self.metadata_path, 'checkpoints/metadata.pkl')
+            pickle_file_path = os.path.join(self.metadata_path, "checkpoints/metadata.pkl")
             # check that pickle file exists
             assert os.path.isfile(pickle_file_path), f"No file found at {pickle_file_path}"
-            with open(pickle_file_path, 'rb') as metadata_file:
+            with open(pickle_file_path, "rb") as metadata_file:
                 metadata_dict = pickle.load(metadata_file)
 
             for metadata_key in self.metadata_keys:

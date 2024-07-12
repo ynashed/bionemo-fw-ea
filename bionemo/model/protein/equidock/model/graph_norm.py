@@ -41,8 +41,8 @@ class GraphNorm(nn.Module):
             self.gamma = nn.Parameter(torch.ones(self.num_features))
             self.beta = nn.Parameter(torch.zeros(self.num_features))
         else:
-            self.register_parameter('gamma', None)
-            self.register_parameter('beta', None)
+            self.register_parameter("gamma", None)
+            self.register_parameter("beta", None)
 
     def norm(self, x):
         mean = x.mean(dim=0, keepdim=True)

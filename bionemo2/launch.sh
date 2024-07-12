@@ -259,7 +259,7 @@ pull() {
 #Function to run the Docker container
 run() {
     echo "running docker container"
-    docker run --ipc=host --net=host --shm-size=512m --gpus all --rm -it --entrypoint /bin/bash ${IMAGE_NAME}:${IMAGE_TAG} 
+    docker run --ipc=host --net=host --shm-size=512m --gpus all --rm -it --entrypoint /bin/bash ${IMAGE_NAME}:${IMAGE_TAG}
 }
 
 case "$1" in

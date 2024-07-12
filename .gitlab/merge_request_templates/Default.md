@@ -8,7 +8,7 @@ Add a one-line overview of what this PR aims to accomplish.
 * You can potentially add a usage example below
 
 ```python
-# Add a code snippet demonstrating how to use this 
+# Add a code snippet demonstrating how to use this
 ```
 
 # Before your PR is "Ready for review?"
@@ -19,13 +19,13 @@ Add a one-line overview of what this PR aims to accomplish.
 - [ ] Did you set `JET_NOT_REQUIRED` label as one of this MR's labels if your MR is eligible for NOT running `jet` stage (and tests in JET)? See `CONTRIBUTING.md` for information.
 - [ ] Did you write any new necessary unit tests of added utilities (added to `tests`) or of training and inference for a new model (in `examples/tests`)? See `CONTRIBUTING.md` for more details.
 - [ ] Did you add or update any necessary documentation (including comments in config files for all new config values)?
-  
+
 
 # When to label your MR as `SKIP_CI` or `JET_NOT_REQUIRED`
-Most of the changes to files with extensions `*.py`, `*.yaml`, `*.yml`,  `Dockerfile*` or `requirements.txt` DO REQUIRE both BioNeMo CI and `jet` stage to be run, should be carefully tested and ARE NOT eligible to use `SKIP_CI` or `JET_NOT_REQUIRE` label as they affect container deployment and model performance or convergence. 
+Most of the changes to files with extensions `*.py`, `*.yaml`, `*.yml`,  `Dockerfile*` or `requirements.txt` DO REQUIRE both BioNeMo CI and `jet` stage to be run, should be carefully tested and ARE NOT eligible to use `SKIP_CI` or `JET_NOT_REQUIRE` label as they affect container deployment and model performance or convergence.
 The changes to the codebase that are eligible for using `SKIP_CI` label are:
 * changes to the files with extension `.md` or `.ipynb`
-* changes under folders `docs`, `LICENSE`, 
+* changes under folders `docs`, `LICENSE`,
 * changes to the files with extension `.sh` under `examples/**/scripts/*.sh` related to training scripts of models
 * changes to the other files with extension `.sh` not affecting container build, models and data download for unit test or JET tests
 * updating files with extensions different than `*.sh`, `*.py`, `*.yaml`, `*.yml`,  `Dockerfile*` or `requirements.txt` that **DO NOT** affect model checkpoints or data download, docker building, unit tests and model performance or convergence
@@ -36,5 +36,3 @@ The changes to the codebase that are eligible for using `JET_NOT_REQUIRE` label 
 * improving hydra configs docstrings (comments and descriptions) in  `*.yaml`, `*.yml`
 * changes to `Dockerfile` or `requirements.txt` that **DO NOT** affect model performance or convergence. Changes that **REQUIRE** `jet` stage are, for instance, python package update or a NeMo container version update.
 * updating files with extensions different that `*.py`, `*.yaml`, `*.yml`,  `Dockerfile` or `requirements.txt` that **DO NOT** affect model performance or convergence
-
-

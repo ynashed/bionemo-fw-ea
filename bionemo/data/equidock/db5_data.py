@@ -31,23 +31,23 @@ from torch.utils.data import Dataset
 from bionemo.data.equidock.protein_utils import UniformRotation_Translation
 
 
-__all__ = ['Unbound_Bound_Data', 'nemo_get_dataset']
+__all__ = ["Unbound_Bound_Data", "nemo_get_dataset"]
 
 
 class Unbound_Bound_Data(Dataset):
-    def __init__(self, cfg, if_swap=True, reload_mode='train'):
+    def __init__(self, cfg, if_swap=True, reload_mode="train"):
         cache_path = os.path.join(
             cfg.cache_path,
             cfg.data_name
-            + '_'
+            + "_"
             + cfg.graph_nodes
-            + '_maxneighbor_'
+            + "_maxneighbor_"
             + str(cfg.graph_max_neighbor)
-            + '_cutoff_'
+            + "_cutoff_"
             + str(cfg.graph_cutoff)
-            + '_pocketCut_'
+            + "_pocketCut_"
             + str(cfg.pocket_cutoff)
-            + '/cv_'
+            + "/cv_"
             + str(cfg.split),
         )
 
@@ -55,20 +55,20 @@ class Unbound_Bound_Data(Dataset):
         self.reload_mode = reload_mode
         self.if_swap = if_swap
 
-        frac_str = ''
-        if reload_mode == 'train' and cfg["data_name"] == 'dips':
-            frac_str = 'frac_' + str(cfg.data_fraction) + '_'
+        frac_str = ""
+        if reload_mode == "train" and cfg["data_name"] == "dips":
+            frac_str = "frac_" + str(cfg.data_fraction) + "_"
 
-        label_filename = os.path.join(cache_path, 'label_' + frac_str + reload_mode + '.pkl')
-        self.ligand_graph_filename = os.path.join(cache_path, 'ligand_graph_' + frac_str + reload_mode + '.bin')
-        self.receptor_graph_filename = os.path.join(cache_path, 'receptor_graph_' + frac_str + reload_mode + '.bin')
+        label_filename = os.path.join(cache_path, "label_" + frac_str + reload_mode + ".pkl")
+        self.ligand_graph_filename = os.path.join(cache_path, "ligand_graph_" + frac_str + reload_mode + ".bin")
+        self.receptor_graph_filename = os.path.join(cache_path, "receptor_graph_" + frac_str + reload_mode + ".bin")
 
-        with open(label_filename, 'rb') as infile:
+        with open(label_filename, "rb") as infile:
             label = pickle.load(infile)
 
-        self.pocket_coors_list = label['pocket_coors_list']
-        self.bound_ligand_repres_nodes_loc_array_list = label['bound_ligand_repres_nodes_loc_array_list']
-        self.bound_receptor_repres_nodes_loc_array_list = label['bound_receptor_repres_nodes_loc_array_list']
+        self.pocket_coors_list = label["pocket_coors_list"]
+        self.bound_ligand_repres_nodes_loc_array_list = label["bound_ligand_repres_nodes_loc_array_list"]
+        self.bound_receptor_repres_nodes_loc_array_list = label["bound_receptor_repres_nodes_loc_array_list"]
         self.rot_T, self.rot_b = [], []
         infile.close()
 
@@ -103,16 +103,16 @@ class Unbound_Bound_Data(Dataset):
         if len(self.rot_T) != 0:
             rot_T, rot_b = self.rot_T[idx], self.rot_b[idx]
         else:
-            rot_T, rot_b = UniformRotation_Translation(translation_interval=self.cfg['translation_interval'])
+            rot_T, rot_b = UniformRotation_Translation(translation_interval=self.cfg["translation_interval"])
 
-        ligand_original_loc = ligand_graph.ndata['x'].detach().numpy()
+        ligand_original_loc = ligand_graph.ndata["x"].detach().numpy()
 
         mean_to_remove = ligand_original_loc.mean(axis=0, keepdims=True)
 
         pocket_coors_ligand = (rot_T @ (pocket_coors_ligand - mean_to_remove).T).T + rot_b
         ligand_new_loc = (rot_T @ (ligand_original_loc - mean_to_remove).T).T + rot_b
 
-        ligand_graph.ndata['new_x'] = torch.from_numpy(ligand_new_loc.astype(np.float32))
+        ligand_graph.ndata["new_x"] = torch.from_numpy(ligand_new_loc.astype(np.float32))
 
         return (
             ligand_graph,
@@ -125,9 +125,9 @@ class Unbound_Bound_Data(Dataset):
 
 
 def nemo_get_dataset(args, reload):
-    if reload not in ['train', 'val', 'test']:
+    if reload not in ["train", "val", "test"]:
         raise ValueError(f"reload(={reload}) is not valid, choose from train, val, and test!")
-    if_swap = True if reload == 'train' else False
+    if_swap = True if reload == "train" else False
 
     data_set = Unbound_Bound_Data(args, if_swap=if_swap, reload_mode=reload)
 

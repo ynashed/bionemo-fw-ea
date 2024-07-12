@@ -1,6 +1,6 @@
 
 protein_data_dir: ${oc.env:BIONEMO_HOME}/data/PDB_processed
-protein_ligand_csv: null # same csv file as used in infer.py, check infer.yaml for more details. 
+protein_ligand_csv: null # same csv file as used in infer.py, check infer.yaml for more details.
                          # for eval.py, only mol2 and sdf for ligand and pdb for protein are supported as coordinates are required.
 
 data:

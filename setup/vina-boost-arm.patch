@@ -8,6 +8,5 @@ index 6d1c6a7..5aa536e 100644
              return include_dirs, '/usr/lib'
 +        elif glob.glob('/usr/lib/aarch64-linux-gnu/libboost*'):
 +            return include_dirs, '/usr/lib/aarch64-linux-gnu'
- 
+
      return None, None
- 

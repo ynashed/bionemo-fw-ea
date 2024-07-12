@@ -36,7 +36,7 @@ spec:
   warmup: 200
   default_overwrites: "++exp_manager.create_tensorboard_logger=True ++exp_manager.wandb_logger_kwargs.offline=False ++exp_manager.create_wandb_logger=True ++exp_manager.create_checkpoint_callback=False ++exp_manager.resume_if_exists=False"
   extra_overwrites: ""
-  script: |-    
+  script: |-
     cd {BIONEMO_HOME};
     mkdir -p {tensorboard_dir};
     if [ "$SLURM_LOCALID" = "0" ]; then cp /misc_data/npz/.*.npz {BIONEMO_HOME}/bionemo/model/molecule/diffdock/; fi;

@@ -13,6 +13,7 @@ Entry point to EquiDock.
 
 modify parameters from conf/*.cfg
 """
+
 import os
 import pathlib
 import tempfile
@@ -43,7 +44,7 @@ torch.backends.cuda.matmul.allow_tf32 = False
 torch.backends.cuda.allow_tf32 = False
 torch.backends.cudnn.enabled = False
 
-os.environ['DGLBACKEND'] = 'pytorch'
+os.environ["DGLBACKEND"] = "pytorch"
 torch.set_float32_matmul_precision("high")
 BIONEMO_ROOT = pathlib.Path(bionemo.__file__).parent.parent.as_posix()
 
@@ -73,24 +74,24 @@ def main(cfg) -> None:
 
     with tempfile.TemporaryDirectory() as temp_dir:
         # random transformed zip pdb directory
-        extract_to_dir(os.path.join(data_dir, 'ligands.zip'), temp_dir)
-        extract_to_dir(os.path.join(data_dir, 'receptors.zip'), temp_dir)
+        extract_to_dir(os.path.join(data_dir, "ligands.zip"), temp_dir)
+        extract_to_dir(os.path.join(data_dir, "receptors.zip"), temp_dir)
 
         pdb_files = [
-            f for f in os.listdir(temp_dir) if os.path.isfile(os.path.join(temp_dir, f)) and f.endswith('.pdb')
+            f for f in os.listdir(temp_dir) if os.path.isfile(os.path.join(temp_dir, f)) and f.endswith(".pdb")
         ]
         pdb_files.sort()
         time_list = []
 
         for file in pdb_files:
             start = time.perf_counter()
-            if not file.endswith('_l_b.pdb'):
+            if not file.endswith("_l_b.pdb"):
                 continue
 
-            ll = len('_l_b.pdb')
-            ligand_filename = os.path.join(temp_dir, f'{file[:-ll]}_l_b.pdb')
-            receptor_filename = os.path.join(temp_dir, f'{file[:-ll]}_r_b.pdb')
-            out_filename = f'{file[:-ll]}_l_b_COMPLEX.pdb'
+            ll = len("_l_b.pdb")
+            ligand_filename = os.path.join(temp_dir, f"{file[:-ll]}_l_b.pdb")
+            receptor_filename = os.path.join(temp_dir, f"{file[:-ll]}_r_b.pdb")
+            out_filename = f"{file[:-ll]}_l_b_COMPLEX.pdb"
             logging.info(f"Processing {out_filename} ...")
 
             # Create ligand and receptor graphs and arrays
@@ -130,11 +131,11 @@ def main(cfg) -> None:
             # Get initial ligand position
             ppdb_ligand = PandasPdb().read_pdb(ligand_filename)
             unbound_ligand_all_atoms_pre_pos = (
-                ppdb_ligand.df['ATOM'][['x_coord', 'y_coord', 'z_coord']].to_numpy().squeeze().astype(np.float32)
+                ppdb_ligand.df["ATOM"][["x_coord", "y_coord", "z_coord"]].to_numpy().squeeze().astype(np.float32)
             )
             unbound_ligand_new_pos = (rotation @ unbound_ligand_all_atoms_pre_pos.T).T + translation
 
-            if cfg.get('postprocess', None) is not None and cfg.postprocess.remove_clashes:
+            if cfg.get("postprocess", None) is not None and cfg.postprocess.remove_clashes:
                 logging.info("Removing clashes!")
                 max_iteration = cfg.postprocess.max_iteration
 
@@ -148,16 +149,16 @@ def main(cfg) -> None:
                     cfg.postprocess.half_precision,
                 )
 
-                ppdb_ligand.df['ATOM'][
-                    ['x_coord', 'y_coord', 'z_coord']
-                ] = unbound_ligand_new_pos  # unbound_ligand_new_pos
+                ppdb_ligand.df["ATOM"][["x_coord", "y_coord", "z_coord"]] = (
+                    unbound_ligand_new_pos  # unbound_ligand_new_pos
+                )
 
             else:
-                ppdb_ligand.df['ATOM'][
-                    ['x_coord', 'y_coord', 'z_coord']
-                ] = unbound_ligand_new_pos  # unbound_ligand_new_pos
+                ppdb_ligand.df["ATOM"][["x_coord", "y_coord", "z_coord"]] = (
+                    unbound_ligand_new_pos  # unbound_ligand_new_pos
+                )
             unbound_ligand_save_filename = os.path.join(output_dir, out_filename)
-            ppdb_ligand.to_pdb(path=unbound_ligand_save_filename, records=['ATOM'], gz=False)
+            ppdb_ligand.to_pdb(path=unbound_ligand_save_filename, records=["ATOM"], gz=False)
             time_list.append((time.perf_counter() - start))
 
         time_array = np.array(time_list)

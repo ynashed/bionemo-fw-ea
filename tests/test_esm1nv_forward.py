@@ -11,6 +11,7 @@
 """
 This file tests the forward pass of ESM1.
 """
+
 import json
 import os
 from pathlib import Path
@@ -28,22 +29,22 @@ from bionemo.utils.hydra import load_model_config
 from bionemo.utils.tests import Deterministic, distributed_model_parallel_state
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope="module")
 def golden_value_prepend_dir(bionemo_home: Path) -> Path:
     yield Path(bionemo_home / "tests" / "data" / "esm1_golden_values")
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope="module")
 def golden_value_heatmap_dir(golden_value_prepend_dir: Path) -> Path:
     yield Path(golden_value_prepend_dir / "heatmaps")
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope="module")
 def golden_values_fp16_json(golden_value_prepend_dir: Path) -> Path:
     yield Path(golden_value_prepend_dir / "revert_esm1nv_infer_golden_values_fp16.json")
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope="module")
 def golden_values_fp32_json(golden_value_prepend_dir: Path) -> Path:
     yield Path(golden_value_prepend_dir / "revert_esm1nv_infer_golden_values_fp32.json")
 
@@ -53,8 +54,8 @@ def esm1nv_forward_config_path(bionemo_home: Path) -> Path:
     yield Path(bionemo_home / "examples" / "tests" / "conf")
 
 
-def _load_config(precision: Literal['32', '16-mixed'], esm1nv_forward_config_path) -> DictConfig:
-    cfg = load_model_config(config_name='esm1nv_infer', config_path=esm1nv_forward_config_path)
+def _load_config(precision: Literal["32", "16-mixed"], esm1nv_forward_config_path) -> DictConfig:
+    cfg = load_model_config(config_name="esm1nv_infer", config_path=esm1nv_forward_config_path)
     cfg.trainer.precision = precision
     return cfg
 
@@ -65,29 +66,29 @@ def _load_model(cfg) -> Iterator[Tuple[Any, Any, DataLoader]]:
         yield model, trainer, dataloader
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope="module")
 def cfg_32(esm1nv_forward_config_path):
-    return _load_config('32', esm1nv_forward_config_path)
+    return _load_config("32", esm1nv_forward_config_path)
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope="module")
 def cfg_16mixed(esm1nv_forward_config_path):
-    return _load_config('16-mixed', esm1nv_forward_config_path)
+    return _load_config("16-mixed", esm1nv_forward_config_path)
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope="module")
 def esm1_model_32(cfg_32):
     yield from _load_model(cfg_32)
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope="module")
 def esm1_model_16mixed(cfg_16mixed):
     yield from _load_model(cfg_16mixed)
 
 
 def plot_heatmap(diff_array: np.ndarray, title: str, filepath: str) -> None:
     plt.figure(figsize=(8, 6))
-    plt.imshow(diff_array, cmap='coolwarm', interpolation='nearest')
+    plt.imshow(diff_array, cmap="coolwarm", interpolation="nearest")
     plt.colorbar()
     plt.title(title)
     plt.xlabel("Predictions Index")
@@ -151,8 +152,8 @@ def _test_esm1_inference_input_output_shapes_sizes_from_nemo_ckpt(cfg_infer, mod
     assert isinstance(predictions[0], dict)
 
     # Confirm that embeddings are type numpy array
-    assert isinstance(predictions[0]['embeddings'], np.ndarray)
-    assert isinstance(predictions[0]['hiddens'], np.ndarray)
+    assert isinstance(predictions[0]["embeddings"], np.ndarray)
+    assert isinstance(predictions[0]["hiddens"], np.ndarray)
 
     # Confirm that the output dictionary has the expected keys.
     assert set(cfg_infer.model.downstream_task.outputs).issubset(set(predictions[0].keys()))
@@ -160,15 +161,15 @@ def _test_esm1_inference_input_output_shapes_sizes_from_nemo_ckpt(cfg_infer, mod
     # Confirm that the output dictionary has the expected values.
     sample = next(iter(dataloader))
     # Confirm that the input sample's sequence length matches the hidden layer output sequence length.
-    assert len(sample['sequence'][0]) == len(predictions[0]['hiddens'])
+    assert len(sample["sequence"][0]) == len(predictions[0]["hiddens"])
 
     # Confirm that the shape of the embemddings are expected
-    assert predictions[0]['embeddings'].shape == (cfg_infer.model.hidden_size,)
-    assert predictions[0]['hiddens'].shape == (len(sample['sequence'][0]), cfg_infer.model.hidden_size)
-    assert predictions[0]['embeddings'].shape == predictions[0]['hiddens'][-1].shape
+    assert predictions[0]["embeddings"].shape == (cfg_infer.model.hidden_size,)
+    assert predictions[0]["hiddens"].shape == (len(sample["sequence"][0]), cfg_infer.model.hidden_size)
+    assert predictions[0]["embeddings"].shape == predictions[0]["hiddens"][-1].shape
 
     # Maybe remove this test. It is not necessary.
-    assert sample['sequence'][0] == predictions[0]['sequence']
+    assert sample["sequence"][0] == predictions[0]["sequence"]
 
 
 def test_esm1_inference_input_output_shapes_sizes_from_nemo_ckpt_32(cfg_32, esm1_model_32):
@@ -193,11 +194,11 @@ def _test_esm1nv_golden_value_json_and_overwrite(
     current_embeddings = current_predictions["embeddings"]
 
     # Load golden values
-    with open(golden_json_filepath, 'r') as f:
+    with open(golden_json_filepath, "r") as f:
         golden_values = json.load(f)
 
     # Convert predictions from json to array
-    golden_predictions = golden_values['predictions']
+    golden_predictions = golden_values["predictions"]
     golden_embeddings = np.array(golden_predictions["embeddings"])
     golden_hiddens = np.array(golden_predictions["hiddens"])
 

@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --account=healthcareeng_bionemo
 #SBATCH --partition=interactive
-#SBATCH 
+#SBATCH
 #SBATCH -N 2
 #SBATCH --ntasks-per-node 8
 #SBATCH --gpus-per-node 8
@@ -63,10 +63,10 @@ srun --mpi=pmix \
   echo "'date=$(date +'%Y%m%dT%H%M')'" &&
   export HYDRA_FULL_ERROR=1 &&
   cd /workspace/bionemo &&
-  echo 'launch_qa_testcase_08.sh - before install_third_party.sh' &&  
+  echo 'launch_qa_testcase_08.sh - before install_third_party.sh' &&
   ./examples/protein/openfold/scripts/install_third_party.sh &&
-  echo 'launch_qa_testcase_08.sh - after install_third_party.sh' &&  
-  echo 'launch_qa_testcase_08.sh - before download_artifacts.py' &&  
+  echo 'launch_qa_testcase_08.sh - after install_third_party.sh' &&
+  echo 'launch_qa_testcase_08.sh - before download_artifacts.py' &&
   python download_artifacts.py --source pbss --model_dir models --models openfold_initial_training_inhouse &&
   echo 'launch_qa_testcase_08.sh - after download_artifacts.py' &&
   echo 'launch_qa_testcase_08.sh - before train.py' &&

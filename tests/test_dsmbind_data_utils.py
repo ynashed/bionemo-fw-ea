@@ -30,11 +30,11 @@ def dsmbind_test_raw_data_dir(bionemo_home) -> str:
 def test_dsmbind_data_preprocess(bionemo_home: Path):
     raw_data_dir = dsmbind_test_raw_data_dir(bionemo_home)
     preprocess(raw_data_dir=raw_data_dir)
-    with open(os.path.join(raw_data_dir, 'processed.pkl'), 'rb') as f:
+    with open(os.path.join(raw_data_dir, "processed.pkl"), "rb") as f:
         processed_data = pickle.load(f)
-    os.remove(os.path.join(raw_data_dir, 'processed.pkl'))
+    os.remove(os.path.join(raw_data_dir, "processed.pkl"))
     for data in processed_data:
-        if data['pdb'] == "5cpr":
+        if data["pdb"] == "5cpr":
             assert (
                 data["target_seq"]
                 == "MSAKELCENDDLATSLVLDPYLGFQTHKMNRQEELKEVIERFKKDEHLEKAFKCLTSGEWARHYFLNKNKMQEKLFKEHVFIYLRMFATDSGFEILPCNRYSSEQNGAKIVATKEWKRNDKIELLVGCIAELSEIEENMLLRHGENDFSVMYSTRKNCAQLWLGPAAFINHDCRPNCKFVSTGRDTACVKALRDIEPGEEISCYYGDGFFGENNEFCECYTCERRGTGAFKS"
@@ -62,7 +62,7 @@ def test_dsmbind_data_preprocess(bionemo_home: Path):
                 ),
                 atol=1.0e-3,
             )
-        elif data['pdb'] == "4r0i":
+        elif data["pdb"] == "4r0i":
             assert (
                 data["target_seq"]
                 == "VVGGTDADEGEWPWQVSLHALGQGHICGASLISPNWLVSAAHCYIDDRGFRYSDPTQWTAFLGLHDQSQRSAPGVQERRLKRIISHPFFNDFTFDYDIALLELEKPAEYSSMVRPICLPDASHVFPAGKAIWVTGWGHTQYGGTGALILQKGEIRVINQTTCENLLPQQITPRMMCVGFLSGGVDSCQGDSGGPLSSVEADGRIFQAGVVSWGDGCAQRNKPGVYTRLPLFRDWIKENTGVCGLR"
@@ -101,11 +101,11 @@ def test_dsmbind_dataset(bionemo_home: Path):
     preprocess(raw_data_dir=raw_data_dir)
 
     dataset = DSMBindDataset(
-        processed_data_path=os.path.join(raw_data_dir, 'processed.pkl'),
+        processed_data_path=os.path.join(raw_data_dir, "processed.pkl"),
         aa_size=cfg.model.aa_size,
         max_residue_atoms=cfg.model.max_residue_atoms,
     )
-    os.remove(os.path.join(raw_data_dir, 'processed.pkl'))
+    os.remove(os.path.join(raw_data_dir, "processed.pkl"))
     dataloader = DataLoader(dataset, batch_size=2, collate_fn=dataset.pl_collate_fn, shuffle=False)
     data_iterator = iter(dataloader)
     batched_binder, batched_target = next(

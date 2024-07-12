@@ -80,7 +80,7 @@ class MolEncDecModelBase(MegatronLMEncoderDecoderModel, ABC):
     def _check_scheduler(self, cfg):
         """Warn if maximum learning rate with Noam is less than minimum learning rate"""
         # TODO add to Noam Scheduler in NeMo
-        if cfg.optim.sched.name == 'NoamAnnealing':
+        if cfg.optim.sched.name == "NoamAnnealing":
             if cfg.optim.sched.warmup_steps:
                 warmup_steps = cfg.optim.sched.warmup_steps
             else:
@@ -89,7 +89,7 @@ class MolEncDecModelBase(MegatronLMEncoderDecoderModel, ABC):
             min_lr = cfg.optim.sched.min_lr
             if max_lr <= min_lr:
                 logging.warning(
-                    f'Warning: maximum learning rate for Noam Scheduler ({max_lr}) is less than minimum ({min_lr}).'
+                    f"Warning: maximum learning rate for Noam Scheduler ({max_lr}) is less than minimum ({min_lr})."
                 )
         return
 
@@ -100,18 +100,18 @@ class MolEncDecModelBase(MegatronLMEncoderDecoderModel, ABC):
         Returns:
             dicts with number of samples needed for train, val and test steps
         """
-        tensor_model_parallel_size = self._cfg.get('tensor_model_parallel_size', 1)
+        tensor_model_parallel_size = self._cfg.get("tensor_model_parallel_size", 1)
         global_batch_size = (
             self.trainer.world_size * self._cfg.micro_batch_size / tensor_model_parallel_size
         ) * self.trainer.limit_train_batches
         return int(self.trainer.max_steps * global_batch_size)
 
     def build_train_valid_test_datasets(self):
-        logging.info(f'Building datasets for {type(self).__name__}')
+        logging.info(f"Building datasets for {type(self).__name__}")
 
-        if self._cfg.data.get('dataset_type', None) is not None:
+        if self._cfg.data.get("dataset_type", None) is not None:
             dataset_types = DatasetTypes.__members__
-            if self._cfg.data.get('dataset_type') not in dataset_types:
+            if self._cfg.data.get("dataset_type") not in dataset_types:
                 raise ValueError(
                     f"dataset_type must be in {dataset_types}. Found {self._cfg.data.get('dataset_type')}"
                 )
@@ -120,18 +120,18 @@ class MolEncDecModelBase(MegatronLMEncoderDecoderModel, ABC):
         self._load_train_valid_test_datasets(train_n_samples=train_n_samples)
 
         if self._train_ds is not None:
-            logging.info(f'Length of train dataset: {len(self._train_ds)}')
+            logging.info(f"Length of train dataset: {len(self._train_ds)}")
         else:
-            logging.info('No train dataset is used')
+            logging.info("No train dataset is used")
         if self._validation_ds is not None:
-            logging.info(f'Length of val dataset: {len(self._validation_ds)}')
+            logging.info(f"Length of val dataset: {len(self._validation_ds)}")
         else:
-            logging.info('No validation dataset is used')
+            logging.info("No validation dataset is used")
         if self._test_ds is not None:
-            logging.info(f'Length of test dataset: {len(self._test_ds)}')
+            logging.info(f"Length of test dataset: {len(self._test_ds)}")
         else:
-            logging.info('No test dataset is used')
-        logging.info('Finished building MegaMolBART datasets.')
+            logging.info("No test dataset is used")
+        logging.info("Finished building MegaMolBART datasets.")
         return self._train_ds, self._validation_ds, self._test_ds
 
     def build_pretraining_data_loader(self, dataset, consumed_samples, num_workers=None):
@@ -160,7 +160,7 @@ class MolEncDecModelBase(MegatronLMEncoderDecoderModel, ABC):
 
     def get_step_logits(self, batch, batch_idx):
         """Teacher forcing"""
-        arg_names = ['enc_input_ids', 'enc_attn_mask', 'dec_input_ids', 'dec_attn_mask']
+        arg_names = ["enc_input_ids", "enc_attn_mask", "dec_input_ids", "dec_attn_mask"]
         (
             encoder_input_ids,
             decoder_input_ids,
@@ -198,7 +198,7 @@ class MolEncDecModelBase(MegatronLMEncoderDecoderModel, ABC):
 
         if output_tensor:
             # collect across micro batches
-            logits_tensors_list = [o['token_logits'] for o in output_tensor]
+            logits_tensors_list = [o["token_logits"] for o in output_tensor]
             logits_tensor = torch.concat(logits_tensors_list)
         else:
             # we're not on the last pipeline stage so no output
@@ -232,8 +232,8 @@ class MolEncDecModelBase(MegatronLMEncoderDecoderModel, ABC):
             dec_mask,
         ) = self.process_global_batch(batch)
 
-        target_smiles = batch['target_smiles']
-        token_logits[:, :, self.tokenizer.vocab_size :] = -float('Inf')  # never pick padded tokens
+        target_smiles = batch["target_smiles"]
+        token_logits[:, :, self.tokenizer.vocab_size :] = -float("Inf")  # never pick padded tokens
 
         log_n_batches = 10
         log_mol = True if batch_idx < log_n_batches else False  # TODO enable logging in yaml config
@@ -261,15 +261,15 @@ class MolEncDecModelBase(MegatronLMEncoderDecoderModel, ABC):
         """
         Shared logging for validation and test
         """
-        logging.info(f'Finishing {prefix} epoch')
+        logging.info(f"Finishing {prefix} epoch")
         averaged_loss = super()._test_validation_epoch_end(step_outputs, prefix)
 
         # Log results
         log_list = []
         for metric_name, metric_val in averaged_loss.items():
-            metric_name = metric_name.replace('_', ' ').title()
-            log_list.append(f'{metric_name}: {metric_val:.2f}')
-        logging.info(f'{prefix.title()} Results: ' + ', '.join(log_list))
+            metric_name = metric_name.replace("_", " ").title()
+            log_list.append(f"{metric_name}: {metric_val:.2f}")
+        logging.info(f"{prefix.title()} Results: " + ", ".join(log_list))
 
         return averaged_loss
 
@@ -324,8 +324,8 @@ class MolEncDecModelBase(MegatronLMEncoderDecoderModel, ABC):
                 sampled_smiles.append(sampled_smiles_i)
         else:
             raise ValueError(
-                f'The shape of the tensor with token_ids is not supported. '
-                f'Supported numbers of dims: {supported_dims}'
+                f"The shape of the tensor with token_ids is not supported. "
+                f"Supported numbers of dims: {supported_dims}"
             )
         self.unfreeze()
         return sampled_smiles
@@ -376,11 +376,11 @@ class MolEncDecModelBase(MegatronLMEncoderDecoderModel, ABC):
         character_accuracy = num_correct / total
 
         if log:
-            logging.info(f'Character accuracy for batch {batch_idx}:')
+            logging.info(f"Character accuracy for batch {batch_idx}:")
             for idx in range(predicted_tokens.shape[0]):
                 mask = loss_mask[idx].to(int)
                 correct_ = labels[idx][mask] == predicted_tokens[idx][mask]
-                logging.info(f'     Sample {idx} has {correct_} / {sum(mask)}')
+                logging.info(f"     Sample {idx} has {correct_} / {sum(mask)}")
 
         return character_accuracy
 
@@ -426,16 +426,16 @@ class MolEncDecModelBase(MegatronLMEncoderDecoderModel, ABC):
         molecular_accuracy = torch.tensor([num_correct / total]).to(tokens_enc.device)
 
         if log:
-            logging.info(f'Molecular accuracy for batch {batch_idx}:')
+            logging.info(f"Molecular accuracy for batch {batch_idx}:")
             for idx, (invalid_, correct_) in enumerate(zip(invalid, correct_smiles)):
                 if invalid_:
-                    result = 'invalid'
+                    result = "invalid"
                 elif correct_:
-                    result = 'correct'
+                    result = "correct"
                 else:
-                    result = 'incorrect'
+                    result = "incorrect"
                 logging.info(
-                    f'     Sample {idx} is {result}, target: {target_smiles[idx]}, sample: {sampled_smiles[idx]}'
+                    f"     Sample {idx} is {result}, target: {target_smiles[idx]}, sample: {sampled_smiles[idx]}"
                 )
 
         return molecular_accuracy, percent_invalid
@@ -472,9 +472,9 @@ class MolEncDecModelBase(MegatronLMEncoderDecoderModel, ABC):
             tokens_enc, enc_mask, target_smiles, batch_idx, log=log_mol
         )
         metrics = {
-            'character_accuracy': character_accuracy,
-            'molecular_accuracy': molecular_accuracy,
-            'percent_invalid': percent_invalid,
+            "character_accuracy": character_accuracy,
+            "molecular_accuracy": molecular_accuracy,
+            "percent_invalid": percent_invalid,
         }
         return metrics
 

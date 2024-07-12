@@ -94,7 +94,7 @@ class SingleCellDataModule(BioNeMoDataModule):
             dataset,
             num_samples=self.train_num_samples,
             cfg=self.cfg,
-            name=f'train_{self.train_num_samples}',
+            name=f"train_{self.train_num_samples}",
             index_mapping_dir=self.index_mapping_dir,
         )
 
@@ -104,7 +104,7 @@ class SingleCellDataModule(BioNeMoDataModule):
             dataset,
             num_samples=self.val_num_samples,
             cfg=self.cfg,
-            name=f'val_{self.val_num_samples}',
+            name=f"val_{self.val_num_samples}",
             index_mapping_dir=self.index_mapping_dir,
         )
 
@@ -114,7 +114,7 @@ class SingleCellDataModule(BioNeMoDataModule):
             dataset,
             num_samples=self.test_num_samples,
             cfg=self.cfg,
-            name=f'test_{self.test_num_samples}',
+            name=f"test_{self.test_num_samples}",
             index_mapping_dir=self.index_mapping_dir,
         )
 
@@ -191,7 +191,7 @@ class AdamsonDataModule(BioNeMoDataModule):
             dataset,
             num_samples=self.train_num_samples,
             cfg=self.cfg,
-            name=f'train_{self.train_num_samples}',
+            name=f"train_{self.train_num_samples}",
             index_mapping_dir=self.index_mapping_dir,
         )
 
@@ -215,7 +215,7 @@ class AdamsonDataModule(BioNeMoDataModule):
 
 def create_adamson_splits(
     data: AnnData,
-    split_type: Literal['single', 'single_only', 'double', 'double-0', 'double-1'] = 'single',
+    split_type: Literal["single", "single_only", "double", "double-0", "double-1"] = "single",
     train_ratio: float = 0.8,
     val_ratio: float = 0.1,
     seed: int = 1337,
@@ -251,7 +251,7 @@ def create_adamson_splits(
 
 
 def _split_data(
-    split_type: Literal['single', 'single_only', 'double', 'double-0', 'double-1'],
+    split_type: Literal["single", "single_only", "double", "double-0", "double-1"],
     perts: List[str],
     rng: np.random.RandomState,
     train_ratio: float = 0.8,
@@ -297,7 +297,7 @@ def _split_data(
             train_perts = [p for p in perts if p not in test_perts]
         elif split_type == "double-0":
             single_or_both_unseen_perts = [
-                p for p in test_doubles if len([pp for pp in p.split('+') if pp not in test_genes]) > 0
+                p for p in test_doubles if len([pp for pp in p.split("+") if pp not in test_genes]) > 0
             ]
             test_doubles = [p for p in test_doubles if p not in single_or_both_unseen_perts]
             test_perts = test_singles + test_doubles
@@ -306,7 +306,7 @@ def _split_data(
             # - filter perturbations in double perturbations that have both genes not in `test_genes`
             # i.e. train set will include double perturbations that have both not in the test set
             both_unseen_perts = [
-                p for p in test_doubles if len([pp for pp in p.split('+') if pp not in test_genes]) > 1
+                p for p in test_doubles if len([pp for pp in p.split("+") if pp not in test_genes]) > 1
             ]
             test_doubles = [p for p in test_doubles if p not in both_unseen_perts]
             test_perts = test_singles + test_doubles

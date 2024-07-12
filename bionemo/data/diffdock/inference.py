@@ -38,7 +38,7 @@ from bionemo.model.molecule.diffdock.utils.utils import get_symmetry_rmsd
 
 
 def set_nones(l):
-    return [s if str(s) != 'nan' else None for s in l]
+    return [s if str(s) != "nan" else None for s in l]
 
 
 def get_sequences(protein_files, protein_sequences):
@@ -65,8 +65,8 @@ def generate_ESM_structure(model, filename, sequence):
                 f.write(output)
                 print("saved", filename)
         except RuntimeError as e:
-            if 'out of memory' in str(e):
-                print('| WARNING: ran out of memory on chunk_size', chunk_size)
+            if "out of memory" in str(e):
+                print("| WARNING: ran out of memory on chunk_size", chunk_size)
                 for p in model.parameters():
                     if p.grad is not None:
                         del p.grad  # free some memory
@@ -126,18 +126,18 @@ class InferenceDataset(Dataset):
             protein_sequences = get_sequences(protein_files, protein_sequences)
             labels, sequences = [], []
             for i in range(len(protein_sequences)):
-                s = protein_sequences[i].split(':')
+                s = protein_sequences[i].split(":")
                 sequences.extend(s)
-                labels.extend([complex_names[i] + '_chain_' + str(j) for j in range(len(s))])
+                labels.extend([complex_names[i] + "_chain_" + str(j) for j in range(len(s))])
 
             dataset = FastaBatchedDataset(labels, sequences)
             lm_embeddings = compute_ESM_embeddings(model, alphabet, dataset)
 
             self.lm_embeddings = []
             for i in range(len(protein_sequences)):
-                s = protein_sequences[i].split(':')
+                s = protein_sequences[i].split(":")
                 self.lm_embeddings.append(
-                    [lm_embeddings[complex_names[i] + '_chain_' + str(j)] for j in range(len(s))]
+                    [lm_embeddings[complex_names[i] + "_chain_" + str(j)] for j in range(len(s))]
                 )
 
         elif not lm_embeddings:
@@ -172,7 +172,7 @@ class InferenceDataset(Dataset):
 
         # build the pytorch geometric heterogeneous graph
         complex_graph = HeteroData()
-        complex_graph['name'] = name
+        complex_graph["name"] = name
 
         # parse the ligand, either from file or smile
         try:
@@ -184,7 +184,7 @@ class InferenceDataset(Dataset):
             else:
                 mol = read_molecule(ligand_description, remove_hs=False, sanitize=True)
                 if mol is None:
-                    raise Exception('RDKit could not read the molecule ', ligand_description)
+                    raise Exception("RDKit could not read the molecule ", ligand_description)
                 mol.RemoveAllConformers()
                 mol = MolFromSmiles(
                     MolToSmiles(mol)
@@ -193,9 +193,9 @@ class InferenceDataset(Dataset):
                 generate_conformer(mol, seed=self.seed)
         except Exception as e:
             print(
-                'Failed to read molecule ', ligand_description, ' We are skipping it. The reason is the exception: ', e
+                "Failed to read molecule ", ligand_description, " We are skipping it. The reason is the exception: ", e
             )
-            complex_graph['success'] = False
+            complex_graph["success"] = False
             return complex_graph
 
         try:
@@ -217,9 +217,9 @@ class InferenceDataset(Dataset):
             )
             if lm_embeddings is not None and len(c_alpha_coords) != len(lm_embeddings):
                 print(
-                    f'LM embeddings for complex {name} did not have the right length for the protein. Skipping {name}.'
+                    f"LM embeddings for complex {name} did not have the right length for the protein. Skipping {name}."
                 )
-                complex_graph['success'] = False
+                complex_graph["success"] = False
                 return complex_graph
 
             get_rec_graph(
@@ -239,22 +239,22 @@ class InferenceDataset(Dataset):
             )
 
         except Exception as e:
-            print(f'Skipping {name} because of the error:')
+            print(f"Skipping {name} because of the error:")
             print(e)
-            complex_graph['success'] = False
+            complex_graph["success"] = False
             return complex_graph
 
-        protein_center = torch.mean(complex_graph['receptor'].pos, dim=0, keepdim=True)
-        complex_graph['receptor'].pos -= protein_center
+        protein_center = torch.mean(complex_graph["receptor"].pos, dim=0, keepdim=True)
+        complex_graph["receptor"].pos -= protein_center
         if self.all_atoms:
-            complex_graph['atom'].pos -= protein_center
+            complex_graph["atom"].pos -= protein_center
 
-        ligand_center = torch.mean(complex_graph['ligand'].pos, dim=0, keepdim=True)
-        complex_graph['ligand'].pos -= ligand_center
+        ligand_center = torch.mean(complex_graph["ligand"].pos, dim=0, keepdim=True)
+        complex_graph["ligand"].pos -= ligand_center
 
         complex_graph.original_center = protein_center
         complex_graph.mol = mol
-        complex_graph['success'] = True
+        complex_graph["success"] = True
         return complex_graph
 
 
@@ -272,10 +272,10 @@ def build_inference_datasets(cfg: DictConfig) -> Tuple[List, Dataset, Dataset, D
     """
     if cfg.protein_ligand_csv is not None:
         df = pd.read_csv(cfg.protein_ligand_csv)
-        complex_name_list = set_nones(df['complex_name'].tolist())
-        protein_path_list = set_nones(df['protein_path'].tolist())
-        protein_sequence_list = set_nones(df['protein_sequence'].tolist())
-        ligand_description_list = set_nones(df['ligand_description'].tolist())
+        complex_name_list = set_nones(df["complex_name"].tolist())
+        protein_path_list = set_nones(df["protein_path"].tolist())
+        protein_sequence_list = set_nones(df["protein_sequence"].tolist())
+        ligand_description_list = set_nones(df["ligand_description"].tolist())
     else:
         complex_name_list = [cfg.complex_name]
         protein_path_list = [cfg.protein_path]
@@ -311,7 +311,7 @@ def build_inference_datasets(cfg: DictConfig) -> Tuple[List, Dataset, Dataset, D
             confidence_model_cfg.use_original_model_cache or confidence_model_cfg.transfer_weights
         ):  # if the confidence model uses the same type of data as the original model then we do not need this dataset and can just use the complexes
             logging.info(
-                'HAPPENING | confidence model uses different type of graphs than the score model. Loading (or creating if not existing) the data for the confidence model now.'
+                "HAPPENING | confidence model uses different type of graphs than the score model. Loading (or creating if not existing) the data for the confidence model now."
             )
             confidence_test_dataset = InferenceDataset(
                 out_dir=cfg.out_dir,
@@ -372,14 +372,14 @@ def compute_rmsd(
             if cfg.file_to_exclude is not None:
                 file_paths = [path for path in file_paths if cfg.file_to_exclude not in path]
             try:
-                file_path = [path for path in file_paths if f'rank{i+1}_' in path][0]
+                file_path = [path for path in file_paths if f"rank{i+1}_" in path][0]
                 mol_pred = read_molecule(
                     os.path.join(cfg.results_path, directory_with_name, file_path), remove_hs=True, sanitize=True
                 )
                 mol_pred = Chem.RemoveAllHs(mol_pred)
             except Exception as e:
                 logging.warning(
-                    f'In {name} rank={i+1}, error encountered: {e}, ' + f"Please redo inference with {name}"
+                    f"In {name} rank={i+1}, error encountered: {e}, " + f"Please redo inference with {name}"
                 )
                 return None, None, None
 
@@ -391,7 +391,7 @@ def compute_rmsd(
             os.path.join(cfg.results_path, name, f'{"" if cfg.no_id_in_filename else name}{cfg.file_suffix}')
         ):
             raise Exception(
-                'path did not exists:',
+                "path did not exists:",
                 os.path.join(cfg.results_path, name, f'{"" if cfg.no_id_in_filename else name}{cfg.file_suffix}'),
             )
         mol_pred = read_molecule(
@@ -442,8 +442,8 @@ def compute_performance_metrics(
         Dict: A dictionary of performance metrics for top 1, top 5, top 10 predictions.
     """
     performance_metrics = {}
-    for overlap in ['', 'no_overlap_']:
-        if 'no_overlap_' == overlap:
+    for overlap in ["", "no_overlap_"]:
+        if "no_overlap_" == overlap:
             without_rec_overlap = np.array(without_rec_overlap_list, dtype=bool)
             rmsds = np.array(rmsds_list)[without_rec_overlap]
             centroid_distances = np.array(centroid_distances_list)[without_rec_overlap]
@@ -458,36 +458,36 @@ def compute_performance_metrics(
             successful_names = np.array(successful_names_list)
 
         if save_results:
-            np.save(os.path.join(cfg.results_path, f'{overlap}rmsds.npy'), rmsds)
-            np.save(os.path.join(cfg.results_path, f'{overlap}names.npy'), successful_names)
-            np.save(os.path.join(cfg.results_path, f'{overlap}min_cross_distances.npy'), np.array(min_cross_distances))
-            np.save(os.path.join(cfg.results_path, f'{overlap}min_self_distances.npy'), np.array(min_self_distances))
-            np.save(os.path.join(cfg.results_path, f'{overlap}centroid_distances.npy'), np.array(centroid_distances))
+            np.save(os.path.join(cfg.results_path, f"{overlap}rmsds.npy"), rmsds)
+            np.save(os.path.join(cfg.results_path, f"{overlap}names.npy"), successful_names)
+            np.save(os.path.join(cfg.results_path, f"{overlap}min_cross_distances.npy"), np.array(min_cross_distances))
+            np.save(os.path.join(cfg.results_path, f"{overlap}min_self_distances.npy"), np.array(min_self_distances))
+            np.save(os.path.join(cfg.results_path, f"{overlap}centroid_distances.npy"), np.array(centroid_distances))
 
         performance_metrics.update(
             {
-                f'{overlap}steric_clash_fraction': (
+                f"{overlap}steric_clash_fraction": (
                     100 * (min_cross_distances < 0.4).sum() / len(min_cross_distances) / cfg.num_predictions
                 ).__round__(2),
-                f'{overlap}self_intersect_fraction': (
+                f"{overlap}self_intersect_fraction": (
                     100 * (min_self_distances < 0.4).sum() / len(min_self_distances) / cfg.num_predictions
                 ).__round__(2),
-                f'{overlap}mean_rmsd': rmsds[:, 0].mean(),
-                f'{overlap}rmsds_below_2': (100 * (rmsds[:, 0] < 2).sum() / len(rmsds[:, 0])),
-                f'{overlap}rmsds_below_5': (100 * (rmsds[:, 0] < 5).sum() / len(rmsds[:, 0])),
-                f'{overlap}rmsds_percentile_25': np.percentile(rmsds[:, 0], 25).round(2),
-                f'{overlap}rmsds_percentile_50': np.percentile(rmsds[:, 0], 50).round(2),
-                f'{overlap}rmsds_percentile_75': np.percentile(rmsds[:, 0], 75).round(2),
-                f'{overlap}mean_centroid': centroid_distances[:, 0].mean().__round__(2),
-                f'{overlap}centroid_below_2': (
+                f"{overlap}mean_rmsd": rmsds[:, 0].mean(),
+                f"{overlap}rmsds_below_2": (100 * (rmsds[:, 0] < 2).sum() / len(rmsds[:, 0])),
+                f"{overlap}rmsds_below_5": (100 * (rmsds[:, 0] < 5).sum() / len(rmsds[:, 0])),
+                f"{overlap}rmsds_percentile_25": np.percentile(rmsds[:, 0], 25).round(2),
+                f"{overlap}rmsds_percentile_50": np.percentile(rmsds[:, 0], 50).round(2),
+                f"{overlap}rmsds_percentile_75": np.percentile(rmsds[:, 0], 75).round(2),
+                f"{overlap}mean_centroid": centroid_distances[:, 0].mean().__round__(2),
+                f"{overlap}centroid_below_2": (
                     100 * (centroid_distances[:, 0] < 2).sum() / len(centroid_distances[:, 0])
                 ).__round__(2),
-                f'{overlap}centroid_below_5': (
+                f"{overlap}centroid_below_5": (
                     100 * (centroid_distances[:, 0] < 5).sum() / len(centroid_distances[:, 0])
                 ).__round__(2),
-                f'{overlap}centroid_percentile_25': np.percentile(centroid_distances[:, 0], 25).round(2),
-                f'{overlap}centroid_percentile_50': np.percentile(centroid_distances[:, 0], 50).round(2),
-                f'{overlap}centroid_percentile_75': np.percentile(centroid_distances[:, 0], 75).round(2),
+                f"{overlap}centroid_percentile_25": np.percentile(centroid_distances[:, 0], 25).round(2),
+                f"{overlap}centroid_percentile_50": np.percentile(centroid_distances[:, 0], 50).round(2),
+                f"{overlap}centroid_percentile_75": np.percentile(centroid_distances[:, 0], 75).round(2),
             }
         )
 
@@ -503,26 +503,26 @@ def compute_performance_metrics(
         ][:, 0]
         performance_metrics.update(
             {
-                f'{overlap}top5_steric_clash_fraction': (
+                f"{overlap}top5_steric_clash_fraction": (
                     100 * (top5_min_cross_distances < 0.4).sum() / len(top5_min_cross_distances)
                 ).__round__(2),
-                f'{overlap}top5_self_intersect_fraction': (
+                f"{overlap}top5_self_intersect_fraction": (
                     100 * (top5_min_self_distances < 0.4).sum() / len(top5_min_self_distances)
                 ).__round__(2),
-                f'{overlap}top5_rmsds_below_2': (100 * (top5_rmsds < 2).sum() / len(top5_rmsds)).__round__(2),
-                f'{overlap}top5_rmsds_below_5': (100 * (top5_rmsds < 5).sum() / len(top5_rmsds)).__round__(2),
-                f'{overlap}top5_rmsds_percentile_25': np.percentile(top5_rmsds, 25).round(2),
-                f'{overlap}top5_rmsds_percentile_50': np.percentile(top5_rmsds, 50).round(2),
-                f'{overlap}top5_rmsds_percentile_75': np.percentile(top5_rmsds, 75).round(2),
-                f'{overlap}top5_centroid_below_2': (
+                f"{overlap}top5_rmsds_below_2": (100 * (top5_rmsds < 2).sum() / len(top5_rmsds)).__round__(2),
+                f"{overlap}top5_rmsds_below_5": (100 * (top5_rmsds < 5).sum() / len(top5_rmsds)).__round__(2),
+                f"{overlap}top5_rmsds_percentile_25": np.percentile(top5_rmsds, 25).round(2),
+                f"{overlap}top5_rmsds_percentile_50": np.percentile(top5_rmsds, 50).round(2),
+                f"{overlap}top5_rmsds_percentile_75": np.percentile(top5_rmsds, 75).round(2),
+                f"{overlap}top5_centroid_below_2": (
                     100 * (top5_centroid_distances < 2).sum() / len(top5_centroid_distances)
                 ).__round__(2),
-                f'{overlap}top5_centroid_below_5': (
+                f"{overlap}top5_centroid_below_5": (
                     100 * (top5_centroid_distances < 5).sum() / len(top5_centroid_distances)
                 ).__round__(2),
-                f'{overlap}top5_centroid_percentile_25': np.percentile(top5_centroid_distances, 25).round(2),
-                f'{overlap}top5_centroid_percentile_50': np.percentile(top5_centroid_distances, 50).round(2),
-                f'{overlap}top5_centroid_percentile_75': np.percentile(top5_centroid_distances, 75).round(2),
+                f"{overlap}top5_centroid_percentile_25": np.percentile(top5_centroid_distances, 25).round(2),
+                f"{overlap}top5_centroid_percentile_50": np.percentile(top5_centroid_distances, 50).round(2),
+                f"{overlap}top5_centroid_percentile_75": np.percentile(top5_centroid_distances, 75).round(2),
             }
         )
 
@@ -538,30 +538,30 @@ def compute_performance_metrics(
         ][:, 0]
         performance_metrics.update(
             {
-                f'{overlap}top10_self_intersect_fraction': (
+                f"{overlap}top10_self_intersect_fraction": (
                     100 * (top10_min_self_distances < 0.4).sum() / len(top10_min_self_distances)
                 ).__round__(2),
-                f'{overlap}top10_steric_clash_fraction': (
+                f"{overlap}top10_steric_clash_fraction": (
                     100 * (top10_min_cross_distances < 0.4).sum() / len(top10_min_cross_distances)
                 ).__round__(2),
-                f'{overlap}top10_rmsds_below_2': (100 * (top10_rmsds < 2).sum() / len(top10_rmsds)).__round__(2),
-                f'{overlap}top10_rmsds_below_5': (100 * (top10_rmsds < 5).sum() / len(top10_rmsds)).__round__(2),
-                f'{overlap}top10_rmsds_percentile_25': np.percentile(top10_rmsds, 25).round(2),
-                f'{overlap}top10_rmsds_percentile_50': np.percentile(top10_rmsds, 50).round(2),
-                f'{overlap}top10_rmsds_percentile_75': np.percentile(top10_rmsds, 75).round(2),
-                f'{overlap}top10_centroid_below_2': (
+                f"{overlap}top10_rmsds_below_2": (100 * (top10_rmsds < 2).sum() / len(top10_rmsds)).__round__(2),
+                f"{overlap}top10_rmsds_below_5": (100 * (top10_rmsds < 5).sum() / len(top10_rmsds)).__round__(2),
+                f"{overlap}top10_rmsds_percentile_25": np.percentile(top10_rmsds, 25).round(2),
+                f"{overlap}top10_rmsds_percentile_50": np.percentile(top10_rmsds, 50).round(2),
+                f"{overlap}top10_rmsds_percentile_75": np.percentile(top10_rmsds, 75).round(2),
+                f"{overlap}top10_centroid_below_2": (
                     100 * (top10_centroid_distances < 2).sum() / len(top10_centroid_distances)
                 ).__round__(2),
-                f'{overlap}top10_centroid_below_5': (
+                f"{overlap}top10_centroid_below_5": (
                     100 * (top10_centroid_distances < 5).sum() / len(top10_centroid_distances)
                 ).__round__(2),
-                f'{overlap}top10_centroid_percentile_25': np.percentile(top10_centroid_distances, 25).round(2),
-                f'{overlap}top10_centroid_percentile_50': np.percentile(top10_centroid_distances, 50).round(2),
-                f'{overlap}top10_centroid_percentile_75': np.percentile(top10_centroid_distances, 75).round(2),
+                f"{overlap}top10_centroid_percentile_25": np.percentile(top10_centroid_distances, 25).round(2),
+                f"{overlap}top10_centroid_percentile_50": np.percentile(top10_centroid_distances, 50).round(2),
+                f"{overlap}top10_centroid_percentile_75": np.percentile(top10_centroid_distances, 75).round(2),
             }
         )
 
-    with open(os.path.join(cfg.results_path, 'performance_metrics.txt'), "w") as f:
+    with open(os.path.join(cfg.results_path, "performance_metrics.txt"), "w") as f:
         for k in performance_metrics:
             f.write(f"{k} {performance_metrics[k]}\n")
     return performance_metrics

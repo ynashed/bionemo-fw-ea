@@ -90,7 +90,7 @@ def _select_dwnstr_task_validation_callbacks(cfg: DictConfig) -> List[DictConfig
     """
     assert "model" in cfg, " The 'model' key is not present in the supplied cfg"
     valid_cbs = []
-    if 'dwnstr_task_validation' in cfg.model and cfg.model.dwnstr_task_validation['enabled']:
+    if "dwnstr_task_validation" in cfg.model and cfg.model.dwnstr_task_validation["enabled"]:
         valid_cbs = [cfg.model.dwnstr_task_validation.dataset]
 
     return valid_cbs
@@ -112,7 +112,7 @@ def setup_dwnstr_task_validation_callbacks(cfg: DictConfig, plugins: Optional[Li
     callbacks_cfg.extend(_select_dwnstr_task_validation_callbacks(cfg))
 
     callbacks = [
-        import_class_by_path(callback_cfg['class'])(callback_cfg, cfg, plugins) for callback_cfg in callbacks_cfg
+        import_class_by_path(callback_cfg["class"])(callback_cfg, cfg, plugins) for callback_cfg in callbacks_cfg
     ]
     return callbacks
 
@@ -127,11 +127,11 @@ def add_training_callbacks(cfg: DictConfig, callbacks: List[Callback]) -> List[C
         plugins: Optional plugins to be passed to callbacks
 
     """
-    if 'model' in cfg and 'training_callbacks' in cfg.model:
+    if "model" in cfg and "training_callbacks" in cfg.model:
         callbacks_cfg: List[Dict[str, Any]] = cfg.model.training_callbacks
         for callback_cfg in callbacks_cfg:
             callback_kwargs = dict(deepcopy(callback_cfg))
-            callback_cls = callback_kwargs.pop('class')
+            callback_cls = callback_kwargs.pop("class")
             callbacks.append(import_class_by_path(callback_cls)(**callback_kwargs))
 
     if CREATE_METRIC_COLLECTOR in cfg:

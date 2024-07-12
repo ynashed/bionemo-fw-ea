@@ -67,13 +67,13 @@ def save_checkpoint(epoch, model, optimizer, loss, checkpoint_dir):
     """
     This is the function to save the checkpoint.
     """
-    checkpoint_path = os.path.join(checkpoint_dir, f'checkpoint_epoch_{epoch}.pth')
+    checkpoint_path = os.path.join(checkpoint_dir, f"checkpoint_epoch_{epoch}.pth")
     torch.save(
         {
-            'epoch': epoch,
-            'model_state_dict': model.state_dict(),
-            'optimizer_state_dict': optimizer.state_dict(),
-            'loss': loss,
+            "epoch": epoch,
+            "model_state_dict": model.state_dict(),
+            "optimizer_state_dict": optimizer.state_dict(),
+            "loss": loss,
         },
         checkpoint_path,
     )
@@ -113,7 +113,7 @@ def main(cfg) -> None:
         model = torch.nn.DataParallel(model, device_ids=list(range(len(devices))))
     model.to(devices[0])  # Move model to the first device
     total_params = sum(p.numel() for p in model.parameters())
-    logging.info(f'# Model parameters: {total_params}')
+    logging.info(f"# Model parameters: {total_params}")
 
     # Setup training
     logging.info("************** Setup Training ***********")
@@ -125,7 +125,7 @@ def main(cfg) -> None:
     for epoch in range(cfg.train.max_epochs):
         train_loss = train_one_epoch(model, train_loader, optimizer, cfg.train.clip_norm, devices[0])
         scheduler.step()
-        logging.info(f'Epoch {epoch+1}/{cfg.train.max_epochs}, Loss: {train_loss:.4f}')
+        logging.info(f"Epoch {epoch+1}/{cfg.train.max_epochs}, Loss: {train_loss:.4f}")
         if (epoch + 1) % cfg.train.ckpt_interval == 0:
             save_checkpoint(epoch + 1, model, optimizer, train_loss, cfg.train.ckpt_dir)
     logging.info("************** Done ***********")
@@ -133,5 +133,5 @@ def main(cfg) -> None:
     # Skip validation now since we don't have the licence for the validation data
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

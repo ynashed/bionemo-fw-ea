@@ -1,5 +1,5 @@
 # Running tests on BioNeMo's models using JET in CI
-Tests initiated through JET (visit [JET Documentation](https://jet.nvidia.com/docs/tutorials/intro/)) in BioNeMo CI are trainings or testing/inference tasks related to BioNeMo's models which log performance, 
+Tests initiated through JET (visit [JET Documentation](https://jet.nvidia.com/docs/tutorials/intro/)) in BioNeMo CI are trainings or testing/inference tasks related to BioNeMo's models which log performance,
 test if the scripts are executed correctly and optionally test for partial convergence. The SLURM jobs are executed on `draco-oci-iad`.
 
 
@@ -15,18 +15,18 @@ Each folder in `internal/jet/workloads/` consists of subfolders with configurati
 Remark that configurations in the folder `recipes` use python commands which
 * runs on `draco-oci-iad`
 * access model checkpoints and data from `/lustre/fsw/portfolios/healthcareeng/projects/healthcareeng_bionemo/jet` on draco-oci-iad
-* launch training and inference scripts from `examples` 
+* launch training and inference scripts from `examples`
 * launch inference scripts from `bionemo/model/infer.py`
 
 Therefore, any modifications to these files should also take into account the configurations in `internal/jet/workloads/training-inference-unit-tests/recipes` or `internal/jet/workloads/partial-conv-trainings/recipes`
 
 The CI stages related to JET are named
 * `jet-configure` - where the default docker image and additional attributes related to a pipeline are provided in the configurations in `builds` and `recipes`;
-* `jet-trigger` - which triggers [JET CI](https://gitlab-master.nvidia.com/dl/jet/ci) using modified configs from `training-inference-unit-tests` or `partial-conv-trainings`. 
+* `jet-trigger` - which triggers [JET CI](https://gitlab-master.nvidia.com/dl/jet/ci) using modified configs from `training-inference-unit-tests` or `partial-conv-trainings`.
   * the tests are submitted to `draco-oci-iad` as slurm jobs
   * the stage waits for their completion and examines their execution
   * the logs are sent to a database
-* `jet-test` - which collects outputs of the scripts executed in the previous stage using [JET API](https://gitlab-master.nvidia.com/dl/jet/api) 
+* `jet-test` - which collects outputs of the scripts executed in the previous stage using [JET API](https://gitlab-master.nvidia.com/dl/jet/api)
   * summarizes their results collectively and per each test
   * prints docker info and scripts for debugging if tests failed
 
@@ -43,11 +43,11 @@ JET configs in the folders `recipes` have the following gsections shared among a
 
 ### 1.1 Details about the `products` section
 Imagine wanting to test a metric that varies based on the parameters of the same script, or simply wanting to test the execution of scripts with different input parameters.
-You can associate the construction of the parameter grid with the workload `products` section. 
+You can associate the construction of the parameter grid with the workload `products` section.
 
 The command in the `spec.script` subsection varies across a grid of parameters which are defined by:
 * number of `nodes` (e.g. `1`)
-* variables specifying command to executed defined by `domain`, `model`, `variant` and `config_name`. 
+* variables specifying command to executed defined by `domain`, `model`, `variant` and `config_name`.
   * `config_name` should be a test config with the lightest training specific for unit testing using sample data
 * number of `gpus` (e.g., `1`, `8`)
 * `precision` (e.g., `16`, `bf16`, `32`)
@@ -87,13 +87,13 @@ JET pipeline with smoke tests is included in
 * merge request pipeline (disable it by applying the MR label `JET_NOT_REQUIRED`)
 * is executed as part of the mandatory CI pipeline for each commit to the `dev` branch
 
-Additionally, it can be executed as a web-triggered pipeline for any branch. Refer to section 3.1 below. 
+Additionally, it can be executed as a web-triggered pipeline for any branch. Refer to section 3.1 below.
 Set `PYTEST=false` flag to disable the test stage (pytest) if not needed to get results faster.
 
 The test configurations can be found under `internal/jet/workloads/training-inference-unit-tests`.
 The tests should be structured as brief training or inference scripts, ideally lasting less than 5 minutes and using sample data. They should verify the execution of these scripts for any relevant parameters to ensure proper functionality after codebase changes.
 
-The jobs in JET are executed on `draco-oci-iad` using BioNeMo's container. 
+The jobs in JET are executed on `draco-oci-iad` using BioNeMo's container.
 ### 1.1 How is the sample data provided to the JET smoke test?
 If a sample data for a training or inference config is not available in the docker container,
 it must be placed under `/lustre/fsw/portfolios/healthcareeng/projects/healthcareeng_bionemo/jet/data/test_data` on `draco-oci-iad`. It must be kept updated as well.
@@ -122,7 +122,7 @@ See [internal/jet/workloads/training-inference-unit-tests/recipes/config_openfol
 ### 1.3 Adding a new case to JET smoke tests
 
 The steps to add a new smoke test configuration to JET are as follows:
-1. Refer to the configurations in other config files under `internal/jet/workloads/training-inference-unit-tests` 
+1. Refer to the configurations in other config files under `internal/jet/workloads/training-inference-unit-tests`
 2. Specify the command to run by setting the `domain`, `model`, `variant`, and `config_name` variables.
 3. Specify the mandatory test cases: `nodes=1`, `gpu`, `precisions`, `batch_size`
 4. Specify other model-specific parameters required for executing the command during testing
@@ -133,8 +133,8 @@ The steps to add a new smoke test configuration to JET are as follows:
 To test JET configurations, run the JET-only pipeline either for a merge request or using the web-based pipeline creator as described in section 3.
 
 ## 2. JET convergence tests
-JET convergence tests involve longer training sessions for models which are orchestrated by JET. 
-The parameterization of these trainings is similar to JET smoke tests, with the key difference being that they use full data to test production-grade training configurations. 
+JET convergence tests involve longer training sessions for models which are orchestrated by JET.
+The parameterization of these trainings is similar to JET smoke tests, with the key difference being that they use full data to test production-grade training configurations.
 The convergence tests are designed to identify regressions in training accuracy. To do so, they test expected properties of the tested training sessions.
 See configs in `internal/jet/workloads/partial-conv-trainings`.
 
@@ -177,31 +177,31 @@ The convergence tests pipeline on `dev` branch runs every second day. It is sche
 THe tests for other branches need to be triggered manually using GitLab pipeline creator website, see section 3.1.2.
 
 ### 2.5 Are training curves accessible from the convergence test pipeline?
-Yes! The default behavior of the convergence test pipelines is to log training data to wandb. 
-The project name used for these logs follows the format `jet--partial-conv-trainings--${WANDB_PROJECT_SUFFIX}`. 
+Yes! The default behavior of the convergence test pipelines is to log training data to wandb.
+The project name used for these logs follows the format `jet--partial-conv-trainings--${WANDB_PROJECT_SUFFIX}`.
 Here, the `WANDB_PROJECT_SUFFIX` variable defaults to the name of the branch that triggers the pipeline, or to the source branch name in case of merge requests.
 The wandb run name defaults to `${CI_PIPELINE_CREATED_AT}_${CI_COMMIT_SHORT_SHA}_${CI_PIPELINE_ID}`. A user can prepend a suffix to the run name by setting `WANDB_RUN_SUFFIX`.
 
 For instance, to view the training curve logged to wandb for the dev branch, see [jet--partial-conv-trainings--dev](https://wandb.ai/clara-discovery/jet--partial-conv-trainings--dev?nw=nwuserdorotat_nv) project at wandb.
 
-To customize the `WANDB_PROJECT_SUFFIX` or `WANDB_RUN_SUFFIX`, users can modify this variables through the GitLab pipeline configuration interface. 
-This can be done by visiting the [GitLab pipeline creation page](https://gitlab-master.nvidia.com/clara-discovery/bionemo/-/pipelines/new), 
-scrolling to the bottom of the page, and entering `WANDB_PROJECT_SUFFIX` or `WANDB_RUN_SUFFIX` in the `Input variable key` field. Users should then provide their desired suffix in the `Input variable value field`. 
+To customize the `WANDB_PROJECT_SUFFIX` or `WANDB_RUN_SUFFIX`, users can modify this variables through the GitLab pipeline configuration interface.
+This can be done by visiting the [GitLab pipeline creation page](https://gitlab-master.nvidia.com/clara-discovery/bionemo/-/pipelines/new),
+scrolling to the bottom of the page, and entering `WANDB_PROJECT_SUFFIX` or `WANDB_RUN_SUFFIX` in the `Input variable key` field. Users should then provide their desired suffix in the `Input variable value field`.
 Note that the project names in wandb must adhere to the regex pattern [a-zA-Z0-9-] to ensure valid naming conventions.
 
 
 ### 2.6 How to track and compare results from convergence tests
 The dashboard for convergence tracking & reporting is available for `dev` branch, see section 2.5.1. For all branches, a user can see the tests results in `jet-test` stage and training curves which are logged to wandb, see section 2.5.
 #### 2.6.1 Test results displayed in `jet-test` stage
-You can identify failed tests by reviewing the GitLab job log, accessible through the information provided in the `jet-test` stage job log. 
-This stage aggregates details from both GitLab jobs and associated test executions. 
-Rows corresponding to failed tests or job scripts are highlighted in red. 
+You can identify failed tests by reviewing the GitLab job log, accessible through the information provided in the `jet-test` stage job log.
+This stage aggregates details from both GitLab jobs and associated test executions.
+Rows corresponding to failed tests or job scripts are highlighted in red.
 Below is an example of such an output:
 ```
 2024-07-01 16:44:26,886 - CONVERGENCE TESTrecipe/diffdock_train_bionemo_partial-conv-trainings_32_nodes-1_gpus-8_bs-12_seed-42_config-train-confidence_domain-molecule_mepochs-80_warmup-200 with TEST status: failed, job status: success
 TEST: [train_loss_epoch between 0.0695 and 0.0905: pass] AND [train_loss_step between 0.0 and 0.215: pass] AND [val_loss between 0.1165 and 0.1475: fail (value 0.15271605551242828 is greater then 0.1475)] AND [exit code is 0: pass]
 
-JET pipeline id: 16054872, BioNeMo pipeline id: 16052340 JET job id: 98530000, 
+JET pipeline id: 16054872, BioNeMo pipeline id: 16052340 JET job id: 98530000,
 script duration in sec: 4933.25, job duration in sec (SLURM queue + JET setup + script duration): 5272.79
 JET job id logs: https://gitlab-master.nvidia.com/dl/jet/ci/-/jobs/98530000
 dllogger: https://pbss.s8k.io/v1/AUTH_team-jet-logs/f16137ab012f49d7a75830affbd60cfe/dllogger.json
@@ -211,7 +211,7 @@ trainer_logs: https://pbss.s8k.io/v1/AUTH_team-jet-logs/f16137ab012f49d7a75830af
 2024-07-01 16:44:26,887 - CONVERGENCE TESTrecipe/diffdock_train_bionemo_partial-conv-trainings_32_nodes-1_gpus-8_bs-12_seed-42_config-train-score_domain-molecule_mepochs-80_warmup-200 with TEST status: success, job status: success
 TEST: [train_loss_epoch between 0.6215 and 0.6505: pass] AND [train_loss_step between 0.6065 and 0.6875: pass] AND [valinf_rmsds_lt2 between 0.0415 and 0.0925: pass] AND [valinf_rmsds_lt5 between 0.2315 and 0.3145: pass] AND [exit code is 0: pass]
 
-JET pipeline id: 16054872, BioNeMo pipeline id: 16052340 JET job id: 98530004, 
+JET pipeline id: 16054872, BioNeMo pipeline id: 16052340 JET job id: 98530004,
 script duration in sec: 7024.04, job duration in sec (SLURM queue + JET setup + script duration): 7358.01
 JET job id logs: https://gitlab-master.nvidia.com/dl/jet/ci/-/jobs/98530004
 dllogger: https://pbss.s8k.io/v1/AUTH_team-jet-logs/7faea47c21204628b617ed07a987ee77/dllogger.json
@@ -221,27 +221,27 @@ trainer_logs: https://pbss.s8k.io/v1/AUTH_team-jet-logs/7faea47c21204628b617ed07
 #### 2.6.2 Dashboard for regression tracking & reporting on `dev` branch
 The source of truth for  `dev` branch. The tests results are displayed, summarised and tracked in the [dashboard](http://clara-discovery.gitlab-master-pages.nvidia.com/dashboards) deployed by [BioNeMo's dashboard repository](https://gitlab-master.nvidia.com/clara-discovery/dashboards).
 
-Every convergence test pipeline in BioNeMo CI ends with the automatic dashboard update regardless of the tests results. 
-The stage `dashboard-update-trigger` triggers deploy pipeline in the dashboard repository, regardless whether the tests succeeded or failed. 
+Every convergence test pipeline in BioNeMo CI ends with the automatic dashboard update regardless of the tests results.
+The stage `dashboard-update-trigger` triggers deploy pipeline in the dashboard repository, regardless whether the tests succeeded or failed.
 See [.gitlab-ci.yml](https://gitlab-master.nvidia.com/clara-discovery/bionemo/-/blob/dev/.gitlab-ci.yml?ref_type=heads) for details.
 
 ### 2.7 How to compare convergence tests results between different gitlab branches
-The dashboard is available only for the `dev` branch but one can compare convergence training pipelines between different branches in two ways. 
+The dashboard is available only for the `dev` branch but one can compare convergence training pipelines between different branches in two ways.
 #### 2.7.1 Comparing tests results for the same convergence tests
-If test definition sections in the jet configurations file located at `internal/jet/workloads/partial-conv-trainings/recipes` are identical on every branch, 
+If test definition sections in the jet configurations file located at `internal/jet/workloads/partial-conv-trainings/recipes` are identical on every branch,
 a user can verify in the jet-test stage of each branch-specific convergence tests pipeline whether tests pass for the same job key.
-#### 2.7.2 Comparing training curves of convergence tests 
-A user can maintain a single wandb project name with branch-specific wandb run names, which are utilized to log training curves during the convergence tests pipeline. 
-This configuration is achievable by initiating the convergence tests pipeline from the [GitLab pipeline creation page]([GitLab pipeline creation page](https://gitlab-master.nvidia.com/clara-discovery/bionemo/-/pipelines/new)) 
-and setting the `WANDB_PROJECT_SUFFIX` and `WANDB_RUN_SUFFIX` variables through the GitLab pipeline configuration interface. 
-To ensure all training curves from different convergence test pipelines log under the same wandb project, the `WANDB_PROJECT_SUFFIX` must remain consistent. 
+#### 2.7.2 Comparing training curves of convergence tests
+A user can maintain a single wandb project name with branch-specific wandb run names, which are utilized to log training curves during the convergence tests pipeline.
+This configuration is achievable by initiating the convergence tests pipeline from the [GitLab pipeline creation page]([GitLab pipeline creation page](https://gitlab-master.nvidia.com/clara-discovery/bionemo/-/pipelines/new))
+and setting the `WANDB_PROJECT_SUFFIX` and `WANDB_RUN_SUFFIX` variables through the GitLab pipeline configuration interface.
+To ensure all training curves from different convergence test pipelines log under the same wandb project, the `WANDB_PROJECT_SUFFIX` must remain consistent.
 To distinguish training curves across various branches, the `WANDB_RUN_SUFFIX` should be configured to reflect branch-specific identifiers.
 
 ## 3. How to trigger JET testing pipeline
-JET pipeline can be triggered using BioNeMo CI. This section outlines the most common approaches. 
+JET pipeline can be triggered using BioNeMo CI. This section outlines the most common approaches.
 ### 3.1 Run the JET pipeline using the web-based pipeline creator.
 Running JET test in BioNeMo CI using web pipeline creator.
-Visit [pipelines tab in BioNeMo repository](https://gitlab-master.nvidia.com/clara-discovery/bionemo/-/pipelines), click on [Run pipeline](https://gitlab-master.nvidia.com/clara-discovery/bionemo/-/pipelines/new) button 
+Visit [pipelines tab in BioNeMo repository](https://gitlab-master.nvidia.com/clara-discovery/bionemo/-/pipelines), click on [Run pipeline](https://gitlab-master.nvidia.com/clara-discovery/bionemo/-/pipelines/new) button
 and select branch name (ie `dev`)
 
 #### 3.1.1 Running JET only pipeline with JET smoke tests
@@ -260,10 +260,10 @@ Set label `JET_NOT_REQUIRED` to disable the `jet` stage from a merge request pip
 ## 4. How to configure a model-specific JET Pipeline
 You can run the JET pipeline for a specific model instead of all models. The advantage of this approach is a shorter waiting time.
 ### 4.1 Model-specific merge request pipeline
-When creating a merge request, specify **ONE** model label related to the model name from the available labels under see [BioNeMo MR's labels list](https://gitlab-master.nvidia.com/clara-discovery/bionemo/-/labels), ie `OpenFold, ESM1, ESM2, MolMIM` 
+When creating a merge request, specify **ONE** model label related to the model name from the available labels under see [BioNeMo MR's labels list](https://gitlab-master.nvidia.com/clara-discovery/bionemo/-/labels), ie `OpenFold, ESM1, ESM2, MolMIM`
 If multiple labels are specified, only the first one will be used. Do not set any model-specific label to run a pipeline that tests all models.
 
-### 4.2 Model-specific web triggered pipeline 
+### 4.2 Model-specific web triggered pipeline
 To test only one model with JET, select the model name from the available options for `JET_MODEL_NAME`. If no specific model is selected, the default value is all, and all available models will be tested in the JET pipeline.
 
 ## 5. Adding a new model to JET tests
@@ -276,7 +276,7 @@ If new model needs to be added to JET tests, make sure that
   variables:
     JET_WORKLOADS_FILTER: type == 'recipe' and spec.model == 'new_model_name'
 ```
-where `new_model_name` is the string under `model` in the section `products` in the new model specific JET tests configs 
+where `new_model_name` is the string under `model` in the section `products` in the new model specific JET tests configs
 ```bash
 products:
   - domain: [....]
@@ -287,11 +287,11 @@ products:
 
 ## 6. Getting information about the tests
 Use method `internal/jet/get_results_from_jet.py` to query the results of BioNeMo's tests in JET and get information about failures, errors or duration.
-The results can be provided for all tests or filtered by specific reference IDs, pipeline IDs, workload IDs, or a period of time. 
+The results can be provided for all tests or filtered by specific reference IDs, pipeline IDs, workload IDs, or a period of time.
 They can be saved to a `.json file`, returned as `pandas.DataFrame` or printed to the console (default).
 ### 6.1 Installing JET API
 JET API is command-line interface for querying JET logs. One need to install JET API (preferably in a seperate conda env)
-in order to use `internal/jet/get_results_from_jet.py`. After installation, JET API credentials need to be set 
+in order to use `internal/jet/get_results_from_jet.py`. After installation, JET API credentials need to be set
 by directly calling `jet secrets login;jet secrets pull` from the command line.
 
 ### 6.2 Useful commands
@@ -347,7 +347,7 @@ and information about success of the tests and relevant details such as
 ```bash
 2023-08-21 17:18:40,853 - PERFORMANCE TEST recipe/megamolbart_pretrain_bionemo-jet_perf-train_32_nodes-1_gpus-1_bs-32 with status: SUCCESS
 JET Workloads ref: dorotat/bionemo-perf-poc, JET pipeline id: 8307367, JET job id: 60422651, JET workload id: aaa49cdb27f54026a21bc818736fc70c
-JET job logs: 
+JET job logs:
 dllogger: https://pbss.s8k.io/v1/AUTH_team-jet-logs/aaa49cdb27f54026a21bc818736fc70c/dllogger.json
 output_script: https://pbss.s8k.io/v1/AUTH_team-jet-logs/aaa49cdb27f54026a21bc818736fc70c/output_script.log
 

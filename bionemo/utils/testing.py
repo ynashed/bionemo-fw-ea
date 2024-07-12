@@ -39,7 +39,7 @@ def get_size(obj: Any, seen: Optional[Set[int]] = None) -> int:
     if obj_id in seen:
         return 0
     seen.add(obj_id)
-    if hasattr(obj, '__dict__'):
+    if hasattr(obj, "__dict__"):
         size += get_size(obj.__dict__, seen)
     if isinstance(obj, (list, tuple, set, frozenset)):
         size += sum(get_size(item, seen) for item in obj)
@@ -52,7 +52,7 @@ def human_readable_size(size_in_bytes: int) -> str:
     """
     Convert size in bytes to a human-readable format.
     """
-    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+    for unit in ["B", "KB", "MB", "GB", "TB"]:
         if size_in_bytes < 1024.0:
             return f"{size_in_bytes:.2f} {unit}"
         size_in_bytes /= 1024.0

@@ -63,13 +63,13 @@ def test_backward_with_scatter():
     # Forward pass through the MLP
     output = model(input_tensor)
     # Perform scatter softmax along dimension 0
-    softmax_output = scatter_softmax(output, torch.tensor([0], device='cuda'), dim=0)
+    softmax_output = scatter_softmax(output, torch.tensor([0], device="cuda"), dim=0)
 
     # Create target tensor (random for demonstration)
-    target = torch.randn((output.size(0), output.size(1)), device='cuda')  # Assuming output size of 10
+    target = torch.randn((output.size(0), output.size(1)), device="cuda")  # Assuming output size of 10
 
     # Calculate negative log likelihood loss with log_softmax
-    loss = nn.functional.mse_loss(torch.log(softmax_output), target, reduction='none')
+    loss = nn.functional.mse_loss(torch.log(softmax_output), target, reduction="none")
 
     # Calculate mean loss with scatter_mean
     mean_loss = scatter_mean(loss, torch.tensor([0, 0, 0, 0, 0, 1, 1, 1, 1, 1] * 64).view(64, 10).cuda(), dim=0).mean()

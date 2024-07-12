@@ -1,6 +1,6 @@
 # esm2nv readme for internal use
 
-The goal of this readme is to collect instructions useful for on-boarding 
+The goal of this readme is to collect instructions useful for on-boarding
 Nvidia-internal developers to the openfold project.
 
 ## (1) Data preprocessing
@@ -107,12 +107,12 @@ Next, we extract the embeddings of the input sequences, specified by task, using
 ```bash
 # Choose fasta input for the specific FLIP task
 # secondary_structure/sequences.fasta
-# scl/mixed_soft.fasta               
-# conservation/sequences.fasta       
-# bind/sequences.fasta               
-# sav/mixed.fasta                    
-# meltome/mixed_split.fasta          
-# gb1/two_vs_rest.fasta              
+# scl/mixed_soft.fasta
+# conservation/sequences.fasta
+# bind/sequences.fasta
+# sav/mixed.fasta
+# meltome/mixed_split.fasta
+# gb1/two_vs_rest.fasta
 # aav/seven_vs_many.fasta
 
 FLIP_DATA_FILE=secondary_structure/sequences.fasta
@@ -181,7 +181,7 @@ Check out [this tutorial](https://github.com/NVIDIA/Megatron-LM/blob/main/megatr
 Inherited from [MegatronLM](https://github.com/NVIDIA/Megatron-LM), gradient accumulate in NeMo is done by expanding global_batch_size in [get_forward_backward_func](https://github.com/NVIDIA/Megatron-LM/blob/main/megatron/core/pipeline_parallel/schedules.py#L19) wrapper.
 
 > While this is single GPU training, the batch size specified by --micro-batch-size is a single forward-backward path batch-size and the code will perform gradient accumulation steps until it reaches global-batch-size which is the batch size per iteration.
-> 
+>
 > — MegatronLM front page README
 
 Therefore `accumulate_grad_batches` should always be set to 1 in vanilla NeMo. However, unlike NeMo where the actual gradient accumulation is inferred from global batch size, world size and parallelism, in [BioNeMo](https://gitlab-master.nvidia.com/clara-discovery/bionemo/-/blame/dev/bionemo/model/utils.py?ref_type=heads#L118), we infer global batch size from `accumulate_grad_batches` and the rest instead.

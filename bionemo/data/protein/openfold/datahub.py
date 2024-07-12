@@ -61,21 +61,21 @@ def get_structured_paths(data_cfg) -> DictConfig:
     data_cfg.dataset_path = Path(data_cfg.dataset_path)
     return OmegaConf.create(
         {
-            'mmcif_chains': data_cfg.dataset_path / 'pdb_mmcif' / data_cfg.dataset_variant / 'chains.csv',
-            'mmcif_dicts': data_cfg.dataset_path / 'pdb_mmcif' / data_cfg.dataset_variant / 'dicts',
-            'obsolete_filepath': data_cfg.dataset_path / 'pdb_mmcif' / data_cfg.dataset_variant / 'obsolete.dat',
-            'alignments_dirpath': data_cfg.dataset_path
-            / 'open_protein_set'
+            "mmcif_chains": data_cfg.dataset_path / "pdb_mmcif" / data_cfg.dataset_variant / "chains.csv",
+            "mmcif_dicts": data_cfg.dataset_path / "pdb_mmcif" / data_cfg.dataset_variant / "dicts",
+            "obsolete_filepath": data_cfg.dataset_path / "pdb_mmcif" / data_cfg.dataset_variant / "obsolete.dat",
+            "alignments_dirpath": data_cfg.dataset_path
+            / "open_protein_set"
             / data_cfg.dataset_variant
-            / 'pdb_alignments',
-            'uniclust30_alignments': data_cfg.dataset_path
-            / 'open_protein_set'
+            / "pdb_alignments",
+            "uniclust30_alignments": data_cfg.dataset_path
+            / "open_protein_set"
             / data_cfg.dataset_variant
-            / 'uniclust30_alignments',
-            'uniclust30_targets': data_cfg.dataset_path
-            / 'open_protein_set'
+            / "uniclust30_alignments",
+            "uniclust30_targets": data_cfg.dataset_path
+            / "open_protein_set"
             / data_cfg.dataset_variant
-            / 'uniclust30_targets',
+            / "uniclust30_targets",
         }
     )
 
@@ -143,7 +143,7 @@ def get_initial_training_dl(
         "use_threading": ds_cfg.threading_enabled,
         "prefetch_factor": 2,
     }
-    if OptimHub.config('dataloader_pq'):
+    if OptimHub.config("dataloader_pq"):
         InitialTrainingDataloader = InitialTrainingDataloaderPQ
         if "timeout_for_pqueue_get" in ds_cfg:
             args_for_dataloader["timeout_for_pqueue_get"] = ds_cfg["timeout_for_pqueue_get"]

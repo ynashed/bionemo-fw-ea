@@ -1,5 +1,5 @@
 name: mmb_physchem
-defaults: 
+defaults:
   - pretrain_small_span_aug
 do_preprocessing: False
 do_training: True # set to false if data preprocessing steps must be completed
@@ -36,7 +36,7 @@ model:
   micro_batch_size: 32 # NOTE: adjust to occupy ~ 90% of GPU memory
   global_batch_size: null
   tensor_model_parallel_size: 1  # model parallelism
-  
+
   downstream_task:
     n_outputs: 1
     hidden_layer_size: 128
@@ -46,7 +46,7 @@ model:
     # Preprocessing data params
     links_file: ${oc.env:BIONEMO_HOME}/examples/molecule/megamolbart/dataset/PhysChem-downloader.txt
     preprocessed_data_path: ${oc.env:BIONEMO_HOME}/data/physchem/ #sets the location physchem dataset will be downloaded
-    dataset_path: ${model.data.preprocessed_data_path}/${model.data.task_name} 
+    dataset_path: ${model.data.preprocessed_data_path}/${model.data.task_name}
     split_data: True
     val_frac: 0.15 # proportion of samples used for validation set
     test_frac: 0.15 # proportion of samples used for test set
@@ -63,7 +63,7 @@ model:
       test: x000
     num_workers: 8
     shuffle: False
-  
+
   finetuning_optim:
     name: adam
     lr: 0.001

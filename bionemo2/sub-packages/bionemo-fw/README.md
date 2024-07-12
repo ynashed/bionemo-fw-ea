@@ -1,6 +1,6 @@
 # bionemo-fw
 
-BioNeMo Framework (FW): Production grade framework for AI-enabled Drug Discovery. 
+BioNeMo Framework (FW): Production grade framework for AI-enabled Drug Discovery.
 
 All independently installable bionemo feature packages are dependencies of the bionemo-fw (`bionemo.fw`) namespace package.
 Additionally, the bionemo-core (`bionemo.core`) package is also a dependency.

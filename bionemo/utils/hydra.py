@@ -57,8 +57,8 @@ def load_model_config(
         register_searchpath_config_plugin(C)
 
     with initialize_config_dir(version_base=None, config_dir=str(config_path)):
-        cfg = compose(config_name=config_name.replace('.yaml', ''))
+        cfg = compose(config_name=config_name.replace(".yaml", ""))
     if logger is not None:
         logger.info("\n\n************** Experiment configuration ***********")
-        logger.info(f'\n{OmegaConf.to_yaml(cfg)}')
+        logger.info(f"\n{OmegaConf.to_yaml(cfg)}")
     return cfg

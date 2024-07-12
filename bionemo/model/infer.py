@@ -13,6 +13,7 @@ Runs inference over all models. Supports extracting embeddings, and hiddens.
 
 NOTE: If out of memory (OOM) error occurs, try spliting the data to multiple smaller files.
 """
+
 import os
 import pickle
 from pathlib import Path
@@ -60,7 +61,7 @@ def entrypoint(cfg: DictConfig) -> None:
         output_format = "pkl"
 
     if output_format not in ["pkl", "h5"]:
-        raise ValueError(f'Users must specify either pkl or h5 output format but {output_format} is given')
+        raise ValueError(f"Users must specify either pkl or h5 output format but {output_format} is given")
 
     if os.path.exists(output_fname):
         if output_format == "pkl":
@@ -92,7 +93,7 @@ def entrypoint(cfg: DictConfig) -> None:
     elif output_format == "h5":
         # pack embeddings into h5 instead of pickle
         for emb in cfg.model.downstream_task.outputs:
-            values_dict = {sample['id']: sample[emb] for sample in predictions}
+            values_dict = {sample["id"]: sample[emb] for sample in predictions}
             output_embeddings_path = f"{output_fname}_{emb}.h5"
             with h5py.File(output_embeddings_path, "w") as output_embeddings_file:
                 for idx, (seq_id, values) in enumerate(tqdm(values_dict.items(), f"converting {emb} to h5 format")):
@@ -105,8 +106,8 @@ def entrypoint(cfg: DictConfig) -> None:
                     )
                     output_embeddings_file[str(idx)].attrs["original_id"] = seq_id
     else:
-        raise ValueError(f'Users must specify either pkl or h5 output format but {output_format} is given')
+        raise ValueError(f"Users must specify either pkl or h5 output format but {output_format} is given")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     entrypoint()

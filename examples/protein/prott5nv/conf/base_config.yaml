@@ -1,5 +1,5 @@
 name: prott5nv
-desc: Base parameters for ProtT5nv model 
+desc: Base parameters for ProtT5nv model
 do_training: True # set to false if data preprocessing steps must be completed
 do_testing: False # set to true to run evaluation on test data after training, requires test_dataset section
 restore_from_path: null # used when starting from a .nemo file
@@ -26,7 +26,7 @@ exp_manager:
   name: ${name}
   exp_dir: ${oc.env:BIONEMO_HOME}/results/nemo_experiments/${.name}/${.wandb_logger_kwargs.name}
   explicit_log_dir: ${.exp_dir}
-  create_wandb_logger: True 
+  create_wandb_logger: True
   create_tensorboard_logger: True
   wandb_logger_kwargs:
     project: ${name}_pretraining
@@ -100,7 +100,7 @@ model:
   num_self_attention_per_cross_attention: 1 # Number of self-attention layers for every cross-attention layer.
   share_token_embeddings: True # If True share encoder/decoder embeddings
   share_decoder_tokens_head_embeddings: True # If True share decoder embeddings and decoder projection to logits
-  
+
   tokenizer:
     library: 'sentencepiece'
     type: null
@@ -137,7 +137,7 @@ model:
     data_prefix: null # must be "" or null
     index_mapping_dir: null # path to store cached indexing files (if empty, will be stored in the same directory as dataset_path)
     data_impl: csv_mmap # mmap, retmmap, text_mmap, csv_mmap (.csv will be added to dataset file names if missing)
-    # Supported kwargs (with default values): 
+    # Supported kwargs (with default values):
     #     text_mmap (newline_int=10, header_lines=0, workers=None, sort_dataset_paths=True)
     #     csv_mmap (newline_int=10, header_lines=0,workers=None, sort_dataset_paths=True, data_col=1, data_sep=",")
     data_impl_kwargs: # currently used only for text_mmap, csv_mmap (should be data_impl dependant)

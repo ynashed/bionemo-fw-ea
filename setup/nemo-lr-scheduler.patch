@@ -4,8 +4,8 @@ index 73ad1e18a..c20d56a01 100644
 +++ b/nemo/core/optim/lr_scheduler.py
 @@ -216,6 +216,39 @@ class WarmupHoldPolicy(WarmupPolicy):
          return self._get_lr(step)
- 
- 
+
+
 +class WarmupAnnealDecayHold(_LRScheduler):
 +    def __init__(self, optimizer, *, max_steps, warmup_steps, max_lr, min_lr: float = 4e-5, anneal_percentage: float = 0.10, last_epoch: int = -1, constant_steps: int = None, warmup_ratio: float = None):
 +        """
@@ -18,13 +18,13 @@ index 73ad1e18a..c20d56a01 100644
 +        self.max_steps = max_steps
 +        self.warmup_steps = warmup_steps
 +        self.max_lr = max_lr
-+        self.anneal_percentage = anneal_percentage 
++        self.anneal_percentage = anneal_percentage
 +        self.last_epoch = last_epoch
 +        self.min_lr = min_lr
 +
 +        for group in optimizer.param_groups:
 +            group.setdefault('initial_lr', max_lr)
-+        
++
 +        super(WarmupAnnealDecayHold, self).__init__(optimizer, last_epoch)
 +
 +    def get_lr(self):
@@ -35,7 +35,7 @@ index 73ad1e18a..c20d56a01 100644
 +            decay_steps = self.max_steps - self.warmup_steps
 +            lr = self.max_lr * (1 - (step_num - self.warmup_steps) / decay_steps)
 +            lr = max(lr, self.max_lr * self.anneal_percentage)
-+        
++
 +        return [lr for _ in self.optimizer.param_groups]
 +
 +

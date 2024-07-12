@@ -151,7 +151,7 @@ trainer:
   enable_checkpointing: False # checkpointing is done by NeMo exp_manager
   reload_dataloaders_every_n_epochs: 0 # Set to a non-negative integer to reload dataloaders every n epochs. Default: ``0``.
   accumulate_grad_batches: 1
-  
+
 
 exp_manager:
   name: ${model.name}_nnodes_${trainer.num_nodes}_ndevices_${trainer.devices}_bs_${data.micro_batch_size}
@@ -169,22 +169,22 @@ exp_manager:
     filename: '${model.name}--{val_complex_rmsd_median:.4f}-{step}' # -{consumed_samples}'
     save_best_model: True
     save_nemo_on_train_end: True
-  
+
   # ********************************************************* #
   # Early stopping callback works with the latest nemo
   create_early_stopping_callback: True
   early_stopping_callback_params:
     monitor: val_complex_rmsd_median
-    mode: 'min' 
+    mode: 'min'
     patience: 500
     verbose: True
     check_on_train_epoch_end: False
-  
+
   #EMA
   ema: # Exponential Moving Average; is picked up by exp_manager()
     enable: False # Creates EMA callback in exp_manager
     decay: 0.999 # (ema_rate) The exponential decay used when calculating the moving average. Has to be between 0-1.
-    
+
   # logging
   exp_dir: ${oc.env:BIONEMO_HOME}/results/nemo_experiments/${.name}/${.wandb_logger_kwargs.name}
   explicit_log_dir: ${.exp_dir}

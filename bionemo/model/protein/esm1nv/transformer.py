@@ -120,13 +120,13 @@ class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
         onnx_safe=False,
         attention_dropout=0.1,
         ffn_dropout=0.0,
-        activation='gelu',
+        activation="gelu",
         megatron_legacy=False,
         bias=True,
         chunk_size=64,
-        normalization='layernorm',
-        transformer_block_type='pre_ln',
-        position_embedding_type='learned_absolute',
+        normalization="layernorm",
+        transformer_block_type="pre_ln",
+        position_embedding_type="learned_absolute",
         multi_query_attention=False,
         headscale=False,
         activations_checkpoint_granularity=None,
@@ -146,7 +146,7 @@ class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
         if kv_channels is None:
             assert (
                 hidden_size % num_attention_heads == 0
-            ), 'hidden_size must be divisible by num_attention_heads if kv_channels is None'
+            ), "hidden_size must be divisible by num_attention_heads if kv_channels is None"
             kv_channels = hidden_size // num_attention_heads
 
         self.layer_number = layer_number
@@ -166,15 +166,15 @@ class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
 
         if not bias and bias_dropout_add_fusion:
             raise ValueError(
-                'bias_dropout_add_fusion=True requires bias=True, found bias=False. Either set both to True or both to False.'
+                "bias_dropout_add_fusion=True requires bias=True, found bias=False. Either set both to True or both to False."
             )
 
         # the low_precision_layernorm does not require a bias term, whereas layernorm1p from apex
         # does require a bias, so it cannot be used for bias-less low precision LN such as in MPT-7B
-        if normalization not in ['layernorm', 'layernorm1p', 'rmsnorm', 'low_precision_layernorm']:
+        if normalization not in ["layernorm", "layernorm1p", "rmsnorm", "low_precision_layernorm"]:
             raise ValueError(f'normalization must be "layernorm", "layernorm1p" or "rmsnorm", found {normalization}')
 
-        if transformer_block_type not in ['pre_ln', 'post_ln', 'normformer']:
+        if transformer_block_type not in ["pre_ln", "post_ln", "normformer"]:
             raise ValueError(
                 f'transformer_block_type must be either "pre_ln" or "post_ln" or "normformer", found {transformer_block_type}'
             )
@@ -188,7 +188,7 @@ class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
         # retrieval_decoder_after_self_attn skips the self attention
         if self.layer_type != LayerType.retrieval_decoder_after_self_attn:
             # Layernorm on the input data.
-            if normalization == 'layernorm':
+            if normalization == "layernorm":
                 self.input_layernorm = esm_get_layer_norm(
                     hidden_size,
                     layernorm_epsilon,
@@ -196,11 +196,11 @@ class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
                     config.sequence_parallel,
                     use_pt_layernorm=use_pt_layernorm,
                 )
-            elif normalization == 'layernorm1p':
+            elif normalization == "layernorm1p":
                 self.input_layernorm = LayerNorm1P(
                     hidden_size, layernorm_epsilon, sequence_parallel_enabled=config.sequence_parallel
                 )
-            elif normalization == 'low_precision_layernorm':
+            elif normalization == "low_precision_layernorm":
                 self.input_layernorm = LPLayerNorm(hidden_size, layernorm_epsilon)
             else:
                 self.input_layernorm = MixedFusedRMSNorm(hidden_size, layernorm_epsilon)
@@ -208,7 +208,7 @@ class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
             # this code allows us to remove the bias terms from the layernorm module
             # so that we can support MPT. However, certain apex-based LNs don't support
             # removing bias, so we also have to check for that
-            if not bias and normalization not in ['layernorm', 'layernorm1p']:
+            if not bias and normalization not in ["layernorm", "layernorm1p"]:
                 remove_bias_from_layernorm(self.input_layernorm)
 
             self.self_attention = ESMnvParallelAttention(
@@ -238,8 +238,8 @@ class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
                 use_esm_attention=use_esm_attention,
             )
 
-            if transformer_block_type == 'normformer':
-                if normalization == 'layernorm':
+            if transformer_block_type == "normformer":
+                if normalization == "layernorm":
                     self.post_attention_normformer_norm = esm_get_layer_norm(
                         hidden_size,
                         layernorm_epsilon,
@@ -249,10 +249,10 @@ class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
                 else:
                     self.post_attention_normformer_norm = MixedFusedRMSNorm(hidden_size, layernorm_epsilon)
 
-            if self.layer_type != LayerType.decoder_pre_mlp or self.transformer_block_type != 'post_ln':
+            if self.layer_type != LayerType.decoder_pre_mlp or self.transformer_block_type != "post_ln":
                 #  the post_attention_layernorm is used for layermorm after mlp
                 # don't need it for decoder_pre_mlp and post_ln
-                if normalization == 'layernorm':
+                if normalization == "layernorm":
                     self.post_attention_layernorm = esm_get_layer_norm(
                         hidden_size,
                         layernorm_epsilon,
@@ -260,15 +260,15 @@ class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
                         config.sequence_parallel,
                         use_pt_layernorm=use_pt_layernorm,
                     )
-                elif normalization == 'layernorm1p':
+                elif normalization == "layernorm1p":
                     self.post_attention_layernorm = LayerNorm1P(
                         hidden_size, layernorm_epsilon, sequence_parallel_enabled=config.sequence_parallel
                     )
-                elif normalization == 'low_precision_layernorm':
+                elif normalization == "low_precision_layernorm":
                     self.post_attention_layernorm = LPLayerNorm(hidden_size, layernorm_epsilon)
                 else:
                     self.post_attention_layernorm = MixedFusedRMSNorm(hidden_size, layernorm_epsilon)
-                if not bias and normalization not in ['layernorm', 'layernorm1p']:
+                if not bias and normalization not in ["layernorm", "layernorm1p"]:
                     remove_bias_from_layernorm(self.post_attention_layernorm)
 
         if self.layer_type == LayerType.decoder_pre_mlp:
@@ -277,9 +277,9 @@ class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
 
         # the post_attention_layernorm is used for layermorm after mlp
         # need it for post_ln
-        if self.layer_type == LayerType.retrieval_decoder_after_self_attn and self.transformer_block_type == 'post_ln':
+        if self.layer_type == LayerType.retrieval_decoder_after_self_attn and self.transformer_block_type == "post_ln":
             # Layernorm on the attention output
-            if normalization == 'layernorm':
+            if normalization == "layernorm":
                 self.post_attention_layernorm = esm_get_layer_norm(
                     hidden_size,
                     layernorm_epsilon,
@@ -287,15 +287,15 @@ class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
                     config.sequence_parallel,
                     use_pt_layernorm=use_pt_layernorm,
                 )
-            elif normalization == 'layernorm1p':
+            elif normalization == "layernorm1p":
                 self.post_attention_layernorm = LayerNorm1P(
                     hidden_size, layernorm_epsilon, sequence_parallel_enabled=config.sequence_parallel
                 )
-            elif normalization == 'low_precision_layernorm':
+            elif normalization == "low_precision_layernorm":
                 self.post_attention_layernorm = LPLayerNorm(hidden_size, layernorm_epsilon)
             else:
                 self.post_attention_layernorm = MixedFusedRMSNorm(hidden_size, layernorm_epsilon)
-            if not bias and normalization not in ['layernorm', 'layernorm1p']:
+            if not bias and normalization not in ["layernorm", "layernorm1p"]:
                 remove_bias_from_layernorm(self.post_attention_layernorm)
 
         if self.layer_type == LayerType.decoder or self.layer_type == LayerType.retrieval_encoder:
@@ -321,8 +321,8 @@ class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
                 normalize_attention_scores=normalize_attention_scores,
             )
             # Normformer normalization
-            if transformer_block_type == 'normformer':
-                if normalization == 'layernorm':
+            if transformer_block_type == "normformer":
+                if normalization == "layernorm":
                     # BIONEMO ESM LAYER NORM
                     self.post_inter_attention_normformer_norm = esm_get_layer_norm(
                         hidden_size,
@@ -331,7 +331,7 @@ class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
                         config.sequence_parallel,
                         use_pt_layernorm=use_pt_layernorm,
                     )
-                elif normalization == 'layernorm1p':
+                elif normalization == "layernorm1p":
                     self.post_inter_attention_normformer_norm = LayerNorm1P(
                         hidden_size, layernorm_epsilon, sequence_parallel_enabled=config.sequence_parallel
                     )
@@ -339,7 +339,7 @@ class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
                     self.post_inter_attention_normformer_norm = MixedFusedRMSNorm(hidden_size, layernorm_epsilon)
 
             # Layernorm on the attention output.
-            if normalization == 'layernorm':
+            if normalization == "layernorm":
                 # BIONEMO ESM LAYER NORM
                 self.post_inter_attention_layernorm = esm_get_layer_norm(
                     hidden_size,
@@ -348,7 +348,7 @@ class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
                     config.sequence_parallel,
                     use_pt_layernorm=use_pt_layernorm,
                 )
-            elif normalization == 'layernorm1p':
+            elif normalization == "layernorm1p":
                 self.post_inter_attention_layernorm = LayerNorm1P(
                     hidden_size, layernorm_epsilon, sequence_parallel_enabled=config.sequence_parallel
                 )
@@ -377,9 +377,9 @@ class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
                 headscale=headscale,
             )
             # Normformer normalization
-            if transformer_block_type == 'normformer':
+            if transformer_block_type == "normformer":
                 # BIONEMO ESM LAYER NORM
-                if normalization == 'layernorm':
+                if normalization == "layernorm":
                     self.post_inter_attention_normformer_norm = esm_get_layer_norm(
                         hidden_size,
                         layernorm_epsilon,
@@ -387,7 +387,7 @@ class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
                         config.sequence_parallel,
                         use_pt_layernorm=use_pt_layernorm,
                     )
-                elif normalization == 'layernorm1p':
+                elif normalization == "layernorm1p":
                     self.post_inter_attention_normformer_norm = LayerNorm1P(
                         hidden_size, layernorm_epsilon, sequence_parallel_enabled=config.sequence_parallel
                     )
@@ -395,7 +395,7 @@ class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
                     self.post_inter_attention_normformer_norm = MixedFusedRMSNorm(hidden_size, layernorm_epsilon)
 
             # Layernorm on the attention output.
-            if normalization == 'layernorm':
+            if normalization == "layernorm":
                 self.post_inter_attention_layernorm = esm_get_layer_norm(
                     hidden_size,
                     layernorm_epsilon,
@@ -403,7 +403,7 @@ class ESMnvParallelTransformerLayer_(ParallelTransformerLayer_):
                     config.sequence_parallel,
                     use_pt_layernorm=use_pt_layernorm,
                 )
-            elif normalization == 'layernorm1p':
+            elif normalization == "layernorm1p":
                 self.post_inter_attention_layernorm = LayerNorm1P(
                     hidden_size, layernorm_epsilon, sequence_parallel_enabled=config.sequence_parallel
                 )
@@ -483,13 +483,13 @@ class ESMnvParallelTransformerLayer(ESMnvParallelTransformerLayer_):
         masked_softmax_fusion=True,
         attention_dropout=0.1,
         ffn_dropout=0.0,
-        activation='gelu',
+        activation="gelu",
         megatron_legacy=False,
         bias=True,
         chunk_size=64,
-        normalization='layernorm',
-        transformer_block_type='pre_ln',
-        position_embedding_type='learned_absolute',
+        normalization="layernorm",
+        transformer_block_type="pre_ln",
+        position_embedding_type="learned_absolute",
         multi_query_attention=False,
         headscale=False,
         activations_checkpoint_granularity=None,
@@ -634,14 +634,14 @@ class ESMnvParallelTransformer(ParallelTransformer):
         persist_layer_norm=False,
         openai_gelu=False,
         onnx_safe=False,
-        activation='gelu',
+        activation="gelu",
         model_type=ModelType.encoder_or_decoder,
         megatron_legacy=False,
         bias=True,
         chunk_size=64,
-        normalization='layernorm',
-        transformer_block_type='pre_ln',
-        position_embedding_type='learned_absolute',
+        normalization="layernorm",
+        transformer_block_type="pre_ln",
+        position_embedding_type="learned_absolute",
         headscale=False,
         layer_number_offset=0,  # this is use only for attention norm_factor scaling
         activations_checkpoint_granularity=None,
@@ -653,7 +653,7 @@ class ESMnvParallelTransformer(ParallelTransformer):
         fp8_margin=0,
         fp8_interval=1,
         fp8_amax_history_len=1024,
-        fp8_amax_compute_algo='max',
+        fp8_amax_compute_algo="max",
         reduce_amax=True,
         use_emha=False,
         ub_tp_comm_overlap=False,
@@ -674,7 +674,7 @@ class ESMnvParallelTransformer(ParallelTransformer):
         if kv_channels is None:
             assert (
                 hidden_size % num_attention_heads == 0
-            ), 'hidden_size must be divisible by num_attention_heads if kv_channels is None'
+            ), "hidden_size must be divisible by num_attention_heads if kv_channels is None"
             kv_channels = hidden_size // num_attention_heads
 
         self.fp32_residual_connection = fp32_residual_connection
@@ -698,17 +698,17 @@ class ESMnvParallelTransformer(ParallelTransformer):
         self.activations_checkpoint_layers_per_pipeline = activations_checkpoint_layers_per_pipeline
 
         if self.activations_checkpoint_granularity:
-            if self.activations_checkpoint_granularity == 'selective':
-                if self.activations_checkpoint_method == 'uniform':
+            if self.activations_checkpoint_granularity == "selective":
+                if self.activations_checkpoint_method == "uniform":
                     logging.info(
                         (
-                            'Using uniform activation checkpointing with granularity selective forces all layers to use checkpointing.'
+                            "Using uniform activation checkpointing with granularity selective forces all layers to use checkpointing."
                         )
                     )
-                elif self.activations_checkpoint_method == 'block':
+                elif self.activations_checkpoint_method == "block":
                     logging.info(
                         (
-                            'Using block activation checkpointing with granularity selective forces all layers to use checkpointing.'
+                            "Using block activation checkpointing with granularity selective forces all layers to use checkpointing."
                         )
                     )
                 else:
@@ -716,13 +716,13 @@ class ESMnvParallelTransformer(ParallelTransformer):
                         'activations_checkpoint_method should be "uniform" or "block" when using granularity selective.'
                     )
                 self.activations_checkpoint_num_layers = num_layers  # forcing all layers
-            elif self.activations_checkpoint_granularity == 'full':
-                if self.activations_checkpoint_method in ['uniform', 'block']:
+            elif self.activations_checkpoint_granularity == "full":
+                if self.activations_checkpoint_method in ["uniform", "block"]:
                     if not self.activations_checkpoint_num_layers:
                         logging.info(
                             (
-                                f'Using uniform or block activation checkpointing requires activations_checkpoint_num_layers to be set.'
-                                f'Got: {self.activations_checkpoint_num_layers}. Setting to 1 by default.'
+                                f"Using uniform or block activation checkpointing requires activations_checkpoint_num_layers to be set."
+                                f"Got: {self.activations_checkpoint_num_layers}. Setting to 1 by default."
                             )
                         )
                         self.activations_checkpoint_num_layers = 1  # keeping the old default
@@ -766,15 +766,15 @@ class ESMnvParallelTransformer(ParallelTransformer):
         self.is_prev_microbatch_training = True  # Is the previous micro-batch in training mode
         self.microbatch_count = 0  # transformer engine forward needs to know if it is working on the first microbatch
         self.checkpoint_core_attention = (
-            activations_checkpoint_granularity == 'selective'
+            activations_checkpoint_granularity == "selective"
         )  # transformer engine forward allows for more granular selective checkpointing
 
         if self.model_type == ModelType.encoder_or_decoder:
             assert (
                 num_layers % parallel_state.get_pipeline_model_parallel_world_size() == 0
-            ), 'num_layers must be divisible by pipeline_model_parallel_size'
+            ), "num_layers must be divisible by pipeline_model_parallel_size"
 
-        assert moe_frequency <= num_layers, 'MoE frequency must be <= number of transformer layers'
+        assert moe_frequency <= num_layers, "MoE frequency must be <= number of transformer layers"
         # TODO: Add similar assert for encoder-decoder.
 
         self.num_layers = self.get_num_layers(num_layers)
@@ -817,7 +817,7 @@ class ESMnvParallelTransformer(ParallelTransformer):
                     autocast_dtype=precision,
                     use_emha=use_emha,
                     ub_tp_comm_overlap=ub_tp_comm_overlap,
-                    zero_centered_gamma=normalization == 'layernorm1p',
+                    zero_centered_gamma=normalization == "layernorm1p",
                 )
             else:
                 return ESMnvParallelTransformerLayer(
@@ -868,10 +868,10 @@ class ESMnvParallelTransformer(ParallelTransformer):
 
         if parallel_state.get_virtual_pipeline_model_parallel_world_size() is not None:
             assert num_layers % parallel_state.get_virtual_pipeline_model_parallel_world_size() == 0, (
-                'num_layers_per_stage must be divisible by ' 'virtual_pipeline_model_parallel_size'
+                "num_layers_per_stage must be divisible by " "virtual_pipeline_model_parallel_size"
             )
 
-            assert self.model_type.value != 2, 'virtual pipeline parallel currently only supported for GPT'
+            assert self.model_type.value != 2, "virtual pipeline parallel currently only supported for GPT"
 
             # Number of layers in each model chunk is the number of layers in the stage,
             # divided by the number of model chunks in a stage.
@@ -904,9 +904,9 @@ class ESMnvParallelTransformer(ParallelTransformer):
 
         self.layers = torch.nn.ModuleList([build_layer(i + 1 + offset) for i in range(self.num_layers)])
 
-        if self.post_process and self.transformer_block_type != 'post_ln':
+        if self.post_process and self.transformer_block_type != "post_ln":
             # Final layer norm before output.
-            if normalization == 'layernorm':
+            if normalization == "layernorm":
                 self.final_layernorm = esm_get_layer_norm(
                     hidden_size,
                     layernorm_epsilon,
@@ -914,11 +914,11 @@ class ESMnvParallelTransformer(ParallelTransformer):
                     sequence_parallel=config.sequence_parallel,
                     use_pt_layernorm=use_pt_layernorm,
                 )
-            elif normalization == 'layernorm1p':
+            elif normalization == "layernorm1p":
                 self.final_layernorm = LayerNorm1P(
                     hidden_size, layernorm_epsilon, sequence_parallel_enabled=config.sequence_parallel
                 )
-            elif normalization == 'low_precision_layernorm':
+            elif normalization == "low_precision_layernorm":
                 self.final_layernorm = LPLayerNorm(hidden_size, layernorm_epsilon)
             else:
                 self.final_layernorm = MixedFusedRMSNorm(hidden_size, layernorm_epsilon)
@@ -926,7 +926,7 @@ class ESMnvParallelTransformer(ParallelTransformer):
             # this code allows us to remove the bias terms from the layernorm module
             # so that we can support MPT. However, certain apex-based LNs don't support
             # removing bias, so we also have to check for that
-            if not bias and normalization not in ['layernorm', 'layernorm1p']:
+            if not bias and normalization not in ["layernorm", "layernorm1p"]:
                 remove_bias_from_layernorm(self.final_layernorm)
 
         # Hacky set up for vision encoder select layer, won't support PP

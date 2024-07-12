@@ -35,10 +35,10 @@ from bionemo.utils.hydra import load_model_config
 
 
 # Check if this script is run in an interactive session
-is_interactive = hasattr(sys, 'ps1')
+is_interactive = hasattr(sys, "ps1")
 if is_interactive:
-    os.environ['MASTER_ADDR'] = 'localhost'
-    os.environ['MASTER_PORT'] = '12355'
+    os.environ["MASTER_ADDR"] = "localhost"
+    os.environ["MASTER_PORT"] = "12355"
     # initialize the process group
     dist.init_process_group("gloo", rank=0, world_size=1)
 
@@ -47,7 +47,7 @@ parser.add_argument("finput", type=str, help="Path to the input nemo file")
 parser.add_argument("foutput", type=str, help="Path to the output nemo file")
 parser.add_argument(
     "--swap_mlp_weight_blocks",
-    action='store_true',
+    action="store_true",
     default=False,
     help="Turn this on if the updated model calls\
                     FullyConnectedTensorProductConv with src_scalars and\
@@ -56,11 +56,11 @@ parser.add_argument(
                     that maps the edge_emb to tp weights has a different\
                     semantic in the new vs old model.",
 )
-parser.add_argument("--verbose", action='store_true', default=False, help="verbose output")
-parser.add_argument("--warn_extra", action='store_true', default=False, help="Emit extra warnings")
+parser.add_argument("--verbose", action="store_true", default=False, help="verbose output")
+parser.add_argument("--warn_extra", action="store_true", default=False, help="Emit extra warnings")
 parser.add_argument(
     "--strict",
-    action='store_true',
+    action="store_true",
     default=False,
     help="If turned on, will require all model parameters\
                     to be populated with the input nemo file except for\

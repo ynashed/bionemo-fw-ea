@@ -7,14 +7,14 @@ DiffDock is a diffusion generative model for drug discovery in molecular blind d
 
 The Score model is a 3-dimensional equivariant graph neural network that has three layers: embedding, interaction layer with 6 graph convolution layers, and output layer. In total, the Score model has 20M parameters. The Score model is used to generate a series of potential poses for protein-ligand binding by running the reverse diffusion process. The Confidence model has a similar architecture as the Score model but with 5 graph convolution layers in the interaction layer. In total, the Confidence model has 5M parameters. The Confidence model is used to rank the generated ligand poses from the Score model. These models are ready for commercial use.  <br>
 
-## Third-Party Community Consideration 
-This donor model was not owned or developed by NVIDIA. This model has been developed and built to a third-party’s requirements for this application and use case; see [link to Non-NVIDIA Model Card](https://github.com/gcorso/DiffDock/tree/main). 
+## Third-Party Community Consideration
+This donor model was not owned or developed by NVIDIA. This model has been developed and built to a third-party’s requirements for this application and use case; see [link to Non-NVIDIA Model Card](https://github.com/gcorso/DiffDock/tree/main).
 
 ## References:
-[Provide list of reference(s), link(s) to the publication/paper/article, associated works, and lineage where relevant.]  <br> 
+[Provide list of reference(s), link(s) to the publication/paper/article, associated works, and lineage where relevant.]  <br>
 [1] Corso, Gabriele, Hannes Stärk, Bowen Jing, Regina Barzilay, and Tommi Jaakkola. "Diffdock: Diffusion steps, twists, and turns for molecular docking." arXiv preprint arXiv:2210.01776 (2022).
 
-## Model Architecture: 
+## Model Architecture:
 **Architecture Type:** Score-Based Diffusion Model (SBDM)  <br>
 **Network Architecture:**  Graph Convolution Neural Network (GCNN) <br>
 
@@ -29,8 +29,8 @@ This donor model was not owned or developed by NVIDIA. This model has been devel
 **Output Parameters:** Confidence Score and the rank based on this score<br>
 
 ## Software Integration:
-**Runtime Engine(s):** 
-* NeMo, BioNeMo <br> 
+**Runtime Engine(s):**
+* NeMo, BioNeMo <br>
 
 **Supported Hardware Microarchitecture Compatibility:** <br>
 * [Ampere] <br>
@@ -40,7 +40,7 @@ This donor model was not owned or developed by NVIDIA. This model has been devel
 * [Linux] <br>
 * [Windows] <br>
 
-## Model Version(s): 
+## Model Version(s):
 diffdock_score.nemo, version: 1.5
 diffdock_confidence.nemo, version: 1.5
 
@@ -54,9 +54,9 @@ the script outputs the new checkpoint for version 1.5 to
 `new_checkpoint.nemo` as specified in the command line.
 
 ## Change Log:
-* version 1.5: A new version of tensor product convolution layer is implemented using the cugraph-equivariant package, which results in 1.2x speed up in training performance. Because of this new implementation, the checkpoint file should be reformatted. We provide a new checkpoint file for this release and a script that can convert the checkpoint file in the old format to the new format (see section [Model Version(s)](#model-versions) for details). 
+* version 1.5: A new version of tensor product convolution layer is implemented using the cugraph-equivariant package, which results in 1.2x speed up in training performance. Because of this new implementation, the checkpoint file should be reformatted. We provide a new checkpoint file for this release and a script that can convert the checkpoint file in the old format to the new format (see section [Model Version(s)](#model-versions) for details).
 
-# Evaluation: 
+# Evaluation:
 ## Evaluation Dataset:
 **Link:** [PoseBusters benchmark (PDB) set](https://zenodo.org/records/8278563))  <br>
 **Data Collection Method by dataset** <br>
@@ -104,7 +104,7 @@ DiffDock is currently restricted to static snapshot understanding of single liga
 
 DiffDock is also restricted to rigid protein-ligand docking. For the systems have structural or conformation changes during docking, DiffDock inference may generate not ideal results.
 
-Because ESM2 is used as a featurizer, some non-standard amino acids are ignored in the data preprocessing. 
+Because ESM2 is used as a featurizer, some non-standard amino acids are ignored in the data preprocessing.
 
 
 ## License

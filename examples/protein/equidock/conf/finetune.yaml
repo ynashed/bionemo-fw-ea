@@ -110,7 +110,7 @@ model:
     raw_data_path: ${data.raw_data_path}
     split_files_path: ${data.split_files_path}
     reload_mode: 'val'
-    
+
   test_ds:
     micro_batch_size: ${model.micro_batch_size}
     pin_memory: ${data.pin_memory}
@@ -168,17 +168,17 @@ exp_manager:
     filename: '${model.name}--{val_complex_rmsd_median:.3f}-{step}' # -{consumed_samples}'
     save_best_model: True
     save_nemo_on_train_end: True
-  
+
   # ********************************************************* #
   # Early stopping callback works with the latest nemo
   create_early_stopping_callback: True
   early_stopping_callback_params:
     monitor: val_complex_rmsd_median
-    mode: 'min' 
+    mode: 'min'
     patience: 150
     verbose: True
     check_on_train_epoch_end: False
-  
+
   # EMA
   ema: # Exponential Moving Average; is picked up by exp_manager()
     enable: false # Creates EMA callback in exp_manager

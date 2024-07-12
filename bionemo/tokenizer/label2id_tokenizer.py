@@ -64,7 +64,7 @@ class Label2IDTokenizer(TokenizerSpec):
         for token in tokens:
             id_ = self.vocab.get(token)
             if id_ is None:
-                raise ValueError(f'Do not recognize token: {token}')
+                raise ValueError(f"Do not recognize token: {token}")
             else:
                 ids.append(id_)
         return ids
@@ -80,7 +80,7 @@ class Label2IDTokenizer(TokenizerSpec):
         for id_ in ids:
             token = self.decode_vocab.get(id_)
             if token is None:
-                raise ValueError(f'Do not recognize ID: {id_}')
+                raise ValueError(f"Do not recognize ID: {id_}")
             tokens.append(token)
         return tokens
 

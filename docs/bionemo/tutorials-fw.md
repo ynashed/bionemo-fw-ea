@@ -1,10 +1,10 @@
 # BioNeMo Framework Tutorials
 
-The best way to get started with BioNeMo Framework is with the tutorials. Below are some of the example walk-throughs/tutorials which contains code snippets that you can run from within the BioNeMo container. 
+The best way to get started with BioNeMo Framework is with the tutorials. Below are some of the example walk-throughs/tutorials which contains code snippets that you can run from within the BioNeMo container.
 
 Some of the tutorials are presented in the format of Markdown with Python or shell codes, where a user can run example cells by copying the code to a script in an appropriate folder inside the BioNeMo container and execute it.
 
-Other tutorial files are provided in the MarkDown (``.md``) format, where the file may contain various example code snippets in YAML/bash/python/etc. formats. You can follow the instructions provided in those files, make appropriate changes to the codes, and execute them once the container is launched. 
+Other tutorial files are provided in the MarkDown (``.md``) format, where the file may contain various example code snippets in YAML/bash/python/etc. formats. You can follow the instructions provided in those files, make appropriate changes to the codes, and execute them once the container is launched.
 
 In both types of tutorials, it is convenient to first launch the BioNeMo Framework container, and copy the tutorial files to the container -- either via the Jupyter-Lab interface drag-and-drop, or by mounting the files during the launch of container (```docker run -v ...```)
 

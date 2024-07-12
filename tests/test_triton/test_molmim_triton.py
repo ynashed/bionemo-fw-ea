@@ -46,7 +46,7 @@ from bionemo.utils.tests import teardown_apex_megatron_cuda
 
 
 # Handpicked sequences that this model can correctly auto encode
-SMILES = ['c1ccc2ccccc2c1', 'CCC[C@@H]1CN[C@H]2CCC3(CC3)[C@H]2O1']
+SMILES = ["c1ccc2ccccc2c1", "CCC[C@@H]1CN[C@H]2CCC3(CC3)[C@H]2O1"]
 
 MODEL_NAME = "molmim"
 
@@ -56,7 +56,7 @@ NAME_SAMPLINGS = complete_model_name(MODEL_NAME, SAMPLINGS)
 NAME_DECODES = complete_model_name(MODEL_NAME, DECODES)
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope="module")
 def cfg(bionemo_home: Path) -> DictConfig:
     return load_model_config(
         config_path=str(bionemo_home / "examples" / "molecule" / MODEL_NAME / "conf"),
@@ -65,13 +65,13 @@ def cfg(bionemo_home: Path) -> DictConfig:
     )
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope="module")
 def model(cfg: DictConfig) -> MolMIMInference:
     yield load_model_for_inference(cfg, inference_batch_size_for_warmup=len(SMILES))
     teardown_apex_megatron_cuda()
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope="module")
 def server(cfg: DictConfig, model: MolMIMInference) -> Triton:
     triton = Triton()
     bind_embedding(triton, cfg, model, nav=False, triton_model_name=NAME_EMBEDDINGS)
@@ -126,7 +126,7 @@ def _validate_generated(generated: np.ndarray, expected_shape: Tuple[int]) -> No
         assert len(gen) >= 1, f"Expecting batch #{i+1} of generated samples to be non-empty"
         for j in range(len(gen)):
             try:
-                sample = gen[j].decode('utf8')
+                sample = gen[j].decode("utf8")
             except Exception as e:
                 raise ValueError(f"Error decoding generated sample ({i},{j}): {gen[j]}") from e
             assert len(sample) >= 1, f"Expecting sample ({i},{j}) to be non-empty"

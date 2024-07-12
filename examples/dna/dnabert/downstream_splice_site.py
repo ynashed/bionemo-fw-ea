@@ -90,7 +90,7 @@ def main(cfg):
 
     if do_training:
         trainer.fit(model)
-        ckpt_path = 'best'
+        ckpt_path = "best"
 
     if do_prediction:
         if not do_training:

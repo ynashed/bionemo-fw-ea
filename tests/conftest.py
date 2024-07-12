@@ -110,7 +110,7 @@ tests/regression_tests/test_regression.py::test_e SKIPPED (test requires regress
 
 ############################## HELPERS ##############################
 def _level_to_str(level: int) -> str:
-    return f'L{level}'
+    return f"L{level}"
 
 
 def _str_to_level(level_str: str) -> int:
@@ -120,7 +120,7 @@ def _str_to_level(level_str: str) -> int:
 def _regression_test_filter(item):
     item_regression_levels = [mark.args[0] for mark in item.iter_markers(name="regression")]
     if len(item_regression_levels) == 0:
-        item_regression_levels = ['L0']
+        item_regression_levels = ["L0"]
     runner_regression_levels = [_level_to_str(l) for l in item.config.getoption("--regression-level")]
     if not any(item_level in runner_regression_levels for item_level in item_regression_levels):
         pytest.skip(
@@ -156,15 +156,15 @@ def pytest_runtest_setup(item):
 
 @pytest.fixture(autouse=True)
 def skip_if_file_missing(request):
-    if request.node.get_closest_marker('skip_if_no_file'):
-        if not os.path.exists(request.node.get_closest_marker('skip_if_no_file').args[0]):
-            pytest.skip('skipped because model does not exist')
+    if request.node.get_closest_marker("skip_if_no_file"):
+        if not os.path.exists(request.node.get_closest_marker("skip_if_no_file").args[0]):
+            pytest.skip("skipped because model does not exist")
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope="session")
 def bionemo_home() -> Path:
     try:
-        x = os.environ['BIONEMO_HOME']
+        x = os.environ["BIONEMO_HOME"]
     except KeyError:
         raise ValueError("Need to set BIONEMO_HOME in order to run unit tests! See docs for instructions.")
     else:

@@ -125,9 +125,9 @@ class SingleCellDataModule(pl.LightningDataModule):
             num_val_samples = 1
 
         # This happens exactly once during setup.
-        self._train_ds = self._sample_and_shuffle_dataset(self._train_dataset_ori, num_train_samples, 'train')
-        self._validation_ds = self._sample_and_shuffle_dataset(self._val_dataset_ori, num_val_samples, 'val')
-        self._test_ds = self._sample_and_shuffle_dataset(self._test_dataset_ori, num_test_samples, 'test')
+        self._train_ds = self._sample_and_shuffle_dataset(self._train_dataset_ori, num_train_samples, "train")
+        self._validation_ds = self._sample_and_shuffle_dataset(self._val_dataset_ori, num_val_samples, "val")
+        self._test_ds = self._sample_and_shuffle_dataset(self._test_dataset_ori, num_test_samples, "test")
 
     def train_dataloader(self) -> TRAIN_DATALOADERS:
         return self._create_dataloader(self._train_ds)

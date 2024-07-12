@@ -21,8 +21,8 @@ log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
 
 SMIS_FOR_TEST = [
-    'c1cc2ccccc2cc1',
-    'COc1cc2nc(N3CCN(C(=O)c4ccco4)CC3)nc(N)c2cc1OC',
+    "c1cc2ccccc2cc1",
+    "COc1cc2nc(N3CCN(C(=O)c4ccco4)CC3)nc(N)c2cc1OC",
 ]
 
 
@@ -32,12 +32,12 @@ MAX_GEN_LEN: int = 64
 def run_hidden_to_smis(inferer: MolInference, smis: List[str]):
     hidden_state, pad_masks = inferer.seq_to_hiddens(smis)
     infered_smis = inferer.hiddens_to_seq(hidden_state, pad_masks, override_generate_num_tokens=MAX_GEN_LEN)
-    log.info(f'Input SMILES and Infered: {smis}, {infered_smis}')
+    log.info(f"Input SMILES and Infered: {smis}, {infered_smis}")
 
     assert len(infered_smis) == len(smis)
 
     for smi, infered_smi in zip(smis, infered_smis):
-        log.info(f'Input and Infered:{smi},  {infered_smi}')
+        log.info(f"Input and Infered:{smi},  {infered_smi}")
         input_mol = Chem.MolFromSmiles(smi)
         infer_mol = Chem.MolFromSmiles(infered_smi)
         assert input_mol is not None
@@ -46,7 +46,7 @@ def run_hidden_to_smis(inferer: MolInference, smis: List[str]):
         # FIXME remove this distinction once we have a good checkpoint for MolMIM
         if isinstance(inferer, MegaMolBARTInference):
             canonical_infered_smi = Chem.MolToSmiles(infer_mol, canonical=True)
-            log.info(f'Canonical Input and Infered: {canonical_smi}, {canonical_infered_smi}')
+            log.info(f"Canonical Input and Infered: {canonical_smi}, {canonical_infered_smi}")
             assert canonical_smi == canonical_infered_smi
         else:
             if infer_mol is not None:
@@ -80,11 +80,11 @@ def run_sample_not_beam(inferer: MolInference, smis: List[str], sampling_method:
         if mol:
             isvalid = True
             valid_molecules.append(smi)
-        log.info(f'Sample: {smi},  {isvalid}')
+        log.info(f"Sample: {smi},  {isvalid}")
 
-    log.info('Valid Molecules' + "\n".join(valid_molecules))
+    log.info("Valid Molecules" + "\n".join(valid_molecules))
     log.info(
-        f'Total samples = {len(samples_flat)} unique samples {len(set(samples_flat))}  valids {len(valid_molecules)}'
+        f"Total samples = {len(samples_flat)} unique samples {len(set(samples_flat))}  valids {len(valid_molecules)}"
     )
 
     if len(valid_molecules) < len(samples_flat) * 0.3:
@@ -119,13 +119,13 @@ def run_beam_search(inferer: MolInference, smis: List[str], beam_search_method: 
         if mol:
             isvalid = True
             valid_molecules.append(smi)
-        log.info(f'Sample: {smi},  {isvalid}')
+        log.info(f"Sample: {smi},  {isvalid}")
 
-    log.info('Valid Molecules' + "\n".join(valid_molecules))
+    log.info("Valid Molecules" + "\n".join(valid_molecules))
 
     log.info(
-        f'Total samples = {len(samples_flat)} unique samples {len(set(samples_flat))} '
-        f'valids {len(valid_molecules)}'
+        f"Total samples = {len(samples_flat)} unique samples {len(set(samples_flat))} "
+        f"valids {len(valid_molecules)}"
     )
 
     if len(valid_molecules) < len(samples_flat) * 0.3:
@@ -165,13 +165,13 @@ def run_beam_search_product(inferer: MolInference, smis: List[str]):
         if mol:
             isvalid = True
             valid_molecules.append(smi)
-        log.info(f'Sample: {smi},  {isvalid}')
+        log.info(f"Sample: {smi},  {isvalid}")
 
-    log.info('Valid Molecules' + "\n".join(valid_molecules))
+    log.info("Valid Molecules" + "\n".join(valid_molecules))
 
     log.info(
-        f'Total samples = {len(samples_flat)} unique samples {len(set(samples_flat))} '
-        f'valids {len(valid_molecules)}'
+        f"Total samples = {len(samples_flat)} unique samples {len(set(samples_flat))} "
+        f"valids {len(valid_molecules)}"
     )
 
     if len(valid_molecules) < len(samples_flat) * 0.3:

@@ -112,7 +112,7 @@ class PerTokenPredictionCallback(DownstreamValidationCallback):
                         self.valid_cfg.task_type
                     )
                 )
-        pretrain_model_hidden_size = get_from_decoder_encoder_or_model(self.cfg.model, 'hidden_size')
+        pretrain_model_hidden_size = get_from_decoder_encoder_or_model(self.cfg.model, "hidden_size")
         output_sizes = self.valid_cfg.target_sizes
         self.dwnstr_model = ConvNet(pretrain_model_hidden_size, output_sizes=output_sizes).to("cuda")
         self.loss_fn = PerTokenMaskedCrossEntropyLoss()

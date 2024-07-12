@@ -30,7 +30,7 @@ class FineTuneProteinModel(EncoderFineTuning):
         self.encoder_frozen = cfg.encoder_frozen
         self.task_type = cfg.data.task_type
 
-        if self.encoder_frozen and OmegaConf.select(cfg, 'peft.enabled'):
+        if self.encoder_frozen and OmegaConf.select(cfg, "peft.enabled"):
             raise ValueError("Using PEFT requires encoder_frozen: False for training")
 
         super().__init__(cfg, trainer=trainer)
@@ -44,14 +44,14 @@ class FineTuneProteinModel(EncoderFineTuning):
             return [self._optimizer], [self._scheduler]
 
     def build_loss_fn(self):
-        if self.task_type in ['regression', 'classification']:
+        if self.task_type in ["regression", "classification"]:
             loss = bionemo.utils.lookup_or_use(torch.nn, self.cfg.loss_func)
-        elif self.task_type == 'token-level-classification':
+        elif self.task_type == "token-level-classification":
             loss = PerTokenMaskedCrossEntropyLoss()
         return loss
 
     def build_task_head(self):
-        if self.task_type in ['regression', 'classification']:
+        if self.task_type in ["regression", "classification"]:
             if len(self.cfg.data.target_sizes) != 1:
                 raise ValueError("Classification and regression tasks do not support multi-head predictions")
             task_head = MLPModel(
@@ -63,7 +63,7 @@ class FineTuneProteinModel(EncoderFineTuning):
                 dropout=self.cfg.dropout_rate,
             )
 
-        elif self.task_type == 'token-level-classification':
+        elif self.task_type == "token-level-classification":
             task_head = ConvNet(
                 self.encoder_model.cfg.model.hidden_size,
                 output_sizes=self.cfg.data.target_sizes,
@@ -92,9 +92,9 @@ class FineTuneProteinModel(EncoderFineTuning):
         else:
             model = None
 
-        if self.task_type in ['regression', 'classification']:
+        if self.task_type in ["regression", "classification"]:
             self.data_module = SingleValueDataModule(self.cfg, self.trainer, model=model)
-        elif self.task_type == 'token-level-classification':
+        elif self.task_type == "token-level-classification":
             self.data_module = PerTokenValueDataModule(self.cfg, self.trainer, model=model)
 
     def on_fit_start(self):
@@ -117,15 +117,15 @@ class FineTuneProteinModel(EncoderFineTuning):
         self._test_ds = self.data_module.get_sampled_test_dataset()
 
     def encoder_forward(self, protein_model, batch: dict):
-        '''
+        """
         Params:
             batch: Dictionary that conatains
                 "embeddings": this is a sequence of amino acids when `encoder_frozen` is False.
-        '''
+        """
         if self.encoder_frozen:
             # If encoder is frozen, the Dataset returns the embedding directly
             enc_output = batch["embeddings"]
-        elif self.task_type in ['regression', 'classification']:
+        elif self.task_type in ["regression", "classification"]:
             # contains a sequence, not an embedding
             enc_output = protein_model.seq_to_embeddings(batch["embeddings"])  # (B, D)
         else:
@@ -175,9 +175,9 @@ class FineTuneProteinModel(EncoderFineTuning):
 
     def _calc_step(self, batch, batch_idx):
         output_tensor = self.forward(batch)
-        if self.task_type in ['regression', 'classification']:
+        if self.task_type in ["regression", "classification"]:
             _, target = SingleValueDataset.prepare_batch(batch, self._train_ds, task=self.task_type)
-        elif self.task_type == 'token-level-classification':
+        elif self.task_type == "token-level-classification":
             target = self.get_target_from_batch(batch)
         loss = self.loss_fn(output_tensor, target)
         return loss, output_tensor, target

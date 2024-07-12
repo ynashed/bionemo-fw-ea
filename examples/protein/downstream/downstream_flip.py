@@ -26,7 +26,7 @@ from bionemo.model.utils import (
 @hydra_runner(config_path="../esm1nv/conf", config_name="downstream_flip_sec_str")  # ESM1
 def main(cfg) -> None:
     logging.info("\n\n************* Finetune config ****************")
-    logging.info(f'\n{OmegaConf.to_yaml(cfg)}')
+    logging.info(f"\n{OmegaConf.to_yaml(cfg)}")
 
     # Do preprocessing if preprocess
     if cfg.do_preprocessing:
@@ -80,5 +80,5 @@ def main(cfg) -> None:
         logging.info("************** Finished Testing ***********")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

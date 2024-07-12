@@ -39,7 +39,7 @@ UPDATE_GOLDEN_VALUES = os.environ.get("UPDATE_GOLDEN_VALUES", "0") == "1"
 
 @pytest.fixture(scope="module")
 def cfg(config_path_for_tests):
-    cfg = load_model_config(config_name='esm2nv_lora_finetune_test_8M', config_path=config_path_for_tests)
+    cfg = load_model_config(config_name="esm2nv_lora_finetune_test_8M", config_path=config_path_for_tests)
     return cfg
 
 
@@ -49,32 +49,32 @@ def cfg(config_path_for_tests):
 log = logging.getLogger(__name__)
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope="module")
 def lora_checkpoint_path(bionemo_home: Path) -> Path:
     return bionemo_home / "models" / "protein" / "esm2nv" / "esm2nv_sec_str_lora.nemo"
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope="module")
 def esm2_checkpoint_path(bionemo_home: Path) -> Path:
     return bionemo_home / "models" / "protein" / "esm2nv" / "esm2nv_8M_untrained.nemo"
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope="module")
 def output_modified_ckpt_state_dict_fi() -> Path:
     with tempfile.TemporaryDirectory() as tdir:
         yield Path(tdir) / "stripped_state_dict--esm2nv_sec_str_lora.ckpt"
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope="module")
 def golden_output_path(bionemo_home: Path) -> Path:
     # Check for architecture
     gpu_name = torch.cuda.get_device_name(0)
 
-    if 'A6000' in gpu_name:
+    if "A6000" in gpu_name:
         file_n = "esm2_lora_golden_value_output_on_ones_1_5_a6000.tensor"
-    elif 'A100' in gpu_name:
+    elif "A100" in gpu_name:
         file_n = "esm2_lora_golden_values_a100.tensor"
-    elif 'A10G' in gpu_name:
+    elif "A10G" in gpu_name:
         file_n = "ci_esm2_lora_golden_values_a10g.tensor"
     else:
         file_n = "ci_esm2_lora_golden_values_a10g.tensor"
@@ -94,7 +94,7 @@ def test_model(
         extract_and_strip_fine_tuned_esm2_lora(
             lora_checkpoint_path,
             output_modified_ckpt_state_dict_fi,
-            ('elmo', 'class_heads'),
+            ("elmo", "class_heads"),
             verbose=False,
         )
 
@@ -111,7 +111,7 @@ def test_model(
             peft_cfg,
         )
 
-        model_lora = model_lora.to('cuda').eval()
+        model_lora = model_lora.to("cuda").eval()
 
         yield model_lora
 
@@ -145,5 +145,5 @@ def test_model_forward(golden_output_path: Path, test_model: ESM2nvLoRAModel):
         torch.save(embeddings, str(golden_output_path))
         assert False, f"Updated expected values at {golden_output_path}, rerun with UPDATE_GOLDEN_VALUES=0"
     else:
-        golden_embeddings = torch.load(str(golden_output_path), map_location='cuda')
+        golden_embeddings = torch.load(str(golden_output_path), map_location="cuda")
         assert torch.allclose(embeddings, golden_embeddings, atol=1e-6), "Difference detected!"

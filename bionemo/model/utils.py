@@ -35,7 +35,7 @@ from pytorch_lightning.plugins.environments import TorchElasticEnvironment
 from bionemo.callbacks.utils import add_progress_bar_callback, add_test_callbacks, add_training_callbacks
 
 
-M = TypeVar('M')
+M = TypeVar("M")
 """Supposed to be `bionemo.model.core.infer.M`, but cannot import that here due to circular imports.
 """
 
@@ -129,11 +129,11 @@ def infer_global_batch_size(
 
     if (model_parallel_size > world_size) or world_size % model_parallel_size != 0:
         raise ValueError(
-            f'Model parallel size: {model_parallel_size} '
-            f'(tensor_model_paralle_size={tensor_model_parallel_size} x '
-            f'pipeline_model_parallel_size={pipeline_model_parallel_size}) '
-            f'must be <= and a divisor of world size: {world_size} ('
-            f'n_devices={n_devices} x n_nodes={n_nodes}).'
+            f"Model parallel size: {model_parallel_size} "
+            f"(tensor_model_paralle_size={tensor_model_parallel_size} x "
+            f"pipeline_model_parallel_size={pipeline_model_parallel_size}) "
+            f"must be <= and a divisor of world size: {world_size} ("
+            f"n_devices={n_devices} x n_nodes={n_nodes})."
         )
 
     data_parallel_size = world_size // model_parallel_size
@@ -181,22 +181,22 @@ class TrainerBuilder:
         )
 
         # we always inferr global batch size based on micro batch size
-        if cfg.get('do_training', False):
+        if cfg.get("do_training", False):
             # when training we validate
             set_cfg_key(
-                'global_batch_size',
+                "global_batch_size",
                 global_batch_size,
                 cfg.model,
-                msg=' Please set global_batch_size in the config file to be null or to match global_batch_size = micro_batch_size * data_parallel_size * accumulate_grad_batches',
+                msg=" Please set global_batch_size in the config file to be null or to match global_batch_size = micro_batch_size * data_parallel_size * accumulate_grad_batches",
             )
         else:
             # otherwise we override at inference
             with open_dict(cfg):
-                cfg.model['global_batch_size'] = global_batch_size
+                cfg.model["global_batch_size"] = global_batch_size
 
         # accumulate_grad_batches must always be 1 for NeMo Megatron
         with open_dict(cfg):
-            cfg.trainer['accumulate_grad_batches'] = 1
+            cfg.trainer["accumulate_grad_batches"] = 1
 
     @staticmethod
     def configure_plugins(cfg):
@@ -207,15 +207,15 @@ class TrainerBuilder:
                 scaler = GradScaler(
                     init_scale=cfg.model.get("native_amp_init_scale", 2**32),
                     growth_interval=cfg.model.get("native_amp_growth_interval", 1000),
-                    hysteresis=cfg.model.get('hysteresis', 2),
+                    hysteresis=cfg.model.get("hysteresis", 2),
                 )
-            if cfg.model.get('megatron_amp_O2', False):
+            if cfg.model.get("megatron_amp_O2", False):
                 plugins.append(
-                    MegatronHalfPrecisionPlugin(precision=cfg.trainer.precision, device='cuda', scaler=scaler)
+                    MegatronHalfPrecisionPlugin(precision=cfg.trainer.precision, device="cuda", scaler=scaler)
                 )
             else:
                 plugins.append(
-                    PipelineMixedPrecisionPlugin(precision=cfg.trainer.precision, device='cuda', scaler=scaler)
+                    PipelineMixedPrecisionPlugin(precision=cfg.trainer.precision, device="cuda", scaler=scaler)
                 )
 
         if cfg.get("cluster_type", None) == "BCP":
@@ -227,7 +227,7 @@ class TrainerBuilder:
     def configure_callbacks(cfg, extra_callbacks=[]):
         callbacks = [ModelSummary(max_depth=3)]
         callbacks.extend(extra_callbacks)
-        logging.info(f'Selected Callbacks: {[type(c) for c in callbacks]}')
+        logging.info(f"Selected Callbacks: {[type(c) for c in callbacks]}")
         return callbacks
 
     @staticmethod
@@ -236,14 +236,14 @@ class TrainerBuilder:
         return NLPDDPStrategy(
             no_ddp_communication_hook=True,
             # Allocate gradients in a contiguous bucket to save memory (less fragmentation and buffer memory)
-            gradient_as_bucket_view=cfg.model.get('gradient_as_bucket_view', True),
-            find_unused_parameters=cfg.model.get('find_unused_parameters', False),
+            gradient_as_bucket_view=cfg.model.get("gradient_as_bucket_view", True),
+            find_unused_parameters=cfg.model.get("find_unused_parameters", False),
         )
 
     @staticmethod
     def resume_checkpoint(cfg, trainer):
         # update resume from checkpoint found by exp_manager
-        if cfg.model.get('resume_from_checkpoint', None) is not None:
+        if cfg.model.get("resume_from_checkpoint", None) is not None:
             new_path = cfg.model.resume_from_checkpoint
             logging.info(f"Resuming from checkpoint: {new_path} rather than {trainer.ckpt_path}")
             trainer.ckpt_path = cfg.model.resume_from_checkpoint
@@ -284,7 +284,7 @@ def setup_trainer(cfg, builder=None, callbacks=[], adjust_config=True, verbose=T
     add_progress_bar_callback(cfg, callbacks)
 
     if interactive:
-        strategy = 'auto'
+        strategy = "auto"
         # strategy = 'ddp_notebook'
         print(f"Interactive mode selected, using {strategy=}")
     else:
@@ -304,7 +304,7 @@ def setup_trainer(cfg, builder=None, callbacks=[], adjust_config=True, verbose=T
     # log trainer configuration (which might be different from input cfg)
     if verbose:
         logging.info("\n\n************** Trainer configuration ***********")
-        logging.info(f'\n{OmegaConf.to_yaml(cfg)}')
+        logging.info(f"\n{OmegaConf.to_yaml(cfg)}")
 
     return trainer
 
@@ -345,7 +345,7 @@ def restore_model(
         return_config=True,
     )
     with open_dict(cfg):
-        cfg.model = OmegaConf.merge(restore_cfg, cfg.model) if hasattr(cfg, 'model') else restore_cfg
+        cfg.model = OmegaConf.merge(restore_cfg, cfg.model) if hasattr(cfg, "model") else restore_cfg
 
     # build trainer if not provided
     if trainer is None:
@@ -368,12 +368,12 @@ def restore_model(
         strict=strict,
     )
 
-    if OmegaConf.select(cfg, 'model.peft.enabled') is not None:  # skipped if peft.enabled is not present in config
+    if OmegaConf.select(cfg, "model.peft.enabled") is not None:  # skipped if peft.enabled is not present in config
         if cfg.model.peft.enabled:  # skipped if peft.enabled is false
             peft_cfg = LoraPEFTConfig(cfg.model)
             model.add_adapter(peft_cfg)
 
-    if cfg.get('load_from_checkpoint') is not None:
+    if cfg.get("load_from_checkpoint") is not None:
         model.load_from_checkpoint(checkpoint_path=cfg.load_from_checkpoint, strict=strict)
 
     return model
@@ -485,7 +485,7 @@ def initialize_distributed_parallel_state(
     # if not interactive and not torch.distributed.is_initialized():
     if not torch.distributed.is_initialized():
         logging.info("pytorch DDP is not initialized. Initializing with pytorch-lightening...")
-        trainer = pl.Trainer(devices=1, strategy='ddp' if not interactive else "auto", num_nodes=1)
+        trainer = pl.Trainer(devices=1, strategy="ddp" if not interactive else "auto", num_nodes=1)
 
         if trainer.strategy.launcher is not None:
             trainer.strategy.launcher.launch(_dummy, trainer=trainer)

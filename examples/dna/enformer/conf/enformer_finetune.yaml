@@ -26,4 +26,3 @@ exp_manager:
     save_top_k : 1
     monitor: rpearson_human
     mode: max
-    

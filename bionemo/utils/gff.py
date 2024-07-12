@@ -20,6 +20,7 @@ Provide a set of solutions for GFF files and leave room for future improvement:
     - Leave room for extension based on assumptions about what is contained in the attributes column.
 
 """
+
 from collections import defaultdict
 from typing import Dict, List, Literal, Optional, Tuple, TypeVar, Union
 
@@ -72,7 +73,7 @@ class SpliceSiteEntry(GFFEntry):
         return self.attributes_as_dict()["Parent"]
 
 
-T = TypeVar('T', bound=GFFEntry)
+T = TypeVar("T", bound=GFFEntry)
 
 
 def parse_gff3(filename: str, cls: T = SpliceSiteEntry) -> List[T]:
@@ -124,13 +125,13 @@ def _get_exons_by_parent(entries: List[SpliceSiteEntry]) -> Dict[str, List[Splic
 
 
 def get_seqid_from_key(key):
-    '''Given a key in our parent dictionary, returns the parsed sequence id.'''
+    """Given a key in our parent dictionary, returns the parsed sequence id."""
     seqid, _ = key.split(":")
     return seqid
 
 
 def _build_donor_acceptors_midpoints(
-    exon_groups: Dict[str, List[SpliceSiteEntry]]
+    exon_groups: Dict[str, List[SpliceSiteEntry]],
 ) -> Dict[str, Tuple[List[SpliceSiteEntry], List[SpliceSiteEntry], List[SpliceSiteEntry]]]:
     """Internal method used for going from exon groupings to donor, acceptor, and midpoint lists.
 
@@ -156,14 +157,14 @@ def _build_donor_acceptors_midpoints(
 def build_donor_acceptors_midpoints(
     gff_entries: List[SpliceSiteEntry],
 ) -> Dict[str, Tuple[List[SpliceSiteEntry], List[SpliceSiteEntry], List[SpliceSiteEntry]]]:
-    '''Creates a dictionary mapping locus IDs to donor, acceptor, and midpoint lists from a set of GFF lines.
+    """Creates a dictionary mapping locus IDs to donor, acceptor, and midpoint lists from a set of GFF lines.
 
     Args:
         gff_entries: list of parsed and validated SpliceSiteEntries.
 
     Returns:
         Dictionary mapping transcript IDs to donor, acceptor, and midpoint lists.
-    '''
+    """
     parent_lookup = _get_exons_by_parent(gff_entries)
     donor_acceptors_midpoints = _build_donor_acceptors_midpoints(parent_lookup)
     return donor_acceptors_midpoints

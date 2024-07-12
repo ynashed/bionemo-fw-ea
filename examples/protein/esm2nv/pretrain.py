@@ -38,7 +38,7 @@ from bionemo.utils.connectors import BioNeMoSaveRestoreConnector
 @hydra_runner(config_path="conf", config_name="pretrain_esm2_8M")
 def main(cfg) -> None:
     logging.info("\n\n************** Experiment configuration ***********")
-    logging.info(f'\n{OmegaConf.to_yaml(cfg)}')
+    logging.info(f"\n{OmegaConf.to_yaml(cfg)}")
 
     callbacks = setup_dwnstr_task_validation_callbacks(cfg)
 
@@ -98,19 +98,19 @@ def main(cfg) -> None:
             # Prepare training dataset
             preprocessor.prepare_dataset(
                 fasta_path=cfg.model.data.train.custom_pretraining_fasta_path,
-                mode='train',
+                mode="train",
             )
 
             # Prepare val dataset
             preprocessor.prepare_dataset(
                 fasta_path=cfg.model.data.val.custom_pretraining_fasta_path,
-                mode='val',
+                mode="val",
             )
 
             # Prepare test dataset
             preprocessor.prepare_dataset(
                 fasta_path=cfg.model.data.test.custom_pretraining_fasta_path,
-                mode='test',
+                mode="test",
             )
 
         # Downloading and preprocessing data for downstream task validation
@@ -125,5 +125,5 @@ def main(cfg) -> None:
             )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -46,7 +46,7 @@ python src/preprocess_raw_data.py -n_jobs 40 -data db5 -graph_nodes residues -gr
 ```
 
 By default, `preprocess_raw_data.py` uses 10 neighbor for each node when constructing
-the graph and uses only residues (coordinates being those of the alpha carbons). After running `preprocess_raw_data.py` you will get following 
+the graph and uses only residues (coordinates being those of the alpha carbons). After running `preprocess_raw_data.py` you will get following
 ready-for-training data directory:
 
 ```
@@ -90,7 +90,7 @@ python3 project/datasets/builder/prune_pairs.py project/datasets/DIPS/interim/pa
 ```
 
 Then, place file `utils/partition_dips.py` in the `DIPS/src/` folder, use the `pairs-postprocessed-*.txt` files for the actual data splits used in our paper,
-and run from the `DIPS/` folder the command: `python src/partition_dips.py  data/DIPS/interim/pairs-pruned/`. This creates the corresponding train/test/validation splits 
+and run from the `DIPS/` folder the command: `python src/partition_dips.py  data/DIPS/interim/pairs-pruned/`. This creates the corresponding train/test/validation splits
 (again, using the exact splits in `pairs-postprocessed-*.txt`) of the 42K filtered pairs in DIPS. You should now have the following directory:
 
 ```angular2html
@@ -125,7 +125,7 @@ a5  aw	bn  ce	d5  dw	en  fe	g5  gw	hn  ie	j5  jw	kn  le	m5  mw	nn  oe	p5  ps				
 ```
 
 ###Note:
-The raw data `DIPS/data/DIPS/interim/pairs-pruned/` can also be downloaded from https://www.dropbox.com/s/sqknqofy58nlosh/DIPS.zip?dl=0 
+The raw data `DIPS/data/DIPS/interim/pairs-pruned/` can also be downloaded from https://www.dropbox.com/s/sqknqofy58nlosh/DIPS.zip?dl=0
 
 Remove the changes to `DIPS/data/DIPS/interim/pairs-pruned/pairs-postprocessed*.txt` files
 Finally, preprocess the raw data as follow to prepare data for rigid body docking:
@@ -164,24 +164,20 @@ DB5: data/benchmark5.5/cv/cv_0/*.txt
 See `inference_rigid.py`.
 
 ## Pretrained models
-Our paper pretrained models are available in folder `checkpts/`. By loading those (as in `inference_rigid.py`), you can also see 
+Our paper pretrained models are available in folder `checkpts/`. By loading those (as in `inference_rigid.py`), you can also see
 which hyperparameters were used in those models (or directly from their names).
 
 ## Test and reproduce paper's numbers
-Test sets used in our paper are given in `test_sets_pdb/`. Ground truth (bound) structures are in `test_sets_pdb/dips_test_random_transformed/complexes/`, 
-while unbound structures (i.e., randomly rotated and translated ligands and receptors) are in `test_sets_pdb/dips_test_random_transformed/random_transformed/` 
-and you should precisely use those for your predictions (or at least the ligands, while using the ground truth receptors like we do in `inference_rigid.py`). 
+Test sets used in our paper are given in `test_sets_pdb/`. Ground truth (bound) structures are in `test_sets_pdb/dips_test_random_transformed/complexes/`,
+while unbound structures (i.e., randomly rotated and translated ligands and receptors) are in `test_sets_pdb/dips_test_random_transformed/random_transformed/`
+and you should precisely use those for your predictions (or at least the ligands, while using the ground truth receptors like we do in `inference_rigid.py`).
 This test set was originally generated as a randomly sampled family-based subset of complexes in `./DIPS/data/DIPS/interim/pairs-pruned/pairs-postprocessed-test.txt`
 using the file `src/test_all_methods/testset_random_transf.py`.
 
 
-Run `python -m src.inference_rigid` to produce EquiDock's outputs for all test files. This will create a new directory of PDB output files in `test_sets_pdb/`. 
+Run `python -m src.inference_rigid` to produce EquiDock's outputs for all test files. This will create a new directory of PDB output files in `test_sets_pdb/`.
 
 Get RMSD numbers from our papers using `python -m src.test_all_methods.eval_pdb_outputset`. You can use this script to evaluate all other baselines. Baselines' output PDB files are also provided in  `test_sets_pdb/`
 
 ### Note on steric clashes
-Some clashes are possible in our model and we are working on mitigating this issue. Our current solution is a postprocessing clash removal step in `inference_rigid.py#L19`. Output files for DIPS are in `test_sets_pdb/dips_equidock_no_clashes_results/` and for DB5 in `test_sets_pdb/db5_equidock_no_clashes_results/`. 
-
-
-
-
+Some clashes are possible in our model and we are working on mitigating this issue. Our current solution is a postprocessing clash removal step in `inference_rigid.py#L19`. Output files for DIPS are in `test_sets_pdb/dips_equidock_no_clashes_results/` and for DB5 in `test_sets_pdb/db5_equidock_no_clashes_results/`.

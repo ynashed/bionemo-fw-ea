@@ -12,7 +12,7 @@
 
 # Below is a sample set of parameters for launching DiffDock model training with BioNeMo on SLURM-based clusters
 # Any parameters not specified in this script can be changed in the yaml config file
-# located in examples/molecule/diffdock/conf/train_score.yaml and 
+# located in examples/molecule/diffdock/conf/train_score.yaml and
 # examples/molecule/diffdock/conf/train_confidence.yaml
 
 # set your Weights and Biases API KEY
@@ -51,7 +51,7 @@ if [[ "${MODEL_TYPE}" != "score" && "${MODEL_TYPE}" != "confidence" ]]; then
   exit 1
 fi
 
-CONFIG_NAME="train_${MODEL_TYPE}" # name of the yaml config file with parameters 
+CONFIG_NAME="train_${MODEL_TYPE}" # name of the yaml config file with parameters
 
 # Training parameters
 # =========================
@@ -126,4 +126,3 @@ srun \
     trainer.accumulate_grad_batches=${ACCUMULATE_GRAD_BATCHES} \
     model.micro_batch_size=${MICRO_BATCH_SIZE}
 set +x
-

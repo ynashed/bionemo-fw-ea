@@ -45,10 +45,10 @@ torch.backends.cuda.allow_tf32 = False
 torch.backends.cudnn.enabled = False
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope="session")
 def bionemo_home() -> Path:
     try:
-        x = os.environ['BIONEMO_HOME']
+        x = os.environ["BIONEMO_HOME"]
     except KeyError:
         raise ValueError("Need to set BIONEMO_HOME in order to run unit tests! See docs for instructions.")
     else:
@@ -68,8 +68,8 @@ def test_diffdock_embedding_preprocessing(tmp_path, config_path_for_tests):
 
     seed_everything(cfg.seed)
     prep_embedding(cfg.protein_data)
-    fasta = {rec.id: str(rec.seq) for rec in SeqIO.parse(cfg.protein_data.output_fasta_file, 'fasta')}
-    ref_fasta = {rec.id: str(rec.seq) for rec in SeqIO.parse(cfg.ref_fasta_file, 'fasta')}
+    fasta = {rec.id: str(rec.seq) for rec in SeqIO.parse(cfg.protein_data.output_fasta_file, "fasta")}
+    ref_fasta = {rec.id: str(rec.seq) for rec in SeqIO.parse(cfg.ref_fasta_file, "fasta")}
     for complex_name in ref_fasta.keys():
         assert fasta[complex_name] == ref_fasta[complex_name], f"fasta is incorrect for {complex_name}"
 
@@ -98,10 +98,10 @@ def test_diffdock_prepare_score_dataset(config_path_for_tests, tmp_path):
     assert len(os.listdir(os.path.join(cfg.data.cache_path, cfg.ref_train_graph_folder_name))) > 0
 
     attr_dict = {
-        'ligand': ['orig_pos', 'x', 'pos', 'edge_mask', 'mask_rotate'],
-        'receptor': ['x', 'pos', 'mu_r_norm', 'side_chain_vecs'],
-        ('ligand', 'lig_bond', "ligand"): ['edge_index', 'edge_attr'],
-        ('receptor', 'rec_contact', 'receptor'): ['edge_index'],
+        "ligand": ["orig_pos", "x", "pos", "edge_mask", "mask_rotate"],
+        "receptor": ["x", "pos", "mu_r_norm", "side_chain_vecs"],
+        ("ligand", "lig_bond", "ligand"): ["edge_index", "edge_attr"],
+        ("receptor", "rec_contact", "receptor"): ["edge_index"],
     }
 
     for file in os.listdir(cfg.ref_train_graph_file):
@@ -135,13 +135,13 @@ def test_diffdock_prepare_confidence_dataset(tmp_path, config_path_for_tests):
     assert len(os.listdir(os.path.join(cfg.data.cache_path, cfg.ref_train_graph_folder_name))) == 2
 
     attr_dict = {
-        'ligand': ['orig_pos', 'x', 'pos', 'edge_mask', 'mask_rotate'],
-        'receptor': ['x', 'pos', 'mu_r_norm', 'side_chain_vecs'],
-        'atom': ['x', 'pos'],
-        ('ligand', 'lig_bond', "ligand"): ['edge_index', 'edge_attr'],
-        ('receptor', 'rec_contact', 'receptor'): ['edge_index'],
-        ('atom', 'atom_contact', 'atom'): ['edge_index'],
-        ('atom', 'atom_rec_contact', 'receptor'): ['edge_index'],
+        "ligand": ["orig_pos", "x", "pos", "edge_mask", "mask_rotate"],
+        "receptor": ["x", "pos", "mu_r_norm", "side_chain_vecs"],
+        "atom": ["x", "pos"],
+        ("ligand", "lig_bond", "ligand"): ["edge_index", "edge_attr"],
+        ("receptor", "rec_contact", "receptor"): ["edge_index"],
+        ("atom", "atom_contact", "atom"): ["edge_index"],
+        ("atom", "atom_rec_contact", "receptor"): ["edge_index"],
     }
 
     for file in os.listdir(cfg.ref_train_graph_file):

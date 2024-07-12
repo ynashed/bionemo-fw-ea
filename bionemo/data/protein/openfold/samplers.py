@@ -177,17 +177,17 @@ class InitialTrainingSampler(Sampler[Tuple[int, int]]):
         # (4) Zip the global sequences of training example indices and the seeds,
         #       and create a subsequence specific to current rank
         #
-        self.rank_specific_sequence_of_training_example_indices_and_seeds: List[
-            Tuple
-        ] = self.create_rank_specific_sequence_of_training_example_indices_and_seeds(
-            global_sequence_of_training_example_indices,
-            global_sequence_of_seeds,
-            device_batch_size,
-            num_steps_in_one_epoch,
-            is_distributed,
-            rank,
-            world_size,
-            num_prev_steps,
+        self.rank_specific_sequence_of_training_example_indices_and_seeds: List[Tuple] = (
+            self.create_rank_specific_sequence_of_training_example_indices_and_seeds(
+                global_sequence_of_training_example_indices,
+                global_sequence_of_seeds,
+                device_batch_size,
+                num_steps_in_one_epoch,
+                is_distributed,
+                rank,
+                world_size,
+                num_prev_steps,
+            )
         )
         num_training_example_visits_in_one_epoch_for_this_rank: int = len(
             self.rank_specific_sequence_of_training_example_indices_and_seeds

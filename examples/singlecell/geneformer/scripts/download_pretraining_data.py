@@ -52,10 +52,10 @@ parser.add_argument(
 
 def sanitize_string(s):
     # Replace spaces with underscores
-    s = s.replace(' ', '_')
+    s = s.replace(" ", "_")
 
     # Remove special characters except for hyphens and underscores
-    s = re.sub(r'[^\w\-]', '', s)
+    s = re.sub(r"[^\w\-]", "", s)
 
     # Remove single quotes
     s = s.replace("'", "")
@@ -79,7 +79,7 @@ def download_anndata(
     if len(idxs) == 0:
         return 0
     folder_name = os.path.join(*folder_names)
-    folder_path = save_path / f'{folder_name}'
+    folder_path = save_path / f"{folder_name}"
     if not os.path.exists(folder_path):
         os.makedirs(folder_path, exist_ok=True)
 
@@ -127,34 +127,34 @@ if __name__ == "__main__":
             value_filter='suspension_type != "na" and is_primary_data == True and disease == "normal"',
             column_names=[
                 "soma_joinid",
-                'assay',
-                'sex',
-                'development_stage',
-                'n_measured_vars',
-                'tissue_general',
+                "assay",
+                "sex",
+                "development_stage",
+                "n_measured_vars",
+                "tissue_general",
                 "self_reported_ethnicity",
-                'dataset_id',
+                "dataset_id",
             ],
         )
     df: pd.DataFrame = query.concat().to_pandas()
 
     print(f"Found {len(df)} cells matching your query in soma.")
 
-    grp_keys = ['assay', 'sex', 'development_stage', "self_reported_ethnicity", 'tissue_general', 'dataset_id']
-    add_metadata = ['n_measured_vars']
+    grp_keys = ["assay", "sex", "development_stage", "self_reported_ethnicity", "tissue_general", "dataset_id"]
+    add_metadata = ["n_measured_vars"]
 
     dataset_metadata = []
     for grp, gdf in df.groupby(grp_keys):
         other_info = gdf.iloc[0][add_metadata]
         dset_meta = dict(zip(list(grp_keys) + list(add_metadata), list(grp) + list(other_info)))
         n_cells = len(gdf)
-        dset_meta['num_cells'] = n_cells
+        dset_meta["num_cells"] = n_cells
         dataset_metadata.append(dset_meta)
         # grp is a tuple of tissue_general, dataset_id
         fname_parts = tuple(f"{d}__{sanitize_string(s)}" for d, s in zip(grp_keys, grp))
         num_parts = int(math.ceil(len(gdf) / partition_size))
         idxs: List[List[int]] = list(
-            map(list, np.array_split(gdf['soma_joinid'].values, num_parts))
+            map(list, np.array_split(gdf["soma_joinid"].values, num_parts))
         )  # Will split into num_parts files.
 
         fname_idxs = list(zip([fname_parts] * len(idxs), idxs))

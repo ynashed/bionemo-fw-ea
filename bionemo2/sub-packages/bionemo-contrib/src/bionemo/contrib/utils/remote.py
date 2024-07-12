@@ -118,7 +118,7 @@ class RemoteResource:
         return self.fully_qualified_dest_filename
 
     def check_exists(self):
-        """returns true if `fully_qualified_dest_filename` exists and the checksum matches `self.checksum`"""
+        """Returns true if `fully_qualified_dest_filename` exists and the checksum matches `self.checksum`"""
         if os.path.exists(self.fully_qualified_dest_filename):
             with open(self.fully_qualified_dest_filename, "rb") as fd:
                 data = fd.read()

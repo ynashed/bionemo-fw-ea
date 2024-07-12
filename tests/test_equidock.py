@@ -32,7 +32,7 @@ def test_Kabsch_algorithm(data_type):
             # Get transformations from both functions
             R_numpy, t_numpy = rigid_transform_Kabsch_3D(A, B)
             R_torch, t_torch = rigid_transform_Kabsch_3D_torch(
-                torch.from_numpy(A).to('cuda').to(data_type), torch.from_numpy(B).to('cuda').to(data_type)
+                torch.from_numpy(A).to("cuda").to(data_type), torch.from_numpy(B).to("cuda").to(data_type)
             )
 
             # Convert the torch tensors to numpy arrays for easy comparison
@@ -113,7 +113,7 @@ def test_remove_clashes(fast_optimizer, half_precision):
             < compute_body_intersection_loss(x, y, 8.0, 8.0).item()
         )
         x = torch.rand(100, 3).cuda().to(dtype)
-        y = x.detach() + torch.randn(1, 3, device='cuda', dtype=dtype)
+        y = x.detach() + torch.randn(1, 3, device="cuda", dtype=dtype)
 
         x_new = remove_clashes_optimizer(
             x, y, iterations=2000, min_loss=0.5, fast_optimizer=fast_optimizer, half_precision=half_precision

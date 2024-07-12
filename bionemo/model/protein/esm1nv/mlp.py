@@ -85,10 +85,10 @@ class ESMnvParallelMLP(ParallelMLP):
         bias_activation_fusion=True,
         openai_gelu=False,
         onnx_safe=False,
-        activation='gelu',
+        activation="gelu",
         bias=True,
-        transformer_block_type='pre_ln',
-        normalization='layernorm',
+        transformer_block_type="pre_ln",
+        normalization="layernorm",
         layernorm_epsilon=1e-5,
         persist_layer_norm=False,
         dropout=0.0,
@@ -113,15 +113,15 @@ class ESMnvParallelMLP(ParallelMLP):
         self.esm_layer = use_pt_mlp_out
 
         supported_activations = [
-            'gelu',
-            'geglu',
-            'reglu',
-            'swiglu',
-            'squared-relu',
-            'fast-geglu',
-            'fast-swiglu',
-            'fast-reglu',
-            'approx-gelu',
+            "gelu",
+            "geglu",
+            "reglu",
+            "swiglu",
+            "squared-relu",
+            "fast-geglu",
+            "fast-swiglu",
+            "fast-reglu",
+            "approx-gelu",
         ]
 
         if activation not in supported_activations:
@@ -129,7 +129,7 @@ class ESMnvParallelMLP(ParallelMLP):
                 f"Activation {activation} not supported. Supported activations are {supported_activations}"
             )
 
-        self.fast_glu_activation = activation in ['fast-geglu', 'fast-swiglu', 'fast-reglu']
+        self.fast_glu_activation = activation in ["fast-geglu", "fast-swiglu", "fast-reglu"]
 
         # Project to 4h.
         self.dense_h_to_4h = tensor_parallel.ColumnParallelLinear(
@@ -144,7 +144,7 @@ class ESMnvParallelMLP(ParallelMLP):
             bias=bias,
         )
 
-        if activation in ['geglu', 'reglu', 'swiglu']:
+        if activation in ["geglu", "reglu", "swiglu"]:
             # Separate linear layer for *GLU activations.
             # Source: https://github.com/huggingface/transformers/blob/bee361c6f1f7704f8c688895f2f86f6e5ff84727/src/transformers/models/t5/modeling_t5.py#L292
             self.dense_h_to_4h_2 = tensor_parallel.ColumnParallelLinear(
@@ -158,14 +158,14 @@ class ESMnvParallelMLP(ParallelMLP):
             )
 
         self.glu_activation_family = activation in [
-            'geglu',
-            'reglu',
-            'swiglu',
-            'fast-geglu',
-            'fast-reglu',
-            'fast-swiglu',
+            "geglu",
+            "reglu",
+            "swiglu",
+            "fast-geglu",
+            "fast-reglu",
+            "fast-swiglu",
         ]
-        bias_activation_fusion_unavailable = activation in ['reglu', 'swiglu']
+        bias_activation_fusion_unavailable = activation in ["reglu", "swiglu"]
 
         if bias_activation_fusion_unavailable and bias_activation_fusion:
             raise ValueError(
@@ -193,7 +193,7 @@ class ESMnvParallelMLP(ParallelMLP):
             self.activation_func = esm_gelu_func
         elif activation in ["gelu", "geglu", "fast-geglu"]:
             self.activation_func = F.gelu
-        elif activation == 'approx-gelu':
+        elif activation == "approx-gelu":
             self.activation_func = ApproxGELUActivation
         elif onnx_safe:
             self.activation_func = erf_gelu
@@ -202,7 +202,7 @@ class ESMnvParallelMLP(ParallelMLP):
         elif activation in ["swiglu", "fast-swiglu"]:
             # SiLU or sigmoid linear unit is the same as swish with beta = 1 (which is what https://arxiv.org/pdf/2002.05202.pdf uses.)
             self.activation_func = F.silu
-        elif activation == 'squared-relu':
+        elif activation == "squared-relu":
             self.activation_func = squared_relu
 
         # Project back to h.
@@ -223,15 +223,15 @@ class ESMnvParallelMLP(ParallelMLP):
             )
 
         # Normformer normalization
-        if transformer_block_type == 'normformer':
-            if normalization == 'layernorm':
+        if transformer_block_type == "normformer":
+            if normalization == "layernorm":
                 self.normalization = esm_get_layer_norm(
                     ffn_hidden_size // get_tensor_model_parallel_world_size(),
                     layernorm_epsilon,
                     persist_layer_norm,
                     use_pt_layernorm=use_pt_layernorm,
                 )
-            elif normalization == 'layernorm1p':
+            elif normalization == "layernorm1p":
                 self.normalization = LayerNorm1P(
                     ffn_hidden_size // get_tensor_model_parallel_world_size(),
                     layernorm_epsilon,
@@ -254,9 +254,9 @@ class ESMnvParallelMLP(ParallelMLP):
             intermediate_parallel_2, bias_parallel_2 = self.dense_h_to_4h_2(hidden_states)
 
         if self.bias_activation_fusion:
-            if self.activation == 'gelu':
+            if self.activation == "gelu":
                 intermediate_parallel = fused_bias_gelu(intermediate_parallel, bias_parallel)
-            elif self.activation in ['geglu', 'fast-geglu']:
+            elif self.activation in ["geglu", "fast-geglu"]:
                 intermediate_parallel = fused_bias_geglu(
                     intermediate_parallel, bias_parallel, intermediate_parallel_2, bias_parallel_2
                 )
@@ -283,7 +283,7 @@ class ESMnvParallelMLP(ParallelMLP):
             intermediate_parallel = infused_adapter(intermediate_parallel)
 
         # Normformer normalization
-        if self.transformer_block_type == 'normformer':
+        if self.transformer_block_type == "normformer":
             intermediate_parallel = self.normalization(intermediate_parallel)
 
         # [s, b, h] BIONEMO NEW, think about: output, output_bias = super().forward(hidden_states) and the inf statement

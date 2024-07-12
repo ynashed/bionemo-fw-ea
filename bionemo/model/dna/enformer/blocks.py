@@ -40,7 +40,7 @@ class TargetLengthCrop(nn.Module):
             return x
 
         if seq_len < target_len:
-            raise ValueError(f'sequence length {seq_len} is less than target length {target_len}')
+            raise ValueError(f"sequence length {seq_len} is less than target length {target_len}")
 
         trim = (target_len - seq_len) // 2
 

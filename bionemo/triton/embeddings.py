@@ -67,12 +67,12 @@ def nav_triton_embedding_infer_fn(model: M, runner: Package) -> EmbeddingInferFn
 
         tokens_enc, enc_mask = model.tokenize(seqs)
         inp: NavEmbeddingRequest = {
-            'tokens': tokens_enc.cpu().detach().numpy(),
-            'mask': enc_mask.cpu().detach().numpy(),
+            "tokens": tokens_enc.cpu().detach().numpy(),
+            "mask": enc_mask.cpu().detach().numpy(),
         }
 
         hidden_states = runner.infer(inp)
-        hidden_states = torch.tensor(hidden_states['embeddings'], device='cuda')
+        hidden_states = torch.tensor(hidden_states["embeddings"], device="cuda")
         enc_mask = postprocess(enc_mask)
 
         embedding = model.hiddens_to_embedding(hidden_states, enc_mask)

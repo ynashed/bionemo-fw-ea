@@ -2,10 +2,10 @@
 
 BioNeMo Framework provides versatile functionalities for developing, training and deploying large language models. BioNeMo allows users to build biomolecular models by providing access to pre-trained models, creating workflows to fit downstream task models from embeddings, and generating biomolecules that meet user-specified criteria based on the fit model. Built for supercomputing scale, the framework allows developers to easily configure and deploy distributed multi-node jobs with minimal code.
 
-This container contains implementation of the following models : 
+This container contains implementation of the following models :
 * EquiDock
 * DiffDock
-* ESM-2nv 
+* ESM-2nv
 * ESM-1nv
 * ProtT5
 * MegaMolBART

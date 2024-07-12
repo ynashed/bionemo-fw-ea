@@ -279,7 +279,7 @@ def run_impulse_sanity_check(
     sample_data: List[Tuple[str, str]],
     comparison_function: Callable[[torch.Tensor, torch.Tensor, float], Tuple[float, float]] = compare_outputs,
     model_hf_dtype: torch.dtype = None,
-    device: str = 'cpu',
+    device: str = "cpu",
 ) -> Tuple[float, float]:
     """
     Performs an impulse sanity check by comparing the output embeddings from two ESM2 models:
@@ -344,7 +344,7 @@ def run_parameter_gradient_sanity_check(
     sample_data: List[Tuple[str, str]],
     comparison_function: Callable[[torch.Tensor, torch.Tensor, float], Tuple[float, float]] = compare_outputs,
     model_hf_dtype: torch.dtype = None,
-    device: str = 'cpu',
+    device: str = "cpu",
 ) -> Tuple[float, float]:
     """
     Performs a gradient sanity check by comparing the gradients from two ESM2 models:
@@ -554,12 +554,12 @@ def convert_esm_hf_model_to_nemo(args):
 
     for layer_number in range(num_layers):
         # Layer norm before attention
-        checkpoint["state_dict"][
-            f"model.language_model.encoder.layers.{layer_number}.input_layernorm.weight"
-        ] = convert_to_float(hf_weights[f"esm.encoder.layer.{layer_number}.attention.LayerNorm.weight"])
-        checkpoint["state_dict"][
-            f"model.language_model.encoder.layers.{layer_number}.input_layernorm.bias"
-        ] = convert_to_float(hf_weights[f"esm.encoder.layer.{layer_number}.attention.LayerNorm.bias"])
+        checkpoint["state_dict"][f"model.language_model.encoder.layers.{layer_number}.input_layernorm.weight"] = (
+            convert_to_float(hf_weights[f"esm.encoder.layer.{layer_number}.attention.LayerNorm.weight"])
+        )
+        checkpoint["state_dict"][f"model.language_model.encoder.layers.{layer_number}.input_layernorm.bias"] = (
+            convert_to_float(hf_weights[f"esm.encoder.layer.{layer_number}.attention.LayerNorm.bias"])
+        )
 
         # Attention weights are stored in three vectors in hf, but one vector in NeMo
         k_weight = hf_weights[f"esm.encoder.layer.{layer_number}.attention.self.key.weight"]
@@ -596,12 +596,12 @@ def convert_esm_hf_model_to_nemo(args):
         ] = convert_to_float(concat_biases)
 
         # Attention dense layer
-        checkpoint["state_dict"][
-            f"model.language_model.encoder.layers.{layer_number}.self_attention.dense.weight"
-        ] = convert_to_float(hf_weights[f"esm.encoder.layer.{layer_number}.attention.output.dense.weight"])
-        checkpoint["state_dict"][
-            f"model.language_model.encoder.layers.{layer_number}.self_attention.dense.bias"
-        ] = convert_to_float(hf_weights[f"esm.encoder.layer.{layer_number}.attention.output.dense.bias"])
+        checkpoint["state_dict"][f"model.language_model.encoder.layers.{layer_number}.self_attention.dense.weight"] = (
+            convert_to_float(hf_weights[f"esm.encoder.layer.{layer_number}.attention.output.dense.weight"])
+        )
+        checkpoint["state_dict"][f"model.language_model.encoder.layers.{layer_number}.self_attention.dense.bias"] = (
+            convert_to_float(hf_weights[f"esm.encoder.layer.{layer_number}.attention.output.dense.bias"])
+        )
 
         # Layer norm after Attention
         checkpoint["state_dict"][
@@ -612,19 +612,19 @@ def convert_esm_hf_model_to_nemo(args):
         ] = convert_to_float(hf_weights[f"esm.encoder.layer.{layer_number}.LayerNorm.bias"])
 
         # MLP: Intermediate + ESMOuput
-        checkpoint["state_dict"][
-            f"model.language_model.encoder.layers.{layer_number}.mlp.dense_h_to_4h.weight"
-        ] = convert_to_float(hf_weights[f"esm.encoder.layer.{layer_number}.intermediate.dense.weight"])
-        checkpoint["state_dict"][
-            f"model.language_model.encoder.layers.{layer_number}.mlp.dense_h_to_4h.bias"
-        ] = convert_to_float(hf_weights[f"esm.encoder.layer.{layer_number}.intermediate.dense.bias"])
+        checkpoint["state_dict"][f"model.language_model.encoder.layers.{layer_number}.mlp.dense_h_to_4h.weight"] = (
+            convert_to_float(hf_weights[f"esm.encoder.layer.{layer_number}.intermediate.dense.weight"])
+        )
+        checkpoint["state_dict"][f"model.language_model.encoder.layers.{layer_number}.mlp.dense_h_to_4h.bias"] = (
+            convert_to_float(hf_weights[f"esm.encoder.layer.{layer_number}.intermediate.dense.bias"])
+        )
 
-        checkpoint["state_dict"][
-            f"model.language_model.encoder.layers.{layer_number}.mlp.dense_4h_to_h.weight"
-        ] = convert_to_float(hf_weights[f"esm.encoder.layer.{layer_number}.output.dense.weight"])
-        checkpoint["state_dict"][
-            f"model.language_model.encoder.layers.{layer_number}.mlp.dense_4h_to_h.bias"
-        ] = convert_to_float(hf_weights[f"esm.encoder.layer.{layer_number}.output.dense.bias"])
+        checkpoint["state_dict"][f"model.language_model.encoder.layers.{layer_number}.mlp.dense_4h_to_h.weight"] = (
+            convert_to_float(hf_weights[f"esm.encoder.layer.{layer_number}.output.dense.weight"])
+        )
+        checkpoint["state_dict"][f"model.language_model.encoder.layers.{layer_number}.mlp.dense_4h_to_h.bias"] = (
+            convert_to_float(hf_weights[f"esm.encoder.layer.{layer_number}.output.dense.bias"])
+        )
 
     # Inv freq tensor for ROPE class is the same for all layers,
     # but is only saved once in NeMo, we therefore choose the ones from layer 0
@@ -656,8 +656,8 @@ def convert_esm_hf_model_to_nemo(args):
     # checkpoint["state_dict"]["model.language_model.output_layer.weight"] = convert_to_float(new_matrix_weights)
 
     model_classes = {
-        'esm1': ESM1nvModel,
-        'esm2': ESM2nvModel,
+        "esm1": ESM1nvModel,
+        "esm2": ESM2nvModel,
     }
     model_cls = model_classes[args.model_class]
     checkpoint[model_cls.CHECKPOINT_HYPER_PARAMS_KEY] = nemo_config
@@ -675,7 +675,7 @@ def convert_esm_hf_model_to_nemo(args):
     nemo_model.save_to(args.output_nemo_model_file)
 
     logging.info(f"NeMo model saved to: {args.output_nemo_model_file}")
-    if 'hf_precision' in args:
+    if "hf_precision" in args:
         hf_dtype = dtype_from_precision(args.hf_precision)
     else:
         hf_dtype = dtype
@@ -683,7 +683,7 @@ def convert_esm_hf_model_to_nemo(args):
     if args.run_impulse_sanity_check:
         sample_data = load_sample_protein_sequence_data()
         max_absolute_difference, mean_relative_difference = run_impulse_sanity_check(
-            nemo_model.cuda(), model.cuda(), sample_data, compare_outputs, model_hf_dtype=hf_dtype, device='cuda'
+            nemo_model.cuda(), model.cuda(), sample_data, compare_outputs, model_hf_dtype=hf_dtype, device="cuda"
         )
         if max_absolute_difference > 3e-1:
             raise ValueError(

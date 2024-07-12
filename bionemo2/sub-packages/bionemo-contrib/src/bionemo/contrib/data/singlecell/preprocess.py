@@ -82,9 +82,9 @@ class GeneformerPreprocess:
         )
 
     def build_and_save_tokenizer(self, median_dict, gene_to_ens, vocab_output_name):
-        '''Builds the GeneTokenizer using the median dictionary
+        """Builds the GeneTokenizer using the median dictionary
         then serializes and saves the dictionary to disk.
-        '''
+        """
         tokenizer = GeneTokenizer.from_medians_and_genes_dicts(median_dict, gene_to_ens)
         tokenizer.save_vocab(vocab_output_name)
         return tokenizer
@@ -94,24 +94,24 @@ class GeneformerPreprocess:
         if vocab_exists:
             logging.warning(f"Tokenizer vocab file: {vocab_output_name} already exists. Overwriting...")
 
-    def preprocess(self) -> dict[Literal['tokenizer', 'median_dict'], Any]:
+    def preprocess(self) -> dict[Literal["tokenizer", "median_dict"], Any]:
         """Preprocesses for the Geneformer model"""
         gene_name_dict_fn, gene_median_dict_fn = GeneformerResourcePreprocessor(
             dest_directory=self.download_directory,
         ).prepare()
 
         # Load artifacts
-        with open(gene_name_dict_fn, 'rb') as fd:
+        with open(gene_name_dict_fn, "rb") as fd:
             gene_ens = pickle.load(fd)
 
-        with open(gene_median_dict_fn, 'rb') as fd:
+        with open(gene_median_dict_fn, "rb") as fd:
             median_dict = pickle.load(fd)
 
         # Save converted artifacts to JSON to prevent pickle issues.
         medians_dir = os.path.dirname(self.medians_file_path)
         if not os.path.exists(medians_dir):
             os.makedirs(medians_dir, exist_ok=True)  # ensure the dir exists but be ok with race conditions.
-        with open(self.medians_file_path, 'w') as fp:
+        with open(self.medians_file_path, "w") as fp:
             json.dump(median_dict, fp)
 
         if self.tokenizer_vocab_path is not None:
@@ -123,7 +123,7 @@ class GeneformerPreprocess:
         else:
             tokenizer = None
 
-        return {'tokenizer': tokenizer, 'median_dict': median_dict}
+        return {"tokenizer": tokenizer, "median_dict": median_dict}
 
 
-__all__ = ['GeneformerPreprocess']
+__all__ = ["GeneformerPreprocess"]

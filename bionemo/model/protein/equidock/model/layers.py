@@ -46,8 +46,8 @@ class Gaussian(nn.Module):
             self.offsets = nn.Parameter(offsets)
             self.etas = nn.Parameter(etas)
         else:
-            self.register_buffer('offsets', offsets)
-            self.register_buffer('etas', etas)
+            self.register_buffer("offsets", offsets)
+            self.register_buffer("etas", etas)
 
     def forward(self, x):
         x = x.norm(dim=-1, keepdim=True)
@@ -90,21 +90,21 @@ class IEGMN_Layer(NeuralModule):
         """
         super(IEGMN_Layer, self).__init__()
 
-        input_edge_feats_dim = args['input_edge_feats_dim']
-        dropout = args['dropout']
-        nonlin = args['nonlin']
-        self.cross_msgs = args['cross_msgs']
-        layer_norm = args['layer_norm']
-        layer_norm_coors = args['layer_norm_coors']
-        self.final_h_layer_norm = args['final_h_layer_norm']
-        self.use_dist_in_layers = args['use_dist_in_layers']
-        self.skip_weight_h = args['skip_weight_h']
-        self.x_connection_init = args['x_connection_init']
-        leakyrelu_neg_slope = args['leakyrelu_neg_slope']
+        input_edge_feats_dim = args["input_edge_feats_dim"]
+        dropout = args["dropout"]
+        nonlin = args["nonlin"]
+        self.cross_msgs = args["cross_msgs"]
+        layer_norm = args["layer_norm"]
+        layer_norm_coors = args["layer_norm_coors"]
+        self.final_h_layer_norm = args["final_h_layer_norm"]
+        self.use_dist_in_layers = args["use_dist_in_layers"]
+        self.skip_weight_h = args["skip_weight_h"]
+        self.x_connection_init = args["x_connection_init"]
+        leakyrelu_neg_slope = args["leakyrelu_neg_slope"]
 
         self.fine_tune = fine_tune
 
-        self.debug = args['debug']
+        self.debug = args["debug"]
 
         self.h_feats_dim = h_feats_dim
         self.out_feats_dim = out_feats_dim
@@ -179,7 +179,7 @@ class IEGMN_Layer(NeuralModule):
                 torch.nn.init.zeros_(p)
 
     def apply_edges1(self, edges):
-        return {'cat_feat': torch.cat([edges.src['feat'], edges.dst['feat']], dim=1)}
+        return {"cat_feat": torch.cat([edges.src["feat"], edges.dst["feat"]], dim=1)}
 
     def forward(
         self,
@@ -197,31 +197,31 @@ class IEGMN_Layer(NeuralModule):
     ):
         device = hetero_graph.device
         with hetero_graph.local_scope():
-            hetero_graph.nodes['ligand'].data['x_now'] = coors_ligand
-            hetero_graph.nodes['receptor'].data['x_now'] = coors_receptor
+            hetero_graph.nodes["ligand"].data["x_now"] = coors_ligand
+            hetero_graph.nodes["receptor"].data["x_now"] = coors_receptor
             # first time set here
-            hetero_graph.nodes['ligand'].data['feat'] = h_feats_ligand
-            hetero_graph.nodes['receptor'].data['feat'] = h_feats_receptor
+            hetero_graph.nodes["ligand"].data["feat"] = h_feats_ligand
+            hetero_graph.nodes["receptor"].data["feat"] = h_feats_receptor
 
             if self.debug:
-                logging.info(torch.max(hetero_graph.nodes['ligand'].data['x_now']), 'x_now : x_i at layer entrance')
+                logging.info(torch.max(hetero_graph.nodes["ligand"].data["x_now"]), "x_now : x_i at layer entrance")
                 logging.info(
-                    torch.max(hetero_graph.nodes['ligand'].data['feat']), 'data[feat] = h_i at layer entrance'
+                    torch.max(hetero_graph.nodes["ligand"].data["feat"]), "data[feat] = h_i at layer entrance"
                 )
 
             hetero_graph.apply_edges(
-                fn.u_sub_v('x_now', 'x_now', 'x_rel'), etype=('ligand', 'll', 'ligand')
+                fn.u_sub_v("x_now", "x_now", "x_rel"), etype=("ligand", "ll", "ligand")
             )  # x_i - x_j
-            hetero_graph.apply_edges(fn.u_sub_v('x_now', 'x_now', 'x_rel'), etype=('receptor', 'rr', 'receptor'))
+            hetero_graph.apply_edges(fn.u_sub_v("x_now", "x_now", "x_rel"), etype=("receptor", "rr", "receptor"))
 
-            x_rel_mag_ligand = hetero_graph.edges[('ligand', 'll', 'ligand')].data['x_rel'] ** 2
+            x_rel_mag_ligand = hetero_graph.edges[("ligand", "ll", "ligand")].data["x_rel"] ** 2
             # ||x_i - x_j||^2 : (N_res, 1)
             x_rel_mag_ligand = torch.sum(x_rel_mag_ligand, dim=1, keepdim=True)
             x_rel_mag_ligand = torch.cat(
                 [torch.exp(-x_rel_mag_ligand / sigma) for sigma in self.all_sigmas_dist], dim=-1
             )
 
-            x_rel_mag_receptor = hetero_graph.edges[('receptor', 'rr', 'receptor')].data['x_rel'] ** 2
+            x_rel_mag_receptor = hetero_graph.edges[("receptor", "rr", "receptor")].data["x_rel"] ** 2
             x_rel_mag_receptor = torch.sum(x_rel_mag_receptor, dim=1, keepdim=True)
             x_rel_mag_receptor = torch.cat(
                 [torch.exp(-x_rel_mag_receptor / sigma) for sigma in self.all_sigmas_dist], dim=-1
@@ -233,37 +233,37 @@ class IEGMN_Layer(NeuralModule):
 
             if self.debug:
                 logging.info(
-                    torch.max(hetero_graph.edges[('ligand', 'll', 'ligand')].data['x_rel']), 'x_rel : x_i - x_j'
+                    torch.max(hetero_graph.edges[("ligand", "ll", "ligand")].data["x_rel"]), "x_rel : x_i - x_j"
                 )
                 logging.info(
                     torch.max(x_rel_mag_ligand, dim=0).values,
-                    'x_rel_mag_ligand = [exp(-||x_i - x_j||^2 / sigma) for sigma = 1.5 ** x, x = [0, 15]]',
+                    "x_rel_mag_ligand = [exp(-||x_i - x_j||^2 / sigma) for sigma = 1.5 ** x, x = [0, 15]]",
                 )
 
-            hetero_graph.apply_edges(self.apply_edges1, etype=('ligand', 'll', 'ligand'))  # i->j edge:  [h_i h_j]
-            hetero_graph.apply_edges(self.apply_edges1, etype=('receptor', 'rr', 'receptor'))
+            hetero_graph.apply_edges(self.apply_edges1, etype=("ligand", "ll", "ligand"))  # i->j edge:  [h_i h_j]
+            hetero_graph.apply_edges(self.apply_edges1, etype=("receptor", "rr", "receptor"))
 
             cat_input_for_msg_ligand = torch.cat(
-                (hetero_graph.edges['ll'].data['cat_feat'], original_edge_feats_ligand, x_rel_mag_ligand),  # [h_i h_j]
+                (hetero_graph.edges["ll"].data["cat_feat"], original_edge_feats_ligand, x_rel_mag_ligand),  # [h_i h_j]
                 dim=-1,
             )
             cat_input_for_msg_receptor = torch.cat(
-                (hetero_graph.edges['rr'].data['cat_feat'], original_edge_feats_receptor, x_rel_mag_receptor), dim=-1
+                (hetero_graph.edges["rr"].data["cat_feat"], original_edge_feats_receptor, x_rel_mag_receptor), dim=-1
             )
 
-            hetero_graph.edges['ll'].data['msg'] = self.edge_mlp(cat_input_for_msg_ligand)  # m_{i->j}
-            hetero_graph.edges['rr'].data['msg'] = self.edge_mlp(cat_input_for_msg_receptor)
+            hetero_graph.edges["ll"].data["msg"] = self.edge_mlp(cat_input_for_msg_ligand)  # m_{i->j}
+            hetero_graph.edges["rr"].data["msg"] = self.edge_mlp(cat_input_for_msg_receptor)
 
             if self.debug:
                 logging.info(
-                    torch.max(hetero_graph.edges['ll'].data['msg']),
-                    'data[msg] = m_{i->j} = phi^e(h_i, h_j, f_{i,j}, x_rel_mag_ligand)',
+                    torch.max(hetero_graph.edges["ll"].data["msg"]),
+                    "data[msg] = m_{i->j} = phi^e(h_i, h_j, f_{i,j}, x_rel_mag_ligand)",
                 )
 
-            mask = get_mask(hetero_graph.batch_num_nodes('ligand'), hetero_graph.batch_num_nodes('receptor'), device)
+            mask = get_mask(hetero_graph.batch_num_nodes("ligand"), hetero_graph.batch_num_nodes("receptor"), device)
 
             # \mu_i
-            hetero_graph.nodes['ligand'].data['aggr_cross_msg'] = compute_cross_attention(
+            hetero_graph.nodes["ligand"].data["aggr_cross_msg"] = compute_cross_attention(
                 self.att_mlp_Q(h_feats_ligand),
                 self.att_mlp_K(h_feats_receptor),
                 self.att_mlp_V(h_feats_receptor),
@@ -271,7 +271,7 @@ class IEGMN_Layer(NeuralModule):
                 self.cross_msgs,
             )
 
-            hetero_graph.nodes['receptor'].data['aggr_cross_msg'] = compute_cross_attention(
+            hetero_graph.nodes["receptor"].data["aggr_cross_msg"] = compute_cross_attention(
                 self.att_mlp_Q(h_feats_receptor),
                 self.att_mlp_K(h_feats_ligand),
                 self.att_mlp_V(h_feats_ligand),
@@ -281,66 +281,66 @@ class IEGMN_Layer(NeuralModule):
 
             if self.debug:
                 logging.info(
-                    torch.max(hetero_graph.nodes['ligand'].data['aggr_cross_msg']),
-                    'aggr_cross_msg(i) = sum_j a_{i,j} * h_j',
+                    torch.max(hetero_graph.nodes["ligand"].data["aggr_cross_msg"]),
+                    "aggr_cross_msg(i) = sum_j a_{i,j} * h_j",
                 )
 
-            edge_coef_ligand = self.coors_mlp(hetero_graph.edges['ll'].data['msg'])  # \phi^x(m_{i->j})
+            edge_coef_ligand = self.coors_mlp(hetero_graph.edges["ll"].data["msg"])  # \phi^x(m_{i->j})
             # (x_i - x_j) * \phi^x(m_{i->j})
-            hetero_graph.edges['ll'].data['x_moment'] = hetero_graph.edges['ll'].data['x_rel'] * edge_coef_ligand
-            edge_coef_receptor = self.coors_mlp(hetero_graph.edges['rr'].data['msg'])
-            hetero_graph.edges['rr'].data['x_moment'] = hetero_graph.edges['rr'].data['x_rel'] * edge_coef_receptor
+            hetero_graph.edges["ll"].data["x_moment"] = hetero_graph.edges["ll"].data["x_rel"] * edge_coef_ligand
+            edge_coef_receptor = self.coors_mlp(hetero_graph.edges["rr"].data["msg"])
+            hetero_graph.edges["rr"].data["x_moment"] = hetero_graph.edges["rr"].data["x_rel"] * edge_coef_receptor
 
             if self.debug:
-                logging.info(torch.max(edge_coef_ligand), r'edge_coef_ligand : \phi^x(m_{i->j})')
+                logging.info(torch.max(edge_coef_ligand), r"edge_coef_ligand : \phi^x(m_{i->j})")
                 logging.info(
-                    torch.max(hetero_graph.edges['ll'].data['x_moment']),
-                    r'data[x_moment] = (x_i - x_j) * \phi^x(m_{i->j})',
+                    torch.max(hetero_graph.edges["ll"].data["x_moment"]),
+                    r"data[x_moment] = (x_i - x_j) * \phi^x(m_{i->j})",
                 )
 
             hetero_graph.update_all(
-                fn.copy_e('x_moment', 'm'), fn.mean('m', 'x_update'), etype=('ligand', 'll', 'ligand')
+                fn.copy_e("x_moment", "m"), fn.mean("m", "x_update"), etype=("ligand", "ll", "ligand")
             )
 
             hetero_graph.update_all(
-                fn.copy_e('x_moment', 'm'), fn.mean('m', 'x_update'), etype=('receptor', 'rr', 'receptor')
+                fn.copy_e("x_moment", "m"), fn.mean("m", "x_update"), etype=("receptor", "rr", "receptor")
             )
 
-            hetero_graph.update_all(fn.copy_e('msg', 'm'), fn.mean('m', 'aggr_msg'), etype=('ligand', 'll', 'ligand'))
+            hetero_graph.update_all(fn.copy_e("msg", "m"), fn.mean("m", "aggr_msg"), etype=("ligand", "ll", "ligand"))
 
             hetero_graph.update_all(
-                fn.copy_e('msg', 'm'), fn.mean('m', 'aggr_msg'), etype=('receptor', 'rr', 'receptor')
+                fn.copy_e("msg", "m"), fn.mean("m", "aggr_msg"), etype=("receptor", "rr", "receptor")
             )
 
             x_final_ligand = (
                 self.x_connection_init * orig_coors_ligand
-                + (1.0 - self.x_connection_init) * hetero_graph.nodes['ligand'].data['x_now']
-                + hetero_graph.nodes['ligand'].data['x_update']
+                + (1.0 - self.x_connection_init) * hetero_graph.nodes["ligand"].data["x_now"]
+                + hetero_graph.nodes["ligand"].data["x_update"]
             )
 
             x_final_receptor = (
                 self.x_connection_init * orig_coors_receptor
-                + (1.0 - self.x_connection_init) * hetero_graph.nodes['receptor'].data['x_now']
-                + hetero_graph.nodes['receptor'].data['x_update']
+                + (1.0 - self.x_connection_init) * hetero_graph.nodes["receptor"].data["x_now"]
+                + hetero_graph.nodes["receptor"].data["x_update"]
             )
 
             if self.fine_tune:
                 x_final_ligand = x_final_ligand + self.att_mlp_cross_coors_V(h_feats_ligand) * (
-                    hetero_graph.nodes['ligand'].data['x_now']
+                    hetero_graph.nodes["ligand"].data["x_now"]
                     - compute_cross_attention(
                         self.att_mlp_cross_coors_Q(h_feats_ligand),
                         self.att_mlp_cross_coors_K(h_feats_receptor),
-                        hetero_graph.nodes['receptor'].data['x_now'],
+                        hetero_graph.nodes["receptor"].data["x_now"],
                         mask,
                         self.cross_msgs,
                     )
                 )
                 x_final_receptor = x_final_receptor + self.att_mlp_cross_coors_V(h_feats_receptor) * (
-                    hetero_graph.nodes['receptor'].data['x_now']
+                    hetero_graph.nodes["receptor"].data["x_now"]
                     - compute_cross_attention(
                         self.att_mlp_cross_coors_Q(h_feats_receptor),
                         self.att_mlp_cross_coors_K(h_feats_ligand),
-                        hetero_graph.nodes['ligand'].data['x_now'],
+                        hetero_graph.nodes["ligand"].data["x_now"],
                         mask.transpose(0, 1),
                         self.cross_msgs,
                     )
@@ -348,19 +348,19 @@ class IEGMN_Layer(NeuralModule):
 
             if self.debug:
                 logging.info(
-                    torch.max(hetero_graph.nodes['ligand'].data['aggr_msg']), r'data[aggr_msg]: \sum_j m_{i->j} '
+                    torch.max(hetero_graph.nodes["ligand"].data["aggr_msg"]), r"data[aggr_msg]: \sum_j m_{i->j} "
                 )
                 logging.info(
-                    torch.max(hetero_graph.nodes['ligand'].data['x_update']),
-                    r'data[x_update] : \sum_j (x_i - x_j) * \phi^x(m_{i->j})',
+                    torch.max(hetero_graph.nodes["ligand"].data["x_update"]),
+                    r"data[x_update] : \sum_j (x_i - x_j) * \phi^x(m_{i->j})",
                 )
-                logging.info(torch.max(x_final_ligand), 'x_i new = x_final_ligand : x_i + data[x_update]')
+                logging.info(torch.max(x_final_ligand), "x_i new = x_final_ligand : x_i + data[x_update]")
 
             input_node_upd_ligand = torch.cat(
                 (
-                    self.node_norm(hetero_graph.nodes['ligand'].data['feat']),
-                    hetero_graph.nodes['ligand'].data['aggr_msg'],
-                    hetero_graph.nodes['ligand'].data['aggr_cross_msg'],
+                    self.node_norm(hetero_graph.nodes["ligand"].data["feat"]),
+                    hetero_graph.nodes["ligand"].data["aggr_msg"],
+                    hetero_graph.nodes["ligand"].data["aggr_cross_msg"],
                     original_ligand_node_features,
                 ),
                 dim=-1,
@@ -368,9 +368,9 @@ class IEGMN_Layer(NeuralModule):
 
             input_node_upd_receptor = torch.cat(
                 (
-                    self.node_norm(hetero_graph.nodes['receptor'].data['feat']),
-                    hetero_graph.nodes['receptor'].data['aggr_msg'],
-                    hetero_graph.nodes['receptor'].data['aggr_cross_msg'],
+                    self.node_norm(hetero_graph.nodes["receptor"].data["feat"]),
+                    hetero_graph.nodes["receptor"].data["aggr_msg"],
+                    hetero_graph.nodes["receptor"].data["aggr_cross_msg"],
                     original_receptor_node_features,
                 ),
                 dim=-1,
@@ -391,17 +391,17 @@ class IEGMN_Layer(NeuralModule):
                 node_upd_receptor = self.node_mlp(input_node_upd_receptor)
 
             if self.debug:
-                logging.info('node_mlp params')
+                logging.info("node_mlp params")
                 for p in self.node_mlp.parameters():
                     print(p)
-                logging.info(torch.max(input_node_upd_ligand), 'concat(h_i, aggr_msg, aggr_cross_msg)')
-                logging.info(torch.max(node_upd_ligand), 'h_i new = h_i + MLP(h_i, aggr_msg, aggr_cross_msg)')
+                logging.info(torch.max(input_node_upd_ligand), "concat(h_i, aggr_msg, aggr_cross_msg)")
+                logging.info(torch.max(node_upd_ligand), "h_i new = h_i + MLP(h_i, aggr_msg, aggr_cross_msg)")
 
             node_upd_ligand = apply_final_h_layer_norm(
-                hetero_graph, node_upd_ligand, 'ligand', self.final_h_layer_norm, self.final_h_layernorm_layer
+                hetero_graph, node_upd_ligand, "ligand", self.final_h_layer_norm, self.final_h_layernorm_layer
             )
             node_upd_receptor = apply_final_h_layer_norm(
-                hetero_graph, node_upd_receptor, 'receptor', self.final_h_layer_norm, self.final_h_layernorm_layer
+                hetero_graph, node_upd_receptor, "receptor", self.final_h_layer_norm, self.final_h_layernorm_layer
             )
 
             return x_final_ligand, node_upd_ligand, x_final_receptor, node_upd_receptor

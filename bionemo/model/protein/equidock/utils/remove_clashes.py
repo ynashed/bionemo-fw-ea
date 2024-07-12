@@ -44,8 +44,8 @@ def remove_clashes_optimizer(
 
     dtype = torch.half if half_precision else torch.float
 
-    euler_angles_finetune = torch.nn.Parameter(torch.zeros(3, device='cuda', dtype=dtype))
-    translation_finetune = torch.nn.Parameter(torch.zeros(3, device='cuda', dtype=dtype))
+    euler_angles_finetune = torch.nn.Parameter(torch.zeros(3, device="cuda", dtype=dtype))
+    translation_finetune = torch.nn.Parameter(torch.zeros(3, device="cuda", dtype=dtype))
 
     optimizer = torch.optim.SGD([euler_angles_finetune, translation_finetune], lr=lr)
 
@@ -66,14 +66,14 @@ def remove_clashes_optimizer(
 
             if non_int_loss.item() < min_loss + 1.5:
                 for param_group in optimizer.param_groups:
-                    param_group['lr'] = lr / 10
+                    param_group["lr"] = lr / 10
 
             if iter > 1500:
                 for param_group in optimizer.param_groups:
-                    param_group['lr'] = lr * 10
+                    param_group["lr"] = lr * 10
             else:
                 for param_group in optimizer.param_groups:
-                    param_group['lr'] = lr
+                    param_group["lr"] = lr
 
     else:
         s = torch.cuda.Stream()
@@ -110,14 +110,14 @@ def remove_clashes_optimizer(
 
             if non_int_loss.item() < min_loss + 1.5:
                 for param_group in optimizer.param_groups:
-                    param_group['lr'] = lr / 10
+                    param_group["lr"] = lr / 10
 
             if iter > 1500:
                 for param_group in optimizer.param_groups:
-                    param_group['lr'] = lr * 10
+                    param_group["lr"] = lr * 10
             else:
                 for param_group in optimizer.param_groups:
-                    param_group['lr'] = lr
+                    param_group["lr"] = lr
     return ligand_th
 
 
@@ -147,8 +147,8 @@ def remove_clashes(
     """
 
     dtype = torch.half if half_precision else torch.float
-    gt_receptor_nodes_coors = get_coords(receptor_file_name, True).to(device='cuda', dtype=dtype)
-    initial_pos = torch.from_numpy(unbound_ligand_new_pos).to(device='cuda', dtype=dtype)
+    gt_receptor_nodes_coors = get_coords(receptor_file_name, True).to(device="cuda", dtype=dtype)
+    initial_pos = torch.from_numpy(unbound_ligand_new_pos).to(device="cuda", dtype=dtype)
     ligand_th = remove_clashes_optimizer(
         initial_pos, gt_receptor_nodes_coors, iterations, min_loss, lr, fast_optimizer, half_precision
     )

@@ -32,9 +32,9 @@ os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:512"
 e3nn.set_optimization_defaults(optimize_einsums=True)
 
 inputs = [
-    ('diffdock_score_training_test', False),
-    ('diffdock_score_training_test', True),
-    ('diffdock_confidence_training_test', None),
+    ("diffdock_score_training_test", False),
+    ("diffdock_score_training_test", True),
+    ("diffdock_confidence_training_test", None),
 ]
 
 

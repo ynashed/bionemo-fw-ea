@@ -5,7 +5,7 @@ However, they provide the same externally accessible  named tensor API as Triton
 getting up-to-speed with Triton serving and development.
 
 For this purpose you will use [PyTriton](https://github.com/triton-inference-server/pytriton) -- a Flask/FastAPI-like
-interface that simplifies Triton's deployment in Python environments. The library allows serving Machine Learning 
+interface that simplifies Triton's deployment in Python environments. The library allows serving Machine Learning
 models directly from Python through NVIDIA's [Triton Inference Server](https://github.com/triton-inference-server).
 
 
@@ -26,7 +26,7 @@ download this data first _onto your host machine_. You should then always mount 
 
 
 # Supported Models
-All base encoder-decoder bionemo models are supported. All Triton and Model Navigator-using scripts use the 
+All base encoder-decoder bionemo models are supported. All Triton and Model Navigator-using scripts use the
 `--config-path` CLI argument to specify a local directory path containing the saved model configuration.
 
 Examples of supported models are below. Use the `C` env var for compatibility with documented example commands:
@@ -40,14 +40,14 @@ Examples of supported models are below. Use the `C` env var for compatibility wi
 
 # Starting the Dev Model Servers
 The `bionemo.triton` package provides scripts to use Triton to serve every base encoding-decoding bionemo model.
-Triton provides HTTP and gRPC based APIs for each model and serving component. 
+Triton provides HTTP and gRPC based APIs for each model and serving component.
 
 ```bash
 python -m bionemo.triton.{embedding,hidden,sampling}_server --config-path /path/to/dir/with/inference/conf
 ```
 
-Under the hood, the scripts use `hydra` and load model configuration from `infer.yaml` present in the specified 
-config directory, so you can provide custom configuration by specifying a different yaml or overriding particular 
+Under the hood, the scripts use `hydra` and load model configuration from `infer.yaml` present in the specified
+config directory, so you can provide custom configuration by specifying a different yaml or overriding particular
 arguments.
 
 ## Embedding Server
@@ -119,7 +119,7 @@ python bionemo/triton/client_decode.py --input hiddens.json
 
 
 
-# Nav: Optimized Model Runtimes 
+# Nav: Optimized Model Runtimes
 The embeddings, sampling, and hidden state servers uses runtimes optimized by [model navigator](https://github.com/triton-inference-server/model_navigator) package for inference.
 You need to prepare the model before starting the embeddings server. You need to perform this step only once.
 
@@ -127,7 +127,7 @@ NOTE: To use this optimized artifact in `bionemo.triton.inference_wrapper`, you 
 
 Run the conversion with:
 ```bash
-python -m bionemo.triton.nav_embeddings_export --config-path "${CONFIG_PATH}" 
+python -m bionemo.triton.nav_embeddings_export --config-path "${CONFIG_PATH}"
 ```
 
 You can run the conversion for MegaMolBART:

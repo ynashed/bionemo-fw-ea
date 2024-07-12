@@ -103,14 +103,14 @@ variables:
     description: "A flag that specifies the model for which the JET pipeline should run. Defaults to all models."
   WANDB_PROJECT_SUFFIX:
     value: ""
-    description: "A variable that overrides the default suffix in the wandb project name during the jet-configure stage, 
-    used for logging training curves in convergence tests. When not set, the suffix is set to the branch name. 
-    The wandb project name is constructed as ${WANDB_PROJECT_NAME_BASE}--${WANDB_PROJECT_SUFFIX} and 
-    must comply with the regex pattern [a-zA-Z0-9-] to ensure valid naming conventions. 
+    description: "A variable that overrides the default suffix in the wandb project name during the jet-configure stage,
+    used for logging training curves in convergence tests. When not set, the suffix is set to the branch name.
+    The wandb project name is constructed as ${WANDB_PROJECT_NAME_BASE}--${WANDB_PROJECT_SUFFIX} and
+    must comply with the regex pattern [a-zA-Z0-9-] to ensure valid naming conventions.
     For more information, refer to internal/jet/README.md or the jet-configure stage implementation."
   WANDB_RUN_SUFFIX:
      value: ""
-     description: "A variable that prepends suffix in the wandb run name during the jet-configure stage, used for logging training curves in convergence tests. 
+     description: "A variable that prepends suffix in the wandb run name during the jet-configure stage, used for logging training curves in convergence tests.
      By default, the wandb run name is set to ${CI_PIPELINE_CREATED_AT}_${CI_COMMIT_SHORT_SHA}_${CI_PIPELINE_ID}. For further details, please refer to the WANDB_PROJECT_SUFFIX description"
   QA_DOCKER_DEPLOY:
     value: "false"
@@ -443,7 +443,7 @@ build-docs:
         - docs_build
       expire_in: 1 week
 
-.common_pytest_no_gpu_before_script: &common_before_script
+.common_pytest_no_gpu_before_script: &common_no_gpu_before_script
   before_script:
     - df -Thl
     - pwd
@@ -1047,4 +1047,3 @@ dev-deploy:
         docker tag "${IMAGE_NAME}${SUFFIX_DEV}" "${NGC_REPO_NAME}:${TAG_BRANCH_DATE_SHORT_COMMIT}${SUFFIX_DEV}"
         docker push "${NGC_REPO_NAME}:${TAG_BRANCH_DATE_SHORT_COMMIT}${SUFFIX_DEV}"
       fi
-

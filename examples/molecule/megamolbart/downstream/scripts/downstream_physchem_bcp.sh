@@ -10,16 +10,16 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
-# Below is a sample set of parameters for launching MegaMolBart finetuning for a physchem property predition 
+# Below is a sample set of parameters for launching MegaMolBart finetuning for a physchem property predition
 # downstream task with BioNeMo on BCP clusters
 # Replace all ?? with appropriate values prior to launching a job
 # Any parameters not specified in this script can be changed in the yaml config file
-# located in examples/molecule/megamolbart/conf/finetune_config.yaml 
+# located in examples/molecule/megamolbart/conf/finetune_config.yaml
 
 LOCAL_ENV=.env
 # container must contain pretrained model checkpoints
 CONTAINER_IMAGE=??
- 
+
 
 # NGC specific parameters
 TIME_LIMIT="2h"
@@ -31,7 +31,7 @@ INSTANCE="dgx1v.32g.2.norm"
 ORG=nvidian
 TEAM=clara-lifesciences
 LABEL=ml__bionemo
-WL_LABEL=wl___other___bionemo 
+WL_LABEL=wl___other___bionemo
 JOB_NAME=ml-model.bionemo-fw-megamolbart-finetune
 WORKSPACE=?? # Your NGC workspace ID goes here
 
@@ -91,4 +91,3 @@ echo "ngc batch run --name "${JOB_NAME}" --priority NORMAL \
       --image "${CONTAINER_IMAGE}" --org ${ORG} --team ${TEAM} \
       --workspace ${WORKSPACE}:/result --datasetid ${DATASET_ID}:${DATA_MOUNT} \
       --label ${LABEL} --label ${WL_LABEL}" | bash
-

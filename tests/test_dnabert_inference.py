@@ -42,7 +42,7 @@ def dna() -> List[str]:
     import random
 
     random.seed(1337)
-    dnas_for_test = [''.join([random.choice(['A', 'C', 'G', 'T']) for _ in range(512)]) for _ in range(5)]
+    dnas_for_test = ["".join([random.choice(["A", "C", "G", "T"]) for _ in range(512)]) for _ in range(5)]
     return deepcopy(dnas_for_test)
 
 
@@ -93,7 +93,7 @@ def dnabert_expected_vals(bionemo_home: Path) -> Path:
 def dnabert_inferer(bionemo_home: Path) -> Generator[DNABERTInference, None, None]:
     model_name = "dnabert"
     cfg_path = get_config_dir(bionemo_home, model_name)
-    cfg = load_model_config(config_name='infer', config_path=cfg_path)
+    cfg = load_model_config(config_name="infer", config_path=cfg_path)
     with Deterministic(), distributed_model_parallel_state():
         inferer = DNABERTInference(cfg=cfg, inference_batch_size_for_warmup=1)
         yield inferer  # Yield so cleanup happens after the test

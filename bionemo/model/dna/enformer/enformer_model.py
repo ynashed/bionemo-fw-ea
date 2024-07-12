@@ -137,9 +137,9 @@ class Enformer(ModelPT):
         # final pointwise
 
         self.final_pointwise = nn.Sequential(
-            Rearrange('b n d -> b d n'),
+            Rearrange("b n d -> b d n"),
             ConvBlock(filter_list[-1], twice_dim, 1),
-            Rearrange('b d n -> b n d'),
+            Rearrange("b d n -> b n d"),
             nn.Dropout(cfg.dropout_rate / 8),
             GELU(),
         )
@@ -147,10 +147,10 @@ class Enformer(ModelPT):
         # create trunk sequential module
 
         self._trunk = nn.Sequential(
-            Rearrange('b n d -> b d n'),
+            Rearrange("b n d -> b d n"),
             self.stem,
             self.conv_tower,
-            Rearrange('b d n -> b n d'),
+            Rearrange("b d n -> b n d"),
             self.transformer,
             self.crop_final,
             self.final_pointwise,
@@ -192,10 +192,10 @@ class Enformer(ModelPT):
         return self._heads
 
     def trunk_checkpointed(self, x):
-        x = rearrange(x, 'b n d -> b d n')
+        x = rearrange(x, "b n d -> b d n")
         x = self.stem(x)
         x = self.conv_tower(x)
-        x = rearrange(x, 'b d n -> b n d')
+        x = rearrange(x, "b d n -> b n d")
         x = checkpoint_sequential(self.transformer, len(self.transformer), x)
         x = self.crop_final(x)
         x = self.final_pointwise(x)
@@ -236,13 +236,13 @@ class Enformer(ModelPT):
         no_batch = x.ndim == 2
 
         if no_batch:
-            x = rearrange(x, '... -> () ...')
+            x = rearrange(x, "... -> () ...")
 
         trunk_fn = self.trunk_checkpointed if self.use_checkpointing else self._trunk
         x = trunk_fn(x)
 
         if no_batch:
-            x = rearrange(x, '() ... -> ...')
+            x = rearrange(x, "() ... -> ...")
 
         if return_only_embeddings:
             return x
@@ -250,11 +250,11 @@ class Enformer(ModelPT):
         out = map_values(lambda fn: fn(x), self._heads)
 
         if exists(head):
-            assert head in self._heads, f'head {head} not found'
+            assert head in self._heads, f"head {head} not found"
             out = out[head]
 
         if exists(target):
-            assert exists(head), 'head must be passed in if one were to calculate loss directly with targets'
+            assert exists(head), "head must be passed in if one were to calculate loss directly with targets"
 
             if return_corr_coef:
                 return pearson_corr_coef(out, target)
@@ -268,18 +268,18 @@ class Enformer(ModelPT):
 
     def setup_training_data(self, train_data_cfg: Union[omegaconf.DictConfig, Dict]):
         organisms = self.cfg.metrics.organisms.keys()
-        if ('human' in organisms) and ('mouse' in organisms):
+        if ("human" in organisms) and ("mouse" in organisms):
             train_ds = WebCombinedBasenji(
                 dataset_path=train_data_cfg.dataset_path,
                 batch_size=train_data_cfg.batch_size,
                 context_length=self.cfg.context_length,
             )
         else:
-            assert 'human' in organisms
+            assert "human" in organisms
             train_ds = WebBasenji(
                 dataset_path=train_data_cfg.dataset_path,
-                subset='train',
-                organism='human',
+                subset="train",
+                organism="human",
                 batch_size=train_data_cfg.batch_size,
                 context_length=self.cfg.context_length,
                 repeat=True,
@@ -287,17 +287,17 @@ class Enformer(ModelPT):
         self._train_dl = wds.WebLoader(train_ds, num_workers=1, batch_size=None)
 
     def training_step(self, batch, batch_idx, dataset_idx=None):
-        head = batch['head_name']
-        preds = self(x=batch['sequence'], head=head)
-        return poisson_loss(pred=preds, target=batch['target'])
+        head = batch["head_name"]
+        preds = self(x=batch["sequence"], head=head)
+        return poisson_loss(pred=preds, target=batch["target"])
 
     def _single_infer_dataloader(self, cfg: Union[omegaconf.DictConfig, Dict], split: str):
         def dl_organism(organism: str):
             organism_ds = WebBasenji(
-                dataset_path=cfg['dataset_path'],
+                dataset_path=cfg["dataset_path"],
                 subset=split,
                 organism=organism,
-                batch_size=cfg['batch_size'],
+                batch_size=cfg["batch_size"],
                 context_length=self.cfg.context_length,
             )
             return wds.WebLoader(organism_ds, num_workers=1, batch_size=None)
@@ -312,24 +312,24 @@ class Enformer(ModelPT):
         return dls, names
 
     def setup_validation_data(self, val_data_cfg: Union[omegaconf.DictConfig, Dict]):
-        self._validation_dl, self._validation_names = self._single_infer_dataloader(cfg=val_data_cfg, split='valid')
+        self._validation_dl, self._validation_names = self._single_infer_dataloader(cfg=val_data_cfg, split="valid")
 
     def setup_test_data(self, test_data_config: Union[omegaconf.DictConfig, Dict]):
-        self._test_dl, self._test_names = self._single_infer_dataloader(cfg=test_data_config, split='test')
+        self._test_dl, self._test_names = self._single_infer_dataloader(cfg=test_data_config, split="test")
 
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
         if batch is None:
             return
-        head = batch['head_name']
-        preds = self(x=batch['sequence'], head=head)
+        head = batch["head_name"]
+        preds = self(x=batch["sequence"], head=head)
         metric = getattr(self, f"rpearson_{head}")
-        metric.update(preds=preds, target=batch['target'])
+        metric.update(preds=preds, target=batch["target"])
 
     def on_validation_epoch_end(self):
         for organism in self.cfg.metrics.organisms.keys():
-            metric = getattr(self, f'rpearson_{organism}')
+            metric = getattr(self, f"rpearson_{organism}")
             self.log(
-                f'rpearson_{organism}',
+                f"rpearson_{organism}",
                 metric.compute().mean(),
                 sync_dist=False,
                 on_step=False,
@@ -346,12 +346,12 @@ class Enformer(ModelPT):
         self.on_validation_epoch_end()
 
     def predict_step(self, batch, batch_idx, dataloader_idx=0):
-        return {'name': batch['name'], 'pred': self(x=batch['seq'], head='human')}
+        return {"name": batch["name"], "pred": self(x=batch["seq"], head="human")}
 
     def setup_metrics(self):
         for organism, cfg in self.cfg.metrics.organisms.items():
             metric = MeanPearsonCorrCoefPerChannel(n_channels=cfg.num_targets)
-            setattr(self, f'rpearson_{organism}', metric)
+            setattr(self, f"rpearson_{organism}", metric)
 
     def list_available_models(self):
         pass

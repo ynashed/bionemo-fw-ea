@@ -72,9 +72,9 @@ def main(cfg) -> None:
         model = torch.nn.DataParallel(model, device_ids=list(range(len(devices))))
     model.to(devices[0])  # Move model to the first device
     total_params = sum(p.numel() for p in model.parameters())
-    logging.info(f'# Model parameters: {total_params}')
+    logging.info(f"# Model parameters: {total_params}")
     checkpoint = torch.load(checkpoint_path)
-    model.load_state_dict(checkpoint['model_state_dict'])
+    model.load_state_dict(checkpoint["model_state_dict"])
 
     if cfg.data.processed:
         logging.info("************** Loading Inference Dataset ***********")
@@ -88,7 +88,7 @@ def main(cfg) -> None:
         preprocess(raw_data_dir=cfg.data.raw_inference_data_dir)
         logging.info("************** Loading Inference Dataset ***********")
         test_dataset = DSMBindDataset(
-            processed_data_path=os.path.join(cfg.data.raw_inference_data_dir, 'processed.pkl'),
+            processed_data_path=os.path.join(cfg.data.raw_inference_data_dir, "processed.pkl"),
             aa_size=cfg.model.aa_size,
             max_residue_atoms=cfg.model.max_residue_atoms,
         )
@@ -99,5 +99,5 @@ def main(cfg) -> None:
     logging.info(f"Predictions: {predictions}")  # Only the rank of the predictions matters
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -31,7 +31,6 @@ https://github.com/huggingface/transformers/blob/main/src/transformers/models/es
      --model <name_of_the_esm2_model_to_convert> \
 """
 
-
 import argparse
 import pathlib
 from pathlib import Path

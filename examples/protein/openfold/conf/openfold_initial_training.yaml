@@ -1,13 +1,13 @@
 # Title: openfold_initial_training.yaml
-# Usage: 
+# Usage:
 #   cd $BIONEMO_HOME
 #   python examples/protein/openfold/train.py --config=openfold_initial_training
 #
 # Description:
-#   This file contains settings and parameters for the training of the 
+#   This file contains settings and parameters for the training of the
 #   AlphaFold model class at bionemo.model.protein.openfold.openfold_model
 #
-#   (1) AlphaFold currently does not have tensor or pipeline parallelism, so 
+#   (1) AlphaFold currently does not have tensor or pipeline parallelism, so
 #
 #     world_size = num_nodes * num_devices
 #     global_batch_size = micro_batch_size * world_size * accumulate_grad_batches
@@ -15,28 +15,28 @@
 #   where global_batch_size is computed in bionemo.model.utils.infer_global_batch_size
 #
 #
-#   (2) accumulate_grad_batches is set to default 1 in 
+#   (2) accumulate_grad_batches is set to default 1 in
 #
 #   (3) To set the number of steps for the training job, set the parameters
-#     
-#     model.num_steps_in_one_epoch, i.e. num_training_steps_in_one_epoch, 
-#         i.e., num_batches_in_one_epoch ,this identically determines the 
-#         number of mini-batches for 1 epoch, since it determines the number 
+#
+#     model.num_steps_in_one_epoch, i.e. num_training_steps_in_one_epoch,
+#         i.e., num_batches_in_one_epoch ,this identically determines the
+#         number of mini-batches for 1 epoch, since it determines the number
 #         of training example indices in the training data loader for each rank
 #
 #           1 epoch:
 #
 #               rank_0: example_00, example_01, ...., example_{0,num_steps_in_one_epoch-1}
 #               rank_1: example_10, example_11, ...., example_{1,num_steps_in_one_epoch-1}
-#         
+#
 #     trainer.max_steps: at most, this many training steps will occur
 #     trainer.max_epochs: at most, this many epoch will be processes
-#   
+#
 #   trainer.fit will determine the end of the training job via
 #
 #       trainer.global_step = min(
-#             model.num_steps_in_one_epoch * trainer.max_epochs, 
-#             trainer.max_steps,              
+#             model.num_steps_in_one_epoch * trainer.max_epochs,
+#             trainer.max_steps,
 #       )
 #
 #
@@ -59,7 +59,7 @@ do_validation: false
 
 # BnmoTQDMProgressBar
 #   To activate this progress bar, uncomment the 3 lines below
-# progress_bar_kwargs: 
+# progress_bar_kwargs:
 #   name: BnmoTQDMProgressBar
 #   warmup: 10
 
@@ -74,7 +74,7 @@ model:
   metrics:
     # available metrics are: lddt_ca, drmsd_ca, alignment_rmsd, gdt_ts, gdt_ha
     - lddt_ca
-  
+
   optim:
     name: adam
     lr: 1e-3
@@ -233,7 +233,7 @@ exp_manager:
     save_top_k : 2
     monitor: val_lddt_ca
     mode: max
-    # filename 
+    # filename
     #   - As of 2024-03-16, the variable multisessionstep is managed within
     #   the AlphaFold class, since behavior changed as a result of NeMo upgrade,
     #   and the value of step written to checkpoint filename did not reflect

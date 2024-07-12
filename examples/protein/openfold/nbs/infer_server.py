@@ -42,10 +42,10 @@ from bionemo.utils.tests import (
 OpenFoldInferFn = Callable[[np.ndarray, np.ndarray], Dict[str, np.ndarray]]
 
 THIS_FILE_DIR = os.path.dirname(os.path.realpath(__file__))
-PREPEND_CONFIG_DIR = os.path.join(THIS_FILE_DIR, '../conf')
+PREPEND_CONFIG_DIR = os.path.join(THIS_FILE_DIR, "../conf")
 
 
-def get_cfg(prepend_config_path: str, config_name: str, config_path: str = 'conf'):
+def get_cfg(prepend_config_path: str, config_name: str, config_path: str = "conf"):
     prepend_config_path = pathlib.Path(prepend_config_path)
 
     class TestSearchPathConfig(BioNemoSearchPathConfig):
@@ -67,8 +67,8 @@ def make_openfold_infer_fn(
     def _infer_fn(sequences_batch: np.ndarray, msa_a3m_file_contents_batch: np.ndarray) -> Dict[str, np.ndarray]:
         with ExitStack() as stack:  # clean up after every inference call
             # decode and unbatch inputs
-            sequences_batch = np.char.decode(sequences_batch.astype('bytes'), 'utf-8').tolist()
-            msa_a3m_file_contents_batch = np.char.decode(msa_a3m_file_contents_batch.astype('bytes'), 'utf-8').tolist()
+            sequences_batch = np.char.decode(sequences_batch.astype("bytes"), "utf-8").tolist()
+            msa_a3m_file_contents_batch = np.char.decode(msa_a3m_file_contents_batch.astype("bytes"), "utf-8").tolist()
 
             sequences = []
             msa_a3m_file_contents = []
@@ -115,8 +115,8 @@ def make_openfold_infer_fn(
             output_pdb_strings = []
 
             for seq_name in seq_names:
-                pdb_filename = os.path.join(output_dir, f'{seq_name}.pdb')
-                with open(pdb_filename, 'r') as fopen:
+                pdb_filename = os.path.join(output_dir, f"{seq_name}.pdb")
+                with open(pdb_filename, "r") as fopen:
                     output_pdb_string = fopen.read()
 
                 os.remove(pdb_filename)
@@ -141,20 +141,20 @@ def main() -> None:
 
         writers = [PredictionPDBWriter(tmp_output_folder, cfg.force)]
         if cfg.model.downstream_task.outputs:
-            raise NotImplementedError('Downstream_task outputs are not supported on jupyter notebook yet.')
+            raise NotImplementedError("Downstream_task outputs are not supported on jupyter notebook yet.")
         trainer = setup_trainer(cfg, callbacks=writers)
 
-        if cfg.get('restore_from_path', None):
+        if cfg.get("restore_from_path", None):
             alphafold = AlphaFold.restore_from(
                 restore_path=cfg.restore_from_path, override_config_path=cfg, trainer=trainer
             )
-        elif cfg.get('torch_restore', None):
+        elif cfg.get("torch_restore", None):
             alphafold = AlphaFold(cfg=cfg.model, trainer=trainer)
             load_pt_checkpoint(model=alphafold, checkpoint_path=cfg.torch_restore)
         else:
             raise ValueError(
-                'No checkpoint has been provided neither via restore_from_path nor torch_restore. \
-                            Inference was not ran.'
+                "No checkpoint has been provided neither via restore_from_path nor torch_restore. \
+                            Inference was not ran."
             )
 
         # setup for triton

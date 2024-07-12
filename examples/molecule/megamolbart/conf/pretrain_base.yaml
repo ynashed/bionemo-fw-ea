@@ -86,8 +86,8 @@ model:
       train: x[000..186] # Range is for full dataset
       test: x[000..186]
       val: x[000..186]
-    # The following should probably always be True, unless you want to explore the unchanged input data. 
-    #  Changing will impact val/test metrics since canonicalization is done to model outputs but not 
+    # The following should probably always be True, unless you want to explore the unchanged input data.
+    #  Changing will impact val/test metrics since canonicalization is done to model outputs but not
     #  targets (assuming it is done here).
     canonicalize_target_smile: True
     # The following four settings will result in randomized augmentation of SMILES for input, and matched output.

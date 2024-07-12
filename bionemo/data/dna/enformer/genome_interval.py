@@ -41,30 +41,30 @@ def coin_flip():
 # genomic function transforms
 
 seq_indices_embed = torch.zeros(256).long()
-seq_indices_embed[ord('a')] = 0
-seq_indices_embed[ord('c')] = 1
-seq_indices_embed[ord('g')] = 2
-seq_indices_embed[ord('t')] = 3
-seq_indices_embed[ord('n')] = 4
-seq_indices_embed[ord('A')] = 0
-seq_indices_embed[ord('C')] = 1
-seq_indices_embed[ord('G')] = 2
-seq_indices_embed[ord('T')] = 3
-seq_indices_embed[ord('N')] = 4
-seq_indices_embed[ord('.')] = -1
+seq_indices_embed[ord("a")] = 0
+seq_indices_embed[ord("c")] = 1
+seq_indices_embed[ord("g")] = 2
+seq_indices_embed[ord("t")] = 3
+seq_indices_embed[ord("n")] = 4
+seq_indices_embed[ord("A")] = 0
+seq_indices_embed[ord("C")] = 1
+seq_indices_embed[ord("G")] = 2
+seq_indices_embed[ord("T")] = 3
+seq_indices_embed[ord("N")] = 4
+seq_indices_embed[ord(".")] = -1
 
 one_hot_embed = torch.zeros(256, 4)
-one_hot_embed[ord('a')] = torch.Tensor([1.0, 0.0, 0.0, 0.0])
-one_hot_embed[ord('c')] = torch.Tensor([0.0, 1.0, 0.0, 0.0])
-one_hot_embed[ord('g')] = torch.Tensor([0.0, 0.0, 1.0, 0.0])
-one_hot_embed[ord('t')] = torch.Tensor([0.0, 0.0, 0.0, 1.0])
-one_hot_embed[ord('n')] = torch.Tensor([0.0, 0.0, 0.0, 0.0])
-one_hot_embed[ord('A')] = torch.Tensor([1.0, 0.0, 0.0, 0.0])
-one_hot_embed[ord('C')] = torch.Tensor([0.0, 1.0, 0.0, 0.0])
-one_hot_embed[ord('G')] = torch.Tensor([0.0, 0.0, 1.0, 0.0])
-one_hot_embed[ord('T')] = torch.Tensor([0.0, 0.0, 0.0, 1.0])
-one_hot_embed[ord('N')] = torch.Tensor([0.0, 0.0, 0.0, 0.0])
-one_hot_embed[ord('.')] = torch.Tensor([0.25, 0.25, 0.25, 0.25])
+one_hot_embed[ord("a")] = torch.Tensor([1.0, 0.0, 0.0, 0.0])
+one_hot_embed[ord("c")] = torch.Tensor([0.0, 1.0, 0.0, 0.0])
+one_hot_embed[ord("g")] = torch.Tensor([0.0, 0.0, 1.0, 0.0])
+one_hot_embed[ord("t")] = torch.Tensor([0.0, 0.0, 0.0, 1.0])
+one_hot_embed[ord("n")] = torch.Tensor([0.0, 0.0, 0.0, 0.0])
+one_hot_embed[ord("A")] = torch.Tensor([1.0, 0.0, 0.0, 0.0])
+one_hot_embed[ord("C")] = torch.Tensor([0.0, 1.0, 0.0, 0.0])
+one_hot_embed[ord("G")] = torch.Tensor([0.0, 0.0, 1.0, 0.0])
+one_hot_embed[ord("T")] = torch.Tensor([0.0, 0.0, 0.0, 1.0])
+one_hot_embed[ord("N")] = torch.Tensor([0.0, 0.0, 0.0, 0.0])
+one_hot_embed[ord(".")] = torch.Tensor([0.25, 0.25, 0.25, 0.25])
 
 reverse_complement_map = torch.Tensor([3, 2, 1, 0, 4]).long()
 
@@ -106,7 +106,7 @@ def seq_indices_reverse_complement(seq_indices):
 
 def one_hot_reverse_complement(one_hot):
     *_, n, d = one_hot.shape
-    assert d == 4, 'must be one hot encoding with last dimension equal to 4'
+    assert d == 4, "must be one hot encoding with last dimension equal to 4"
     return torch.flip(one_hot, (-1, -2))
 
 
@@ -158,7 +158,7 @@ class FastaInterval:
                 right_padding = end - chromosome_length
                 end = chromosome_length
 
-        seq = ('.' * left_padding) + str(chromosome[start:end]) + ('.' * right_padding)
+        seq = ("." * left_padding) + str(chromosome[start:end]) + ("." * right_padding)
 
         if self.return_seq_indices:
             if self.rc_aug and coin_flip():
@@ -199,8 +199,8 @@ class FastaDataset(Dataset):
         extra_left_seq = extra_seq // 2
         extra_right_seq = extra_seq - extra_left_seq
 
-        seq = ('.' * extra_left_seq) + str(fa_record) + ('.' * extra_right_seq)
-        return {'name': fa_record.name, 'seq': str_to_one_hot(seq)}
+        seq = ("." * extra_left_seq) + str(fa_record) + ("." * extra_right_seq)
+        return {"name": fa_record.name, "seq": str_to_one_hot(seq)}
 
     def __len__(self):
         return len(self.seqs.records)
@@ -221,9 +221,9 @@ class GenomeIntervalDataset(Dataset):
     ):
         super().__init__()
         bed_path = Path(bed_file)
-        assert bed_path.exists(), 'path to .bed file must exist'
+        assert bed_path.exists(), "path to .bed file must exist"
 
-        df = pl.read_csv(str(bed_path), sep='\t', has_header=False)
+        df = pl.read_csv(str(bed_path), sep="\t", has_header=False)
         df = filter_df_fn(df)
         self.df = df
 

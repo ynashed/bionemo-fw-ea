@@ -137,10 +137,10 @@ def time_limit(seconds):
 def estimate_memory_usage(data, num_cross_edges, estimate_memory_usage, bias=True):
     # bias is from the memory of model, so when estimate the upper bound for size aware batch sampler, we don't need this
     total_memory = (
-        estimate_memory_usage.coeff_ligand_num_nodes * data['ligand'].num_nodes
-        + estimate_memory_usage.coeff_ligand_num_edges * data['ligand', 'ligand'].num_edges
-        + estimate_memory_usage.coeff_receptor_num_nodes * data['receptor'].num_nodes
-        + estimate_memory_usage.coeff_receptor_num_edges * data['receptor', 'receptor'].num_edges
+        estimate_memory_usage.coeff_ligand_num_nodes * data["ligand"].num_nodes
+        + estimate_memory_usage.coeff_ligand_num_edges * data["ligand", "ligand"].num_edges
+        + estimate_memory_usage.coeff_receptor_num_nodes * data["receptor"].num_nodes
+        + estimate_memory_usage.coeff_receptor_num_edges * data["receptor", "receptor"].num_edges
         + estimate_memory_usage.coeff_num_cross_edges * num_cross_edges
     )
     if bias:

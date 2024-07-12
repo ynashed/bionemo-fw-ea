@@ -84,8 +84,8 @@ def resolve_cfg(cfg: DictConfig):
     OmegaConf.resolve(cfg)
     with open_dict(cfg):
         # Check if the key `exp_manager` and the nested key `wandb_logger_kwargs` exist
-        if 'exp_manager' in cfg and 'wandb_logger_kwargs' in cfg.exp_manager:
-            cfg.exp_manager.wandb_logger_kwargs.pop('notes', None)
+        if "exp_manager" in cfg and "wandb_logger_kwargs" in cfg.exp_manager:
+            cfg.exp_manager.wandb_logger_kwargs.pop("notes", None)
     cfg_str = yaml.load(OmegaConf.to_yaml(cfg), Loader=yaml.BaseLoader)
     return cfg_str
 
@@ -114,7 +114,7 @@ def load_expected_training_results(results_comparison_dir: str, correct_results:
     """
     results_path = os.path.join(results_comparison_dir, correct_results)
 
-    with open(results_path, 'r') as fh:
+    with open(results_path, "r") as fh:
         expected_results = json.load(fh, object_pairs_hook=OrderedDict)
 
     return expected_results
@@ -131,8 +131,8 @@ def save_expected_training_results(results_comparison_dir: str, correct_results:
         None
     """
     results_path = os.path.join(results_comparison_dir, correct_results)
-    logging.info(f'Saving expected training results to {results_path}')
-    with open(results_path, 'w') as fh:
+    logging.info(f"Saving expected training results to {results_path}")
+    with open(results_path, "w") as fh:
         json.dump(expected_results, fh, indent=4, sort_keys=True)
 
 
@@ -189,7 +189,7 @@ def get_directory_hash(directory):
     for root, _, files in os.walk(directory):
         for name in sorted(files):
             filepath = os.path.join(root, name)
-            with open(filepath, 'rb') as fh:
+            with open(filepath, "rb") as fh:
                 data = fh.read()
                 md5_hash.update(data)
     return md5_hash.hexdigest()
@@ -285,12 +285,12 @@ def download_s3_tar_gz_to_target_path(s3_data_path: str, dest_path: str) -> None
     with tempfile.TemporaryDirectory() as temp_dir:
         try:
             subprocess.run(
-                ['aws', 's3', 'cp', s3_data_path, temp_dir, '--endpoint-url', 'https://pbss.s8k.io'], check=True
+                ["aws", "s3", "cp", s3_data_path, temp_dir, "--endpoint-url", "https://pbss.s8k.io"], check=True
             )
         except subprocess.CalledProcessError as e:
             raise RuntimeError(
-                f'Fail to download file from {s3_data_path}. Check AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY.'
+                f"Fail to download file from {s3_data_path}. Check AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY."
             ) from e
 
-        with tarfile.open(os.path.join(temp_dir, os.path.basename(s3_data_path)), 'r:gz') as tar:
+        with tarfile.open(os.path.join(temp_dir, os.path.basename(s3_data_path)), "r:gz") as tar:
             tar.extractall(path=dest_path)

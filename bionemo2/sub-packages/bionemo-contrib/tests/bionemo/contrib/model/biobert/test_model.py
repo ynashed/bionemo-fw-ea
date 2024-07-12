@@ -92,7 +92,7 @@ def test_weight_shapes_match(seed: int = 42):
             tokenizer_vocab_path=train_data_path / "geneformer.vocab",
         )
         match preprocessor.preprocess():
-            case {'tokenizer': tokenizer, 'median_dict': _}:
+            case {"tokenizer": tokenizer, "median_dict": _}:
                 pass
             case _:
                 assert False

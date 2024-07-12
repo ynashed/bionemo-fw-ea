@@ -21,7 +21,7 @@ from bionemo.data.preprocess.molecule.uspto50k_preprocess import USPTO50KPreproc
 
 
 TRAIN_SPLIT: str = "train"  # Name of train split in train_valid_test_num_samples
-SPLITS: List[str] = [TRAIN_SPLIT, 'val', 'test']
+SPLITS: List[str] = [TRAIN_SPLIT, "val", "test"]
 
 
 def megamolbart_build_train_valid_test_datasets(
@@ -39,10 +39,10 @@ def megamolbart_build_train_valid_test_datasets(
     cfg = deepcopy(cfg)
 
     # setting
-    use_upsampling: bool = cfg.get('use_upsampling', True)
-    data_impl: str = cfg.get('data_impl', None)
+    use_upsampling: bool = cfg.get("use_upsampling", True)
+    data_impl: str = cfg.get("data_impl", None)
     assert data_impl is not None, 'Config "cfg" should contain field "cfg.data_impl"'
-    dataset_path: str = cfg.get('dataset_path', None)
+    dataset_path: str = cfg.get("dataset_path", None)
     assert dataset_path is not None, 'Config "cfg" should contain field "cfg.dataset_path"'
 
     datasets = []
@@ -53,7 +53,7 @@ def megamolbart_build_train_valid_test_datasets(
             ds_name: Optional[Union[str, List[Union[int, str]]]] = cfg.dataset.get(split, None)
             assert ds_name is not None, (
                 f'Config "cfg" should contain field "cfg.dataset.{split}" with name or list of '
-                f'names corresponding to the data files used to construct the dataset'
+                f"names corresponding to the data files used to construct the dataset"
             )
             filepath: str = os.path.join(dataset_path, split, ds_name)
             dataset = build_typed_dataset(
@@ -63,7 +63,7 @@ def megamolbart_build_train_valid_test_datasets(
                 cfg=cfg,
                 num_samples=num_samples,
             )
-            logging.info(f'{split}:{len(dataset)}')
+            logging.info(f"{split}:{len(dataset)}")
         else:
             dataset = None
             logging.info(f"{split} dataset is None")
@@ -85,11 +85,11 @@ def megamolbart_retro_build_train_valid_test_datasets(
         list of dataset for splits
     """
     cfg = deepcopy(cfg)
-    use_upsampling = cfg.get('use_upsampling', True)
+    use_upsampling = cfg.get("use_upsampling", True)
     data_preprocessor = USPTO50KPreprocess(max_smiles_length=cfg.max_seq_length, data_dir=cfg.dataset_path)
 
-    data_impl = cfg.get('data_impl', None)
-    assert data_impl is not None, 'Argument data_impl must be specified!'
+    data_impl = cfg.get("data_impl", None)
+    assert data_impl is not None, "Argument data_impl must be specified!"
 
     datasets = []
 
@@ -104,7 +104,7 @@ def megamolbart_retro_build_train_valid_test_datasets(
                 cfg=cfg,
                 num_samples=num_samples,
             )
-            logging.info(f'{split}:{len(dataset)}')
+            logging.info(f"{split}:{len(dataset)}")
         else:
             dataset = None
             logging.info(f"{split} dataset is None")

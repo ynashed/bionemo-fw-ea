@@ -104,12 +104,12 @@ class EquiDockInference(LightningModule):
         )
 
         if self.cfg.model.input_edge_feats_dim < 0:
-            self.cfg.model.input_edge_feats_dim = ligand_graph.edata['he'].shape[1]
+            self.cfg.model.input_edge_feats_dim = ligand_graph.edata["he"].shape[1]
 
-        ligand_graph.ndata['new_x'] = ligand_graph.ndata['x']
+        ligand_graph.ndata["new_x"] = ligand_graph.ndata["x"]
 
         assert (
-            np.linalg.norm(bound_ligand_repres_nodes_loc_clean_array - ligand_graph.ndata['x'].detach().cpu().numpy())
+            np.linalg.norm(bound_ligand_repres_nodes_loc_clean_array - ligand_graph.ndata["x"].detach().cpu().numpy())
             < 1e-1
         )
 
@@ -153,10 +153,10 @@ class EquiDockInference(LightningModule):
         # Get initial ligand position
         ppdb_ligand = PandasPdb().read_pdb(ligand_filename)
         unbound_ligand_all_atoms_pre_pos = (
-            ppdb_ligand.df['ATOM'][['x_coord', 'y_coord', 'z_coord']].to_numpy().squeeze().astype(np.float32)
+            ppdb_ligand.df["ATOM"][["x_coord", "y_coord", "z_coord"]].to_numpy().squeeze().astype(np.float32)
         )
         unbound_ligand_new_pos = (rotation @ unbound_ligand_all_atoms_pre_pos.T).T + translation
 
-        ppdb_ligand.df['ATOM'][['x_coord', 'y_coord', 'z_coord']] = unbound_ligand_new_pos  # unbound_ligand_new_pos
+        ppdb_ligand.df["ATOM"][["x_coord", "y_coord", "z_coord"]] = unbound_ligand_new_pos  # unbound_ligand_new_pos
 
         return ppdb_ligand

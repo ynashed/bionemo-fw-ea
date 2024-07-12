@@ -22,7 +22,7 @@ from bionemo.model.utils import setup_trainer
 @hydra_runner(config_path="conf", config_name="enformer_infer")
 def main(cfg):
     logging.info("\n\n************** Experiment configuration ***********")
-    logging.info(f'\n{OmegaConf.to_yaml(cfg)}')
+    logging.info(f"\n{OmegaConf.to_yaml(cfg)}")
     writer_callback = FastaRecordsWriter(
         output_dir=cfg.model.predictions_output_path, mode=cfg.model.predictions_write_mode
     )
@@ -33,5 +33,5 @@ def main(cfg):
     trainer.predict(enformer, dl, return_predictions=False)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

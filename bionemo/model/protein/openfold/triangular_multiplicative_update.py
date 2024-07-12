@@ -51,7 +51,7 @@ class TriangleMultiplicativeUpdate(nn.Module):
         self,
         c_z: int,
         c_hidden: int,
-        tmu_type: Literal['outgoing', 'incoming'],
+        tmu_type: Literal["outgoing", "incoming"],
     ) -> None:
         super(TriangleMultiplicativeUpdate, self).__init__()
         self.c_z = c_z

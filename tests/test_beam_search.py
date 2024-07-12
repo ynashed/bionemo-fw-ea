@@ -34,19 +34,19 @@ from bionemo.utils.tests import (
 logger = logging.getLogger(__name__)
 
 _SMIS = [
-    'c1cc2ccccc2cc1',
-    'COc1cc2nc(N3CCN(C(=O)c4ccco4)CC3)nc(N)c2cc1OC',
+    "c1cc2ccccc2cc1",
+    "COc1cc2nc(N3CCN(C(=O)c4ccco4)CC3)nc(N)c2cc1OC",
 ]
 
 _BEAM_SIZE = 5
 _BEAM_ALPHA = 0
 
 
-CORRECT_RESULTS_DIR = 'examples/tests/expected_results'
-CORRECT_RESULTS = 'megamolbart_inference_greedy_beam_search_preds.json'
+CORRECT_RESULTS_DIR = "examples/tests/expected_results"
+CORRECT_RESULTS = "megamolbart_inference_greedy_beam_search_preds.json"
 
-UPDATE_EXPECTED_RESULTS = os.environ.get('UPDATE_EXPECTED_RESULTS', False)
-COMPARE_EXPECTED_RESULTS = os.environ.get('COMPARE_EXPECTED_RESULTS', False)
+UPDATE_EXPECTED_RESULTS = os.environ.get("UPDATE_EXPECTED_RESULTS", False)
+COMPARE_EXPECTED_RESULTS = os.environ.get("COMPARE_EXPECTED_RESULTS", False)
 
 
 def _adjust_config_for_test(cfg: DictConfig) -> DictConfig:
@@ -66,7 +66,7 @@ def _adjust_config_for_test(cfg: DictConfig) -> DictConfig:
     return cfg
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope="module")
 def megamolbart_model_trainer(model_cfg: DictConfig) -> Tuple[MegaMolBARTModel, plt.Trainer]:
     # TODO to remove the first reset in the future - test imp should ensire teardown after model is used
     pl.seed_everything(model_cfg.seed)
@@ -113,7 +113,7 @@ def test_megamolbart_greedy_beam_search(megamolbart_model_trainer, model_cfg):
         outputs = load_expected_training_results(
             results_comparison_dir=CORRECT_RESULTS_DIR, correct_results=CORRECT_RESULTS
         )
-        weights = outputs['weights']
+        weights = outputs["weights"]
 
         # Convert weights from list to tensor.
         for key, lst in weights.items():
@@ -125,7 +125,7 @@ def test_megamolbart_greedy_beam_search(megamolbart_model_trainer, model_cfg):
             assert torch.equal(model.state_dict()[key], weights[key])
 
         # Convert output batch from list to tensor.
-        expected_batch = outputs['batch']
+        expected_batch = outputs["batch"]
         for key, lst in expected_batch.items():
             if isinstance(lst, list):
                 if isinstance(lst[0], str):
@@ -134,7 +134,7 @@ def test_megamolbart_greedy_beam_search(megamolbart_model_trainer, model_cfg):
                     expected_batch[key] = list_to_tensor(lst)
 
         for key in batch.keys():
-            if key == 'target_smiles':
+            if key == "target_smiles":
                 assert batch[key] == expected_batch[key]
             else:
                 assert torch.equal(batch[key], expected_batch[key])
@@ -149,13 +149,13 @@ def test_megamolbart_greedy_beam_search(megamolbart_model_trainer, model_cfg):
     preds, greedy_pad_mask = pad_preds_after_first_eos(
         preds_ori.clone(), eos_id=model.tokenizer.eos_id, pad_id=model.tokenizer.pad_id
     )
-    sampling_method = 'beam-search'
+    sampling_method = "beam-search"
     preds_beam1, logits_beam1 = model.decode(
         tokens_enc.clone(),
         enc_mask.clone(),
         _NUM_TOKENS_TO_GENERATE,
         sampling_method=sampling_method,
-        sampling_kwargs={'beam_size': 1, 'beam_alpha': 0, 'keep_only_best_tokens': True},
+        sampling_kwargs={"beam_size": 1, "beam_alpha": 0, "keep_only_best_tokens": True},
     )
     _, beam1_pad_mask = pad_preds_after_first_eos(
         preds_beam1.clone(), eos_id=model.tokenizer.eos_id, pad_id=model.tokenizer.pad_id
@@ -166,7 +166,7 @@ def test_megamolbart_greedy_beam_search(megamolbart_model_trainer, model_cfg):
         enc_mask.clone(),
         _NUM_TOKENS_TO_GENERATE,
         sampling_method=sampling_method,
-        sampling_kwargs={'beam_size': _BEAM_SIZE, 'beam_alpha': _BEAM_ALPHA, 'return_scores': True},
+        sampling_kwargs={"beam_size": _BEAM_SIZE, "beam_alpha": _BEAM_ALPHA, "return_scores": True},
     )
 
     preds_beam_best, logits_beam_best, scores_beam_best = model.decode(
@@ -175,10 +175,10 @@ def test_megamolbart_greedy_beam_search(megamolbart_model_trainer, model_cfg):
         _NUM_TOKENS_TO_GENERATE,
         sampling_method=sampling_method,
         sampling_kwargs={
-            'beam_size': _BEAM_SIZE,
-            'beam_alpha': _BEAM_ALPHA,
-            'return_scores': True,
-            'keep_only_best_tokens': True,
+            "beam_size": _BEAM_SIZE,
+            "beam_alpha": _BEAM_ALPHA,
+            "return_scores": True,
+            "keep_only_best_tokens": True,
         },
     )
 
@@ -214,7 +214,7 @@ def test_megamolbart_greedy_beam_search(megamolbart_model_trainer, model_cfg):
 
     if UPDATE_EXPECTED_RESULTS:
         weights = model.state_dict()
-        logger.warning(f'Updating expected results in {CORRECT_RESULTS_DIR}/{CORRECT_RESULTS}')
+        logger.warning(f"Updating expected results in {CORRECT_RESULTS_DIR}/{CORRECT_RESULTS}")
 
         # Convert weights from tensors to list so we can save them in JSON.
         for key, tensor in weights.items():
@@ -226,19 +226,19 @@ def test_megamolbart_greedy_beam_search(megamolbart_model_trainer, model_cfg):
                 batch[key] = tensor.tolist()
 
         outputs = {
-            'seed': model_cfg.seed,
-            'smiles': _SMIS,
-            'num_tokens_to_generate': _NUM_TOKENS_TO_GENERATE,
-            'beam_size': _BEAM_SIZE,
-            'beam_alpha': _BEAM_ALPHA,
-            'greedy': {'predictions': preds.tolist(), 'logits': logits.tolist()},
-            'beam': {
-                'predictions': preds_beam.tolist(),
-                'logits': logits_beam.tolist(),
-                'scores': scores_beam.tolist(),
+            "seed": model_cfg.seed,
+            "smiles": _SMIS,
+            "num_tokens_to_generate": _NUM_TOKENS_TO_GENERATE,
+            "beam_size": _BEAM_SIZE,
+            "beam_alpha": _BEAM_ALPHA,
+            "greedy": {"predictions": preds.tolist(), "logits": logits.tolist()},
+            "beam": {
+                "predictions": preds_beam.tolist(),
+                "logits": logits_beam.tolist(),
+                "scores": scores_beam.tolist(),
             },
-            'weights': weights,
-            'batch': batch,
+            "weights": weights,
+            "batch": batch,
         }
         save_expected_training_results(
             results_comparison_dir=CORRECT_RESULTS_DIR,
@@ -248,26 +248,26 @@ def test_megamolbart_greedy_beam_search(megamolbart_model_trainer, model_cfg):
 
     if not UPDATE_EXPECTED_RESULTS and COMPARE_EXPECTED_RESULTS:
         assert [
-            k in ['greedy', 'beam', 'seed', 'smiles', 'num_tokens_to_generate', 'beam_size', 'beam_alpha']
+            k in ["greedy", "beam", "seed", "smiles", "num_tokens_to_generate", "beam_size", "beam_alpha"]
             for k in outputs.keys()
         ]
         assert all(
             outputs[k] == val
             for k, val in zip(
-                ['seed', 'smiles', 'num_tokens_to_generate', 'beam_size', 'beam_alpha'],
+                ["seed", "smiles", "num_tokens_to_generate", "beam_size", "beam_alpha"],
                 [model_cfg.seed, _SMIS, _NUM_TOKENS_TO_GENERATE, _BEAM_SIZE, _BEAM_ALPHA],
             )
-        ), 'Setup of the test does not match setup of the expected results'
+        ), "Setup of the test does not match setup of the expected results"
         # Convert from list to tensor in order to compare.
-        assert torch.equal(list_to_tensor(outputs['greedy']['predictions']), preds)
-        assert torch.equal(list_to_tensor(outputs['greedy']['logits']), logits)
-        assert torch.equal(list_to_tensor(outputs['beam']['predictions']), preds_beam)
-        assert torch.equal(list_to_tensor(outputs['beam']['logits']), logits_beam)
+        assert torch.equal(list_to_tensor(outputs["greedy"]["predictions"]), preds)
+        assert torch.equal(list_to_tensor(outputs["greedy"]["logits"]), logits)
+        assert torch.equal(list_to_tensor(outputs["beam"]["predictions"]), preds_beam)
+        assert torch.equal(list_to_tensor(outputs["beam"]["logits"]), logits_beam)
 
     model.unfreeze()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # To get into a pdb and set an external breakpoint, run:
     # python -m pdb tests/test_beam_search.py
     # then in the session, you can now set breakpoints, eg:

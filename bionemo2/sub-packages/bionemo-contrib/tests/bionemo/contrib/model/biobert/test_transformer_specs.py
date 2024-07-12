@@ -36,7 +36,7 @@ def test_enum_str_choices():
 
 def test_enum_equality():
     assert (
-        transformer_specs.BiobertSpecOption('bert_layer_local_spec')
+        transformer_specs.BiobertSpecOption("bert_layer_local_spec")
         == transformer_specs.BiobertSpecOption.bert_layer_local_spec
     )
 

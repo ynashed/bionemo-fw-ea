@@ -49,4 +49,4 @@ def sample_or_truncate_plus_pad(
         return gene_ids
 
 
-__all__ = ['sample_or_truncate_plus_pad']
+__all__ = ["sample_or_truncate_plus_pad"]

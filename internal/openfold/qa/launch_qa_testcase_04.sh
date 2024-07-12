@@ -2,7 +2,7 @@
 #SBATCH --account=healthcareeng_bionemo
 #SBATCH --job-name=openfold_qa_testcase_04
 #SBATCH --partition=interactive
-#SBATCH 
+#SBATCH
 #SBATCH --nodes=1
 #SBATCH --gpus-per-node 8
 #SBATCH --time 01:00:00                 # wall time
@@ -34,9 +34,9 @@
 #   (b) train.py can create a sample dataset
 #
 # expected results / success criteria:
-#   (1) Estimated run time: 
+#   (1) Estimated run time:
 #       after entering the RUNNING state, the job's runtime should be ~<3min
-#   (2) At ${OUTPUT_DIR}/data_out/openfold_qa_testcase_04/ you should find the 
+#   (2) At ${OUTPUT_DIR}/data_out/openfold_qa_testcase_04/ you should find the
 #       directories and files:
 #
 #       - open_protein_set
@@ -62,8 +62,8 @@ set -xe
 
 # (1) set some task-specific parameters
 #IMAGE_NAME=nvcr.io/nvidian/cvai_bnmo_trng/bionemo:qa_202405_smoke_20240513T1827
-IMAGE_NAME=nvcr.io/nvidian/cvai_bnmo_trng/bionemo:mr--996--c557a19b--2024-05-19-qa 
-INPUT_DIR=/lustre/fsw/portfolios/healthcareeng/projects/healthcareeng_bionemo/openfold/openfold_from_tgrzegorzek_20240228 
+IMAGE_NAME=nvcr.io/nvidian/cvai_bnmo_trng/bionemo:mr--996--c557a19b--2024-05-19-qa
+INPUT_DIR=/lustre/fsw/portfolios/healthcareeng/projects/healthcareeng_bionemo/openfold/openfold_from_tgrzegorzek_20240228
 OUTPUT_DIR=/lustre/fsw/portfolios/healthcareeng/users/broland/qa/qa_202405/testcase_04_${DATETIME_SCRIPT_START}
 
 # (2) create output directories
@@ -84,9 +84,9 @@ srun --mpi=pmix \
   echo "'date=$(date +'%Y%m%dT%H%M')'" &&
   export HYDRA_FULL_ERROR=1 &&
   cd /workspace/bionemo &&
-  echo 'launch_qa_testcase_04.sh - before install_third_party.sh' &&  
+  echo 'launch_qa_testcase_04.sh - before install_third_party.sh' &&
   ./examples/protein/openfold/scripts/install_third_party.sh &&
-  echo 'launch_qa_testcase_04.sh - after install_third_party.sh' &&  
+  echo 'launch_qa_testcase_04.sh - after install_third_party.sh' &&
   echo 'launch_qa_testcase_04.sh - before train.py' &&
   python examples/protein/openfold/train.py \
     ++do_training=false \
@@ -100,5 +100,3 @@ srun --mpi=pmix \
 
 set +x
 printf "${MESSAGE_TEMPLATE}" "end with success"
-
-

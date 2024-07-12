@@ -63,4 +63,3 @@ which is defined in the development dependencies. If you add new Python (`.py`) 
 ```bash
 license-check --license-header ./license_header --check . --modify --replace
 ```
-

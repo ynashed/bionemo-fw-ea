@@ -42,14 +42,14 @@ class Singleton(type):
 
 class DataManager(metaclass=Singleton):
     def __init__(self, cfg, **kwargs) -> None:
-        self.train_ds = nemo_get_dataset(cfg.model.train_ds, 'train')
-        self.validation_ds = nemo_get_dataset(cfg.model.validation_ds, 'val')
-        self.test_ds = nemo_get_dataset(cfg.model.test_ds, 'test')
+        self.train_ds = nemo_get_dataset(cfg.model.train_ds, "train")
+        self.validation_ds = nemo_get_dataset(cfg.model.validation_ds, "val")
+        self.test_ds = nemo_get_dataset(cfg.model.test_ds, "test")
 
     def swap(self, cfg):
         """
         Override DataManager using a new cfg file
         """
-        self.train_ds = nemo_get_dataset(cfg.model.train_ds, 'train')
-        self.validation_ds = nemo_get_dataset(cfg.model.validation_ds, 'val')
-        self.test_ds = nemo_get_dataset(cfg.model.test_ds, 'test')
+        self.train_ds = nemo_get_dataset(cfg.model.train_ds, "train")
+        self.validation_ds = nemo_get_dataset(cfg.model.validation_ds, "val")
+        self.test_ds = nemo_get_dataset(cfg.model.test_ds, "test")

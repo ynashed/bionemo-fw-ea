@@ -18,9 +18,9 @@ __all__: Sequence[str] = ("ESM1nvInference",)
 
 
 class ESM1nvInference(BaseEncoderInference):
-    '''
+    """
     All inference functions
-    '''
+    """
 
     def __init__(
         self,
@@ -61,7 +61,7 @@ class ESM1nvInference(BaseEncoderInference):
         return token_ids
 
     def seq_to_hiddens(self, sequences: List[str]) -> Tuple[torch.Tensor, torch.Tensor]:
-        '''
+        """
         Transforms Sequences into hidden state.
         Should be implemented in a child class, since it is model specific.
         This method returns hidden states and masks.
@@ -74,7 +74,7 @@ class ESM1nvInference(BaseEncoderInference):
         Returns:
             hidden_states (torch.Tensor, float):
             enc_mask (torch.Tensor, long): boolean mask for special tokens (<BOS> and <EOS>) and padded sections
-        '''
+        """
         token_ids, enc_mask = self.tokenize(sequences)
         hidden_states = self.model.encode(token_ids, enc_mask, reconfigure_microbatch=not self.interactive)
 

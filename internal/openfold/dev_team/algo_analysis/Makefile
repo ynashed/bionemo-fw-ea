@@ -8,7 +8,7 @@
 REPO_RELATIVE_PATH=../../../../
 
 test:
-	ls $(REPO_RELATIVE_PATH)	
+	ls $(REPO_RELATIVE_PATH)
 	pytest $(REPO_RELATIVE_PATH)/internal/openfold/dev_team/tests/tests_algo_analysis/test_algo_metrics.py
 	pytest $(REPO_RELATIVE_PATH)/internal/openfold/dev_team/tests/tests_algo_analysis/test_msa_column_global_attention.py
 	pytest $(REPO_RELATIVE_PATH)/internal/openfold/dev_team/tests/tests_algo_analysis/test_outer_product_mean.py

@@ -87,7 +87,7 @@ class MultiHeadAttention(nn.Module):
         # Apply the key padding mask
         if src_key_padding_mask is not None:
             src_key_padding_mask = src_key_padding_mask.unsqueeze(1).unsqueeze(2)  # (B, 1, 1, N)
-            scaled_attention_logits = scaled_attention_logits.masked_fill(src_key_padding_mask, float('-inf'))
+            scaled_attention_logits = scaled_attention_logits.masked_fill(src_key_padding_mask, float("-inf"))
 
         # softmax is applied to the last axis (seq_len_k) so that scores add to 1
         original_dtype = scaled_attention_logits.dtype  # Store original dtype
@@ -192,7 +192,7 @@ class FANN(nn.Module):
         _, V = torch.linalg.eigh(C.detach())
         ops = torch.tensor([[i, j, k] for i in [-1, 1] for j in [-1, 1] for k in [-1, 1]]).to(X.device)
         F_ops = ops.unsqueeze(1).unsqueeze(0) * V.unsqueeze(1)  # [1,8,1,3] x [B,1,3,3] -> [B,8,3,3]
-        h = torch.einsum('boij,bpj->bopi', F_ops.transpose(2, 3), X)  # transpose is inverse [B,8,N,3]
+        h = torch.einsum("boij,bpj->bopi", F_ops.transpose(2, 3), X)  # transpose is inverse [B,8,N,3]
         h = h.view(X.size(0) * 8, X.size(1), 3)
         return h
 

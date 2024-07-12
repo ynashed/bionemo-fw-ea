@@ -37,13 +37,13 @@ RUN apt-get update && \
 WORKDIR /workspace/
 
 # need this otherwise apex or transformer engine crashes since it runs out of host memory
-# c++: fatal error: Killed signal terminated program cc1plus 
+# c++: fatal error: Killed signal terminated program cc1plus
 ARG MAX_JOBS=4
 ENV MAX_JOBS=${MAX_JOBS}
 
 # Install megatron core, this can be removed once 0.3 pip package is released
 # We leave it here in case we need to work off of a specific commit in main
-RUN git clone https://github.com/NVIDIA/Megatron-LM.git && \  
+RUN git clone https://github.com/NVIDIA/Megatron-LM.git && \
   cd Megatron-LM && \
   git checkout e122536b7645edcb7ebf099b5c92a443f7dbf8e7 && \
   pip install .
@@ -54,7 +54,7 @@ RUN git clone https://github.com/NVIDIA/apex.git && \
   git checkout 52e18c894223800cb611682dce27d88050edf1de && \
   pip install -v --no-build-isolation --disable-pip-version-check --no-cache-dir --config-settings "--build-option=--cpp_ext --cuda_ext --fast_layer_norm --distributed_adam --deprecated_fused_adam" ./
 
-# Transformer Engine used in NeMo v1.22 dockerfile 
+# Transformer Engine used in NeMo v1.22 dockerfile
 RUN git clone https://github.com/NVIDIA/TransformerEngine.git && \
   cd TransformerEngine && \
   git fetch origin 8eae4ce2b8fdfbbe525fc8bfecb0df5498cc9687 && \
@@ -182,7 +182,7 @@ RUN pip install -r /tmp/requirements-test.txt
 #    39 ERROR: executor failed running [/bin/sh -c GITLAB_TOKEN=$(cat /run/secrets/GITLAB_TOKEN) pip install -r /tmp/requirements.txt]: exit code: 1
 # but infra-bionemo does:
 #    37 3.282 Collecting infra-bionemo==0.1.0 (from -r /tmp/requirements-dev.txt (line 7))
-#    37 3.366   Downloading https://gitlab-master.nvidia.com/api/v4/projects/118589/packages/pypi/files/487d2342614e85a010143523f44fcee5058ff71b90b5e10a0d4a0ce259f66230/infra_bionemo-0.1.0-py3-none-any.whl (29 kB) 
+#    37 3.366   Downloading https://gitlab-master.nvidia.com/api/v4/projects/118589/packages/pypi/files/487d2342614e85a010143523f44fcee5058ff71b90b5e10a0d4a0ce259f66230/infra_bionemo-0.1.0-py3-none-any.whl (29 kB)
 # NOTE that doing a local docker run w/ personal API token **does work**, it's the gitlab RO API token that does not work
 # THIS IS ONLY A GITLAB CI PROBLEM !!!
 RUN --mount=type=secret,id=GITLAB_TOKEN GITLAB_TOKEN=$(cat /run/secrets/GITLAB_TOKEN) pip install -r /tmp/requirements.txt

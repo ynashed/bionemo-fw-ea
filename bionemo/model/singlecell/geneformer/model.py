@@ -52,12 +52,12 @@ class GeneformerModel(BioNeMoBertModel):
         super().__init__(cfg, trainer, *args, **kwargs)
 
     def _build_tokenizer(self):
-        '''We keep this method signature fixed because its an unofficial ABC'''
+        """We keep this method signature fixed because its an unofficial ABC"""
         self.tokenizer = GeneTokenizer.from_vocab_file(
             self.register_artifact("tokenizer.vocab_file", self.vocab_file, verify_src_exists=True)
         )
 
     def _build_medians(self, medians_file) -> dict:
-        '''Builds the requisite median dictionaries from a json file via the register_artifact hook'''
-        with open(self.register_artifact("data.medians_file", medians_file, verify_src_exists=True), 'r') as fp:
+        """Builds the requisite median dictionaries from a json file via the register_artifact hook"""
+        with open(self.register_artifact("data.medians_file", medians_file, verify_src_exists=True), "r") as fp:
             self.median_dict = json.load(fp)

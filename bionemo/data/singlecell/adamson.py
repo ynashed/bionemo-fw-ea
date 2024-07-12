@@ -27,7 +27,7 @@ class AdamsonDataset(Dataset):
         median_dict: Optional[dict[str, float]] = None,
         max_len: int = 1024,
     ):
-        '''Instantiates a dataset from the preprocessed artifacts, tokenizer, and median dictionary.
+        """Instantiates a dataset from the preprocessed artifacts, tokenizer, and median dictionary.
 
         Args:
             preprocessed_anndata_fn (str): File path to the preprocessed AnnData object containing the unperturbed gene expression profiles and their CRISPR targets.
@@ -47,7 +47,7 @@ class AdamsonDataset(Dataset):
             and 'obs['condition']' columns, respectively. The perturbed gene expression profiles are located in the target_gep_fn,
             which is a npz file produced after preprocessing.
 
-        '''
+        """
         self.max_len = max_len
         self.tokenizer = tokenizer
         self.gene_medians = median_dict
@@ -178,8 +178,8 @@ def process_item(
 
 # Utility functions
 def _parse_pert(pert: str) -> List[str]:
-    '''Pert is either a singleton (ctrl), or its a list of pertubations joined by '+'
-    Returns a list of pertubations'''
+    """Pert is either a singleton (ctrl), or its a list of pertubations joined by '+'
+    Returns a list of pertubations"""
     if pert == "ctrl":
         return []
     else:

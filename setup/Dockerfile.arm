@@ -10,7 +10,7 @@
 # its affiliates is strictly prohibited.
 
 
-# HOWTO build: 
+# HOWTO build:
 # 1. to build on aarch64 change build() in ./launch to use this file Dockerfile.arm (recommended - much faster)
 # 2. to build on amd64 you can use multiplatform buildx, e.g.:
     # docker buildx create --name mybuilder
@@ -23,7 +23,7 @@
     # docker buildx ls
     # #necessary for arm emulation
     # sudo apt-get install -y qemu qemu-user-static
-    # docker buildx ls  
+    # docker buildx ls
     # docker buildx build --platform linux/amd64,linux/arm64 .
 
 
@@ -56,14 +56,14 @@ RUN apt-get update && \
 
 WORKDIR /workspace/
 
-# need this otherwise apex or transformer engine crashes with 
-# c++: fatal error: Killed signal terminated program cc1plus 
+# need this otherwise apex or transformer engine crashes with
+# c++: fatal error: Killed signal terminated program cc1plus
 ARG MAX_JOBS=4
 ENV MAX_JOBS=${MAX_JOBS}
 
 # Install megatron core, this can be removed once 0.3 pip package is released
 # We leave it here in case we need to work off of a specific commit in main
-RUN git clone https://github.com/NVIDIA/Megatron-LM.git && \  
+RUN git clone https://github.com/NVIDIA/Megatron-LM.git && \
   cd Megatron-LM && \
   git checkout e122536b7645edcb7ebf099b5c92a443f7dbf8e7 && \
   pip install .
@@ -74,7 +74,7 @@ RUN git clone https://github.com/NVIDIA/apex.git && \
   git checkout 52e18c894223800cb611682dce27d88050edf1de && \
   pip install -v --no-build-isolation --disable-pip-version-check --no-cache-dir --config-settings "--build-option=--cpp_ext --cuda_ext --fast_layer_norm --distributed_adam --deprecated_fused_adam" ./
 
-# Transformer Engine used in NeMo v1.22 dockerfile 
+# Transformer Engine used in NeMo v1.22 dockerfile
 RUN git clone https://github.com/NVIDIA/TransformerEngine.git && \
   cd TransformerEngine && \
   git fetch origin 8eae4ce2b8fdfbbe525fc8bfecb0df5498cc9687 && \
@@ -110,7 +110,7 @@ RUN git clone -b v$NEMO_VERSION https://github.com/NVIDIA/NeMo.git && \
     sed -i "/megatron_core/d" requirements/requirements_nlp.txt && \
     pip install -r requirements/requirements.txt && \
     pip install -r requirements/requirements_nlp.txt && \
-    pip install ".[nlp]" 
+    pip install ".[nlp]"
 
 ##  need this for backward compatibility: pytests rely on configs in /workspace/nemo/examples
 RUN mkdir -p /workspace/nemo/
@@ -180,8 +180,8 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
 ## While at the runtime only boost-thread and boost-filesystem are needed
 WORKDIR /tmp
 RUN git clone --branch v1.2.5 https://github.com/ccsb-scripps/AutoDock-Vina
-# find /usr/ -name "libboost*"=> /usr/lib/aarch64-linux-gnu/  
-COPY ./setup/vina-boost-arm.patch ./  
+# find /usr/ -name "libboost*"=> /usr/lib/aarch64-linux-gnu/
+COPY ./setup/vina-boost-arm.patch ./
 RUN patch -p1 -d $PWD/AutoDock-Vina -i $PWD/vina-boost-arm.patch && \
     rm $PWD/vina-boost-arm.patch && cd $PWD/AutoDock-Vina/build/linux/release && make && cd ../../python && rm -rf build dist *.egg-info && python setup.py build install && rm -rf $PWD/AutoDock-Vina
 
@@ -328,8 +328,7 @@ RUN pip install --no-deps -e .
 RUN python -c "import nemo.collections.nlp as nemo_nlp" && \
   python -c "import nemo.core as nemo_core" && \
   python -c "import nemo.utils as nemo_utils" && \
-  python -c "import nemo.collections.common as nemo_common" 
+  python -c "import nemo.collections.common as nemo_common"
 
 # FIXME: If BIONEMO_HOME _is not_ /workspace/bionemo, then this ENTRYPOINT is invalid!
 ENTRYPOINT ["/workspace/bionemo/setup/startup.sh"]
-

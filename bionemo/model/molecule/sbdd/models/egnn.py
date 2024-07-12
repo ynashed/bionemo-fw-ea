@@ -25,7 +25,7 @@ from bionemo.model.molecule.sbdd.models.common import (
 
 
 class EGNNBaseLayer(nn.Module):
-    def __init__(self, hidden_dim, edge_feat_dim, num_r_gaussian, update_x=True, act_fn='silu', norm=False):
+    def __init__(self, hidden_dim, edge_feat_dim, num_r_gaussian, update_x=True, act_fn="silu", norm=False):
         super().__init__()
         self.r_min = 0.0
         self.r_max = 10.0
@@ -105,9 +105,9 @@ class EGNN(nn.Module):
         num_r_gaussian,
         k=32,
         cutoff=10.0,
-        cutoff_mode='knn',
+        cutoff_mode="knn",
         update_x=True,
-        act_fn='silu',
+        act_fn="silu",
         norm=False,
     ):
         super().__init__()
@@ -144,14 +144,14 @@ class EGNN(nn.Module):
     def _connect_edge(self, x, mask_ligand, batch):
         # if self.cutoff_mode == 'radius':
         #     edge_index = radius_graph(x, r=self.r, batch=batch, flow='source_to_target')
-        if self.cutoff_mode == 'knn':
-            edge_index = knn_graph(x, k=self.k, batch=batch, flow='source_to_target')
-        elif self.cutoff_mode == 'hybrid':
+        if self.cutoff_mode == "knn":
+            edge_index = knn_graph(x, k=self.k, batch=batch, flow="source_to_target")
+        elif self.cutoff_mode == "hybrid":
             edge_index = batch_hybrid_edge_connection(
                 x, k=self.k, mask_ligand=mask_ligand, batch=batch, add_p_index=True
             )
         else:
-            raise ValueError(f'Not supported cutoff mode: {self.cutoff_mode}')
+            raise ValueError(f"Not supported cutoff mode: {self.cutoff_mode}")
         return edge_index
 
     # todo: refactor
@@ -185,7 +185,7 @@ class EGNN(nn.Module):
             h, x = layer(h, x, edge_index, mask_ligand, edge_attr=edge_type)
             all_x.append(x)
             all_h.append(h)
-        outputs = {'x': x, 'h': h}
+        outputs = {"x": x, "h": h}
         if return_all:
-            outputs.update({'all_x': all_x, 'all_h': all_h})
+            outputs.update({"all_x": all_x, "all_h": all_h})
         return outputs

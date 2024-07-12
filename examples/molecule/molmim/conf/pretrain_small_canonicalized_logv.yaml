@@ -13,9 +13,9 @@ trainer:
   num_nodes: 8
   precision: 32 # 16-mixed, bf16-mixed, 32
 
-model: 
+model:
   name: MolMIM-small
-  
+
   # model architecture
   encoder:
     num_layers: 6

@@ -27,12 +27,12 @@ from sphinx import search
 
 # -- Project information -----------------------------------------------------
 
-project = 'NVIDIA BioNeMo Framework'
-copyright = '2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.'
-author = 'NVIDIA'
+project = "NVIDIA BioNeMo Framework"
+copyright = "2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved."
+author = "NVIDIA"
 
 # The full version, including alpha/beta/rc tags
-release = 'v0.4.0'
+release = "v0.4.0"
 
 # maintain left-side bar toctrees in `contents` file
 # so it doesn't show up needlessly in the index page
@@ -62,21 +62,21 @@ suppress_warnings = ["myst.domains", "ref.ref"]
 numfig = True
 
 # final location of docs for seo/sitemap
-html_baseurl = 'https://docs.nvidia.com/bionemo-framework/0.4.0/'  # FIXME # FIXED for now; needs to be updated at the time of product launch
+html_baseurl = "https://docs.nvidia.com/bionemo-framework/0.4.0/"  # FIXME # FIXED for now; needs to be updated at the time of product launch
 
 # final location of the framework code repo
-fw_code_baseurl = 'https://registry.ngc.nvidia.com/orgs/cobwt4rder8b/containers'  # FIXME # FIXED for now; needs to be updated at the time of product launch
+fw_code_baseurl = "https://registry.ngc.nvidia.com/orgs/cobwt4rder8b/containers"  # FIXME # FIXED for now; needs to be updated at the time of product launch
 
 # final location of the framework signup/info website
-bionemo_info_url = 'https://www.nvidia.com/en-us/gpu-cloud/bionemo'  # FIXME
+bionemo_info_url = "https://www.nvidia.com/en-us/gpu-cloud/bionemo"  # FIXME
 
 # NGC deploy info
-deploy_ngc_registry = 'nvcr.io'  # FIXME # FIXED for now; needs to be updated at the time of product launch
+deploy_ngc_registry = "nvcr.io"  # FIXME # FIXED for now; needs to be updated at the time of product launch
 deploy_ngc_org = "nvidia"  # FIXME
-deploy_ngc_org_id = 'cobwt4rder8b'  # FIXME
+deploy_ngc_org_id = "cobwt4rder8b"  # FIXME
 deploy_ngc_team = "clara"  # FIXME
-deploy_container_name = 'bionemo-framework'  # FIXME
-deploy_container_tag = '1.3'  # FIXME
+deploy_container_name = "bionemo-framework"  # FIXME
+deploy_container_tag = "1.3"  # FIXME
 
 myst_enable_extensions = [
     "dollarmath",
@@ -87,7 +87,7 @@ myst_enable_extensions = [
     "colon_fence",
     # "smartquotes",
     "replacements",
-    'substitution',
+    "substitution",
     # "linkify",
 ]
 myst_heading_anchors = 4
@@ -101,7 +101,7 @@ myst_heading_anchors = 4
 # ]
 
 # Add any paths that contain templates here, relative to this directory.
-templates_path = ['_templates']
+templates_path = ["_templates"]
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
@@ -134,7 +134,7 @@ html_additional_files = ["index.html"]
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ['_static']
+html_static_path = ["_static"]
 html_css_files = ["custom.css"]
 
 html_theme_options = {
@@ -208,21 +208,21 @@ def inject_uniprot_visuals(app, pagename, templatename, context, doctree):
 
     # only inject js/css to uniprot page
     if pagename == uniprot_url:
-        base_path = '_static/uniprot_visual'
-        js_files = ['d3.min.js', 'unirefClusterSample.js', 'UniprotCirclePackViz.js', 'main.js']
-        css_files = ['uniprot_styles.css']
+        base_path = "_static/uniprot_visual"
+        js_files = ["d3.min.js", "unirefClusterSample.js", "UniprotCirclePackViz.js", "main.js"]
+        css_files = ["uniprot_styles.css"]
 
         # inject js -- note, app.add_js_file inside html-page-context doesn't work,
         # so here I directly append our scripts alongside the uniprot page header scripts
-        context['script_files'].extend(f"{base_path}/js/{file}" for file in js_files)
+        context["script_files"].extend(f"{base_path}/js/{file}" for file in js_files)
 
         # inject css
-        context['css_files'].extend(f"{base_path}/css/{file}" for file in css_files)
+        context["css_files"].extend(f"{base_path}/css/{file}" for file in css_files)
 
 
 def setup(app):
-    app.add_config_value('ultimate_replacements', {}, True)
-    app.connect('source-read', ultimateReplace)
+    app.add_config_value("ultimate_replacements", {}, True)
+    app.connect("source-read", ultimateReplace)
     app.add_js_file("https://js.hcaptcha.com/1/api.js")
 
     visitor_script = "//assets.adobedtm.com/5d4962a43b79/c1061d2c5e7b/launch-191c2462b890.min.js"

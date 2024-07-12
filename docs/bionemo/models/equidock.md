@@ -6,7 +6,7 @@
 EquiDock [1] predicts protein-protein complex formation from two individual proteins.
 EquiDock is an SE(3)-equivariant model that treats both the proteins as rigid bodies and assumes no conformational change during the formation of the complex.  This model is ready for commercial use. <br>
 
-## Third-Party Community Consideration 
+## Third-Party Community Consideration
 The original model was not owned or developed by NVIDIA. This model has been developed and built to a third-party’s requirements for this application and use case; see [GitHub](https://github.com/octavian-ganea/equidock_public) for more.
 
 ## References:
@@ -15,7 +15,7 @@ The original model was not owned or developed by NVIDIA. This model has been dev
 3. Vreven, Thom, Iain H. Moal, Anna Vangone, Brian G. Pierce, Panagiotis L. Kastritis, Mieczyslaw Torchala, Raphael Chaleil et al. "Updates to the integrated protein–protein interaction benchmarks: docking benchmark version 5 and affinity benchmark version 2." Journal of molecular biology 427, no. 19 (2015): 3031-3041. <br>
 4. Townshend, Raphael, Rishi Bedi, Patricia Suriana, and Ron Dror. "End-to-end learning on 3d protein structure for interface prediction." Advances in Neural Information Processing Systems 32 (2019). <br>
 
-## Model Architecture: 
+## Model Architecture:
 **Architecture Type:** Graph Neural Network (GNN) <br>
 **Network Architecture:** Independent SE(3)-Equivariant Graph Matching Network (IEGMN) <br>
 
@@ -27,10 +27,10 @@ The original model was not owned or developed by NVIDIA. This model has been dev
 ## Output:
 **Output Types:** Text (Geometric Protein Structure) <br>
 **Output Format(s):** Protein Data Bank (PDB) <br>
-**Other Properties Related to Output:** [ Text represented as integers, floating point 32, and alphabetical representations for the residue name.] <br> 
+**Other Properties Related to Output:** [ Text represented as integers, floating point 32, and alphabetical representations for the residue name.] <br>
 
 ## Software Integration:
-**Runtime Engine(s):** 
+**Runtime Engine(s):**
 * BioNeMo, NeMo 1.2 <br>
 
 **Supported Hardware Microarchitecture Compatibility:** <br>
@@ -40,11 +40,11 @@ The original model was not owned or developed by NVIDIA. This model has been dev
 **[Preferred/Supported] Operating System(s):** <br>
 * [Linux] <br>
 
-## Model Version(s): 
+## Model Version(s):
 dips.23.10 <br>
 db5.23.10 <br>
 
-# Training & Evaluation: 
+# Training & Evaluation:
 
 ## Training Dataset:
 
@@ -55,7 +55,7 @@ db5.23.10 <br>
 * [Not Applicable] <br>
 **Properties:** <br>
 DB5.5 dataset consists of 253 protein structures  built by mining the Protein Data Bank (PDB) for pairs of interacting proteins
-The Database for Interacting Proteins Structures (DIPS) has 41,876 binary complexes containing bound structures with rigid body docking, while DB5.5 includes unbound protein structures. 
+The Database for Interacting Proteins Structures (DIPS) has 41,876 binary complexes containing bound structures with rigid body docking, while DB5.5 includes unbound protein structures.
 Datasets are then randomly partitioned in training, validation, and testing datasets The training and validation are used during training. DB5.5 includes 203/25 training and validation data points respectively. DIPS includes 39,937/974 training and validation data points respectively. <br>
 
 **Dataset License(s):** [https://jirasw.nvidia.com/browse/DGPTT-1300, https://jirasw.nvidia.com/browse/DGPTT-1301] **INTERNAL ONLY** <br>
@@ -66,13 +66,13 @@ Datasets are then randomly partitioned in training, validation, and testing data
 * [Automatic/Sensors] <br>
 **Labeling Method by dataset** <br>
 * [Not Applicable] <br>
-**Properties:** 
+**Properties:**
 
 DB5.5 dataset consists of 253 protein structures  built by mining the Protein Data Bank (PDB) for pairs of interacting proteins
-The Database for Interacting Proteins Structures (DIPS) has 41,876 binary complexes containing bound structures with rigid body docking, while DB5.5 includes unbound protein structures. 
+The Database for Interacting Proteins Structures (DIPS) has 41,876 binary complexes containing bound structures with rigid body docking, while DB5.5 includes unbound protein structures.
 
 Datasets are then randomly partitioned in training, validation, and testing datasets The training and validation are used during training. DB5.5 and DIPS testing datasets include 25 and 965 testing data points respectively.
- <br> 
+ <br>
 
 **Dataset License(s):** [https://jirasw.nvidia.com/browse/DGPTT-1300, https://jirasw.nvidia.com/browse/DGPTT-1301] **INTERNAL ONLY** <br>
 
@@ -119,4 +119,3 @@ Training speed was tested on DGX-A100 systems with 8 IEGM layers over DIPS datas
 ## License
 
 EquiDock is provided under the {{model_license_slug}}.
-

@@ -50,7 +50,7 @@ model:
       num_workers: 10
       task_name: downstream
       dataset_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/protein/downstream
-      dataset: 
+      dataset:
         train: x000
         test: x000
       target_sizes: [3, 8, 2]
@@ -72,7 +72,7 @@ model:
           last_epoch: -1
           warmup_ratio: 0.01
           max_steps: 1000
-  
+
 exp_manager:
   exp_dir: ${oc.env:BIONEMO_HOME}/test_results/nemo_experiments/prott5nv_sec_str_val
   create_wandb_logger: False

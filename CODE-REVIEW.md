@@ -213,7 +213,7 @@ a fruitful interaction across the team members.
     look and feel of the code which defines the most fundamentals of how the code should be
     developed and allows reviewers to focus on the most important aspects of a new piece of code.
     For bash scripting please follow the Google Shell Style Guide [here](https://google.github.io/styleguide/shellguide.html)
-    
+
 
 
 -   We follow a revert + fix policy in the codebase for any showstopper
@@ -406,7 +406,7 @@ a fruitful interaction across the team members.
     the full story of the patch in mind since they were not the author. A comment
     is not a demand, it's a suggestion towards a mutually acceptable solution
     between the author and the reviewer.
-    
+
 
 -   Don't submit code that you know will break other
     platforms/dependencies. If your patch affects code that is used by

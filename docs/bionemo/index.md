@@ -5,11 +5,11 @@ AI models are changing how we think about and access information on an unprecede
 ![](./images/bionemo_overview_2.png)
 
 ## BioNeMo Framework
-BioNeMo Framework provides versatile functionalities for developing, training and deploying large scale bio-based models. BioNeMo allows users to build biomolecular models by providing access to pre-trained models, creating workflows to fit downstream task models from embeddings, and generating biomolecules that meet user-specified criteria based on the fit model. Built for supercomputing scale, the framework allows developers to easily configure and deploy distributed multi-node jobs with minimal code. 
+BioNeMo Framework provides versatile functionalities for developing, training and deploying large scale bio-based models. BioNeMo allows users to build biomolecular models by providing access to pre-trained models, creating workflows to fit downstream task models from embeddings, and generating biomolecules that meet user-specified criteria based on the fit model. Built for supercomputing scale, the framework allows developers to easily configure and deploy distributed multi-node jobs with minimal code.
 
 ![](./images/bionemo_overview_1.png)
 
-The underpinnings of the biological research framework rely on [NeMo](https://docs.nvidia.com/deeplearning/nemo/user-guide/docs/en/stable/starthere/intro.html), a framework initially established for conversational AI methods. NeMo provides a robust environment for working with large learning models, including [Megatron](https://docs.nvidia.com/deeplearning/nemo/user-guide/docs/en/stable/nlp/megatron.html) models. The BioNeMo Framework provides enhancements to PyTorch Lighting, such as hyperparameter configuarbility with YAML files and checkpoint management. Users can conveniently and quickly train models using these features, test them for desired tasks, and integrate them alongside existing applications. 
+The underpinnings of the biological research framework rely on [NeMo](https://docs.nvidia.com/deeplearning/nemo/user-guide/docs/en/stable/starthere/intro.html), a framework initially established for conversational AI methods. NeMo provides a robust environment for working with large learning models, including [Megatron](https://docs.nvidia.com/deeplearning/nemo/user-guide/docs/en/stable/nlp/megatron.html) models. The BioNeMo Framework provides enhancements to PyTorch Lighting, such as hyperparameter configuarbility with YAML files and checkpoint management. Users can conveniently and quickly train models using these features, test them for desired tasks, and integrate them alongside existing applications.
 
 Some of the key features of BioNeMo Framework are:
 

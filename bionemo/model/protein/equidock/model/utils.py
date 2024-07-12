@@ -28,36 +28,36 @@ from bionemo.model.protein.equidock.model.graph_norm import GraphNorm
 
 
 def get_non_lin(type, negative_slope):
-    if type == 'swish':
+    if type == "swish":
         return nn.SiLU()
     else:
-        assert type == 'lkyrelu'
+        assert type == "lkyrelu"
         return nn.LeakyReLU(negative_slope=negative_slope)
 
 
 def get_layer_norm(layer_norm_type, dim):
-    if layer_norm_type == 'BN':
+    if layer_norm_type == "BN":
         return nn.BatchNorm1d(dim)
-    elif layer_norm_type == 'LN':
+    elif layer_norm_type == "LN":
         return nn.LayerNorm(dim)
     else:
         return nn.Identity()
 
 
 def get_final_h_layer_norm(layer_norm_type, dim):
-    if layer_norm_type == 'BN':
+    if layer_norm_type == "BN":
         return nn.BatchNorm1d(dim)
-    elif layer_norm_type == 'LN':
+    elif layer_norm_type == "LN":
         return nn.LayerNorm(dim)
-    elif layer_norm_type == 'GN':
+    elif layer_norm_type == "GN":
         return GraphNorm(dim)
     else:
-        assert layer_norm_type == '0'
+        assert layer_norm_type == "0"
         return nn.Identity()
 
 
 def apply_final_h_layer_norm(g, h, node_type, norm_type, norm_layer):
-    if norm_type == 'GN':
+    if norm_type == "GN":
         return norm_layer(g, h, node_type)
     return norm_layer(h)
 

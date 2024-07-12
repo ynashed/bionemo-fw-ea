@@ -63,17 +63,17 @@ def test_dsmbind_inference(bionemo_home: Path):
     model = DSMBind(cfg.model)
     model.to(device)
     checkpoint = torch.load(checkpoint_path)
-    model.load_state_dict(checkpoint['model_state_dict'])
+    model.load_state_dict(checkpoint["model_state_dict"])
 
     # Process and load dataset
     raw_data_dir = dsmbind_test_raw_data_dir(bionemo_home)
     preprocess(raw_data_dir=raw_data_dir)
     inference_dataset = DSMBindDataset(
-        processed_data_path=os.path.join(raw_data_dir, 'processed.pkl'),
+        processed_data_path=os.path.join(raw_data_dir, "processed.pkl"),
         aa_size=cfg.model.aa_size,
         max_residue_atoms=cfg.model.max_residue_atoms,
     )
-    os.remove(os.path.join(raw_data_dir, 'processed.pkl'))
+    os.remove(os.path.join(raw_data_dir, "processed.pkl"))
     test_loader = DataLoader(inference_dataset, 1, collate_fn=inference_dataset.pl_collate_fn, shuffle=False)
 
     predictions = inference(model, test_loader, device)

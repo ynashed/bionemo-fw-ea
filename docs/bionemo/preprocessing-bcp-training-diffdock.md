@@ -1,7 +1,7 @@
 
 # DiffDock: Preparing Workspace and Data for Pre-training
 
-This section outlines the steps to prepare your workspace with pre-processed files for training DiffDock using the NVIDIA NGC platform. 
+This section outlines the steps to prepare your workspace with pre-processed files for training DiffDock using the NVIDIA NGC platform.
 
 This workspace can then be used to launch DiffDock training job using the template script `<BioNeMO_Workspace>/examples/molecule/diffdock/scripts/train_bcp.sh`.
 
@@ -38,7 +38,7 @@ The protein and ligand structure data files, e.g., PDB files for proteins and
 SDF files for ligands, should be placed in a dedicated data directory, which is
 to be passed to the data preprocessing script (see details below) via the
 config option `protein_data.protein_data_dir=/path/to/data`. The user needs to
-provide a CSV file that specifies the protein-ligand complexes' name and the corresponding 
+provide a CSV file that specifies the protein-ligand complexes' name and the corresponding
 structure data files in the following format:
 
 ```csv

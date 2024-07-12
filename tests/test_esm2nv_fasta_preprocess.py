@@ -11,6 +11,7 @@
 """
 This file tests the data-related utilities for ESM2.
 """
+
 import os
 import shutil
 from pathlib import Path
@@ -28,13 +29,13 @@ from bionemo.utils.tests import teardown_apex_megatron_cuda
 
 
 CUSTOM_PRETRAINING_TRAIN_FASTA_PATH = (
-    Path(os.environ['BIONEMO_HOME']) / 'examples/tests/test_data/protein/esm2nv/example_train.fasta'
+    Path(os.environ["BIONEMO_HOME"]) / "examples/tests/test_data/protein/esm2nv/example_train.fasta"
 )
 CUSTOM_PRETRAINING_VAL_FASTA_PATH = (
-    Path(os.environ['BIONEMO_HOME']) / 'examples/tests/test_data/protein/esm2nv/example_val.fasta'
+    Path(os.environ["BIONEMO_HOME"]) / "examples/tests/test_data/protein/esm2nv/example_val.fasta"
 )
 CUSTOM_PRETRAINING_TEST_FASTA_PATH = (
-    Path(os.environ['BIONEMO_HOME']) / 'examples/tests/test_data/protein/esm2nv/example_test.fasta'
+    Path(os.environ["BIONEMO_HOME"]) / "examples/tests/test_data/protein/esm2nv/example_test.fasta"
 )
 
 NUM_EXAMPLE_SEQUENCES = 100
@@ -56,7 +57,7 @@ def cfg(tmp_path: str, config_path_for_tests: str) -> DictConfig:
     Returns:
         (DictConfig): Overriden test config
     """
-    cfg = load_model_config(config_name='esm2nv_data_test', config_path=config_path_for_tests)
+    cfg = load_model_config(config_name="esm2nv_data_test", config_path=config_path_for_tests)
 
     # avoid overwriting index files
     target_custom_pretraining_train_fasta_path = tmp_path / os.path.basename(CUSTOM_PRETRAINING_TRAIN_FASTA_PATH)
@@ -108,7 +109,7 @@ def preprocess_fasta_dataset(root_directory: str, cfg: DictConfig, mode: str, nu
         mode (str): Options are 'train', 'val' and 'test'.
         num_csv_files (int): Number of csv file(s).
     """
-    assert mode in ['train', 'val', 'test']
+    assert mode in ["train", "val", "test"]
 
     preprocessor = FastaPreprocess(root_directory=root_directory)
     custom_pretraining_fasta_path = cfg.model.data[mode].custom_pretraining_fasta_path
@@ -128,7 +129,7 @@ def preprocess_fasta_train_val_test_dataset(root_directory: str, cfg: DictConfig
         cfg (DictConfig): Configuration in full.
         num_csv_files (int): Number of csv file(s).
     """
-    for mode in ['train', 'val', 'test']:
+    for mode in ["train", "val", "test"]:
         preprocess_fasta_dataset(
             root_directory=root_directory,
             cfg=cfg,
@@ -148,11 +149,11 @@ def test_fasta_preprocess_training_dataset_creates_non_empty_dirs(tmp_path: str,
     preprocess_fasta_dataset(
         root_directory=tmp_path,
         cfg=cfg,
-        mode='train',
+        mode="train",
         num_csv_files=NUM_CSV_FILES,
     )
     # info: empty csv when NUM_CSV_FILES > NUM_EXAMPLE_SEQUENCES
-    assert len(os.listdir(tmp_path / 'train')) == NUM_CSV_FILES
+    assert len(os.listdir(tmp_path / "train")) == NUM_CSV_FILES
 
 
 def test_fasta_preprocess_val_dataset_creates_non_empty_dirs(tmp_path: str, cfg: DictConfig):
@@ -165,11 +166,11 @@ def test_fasta_preprocess_val_dataset_creates_non_empty_dirs(tmp_path: str, cfg:
     preprocess_fasta_dataset(
         root_directory=tmp_path,
         cfg=cfg,
-        mode='val',
+        mode="val",
         num_csv_files=NUM_CSV_FILES,
     )
     # info: empty csv when NUM_CSV_FILES > NUM_EXAMPLE_SEQUENCES
-    assert len(os.listdir(tmp_path / 'val')) == NUM_CSV_FILES
+    assert len(os.listdir(tmp_path / "val")) == NUM_CSV_FILES
 
 
 def test_fasta_preprocess_test_dataset_creates_non_empty_dirs(tmp_path: str, cfg: DictConfig):
@@ -182,11 +183,11 @@ def test_fasta_preprocess_test_dataset_creates_non_empty_dirs(tmp_path: str, cfg
     preprocess_fasta_dataset(
         root_directory=tmp_path,
         cfg=cfg,
-        mode='test',
+        mode="test",
         num_csv_files=NUM_CSV_FILES,
     )
     # info: empty csv when NUM_CSV_FILES > NUM_EXAMPLE_SEQUENCES
-    assert len(os.listdir(tmp_path / 'test')) == NUM_CSV_FILES
+    assert len(os.listdir(tmp_path / "test")) == NUM_CSV_FILES
 
 
 def test_esm2nv_model_creates_train_dataset_with_expected_number_of_samples(
@@ -202,7 +203,7 @@ def test_esm2nv_model_creates_train_dataset_with_expected_number_of_samples(
     preprocess_fasta_dataset(
         root_directory=tmp_path,
         cfg=cfg,
-        mode='train',
+        mode="train",
         num_csv_files=NUM_CSV_FILES,
     )
 
@@ -216,8 +217,8 @@ def test_esm2nv_model_creates_train_dataset_with_expected_number_of_samples(
     assert len(train_dataset) == NUM_OUTPUT_SEQUENCES
     assert sample is not None
     assert isinstance(sample, dict)
-    assert isinstance(sample['sequence'], str)
-    assert isinstance(sample['sequence_id'], str)
+    assert isinstance(sample["sequence"], str)
+    assert isinstance(sample["sequence_id"], str)
 
 
 def test_esm2nv_model_creates_train_dataset_with_valid_outputs_given_num_samples_is_none(
@@ -233,7 +234,7 @@ def test_esm2nv_model_creates_train_dataset_with_valid_outputs_given_num_samples
     preprocess_fasta_dataset(
         root_directory=tmp_path,
         cfg=cfg,
-        mode='train',
+        mode="train",
         num_csv_files=NUM_CSV_FILES,
     )
 
@@ -246,8 +247,8 @@ def test_esm2nv_model_creates_train_dataset_with_valid_outputs_given_num_samples
     assert len(train_dataset) == NUM_EXAMPLE_SEQUENCES
     assert sample is not None
     assert isinstance(sample, dict)
-    assert isinstance(sample['sequence'], str)
-    assert isinstance(sample['sequence_id'], str)
+    assert isinstance(sample["sequence"], str)
+    assert isinstance(sample["sequence_id"], str)
 
 
 def test_esm2nv_model_creates_train_dataset_fails_when_num_samples_is_none_with_upsampling(
@@ -264,7 +265,7 @@ def test_esm2nv_model_creates_train_dataset_fails_when_num_samples_is_none_with_
     preprocess_fasta_dataset(
         root_directory=tmp_path,
         cfg=cfg,
-        mode='train',
+        mode="train",
         num_csv_files=NUM_CSV_FILES,
     )
 
@@ -273,7 +274,7 @@ def test_esm2nv_model_creates_train_dataset_fails_when_num_samples_is_none_with_
 
 
 # TODO [sichu] model leakage starting from including test functions here onwards
-@pytest.mark.skip(reason='unknown model leakage to other tests')
+@pytest.mark.skip(reason="unknown model leakage to other tests")
 def test_esm2nv_model_creates_validation_dataset_with_valid_outputs_given_num_samples_is_none(
     tmp_path: str, model: ESM2nvModel, cfg: DictConfig
 ):
@@ -287,7 +288,7 @@ def test_esm2nv_model_creates_validation_dataset_with_valid_outputs_given_num_sa
     preprocess_fasta_dataset(
         root_directory=tmp_path,
         cfg=cfg,
-        mode='val',
+        mode="val",
         num_csv_files=NUM_CSV_FILES,
     )
 
@@ -299,11 +300,11 @@ def test_esm2nv_model_creates_validation_dataset_with_valid_outputs_given_num_sa
     assert len(val_dataset) == NUM_EXAMPLE_SEQUENCES
     assert sample is not None
     assert isinstance(sample, dict)
-    assert isinstance(sample['sequence'], str)
-    assert isinstance(sample['sequence_id'], str)
+    assert isinstance(sample["sequence"], str)
+    assert isinstance(sample["sequence_id"], str)
 
 
-@pytest.mark.skip(reason='unknown model leakage to other tests')
+@pytest.mark.skip(reason="unknown model leakage to other tests")
 def test_esm2nv_model_creates_validation_dataset_with_set_length(tmp_path: str, model: ESM2nvModel, cfg: DictConfig):
     """Test val dataset length and types of samples from ESM2nvModel when upsampling with expected number of samples.
 
@@ -315,7 +316,7 @@ def test_esm2nv_model_creates_validation_dataset_with_set_length(tmp_path: str, 
     preprocess_fasta_dataset(
         root_directory=tmp_path,
         cfg=cfg,
-        mode='val',
+        mode="val",
         num_csv_files=NUM_CSV_FILES,
     )
 
@@ -327,11 +328,11 @@ def test_esm2nv_model_creates_validation_dataset_with_set_length(tmp_path: str, 
 
     assert sample is not None
     assert isinstance(sample, dict)
-    assert isinstance(sample['sequence'], str)
-    assert isinstance(sample['sequence_id'], str)
+    assert isinstance(sample["sequence"], str)
+    assert isinstance(sample["sequence_id"], str)
 
 
-@pytest.mark.skip(reason='unknown model leakage to other tests')
+@pytest.mark.skip(reason="unknown model leakage to other tests")
 def test_esm2nv_model_creates_test_dataset_with_valid_outputs(tmp_path: str, model: ESM2nvModel, cfg: DictConfig):
     """Test test dataset length and types of samples from ESM2nvModel without expected number of samples.
 
@@ -343,7 +344,7 @@ def test_esm2nv_model_creates_test_dataset_with_valid_outputs(tmp_path: str, mod
     preprocess_fasta_dataset(
         root_directory=tmp_path,
         cfg=cfg,
-        mode='test',
+        mode="test",
         num_csv_files=NUM_CSV_FILES,
     )
 
@@ -353,11 +354,11 @@ def test_esm2nv_model_creates_test_dataset_with_valid_outputs(tmp_path: str, mod
     sample = next(iter(test_dataset))
     assert sample is not None
     assert isinstance(sample, dict)
-    assert isinstance(sample['sequence'], str)
-    assert isinstance(sample['sequence_id'], str)
+    assert isinstance(sample["sequence"], str)
+    assert isinstance(sample["sequence_id"], str)
 
 
-@pytest.mark.skip(reason='unknown model leakage to other tests')
+@pytest.mark.skip(reason="unknown model leakage to other tests")
 def test_esm2nv_model_creates_test_dataset_with_set_length(tmp_path: str, model: ESM2nvModel, cfg: DictConfig):
     """Test test dataset length and types of samples from ESM2nvModel when upsampling with expected number of samples.
 
@@ -369,7 +370,7 @@ def test_esm2nv_model_creates_test_dataset_with_set_length(tmp_path: str, model:
     preprocess_fasta_dataset(
         root_directory=tmp_path,
         cfg=cfg,
-        mode='test',
+        mode="test",
         num_csv_files=NUM_CSV_FILES,
     )
     cfg.model.data.test.use_upsampling = True
@@ -381,11 +382,11 @@ def test_esm2nv_model_creates_test_dataset_with_set_length(tmp_path: str, model:
     sample = next(iter(test_dataset))
     assert sample is not None
     assert isinstance(sample, dict)
-    assert isinstance(sample['sequence'], str)
-    assert isinstance(sample['sequence_id'], str)
+    assert isinstance(sample["sequence"], str)
+    assert isinstance(sample["sequence_id"], str)
 
 
-@pytest.mark.skip(reason='unknown model leakage to other tests')
+@pytest.mark.skip(reason="unknown model leakage to other tests")
 def test_esm2nv_model_build_train_valid_test_datasets_returns_valid_train_dataset(
     tmp_path: str, model: ESM2nvModel, cfg: DictConfig
 ):
@@ -407,7 +408,7 @@ def test_esm2nv_model_build_train_valid_test_datasets_returns_valid_train_datase
     )  # already checked to be on manually in cfg fixture
 
 
-@pytest.mark.skip(reason='unknown model leakage to other tests')
+@pytest.mark.skip(reason="unknown model leakage to other tests")
 def test_esm2nv_model_build_train_valid_test_datasets_returns_valid_val_dataset(
     tmp_path: str, model: ESM2nvModel, cfg: DictConfig
 ):
@@ -429,7 +430,7 @@ def test_esm2nv_model_build_train_valid_test_datasets_returns_valid_val_dataset(
     )  # warning: assume cfg.model.data.val.data_impl == 'csv_fields_mmap'
 
 
-@pytest.mark.skip(reason='unknown model leakage to other tests')
+@pytest.mark.skip(reason="unknown model leakage to other tests")
 def test_esm2nv_model_build_train_valid_test_datasets_returns_valid_test_dataset(
     tmp_path: str, model: ESM2nvModel, cfg: DictConfig
 ):
@@ -449,7 +450,7 @@ def test_esm2nv_model_build_train_valid_test_datasets_returns_valid_test_dataset
     isinstance(test_ds, mapped_dataset.MappedDataset)
 
 
-@pytest.mark.skip(reason='unknown model leakage to other tests')
+@pytest.mark.skip(reason="unknown model leakage to other tests")
 def test_build_train_valid_test_dataset_limits_val_batches_uses_fraction_of_dataset(
     tmp_path: str, model: ESM2nvModel, cfg: DictConfig
 ):
@@ -480,7 +481,7 @@ def test_build_train_valid_test_dataset_limits_val_batches_uses_fraction_of_data
     assert len(val_ds) == expected_len_val_ds
 
 
-@pytest.mark.skip(reason='unknown model leakage to other tests')
+@pytest.mark.skip(reason="unknown model leakage to other tests")
 def test_build_train_valid_test_dataset_limits_test_batches_uses_fraction_of_dataset(
     tmp_path: str, model: ESM2nvModel, cfg: DictConfig
 ):
@@ -505,7 +506,7 @@ def test_build_train_valid_test_dataset_limits_test_batches_uses_fraction_of_dat
     assert len(test_ds) == expected_len_test_ds
 
 
-@pytest.mark.skip(reason='unknown model leakage to other tests')
+@pytest.mark.skip(reason="unknown model leakage to other tests")
 def test_build_train_valid_test_dataset_limits_val_batches_uses_full_dataset(
     tmp_path: str, model: ESM2nvModel, cfg: DictConfig
 ):
@@ -537,7 +538,7 @@ def test_build_train_valid_test_dataset_limits_val_batches_uses_full_dataset(
     assert len(val_ds) == expected_len_val_ds
 
 
-@pytest.mark.skip(reason='unknown model leakage to other tests')
+@pytest.mark.skip(reason="unknown model leakage to other tests")
 def test_build_train_valid_test_dataset_limits_val_batches_int_2(tmp_path: str, model: ESM2nvModel, cfg: DictConfig):
     """Test val dataset length under resampling when limiting val batches to int(2).
 
@@ -568,7 +569,7 @@ def test_build_train_valid_test_dataset_limits_val_batches_int_2(tmp_path: str, 
     assert len(val_ds) == expected_len_val_ds
 
 
-@pytest.mark.skip(reason='unknown model leakage to other tests')
+@pytest.mark.skip(reason="unknown model leakage to other tests")
 def test_build_train_valid_test_dataset_limits_val_batches_error_when_zero(
     tmp_path: str, model: ESM2nvModel, cfg: DictConfig
 ):
@@ -591,7 +592,7 @@ def test_build_train_valid_test_dataset_limits_val_batches_error_when_zero(
         model.build_train_valid_test_datasets()
 
 
-@pytest.mark.skip(reason='unknown model leakage to other tests')
+@pytest.mark.skip(reason="unknown model leakage to other tests")
 def test_build_train_valid_test_dataset_throws_error_if_limit_val_batches_but_no_upsampling_in_cfg(
     tmp_path: str, model: ESM2nvModel, cfg: DictConfig
 ):
@@ -615,7 +616,7 @@ def test_build_train_valid_test_dataset_throws_error_if_limit_val_batches_but_no
         model.build_train_valid_test_datasets()
 
 
-@pytest.mark.skip(reason='unknown model leakage to other tests')
+@pytest.mark.skip(reason="unknown model leakage to other tests")
 def test_build_train_valid_test_dataset_limits_train_batches_based_on_max_steps(
     tmp_path: str, model: ESM2nvModel, cfg: DictConfig
 ):
@@ -639,7 +640,7 @@ def test_build_train_valid_test_dataset_limits_train_batches_based_on_max_steps(
     assert len(train_ds) == 20
 
 
-@pytest.mark.skip(reason='unknown model leakage to other tests')
+@pytest.mark.skip(reason="unknown model leakage to other tests")
 def test_esm2nv_model_fails_if_test_use_upsampling_false_but_limit_test_batches_not_1(
     tmp_path: str, model: ESM2nvModel, cfg: DictConfig
 ):
@@ -662,7 +663,7 @@ def test_esm2nv_model_fails_if_test_use_upsampling_false_but_limit_test_batches_
         model.build_train_valid_test_datasets()
 
 
-@pytest.mark.skip(reason='unknown model leakage to other tests')
+@pytest.mark.skip(reason="unknown model leakage to other tests")
 def test_esm2nv_model_fails_if_val_use_upsampling_false_but_limit_val_batches_not_1(
     tmp_path: str, model: ESM2nvModel, cfg: DictConfig
 ):

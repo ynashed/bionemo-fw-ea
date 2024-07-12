@@ -45,7 +45,7 @@ __all__: Sequence[str] = (
 )
 
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 def add_jitter(embedding: torch.Tensor, radius: float, cnt: int) -> list[torch.Tensor]:
@@ -139,7 +139,7 @@ def _safe_triton_controlled_generation_infer_fn(
             raise ValueError(f"Missing required field '{fieldname}'")
 
         if issubclass(t, str):
-            x = np.char.decode(a, encoding='utf-8')
+            x = np.char.decode(a, encoding="utf-8")
             y = cast(t, next(iter(x)))
 
         elif issubclass(t, list):
@@ -169,7 +169,7 @@ def _safe_triton_controlled_generation_infer_fn(
         # algorithm = _get(request, 'algorithm', str)
 
         print(f"{request['algorithm']=}")
-        algorithm = decode_str_single(request['algorithm'])
+        algorithm = decode_str_single(request["algorithm"])
 
         # TODO: can actually accept a batch of smiles strings!
         # smi = _get(request, 'smi', str)
@@ -179,10 +179,10 @@ def _safe_triton_controlled_generation_infer_fn(
         # smis = decode_str_batch_rows(request['smi'])
         # print(f"{smis=} | {type(smis)=}")
         # smi = smis[0]
-        smi = decode_str_single(request['smi'])
+        smi = decode_str_single(request["smi"])
         print(f"{smi=}")
 
-        num_molecules = _get(request, 'num_molecules', int, test=(lambda x: x > 0, "Positive"))
+        num_molecules = _get(request, "num_molecules", int, test=(lambda x: x > 0, "Positive"))
 
         if algorithm == "CMA-ES":
             score_type: str = "cma-es"
@@ -193,11 +193,11 @@ def _safe_triton_controlled_generation_infer_fn(
             print(f"{request['minimize']=}")
             print(f"{request['min_similarity']=}")
 
-            property_name = decode_str_single(request['property_name'])
-            particles = decode_single(request['particles'], int)
-            iterations = decode_single(request['iterations'], int)
-            minimize = decode_single(request['minimize'], bool)
-            min_similarity = decode_single(request['min_similarity'], float)
+            property_name = decode_str_single(request["property_name"])
+            particles = decode_single(request["particles"], int)
+            iterations = decode_single(request["iterations"], int)
+            minimize = decode_single(request["minimize"], bool)
+            min_similarity = decode_single(request["min_similarity"], float)
             print(f"{property_name=}")
             print(f"{particles=}")
             print(f"{iterations=}")
@@ -260,7 +260,7 @@ def _safe_triton_controlled_generation_infer_fn(
 
         else:
             score_type = "tanimoto_similarity"
-            radius = _get(request, 'radius', float, test=(lambda x: 0 <= x <= 2, "Must be in [0,2]"))
+            radius = _get(request, "radius", float, test=(lambda x: 0 <= x <= 2, "Must be in [0,2]"))
 
             embedding = model.seq_to_embeddings([smi]).unsqueeze(1)
 
@@ -278,13 +278,13 @@ def _safe_triton_controlled_generation_infer_fn(
                 final_result.append({"sample": sample, "score": score})
 
         # Sort the final results
-        final_result.sort(key=lambda d: d['score'], reverse=True)
+        final_result.sort(key=lambda d: d["score"], reverse=True)
         # And turn back into tensors in name-oriented batch form
         final_samples: list[str] = []
         final_scores: list[float] = []
         for d in final_result:
-            final_samples.append(d['sample'])
-            final_scores.append(d['score'])
+            final_samples.append(d["sample"])
+            final_scores.append(d["score"])
 
         # formulate & return response
         response: ControlledGenerationResponse = {

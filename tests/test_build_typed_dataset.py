@@ -24,48 +24,48 @@ from bionemo.utils.tests import teardown_apex_megatron_cuda
 
 
 def test_dataset_builder_fasta_fields():
-    filepath = 'examples/tests/test_data/preprocessing/test/uniref2022_small.fasta'
+    filepath = "examples/tests/test_data/preprocessing/test/uniref2022_small.fasta"
     data_impl = _FASTA_FIELDS_MMAP_TYPE
-    kwargs = {'data_fields': {'id': 0, 'sequence': 1}}
+    kwargs = {"data_fields": {"id": 0, "sequence": 1}}
 
-    cfg = {'data_impl_kwargs': {_FASTA_FIELDS_MMAP_TYPE: kwargs}}
+    cfg = {"data_impl_kwargs": {_FASTA_FIELDS_MMAP_TYPE: kwargs}}
     cfg = OmegaConf.create(cfg)
     dataset = build_typed_dataset(
         dataset_paths=filepath, data_impl=data_impl, use_upsampling=False, cfg=cfg, num_samples=None
     )
 
     assert isinstance(dataset, _DATA_IMPL_TYPE_CLS[data_impl]), (
-        f'Dataset with data_imp={data_impl} should be ' f'of class {_DATA_IMPL_TYPE_CLS[data_impl].__name__}'
+        f"Dataset with data_imp={data_impl} should be " f"of class {_DATA_IMPL_TYPE_CLS[data_impl].__name__}"
     )
 
     assert len(dataset) == 100
-    assert list(dataset[57].keys()) == ['n', 'Tax', 'TaxID', 'RepID', 'id', 'sequence']
-    assert dataset[1]['n'] == '2'
-    assert dataset[13]['Tax'] == 'Galemys'
-    assert dataset[28]['TaxID'] == '117571'
-    assert dataset[81]['RepID'] == 'A0A202DCN3_9BACT'
-    assert dataset[64]['id'] == 'UniRef50_A0A6F9DW11'
-    seq = dataset[97]['sequence']
+    assert list(dataset[57].keys()) == ["n", "Tax", "TaxID", "RepID", "id", "sequence"]
+    assert dataset[1]["n"] == "2"
+    assert dataset[13]["Tax"] == "Galemys"
+    assert dataset[28]["TaxID"] == "117571"
+    assert dataset[81]["RepID"] == "A0A202DCN3_9BACT"
+    assert dataset[64]["id"] == "UniRef50_A0A6F9DW11"
+    seq = dataset[97]["sequence"]
     assert isinstance(seq, str)
     assert len(seq) == 24603
     assert (
-        set(seq) - {'Y', 'N', 'W', 'E', 'F', 'L', 'A', 'K', 'R', 'D', 'C', 'Q', 'S', 'H', 'I', 'V', 'M', 'G', 'P', 'T'}
+        set(seq) - {"Y", "N", "W", "E", "F", "L", "A", "K", "R", "D", "C", "Q", "S", "H", "I", "V", "M", "G", "P", "T"}
     ) == set()
 
 
 def test_dataset_builder_csv_mmap():
     # MegamolBART pretraining
-    filepath = 'examples/tests/test_data/molecule/test/x[000..001]'
+    filepath = "examples/tests/test_data/molecule/test/x[000..001]"
     data_impl = _CSV_MMAP_TYPE
     kwargs = {
-        'newline_int': 10,
-        'header_lines': 1,
-        'workers': 1,
-        'sort_dataset_paths': True,
-        'data_sep': ',',
-        'data_col': 1,
+        "newline_int": 10,
+        "header_lines": 1,
+        "workers": 1,
+        "sort_dataset_paths": True,
+        "data_sep": ",",
+        "data_col": 1,
     }
-    cfg = {'data_impl_kwargs': {_CSV_MMAP_TYPE: kwargs}}
+    cfg = {"data_impl_kwargs": {_CSV_MMAP_TYPE: kwargs}}
     cfg = OmegaConf.create(cfg)
 
     dataset = build_typed_dataset(
@@ -73,40 +73,40 @@ def test_dataset_builder_csv_mmap():
     )
     assert len(dataset) == 18
     assert isinstance(dataset, _DATA_IMPL_TYPE_CLS[data_impl]), (
-        f'Dataset with data_imp={data_impl} should be ' f'of class {_DATA_IMPL_TYPE_CLS[data_impl].__name__}'
+        f"Dataset with data_imp={data_impl} should be " f"of class {_DATA_IMPL_TYPE_CLS[data_impl].__name__}"
     )
-    assert dataset[0] == 'CN[C@H](CC(=O)NC1CC1)C(N)=O' and dataset[17] == 'C=C[C@@H]1CCCCN1[C@@H]1CC[C@H]1N'
+    assert dataset[0] == "CN[C@H](CC(=O)NC1CC1)C(N)=O" and dataset[17] == "C=C[C@@H]1CCCCN1[C@@H]1CC[C@H]1N"
 
 
 def test_dataset_builder_csv_fields_mmap():
     # MegaMolBART downstream task retrosynthesis
-    filepath = 'examples/tests/test_data/reaction/processed/test/data.csv'
+    filepath = "examples/tests/test_data/reaction/processed/test/data.csv"
     data_impl = _CSV_FIELDS_MMAP_TYPE
     kwargs = {
-        'newline_int': 10,
-        'header_lines': 1,
-        'workers': 1,
-        'sort_dataset_paths': False,
-        'data_sep': ',',
-        'data_fields': {'products': 3, 'reactants': 2},
+        "newline_int": 10,
+        "header_lines": 1,
+        "workers": 1,
+        "sort_dataset_paths": False,
+        "data_sep": ",",
+        "data_fields": {"products": 3, "reactants": 2},
     }
-    cfg = {'data_impl_kwargs': {_CSV_FIELDS_MMAP_TYPE: kwargs}}
+    cfg = {"data_impl_kwargs": {_CSV_FIELDS_MMAP_TYPE: kwargs}}
     cfg = OmegaConf.create(cfg)
     dataset = build_typed_dataset(
         dataset_paths=filepath, data_impl=data_impl, use_upsampling=False, cfg=cfg, num_samples=None
     )
     assert len(dataset) == 10
     assert isinstance(dataset, _DATA_IMPL_TYPE_CLS[data_impl]), (
-        f'Dataset with data_imp={data_impl} should be ' f'of class {_DATA_IMPL_TYPE_CLS[data_impl].__name__}'
+        f"Dataset with data_imp={data_impl} should be " f"of class {_DATA_IMPL_TYPE_CLS[data_impl].__name__}"
     )
     assert dataset[0] == {
-        'products': 'COC(=O)CCC(=O)c1ccc(OC2CCCCO2)cc1O',
-        'reactants': 'C1=COCCC1.COC(=O)CCC(=O)c1ccc(O)cc1O',
+        "products": "COC(=O)CCC(=O)c1ccc(OC2CCCCO2)cc1O",
+        "reactants": "C1=COCCC1.COC(=O)CCC(=O)c1ccc(O)cc1O",
     }
 
     # testing if list will pass
     n = 2
-    data_paths = ['examples/tests/test_data/reaction/processed/test/data.csv'] * n
+    data_paths = ["examples/tests/test_data/reaction/processed/test/data.csv"] * n
     dataset_2 = build_typed_dataset(
         dataset_paths=data_paths, data_impl=data_impl, use_upsampling=False, cfg=cfg, num_samples=None
     )
@@ -116,17 +116,17 @@ def test_dataset_builder_csv_fields_mmap():
 @pytest.mark.needs_gpu
 def test_dataset_builder_upsampling():
     # MegaMolBART downstream task retrosynthesis
-    filepath = 'examples/tests/test_data/reaction/processed/test/data.csv'
+    filepath = "examples/tests/test_data/reaction/processed/test/data.csv"
     data_impl = _CSV_FIELDS_MMAP_TYPE
     kwargs = {
-        'newline_int': 10,
-        'header_lines': 1,
-        'workers': 1,
-        'sort_dataset_paths': False,
-        'data_sep': ',',
-        'data_fields': {'products': 3, 'reactants': 2},
+        "newline_int": 10,
+        "header_lines": 1,
+        "workers": 1,
+        "sort_dataset_paths": False,
+        "data_sep": ",",
+        "data_fields": {"products": 3, "reactants": 2},
     }
-    cfg = {'data_impl_kwargs': {_CSV_FIELDS_MMAP_TYPE: kwargs}}
+    cfg = {"data_impl_kwargs": {_CSV_FIELDS_MMAP_TYPE: kwargs}}
     cfg = OmegaConf.create(cfg)
     with open_dict(cfg):
         cfg.max_seq_length = 512

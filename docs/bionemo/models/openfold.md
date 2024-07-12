@@ -1,4 +1,4 @@
-# OpenFold 
+# OpenFold
 # Model Overview
 
 ## User guide
@@ -13,7 +13,7 @@ If users are interested in diving into BioNeMo in details, users can refer to `b
 ### Inference
 Users can initiate inference with `examples/protein/openfold/infer.py` and provide the input sequence(s) and optional multiple sequence alignment(s) (MSA) for inference. There is MSA data in ${model.data.dataset_path}/inference/msas/, and users can follow a step-by-step guidance in jupyter notebook in `nbs/inference.ipynb` if desired. If the notebook fails due to a timeout error, increate inference_timeout_s to 300 at `ModelClient("localhost", "bionemo_openfold", inference_timeout_s= 180)`.
 
-For additional template-based inference, users would provide template hhr or generate templates on-the-fly after installing the necessary alignment software under `scripts/install_third_party.sh`. Alternatively, users can download the pdb70 database. To do this, download http://wwwuser.gwdg.de/~compbiol/data/hhsuite/databases/hhsuite_dbs/old-releases/pdb70_from_mmcif_200401.tar.gz. Then, perform alignments on the desired sequences with `scripts/precompute_alignments`. Then, generate_templates_if_missing should be set to True and the value pdb70_database_path in conf/infer.yaml to should be set to the pdb directory. 
+For additional template-based inference, users would provide template hhr or generate templates on-the-fly after installing the necessary alignment software under `scripts/install_third_party.sh`. Alternatively, users can download the pdb70 database. To do this, download http://wwwuser.gwdg.de/~compbiol/data/hhsuite/databases/hhsuite_dbs/old-releases/pdb70_from_mmcif_200401.tar.gz. Then, perform alignments on the desired sequences with `scripts/precompute_alignments`. Then, generate_templates_if_missing should be set to True and the value pdb70_database_path in conf/infer.yaml to should be set to the pdb directory.
 
 More details are available in `conf/infer.yaml`.
 
@@ -34,7 +34,7 @@ python examples/protein/openfold/train.py --config-name openfold_finetuning.yaml
 ```
 
 ## Description:
-<!-- This document gives a brief summary of the BioNeMo framework's implementation of OpenFold. This implementation is derived from public OpenFold and DeepMind AlphaFold-2.  Below we summarize 
+<!-- This document gives a brief summary of the BioNeMo framework's implementation of OpenFold. This implementation is derived from public OpenFold and DeepMind AlphaFold-2.  Below we summarize
 - user guide on inference and training
 - dataset and preprocessing
 - accuracy and runtime results -->
@@ -169,7 +169,7 @@ The following parameters are described and configured in the current version of 
 
 #### Optimisations
 
-In the BioNeMo - OpenFold project, we integrate optimisations from the NVIDIA team that submits code to [MLPerf benchmarks](https://mlcommons.org/benchmarks/training-hpc/). Here we give more detail on the specific optimisations available in the BioNeMo Project. 
+In the BioNeMo - OpenFold project, we integrate optimisations from the NVIDIA team that submits code to [MLPerf benchmarks](https://mlcommons.org/benchmarks/training-hpc/). Here we give more detail on the specific optimisations available in the BioNeMo Project.
 
 | optimisation setting                     | integrated        | employed in training speed benchmark|
 | :--------------------------------------: | :---------------: | :---------------------------: |
@@ -183,8 +183,8 @@ In the BioNeMo - OpenFold project, we integrate optimisations from the NVIDIA te
 
 ### Initial Training
 
-In the table below, we show the results of initial training benchmarks, with the following protocol.  
-We run training with a large value of 'trainer.max_steps' and when we see the validation metric (lddt-ca) for 
+In the table below, we show the results of initial training benchmarks, with the following protocol.
+We run training with a large value of 'trainer.max_steps' and when we see the validation metric (lddt-ca) for
 the EMA model above 89%, we manually end the training job.  As a post-processing step we compute metrics
 
 $$ \text{crossing-step}  = \text{the first training step when the validation metric is larger than 89\%} $$
@@ -193,10 +193,10 @@ $$ \text{time-wo-val-days } = \text{ training time without validation phase, in 
 $$ \text{time-wi-val-days } = \text{ training time with validation phase, in days, until the crossing-step } $$
 $$ \text{training-speed-kpi} = \frac{\text{sum of training step times with no optimizations, until the crossing-step}}{\text{sum of training step times with optimization setting X, until the crossing-step}} $$
 
-These training jobs are conducted with the settings in the config file 
-`examples/protein/openfold/config/openfold_initial_training.yaml`, 
-with certain parameters having the override values in the table.  Each training 
-job is a sequence of sub-jobs, each sub-job managed by 
+These training jobs are conducted with the settings in the config file
+`examples/protein/openfold/config/openfold_initial_training.yaml`,
+with certain parameters having the override values in the table.  Each training
+job is a sequence of sub-jobs, each sub-job managed by
 [slurm](https://slurm.schedmd.com/sbatch.html) with a 4h walltime.
 
 | model.optimisations                             | trainer.precision | machine spec | job completion date | level | crossing-step | training step time [secs] |time-wo-val-days | time-wi-val-days  | training-speed-kpi |

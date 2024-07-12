@@ -13,7 +13,7 @@ trainer:
   val_check_interval: 62
   limit_val_batches: 1
   accumulate_grad_batches: 1
-    
+
 model:
   micro_batch_size: 4
   global_batch_size: null

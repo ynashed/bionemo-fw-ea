@@ -41,13 +41,13 @@ class PredictionPDBWriter(Callback):
             outputs = [outputs]
         for input_dict, output_dict in zip(batch, outputs):
             try:
-                name = input_dict['seq_name'][0]
+                name = input_dict["seq_name"][0]
             except KeyError:
-                name = input_dict['seq_index'][0]
+                name = input_dict["seq_index"][0]
 
             unrelaxed_pdb_filepath = self.result_path / f"{name}.pdb"
             if unrelaxed_pdb_filepath.exists() and not self.force:
-                logging.warning(f'Writer target {unrelaxed_pdb_filepath} exists. Skip overwriting.')
+                logging.warning(f"Writer target {unrelaxed_pdb_filepath} exists. Skip overwriting.")
                 continue
 
             aatype = input_dict["aatype"][0, :, 0].cpu().numpy()
@@ -95,13 +95,13 @@ class PredictionFeatureWriter(Callback):
 
         for input_dict, output_dict in zip(batch, outputs):
             try:
-                name = input_dict['seq_name'][0]
+                name = input_dict["seq_name"][0]
             except KeyError:
-                name = input_dict['seq_index'][0]
+                name = input_dict["seq_index"][0]
 
             feature_filepath = self.result_path / f"{name}.pkl"
             if feature_filepath.exists() and not self.force:
-                logging.warning(f'Writer target {feature_filepath} exists. Skip overwriting.')
+                logging.warning(f"Writer target {feature_filepath} exists. Skip overwriting.")
                 continue
 
             features = {}
@@ -116,5 +116,5 @@ class PredictionFeatureWriter(Callback):
                         f'{", ".join(output_dict.keys())} are available for downstream features but ' f'{k} is given.'
                     )
 
-            with feature_filepath.open('wb') as f:
+            with feature_filepath.open("wb") as f:
                 pickle.dump(features, f)

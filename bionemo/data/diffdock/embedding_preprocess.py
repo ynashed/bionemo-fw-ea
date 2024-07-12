@@ -187,7 +187,7 @@ def compute_ESM_embeddings(model, alphabet, dataset, store_path=None):
                 if store_path is None:
                     embeddings[label] = value
                 else:
-                    torch.save(value, os.path.join(store_path, f'{label}.pt'))
+                    torch.save(value, os.path.join(store_path, f"{label}.pt"))
 
     if store_path is None:
         return embeddings
@@ -197,7 +197,7 @@ class DataPreprocess(object):
     def __init__(self, cfg: DictConfig) -> None:
         self.cfg = cfg
         self.three_to_one = amino_acid_seq_three_to_one
-        self.num_cores = cfg.get('num_workers')
+        self.num_cores = cfg.get("num_workers")
         self.esm_embeddings_path = cfg.esm_embeddings_path
         os.makedirs(self.esm_embeddings_path, exist_ok=True)
 
@@ -216,7 +216,7 @@ class DataPreprocess(object):
         file_paths = []
         df = pd.read_csv(self.cfg.protein_ligand_csv)
 
-        for complex_name, protein_path in df[['complex_name', 'protein_path']].values.tolist():
+        for complex_name, protein_path in df[["complex_name", "protein_path"]].values.tolist():
             file_paths.append((complex_name, os.path.join(self.cfg.protein_data_dir, protein_path)))
 
         return file_paths

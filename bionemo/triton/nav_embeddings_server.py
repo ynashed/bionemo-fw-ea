@@ -27,7 +27,7 @@ __all_: Sequence[str] = ()
 @hydra_runner(config_path="conf", config_name="infer")
 def entrypoint(cfg) -> None:
     logging.info("\n\n************** Experiment configuration ***********")
-    logging.info(f'\n{OmegaConf.to_yaml(cfg)}')
+    logging.info(f"\n{OmegaConf.to_yaml(cfg)}")
 
     model, runner = load_navigated_model_for_inference(cfg, strategy=model_navigator.MaxThroughputStrategy())
 

@@ -72,9 +72,9 @@ class SpliceSiteBERTPredictionModel(EncoderFineTuning):
         return input_tensor[:, idx, :]
 
     def encoder_forward(self, bert_model: DNABERTInference, batch: dict):
-        tokens = batch['text']
+        tokens = batch["text"]
         # 0 indicates padding, 1 indicates a lack of padding.
-        padding_mask = batch['padding_mask']
+        padding_mask = batch["padding_mask"]
         with autocast(enabled=True):
             output_tensor = bert_model.model(tokens, padding_mask, token_type_ids=None, lm_labels=None)
         return output_tensor

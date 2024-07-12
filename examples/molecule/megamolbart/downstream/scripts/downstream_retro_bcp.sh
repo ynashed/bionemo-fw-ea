@@ -11,9 +11,9 @@
 # its affiliates is strictly prohibited.
 
 ####
-# Example shell script to launch training of 
-# retrosynthesis prediction with 
-# MegaMolBart model on NGC. 
+# Example shell script to launch training of
+# retrosynthesis prediction with
+# MegaMolBart model on NGC.
 ####
 
 # NOTE: parameters must be adjusted for customer training
@@ -48,7 +48,7 @@ WORKSPACE= # Your NGC workspace ID goes here
 ACCUMULATE_GRAD_BATCHES=1
 TENSOR_MODEL_PARALLEL_SIZE=1 # tensor model parallel size,  model checkpoint must be compatible with tensor model parallel size
 RESTORE_FROM_PATH=/model/molecule/${MODEL}/${MODEL}.nemo
-MICRO_BATCH_SIZE=256 
+MICRO_BATCH_SIZE=256
 MAX_STEPS=20000 # duration of training as the number of training steps
 VAL_CHECK_INTERVAL=100 # how often validation step is performed
 

@@ -24,12 +24,12 @@ from bionemo.data.sbdd.utils_data import PDBProtein, parse_sdf_file
 @pytest.fixture(scope="module")
 def protein_ligand_data():
     data_prefix = "examples/tests/test_data/molecule/sbdd"
-    lig_paths = ['2z3h_A_rec_1wn6_bst_lig_tt_docked_3.sdf', '4aaw_A_rec_4ac3_r83_lig_tt_min_0.sdf']
-    prot_paths = ['2z3h_A_rec.pdb', '4aaw_A_rec.pdb']  #! These are uncut proteins ie the full structure
+    lig_paths = ["2z3h_A_rec_1wn6_bst_lig_tt_docked_3.sdf", "4aaw_A_rec_4ac3_r83_lig_tt_min_0.sdf"]
+    prot_paths = ["2z3h_A_rec.pdb", "4aaw_A_rec.pdb"]  #! These are uncut proteins ie the full structure
 
     # Transforms
     protein_featurizer = trans.FeaturizeProteinAtom()
-    ligand_featurizer = trans.FeaturizeLigandAtom('add_aromatic')
+    ligand_featurizer = trans.FeaturizeLigandAtom("add_aromatic")
     transform_list = [
         protein_featurizer,
         ligand_featurizer,
@@ -57,7 +57,7 @@ def test_dataset_preprocessing(protein_ligand_data):
 
     assert len(dataset) == 2
     assert dataset[0].protein_element.shape[0] == 409
-    assert dataset[0].ligand_smiles == 'CN(CC[C@H](N)CC(=O)N[C@H]1CC[C@H](N2C=C[C@@](N)(O)NC2=O)O[C@@H]1C(=O)O)C(=N)N'
+    assert dataset[0].ligand_smiles == "CN(CC[C@H](N)CC(=O)N[C@H]1CC[C@H](N2C=C[C@@](N)(O)NC2=O)O[C@@H]1C(=O)O)C(=N)N"
     assert dataset[0].ligand_pos.shape[0] == 31
 
 

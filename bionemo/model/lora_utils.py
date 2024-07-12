@@ -44,7 +44,7 @@ def extract_and_strip_fine_tuned_esm2_lora(
     input_nemo_fi: Path | str,
     output_modified_ckpt_state_dict_fi: Path | str,
     task_layer_parts: Sequence[str],
-    device: torch.device | str = 'cpu',
+    device: torch.device | str = "cpu",
     verbose: bool = True,
 ) -> None:
     with tempfile.TemporaryDirectory() as tdir:
@@ -60,7 +60,7 @@ def extract_and_strip_fine_tuned_esm2_lora(
         if verbose:
             print(os.listdir(tdir))
 
-        ckpt_original = Path(tdir) / 'model_weights.ckpt'
+        ckpt_original = Path(tdir) / "model_weights.ckpt"
 
         state_dict = _load_and_megatronize_state_dict(
             device=device,

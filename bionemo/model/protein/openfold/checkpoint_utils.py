@@ -104,7 +104,7 @@ def load_pt_checkpoint(model: AlphaFold, checkpoint_path: Union[str, Path]):
     # if direct checkpoint loading fails, remap names...
     checkpoint_state_dict = remap_layers_names(checkpoint_state_dict)
     # ... check if any layers been fused ...
-    if OptimHub.config('mha_fused_gemm'):
+    if OptimHub.config("mha_fused_gemm"):
         checkpoint_state_dict = remap_mlperf_layers(model, checkpoint_state_dict)
 
     # Finally, re-try again

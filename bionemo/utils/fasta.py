@@ -159,7 +159,7 @@ class FastaTransform(ABC):
 
 @dataclass
 class FastaSplitNs(FastaTransform):
-    '''Preprocessor that removes Ns, and creates new contigs between Ns. Runs of Ns are split once.'''
+    """Preprocessor that removes Ns, and creates new contigs between Ns. Runs of Ns are split once."""
 
     fasta_filenames: List[str]
 

@@ -4,7 +4,7 @@ index 6818f99d0..6f3150453 100644
 +++ b/nemo/collections/nlp/data/language_modeling/megatron/data_samplers.py
 @@ -78,7 +78,7 @@ class BaseMegatronSampler:
          )
- 
+
      def __len__(self):
 -        num_available_samples: int = self.total_samples - self.consumed_samples
 +        num_available_samples: int = self.total_samples # - self.consumed_samples   # the length should always be the total lenght, even if we restart halfway through.

@@ -37,14 +37,14 @@ from bionemo.utils.tests import (
 DATA_NAMES = ["dips", "db5"]
 # TODO
 THIS_FILE_DIR = os.path.dirname(os.path.realpath(__file__))
-PREPEND_CONFIG_DIR = os.path.join(THIS_FILE_DIR, '../conf')
+PREPEND_CONFIG_DIR = os.path.join(THIS_FILE_DIR, "../conf")
 
 torch.use_deterministic_algorithms(False)
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 
 
-def get_cfg(prepend_config_path: str, config_name: str, config_path: str = 'conf'):
+def get_cfg(prepend_config_path: str, config_name: str, config_path: str = "conf"):
     prepend_config_path = pathlib.Path(prepend_config_path)
 
     class TestSearchPathConfig(BioNemoSearchPathConfig):
@@ -76,7 +76,7 @@ def main() -> None:
     args = parse_args()
 
     # Setup model in eval mode
-    cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='infer', config_path="../conf")
+    cfg = get_cfg(PREPEND_CONFIG_DIR, config_name="infer", config_path="../conf")
     cfg.data.data_name = args.model
 
     initialize_distributed_parallel_state(
@@ -89,7 +89,7 @@ def main() -> None:
     model.eval()
 
     logging.info("\n\n************** Inference configuration ***********")
-    logging.info(f'\n{OmegaConf.to_yaml(cfg)}')
+    logging.info(f"\n{OmegaConf.to_yaml(cfg)}")
 
     @batch
     def _infer_fn(
@@ -136,11 +136,11 @@ def main() -> None:
         # Get initial ligand position
         ppdb_ligand = PandasPdb().read_pdb(ligand_filename)
         unbound_ligand_all_atoms_pre_pos = (
-            ppdb_ligand.df['ATOM'][['x_coord', 'y_coord', 'z_coord']].to_numpy().squeeze().astype(np.float32)
+            ppdb_ligand.df["ATOM"][["x_coord", "y_coord", "z_coord"]].to_numpy().squeeze().astype(np.float32)
         )
         unbound_ligand_new_pos = (rotation @ unbound_ligand_all_atoms_pre_pos.T).T + translation
 
-        if cfg.get('postprocess', None) is not None and cfg.postprocess.remove_clashes:
+        if cfg.get("postprocess", None) is not None and cfg.postprocess.remove_clashes:
             logging.info("Removing clashes!")
             max_iteration = cfg.postprocess.max_iteration
             unbound_ligand_new_pos = remove_clashes(
@@ -153,16 +153,16 @@ def main() -> None:
                 cfg.postprocess.half_precision,
             )
 
-            ppdb_ligand.df['ATOM'][
-                ['x_coord', 'y_coord', 'z_coord']
-            ] = unbound_ligand_new_pos  # unbound_ligand_new_pos
+            ppdb_ligand.df["ATOM"][["x_coord", "y_coord", "z_coord"]] = (
+                unbound_ligand_new_pos  # unbound_ligand_new_pos
+            )
 
         else:
-            ppdb_ligand.df['ATOM'][
-                ['x_coord', 'y_coord', 'z_coord']
-            ] = unbound_ligand_new_pos  # unbound_ligand_new_pos
+            ppdb_ligand.df["ATOM"][["x_coord", "y_coord", "z_coord"]] = (
+                unbound_ligand_new_pos  # unbound_ligand_new_pos
+            )
 
-        ppdb_ligand.to_pdb(path=out_filename, records=['ATOM'], gz=False)
+        ppdb_ligand.to_pdb(path=out_filename, records=["ATOM"], gz=False)
 
         response = {"generated": np.char.encode(["5"], "utf-8").reshape((1, -1))}
 

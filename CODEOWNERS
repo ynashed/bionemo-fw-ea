@@ -233,7 +233,7 @@ docs/build/html/models/megamolbart.html @sveccham
 docs/build/html/.doctrees/models/megamolbart.doctree @sveccham
 
 ##
-## molmim @tshimko 
+## molmim @tshimko
 ##
 bionemo/model/molecule/molmim @jstjohn @tshimko
 bionemo/model/molecule/mol_enc_dec_model_base.py @jstjohn @tshimko
@@ -244,7 +244,7 @@ docs/bionemo/images/MolMIM_molecule_generation_2.png @jstjohn @tshimko
 docs/bionemo/models/molmim.md @jstjohn @tshimko
 docs/bionemo/notebooks/MolMIM_GenerativeAI_local_inference_with_examples.ipynb @jstjohn @tshimko
 docs/bionemo/notebooks/cma_es_guided_molecular_optimization_molmim.ipynb @jstjohn @tshimko
-docs/bionemo/notebooks/model_training_molmim.ipynb @tshimko @jstjohn 
+docs/bionemo/notebooks/model_training_molmim.ipynb @tshimko @jstjohn
 docs/readme-images/molmim_training_throughput.png @jstjohn @tshimko
 fw2nim_examples/molmim @mgreaves @tshimko
 

@@ -173,7 +173,6 @@ models:
         symlink:
             source: "../../enformer_pretrained32.nemo"
             target: "dna/enformer/enformer_pretrained32.nemo"
-        relative_download_dir: "dna/enformer/"
     dsmbind:
         ngc: null
         pbss: "s3://bionemo-ci/models/dsmbind.pth"

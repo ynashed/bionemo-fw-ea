@@ -115,8 +115,7 @@ class BioBertLightningModule(
 
 
 def biobert_data_step(dataloader_iter) -> Dict[str, torch.Tensor]:
-    """
-    Preprocesses a batch of data for the GeneFormer model, and ingest a single batch of data from the dataloader iterator.
+    """Preprocesses a batch of data for the GeneFormer model, and ingest a single batch of data from the dataloader iterator.
         only necessary batch keys are subsetted and passed to the model's forward pass, and the loss forward pass, depending on stage.
         TODO document how parallel_state pipeline stages work.
 
@@ -127,7 +126,6 @@ def biobert_data_step(dataloader_iter) -> Dict[str, torch.Tensor]:
         output: A dictionary of this batch limiting to relevant keys.
 
     """
-
     # Based on: https://github.com/NVIDIA/Megatron-LM/blob/main/pretrain_gpt.py#L87
     # https://github.com/NVIDIA/NeMo/blob/main/nemo/collections/nlp/models/language_modeling/megatron_gpt_model.py#L828-L842
 
@@ -156,9 +154,8 @@ def biobert_data_step(dataloader_iter) -> Dict[str, torch.Tensor]:
 
 
 def bert_forward_step(model: pl.LightningModule, batch: Dict[str, torch.Tensor]) -> DataT:
-    """
-    This subsets the batch keys to the ones actually used by forward pass of the model, and then calls the model's forward pass.
-      if "cu_seqsens" are defined in the batch, then the packed sequence parameters are also passed to the model for forward pass efficiency.
+    """This subsets the batch keys to the ones actually used by forward pass of the model, and then calls the model's forward pass.
+    if "cu_seqsens" are defined in the batch, then the packed sequence parameters are also passed to the model for forward pass efficiency.
     """
     forward_args = {
         "input_ids": batch["text"],
@@ -167,16 +164,15 @@ def bert_forward_step(model: pl.LightningModule, batch: Dict[str, torch.Tensor])
         # "tokentype_ids": batch.get("types", None),
     }
 
-    if 'cu_seqlens' in batch:
-        forward_args['packed_seq_params'] = get_packed_seq_params(batch)
+    if "cu_seqlens" in batch:
+        forward_args["packed_seq_params"] = get_packed_seq_params(batch)
 
     forward_results = model(**forward_args)
     return forward_results  # TODO support losses that also include the binary head, this means doing something more fancy than the one default GPT reduction function above MaskedTokenLossReduction()
 
 
 def bert_default_optimizer(module) -> Optimizer:
-    """
-    Returns the default optimizer for the BERT module.
+    """Returns the default optimizer for the BERT module.
 
     Args:
         module: The BERT module.
@@ -190,8 +186,7 @@ def bert_default_optimizer(module) -> Optimizer:
 
 
 def get_batch_on_this_context_parallel_rank(batch: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
-    """
-    Modifies the batch data based on the context parallel rank, if the context parallel world size is greater than 1. Otherwise the batch is returned as-is.
+    """Modifies the batch data based on the context parallel rank, if the context parallel world size is greater than 1. Otherwise the batch is returned as-is.
 
     Args:
         batch (dict): The input batch data.
@@ -201,13 +196,13 @@ def get_batch_on_this_context_parallel_rank(batch: Dict[str, torch.Tensor]) -> D
     """
     if cp_size := parallel_state.get_context_parallel_world_size() > 1:
         num_valid_tokens_in_ub = None
-        if 'loss_mask' in batch and batch['loss_mask'] is not None:
-            num_valid_tokens_in_ub = batch['loss_mask'].sum()
+        if "loss_mask" in batch and batch["loss_mask"] is not None:
+            num_valid_tokens_in_ub = batch["loss_mask"].sum()
 
         cp_rank = parallel_state.get_context_parallel_rank()
         for key, val in batch.items():
             if val is not None:
-                seq_dim = 1 if key != 'attention_mask' else 2
+                seq_dim = 1 if key != "attention_mask" else 2
                 _val = val.view(
                     *val.shape[0:seq_dim],
                     2 * cp_size,
@@ -220,13 +215,12 @@ def get_batch_on_this_context_parallel_rank(batch: Dict[str, torch.Tensor]) -> D
                 _val = _val.index_select(seq_dim, index)
                 _val = _val.view(*val.shape[0:seq_dim], -1, *_val.shape[(seq_dim + 2) :])
                 batch[key] = _val
-        batch['num_valid_tokens_in_ub'] = num_valid_tokens_in_ub
+        batch["num_valid_tokens_in_ub"] = num_valid_tokens_in_ub
     return batch
 
 
 def get_packed_seq_params(batch: Dict[str, torch.Tensor]) -> PackedSeqParams:
-    """
-    Get the packed sequence parameters for the given batch. This function should only be called if `cu_seqlens` is defined in the batch.
+    """Get the packed sequence parameters for the given batch. This function should only be called if `cu_seqlens` is defined in the batch.
 
     Args:
         batch (dict): The input batch containing the following keys:
@@ -243,17 +237,16 @@ def get_packed_seq_params(batch: Dict[str, torch.Tensor]) -> PackedSeqParams:
             - qkv_format (str): The format of query, key, and value tensors.
 
     """
-
-    cu_seqlens = batch['cu_seqlens'].squeeze()  # remove batch size dimension (mbs=1)
+    cu_seqlens = batch["cu_seqlens"].squeeze()  # remove batch size dimension (mbs=1)
     # remove -1 "paddings" added in collate_fn
-    if cu_seqlens_argmin := batch.get('cu_seqlens_argmin', None) is not None:
+    if cu_seqlens_argmin := batch.get("cu_seqlens_argmin", None) is not None:
         # pre-compute cu_seqlens_argmin in dataset class for perf
         cu_seqlens = cu_seqlens[: cu_seqlens_argmin.item()]
     else:
         cu_seqlens = cu_seqlens[: torch.argmin(cu_seqlens)]
 
     # pre-compute max_seqlens in dataset class for perf
-    max_seqlen = batch['max_seqlen'].squeeze() if 'max_seqlen' in batch else None
+    max_seqlen = batch["max_seqlen"].squeeze() if "max_seqlen" in batch else None
 
     # these args are passed eventually into TEDotProductAttention.forward()
     return PackedSeqParams(
@@ -261,7 +254,7 @@ def get_packed_seq_params(batch: Dict[str, torch.Tensor]) -> PackedSeqParams:
         cu_seqlens_kv=cu_seqlens,
         max_seqlen_q=max_seqlen,
         max_seqlen_kv=max_seqlen,
-        qkv_format='thd',
+        qkv_format="thd",
     )
 
 

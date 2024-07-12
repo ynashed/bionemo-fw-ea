@@ -16,4 +16,3 @@ model:
 inference:
   num_gpus: 1  # number of GPUs
   ckpt_path: ${oc.env:BIONEMO_HOME}/models/molecule/dsmbind/dsmbind.pth # path to the trained checkpoint
-

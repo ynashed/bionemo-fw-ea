@@ -12,6 +12,7 @@ Entry point to DiffDock: training of score/confidence model.
 
 modify parameters from conf/*.yaml
 """
+
 import os
 import warnings
 
@@ -47,7 +48,7 @@ def main(cfg) -> None:
     if not cfg.model.confidence_mode:
         os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:512"
 
-    if cfg.get('seed', None) is not None:
+    if cfg.get("seed", None) is not None:
         seed_everything(cfg.seed)
 
     if cfg.do_embedding_preprocessing:
@@ -77,5 +78,5 @@ def main(cfg) -> None:
 
 
 if __name__ == "__main__":
-    RDLogger.DisableLog('rdApp.*')
+    RDLogger.DisableLog("rdApp.*")
     main()
