@@ -132,7 +132,7 @@ models:
         # A pretrained 10.3M parameter geneformer (BERT) on 23M unique single cells and 25429 ENSG based tokens,
         #   padded to a final shape of 25472 for GPU efficiency.
         # See https://wandb.ai/clara-discovery/scFM_v9/runs/4ij9ghox
-        ngc: null
+        ngc: "nvidia/clara/geneformer_10m:1.6"
         pbss: "s3://bionemo-ci/models/geneformer-10M-240530-step-115430-wandb-4ij9ghox.nemo"
         symlink:
             source: "../../geneformer-10M-240530-step-115430-wandb-4ij9ghox.nemo"
@@ -141,7 +141,7 @@ models:
         # A pretrained 106M parameter geneformer (BERT) on 23M unique single cells and 25429 ENSG based tokens,
         #   padded to a final shape of 25472 for GPU efficiency.
         # See https://wandb.ai/clara-discovery/scFM_v9/runs/KZxWJ0I5
-        ngc: null
+        ngc: "nvidia/clara/geneformer_100m:1.6"
         pbss: "s3://bionemo-ci/models/geneformer-106M-240530-step-115430-wandb-KZxWJ0I5.nemo"
         symlink:
             source: "../../geneformer-106M-240530-step-115430-wandb-KZxWJ0I5.nemo"

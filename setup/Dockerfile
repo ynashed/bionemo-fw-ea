@@ -93,6 +93,11 @@ RUN git clone -b v$NEMO_VERSION https://github.com/NVIDIA/NeMo.git && \
     pip install -r requirements/requirements_nlp.txt && \
     pip install ".[nlp]"
 
+# Remove lightning-app. Nemo and BioNeMo doesn't use it, and it introduces security vulnerabilities:
+# https://github.com/advisories/GHSA-cgwc-qvrx-rf7f
+# https://github.com/advisories/GHSA-mr7h-w2qc-ffc2
+RUN rm -rf /usr/local/lib/python3.10/dist-packages/lightning/app
+
 # need this for backward compatibility: pytests rely on configs in /workspace/nemo/examples
 RUN mkdir -p /workspace/nemo/
 RUN cp -r /tmp/nemo/NeMo/scripts /workspace/nemo/scripts
@@ -248,6 +253,11 @@ RUN pip uninstall -y opencv-python opencv fonttools \
        /usr/local/share/opencv4 \
        /usr/local/lib/cmake/opencv4 \
        /usr/local/bin/opencv*
+
+# Remove CVEs:
+RUN rm -rf /opt/pytorch/pytorch/third_party/onnx \
+  && DEBIAN_FRONTEND=noninteractive apt remove -y libslurm37 libpmi2-0 openssh-client \
+  && DEBIAN_FRONTEND=noninteractive apt autoremove -y
 
 ####
 #### NOTE: THIS MUST BE THE ABSOLUTE **LAST** STEP BEFORE ENTRYPOINT !!!!!

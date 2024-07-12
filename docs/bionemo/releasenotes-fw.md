@@ -8,7 +8,7 @@
 
 ## BioNeMo Framework v1.6
 ### New Features
-* [Inference] `model.freeze_layers` inference config parameter added to freeze a specified number of layers. Thank you to github user [@nehap25](https://github.com/nehap25)!
+* [Model Fine-tuning] `model.freeze_layers` fine-tuning config parameter added to freeze a specified number of layers. Thank you to github user [@nehap25](https://github.com/nehap25)!
 * [ESM2]  Loading pre-trained ESM2 weights and continue pre-training on the MLM objective on a custom FASTA dataset is now supported.
 * [OpenFold] MLPerf feature 3.2 bug (mha_fused_gemm) fix has merged.
 * [OpenFold] MLPerf feature 3.10 integrated into bionemo framework.
