@@ -78,7 +78,7 @@ class MegatronBioBertModel(LanguageModule):
         fp16_lm_cross_entropy: bool = False,
         parallel_output: bool = True,
         share_embeddings_and_output_weights: bool = False,
-        position_embedding_type: Literal['learned_absolute', 'rope'] = 'learned_absolute',
+        position_embedding_type: Literal["learned_absolute", "rope"] = "learned_absolute",
         rotary_percent: float = 1.0,
         seq_len_interpolation_factor: Optional[float] = None,
         add_binary_head=True,
@@ -114,7 +114,7 @@ class MegatronBioBertModel(LanguageModule):
         if self.pre_process:
             self.embedding = lm_embedding
 
-        if self.position_embedding_type == 'rope':
+        if self.position_embedding_type == "rope":
             self.rotary_pos_emb = RotaryEmbedding(
                 kv_channels=self.config.kv_channels,
                 rotary_percent=rotary_percent,
@@ -171,7 +171,6 @@ class MegatronBioBertModel(LanguageModule):
         Returns:
             Tensor: The extended binary attention mask
         """
-
         # We create a 3D attention mask from a 2D tensor mask.
         # [b, 1, s]
         attention_mask_b1s = attention_mask.unsqueeze(1)
@@ -217,7 +216,7 @@ class MegatronBioBertModel(LanguageModule):
         if not isinstance(input_tensor, list):
             input_tensor = [input_tensor]
 
-        assert len(input_tensor) == 1, 'input_tensor should only be length 1 for gpt/bert'
+        assert len(input_tensor) == 1, "input_tensor should only be length 1 for gpt/bert"
         self.encoder.set_input_tensor(input_tensor[0])
 
     def forward(
@@ -258,7 +257,7 @@ class MegatronBioBertModel(LanguageModule):
 
         # Rotary positional embeddings (Why not move this into BERT/GPTEmberdding ?)
         rotary_pos_emb = None
-        if self.position_embedding_type == 'rope':
+        if self.position_embedding_type == "rope":
             rotary_seq_len = self.rotary_pos_emb.get_rotary_seq_len(
                 inference_params, self.encoder, encoder_input, self.config
             )
@@ -328,7 +327,7 @@ class BioBertConfig(TransformerConfig):
     optimizer_fn: Optional[Callable[["MegatronBioBertModel"], Optimizer]] = None
 
     def configure_embedding(self, vocab_size, do_next_sentence=False) -> "LanguageModelEmbedding":
-        """configures and returns an instantiated object of embedding module
+        """Configures and returns an instantiated object of embedding module
 
         Args:
             vocab_size (int): size of the vocabulary
@@ -355,7 +354,7 @@ class BioBertConfig(TransformerConfig):
 
         # The local specs all require the standard full attention mask. For transformer engine only the NVTE_FLASH_ATTN=0
         #  option requires this full attention mask.
-        use_full_attention_mask: bool = os.getenv('NVTE_FLASH_ATTN') == '0' or self.biobert_spec_option in {
+        use_full_attention_mask: bool = os.getenv("NVTE_FLASH_ATTN") == "0" or self.biobert_spec_option in {
             BiobertSpecOption.bert_layer_local_spec,
             BiobertSpecOption.bert_layer_local_spec_with_qk_ln,
         }

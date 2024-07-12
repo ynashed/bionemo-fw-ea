@@ -48,14 +48,14 @@ class GeneTokenizer(Label2IDTokenizer):
 
     @classmethod
     def from_medians_and_genes_dicts(cls, median_dict: Dict[str, float], gene_to_ens: Dict[str, str]):
-        '''Creates a tokenizer from a median dictionary'''
+        """Creates a tokenizer from a median dictionary"""
         tokens = list(cls.special_tokens) + list(median_dict.keys())
         vocab = cls._build_vocab(tokens)
         return cls(vocab, gene_to_ens)
 
     @staticmethod
     def _build_vocab(strings: Union[List[str], str]):
-        '''We override the parent because complete strings are tokens. Otherwise has the same behavior.'''
+        """We override the parent because complete strings are tokens. Otherwise has the same behavior."""
         vocab = {}
         if isinstance(strings, str):
             strings = [strings]
@@ -66,8 +66,7 @@ class GeneTokenizer(Label2IDTokenizer):
         return vocab
 
     def token_to_id(self, token: str) -> int:
-        """
-        Converts a token to its corresponding ID.
+        """Converts a token to its corresponding ID.
 
         Args:
             token (str): The token to be converted.
@@ -89,35 +88,34 @@ class GeneTokenizer(Label2IDTokenizer):
         return super().tokens_to_ids(tokens)
 
     def save_vocab(self, vocab_file):
-        '''Saves the vocabulary as a newline delimieted vocabulary file, each line represents an int -> token mapping. line number is assumed to be the integer.'''
+        """Saves the vocabulary as a newline delimieted vocabulary file, each line represents an int -> token mapping. line number is assumed to be the integer."""
         vocab_dir = os.path.dirname(vocab_file)
         if not os.path.exists(vocab_dir):
             os.makedirs(vocab_dir, exist_ok=True)  # ensure the dir exists but be ok with race conditions.
 
         to_serialize = {}
-        to_serialize['vocab'] = self.vocab
-        to_serialize['gene_to_ens'] = self.gene_to_ens
+        to_serialize["vocab"] = self.vocab
+        to_serialize["gene_to_ens"] = self.gene_to_ens
 
-        with open(vocab_file, 'w') as f:
+        with open(vocab_file, "w") as f:
             json.dump(to_serialize, f)
 
     @classmethod
     def from_vocab_file(cls, vocab_file):
-        '''This method adds a layer on the constructor in the case we are working from a filename instead of a dictionary'''
+        """This method adds a layer on the constructor in the case we are working from a filename instead of a dictionary"""
         if not os.path.exists(vocab_file):
             raise FileNotFoundError(f"Vocab file {vocab_file} not found, run preprocessing to create it.")
 
         with open(vocab_file) as f:
             to_deserialize = json.load(f)
-            vocab = to_deserialize['vocab']
-            gene_to_ens = to_deserialize['gene_to_ens']
+            vocab = to_deserialize["vocab"]
+            gene_to_ens = to_deserialize["gene_to_ens"]
 
         tokenizer = GeneTokenizer(vocab, gene_to_ens)
         return tokenizer
 
     def gene_tok_to_ens(self, gene: str) -> str:
-        """
-        Converts a gene token to its corresponding Ensembl ID.
+        """Converts a gene token to its corresponding Ensembl ID.
 
         Args:
             gene (str): The gene token to be converted.
@@ -128,8 +126,7 @@ class GeneTokenizer(Label2IDTokenizer):
         return self.gene_to_ens[gene]
 
     def ens_tok_to_gene(self, ens: str) -> str:
-        """
-        Converts an Ensembl token to a gene name.
+        """Converts an Ensembl token to a gene name.
 
         Args:
             ens (str): The Ensembl token to be converted.

@@ -29,13 +29,13 @@ from tqdm import tqdm
 
 
 parser = argparse.ArgumentParser("Converts a series of AnnData objects into a memmap format")
-parser.add_argument("--save-path", "--sp", type=str, default='./', help="save path to save memmap files")
-parser.add_argument("--data-path", "--dp", type=str, default='./data', help="path to the data")
+parser.add_argument("--save-path", "--sp", type=str, default="./", help="save path to save memmap files")
+parser.add_argument("--data-path", "--dp", type=str, default="./data", help="path to the data")
 parser.add_argument("--use-mp", "-mp", action="store_true", help="use multiprocessing")
 parser.add_argument(
     "--strict-metadata",
     "-strict",
-    dest='strict',
+    dest="strict",
     action="store_true",
     help="Fails if any of the columns in obs_cols are not present in the AnnData object.",
 )
@@ -44,18 +44,18 @@ parser.add_argument(
 )
 parser.add_argument(
     "--obs-cols",
-    nargs='+',
+    nargs="+",
     default=[
-        'suspension_type',
-        'is_primary_data',
-        'cell_type',
-        'assay',
-        'disease',
-        'tissue_general',
-        'sex',
-        'tissue',
-        'self_reported_ethnicity',
-        'development_stage',
+        "suspension_type",
+        "is_primary_data",
+        "cell_type",
+        "assay",
+        "disease",
+        "tissue_general",
+        "sex",
+        "tissue",
+        "self_reported_ethnicity",
+        "development_stage",
     ],
     help="series of columns to extract from each AnnData `obs` dataframe",
 )
@@ -80,7 +80,6 @@ def create_metadata(file_path: PosixPath, shared_dict: Dict[str, Dict[str, objec
             If the file cannot be read or if the `data` object is None.
 
     """
-
     try:
         data = scanpy.read_h5ad(file_path)
     except Exception:
@@ -125,8 +124,7 @@ def write_data(
     gene_data_ptr: np.ndarray,
     strict: bool = False,
 ) -> List[pd.DataFrame]:
-    """
-    Writes `AnnData` into memmap.
+    """Writes `AnnData` into memmap.
 
     Args:
         file_path (PosixPath): The path to the file.
@@ -137,10 +135,10 @@ def write_data(
         gene_data_indices (np.ndarray): The array to store gene data indices.
         gene_data_ptr (np.ndarray): The array to store gene data pointers.
         strict (bool): If True, only extract the columns specified in `obs_cols`.
+
     Returns:
         List[pd.DataFrame]: The features extracted from the data.
     """
-
     # - check if the file name exists in the metadata dictionary
     if str(file_path) not in metadata:
         return []
@@ -224,7 +222,7 @@ if __name__ == "__main__":
     metadata_path = save_path / "metadata.json"
     if metadata_path.exists():
         print("Metadata already exists, loading...")
-        with open(metadata_path, 'r') as fp:
+        with open(metadata_path, "r") as fp:
             metadata = json.load(fp)
     else:
         if args.use_mp:
@@ -245,7 +243,7 @@ if __name__ == "__main__":
         for k, v in metadata.items():
             assert v["shape"][1] == len(v["feature_ids"]), f"feature names and shape mismatch for file {k}"
 
-        with open(metadata_path, 'w') as fp:
+        with open(metadata_path, "w") as fp:
             json.dump(metadata, fp)
 
         print("Done creating `metadata.json`")
@@ -253,33 +251,33 @@ if __name__ == "__main__":
     print(f"Writing data into memmaps to {save_path}...")
 
     # - calculate totals to initalize array sizes
-    total_el = sum([v['num_el'] for k, v in metadata.items()])
+    total_el = sum([v["num_el"] for k, v in metadata.items()])
     num_samples = sum([v["shape"][0] for k, v in metadata.items()])
     gene_path = save_path
 
     # - init or append mode memmap files
     gene_data = np.memmap(
-        gene_path / 'gene_expression_data.npy',
-        dtype='float32',
-        mode='w+' if not os.path.exists(gene_path / 'gene_expression_data.npy') else 'r+',
+        gene_path / "gene_expression_data.npy",
+        dtype="float32",
+        mode="w+" if not os.path.exists(gene_path / "gene_expression_data.npy") else "r+",
         shape=(total_el,),
     )
 
     gene_data_indices = np.memmap(
-        gene_path / 'gene_expression_ind.npy',
-        dtype='int32',
-        mode='w+' if not os.path.exists(gene_path / 'gene_expression_ind.npy') else 'r+',
+        gene_path / "gene_expression_ind.npy",
+        dtype="int32",
+        mode="w+" if not os.path.exists(gene_path / "gene_expression_ind.npy") else "r+",
         shape=(total_el,),
     )
 
     gene_data_ptr = np.memmap(
-        gene_path / 'gene_expression_ptr.npy',
-        dtype='int64',
-        mode='w+' if not os.path.exists(gene_path / 'gene_expression_ptr.npy') else 'r+',
+        gene_path / "gene_expression_ptr.npy",
+        dtype="int64",
+        mode="w+" if not os.path.exists(gene_path / "gene_expression_ptr.npy") else "r+",
         shape=(num_samples + 1,),
     )
 
-    metadata = json.load(open(save_path / "metadata.json", 'r'))
+    metadata = json.load(open(save_path / "metadata.json", "r"))
 
     # - start processing all files
     metadata = calculate_running_sums(metadata)
@@ -299,7 +297,7 @@ if __name__ == "__main__":
         )
         features.append(feature)
 
-    print('Saving dataframe ...')
+    print("Saving dataframe ...")
     df = pd.concat(features)
-    df.to_csv(save_path / 'features.csv', index=False)
-    print('Done creating dataset ...')
+    df.to_csv(save_path / "features.csv", index=False)
+    print("Done creating dataset ...")

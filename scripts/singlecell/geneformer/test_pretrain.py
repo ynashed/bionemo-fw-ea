@@ -61,8 +61,8 @@ def test_main_runs(tmpdir):
         micro_batch_size=2,
         cosine_rampup_frac=0.01,
         cosine_hold_frac=0.01,
-        precision='bf16-mixed',
-        experiment_name='test_experiment',
+        precision="bf16-mixed",
+        experiment_name="test_experiment",
         resume_if_exists=False,
         create_tensorboard_logger=False,
     )

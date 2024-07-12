@@ -36,8 +36,7 @@ class Item(TypedDict):
 
 
 class SingleCellDataset(Dataset):
-    """
-    A dataset class for single-cell pre-training. These can be generated using the sc_memmap.py script. Future
+    """A dataset class for single-cell pre-training. These can be generated using the sc_memmap.py script. Future
     updates will contain more comprehensive workflows for generating a Sparse Memmap from scRNA-seq.
 
     Args:
@@ -102,7 +101,7 @@ class SingleCellDataset(Dataset):
         path = Path(data_path)
 
         # - metadata
-        metadata = json.load(open(path / 'metadata.json', 'r'))
+        metadata = json.load(open(path / "metadata.json", "r"))
 
         # - median dict
         self.gene_medians = median_dict
@@ -111,14 +110,14 @@ class SingleCellDataset(Dataset):
         total_el = sum([v["num_el"] for _, v in metadata.items()])
         self.num_samples = sum([v["shape"][0] for _, v in metadata.items()])
         # - load data
-        self.gene_data = np.memmap(path / 'gene_expression_data.npy', dtype='float32', mode='r', shape=(total_el,))
+        self.gene_data = np.memmap(path / "gene_expression_data.npy", dtype="float32", mode="r", shape=(total_el,))
 
         self.gene_data_indices = np.memmap(
-            path / 'gene_expression_ind.npy', dtype='int32', mode='r', shape=(total_el,)
+            path / "gene_expression_ind.npy", dtype="int32", mode="r", shape=(total_el,)
         )
 
         self.gene_data_ptr = np.memmap(
-            path / 'gene_expression_ptr.npy', dtype='int64', mode='r', shape=(self.num_samples + 1,)
+            path / "gene_expression_ptr.npy", dtype="int64", mode="r", shape=(self.num_samples + 1,)
         )
         self.tokenizer = tokenizer
         rnd_key = next(iter(metadata))
@@ -131,7 +130,7 @@ class SingleCellDataset(Dataset):
         #  being a primary culprit behind large RAM usage in dataloaders that use multiprocessing.
         features_all_same = True
         for m in metadata.values():
-            if np.any(np.char.not_equal(np.array(m['feature_ids']), feature_ids)):
+            if np.any(np.char.not_equal(np.array(m["feature_ids"]), feature_ids)):
                 features_all_same = False
                 break
 
@@ -188,12 +187,12 @@ class SingleCellDataset(Dataset):
         #  metadata is not needed because feature_ids are the same for every file, then we can just use the single feature_ids
         #  vector instead.
         feature_ids: np.ndarray = (
-            self.feature_ids if self.metadata is None else self.metadata_lookup(idx)['feature_ids']
+            self.feature_ids if self.metadata is None else self.metadata_lookup(idx)["feature_ids"]
         )
         return gene_data, col_idxs, feature_ids
 
     def __getitem__(self, idx: int) -> Item:
-        '''Performs a lookup and the required transformation for the model'''
+        """Performs a lookup and the required transformation for the model"""
         gene_data, col_idxs, feature_ids = self.lookup_cell_by_idx(idx)
         return process_item(
             gene_data,
@@ -243,13 +242,13 @@ def process_item(
         dirichlet_alpha (float): Alpha value for dirichlet sampling if set by `probabilistic_dirichlet_sampling`. Defaults to 0.5.
         same_length (bool): when true, sample the same length of genes as you originally had before the dirichlet sampler.
         recompute_globals (bool): when true, global arrays are always recomputed. this is only useful for testing.
+
     Returns:
         dict: Processed item dictionary.
 
     NOTE: this method is very important and very useful. To generalize thiswwe should add an abstraction for
         Datasets that have some kind of functor transformation.
     """
-
     if max_len < 1:
         raise ValueError(f"max_len must be greater than 1, {max_len=}")
 
@@ -351,4 +350,4 @@ def process_item(
     return item
 
 
-__all__ = ['SingleCellDataset']
+__all__ = ["SingleCellDataset"]

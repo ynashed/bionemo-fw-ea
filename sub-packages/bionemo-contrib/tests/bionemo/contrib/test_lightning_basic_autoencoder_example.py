@@ -46,7 +46,7 @@ def test_train_mnist_litautoencoder_with_megatron_strategy_single_gpu():
         enable_nemo_ckpt_io=False,
     )
     with megatron_parallel_state_utils.distributed_model_parallel_state():
-        trainer = nl.Trainer(accelerator='gpu', devices=1, strategy=strategy, max_steps=10, num_nodes=1)
+        trainer = nl.Trainer(accelerator="gpu", devices=1, strategy=strategy, max_steps=10, num_nodes=1)
         data_module = lb.MNISTDataModule()
         data_module.trainer = trainer
         trainer.fit(model, data_module)

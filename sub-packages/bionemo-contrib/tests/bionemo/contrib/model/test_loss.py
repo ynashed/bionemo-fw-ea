@@ -44,7 +44,7 @@ def test_loss_equivalency_nemo_vs_pytorch():
 
         ####################
         # Base case: Calculate the cross-entropy loss of masked tokens using the vanilla pytorch function.
-        expected_loss = F.cross_entropy(logits[loss_mask], target[loss_mask], reduction='mean')
+        expected_loss = F.cross_entropy(logits[loss_mask], target[loss_mask], reduction="mean")
 
         ####################
         # Part 1) get the loss using NeMo/Megatron's default strategy of
@@ -99,7 +99,7 @@ def test_loss_equivalency_bionemo_vs_pytorch():
 
         ####################
         # Base case: Calculate the cross-entropy loss of masked tokens using the vanilla pytorch function.
-        expected_loss = F.cross_entropy(logits[loss_mask], target[loss_mask], reduction='mean')
+        expected_loss = F.cross_entropy(logits[loss_mask], target[loss_mask], reduction="mean")
         ####################
         # Part 2) get the loss using BioNeMo's default strategy of
         #  a. passing model logits through the forward of MaskedTokenLossReduction, which is executed

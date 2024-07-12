@@ -45,8 +45,7 @@ def my_test():
 
 
 def _reset_microbatch_calculator():
-    """
-    Resets _GLOBAL_NUM_MICROBATCHES_CALCULATOR in apex which is used in NeMo to initilised model parallel in
+    """Resets _GLOBAL_NUM_MICROBATCHES_CALCULATOR in apex which is used in NeMo to initilised model parallel in
     nemo.collections.nlp.modules.common.megatron.megatron_init.initialize_model_parallel_for_nemo
     """
     apex.transformer.pipeline_parallel.utils._GLOBAL_NUM_MICROBATCHES_CALCULATOR = None
@@ -57,8 +56,7 @@ def _dummy() -> None:
 
 
 def _teardown_apex_megatron_cuda():
-    """
-    Cleans GPU allocation and model and data parallel settings after usage of a model:
+    """Cleans GPU allocation and model and data parallel settings after usage of a model:
     - sets the global variables related to model and data parallelism to None in Apex and Megatron:.
     - releases all unoccupied cached GPU memory currently held by the caching CUDA allocator, see torch.cuda.empty_cache
     """
@@ -78,7 +76,7 @@ def _initialize_distributed_parallel_state(
     # if not interactive and not torch.distributed.is_initialized():
     if not torch.distributed.is_initialized():
         logging.info("pytorch DDP is not initialized. Initializing with pytorch-lightening...")
-        trainer = pl.Trainer(devices=1, strategy='ddp' if not interactive else "auto", num_nodes=1)
+        trainer = pl.Trainer(devices=1, strategy="ddp" if not interactive else "auto", num_nodes=1)
 
         if trainer.strategy.launcher is not None:
             trainer.strategy.launcher.launch(_dummy, trainer=trainer)

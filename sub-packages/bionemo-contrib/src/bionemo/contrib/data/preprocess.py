@@ -33,7 +33,7 @@ class ResourcePreprocessor(ABC):
     """
 
     root_directory: Optional[str] = RemoteResource.get_env_tmpdir()
-    dest_directory: str = 'data'
+    dest_directory: str = "data"
 
     def get_checksums(self) -> List[str]:
         return [resource.checksum for resource in self.get_remote_resources()]

@@ -21,9 +21,8 @@ from pytorch_lightning.loggers import TensorBoardLogger, WandbLogger
 
 
 class WandbLoggerOptions(TypedDict):
-    """
-    Note: `name` controls the exp name is handled by the NeMoLogger so it is ommitted here.
-        `directory` is also omitted since it is set by the NeMoLogger.
+    """Note: `name` controls the exp name is handled by the NeMoLogger so it is ommitted here.
+    `directory` is also omitted since it is set by the NeMoLogger.
     """
 
     offline: bool  # offline mode
@@ -42,6 +41,7 @@ def setup_nemo_lightning_logger(
     **kwargs: Dict[str, Any],
 ) -> NeMoLogger:
     """Setup the logger for the experiment.
+
     Args:
         name: The name of the experiment. Results go into `root_dir`/`name`
         root_dir: The root directory to create the `name` directory in for saving run results.
@@ -77,6 +77,6 @@ def setup_nemo_lightning_logger(
 
 
 __all__: Sequence[str] = (
-    'WandbLoggerOptions',
-    'setup_nemo_lightning_logger',
+    "WandbLoggerOptions",
+    "setup_nemo_lightning_logger",
 )

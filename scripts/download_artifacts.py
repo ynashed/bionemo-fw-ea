@@ -13,7 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Script to download pretrained models from NGC or PBSS. """
+"""Script to download pretrained models from NGC or PBSS."""
+
 import argparse
 import os
 import sys
@@ -31,7 +32,7 @@ ALL_KEYWORD = "all"
 # Path to this file, it is expected to live in the same directory as artifact_paths.yaml
 SCRIPT_DIR = Path(os.path.dirname(os.path.realpath(__file__)))
 DATA_SOURCE_CONFIG = SCRIPT_DIR / "artifact_paths.yaml"
-ArtifactSource = Literal['ngc', 'pbss']
+ArtifactSource = Literal["ngc", "pbss"]
 
 
 #####################################################
@@ -75,8 +76,7 @@ class Config(BaseModel):
 
 
 def streamed_subprocess_call(cmd: str, stream_stdout: bool = False) -> Tuple[str, str, int]:
-    """
-    Run a command in a subprocess, streaming its output and handling errors.
+    """Run a command in a subprocess, streaming its output and handling errors.
 
     Args:
         cmd (str): The bash command to be executed.
@@ -84,6 +84,7 @@ def streamed_subprocess_call(cmd: str, stream_stdout: bool = False) -> Tuple[str
 
     Returns:
         (str, str, int): The stdout string, stderr string, and return code integer.
+
     Raises:
         CalledProcessError: If the subprocess exits with a non-zero return code.
 
@@ -121,8 +122,7 @@ def streamed_subprocess_call(cmd: str, stream_stdout: bool = False) -> Tuple[str
 
 
 def get_available_models(config: Config, source: ArtifactSource) -> List[str]:
-    """
-    Get a list of models that are available from a given source.
+    """Get a list of models that are available from a given source.
 
     Args:
         config (Config): The artifacts configuration.
@@ -148,9 +148,7 @@ def check_ngc_cli():
 
 
 def check_and_install_ngc_cli(ngc_install_dir="/tmp"):
-    """
-    Checks if NGC CLI is present on the system, and installs if it isn't present.
-    """
+    """Checks if NGC CLI is present on the system, and installs if it isn't present."""
     logging.warning(f"Installing NGC CLI to {ngc_install_dir}")
     # Very important to run wget in quiet mode, or else an I/O deadlock happens.
     # It's this issue, and it's not trivial to fix without breaking the streaming
@@ -176,10 +174,9 @@ def download_artifacts(
     source: ArtifactSource,
     download_dir_base: Path,
     stream_stdout: bool = False,
-    artifact_type: str = 'model',
+    artifact_type: str = "model",
 ) -> None:
-    """
-    Download models or data from a given source.
+    """Download models or data from a given source.
 
     Args:
         config (Config): The artifacts configuration.
@@ -199,7 +196,7 @@ def download_artifacts(
             NGC_INSTALL_DIR = "/tmp"
             check_and_install_ngc_cli(NGC_INSTALL_DIR)
             ngc_call_command = str(os.path.join(NGC_INSTALL_DIR, "ngc-cli/ngc"))
-    if artifact_type == 'model':
+    if artifact_type == "model":
         conf = config.models
     else:
         conf = config.data
@@ -222,10 +219,10 @@ def download_artifacts(
 
             # TODO: this assumes that it's a model for now.
             command = f"mkdir -p {str(complete_download_dir)} && {ngc_call_command} registry model download-version {artifact_source_path} --dest {str(complete_download_dir)} && mv {str(ngc_dirname)}/* {str(complete_download_dir)}/ && rm -d {str(ngc_dirname)}"
-            file_name = artifact_source_path.split('/')[-1]
+            file_name = artifact_source_path.split("/")[-1]
         elif source == "pbss":
             command = f"aws s3 cp {str(artifact_source_path)} {str(complete_download_dir)}/ --endpoint-url https://pbss.s8k.io"
-            file_name = artifact_source_path.split('/')[-1]
+            file_name = artifact_source_path.split("/")[-1]
         if conf[download_artifact].extra_args:
             extra_args = conf[download_artifact].extra_args
             command = f"{command} {extra_args}"
@@ -256,20 +253,18 @@ def download_artifacts(
 
 
 def load_config(config_file: Path = DATA_SOURCE_CONFIG) -> Config:
-    """
-    Loads the artifacts file into a dictionary.
+    """Loads the artifacts file into a dictionary.
 
     Return:
         (Config): The configuration dictionary that specifies where and how to download models.
     """
-    with open(DATA_SOURCE_CONFIG, 'rt') as rt:
+    with open(DATA_SOURCE_CONFIG, "rt") as rt:
         config_data = yaml.safe_load(rt)
     return Config(**config_data)
 
 
 def main():
-    """
-    Script to download pretrained checkpoints from PBSS (SwiftStack) or NGC.
+    """Script to download pretrained checkpoints from PBSS (SwiftStack) or NGC.
 
     After the models are downloaded, symlinked paths are created. The models and symlinks
     are all defined in DATA_SOURCE_CONFIG.
@@ -277,40 +272,40 @@ def main():
     config = load_config()
     all_models_list = list(config.models.keys())
     all_data_list = list(config.data.keys())
-    parser = argparse.ArgumentParser(description='Pull pretrained model checkpoints and corresponding data.')
+    parser = argparse.ArgumentParser(description="Pull pretrained model checkpoints and corresponding data.")
     parser.add_argument(
-        '--models',
-        nargs='*',
+        "--models",
+        nargs="*",
         choices=all_models_list + [ALL_KEYWORD],
-        help='Name of the model (optional if downloading all models)',
+        help="Name of the model (optional if downloading all models)",
     )
 
     parser.add_argument(
-        '--data',
-        nargs='*',
+        "--data",
+        nargs="*",
         choices=all_data_list + [ALL_KEYWORD],
-        help='Name of the data (optional if downloading all data)',
+        help="Name of the data (optional if downloading all data)",
     )
 
     parser.add_argument(
-        '--model_dir',
-        default='.',
+        "--model_dir",
+        default=".",
         type=str,
-        help='Directory into which download and symlink the model.',
+        help="Directory into which download and symlink the model.",
     )
 
     parser.add_argument(
-        '--data_dir',
-        default='.',
+        "--data_dir",
+        default=".",
         type=str,
-        help='Directory into which download and symlink the data.',
+        help="Directory into which download and symlink the data.",
     )
 
     parser.add_argument(
-        '--source',
+        "--source",
         choices=list(ArtifactSource.__args__),
-        default='ngc',
-        help='Pull model from NVIDIA GPU Cloud (NGC) or SwiftStack (internal). Default is NGC.',
+        default="ngc",
+        help="Pull model from NVIDIA GPU Cloud (NGC) or SwiftStack (internal). Default is NGC.",
     )
     parser.add_argument("--verbose", action="store_true", help="Print model download progress.")
     args = parser.parse_args()

@@ -19,7 +19,7 @@ from typing import Literal
 import torch
 
 
-PrecisionTypes = Literal['fp16', 'bf16', 'fp32', 'bf16-mixed', 'fp32-mixed', '16-mixed', 'fp16-mixed', 16, 32]
+PrecisionTypes = Literal["fp16", "bf16", "fp32", "bf16-mixed", "fp32-mixed", "16-mixed", "fp16-mixed", 16, 32]
 
 
 def get_autocast_dtype(precision: PrecisionTypes) -> torch.dtype:
@@ -46,4 +46,4 @@ def get_autocast_dtype(precision: PrecisionTypes) -> torch.dtype:
         raise ValueError(f"Unsupported precision: {precision}")
 
 
-__all__ = ['get_autocast_dtype', 'PrecisionTypes']
+__all__ = ["get_autocast_dtype", "PrecisionTypes"]
