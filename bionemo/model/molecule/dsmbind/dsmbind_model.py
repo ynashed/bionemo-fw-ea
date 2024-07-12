@@ -57,7 +57,7 @@ class DSMBind(nn.Module):
 
         Args:
             binder (Tuple[torch.Tensor, List[Mol], torch.Tensor]): the batched ligand info. The first tensor is the ligand atom coordinates. The second list is a list of RDKit molecules. The third tensor is a mask for indicating ligand atoms. Refer to the data/dsmbind/dataset.py to see how they are built and batched.
-            target (Tuple[torch.Tensor, torch.Tensor, torch.Tensor]): the batched target pocket info. The first tensor is the residue coordinates. The second tensor is a one-hot residue embedding. The third tensor represents all residue atoms in the pocket. Refer to the data/dsmbind/dataset.py to see how they are built and batched.
+            target (Tuple[torch.Tensor, torch.Tensor, torch.Tensor]): the batched target pocket info. The first tensor is the target atom coordinates. The second tensor is a one-hot residue embedding. The third tensor represents all target atoms in the pocket. Refer to the data/dsmbind/dataset.py to see how they are built and batched.
 
         Returns:
             torch.Tensor: the denoising score matching loss value.
@@ -67,8 +67,6 @@ class DSMBind(nn.Module):
         bind_S = self.mpn(mol2graph(mol_batch))
 
         B, N, M = bind_S.size(0), bind_S.size(1), tgt_X.size(1)
-        bind_A[:, :, 1].clamp(max=1).float()
-        tgt_A[:, :, 1].clamp(max=1).float()
         bind_A = bind_A * (true_X.norm(dim=-1) > 1e-4).long()
         tgt_A = tgt_A * (tgt_X.norm(dim=-1) > 1e-4).long()
         atom_mask = (bind_A > 0).float().unsqueeze(-1)
@@ -115,7 +113,7 @@ class DSMBind(nn.Module):
 
         Args:
             binder (Tuple[torch.Tensor, List[Mol], torch.Tensor]): the batched ligand info. The first tensor is the ligand atom coordinates. The second list is a list of RDKit molecules. The third tensor is a mask for indicating ligand atoms. Refer to the data/dsmbind/dataset.py to see how they are built and batched.
-            target (Tuple[torch.Tensor, torch.Tensor, torch.Tensor]): the batched target pocket info. The first tensor is the residue coordinates. The second tensor is a one-hot residue embedding. The third tensor represents all residue atoms in the pocket. Refer to the data/dsmbind/dataset.py to see how they are built and batched.
+            target (Tuple[torch.Tensor, torch.Tensor, torch.Tensor]): the batched target pocket info. The first tensor is the target atom coordinates. The second tensor is a one-hot residue embedding. The third tensor represents all target atoms in the pocket. Refer to the data/dsmbind/dataset.py to see how they are built and batched.
 
         Returns:
             torch.Tensor: the predicted energy.
@@ -145,7 +143,7 @@ class DSMBind(nn.Module):
             (tgt_X, tgt_S, tgt_A),
         )  # [B,N+M,self.max_residue_atoms,H]
 
-        bind_h = self.binder_mlp(h[:, :N]).view(B, N * self.max_residue_atoms, -1)
-        tgt_h = self.target_mlp(h[:, N:]).view(B, M * self.max_residue_atoms, -1)
+        bind_h = self.binder_output(h[:, :N]).view(B, N * self.max_residue_atoms, -1)
+        tgt_h = self.target_output(h[:, N:]).view(B, M * self.max_residue_atoms, -1)
         energy = torch.matmul(bind_h, tgt_h.transpose(1, 2))  # [B,N*self.max_residue_atoms,M*self.max_residue_atoms]
         return (energy * mask_2D).sum(dim=(1, 2))  # [B]

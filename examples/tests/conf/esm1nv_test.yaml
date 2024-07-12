@@ -34,8 +34,10 @@ model:
     data_impl_kwargs:
       csv_mmap:
         data_col: 3 # 0-based
-    modify_percent: 0.1
-    perturb_percent: 0.5
+    modify_percent: 0.15
+    perturb_percent: 0.1
+    mask_percent: 0.8
+    identity_percent: 0.1
     data_prefix: null
 
   dwnstr_task_validation:

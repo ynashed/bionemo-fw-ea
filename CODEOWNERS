@@ -12,19 +12,19 @@
 ##                                                                                                                #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
-# Documentation changes are user-facing: require PM review
-docs/ @ntadimeti @trvachov
+# Documentation changes are user-facing
+docs/ @saeep @trvachov @tshimko
 
 # Requires bionemo FW team or PM review to change CODEOWNERS or README
-CODEOWNERS @broland @cye @dorotat @jomitchell @kdidi @mgreaves @ntadimeti @trvachov 
-README.md @broland @cye @dorotat @jomitchell @kdidi @mgreaves @ntadimeti @trvachov
+CODEOWNERS @broland @cye @dorotat @jomitchell @jwilber @kdidi @mgreaves @ntadimeti @pbinder @trvachov @yangzhang
+README.md @broland @cye @dorotat @jomitchell @jwilber @kdidi @mgreaves @ntadimeti @pbinder @trvachov @yangzhang
 
 # Requires bionemo FW team review when modifying: environment, internal-only code, CI, interacting with the codebase
-.gitlab-ci.yml @broland @cye @dorotat @jomitchell @kdidi @mgreaves @trvachov
-internal/ @broland @cye @dorotat @jomitchell @kdidi @mgreaves @trvachov
-setup/Dockerfile* @broland @cye @dorotat @jomitchell @kdidi @mgreaves @trvachov
-setup/requirements*.txt @broland @cye @dorotat @jomitchell @kdidi @mgreaves @trvachov
-CONTRIBUTING.md @broland @cye @dorotat @jomitchell @kdidi @mgreaves @trvachov
+.gitlab-ci.yml @broland @cye @dorotat @jomitchell @jwilber @kdidi @mgreaves @pbinder @trvachov @yangzhang
+internal/ @broland @cye @dorotat @jomitchell @kdidi @jwilber @mgreaves @pbinder @trvachov @yangzhang
+setup/Dockerfile* @broland @cye @dorotat @jomitchell @jwilber @kdidi @mgreaves @pbinder @trvachov @yangzhang
+setup/requirements*.txt @broland @cye @dorotat @jomitchell @jwilber @kdidi @mgreaves @pbinder @trvachov @yangzhang
+CONTRIBUTING.md @broland @cye @dorotat @jomitchell @jwilber @kdidi @mgreaves @pbinder @trvachov @yangzhang
 
 
 
@@ -38,11 +38,15 @@ CONTRIBUTING.md @broland @cye @dorotat @jomitchell @kdidi @mgreaves @trvachov
 ##
 ## diffdock @guoqingz
 ##
-bionemo/model/molecule/diffdock @guoqingz
+bionemo/model/molecule/diffdock @guoqingz @dejunl
 tests/test_diffdock_training.py @guoqingz
 tests/test_diffdock_inference.py @guoqingz
-bionemo/data/diffdock @guoqingz
-examples/tests/test_data/molecule/diffdock @guoqingz
+tests/test_diffdock_model.py @dejunl
+tests/test_so3.py @guoqingz
+tests/test_pickles_to_wds_tars.py @guoqingz
+tests/test_size_aware_batching.py @guoqingz
+bionemo/data/diffdock @guoqingz @dejunl
+examples/tests/test_data/molecule/diffdock @guoqingz @dejunl
 examples/molecule/diffdock @guoqingz
 docs/bionemo/preprocessing-bcp-training-diffdock.md @guoqingz
 docs/bionemo/images/diffdock_fw_overview.png @guoqingz @zmcclure
@@ -54,7 +58,7 @@ docs/bionemo/images/diffdock_perf.png @guoqingz @zmcclure
 docs/bionemo/models/diffdock.md @guoqingz @zmcclure
 docs/bionemo/notebooks/model_training_diffdock.ipynb @guoqingz
 docs/build/html/_sources/preprocessing-bcp-training-diffdock.md @guoqingz
-docs/build/html/_sources/models/diffdock.md @guoqingz
+docs/build/html/_sources/models/diffdock.md @guoqingz @zmcclure
 docs/build/html/_sources/notebooks/model_training_diffdock.ipynb @guoqingz
 docs/build/html/models/diffdock.html @guoqingz
 docs/build/html/_images/diffdock_fw_overview.png @guoqingz
@@ -82,6 +86,17 @@ docs/readme-images/dnabert1xa100.png @skothenhill
 docs/readme-images/dnabert8xa100.png @skothenhill
 
 ##
+## dsmbind @menliu
+##
+bionemo/model/molecule/dsmbind @farhadr @menliu
+bionemo/data/dsmbind @farhadr @menliu
+examples/molecule/dsmbind @farhadr @menliu
+tests/test_dsmbind_data_utils.py @farhadr @menliu
+tests/test_dsmbind_model.py @farhadr @menliu
+tests/dsmbind_test_data @farhadr @menliu
+# MISSING DOCS
+
+##
 ## enformer @srabhi (TODO FIXME: requires handoff to member of bionemo team!!!)
 ##
 bionemo/model/dna/enformer @srabhi
@@ -101,6 +116,7 @@ tests/test_triton/test_esm2nv_triton.py @farhadr @jomitchell @mgreaves
 tests/test_examples/test_esm1nv_inference_notebook.py @farhadr @jomitchell @mgreaves
 tests/test_examples/test_esm2nv_inference_notebook.py @farhadr @jomitchell @mgreaves
 tests/test_esm2nv_data_utils.py @farhadr @jomitchell
+tests/test_protein_dataloader.py @jstjohn @farhadr @jomitchell @sichu
 tests/_test_esm2_uf90clustermapping_dataset.py @farhadr @jomitchell
 tests/test_esm2nv_training_utils.py @farhadr @jomitchell
 tests/data/esm2_golden_values @farhadr @jomitchell
@@ -244,10 +260,21 @@ docs/bionemo/models/openfold.md @broland @kdidi
 bionemo/model/protein/prott5nv @mkorshunova
 tests/test_prott5nv_inference.py @mkorshunova
 tests/test_examples/test_prott5nv_inference_notebook.py @mkorshunova @mgreaves
-tests/test_protein_dataloader.py @mkorshunova
 examples/protein/prott5nv @mkorshunova
 tokenizers/protein/prott5nv @mkorshunova
 docs/bionemo/models/prott5nv.md @mkorshunova
 docs/build/html/_sources/models/prott5nv.md @mkorshunova
 docs/build/html/models/prott5nv.html @mkorshunova
 docs/build/html/.doctrees/models/prott5nv.doctree @mkorshunova
+
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+##                                                                                                                #
+#### bionemo2                                                                                                     #
+##                                                                                                                #
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+##
+## bionemo opensource team
+##
+bionemo2/ @farhadr @jomitchell @jstjohn @mgreaves @skothenhill @trvachov

@@ -31,8 +31,10 @@ import random
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Optional, Union
 
+import numpy as np
 import torch
 from nemo.collections.common.tokenizers import TokenizerSpec
+from pytest import approx
 
 
 __all__ = [
@@ -307,18 +309,25 @@ class BertMasking:
     Arguments:
         tokenizer (TokenizerAdapterSpec): Tokenizer to use for determining mask
             token.
-        modify_percent (float): The percentage of total tokens to modify
-        perturb_percent (float): Of the total tokens being modified,
-            percentage of tokens to perturb. Perturbation changes the
+        modify_percent (float): The fraction of total tokens to modify
+        perturb_token_percent (float): Of the total tokens being modified,
+            fraction of tokens to perturb. Perturbation changes the
             tokens randomly to some other non-special token.
+        mask_token_percent (float): Of the total tokens being modified,
+            fraction of tokens make the [MASK].
+        identity_token_percent (float): Of the total tokens being modified,
+            fraction of tokens to leave unchanged.
         sampler (TokenSampler): Sampler to use for determining indices
             and tokens to use for modifying the token strings.
 
     """
 
     tokenizer: TokenizerAdapterSpec
-    modify_percent: float = 0.1
-    perturb_percent: float = 0.5
+    # The following defaults come from the BERT/ESM publications.
+    modify_percent: float = 0.15
+    mask_token_percent: float = 0.8
+    perturb_token_percent: float = 0.1
+    identity_token_percent: float = 0.1
     sampler: TokenSampler = TokenSampler()
 
     def _perturb_token(self, token, indices):
@@ -358,7 +367,7 @@ class BertMasking:
         token: modified tokens
         """
         mask_token = self.tokenizer.get_mask_token()
-        new_tokens = token
+        new_tokens = copy.copy(token)
         for idx in indices:
             new_tokens[idx] = mask_token
         return new_tokens
@@ -379,30 +388,57 @@ class BertMasking:
             token_masks (List[List[float]]): Indicated if the token masks
 
         """
-        if self.modify_percent > 1.0:
-            raise ValueError("Modification ratio value cannot exceed 1")
-        if self.perturb_percent > 1.0:
-            raise ValueError("Perturbation ratio value cannot exceed 1")
+        if self.modify_percent > 1.0 or self.modify_percent < 0:
+            raise ValueError("Modification ratio must be between 0 and 1")
+        if self.perturb_token_percent > 1.0 or self.perturb_token_percent < 0:
+            raise ValueError("Perturbation ratio must be between 0 and 1")
+        if self.mask_token_percent > 1.0 or self.mask_token_percent < 0:
+            raise ValueError("Mask token ratio must be between 0 and 1")
+        if self.identity_token_percent > 1.0 or self.identity_token_percent < 0:
+            raise ValueError("Identity token ratio must be between 0 and 1")
+        if self.mask_token_percent + self.identity_token_percent + self.perturb_token_percent != approx(1.0):
+            raise ValueError("Mask token, identity token, and perturb token ratios must sum to 1")
 
         modified_tokens = []
         token_masks = []
         for token in tokens:
             token_len = len(token)
-            num_modifications = int(token_len * self.modify_percent)
-            num_perturbs = int(num_modifications * self.perturb_percent)
-            # TODO: changed the assertion here, check that Neha merges
-            # change in own PR, as discussed on 8/3/22
-            assert num_perturbs <= num_modifications
+            mod_tokens = copy.deepcopy(token)  # make a copy of tokens that we modify below
 
-            indices_to_modify = self.sampler.sample_indices(token_len, num_modifications)
+            # Use binomial probability of masks so that we can handle short sequences probabilistically.
+            mask = np.random.binomial(1, self.modify_percent, token_len).astype(bool)
+            if self.modify_percent > 0:
+                n_masked = mask.sum()
+                if n_masked == 0:
+                    # If we have no tokens to mask, we need to mask at least one if there is a non-zero request for mask.
+                    mask[np.random.randint(0, token_len)] = True
 
-            pert_token = self._perturb_token(token, indices_to_modify[0:num_perturbs])
-            mask_token = self._mask_token(pert_token, indices_to_modify[num_perturbs:])
+            # Step 3: Assign categories to each mask type
+            category_probs = np.random.rand(token_len)
+            mask_mask = (category_probs < self.mask_token_percent) & mask
+            perturb_mask = (
+                (category_probs >= self.mask_token_percent)
+                & (category_probs < (self.mask_token_percent + self.perturb_token_percent))
+            ) & mask
+            # The following category is implicit, but this is what we would use if we were doing this.
+            # identity_mask = (category_probs >= (self.mask_token_percent + self.perturb_token_percent)) & mask
 
-            modified_tokens.append(mask_token)
+            # There is an implicit third category of tokens, num_identities, which are the tokens that are not perturbed or masked.
+            #  ie we cannot assume that the number mask_mask | perturb_mask == mask, since some will also be identities.
 
-            mask = [1 if idx in indices_to_modify else 0 for idx in range(token_len)]
-            token_masks.append(mask)
+            mask_indices = np.where(mask_mask)[0]
+            perturb_indices = np.where(perturb_mask)[0]
+            # Each call below will mutate the sequence after the next line our tokens will be perturbed at the sampled indices.
+            if len(perturb_indices) > 0:
+                mod_tokens = self._perturb_token(mod_tokens, perturb_indices)
+            if len(mask_indices) > 0:
+                mod_tokens = self._mask_token(mod_tokens, mask_indices)
+
+            # Note, the third category, num_identites, is not perturbed or masked, so that token isn't
+            #  modified, but it is still included in the loss mask since it is a member of mask.
+            modified_tokens.append(mod_tokens)
+
+            token_masks.append(mask.astype(int).tolist())  # convert the mask to a list for output.
 
         return modified_tokens, token_masks
 

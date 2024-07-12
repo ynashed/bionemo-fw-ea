@@ -149,6 +149,18 @@ def extract_output_filename(cfg: DictConfig) -> str:
     return output_fname
 
 
+def extract_output_format(cfg: DictConfig) -> str:
+    try:
+        output_format = cfg.model.data.output_format
+    except Exception as e:
+        raise ValueError("Expecting model.data.extract_output_format to exist in configuration!") from e
+    if output_format is None or len(output_format) == 0:
+        raise ValueError(
+            "Output format not specified in configuration! Specify one under: model.data.extract_output_format"
+        )
+    return output_format
+
+
 def validate_output_filename(output_fname: str, overwrite: bool) -> None:
     """Raises an exception if invalid or otherwise cannot write to location."""
     if len(output_fname) == 0:
@@ -165,9 +177,6 @@ def validate_output_filename(output_fname: str, overwrite: bool) -> None:
         except Exception:
             logging.error("Failed to ensure that directory containing output exists!")
             raise
-
-    if not output_fname.endswith(".pkl"):
-        logging.warning("Writing output as pickle file but it does not have .pkl extension!")
 
 
 def main(config_path: str, config_name: str, output_override: Optional[str], overwrite: bool) -> None:

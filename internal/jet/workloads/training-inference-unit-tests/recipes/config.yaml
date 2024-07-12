@@ -20,28 +20,22 @@ launchers:
     ntasks_per_node: '{gpus}'
   name:dgxa100_dracooci:
     mounts:
-      /workspace/bionemo/models: /lustre/fsw/portfolios/convai/projects/convai_bionemo_training/jet/models
-      /workspace/bionemo/examples/tests/test_data/cellxgene_2023-12-15_small: /lustre/fsw/portfolios/convai/projects/convai_bionemo_training/jet/data/test_data/cellxgene_2023-12-15_small
+      /workspace/bionemo/models: /lustre/fsw/portfolios/healthcareeng/projects/healthcareeng_bionemo/jet/models
+      /workspace/bionemo/examples/tests/test_data/cellxgene_2023-12-15_small: /lustre/fsw/portfolios/healthcareeng/projects/healthcareeng_bionemo/jet/data/test_data/cellxgene_2023-12-15_small
 spec:
   build: bionemo
   scope: perf-train
   platforms: [linux/amd64]
   BIONEMO_HOME: "/workspace/bionemo"
   MODEL_PATH: "/workspace/bionemo/models"
-  NGC_CLI_FORMAT_TYPE: ascii
-  NGC_CLI_ORG: nvidian
-  NGC_CLI_TEAM: clara-lifesciences
   config_path: "examples/tests/conf/"
   warmup: 0
-  val_check_interval: 100
-  max_steps: 500
+  val_check_interval: 50
+  max_steps: 100
   default_overwrites: "++exp_manager.create_wandb_logger=False ++exp_manager.create_tensorboard_logger=False ++exp_manager.exp_dir=/tmp/nemo_experiments/ ++exp_manager.create_checkpoint_callback=False ++exp_manager.resume_if_exists=False"
   extra_overwrites: ""
   script: |-
     cd {BIONEMO_HOME}
-    export NGC_CLI_ORG={NGC_CLI_ORG}
-    export NGC_CLI_TEAM={NGC_CLI_TEAM}
-    export NGC_CLI_FORMAT_TYPE={NGC_CLI_FORMAT_TYPE}
     if [ "$SLURM_LOCALID" = "0" ]; then
       if [ "{model}" = "esm2nv" ]; then
         unzip examples/tests/test_data/uniref202104_esm2_qc_test200_val200.zip -d examples/tests/test_data/;
@@ -56,22 +50,27 @@ spec:
     trainer.num_nodes={nodes} trainer.devices={gpus} trainer.precision={precision} model.micro_batch_size={batch_size} \
     trainer.max_steps={max_steps} trainer.val_check_interval={val_check_interval} \
     ++model.dwnstr_task_validation.enabled={dwnstr_task} \
-    {default_overwrites} {extra_overwrites} hydra.searchpath=[file://{BIONEMO_HOME}/examples/{domain}/{model}/conf] \
+    {default_overwrites} {extra_overwrites} \
     ++create_dllogger_callbacks=True ++create_trainer_metric_callback=True \
     ++dllogger_callbacks_kwargs.use_existing_dllogger=True ++dllogger_callbacks_kwargs.warmup={warmup} \
     ++dllogger_callbacks_kwargs.json_file={dllogger_file} ++trainer_metric_callback_kwargs.log_path={assets_dir} ++logs_dir={logs_dir}
-  time_limit: 3600
+  time_limit: 1800
   artifacts: {}
-  metrics:
-    throughput_train:
-      goal: maximize
-      tags: [primary]
-    latency_train_mean:
-      goal: minimize
-      tags: [secondary]
-    train_loss:
-      goal: minimize
-      tags: [secondary]
+metrics:
+  throughput_train:
+    goal: maximize
+    tags: [primary]
+  latency_train_mean:
+    goal: minimize
+    tags: [secondary]
+  train_loss:
+    goal: minimize
+    tags: [secondary]
+tests_spec:
+  - logic_type: static
+    logic_spec:
+      exit_codes:
+        - 0
 products:
   - nodes: [1]
     gpus: [8]

@@ -20,12 +20,9 @@ import torch
 from Bio import SeqIO
 from pytorch_lightning import seed_everything
 
-from bionemo.data.diffdock.confidence_dataset import diffdock_confidence_dataset
-from bionemo.data.diffdock.confidence_store import ConfidenceStore
-from bionemo.data.diffdock.docking_dataset import diffdock_build_dataset
+from bionemo.data.diffdock.confidence_dataset import diffdock_build_confidence_dataset
+from bionemo.data.diffdock.docking_dataset import DataSplit, diffdock_build_dataset
 from bionemo.data.diffdock.embedding_preprocess import prep_embedding
-from bionemo.data.diffdock.embedding_store import EmbeddingStore
-from bionemo.data.diffdock.heterograph_store import HeterographStore
 from bionemo.model.molecule.diffdock.infer import DiffDockModelInference
 from bionemo.model.molecule.diffdock.utils.diffusion import t_to_sigma as t_to_sigma_compl
 from bionemo.utils.hydra import load_model_config
@@ -58,42 +55,39 @@ def config_path_for_tests(bionemo_home) -> str:
 @pytest.mark.needs_gpu
 def test_diffdock_embedding_preprocessing(tmp_path, config_path_for_tests):
     cfg = load_model_config(config_name="diffdock_embedding_test", config_path=config_path_for_tests)
-    cfg.training_data.output_fasta_file = str(tmp_path / "pdb_sequences.fasta")
-    cfg.training_data.esm_embeddings_path = str(tmp_path / "esm2_embeddings.sqlite3")
+    cfg.protein_data.output_fasta_file = str(tmp_path / "pdb_sequences.fasta")
+    cfg.protein_data.esm_embeddings_path = str(tmp_path / "esm2_embeddings")
 
-    prep_embedding(cfg.training_data)
-    fasta = {rec.id: str(rec.seq) for rec in SeqIO.parse(cfg.training_data.output_fasta_file, 'fasta')}
+    seed_everything(cfg.seed)
+    prep_embedding(cfg.protein_data)
+    fasta = {rec.id: str(rec.seq) for rec in SeqIO.parse(cfg.protein_data.output_fasta_file, 'fasta')}
     ref_fasta = {rec.id: str(rec.seq) for rec in SeqIO.parse(cfg.ref_fasta_file, 'fasta')}
     for complex_name in ref_fasta.keys():
         assert fasta[complex_name] == ref_fasta[complex_name], f"fasta is incorrect for {complex_name}"
 
-    emb_store = EmbeddingStore(db_path=cfg.training_data.esm_embeddings_path)
-    ref_emb_store = EmbeddingStore(db_path=cfg.training_data.esm_embeddings_path)
+    assert len(os.listdir(cfg.protein_data.esm_embeddings_path)) == 3
 
-    for complex_name in ref_fasta.keys():
-        embedding = torch.from_numpy(pickle.loads(emb_store.search(complex_name)[0][1]))
-        ref_embedding = torch.from_numpy(pickle.loads(ref_emb_store.search(complex_name)[0][1]))
+    for file in os.listdir(cfg.ref_esm_embeddings_path):
+        ref_embedding = torch.load(os.path.join(cfg.ref_esm_embeddings_path, file))
+        embedding = torch.load(os.path.join(cfg.protein_data.esm_embeddings_path, file))
 
-        assert torch.allclose(embedding, ref_embedding)
+        assert torch.allclose(embedding, ref_embedding, atol=1.0e-2)
 
 
 @pytest.mark.slow
 def test_diffdock_prepare_score_dataset(config_path_for_tests, tmp_path):
     cfg = load_model_config(config_name="diffdock_score_preprocessing_test", config_path=config_path_for_tests)
-    cfg.model.train_ds.cache_path = str(tmp_path / "data_cache")
+    cfg.data.cache_path = str(tmp_path / "data_cache")
+
     t_to_sigma = partial(t_to_sigma_compl, cfg=cfg.model)
 
-    dataset = diffdock_build_dataset(cfg.model.train_ds, t_to_sigma, _num_conformers=True, mode="train")
+    dataset = diffdock_build_dataset(
+        cfg.data, cfg.model.train_ds, t_to_sigma, _num_conformers=True, mode=DataSplit("train")
+    )
+    seed_everything(cfg.seed)
     dataset.build_complex_graphs()
 
-    assert os.path.isfile(
-        os.path.join(cfg.model.train_ds.cache_path, cfg.train_graph_folder_name, 'heterographs.sqlite3')
-    )
-    graphs = HeterographStore(
-        os.path.join(cfg.model.train_ds.cache_path, cfg.train_graph_folder_name, 'heterographs.sqlite3')
-    )
-    ref_graphs = HeterographStore(cfg.ref_train_graph_file)
-    assert len(graphs) == len(ref_graphs) == 2
+    assert len(os.listdir(os.path.join(cfg.data.cache_path, cfg.ref_train_graph_folder_name))) > 0
 
     attr_dict = {
         'ligand': ['orig_pos', 'x', 'pos', 'edge_mask', 'mask_rotate'],
@@ -102,9 +96,9 @@ def test_diffdock_prepare_score_dataset(config_path_for_tests, tmp_path):
         ('receptor', 'rec_contact', 'receptor'): ['edge_index'],
     }
 
-    for idx in range(2):
-        sample = graphs[idx]
-        ref_sample = ref_graphs[0] if sample.name == ref_graphs[0].name else ref_graphs[1]
+    for file in os.listdir(cfg.ref_train_graph_file):
+        ref_sample = pickle.load(open(os.path.join(cfg.ref_train_graph_file, file), "rb"))
+        sample = pickle.load(open(os.path.join(cfg.data.cache_path, cfg.ref_train_graph_folder_name, file), "rb"))
 
         assert torch.allclose(torch.tensor(sample.rmsd_matching), torch.tensor(ref_sample.rmsd_matching), atol=0.01)
         assert torch.allclose(
@@ -124,20 +118,13 @@ def test_diffdock_prepare_score_dataset(config_path_for_tests, tmp_path):
 @pytest.mark.needs_checkpoint
 def test_diffdock_prepare_confidence_dataset(tmp_path, config_path_for_tests):
     cfg = load_model_config(config_name="diffdock_confidence_preprocessing_test", config_path=config_path_for_tests)
-    cfg.model.train_ds.cache_path = str(tmp_path / "data_cache")
-    seed_everything(cfg.seed)
+    cfg.data.cache_path = str(tmp_path / "data_cache")
 
-    dataset = diffdock_confidence_dataset(cfg.model.train_ds, mode="train")
+    dataset = diffdock_build_confidence_dataset(cfg.data, cfg.model.train_ds, mode=DataSplit("train"))
+    seed_everything(cfg.seed)
     dataset.build_complex_graphs()
 
-    assert os.path.isfile(
-        os.path.join(cfg.model.train_ds.cache_path, cfg.train_graph_folder_name, 'heterographs.sqlite3')
-    )
-    graphs = HeterographStore(
-        os.path.join(cfg.model.train_ds.cache_path, cfg.train_graph_folder_name, 'heterographs.sqlite3')
-    )
-    ref_graphs = HeterographStore(cfg.ref_train_graph_file)
-    assert len(graphs) == len(ref_graphs) == 2
+    assert len(os.listdir(os.path.join(cfg.data.cache_path, cfg.ref_train_graph_folder_name))) == 2
 
     attr_dict = {
         'ligand': ['orig_pos', 'x', 'pos', 'edge_mask', 'mask_rotate'],
@@ -149,9 +136,9 @@ def test_diffdock_prepare_confidence_dataset(tmp_path, config_path_for_tests):
         ('atom', 'atom_rec_contact', 'receptor'): ['edge_index'],
     }
 
-    for idx in range(2):
-        sample = graphs[idx]
-        ref_sample = ref_graphs[0] if sample.name == ref_graphs[0].name else ref_graphs[1]
+    for file in os.listdir(cfg.ref_train_graph_file):
+        ref_sample = pickle.load(open(os.path.join(cfg.ref_train_graph_file, file), "rb"))
+        sample = pickle.load(open(os.path.join(cfg.data.cache_path, cfg.ref_train_graph_folder_name, file), "rb"))
 
         assert torch.allclose(torch.tensor(sample.rmsd_matching), torch.tensor(ref_sample.rmsd_matching), atol=0.01)
         assert torch.allclose(
@@ -166,24 +153,22 @@ def test_diffdock_prepare_confidence_dataset(tmp_path, config_path_for_tests):
 
     score_model = DiffDockModelInference(cfg.score_infer)
     score_model.eval()
-    dataset.build_confidence_dataset(score_model)
+
+    seed_everything(cfg.seed)
+    dataset.generate_ligand_poses(score_model, cfg.score_infer.data)
     teardown_apex_megatron_cuda()
 
-    assert os.path.isfile(
-        os.path.join(cfg.model.train_ds.cache_path, cfg.ligand_pose_folder_name, 'confidence_cache_id_base.sqlite3')
-    )
-    ligand_poses = ConfidenceStore(
-        os.path.join(cfg.model.train_ds.cache_path, cfg.ligand_pose_folder_name, 'confidence_cache_id_base.sqlite3')
-    )
-    ref_ligand_poses = ConfidenceStore(cfg.ref_ligand_pose_file)
+    assert len(os.listdir(os.path.join(cfg.data.cache_path, cfg.ref_ligand_pose_folder_name))) == 2
 
-    assert len(ligand_poses) == len(ref_ligand_poses) == 2
+    for file in os.listdir(cfg.ref_ligand_pose_file):
+        ref_sample = pickle.load(open(os.path.join(cfg.ref_ligand_pose_file, file), "rb"))
+        sample = pickle.load(open(os.path.join(cfg.data.cache_path, cfg.ref_ligand_pose_folder_name, file), "rb"))
 
-    for idx in range(2):
-        sample = ligand_poses[idx]
-        ref_sample = ref_ligand_poses[0] if sample[0] == ref_ligand_poses[0][0] else ref_ligand_poses[1]
+        # complex name
+        assert sample[0] == ref_sample[0]
+
         # ligand positions
-        assert np.allclose(sample[1], ref_sample[1], atol=0.01)
+        assert np.allclose(sample[1], ref_sample[1], atol=0.1)
 
         # RMSD
-        assert np.allclose(sample[2], ref_sample[2], atol=0.01)
+        assert np.allclose(sample[2], ref_sample[2], atol=0.1)

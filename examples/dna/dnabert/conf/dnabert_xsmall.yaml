@@ -51,7 +51,7 @@ model:
       min_lr: 1e-5
 
 exp_manager:
-  explicit_log_dir: null
+  explicit_log_dir: ${.exp_dir}
   exp_dir: ${oc.env:BIONEMO_HOME}/results/nemo_experiments/${.name}/${.wandb_logger_kwargs.name}
   name: dnabert
   create_wandb_logger: True

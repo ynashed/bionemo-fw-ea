@@ -23,7 +23,7 @@ launchers:
     ntasks_per_node: '{gpus}'
   name:dgxa100_dracooci:
     mounts:
-      /workspace/bionemo/data: /lustre/fsw/portfolios/convai/projects/convai_bionemo_training/jet/data
+      /workspace/bionemo/data: /lustre/fsw/portfolios/healthcareeng/projects/healthcareeng_bionemo/jet/data
 spec:
   build: bionemo
   scope: ""
@@ -37,6 +37,7 @@ spec:
   extra_overwrites: ""
   script: |-
     cd {BIONEMO_HOME};
+    mkdir -p {tensorboard_dir};
     export WANDB_API_KEY=$BIONEMO_WANDB_API_KEY;
     model_tag={model}_{variant}_{config_name}_{dwnstr_task}dwnstr;
     python examples/{domain}/{model}/{variant}.py --config-name {config_name} \
@@ -44,7 +45,7 @@ spec:
     ++trainer.accumulate_grad_batches={accumulate_grad_batches} trainer.val_check_interval={val_check_interval} \
     ++model.optim.sched.constant_steps=null  ++model.optim.sched.last_epoch=-1  ++model.optim.sched.min_lr=0.0000002 \
     ++model.optim.sched.anneal_percentage=0.10  ++model.optim.eps=10e-8  ++model.optim.weight_decay=0.01 \
-    ++model.seed={seed} trainer.max_steps={max_steps} ++exp_manager.exp_dir={assets_dir} \
+    ++model.seed={seed} trainer.max_steps={max_steps} ++exp_manager.exp_dir={tensorboard_dir} \
     ++model.dwnstr_task_validation.enabled={dwnstr_task} \
     ++model.data.index_mapping_dir={BIONEMO_HOME}/data/index_dir/{config_name} \
     ++model.data.datapath=/workspace/bionemo/data/uniref202104_esm2_120123_jm \
@@ -56,17 +57,7 @@ spec:
     ++create_dllogger_callbacks=True ++create_trainer_metric_callback=True \
     ++dllogger_callbacks_kwargs.use_existing_dllogger=True ++dllogger_callbacks_kwargs.warmup={warmup} \
     ++dllogger_callbacks_kwargs.json_file={dllogger_file} ++trainer_metric_callback_kwargs.log_path={assets_dir} \
-    ++logs_dir={logs_dir};
-    if [ -z $SLURM_LOCALID ] || [ $SLURM_LOCALID = 0 ]
-    then
-      mkdir -p {tensorboard_dir}
-      find {assets_dir} -type f -name "events.out.tfevents*" -exec cp {{}} {tensorboard_dir} \;
-      latest_log="{assets_dir}/run_0/output_script-0.log";
-      [ ! -f "$latest_log" ] && {{ echo "File $latest_log does not exist. Exiting with error."; exit 1; }};
-      experiment_link=$(grep -o "View run at https://wandb.ai/[^']*" "$latest_log" | awk 'NR==1 {{print $4}}');
-      project_link=$(grep -o "View project at https://wandb.ai/[^']*" "$latest_log" | awk 'NR==1 {{print $4}}');
-      echo "{{WANDB_RUN_LINK: \"$experiment_link\", WANDB_PROJECT_LINK: \"$project_link\"}}" > {logs_dir}/extra.yaml
-    fi
+    ++logs_dir={logs_dir}
   time_limit: 14400
   artifacts: {}
 metrics:
@@ -88,13 +79,13 @@ products:
     precision: [32]
     products:
       - domain: [protein]
-        dwnstr_task: [False, True]
+        dwnstr_task: [False]
         products:
           - variant: [pretrain]
             model: [esm2nv]
             config_name: [pretrain_esm2_650M]
             batch_size: [8]
-            max_steps: [144000]
+            max_steps: [142400]
             seed: [1234]
             val_check_interval: [500]
             accumulate_grad_batches: [8]

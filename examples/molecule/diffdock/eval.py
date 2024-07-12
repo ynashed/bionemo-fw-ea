@@ -15,6 +15,7 @@ modify parameters from conf/*.yaml
 import os
 
 import numpy as np
+import pandas as pd
 from biopandas.pdb import PandasPdb
 from nemo.core.config import hydra_runner
 from nemo.utils import logging
@@ -32,7 +33,15 @@ def main(cfg) -> None:
 
     logging.info('Reading paths and names.')
 
-    names = read_strings_from_txt(cfg.data.split_test)
+    if cfg.get('protein_ligand_csv') is not None:
+        df = pd.read_csv(cfg.protein_ligand_csv)
+        names = df['complex_name'].tolist()
+        ligand_description_list = df['ligand_description'].tolist()
+        protein_path_list = df['protein_path'].tolist()
+    else:
+        names = read_strings_from_txt(cfg.data.split_test)
+        ligand_description_list = [None for _ in names]
+        protein_path_list = [None for _ in names]
     names_no_rec_overlap = read_strings_from_txt(cfg.names_no_rec_overlap)
     os.makedirs(cfg.results_path, exist_ok=True)
     results_path_containments = os.listdir(cfg.results_path)
@@ -46,7 +55,13 @@ def main(cfg) -> None:
 
     for i, name in enumerate(tqdm(names)):
         # read the reference and predicted ligand molecules and compute RMSDs.
-        rmsd, ligand_pos, orig_ligand_pos = compute_rmsd(cfg, name, results_path_containments)
+        try:
+            rmsd, ligand_pos, orig_ligand_pos = compute_rmsd(
+                cfg, name, results_path_containments, ref_ligand=ligand_description_list[i]
+            )
+        except Exception as e:
+            logging.warning(f"{name} failed because of error:\n{e}")
+            continue
 
         if rmsd is None:
             continue
@@ -56,9 +71,12 @@ def main(cfg) -> None:
             np.linalg.norm(ligand_pos.mean(axis=1) - orig_ligand_pos[None, :].mean(axis=1), axis=1)
         )
 
-        rec_path = os.path.join(cfg.data.data_dir, name, f'{name}_protein_processed.pdb')
-        if not os.path.exists(rec_path):
-            rec_path = os.path.join(cfg.data.data_dir, name, f'{name}_protein_obabel_reduce.pdb')
+        if protein_path_list[i] is not None:
+            rec_path = protein_path_list[i]
+        else:
+            rec_path = os.path.join(cfg.data.data_dir, name, f'{name}_protein_processed.pdb')
+            if not os.path.exists(rec_path):
+                rec_path = os.path.join(cfg.data.data_dir, name, f'{name}_protein_obabel_reduce.pdb')
         rec = PandasPdb().read_pdb(rec_path)
         rec_df = rec.df['ATOM']
         receptor_pos = rec_df[['x_coord', 'y_coord', 'z_coord']].to_numpy().squeeze().astype(np.float32)

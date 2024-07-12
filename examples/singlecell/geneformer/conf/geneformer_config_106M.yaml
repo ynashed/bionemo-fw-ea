@@ -35,7 +35,7 @@ model:
     medians_file: ${.train_dataset_path}/medians.json  # By convention the medians file is preprocessed into the train dataset path.
 
 exp_manager:
-  explicit_log_dir: null
+  explicit_log_dir: ${.exp_dir}
   exp_dir: ${oc.env:BIONEMO_HOME}/results/nemo_experiments/${.name}/${.wandb_logger_kwargs.name}
   name: geneformer
   create_wandb_logger: True

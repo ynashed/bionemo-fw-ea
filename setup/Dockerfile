@@ -1,6 +1,7 @@
+
 # SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: LicenseRef-NvidiaProprietary
-#
+
 # NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
 # property and proprietary rights in and to this material, related
 # documentation and any modifications thereto. Any use, reproduction,
@@ -14,8 +15,95 @@
 #   - libstdcxx-ng=11.1.0=h56837e0_8
 #   - pycairo=1.20.1=py38hf61ee4a_0
 
-ARG BASE_IMAGE=nvcr.io/nvidia/nemo:23.10
-FROM ${BASE_IMAGE}
+# Most of the first part is directly copied from NeMo v1.22 Dockerfile https://github.com/NVIDIA/NeMo/blob/v1.22.0/Dockerfile
+# kept all dependencies necessary for nemo.collections.nlp, nemo.core, nemo.utils, nemo.collections.common
+
+ARG BASE_IMAGE=nvcr.io/nvidia/pytorch:23.10-py3
+# build an image that includes only the nemo dependencies, ensures that dependencies
+# are included first for optimal caching, and useful for building a development
+# image (by specifying build target as `nemo-deps`)
+FROM ${BASE_IMAGE} as base
+
+# Ensure apt-get won't prompt for selecting options
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && \
+  apt-get upgrade -y && \
+  apt-get install -y \
+  libfreetype6 \
+  swig && \
+  rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace/
+
+# need this otherwise apex or transformer engine crashes since it runs out of host memory
+# c++: fatal error: Killed signal terminated program cc1plus
+ARG MAX_JOBS=4
+ENV MAX_JOBS=${MAX_JOBS}
+
+# Install megatron core, this can be removed once 0.3 pip package is released
+# We leave it here in case we need to work off of a specific commit in main
+RUN git clone https://github.com/NVIDIA/Megatron-LM.git && \
+  cd Megatron-LM && \
+  git checkout e122536b7645edcb7ebf099b5c92a443f7dbf8e7 && \
+  pip install .
+
+# Distributed Adam support for multiple dtypes
+RUN git clone https://github.com/NVIDIA/apex.git && \
+  cd apex && \
+  git checkout 52e18c894223800cb611682dce27d88050edf1de && \
+  pip install -v --no-build-isolation --disable-pip-version-check --no-cache-dir --config-settings "--build-option=--cpp_ext --cuda_ext --fast_layer_norm --distributed_adam --deprecated_fused_adam" ./
+
+# Transformer Engine used in NeMo v1.22 dockerfile
+RUN git clone https://github.com/NVIDIA/TransformerEngine.git && \
+  cd TransformerEngine && \
+  git fetch origin 8eae4ce2b8fdfbbe525fc8bfecb0df5498cc9687 && \
+  git checkout FETCH_HEAD && \
+  git submodule init && git submodule update && \
+  NVTE_FRAMEWORK=pytorch NVTE_WITH_USERBUFFERS=0 MPI_HOME=/usr/local/mpi pip install .
+
+WORKDIR /tmp/
+
+# uninstall stuff from base container
+RUN pip uninstall -y sacrebleu torchtext
+
+WORKDIR /tmp/nemo
+# install flash attention
+RUN pip install flash-attn
+# install numba for latest containers
+# ImportError: Numba needs NumPy 1.24 or less
+RUN pip install numba>=0.57.1
+ARG NEMO_VERSION=1.22.0
+# Check that NEMO_VERSION is set. Build will fail without this. Expose NEMO and base container
+# version information as runtime environment variable for introspection purposes
+RUN /usr/bin/test -n "$NEMO_VERSION" && \
+  /bin/echo "export NEMO_VERSION=${NEMO_VERSION}" >> /root/.bashrc && \
+  /bin/echo "export BASE_IMAGE=${BASE_IMAGE}" >> /root/.bashrc
+
+# Install NeMo
+RUN git clone -b v$NEMO_VERSION https://github.com/NVIDIA/NeMo.git && \
+    cd NeMo && \
+    pip uninstall -y nemo_toolkit sacrebleu && \
+    pip install -r requirements/requirements_lightning.txt && \
+    pip install -r requirements/requirements_common.txt && \
+    sed -i "/torch/d" requirements/requirements.txt && \
+    sed -i "/triton/d" requirements/requirements.txt && \
+    sed -i "/megatron_core/d" requirements/requirements_nlp.txt && \
+    pip install -r requirements/requirements.txt && \
+    pip install -r requirements/requirements_nlp.txt && \
+    pip install ".[nlp]"
+
+# Remove lightning-app. Nemo and BioNeMo doesn't use it, and it introduces security vulnerabilities:
+# https://github.com/advisories/GHSA-cgwc-qvrx-rf7f
+# https://github.com/advisories/GHSA-mr7h-w2qc-ffc2
+RUN rm -rf /usr/local/lib/python3.10/dist-packages/lightning/app
+
+# need this for backward compatibility: pytests rely on configs in /workspace/nemo/examples
+RUN mkdir -p /workspace/nemo/
+RUN cp -r /tmp/nemo/NeMo/scripts /workspace/nemo/scripts
+RUN cp -r /tmp/nemo/NeMo/examples /workspace/nemo/examples
+RUN cp -r /tmp/nemo/NeMo/tests /workspace/nemo/tests
+RUN cp -r /tmp/nemo/NeMo/tutorials /workspace/nemo/tutorials
 
 ENV TERM=xterm
 ENV FORCE_CUDA=1
@@ -92,6 +180,16 @@ COPY setup/requirements*.txt /tmp/
 COPY setup/install_lmdb.sh /tmp/install_lmdb.sh
 RUN --mount=type=secret,id=GITLAB_TOKEN GITLAB_TOKEN=$(cat /run/secrets/GITLAB_TOKEN) pip install -r /tmp/requirements-dev.txt
 RUN pip install -r /tmp/requirements-test.txt
+
+# FIXME [mgreaves] unknown why installing fw2nim doesn't work
+#    39 35.05 ERROR: Could not find a version that satisfies the requirement fw2nim==0.1.0 (from versions: none)
+#    39 35.05 ERROR: No matching distribution found for fw2nim==0.1.0
+#    39 ERROR: executor failed running [/bin/sh -c GITLAB_TOKEN=$(cat /run/secrets/GITLAB_TOKEN) pip install -r /tmp/requirements.txt]: exit code: 1
+# but infra-bionemo does:
+#    37 3.282 Collecting infra-bionemo==0.1.0 (from -r /tmp/requirements-dev.txt (line 7))
+#    37 3.366   Downloading https://gitlab-master.nvidia.com/api/v4/projects/118589/packages/pypi/files/487d2342614e85a010143523f44fcee5058ff71b90b5e10a0d4a0ce259f66230/infra_bionemo-0.1.0-py3-none-any.whl (29 kB)
+# NOTE that doing a local docker run w/ personal API token **does work**, it's the gitlab RO API token that does not work
+# THIS IS ONLY A GITLAB CI PROBLEM !!!
 RUN --mount=type=secret,id=GITLAB_TOKEN GITLAB_TOKEN=$(cat /run/secrets/GITLAB_TOKEN) pip install -r /tmp/requirements.txt
 # need special install for lmdb: it cannot be installed via pip, but be built from source
 # but unfortunately, https://github.com/jnwatson/py-lmdb.git isn't PEP-512 compliant, so we have to manually run setup.py
@@ -167,13 +265,25 @@ RUN pip uninstall -y opencv-python opencv fonttools \
 # BioNeMo Build
 #########################################################################################
 
+# directory permissioning commands:
+#   - openfold training requires the installation of libraries via
+#   ./examples/protein/openfold/scripts/install_third_party.sh,
+#   at container run time, rather than image build time.
+#   - the installers require the user submitting the install commands
+#   to have access to certain locations, where typically root has access
+#   but the user does not.
+RUN chmod a+rwx /usr/local /usr/local/lib /usr/local/include /usr/local/bin
+RUN mkdir -p /usr/local/scripts /usr/local/lib/cmake/
+RUN chmod a+rwx /usr/local/scripts /usr/local/lib/cmake/
+
+
 ### The location of the installed library in the container. Set BIONEMO_HOME env to change this for development purposes.
 ARG BIONEMO_HOME=/workspace/bionemo
 ENV BIONEMO_HOME=${BIONEMO_HOME}
 RUN mkdir -p ${BIONEMO_HOME}
 WORKDIR ${BIONEMO_HOME}
 ### Copy the bionemo repo contents for distribution
-COPY LICENSE README.md artifact_paths.yaml download_models.py launch.sh setup.py pyproject.toml ${BIONEMO_HOME}/
+COPY LICENSE README.md artifact_paths.yaml download_artifacts.py launch.sh setup.py pyproject.toml ${BIONEMO_HOME}/
 COPY setup ${BIONEMO_HOME}/setup
 COPY hydra_plugins ${BIONEMO_HOME}/hydra_plugins
 COPY tokenizers ${BIONEMO_HOME}/tokenizers

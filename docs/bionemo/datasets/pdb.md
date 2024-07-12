@@ -22,7 +22,7 @@ Sequence-based pruning is applied to prevent cross-contamination between the DIP
 
 ## Continuous Automated Model EvaluatiOn (CAMEO) {cite:p}`robin2023automated`
 
-Continuous Automated Model EvaluatiOn ([CAMEO](https://cameo3d.org/)) {cite:p}`robin2023automated` is a community-led project for continuous quality assessment for biomolecular structure prediction, including monomeric and multimeric proteins, nucleic acids and small molecule liagnds. It operates by issuing weekly challenges in predicting protein structures soon to be released publicly at Protein Data Bank. Structure prediction from participating servers are evaluated in metrics such as Local Distance Difference Test (lDDT). CAMEO is considered a more frequent evaluation compared to the gold standard - the biannual Critical Assessment of protein Structure Prediction (CASP).
+Continuous Automated Model EvaluatiOn ([CAMEO](https://cameo3d.org/)) {cite:p}`robin2023automated` is a community-led project for continuous quality assessment for biomolecular structure prediction, including monomeric and multimeric proteins, nucleic acids and small molecule ligands. It operates by issuing weekly challenges in predicting protein structures soon to be released publicly at Protein Data Bank. Structure prediction from participating servers are evaluated in metrics such as Local Distance Difference Test (lDDT). CAMEO is considered a more frequent evaluation compared to the gold standard - the biannual Critical Assessment of protein Structure Prediction (CASP).
 
 ## Derivative datasets in OpenFold training {cite:p}`Ahdritz2022.11.20.517210`
 

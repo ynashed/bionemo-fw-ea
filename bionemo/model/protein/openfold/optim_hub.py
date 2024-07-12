@@ -22,6 +22,7 @@ class OptimHub:
         "layernorm_inductor": False,
         "inductor_global": False,
         "dataloader_pq": False,
+        "FusedAdamSWA": False,
     }
 
     @staticmethod
@@ -44,6 +45,7 @@ class OptimHub:
         if 'all' in optims:
             optims = OptimHub.__conf.keys()
         for optim in optims:
+            # TODO: [optim-hub] this assumes optims is a set, enforce in hydra configs or make it work with dict as well
             OptimHub.set(optim, True)
 
         if OptimHub.config('layernorm_triton') and OptimHub.config('layernorm_inductor'):

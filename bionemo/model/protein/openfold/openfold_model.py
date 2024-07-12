@@ -24,14 +24,16 @@
 # limitations under the License.
 
 import re
-from typing import Any, Dict, Tuple, Union
+from copy import deepcopy
+from typing import Any, Dict, Optional, Sequence, Tuple, Union
 
 import nemo
 import omegaconf
 import pytorch_lightning
 import torch
+from nemo.collections.common.callbacks import EMA
 from nemo.core import ModelPT
-from pytorch_lightning import Trainer
+from pytorch_lightning import Callback, Trainer
 
 import bionemo.data.protein.openfold.residue_constants as rc
 from bionemo.data.protein.openfold.datahub import get_training_dataloader, get_validation_dataloader
@@ -48,12 +50,15 @@ from bionemo.model.protein.openfold.feature_building import (
 )
 from bionemo.model.protein.openfold.input_embedder import InputEmbedder
 from bionemo.model.protein.openfold.loss import AlphaFoldLoss
+from bionemo.model.protein.openfold.optim_hub import OptimHub
 from bionemo.model.protein.openfold.recycling_embedder import RecyclingEmbedder
 from bionemo.model.protein.openfold.structure_module import StructureModule
+from bionemo.model.protein.openfold.swa import AlphaFoldEMA
 from bionemo.model.protein.openfold.template_angle_embedder import TemplateAngleEmbedder
 from bionemo.model.protein.openfold.template_pair_embedder import TemplatePairEmbedder
 from bionemo.model.protein.openfold.template_pair_stack import TemplatePairStack
 from bionemo.model.protein.openfold.template_pointwise_attention import TemplatePointwiseAttention
+from bionemo.model.protein.openfold.triton.fused_adam_swa import FusedAdamSWA
 from bionemo.model.protein.openfold.utils.logging_utils import (
     environ_as_multiline_str,
     log_with_nemo_at_level,
@@ -566,6 +571,88 @@ class AlphaFold(ModelPT):
             self,
         )
 
+    def _setup_fused_adam_swa(self):
+        # We will use this instance to create FusedAdamSWA and replace it at self._optimizer
+
+        alphafold_parameters_bf16 = list(self.parameters())
+        # TODO [optim-hub] normally we would do deepcopy(self) but that does not work because of non-picable Proxy object of
+        # NeMo decorator
+        alphafold_parameters_fp32 = [t.to(dtype=torch.float32) for t in deepcopy(alphafold_parameters_bf16)]
+
+        self._optimizer = FusedAdamSWA.from_optim(
+            adam_optimizer=self._optimizer,  # at this point self._optimizer should be set to Adam instance
+            fp32_params=alphafold_parameters_fp32,
+            bf16_params=alphafold_parameters_bf16,
+            swa_params=alphafold_parameters_bf16,  # TODO: [optim-hub] has to be replaces with actual alphafold_parameters_swa!
+            swa_decay_rate=0.999,  # TODO: [optim-hub] replace with config value and align with NeMo's EMA
+        )
+
+        self._scheduler['scheduler'].optimizer = self._optimizer
+
+    def configure_callbacks(self) -> Union[Sequence[Callback], Callback]:
+        """A pytorch lightning mechanism extendsreturn value extends the
+        list of callbacks reference in the trainer object.
+
+        Alternatively, we could directly update trainer.callbacks here, but
+        there may be other mechanisms that need access to the return value.
+
+        See reference
+        https://github.com/Lightning-AI/pytorch-lightning/blob/f6fd046552a1504023cb3386a8a0df418a810e4f/src/lightning/pytorch/core/module.py#L936
+        """
+        log_with_nemo_at_level(
+            """
+            AlphaFold.configure_callbacks()
+            """
+        )
+        # The assumption here is made that configure_callbacks is called before setup_optimization.
+        # TODO: [optim-hub] explain why
+        if OptimHub.config('FusedAdamSWA'):
+            # normally, AlphaFoldEMA should replace nemo.collections.common.callbacks.EMA because in newer PTL version
+            # lightining.pytorch.trainer.trainer.connectors.callback_connector._CallbackConnector._attach_model_callbacks
+            # replaces callbacks checking if model callback is a subclass of trainer callback. In older versions,
+            # types must be exact
+            self.trainer.callbacks = list(
+                filter(lambda callback: not isinstance(callback, EMA), self.trainer.callbacks)
+            )
+            return [AlphaFoldEMA()]
+
+    def setup_optimization(
+        self,
+        optim_config: Optional[Union[omegaconf.DictConfig, Dict]] = None,
+        optim_kwargs: Optional[Dict[str, Any]] = None,
+    ):
+        super().setup_optimization(optim_config=optim_config, optim_kwargs=optim_kwargs)
+
+        if OptimHub.config('FusedAdamSWA'):
+            if self._cfg.optim.name != 'adam':
+                raise Exception(
+                    "FusedAdamSWA requires 'adam' optimizer. Please set the optimizer explicitly in the config."
+                )
+            if self.trainer.precision not in ['bf16', 'bf16-mixed']:
+                raise Exception(
+                    "FusedAdamSWA requires bf16 training. Please set trainer.precision to 'bf16' if you would like to proceed."
+                )
+            self._setup_fused_adam_swa()
+
+    def on_fit_start(self) -> None:
+        log_with_nemo_at_level(
+            """
+                AlphaFold.on_fit_start(), begin,
+
+                """,
+            self,
+        )
+
+        super().on_fit_start()
+        log_with_nemo_at_level(
+            f"""
+                AlphaFold.on_fit_start(), end
+                model_cfg.optimisations={self.cfg.get("optimisations", None)}
+                self.trainer.callbacks={[str(x) for x in self.trainer.callbacks]}
+                """,
+            self,
+        )
+
     def training_step(self, train_batch: Dict, train_batch_idx: int, train_dataset_idx: Union[int, None] = None):
         """For this model, this method is always called with train_dataset_idx=None
         This is called for global_step=0.
@@ -619,11 +706,14 @@ class AlphaFold(ModelPT):
         )
 
         # (3) custom val metrics data structures
-        self._update_val_metrics_this_validation_step(val_batch, val_metrics_this_step_this_rank)
+        # update only if validation computation was successful
+        if val_metrics_this_step_this_rank is not None:
+            self._update_val_metrics_this_validation_step(val_batch, val_metrics_this_step_this_rank)
 
     def on_validation_start(self):
         log_with_nemo_at_level("AlphaFold.on_validation_start(), begin", self)
         super(AlphaFold, self).on_validation_start()
+        self.eval()  # docs: https://pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module.eval
         log_with_nemo_at_level("AlphaFold.on_validation_start(), end", self)
 
     def on_validation_epoch_end(self):
@@ -693,6 +783,7 @@ class AlphaFold(ModelPT):
             self,
         )
         super(AlphaFold, self).on_validation_end()
+        self.train()  # docs: https://pytorch.org/docs/stable/generated/torch.nn.Module.html#torch.nn.Module.train
         log_with_nemo_at_level(
             """AlphaFold.on_validation_end(), end, checkpoints have been saved""",
             self,
@@ -732,6 +823,7 @@ class AlphaFold(ModelPT):
     def _compute_validation_metrics_this_validation_step(self, val_batch: Dict, val_batch_idx: int):
         val_outputs = self(val_batch)
         val_batch = map_tensor_tree(lambda t: t[..., -1], val_batch)
+
         val_metrics_this_step_this_rank = compute_validation_metrics(
             predicted_atom_positions=val_outputs["final_atom_positions"],
             target_atom_positions=val_batch["all_atom_positions"],
@@ -828,7 +920,6 @@ class AlphaFold(ModelPT):
             self,
         )
         # (2) aggregate metrics from gathered tensors
-        #
         has_val_example = ptl_gathered_val_metrics_as_tensors[VAL_EXAMPLE_ID] != -1
         num_nondistinct_val_example_ids_this_epoch = torch.sum(has_val_example)
         num_distinct_val_example_ids_this_epoch = len(

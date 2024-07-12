@@ -131,8 +131,8 @@ def get_data_overrides(script_or_cfg_path: str) -> str:
     elif model == 'diffdock':
         return (
             f' ++data.split_train={TEST_DATA_DIR}/molecule/diffdock/splits/split_train'
-            f' ++data.split_val={TEST_DATA_DIR}/molecule/diffdock/splits/split_val'
-            f' ++data.split_test={TEST_DATA_DIR}/molecule/diffdock/splits/split_test'
+            f' ++data.split_val={TEST_DATA_DIR}/molecule/diffdock/splits/split_train'
+            f' ++data.split_test={TEST_DATA_DIR}/molecule/diffdock/splits/split_train'
             f' ++data.cache_path={TEST_DATA_DIR}/molecule/diffdock/data_cache'
         )
     elif 'downstream' in script:
@@ -187,10 +187,13 @@ def get_train_args_overrides(script_or_cfg_path, train_args):
         # do not use kalign as it requires third-party-download and it not essential for testing
         train_args['model.data.realign_when_required'] = False
     elif model == "diffdock":
-        # Use size aware batch sampler, and set the size control to default
+        # Use size aware batching, and set the size control to default
+        train_args['trainer.devices'] = 1
         train_args['model.micro_batch_size'] = 2
         train_args['model.estimate_memory_usage.maximal'] = 'null'
         train_args['model.max_total_size'] = 'null'
+        train_args['model.train_ds.num_workers'] = 1
+        train_args['model.validation_ds.num_workers'] = 1
 
     return train_args
 

@@ -1,0 +1,335 @@
+
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
+
+
+# HOWTO build: 
+# 1. to build on aarch64 change build() in ./launch to use this file Dockerfile.arm (recommended - much faster)
+# 2. to build on amd64 you can use multiplatform buildx, e.g.:
+    # docker buildx create --name mybuilder
+    # docker buildx use mybuilder
+    # docker buildx inspect --bootstrap
+    # docker buildx --help
+    # docker buildx --version
+    # docker --version
+    # docker buildx version
+    # docker buildx ls
+    # #necessary for arm emulation
+    # sudo apt-get install -y qemu qemu-user-static
+    # docker buildx ls  
+    # docker buildx build --platform linux/amd64,linux/arm64 .
+
+
+# TODO: check if the following missing dependencies are needed
+#   - lcms2=2.12=hddcbb42_0
+#   - libgcc-ng=11.1.0=hc902ee8_8
+#   - libstdcxx-ng=11.1.0=h56837e0_8
+#   - pycairo=1.20.1=py38hf61ee4a_0
+
+
+# Most of the first part is directly copied from NeMo v1.22 Dockerfile https://github.com/NVIDIA/NeMo/blob/v1.22.0/Dockerfile
+# kept all dependencies necessary for nemo.collections.nlp, nemo.core, nemo.utils, nemo.collections.common
+
+ARG BASE_IMAGE=nvcr.io/nvidia/pytorch:23.10-py3
+# build an image that includes only the nemo dependencies, ensures that dependencies
+# are included first for optimal caching, and useful for building a development
+# image (by specifying build target as `nemo-deps`)
+FROM ${BASE_IMAGE} as base
+
+# Ensure apt-get won't prompt for selecting options
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && \
+  apt-get upgrade -y && \
+  apt-get install -y \
+  libfreetype6 \
+  libopencc-dev \
+  swig && \
+  rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace/
+
+# need this otherwise apex or transformer engine crashes with 
+# c++: fatal error: Killed signal terminated program cc1plus 
+ARG MAX_JOBS=4
+ENV MAX_JOBS=${MAX_JOBS}
+
+# Install megatron core, this can be removed once 0.3 pip package is released
+# We leave it here in case we need to work off of a specific commit in main
+RUN git clone https://github.com/NVIDIA/Megatron-LM.git && \  
+  cd Megatron-LM && \
+  git checkout e122536b7645edcb7ebf099b5c92a443f7dbf8e7 && \
+  pip install .
+
+# Distributed Adam support for multiple dtypes
+RUN git clone https://github.com/NVIDIA/apex.git && \
+  cd apex && \
+  git checkout 52e18c894223800cb611682dce27d88050edf1de && \
+  pip install -v --no-build-isolation --disable-pip-version-check --no-cache-dir --config-settings "--build-option=--cpp_ext --cuda_ext --fast_layer_norm --distributed_adam --deprecated_fused_adam" ./
+
+# Transformer Engine used in NeMo v1.22 dockerfile 
+RUN git clone https://github.com/NVIDIA/TransformerEngine.git && \
+  cd TransformerEngine && \
+  git fetch origin 8eae4ce2b8fdfbbe525fc8bfecb0df5498cc9687 && \
+  git checkout FETCH_HEAD && \
+  git submodule init && git submodule update && \
+  NVTE_FRAMEWORK=pytorch NVTE_WITH_USERBUFFERS=0 MPI_HOME=/usr/local/mpi pip install .
+
+
+# uninstall stuff from base container
+RUN pip3 uninstall -y sacrebleu torchtext
+
+WORKDIR /tmp/
+# install flash attention
+RUN pip install flash-attn
+# install numba for latest containers
+# ImportError: Numba needs NumPy 1.24 or less
+RUN pip install numba>=0.57.1
+ARG NEMO_VERSION=1.22.0
+# Check that NEMO_VERSION is set. Build will fail without this. Expose NEMO and base container
+# version information as runtime environment variable for introspection purposes
+RUN /usr/bin/test -n "$NEMO_VERSION" && \
+  /bin/echo "export NEMO_VERSION=${NEMO_VERSION}" >> /root/.bashrc && \
+  /bin/echo "export BASE_IMAGE=${BASE_IMAGE}" >> /root/.bashrc
+
+# Install NeMo
+RUN git clone -b v$NEMO_VERSION https://github.com/NVIDIA/NeMo.git && \
+    cd NeMo && \
+    pip uninstall -y nemo_toolkit sacrebleu && \
+    pip install -r requirements/requirements_lightning.txt && \
+    pip install -r requirements/requirements_common.txt && \
+    sed -i "/torch/d" requirements/requirements.txt && \
+    sed -i "/triton/d" requirements/requirements.txt && \
+    sed -i "/megatron_core/d" requirements/requirements_nlp.txt && \
+    pip install -r requirements/requirements.txt && \
+    pip install -r requirements/requirements_nlp.txt && \
+    pip install ".[nlp]" 
+
+##  need this for backward compatibility: pytests rely on configs in /workspace/nemo/examples
+RUN mkdir -p /workspace/nemo/
+RUN cp -r /tmp/NeMo/scripts /workspace/nemo/scripts
+RUN cp -r /tmp/NeMo/examples /workspace/nemo/examples
+RUN cp -r /tmp/NeMo/tests /workspace/nemo/tests
+RUN cp -r /tmp/NeMo/tutorials /workspace/nemo/tutorials
+RUN rm -rf /tmp/NeMo
+
+ENV TERM=xterm
+ENV FORCE_CUDA=1
+
+# makes the interactive bash shell "login" have this in the prompt
+RUN echo 'export PS1="(bionemo docker) $PS1"' > /docker_bashrc
+
+# TODO: Long term, docker should not be running as root.
+ENV HOME=/root
+# copy built DGL and install it
+
+RUN apt-get update \
+    && apt-get install -y git build-essential python3-dev make cmake \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /tmp/dgl
+RUN git clone --branch v2.2.1 --recurse-submodules --depth 1 https://github.com/dmlc/dgl.git .
+WORKDIR /tmp/dgl/build
+RUN export NCCL_ROOT=/usr \
+    && cmake .. -GNinja -DCMAKE_BUILD_TYPE=Release \
+        -DUSE_CUDA=ON -DCUDA_ARCH_BIN="60 70 80 90" -DCUDA_ARCH_PTX="90" \
+        -DCUDA_ARCH_NAME="Manual" \
+        -DUSE_FP16=ON \
+        -DBUILD_TORCH=ON \
+        -DUSE_NCCL=ON \
+        -DUSE_SYSTEM_NCCL=ON \
+        -DBUILD_WITH_SHARED_NCCL=ON \
+        -DUSE_AVX=ON \
+    && cmake --build .
+RUN cd /tmp/dgl/python && python setup.py install  && rm -rf /tmp/dgl
+
+# Please populate the labels below if using a custom base container (ie not NeMo GA)
+# For nightly NeMo builds, only com.nvidia.nemo.description should be provided
+# (release and git_hash labels are filled automatically).
+# LABEL "com.nvidia.nemo.release"="r1.19.0"
+# LABEL "com.nvidia.nemo.git_hash"="a5fbsegy"
+# LABEL "com.nvidia.nemo.description"="Cusotom build with XYZ fixed"
+
+## Installing system dependencies and tools
+##
+## NOTE: Need to resolve issue with libboost-all-dev for vina py. dependency.
+##      If we apt install libboost-dev-all, then, on import torch, we observe an error
+##      stating that ucm_set_global_opts is undefined in libucs. The error stack will
+##      always look something like the following:
+##
+## .........................................: in <module>
+##     import torch
+## /usr/local/lib/python3.10/dist-packages/torch/__init__.py:234: in <module>
+##     from torch._C import *  # noqa: F403
+## E   ImportError: /opt/hpcx/ucx/lib/libucs.so.0: undefined s
+##
+
+RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y \
+        python3-setuptools python3-dev libboost-all-dev swig \
+        wget git unzip tmux vim emacs-nox tree xterm \
+        liblmdb-dev libopenbabel-dev python3-openbabel openbabel libopenbabel7
+## libboost-all-dev is required by vina==1.2.5 for its compilation
+## While at the runtime only boost-thread and boost-filesystem are needed
+WORKDIR /tmp
+RUN git clone --branch v1.2.5 https://github.com/ccsb-scripps/AutoDock-Vina
+# find /usr/ -name "libboost*"=> /usr/lib/aarch64-linux-gnu/  
+COPY ./setup/vina-boost-arm.patch ./  
+RUN patch -p1 -d $PWD/AutoDock-Vina -i $PWD/vina-boost-arm.patch && \
+    rm $PWD/vina-boost-arm.patch && cd $PWD/AutoDock-Vina/build/linux/release && make && cd ../../python && rm -rf build dist *.egg-info && python setup.py build install && rm -rf $PWD/AutoDock-Vina
+
+
+WORKDIR /workspace/
+RUN apt purge *mpi* -y \
+    && apt autoremove -y \
+    && apt install libboost-thread-dev libboost-filesystem-dev -y \
+    && rm -rf /var/lib/apt/lists/*
+
+
+# special handling for openbabel:
+# apt installs the openbabel3 library to /usr/include/openbabel3, but the openbabel python package
+# assumes that it is under /usr/local/include/openbabel3. The error will look like this on install:
+#       Error: SWIG failed. Is Open Babel installed?
+#       You may need to manually specify the location of Open Babel include and library directories. For example:
+#         python setup.py build_ext -I/usr/local/include/openbabel3 -L/usr/local/lib
+#         python setup.py install
+#       [end of output]
+# To fix, we symlink!
+
+
+
+
+RUN ln -s /usr/include/openbabel3 /usr/local/include/openbabel3
+# NOTE: openbabel is inlcuded in setup/requirements.txt
+
+# Optional: Install code-server to enable easy remote development on a container
+# More info about code-server be found here: https://coder.com/docs/code-server/v4.4.0
+# ADD https://github.com/coder/code-server/releases/download/v4.4.0/code-server_4.4.0_amd64.deb code-server_4.4.0_amd64.deb
+# RUN dpkg -i ./code-server_4.4.0_amd64.deb && rm -f code-server_4.4.0_amd64.deb
+#
+# # Install extensions from the marketplace
+# RUN code-server --install-extension ms-python.python
+# moved -test and -dev up in build to resolve build errors
+# COPY files first **BEFORE** installing from them => use the layer cache effectively!
+COPY setup/requirements*.txt /tmp/
+COPY setup/install_lmdb.sh /tmp/install_lmdb.sh
+RUN --mount=type=secret,id=GITLAB_TOKEN GITLAB_TOKEN=$(cat /run/secrets/GITLAB_TOKEN) pip install -r /tmp/requirements-dev.txt
+RUN pip install -r /tmp/requirements-test.txt
+# nvidia-pytriton>=0.4.2 for arm support
+RUN sed -i 's/nvidia-pytriton==0.4.0/nvidia-pytriton==0.4.2/g' /tmp/requirements.txt && sed -i 's/polars==0.16.7/polars==0.20.30/g' /tmp/requirements.txt
+RUN --mount=type=secret,id=GITLAB_TOKEN GITLAB_TOKEN=$(cat /run/secrets/GITLAB_TOKEN) pip install -r /tmp/requirements.txt
+# need special install for lmdb: it cannot be installed via pip, but be built from source
+# but unfortunately, https://github.com/jnwatson/py-lmdb.git isn't PEP-512 compliant, so we have to manually run setup.py
+RUN /tmp/install_lmdb.sh
+# requirements-cve.txt *must* be installed last to patch security vulns in pip packages
+RUN sed -i "/triton/d" /tmp/requirements-cve.txt && pip install -r /tmp/requirements-cve.txt
+# for pytorch23.10 need to use internal wheel to install openai triton, otherwise need to upgrade to pytorch24.03+
+RUN wget https://gitlab-master.nvidia.com/api/v4/projects/105799/packages/generic/pytorch_triton/wheel/pytorch_triton-2.2.0+e28a256d7-cp310-cp310-linux_aarch64.whl &&\
+    pip install pytorch_triton-2.2.0+e28a256d7-cp310-cp310-linux_aarch64.whl
+
+
+# AWS CLI is inside requirements.txt. Add config file.
+# This config file does not contain access keys.
+RUN mkdir -p $HOME/.aws
+COPY setup/aws-config-swiftstack $HOME/.aws/config
+
+# Recompile Megatron helpers -- NOTE this may need to be done before running job later
+RUN NEMO_PATH=$(python -c 'import nemo; print(nemo.__path__[0])') && \
+   cd ${NEMO_PATH}/collections/nlp/data/language_modeling/megatron && \
+   make
+
+#########################################################################################
+# Apply NeMo patches for key upstream changes between releases
+#  TODO whenever we upgrade nemo see which can be removed.
+#########################################################################################
+# 1. Setting the workdir to the base nemo directory for all nemo patches
+
+# NOTE: This is to support the MegaMolBart LM model compatability with Jupyter notebooks and ipdb.
+#       This is exposed through the `iteractive=True` constructor parameter.
+#       In MegaMolBart, specifically, this patch adds support for recongifure_minibatch as a flag
+#       in its decode method.
+# TODO [mgreaves] Upstream nemo-v-1.22-support_interactive_megamolbart_lm-decode_reconfigure_minibatch patch and
+# then remove here when we can upgrade our nemo dependency.
+#                 https://jirasw.nvidia.com/browse/CDISCOVERY-2146
+# NOTE: hiddens_support_train_v_inf_outputs.patch applies the patch from https://github.com/NVIDIA/NeMo/pull/8466 which fixes an issue
+#        where training uses the same hiddens key for inference (eg always the gaussian noised z rather than z_mean).
+# NOTE: data_sampler_constant_len.patch.patch applies the patch from https://github.com/NVIDIA/NeMo/pull/8576 which fixes an issue
+#        where you restart a run after an epoch.
+# NOTE: nemo-lr-scheduler.patch adds patch for WarmupAnnealDecayHold NeMo LR Scheduler
+COPY ./setup/*.patch ./
+RUN NEMO_INST_DIR=$(python -c 'import nemo; from pathlib import Path; print(Path(nemo.__path__[0]).parent)') && \
+    patch -p1 -d $NEMO_INST_DIR -i $PWD/nemo-v-1.22-support_interactive_megamolbart_lm-decode_reconfigure_minibatch.patch && \
+    patch -p1 -d $NEMO_INST_DIR -i $PWD/hiddens_support_train_v_inf_outputs.patch && \
+    patch -p1 -d $NEMO_INST_DIR -i $PWD/data_sampler_constant_len.patch && \
+    patch -p1 -d $NEMO_INST_DIR -i $PWD/nemo-lr-scheduler.patch && \
+    patch -p1 -d $NEMO_INST_DIR -i $PWD/nemo-v-1.22-remove-triton-check.patch && \
+    rm *.patch
+
+#
+# Special Handling for Python Package Security Vulnerabilities
+#
+
+# Remove nvm as it's not expected users will need this, and it introduces unfixable vulnerabilties:
+# https://nvd.nist.gov/vuln/detail/CVE-2023-32002
+RUN /bin/bash -c "source /usr/local/nvm/nvm.sh && nvm deactivate && nvm unload && sed -i '/NVM/d' /root/.bashrc" \
+    && rm -rf /usr/local/nvm \
+    && /bin/bash -c "sed -i '/NVM/d' /root/.bashrc && sed -i '/nvm.sh/d' /etc/bash.bashrc"
+
+# Remove OpenCV: We do not use it and it adds a security vulnerability (fix: https://github.com/opencv/opencv_contrib/pull/3480)
+# https://nvd.nist.gov/vuln/detail/CVE-2023-2617
+# Remove fonttool: We do not use it and it adds a security vulnerability: https://github.com/advisories/GHSA-6673-4983-2vx5
+RUN pip uninstall -y opencv-python opencv fonttools \
+    && rm -rf \
+       /usr/local/lib/python3.10/dist-packages/cv2 \
+       /usr/local/include/opencv4 \
+       /usr/local/share/opencv4 \
+       /usr/local/lib/cmake/opencv4 \
+       /usr/local/bin/opencv*
+
+####
+#### NOTE: THIS MUST BE THE ABSOLUTE **LAST** STEP BEFORE ENTRYPOINT !!!!!
+####       SPECIFICALLY, THE SECTION LABELED "BioNeMo Build"
+####       DO NOT MAKE OTHER LAYERS **AFTER** THIS SECTON!
+####       OTHERWISE IT WILL MAKE REBUILDS ON SOURCE CHANGES TAKE LONGER THAN NECESSARY BY INVALIDATING THE LAYER CACHE.
+####
+
+#########################################################################################
+# BioNeMo Build
+#########################################################################################
+
+### The location of the installed library in the container. Set BIONEMO_HOME env to change this for development purposes.
+ARG BIONEMO_HOME=/workspace/bionemo
+ENV BIONEMO_HOME=${BIONEMO_HOME}
+RUN mkdir -p ${BIONEMO_HOME}
+WORKDIR ${BIONEMO_HOME}
+### Copy the bionemo repo contents for distribution
+COPY LICENSE README.md artifact_paths.yaml download_artifacts.py launch.sh setup.py pyproject.toml ${BIONEMO_HOME}/
+COPY setup ${BIONEMO_HOME}/setup
+COPY hydra_plugins ${BIONEMO_HOME}/hydra_plugins
+COPY tokenizers ${BIONEMO_HOME}/tokenizers
+# copy the package contents *last* as most churn occurs here
+# --> we can cache the lower-chrun things in previous layers
+COPY examples ${BIONEMO_HOME}/examples
+COPY tests ${BIONEMO_HOME}/tests
+COPY bionemo ${BIONEMO_HOME}/bionemo
+
+### install bionemo
+WORKDIR ${BIONEMO_HOME}
+# we already install dependencies earlier, directly from the requirements*.txt files
+RUN pip install --no-deps -e .
+
+RUN python -c "import nemo.collections.nlp as nemo_nlp" && \
+  python -c "import nemo.core as nemo_core" && \
+  python -c "import nemo.utils as nemo_utils" && \
+  python -c "import nemo.collections.common as nemo_common" 
+
+# FIXME: If BIONEMO_HOME _is not_ /workspace/bionemo, then this ENTRYPOINT is invalid!
+ENTRYPOINT ["/workspace/bionemo/setup/startup.sh"]
+

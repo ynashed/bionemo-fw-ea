@@ -364,8 +364,10 @@ class KmerBertCollate(BertCollate):
         tokenizer: TokenizerSpec,
         seq_length: int,
         pad_size_divisible_by_8: bool,
-        modify_percent: float = 0.1,
-        perturb_percent: float = 0.5,
+        modify_percent: float = 0.15,
+        perturb_token_percent: float = 0.1,
+        identity_token_percent: float = 0.1,
+        mask_token_percent: float = 0.8,
         masking_strategy: Optional[Callable] = None,
         transform_sentences: Optional[Callable] = None,
         dynamic_padding: bool = False,
@@ -381,10 +383,13 @@ class KmerBertCollate(BertCollate):
             seq_length (int): Final length of all sequences
             pad_size_divisible_by_8 (bool): Makes pad size divisible by 8.
                 Needed for NeMo.
-            modify_percent (float): The percentage of total tokens to modify
-            perturb_percent (float): Of the total tokens being modified,
+            modify_percent (float): The percentage of total tokens to modify (including identity) and include in the loss mask.
+                Default is from BERT/ESM paper.
+            perturb_token_percent (float): Of the total tokens being modified,
                 percentage of tokens to perturb. Perturbation changes the
-                tokens randomly to some other non-special token.
+                tokens randomly to some other non-special token typically 0.1.
+            identity_token_percent (float): Of the total tokens being modified, percentage of tokens to keep the same in the loss, typically 0.1.
+            mask_token_percent (float): Of the total tokens being modified, percentage of tokens to mask typically 0.8.
             masking_strategy (Optional[Callable]): A callable that takes a
                 List[List[str]] and returns
                 Tuple[List[List[str]], List[List[float]]], where each
@@ -420,7 +425,9 @@ class KmerBertCollate(BertCollate):
             masking_strategy = BertMasking(
                 tokenizer=tokenizer,
                 modify_percent=modify_percent,
-                perturb_percent=perturb_percent,
+                mask_token_percent=mask_token_percent,
+                identity_token_percent=identity_token_percent,
+                perturb_token_percent=perturb_token_percent,
             )
         if transform_sentences is None:
 

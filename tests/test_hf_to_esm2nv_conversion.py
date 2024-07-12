@@ -85,6 +85,7 @@ def test_esm2_650m_model_hf_to_nemo_conversion_impulse_response_fp16_on_gpu(esm2
 
 
 @pytest.mark.internal
+@pytest.mark.skip(reason="Limited capacity on CI runners, should work locally")
 def test_esm2_3b_model_hf_to_nemo_conversion_impulse_response_fp16_on_gpu(esm2_3b_hf_model_setup, atol=3e-1):
     hf_model_name, hf_model_size, hf_model_dir = esm2_3b_hf_model_setup
     args = get_hf_to_nemo_conversion_args(hf_model_name, hf_model_dir, hf_model_size, precision=16)
@@ -121,6 +122,7 @@ def test_esm2_650m_model_hf_to_nemo_conversion_impulse_response_wo_apex_on_cpu(e
 
 
 @pytest.mark.internal
+@pytest.mark.skip(reason="Limited capacity on CI runners, should work locally")
 def test_esm2_3b_model_hf_to_nemo_conversion_impulse_response_wo_apex_on_cpu(esm2_3b_hf_model_setup, atol=3e-4):
     hf_model_name, hf_model_size, hf_model_dir = esm2_3b_hf_model_setup
     args = get_hf_to_nemo_conversion_args(hf_model_name, hf_model_dir, hf_model_size, use_nemo_apex=False)
@@ -156,8 +158,8 @@ def test_esm2_650m_model_hf_to_nemo_conversion_parameter_gradient_response_fp16_
     assert max_absolute_diff <= atol
 
 
-@pytest.mark.skip(reason="Limited capacity on CI runners, should work locally")
 @pytest.mark.internal
+@pytest.mark.skip(reason="Limited capacity on CI runners, should work locally")
 def test_esm2_3b_model_hf_to_nemo_conversion_parameter_gradient_response_fp16_on_gpu(
     esm2_3b_hf_model_setup, atol=3e-4
 ):
@@ -230,6 +232,7 @@ def test_esm2_650m_model_hf_to_nemo_conversion_trainable_parameter_count(esm2_65
     reason="Difference in parameters after conversion, probably due to missing accounting of some layers"
 )
 @pytest.mark.internal
+@pytest.mark.skip(reason="Limited capacity on CI runners, should work locally")
 def test_esm2_3b_model_hf_to_nemo_conversion_trainable_parameter_count(esm2_3b_hf_model_setup):
     hf_model_name, hf_model_size, hf_model_dir = esm2_3b_hf_model_setup
     args = get_hf_to_nemo_conversion_args(hf_model_name, hf_model_dir, hf_model_size, use_nemo_apex=False)

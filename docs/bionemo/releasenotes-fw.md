@@ -1,15 +1,16 @@
 # Release Notes
+## BioNeMo Framework v1.6
+### New Features
+* [Model Fine-tuning] `model.freeze_layers` fine-tuning config parameter added to freeze a specified number of layers. Thank you to github user [@nehap25](https://github.com/nehap25)!
+* [ESM2]  Loading pre-trained ESM2 weights and continue pre-training on the MLM objective on a custom FASTA dataset is now supported.
+* [OpenFold] MLPerf feature 3.2 bug (mha_fused_gemm) fix has merged.
+* [OpenFold] MLPerf feature 3.10 integrated into bionemo framework.
+* [DiffDock] Updated data loading module for DiffDock model training, changing from sqlite3 backend to webdataset.
+
+
 ## BioNeMo Framework v1.5
 ### New Models
 * [Geneformer](https://www.nature.com/articles/s41586-023-06139-9) is out of **Beta** status. This release includes newly trained checkpoints and benchmarks, including a variant based on the publication with 10M parameters, and the largest variant of geneformer publically available to date with 106M parameters.
-* DiffDock Score and Confidence models checkpoints updated to be compatible with the new implementation of tensor product convolution layer using cugraph-equivariance. Use model version 1.5 with BioNeMo Framework containers v1.5+ for code/checkpoint compatibility.
-
-### New Features
-* For the openfold model, this release includes improved handling of errors that occur when training terminates at 'max_steps', when the optimisation setting for the priority queue dataloader is activated.  Message are logged to clarify expected behavior for the user.  Benchmark results for improved training time, with the priority queue dataloader, are to come.
-* DiffDock score and confidence models adapted to using cugraph-equivariance.
-
-### Known Issues
-* For the OpenFold model, training with the optimisation setting ++model.optimisations=[dataloader_pq] proceeded successfully on a multi-node cluster.  But, in a single machine / single gpu setting on a local workstation, a training run with with a sample of 32 training examples did not successfully complete.  In future development cycles we'll return to a diagnosis of the single machine / single gpu setting.
 
 ## BioNeMo Framework v1.4
 ### New Models
@@ -46,7 +47,7 @@
 ### Bug fixes and Improvements
 * NeMo upgraded to v1.22 ([see NeMo release notes](https://github.com/NVIDIA/NeMo/releases)),
 * PyTorch Lightning upgraded to 2.0.7
-* [NGC CLI](https://org.ngc.nvidia.com/setup/installers/cli) has been removed from the release container. If users download models from inside the container (via e.g. `download_models.py` or `launch.sh download`), the NGC CLI will be auto-installed to pull the models from NGC.
+* [NGC CLI](https://org.ngc.nvidia.com/setup/installers/cli) has been removed from the release container. If users download models from inside the container (via e.g. `download_artifacts.py` or `launch.sh download`), the NGC CLI will be auto-installed to pull the models from NGC.
 
 ### Known Issues
 * BioNeMo Framework v24.03 container is vulnerable to [GHSA-whh8-fjgc-qp73](https://github.com/advisories/GHSA-whh8-fjgc-qp73) in onnx 1.14.0. Users are advised not to open untrusted onnx files with this image. Restrict your mount point to minimize directory traversal impact.

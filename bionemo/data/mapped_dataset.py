@@ -142,42 +142,6 @@ def _infer_kwarg_values(cfg, data_prefix, max_seq_length, seed):
     return data_prefix, max_seq_length, seed
 
 
-def name_index_file(
-    num_epochs, max_num_samples, index_mapping_dir, data_prefix, name, max_seq_length, short_seq_prob, seed
-):
-    '''This enforces the name index structure to make sure when parameters change, we can still load the same index.
-    This is useful for any sample_indexed file.
-
-
-    This should be used like this:
-        np.save(indexmap_filename, samples_mapping, allow_pickle=True)
-    '''
-    import os
-
-    if not num_epochs:
-        if not max_num_samples:
-            raise ValueError("Need to specify either max_num_samples " "or num_epochs")
-        num_epochs = np.iinfo(np.int32).max - 1
-    if not max_num_samples:
-        max_num_samples = np.iinfo(np.int64).max - 1
-
-    # Filename of the index mapping
-    if index_mapping_dir is not None:
-        indexmap_filename = os.path.join(index_mapping_dir, os.path.basename(data_prefix))
-    else:
-        indexmap_filename = data_prefix
-    indexmap_filename += '_{}_indexmap'.format(name)
-    if num_epochs != (np.iinfo(np.int32).max - 1):
-        indexmap_filename += '_{}ep'.format(num_epochs)
-    if max_num_samples != (np.iinfo(np.int64).max - 1):
-        indexmap_filename += '_{}mns'.format(max_num_samples)
-    indexmap_filename += '_{}msl'.format(max_seq_length)
-    indexmap_filename += '_{:0.2f}ssp'.format(short_seq_prob)
-    indexmap_filename += '_{}s'.format(seed)
-    indexmap_filename += '.npy'
-    return indexmap_filename
-
-
 class Uniref90ClusterMappingDataset(MappedDataset):
     '''
     MappedDataset class with 'create_sample_mapping' implementation. 'create_sample_mapping(dataset)'

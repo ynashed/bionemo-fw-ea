@@ -1,0 +1,13 @@
+diff --git a/build/python/setup.py b/build/python/setup.py
+index 6d1c6a7..5aa536e 100644
+--- a/build/python/setup.py
++++ b/build/python/setup.py
+@@ -131,6 +131,8 @@ def locate_boost():
+             return include_dirs, '/usr/lib64'
+         elif glob.glob('/usr/lib/libboost*'):
+             return include_dirs, '/usr/lib'
++        elif glob.glob('/usr/lib/aarch64-linux-gnu/libboost*'):
++            return include_dirs, '/usr/lib/aarch64-linux-gnu'
+ 
+     return None, None
+ 

@@ -1,14 +1,13 @@
 {
     "consumed_samples": 1000.0,
     "global_step": 499.0,
-    "grad_norm": 2.9139621257781982,
-    "loss_scale": 65536.0,
-    "lr": 9.580000187270343e-05,
-    "reduced_train_loss": 2.9308128356933594,
-    "train_backward_timing in s": 7.867813110351562e-05,
-    "train_step_timing in s": 0.07514739036560059,
-    "val_loss": 2.9759111404418945,
-    "val_loss_ECE": 7.867531776428223,
-    "val_perplexity": 19.607481002807617,
-    "validation_step_timing in s": 0.00020575523376464844
+    "grad_norm": 3.633664846420288,
+    "lr": 0.00012981999316252768,
+    "reduced_train_loss": 2.6264822483062744,
+    "train_backward_timing in s": 2.5272369384765625e-05,
+    "train_step_timing in s": 0.042524099349975586,
+    "val_loss": 2.813023567199707,
+    "val_loss_ECE": 7.027558326721191,
+    "val_perplexity": 16.660215377807617,
+    "validation_step_timing in s": 0.00011873245239257812
 }

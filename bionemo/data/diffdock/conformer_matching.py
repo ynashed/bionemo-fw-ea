@@ -108,7 +108,7 @@ def get_torsion_angles(mol):
         n0 = list(G2.neighbors(e[0]))
         n1 = list(G2.neighbors(e[1]))
         torsions_list.append((n0[0], e[0], e[1], n1[0]))
-    return torsions_list
+    return torsions_list, nx.is_connected(G)
 
 
 # GeoMol

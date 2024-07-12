@@ -263,6 +263,7 @@ def test_model_size(config_name: str, model_class: LightningModule, model_parame
                 cfg.model.encoder_cfg = cfg  # TODO: why do we have to do this?
             model = model_class(cfg.model, trainer)
         elif model_class == DiffdockScoreModel or model_class == DiffdockConfidenceModel:
+            DiffdockDataManager.reset_instances()
             data_manager = DiffdockDataManager(cfg)
             model = model_class(cfg=cfg, trainer=trainer, data_manager=data_manager)
         elif model_class == EquiDock:

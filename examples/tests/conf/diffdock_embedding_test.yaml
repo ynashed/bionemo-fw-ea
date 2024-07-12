@@ -5,8 +5,11 @@ hydra:
   searchpath:
      - ${oc.env:BIONEMO_HOME}/examples/molecule/diffdock/conf
 
-ref_fasta_file: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/preprocessing_test/ref/pdb_sequences.fasta
-ref_esm_embeddings_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/preprocessing_test/ref/esm2_embeddings.sqlite3
+seed: 42
 
-training_data:
+ref_fasta_file: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/preprocessing_test/ref/pdb_sequences.fasta
+ref_esm_embeddings_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/preprocessing_test/ref/esm2_embeddings
+
+protein_data:
+  protein_ligand_csv: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/preprocessing_test/protein_ligand.csv
   protein_data_dir:  ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/preprocessing_test/posebusters_benchmark_subset

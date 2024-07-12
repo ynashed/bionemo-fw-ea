@@ -12,8 +12,8 @@ from functools import partial
 
 from nemo.utils import logging
 
-from bionemo.data.diffdock.confidence_dataset import ListDataset, diffdock_confidence_dataset
-from bionemo.data.diffdock.docking_dataset import diffdock_build_dataset
+from bionemo.data.diffdock.confidence_dataset import diffdock_build_confidence_dataset
+from bionemo.data.diffdock.docking_dataset import DataSplit, diffdock_build_dataset
 from bionemo.model.molecule.diffdock.infer import DiffDockModelInference
 from bionemo.model.molecule.diffdock.utils.diffusion import t_to_sigma as t_to_sigma_compl
 
@@ -44,31 +44,32 @@ class DataManager(metaclass=Singleton):
 
         if cfg.model.confidence_mode:
             # Initialize the datasets for confidence model training
-            self.train_ds = diffdock_confidence_dataset(cfg.model.train_ds, mode="train")
-            self.validation_ds = diffdock_confidence_dataset(cfg.model.validation_ds, mode="validation")
-            self.test_ds = diffdock_confidence_dataset(cfg.model.test_ds, mode="test")
+            self.train_ds = diffdock_build_confidence_dataset(cfg.data, cfg.model.train_ds, mode=DataSplit("train"))
+            self.validation_ds = diffdock_build_confidence_dataset(
+                cfg.data, cfg.model.validation_ds, mode=DataSplit("validation")
+            )
+            self.test_ds = diffdock_build_confidence_dataset(cfg.data, cfg.model.test_ds, mode=DataSplit("test"))
         else:
             # Initialize the datasets for score model training
             self.t_to_sigma = partial(t_to_sigma_compl, cfg=cfg.model)
 
             self.train_ds = diffdock_build_dataset(
-                cfg.model.train_ds, self.t_to_sigma, _num_conformers=True, mode="train"
+                cfg.data, cfg.model.train_ds, self.t_to_sigma, _num_conformers=True, mode=DataSplit("train")
             )
             self.validation_ds = diffdock_build_dataset(
-                cfg.model.validation_ds, self.t_to_sigma, _num_conformers=False, mode="validation"
+                cfg.data, cfg.model.validation_ds, self.t_to_sigma, _num_conformers=False, mode=DataSplit("validation")
             )
             self.test_ds = diffdock_build_dataset(
-                cfg.model.test_ds, self.t_to_sigma, _num_conformers=False, mode="test"
+                cfg.data, cfg.model.test_ds, self.t_to_sigma, _num_conformers=False, mode=DataSplit("test")
             )
 
         self.datasets_ready = False
-        if not cfg.do_preprocessing:
+        if cfg.do_training:
             try:
                 self.load_datasets()
-            except Exception:
-                logging.warning(
-                    "Data preprocessing is not done, set 'do_preprocessing' to True for preprocessing datasets"
-                )
+            except Exception as e:
+                logging.error(f'Dataset is not loaded because of the error: {e}')
+                raise e
 
     def preprocess(self):
         if self.cfg.model.confidence_mode:
@@ -82,9 +83,9 @@ class DataManager(metaclass=Singleton):
             score_model = DiffDockModelInference(self.cfg.score_infer)
             score_model.eval()
 
-            self.train_ds.build_confidence_dataset(score_model)
-            self.validation_ds.build_confidence_dataset(score_model)
-            self.test_ds.build_confidence_dataset(score_model)
+            self.train_ds.generate_ligand_poses(score_model, self.cfg.score_infer.data)
+            self.validation_ds.generate_ligand_poses(score_model, self.cfg.score_infer.data)
+            self.test_ds.generate_ligand_poses(score_model, self.cfg.score_infer.data)
         else:
             # preprocess complex graph for score model training
             self.train_ds.build_complex_graphs()
@@ -99,11 +100,6 @@ class DataManager(metaclass=Singleton):
             self.train_ds.load_confidence_dataset()
             self.validation_ds.load_confidence_dataset()
             self.test_ds.load_confidence_dataset()
-
-            self.train_ds = ListDataset(self.train_ds)
-            self.validation_ds = ListDataset(self.validation_ds)
-            self.test_ds = ListDataset(self.test_ds)
-
         else:
             # load complex graph dataset for score model training
             self.train_ds.load_complex_graphs()

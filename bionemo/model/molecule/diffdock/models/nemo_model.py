@@ -9,22 +9,27 @@
 # its affiliates is strictly prohibited.
 
 import copy
+import os
+import random
+from functools import partial
+from typing import Union
 
 import numpy as np
 import torch
+import webdataset as wds
 from nemo.core import ModelPT
 from nemo.core.classes.common import PretrainedModelInfo
 from nemo.utils import logging, model_utils
-from omegaconf import OmegaConf
+from omegaconf import DictConfig, OmegaConf
 from omegaconf.listconfig import ListConfig
 from pytorch_lightning import Trainer
-from torch.utils.data.distributed import DistributedSampler
-from torch.utils.data.sampler import BatchSampler, RandomSampler
 from torch_geometric.data import Batch
-from torch_geometric.loader import DataLoader
+from torch_geometric.loader.dataloader import Collater
 
+from bionemo.data.diffdock.confidence_dataset import ConfidenceDataset, SelectPose
 from bionemo.data.diffdock.data_manager import DataManager
-from bionemo.data.diffdock.sampler import SizeAwareBatchSampler
+from bionemo.data.diffdock.docking_dataset import ProteinLigandDockingDataset
+from bionemo.data.diffdock.webdataset_utils import SizeAwareBatching
 from bionemo.model.molecule.diffdock.models.tensor_product_score_model import (
     TensorProductScoreModel,
 )
@@ -42,7 +47,7 @@ __all__ = ["DiffdockTensorProductScoreModel", "DiffdockTensorProductScoreModelAl
 
 class TensorProductScoreModelBase(ModelPT):
     """
-    This class contstructs ModelPT on top of the core TensorProductScoreModel (CG or AA).
+    This class constructs ModelPT on top of the core TensorProductScoreModel (CG or AA).
     """
 
     def __init__(
@@ -81,34 +86,79 @@ class TensorProductScoreModelBase(ModelPT):
 
             self.local_inference_complex_count = 0
 
-    def diffdock_build_dataloader(self, data_config, dataset, use_new_batch_sampler=False, shuffle=False):
-        if not use_new_batch_sampler or self.cfg.get('batch_sampler') is None:
-            if self.world_size > 1:
-                item_sampler = DistributedSampler(dataset, drop_last=False, seed=self.cfg.seed)
-                batch_sampler = BatchSampler(item_sampler, batch_size=self.cfg.micro_batch_size, drop_last=False)
-                batch_sampler.micro_batch_size = self.cfg.micro_batch_size
-                batch_sampler.set_epoch = item_sampler.set_epoch
-                return DataLoader(
-                    dataset=dataset,
-                    num_workers=data_config.num_workers,
-                    pin_memory=data_config.pin_memory,
-                    batch_sampler=batch_sampler,
+    def diffdock_build_dataloader(
+        self,
+        data_config: DictConfig,
+        pyg_ds: Union[ProteinLigandDockingDataset, ConfidenceDataset],
+        shuffle: bool = False,
+        keep_pos: bool = False,
+        filter_size_one: bool = False,
+    ) -> wds.WebLoader:
+        """Create webdataset data loader
+
+        Args:
+            data_confg (DictConfig): Input config
+            pyg_ds (Union[ProteinLigandDockingDataset, ConfidenceDataset]):
+            input datset object
+            shuffle (bool): whether to shuffle the data
+            keep_pos (bool): whether to keep a copy of the input position in the
+            HeteroData's data['ligand'].aligned_pos tensor to be used later as
+            the reference positions
+            filter_size_one (bool): whether to ask webdataset workflow to filter
+            for batches that has at least 2 samples, i.e., more than 1 sample
+
+        Returns: webdataset's WebLoader object for dataloading
+        """
+        if pyg_ds.webdataset_urls is None:
+            raise RuntimeError(
+                f"No shards is found in the folder " f"{pyg_ds.split_cache_path} to build the dataloader"
+            )
+        if len(pyg_ds.webdataset_urls) < self.world_size * data_config.num_workers:
+            raise RuntimeError(
+                f"there are {len(pyg_ds.webdataset_urls)} shards in the folder {os.path.dirname(pyg_ds.webdataset_urls[0])}, "
+                f"which is smaller than total number of workers {self.world_size * data_config.num_workers} "
+                f"= num. devices({self.world_size}) * num. workers per device({data_config.num_workers}).\n"
+                f"To make sure: num. shards >= (better to be few times larger than)  num_workers * total num. devices, \n"
+                f"you can reduce the `num_workers` in `data.num_workers` and `model.*_ds.num_workers`, "
+                f"to set `num_workers` <= {len(pyg_ds.webdataset_urls)//self.world_size}, "
+                f"recommend to set as <= {max(len(pyg_ds.webdataset_urls)//self.world_size//4, 1)}"
+                f"Or you can increase `model.*_ds.min_num_shards` to be >= {self.world_size * data_config.num_workers}, "
+                f"for this you can remove files in {os.path.dirname(pyg_ds.webdataset_urls[0])}, "
+                f"and run with `do_preprocessing=True do_training=False` first to re-pack the shard files before doing training."
+            )
+        num_samples = len(pyg_ds)
+        random.seed(self.cfg.seed)
+        dataset = (
+            wds.WebDataset(pyg_ds.webdataset_urls, shardshuffle=shuffle, nodesplitter=wds.split_by_node)
+            .decode()
+            .extract_keys(f"*.{pyg_ds.webdataset_fname_suffix_in_tar}")
+        )
+        if not self.cfg.confidence_mode:
+            dataset = dataset.compose(partial(pyg_ds.transform.apply_noise_iter, keep_pos=keep_pos))
+        else:
+            dataset = dataset.compose(
+                SelectPose(
+                    pyg_ds.rmsd_classification_cutoff,
+                    pyg_ds.samples_per_complex,
+                    pyg_ds.balance,
+                    pyg_ds.data_config.all_atoms,
                 )
-            else:
-                return DataLoader(
-                    dataset=dataset,
-                    batch_size=self.cfg.micro_batch_size,
-                    num_workers=data_config.num_workers,
-                    pin_memory=data_config.pin_memory,
-                    drop_last=True,
-                    generator=torch.Generator().manual_seed(self.cfg.seed),
-                    shuffle=shuffle,
+            )
+        dataset = dataset.with_length(num_samples)
+        if shuffle:
+            dataset = dataset.shuffle(size=5000, rng=random.Random(self.cfg.seed))
+
+        num_batches = len(dataset) // self.cfg.global_batch_size + (len(dataset) % self.cfg.global_batch_size != 0)
+        if self.cfg.confidence_mode or not self.cfg.get('apply_size_control', False):
+            dataset = (
+                dataset.batched(
+                    data_config.micro_batch_size,
+                    collation_fn=Collater(dataset=None, follow_batch=None, exclude_keys=None),
                 )
-        elif self.cfg.batch_sampler == 'SizeAwareBatchSampler':
-            if self.world_size > 1:
-                item_sampler = DistributedSampler(dataset, drop_last=False, seed=self.cfg.seed)
-            else:
-                item_sampler = RandomSampler(dataset, generator=torch.Generator().manual_seed(self.cfg.seed))
+                .with_epoch(num_batches)
+                .with_length(num_batches)
+            )
+        else:
             estimate_num_cross_edges = self.cfg.estimate_memory_usage.estimate_num_cross_edges
 
             def num_cross_edge_upper_bound_estimate(n1, n2, n3, n4):
@@ -137,41 +187,45 @@ class TensorProductScoreModelBase(ModelPT):
                 total_memory = estimate_memory_usage(g, n5, self.cfg.estimate_memory_usage, bias=False)
                 return total_memory
 
-            if data_config.get('num_batches') is None:
-                num_samples = len(item_sampler)
-                num_batches = (num_samples // self.cfg.micro_batch_size) + (
-                    num_samples % self.cfg.micro_batch_size != 0
-                )
-            else:
-                num_batches = data_config.num_batches
-            batch_sampler = SizeAwareBatchSampler(
-                item_sampler,
+            batching = SizeAwareBatching(
                 max_total_size=(
                     self.cfg.max_total_size
                     if self.cfg.get("max_total_size", None) is not None
                     else (0.85 * torch.cuda.get_device_properties('cuda:0').total_memory / 2**20)
                 ),
-                sizes=estimate_size,
-                batch_size=self.cfg.micro_batch_size,
-                num_batches=num_batches,
+                size_fn=estimate_size,
             )
+            dataset = dataset.compose(batching).with_epoch(num_batches)  # .with_length(num_batches)
 
-            return DataLoader(
-                dataset=dataset,
+        # batch norm in training phase must have num. of samples > 1
+        if filter_size_one:
+            dataset = dataset.select(lambda x: len(x) > 1)
+
+        loader = (
+            wds.WebLoader(
+                dataset,
                 num_workers=data_config.num_workers,
                 pin_memory=data_config.pin_memory,
-                batch_sampler=batch_sampler,
+                collate_fn=lambda x: x[0],
             )
-        else:
-            raise NotImplementedError(f"batch sampler {self.cfg.batch_sampler}")
+            .with_length(num_batches)
+            .with_epoch(num_batches)
+        )
+
+        # strange features required by nemo optimizer lr_scheduler
+        loader.dataset = pyg_ds  # seems like only length is used, webloader doesn't have this attr
+        loader.batch_size = data_config.micro_batch_size
+        loader.drop_last = False
+        return loader
 
     def setup_training_data(self, train_data_config: OmegaConf):
         logging.info(f"Length of train dataset: {len(self._train_ds)}")
+
         self._train_dl = self.diffdock_build_dataloader(
             train_data_config,
             self._train_ds,
-            use_new_batch_sampler=not self.cfg.confidence_mode,
             shuffle=True,
+            filter_size_one=True,
         )
 
     def setup_validation_data(self, val_data_config: OmegaConf):
@@ -179,19 +233,16 @@ class TensorProductScoreModelBase(ModelPT):
         self._validation_dl = self.diffdock_build_dataloader(
             val_data_config,
             self._validation_ds,
-            shuffle=True,
+            shuffle=False,
+            keep_pos=not self.cfg.confidence_mode,
         )
-
-        if not self.cfg.confidence_mode and self.cfg.val_denoising_inference_freq is not None:
-            # the inference step needs the ligand pos from self._validation_dl.heterograph_store
-            # but we lose the index info, so build a dict to map from name to index
-            self._validation_ds_idx_map = {graph.name: idx for idx, graph in enumerate(self._validation_ds)}
 
     def setup_test_data(self, test_data_config: OmegaConf):
         logging.info(f"Length of test dataset: {len(self._test_ds)}")
         self._test_dl = self.diffdock_build_dataloader(
             test_data_config,
             self._test_ds,
+            shuffle=False,
         )
 
     def training_step(self, train_batch, batch_idx):
@@ -241,9 +292,10 @@ class TensorProductScoreModelBase(ModelPT):
                 tor_base_loss,
             ) = self.loss_function(tr_pred, rot_pred, tor_pred, batch=val_batch, apply_mean=False)
             val_loss = loss.mean().cpu().detach()
+
         if loss.isnan().any():
             logging.warning(f"val_loss is nan... skipping validation batch {batch_idx}")
-            return
+
         val_log = {"val_loss": val_loss}
 
         self.log_dict(
@@ -278,10 +330,10 @@ class TensorProductScoreModelBase(ModelPT):
                         sync_dist=True,
                     )
 
-        # Computing RMSDs from the generated ligand positions via reverse diffusion using the traing score model.
+        # Computing RMSDs from the generated ligand positions via reverse diffusion using the score model.
         # The steps:
         #     1. Randomize original ligand positions
-        #     2. Do reverse diffusion from t: 1->0 with num_inferecen steps
+        #     2. Do reverse diffusion from t: 1->0 with num_inference steps
         #     3. Compute the RMSDs from the generated ligand positions
         # DiffDock use valinf_rmsds_lt2 (percent of inference rmsds less than 2.0 Ang on validation dataset)
         # as the metric for the scheduler to select best models as well as reduce the learning rate
@@ -294,13 +346,9 @@ class TensorProductScoreModelBase(ModelPT):
                 and self.local_inference_complex_count < self.local_num_denoising_inference_complexes
             ):
                 batch = Batch.from_data_list(
-                    [
-                        self._validation_ds.heterograph_store[self._validation_ds_idx_map[name]]
-                        for name in val_batch.name[
-                            : (self.local_num_denoising_inference_complexes - self.local_inference_complex_count)
-                        ]
-                    ]
+                    val_batch[: (self.local_num_denoising_inference_complexes - self.local_inference_complex_count)]
                 )
+                batch['ligand'].pos = batch['ligand'].aligned_pos
 
                 rmsds = self._denoising_inference_step(batch, batch_idx)
 
@@ -322,7 +370,7 @@ class TensorProductScoreModelBase(ModelPT):
             elif (
                 (self.current_epoch + 1) % self.cfg.val_denoising_inference_freq != 0
                 and batch_idx == 0
-                and 'valinf_rmsds_lt2' not in self.trainer.callback_metrics
+                and 'valinf_rmsds_lt2' not in self.trainer.callback_metrics  # TODO restart not loading this value
             ):
                 # return fake 0 as checkpoint saving is expecting these values
                 inf_metrics = {
@@ -341,10 +389,10 @@ class TensorProductScoreModelBase(ModelPT):
 
     def _denoising_inference_step(self, orig_complex_graphs, batch_idx):
         """
-        Computing RMSDs from the generated ligand positions via reverse diffusion using the traing score model.
+        Computing RMSDs from the generated ligand positions via reverse diffusion using the score model.
         The steps:
             1. Randomize original ligand positions
-            2. Do reverse diffusion from t: 1->0 with num_inferecen steps
+            2. Do reverse diffusion from t: 1->0 with num_inference steps
             3. Compute the RMSDs from the generated ligand positions
         """
         t_schedule = np.linspace(1, 0, self.cfg.denoising_inference_steps + 1)[:-1]
@@ -353,17 +401,22 @@ class TensorProductScoreModelBase(ModelPT):
         rmsds = []
         for k in range(orig_complex_graphs.num_graphs):
             data_list = [Batch.from_data_list([copy.deepcopy(orig_complex_graphs[k])])]
-
-            randomize_position(
-                data_list,
-                self.cfg.diffusion.no_torsion,
-                False,
-                self.cfg.diffusion.tr_sigma_max,
-            )
+            skip_failing = False
+            try:
+                randomize_position(
+                    data_list,
+                    self.cfg.diffusion.no_torsion,
+                    False,
+                    self.cfg.diffusion.tr_sigma_max,
+                )
+            except Exception as e:
+                skip_failing = True
+                logging.warning(f"Fail to randomize position in complex: {data_list[0].name[0]} because of error: {e}")
 
             predictions_list = None
+
             failed_convergence_counter = 0
-            while predictions_list is None and failed_convergence_counter <= 5:
+            while predictions_list is None and failed_convergence_counter <= 5 and (not skip_failing):
                 try:
                     predictions_list, confidences = sampling(
                         data_list=data_list,
@@ -377,14 +430,21 @@ class TensorProductScoreModelBase(ModelPT):
                         model_cfg=self.cfg,
                         batch_size=1,
                     )
-                except Exception as expt:
-                    if "failed to converge" in str(expt):
+                except Exception as e:
+                    if "failed to converge" in str(e):
                         failed_convergence_counter += 1
                         self.print("SVD failed to converge - trying again with a new sample")
                     else:
-                        raise expt
+                        logging.warning(f"Inference of complex: {data_list[0].name[0]} failed because of error: {e}")
+                        skip_failing = True
+
             if failed_convergence_counter > 5:
                 self.print("SVD failed to converge 5 times - skipping the complex")
+                rmsds.append(np.array([np.inf]))
+                continue
+
+            if skip_failing:
+                rmsds.append(np.array([np.inf]))
                 continue
 
             orig_complex_graph = orig_complex_graphs[k]

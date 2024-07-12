@@ -9,7 +9,7 @@
 # its affiliates is strictly prohibited.
 
 import os
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import esm
 import numpy as np
@@ -45,7 +45,7 @@ def get_sequences(protein_files, protein_sequences):
     new_sequences = []
     for i in range(len(protein_files)):
         if protein_files[i] is not None:
-            new_sequences.append(get_sequences_from_pdbfile(protein_files[i], to_fasta=False))
+            new_sequences.append(get_sequences_from_pdbfile([None, protein_files[i]], to_fasta=False))
         else:
             new_sequences.append(protein_sequences[i])
     return new_sequences
@@ -335,13 +335,16 @@ def build_inference_datasets(cfg: DictConfig) -> Tuple[List, Dataset, Dataset, D
     return complex_name_list, test_dataset, confidence_test_dataset, test_loader
 
 
-def compute_rmsd(cfg: DictConfig, name: str, results_path_containments: List) -> Tuple[List, np.ndarray, np.ndarray]:
+def compute_rmsd(
+    cfg: DictConfig, name: str, results_path_containments: List, ref_ligand: Optional[str] = None
+) -> Tuple[List, np.ndarray, np.ndarray]:
     """Read the reference and predicted ligand molecules and compute RMSDs.
 
     Args:
         cfg (DictConfig): Inference conf
         name (str): pdbid, used as the folder name for the reference pdb and also the prediction results
         results_path_containments (List): List of the directory with names of predicted pdb.
+        ref_ligand (optional, str): path to the ligand file
 
     Raises:
         Exception: If can't find the pdb with the given name,
@@ -353,7 +356,10 @@ def compute_rmsd(cfg: DictConfig, name: str, results_path_containments: List) ->
                                              predicted ligand positions, [num. of predictions, num. of atoms, 3]
                                              reference ligand positions, [num. of atoms, 3]
     """
-    mol = read_mol(cfg.protein_data_dir, name, remove_hs=True)
+    if ref_ligand is not None:
+        mol = read_molecule(ref_ligand, remove_hs=True, sanitize=True)
+    else:
+        mol = read_mol(cfg.protein_data_dir, name, remove_hs=True)
     mol = Chem.RemoveAllHs(mol)
     orig_ligand_pos = np.array(mol.GetConformer().GetPositions())
 

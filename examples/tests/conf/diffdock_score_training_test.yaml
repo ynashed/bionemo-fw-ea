@@ -8,17 +8,19 @@ hydra:
 name: diffdock_score_training_test
 
 data:
+  num_workers: 2
   split_train: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/splits/split_train # Path of file defining the split.
-  split_val: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/splits/split_val # Path of file defining the split
-  split_test: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/splits/split_test # Path of file defining the split
+  split_val: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/splits/split_train # Path of file defining the split
+  split_test: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/splits/split_train # Path of file defining the split
   cache_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/data_cache # Folder from where to load/restore cached dataset
 
 trainer:
   precision: 32
-  max_epochs: 1
+  max_epochs: 2
 
 model:
-  micro_batch_size: 2
+  apply_size_control: True
+  micro_batch_size: 10
   max_total_size: null
   estimate_memory_usage:
     maximal: null

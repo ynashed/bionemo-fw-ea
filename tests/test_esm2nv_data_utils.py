@@ -26,6 +26,11 @@ from bionemo.utils.tests import teardown_apex_megatron_cuda
 @pytest.fixture(scope="function")
 def cfg(config_path_for_tests):
     cfg = load_model_config(config_name='esm2nv_data_test', config_path=config_path_for_tests)
+    # Ensure default ESM2 pretraining behavior
+    assert cfg.model.data.train.custom_pretraining_fasta_path is None
+    assert cfg.model.data.val.custom_pretraining_fasta_path is None
+    assert cfg.model.data.test.custom_pretraining_fasta_path is None
+
     return cfg
 
 
@@ -227,7 +232,6 @@ def test_build_train_valid_test_dataset_limits_test_batches_uses_batch_num_speci
     assert len(test_ds) == 400
 
 
-# TODO: Move to Dataprep testing once its available.
 def test_esm2nv_preprocess_training_dataset_creates_non_empty_dirs(tmp_path, cfg):
     preprocessor = ESM2Preprocess()
 

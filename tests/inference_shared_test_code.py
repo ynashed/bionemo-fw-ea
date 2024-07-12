@@ -46,6 +46,7 @@ def get_config_dir(bionemo_home: Path, model_name: str) -> str:
         "prott5nv": "protein",
         "esm1nv": "protein",
         "geneformer": "singlecell",
+        'dnabert': 'dna',
     }
     return str(bionemo_home / "examples" / modality[model_name] / model_name / "conf")
 

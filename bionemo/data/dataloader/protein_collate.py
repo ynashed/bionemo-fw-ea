@@ -27,8 +27,10 @@ class ProteinBertCollate(BertCollate):
         tokenizer: TokenizerSpec,
         seq_length: int,
         pad_size_divisible_by_8: bool,
-        modify_percent: float = 0.1,
-        perturb_percent: float = 0.5,
+        modify_percent: float = 0.15,
+        perturb_token_percent: float = 0.1,
+        mask_token_percent: float = 0.8,
+        identity_token_percent: float = 0.1,
         dynamic_padding: bool = True,
     ):
         """
@@ -39,10 +41,16 @@ class ProteinBertCollate(BertCollate):
             seq_length (int): Final length of all sequences
             pad_size_divisible_by_8 (bool): Makes pad size divisible by 8.
                 Needed for NeMo.
-            modify_percent (float): The percentage of total tokens to modify
-            perturb_percent (float): Of the total tokens being modified,
+            modify_token_percent (float): The percentage of total tokens to modify typically 0.15
+            perturb_token_percent (float): Of the total tokens being modified,
                 percentage of tokens to perturb. Perturbation changes the
-                tokens randomly to some other non-special token.
+                tokens randomly to some other non-special token typically 0.1.
+            identity_token_percent (float): Of the total tokens being modified,
+                percentage of tokens to perturb. Perturbation changes the
+                tokens randomly to some other non-special token typically 0.1.
+            mask_token_percent (float): Of the total tokens being modified,
+                percentage of tokens to perturb. Perturbation changes the
+                tokens randomly to some other non-special token typically 0.8.
             dynamic_padding: If True, enables dynamic batch padding, where
                 each batch is padded to the maximum sequence length within that batch.
                 By default True.
@@ -51,7 +59,9 @@ class ProteinBertCollate(BertCollate):
         masking = BertMasking(
             tokenizer=tokenizer,
             modify_percent=modify_percent,
-            perturb_percent=perturb_percent,
+            mask_token_percent=mask_token_percent,
+            identity_token_percent=identity_token_percent,
+            perturb_token_percent=perturb_token_percent,
         )
         super().__init__(
             tokenizer=tokenizer,
@@ -73,8 +83,10 @@ class ESM2BertCollate(ProteinBertCollate):
         tokenizer: TokenizerSpec,
         seq_length: int,
         pad_size_divisible_by_8: bool,
-        modify_percent: float = 0.1,
-        perturb_percent: float = 0.5,
+        modify_percent: float = 0.15,
+        perturb_token_percent: float = 0.1,
+        mask_token_percent: float = 0.8,
+        identity_token_percent: float = 0.1,
         dynamic_padding: bool = True,
     ):
         """Extends the parent class by allowing collate_fns that operate on dictionaries rather
@@ -98,7 +110,9 @@ class ESM2BertCollate(ProteinBertCollate):
             seq_length=seq_length,
             pad_size_divisible_by_8=pad_size_divisible_by_8,
             modify_percent=modify_percent,
-            perturb_percent=perturb_percent,
+            mask_token_percent=mask_token_percent,
+            identity_token_percent=identity_token_percent,
+            perturb_token_percent=perturb_token_percent,
             dynamic_padding=dynamic_padding,
         )
 

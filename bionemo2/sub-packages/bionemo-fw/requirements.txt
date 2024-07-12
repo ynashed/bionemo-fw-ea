@@ -1,0 +1,7 @@
+tensorstore==0.1.45
+zarr
+nltk
+numba>=0.57.1
+flash-attn
+lightning>=2.2.1
+pytorch-lightning>=2.2.1

@@ -1,23 +1,18 @@
-training_data:
-  protein_path: null
-  protein_ligand_csv: null
+protein_data:
+  protein_ligand_csv: ${oc.env:BIONEMO_HOME}/data/PDB_processed/protein_ligand.csv
   protein_data_dir: ${oc.env:BIONEMO_HOME}/data/PDB_processed
   output_fasta_file: ${oc.env:BIONEMO_HOME}/data/pdb_sequences.fasta
-  esm_embeddings_path: ${oc.env:BIONEMO_HOME}/data/esm2_embeddings.sqlite3
-  chain_cutoff: 10
+  esm_embeddings_path: ${oc.env:BIONEMO_HOME}/data/esm2_embeddings
+  num_workers: null
 name: diffdock_score_training_test
 do_embedding_preprocessing: false
 do_preprocessing: false
 do_training: true
 do_testing: false
 seed: 0
-cluster_type: None
-restore_from_path: null
-target: bionemo.model.molecule.diffdock.models.nemo_model.DiffdockTensorProductScoreModel
-infer_target: bionemo.model.molecule.diffdock.infer.ScoreModelInference
 data:
   num_workers: 1
-  pin_memory: false
+  pin_memory: true
   limit_complexes: 0
   all_atoms: false
   receptor_radius: 15
@@ -28,15 +23,18 @@ data:
   matching_maxiter: 20
   max_lig_size: null
   remove_hs: true
+  no_torsion: ${model.diffusion.no_torsion}
   num_conformers: 1
-  world_size: ${multiply:${trainer.devices}, ${trainer.num_nodes}}
-  esm_embeddings_path: ${training_data.esm_embeddings_path}
-  data_dir: ${training_data.protein_data_dir}
+  esm_embeddings_path: ${protein_data.esm_embeddings_path}
+  data_dir: ${protein_data.protein_data_dir}
+  protein_ligand_csv: ${protein_data.protein_ligand_csv}
   split_train: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/splits/split_train
-  split_val: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/splits/split_val
-  split_test: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/splits/split_test
+  split_val: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/splits/split_train
+  split_test: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/splits/split_train
   cache_path: ${oc.env:BIONEMO_HOME}/examples/tests/test_data/molecule/diffdock/data_cache
-  chunk_size: 5
+  num_chunks: ${data.num_workers}
+  generate_conformer_max_iterations: 10
+  generate_conformer_enforce_chirality: false
 trainer:
   devices: 1
   num_nodes: 1
@@ -53,8 +51,6 @@ trainer:
   gradient_clip_val: 1.0
   logger: false
   enable_checkpointing: false
-  use_distributed_sampler: false
-  reload_dataloaders_every_n_epochs: 100000
   accumulate_grad_batches: 1
   deterministic: warn
 model:
@@ -63,7 +59,7 @@ model:
   seed: ${seed}
   micro_batch_size: 5
   global_batch_size: null
-  batch_sampler: null
+  apply_size_control: false
   max_total_size: null
   estimate_memory_usage:
     coeff_ligand_num_nodes: 2.9
@@ -138,70 +134,31 @@ model:
       mode: ${model.inference_earlystop_goal}
   train_ds:
     num_batches: null
+    micro_batch_size: ${model.micro_batch_size}
     pin_memory: ${data.pin_memory}
-    seed: ${seed}
-    no_torsion: ${model.diffusion.no_torsion}
-    all_atoms: ${data.all_atoms}
-    data_dir: ${data.data_dir}
-    limit_complexes: ${data.limit_complexes}
-    receptor_radius: ${data.receptor_radius}
-    c_alpha_max_neighbors: ${data.c_alpha_max_neighbors}
-    remove_hs: ${data.remove_hs}
-    max_lig_size: ${data.max_lig_size}
-    matching_popsize: ${data.matching_popsize}
-    matching_maxiter: ${data.matching_maxiter}
     num_workers: ${data.num_workers}
-    atom_radius: ${data.atom_radius}
-    atom_max_neighbors: ${data.atom_max_neighbors}
-    esm_embeddings_path: ${data.esm_embeddings_path}
-    cache_path: ${data.cache_path}
     num_conformers: ${data.num_conformers}
     split_train: ${data.split_train}
-    chunk_size: ${data.chunk_size}
+    apply_size_control: ${model.apply_size_control}
+    min_num_shards: null
   validation_ds:
     num_batches: null
+    micro_batch_size: ${model.micro_batch_size}
     pin_memory: ${data.pin_memory}
-    seed: ${seed}
-    no_torsion: ${model.diffusion.no_torsion}
-    all_atoms: ${data.all_atoms}
-    data_dir: ${data.data_dir}
-    limit_complexes: ${data.limit_complexes}
-    receptor_radius: ${data.receptor_radius}
-    c_alpha_max_neighbors: ${data.c_alpha_max_neighbors}
-    remove_hs: ${data.remove_hs}
-    max_lig_size: ${data.max_lig_size}
-    matching_popsize: ${data.matching_popsize}
-    matching_maxiter: ${data.matching_maxiter}
     num_workers: ${data.num_workers}
-    atom_radius: ${data.atom_radius}
-    atom_max_neighbors: ${data.atom_max_neighbors}
-    esm_embeddings_path: ${data.esm_embeddings_path}
-    cache_path: ${data.cache_path}
     num_conformers: ${data.num_conformers}
     split_val: ${data.split_val}
-    chunk_size: ${data.chunk_size}
+    apply_size_control: false
+    min_num_shards: null
   test_ds:
     num_batches: null
+    micro_batch_size: ${model.micro_batch_size}
     pin_memory: ${data.pin_memory}
-    seed: ${seed}
-    no_torsion: ${model.diffusion.no_torsion}
-    all_atoms: ${data.all_atoms}
-    data_dir: ${data.data_dir}
-    limit_complexes: ${data.limit_complexes}
-    receptor_radius: ${data.receptor_radius}
-    c_alpha_max_neighbors: ${data.c_alpha_max_neighbors}
-    remove_hs: ${data.remove_hs}
-    max_lig_size: ${data.max_lig_size}
-    matching_popsize: ${data.matching_popsize}
-    matching_maxiter: ${data.matching_maxiter}
     num_workers: ${data.num_workers}
-    atom_radius: ${data.atom_radius}
-    atom_max_neighbors: ${data.atom_max_neighbors}
-    esm_embeddings_path: ${data.esm_embeddings_path}
-    cache_path: ${data.cache_path}
     num_conformers: ${data.num_conformers}
     split_test: ${data.split_test}
-    chunk_size: ${data.chunk_size}
+    apply_size_control: false
+    min_num_shards: null
   optimize_einsums: false
 exp_manager:
   name: ${name}

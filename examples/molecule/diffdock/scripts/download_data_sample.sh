@@ -53,8 +53,8 @@ else
     exit 1
 fi
 
-VERSION_PROCESSED_SAMPLE=processed_sample_01082024
-VERSION_PREPROCESSING_TEST=preprocessing_test_02282024
+VERSION_PROCESSED_SAMPLE=processed_sample_05022024
+VERSION_PREPROCESSING_TEST=preprocessing_test_05022024
 VERSION_MODELIO=model_io_03042024_cugraph
 
 if [ -n "$PBSS" ]; then

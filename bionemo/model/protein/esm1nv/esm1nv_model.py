@@ -17,6 +17,7 @@ from typing import Dict, List, Optional, Union
 import torch
 from megatron.core import parallel_state
 from nemo.collections.nlp.data.language_modeling.megatron.data_samplers import MegatronPretrainingSampler
+from nemo.collections.nlp.data.language_modeling.text_memmap_dataset import CSVFieldsMemmapDataset
 from nemo.collections.nlp.modules.common.megatron.utils import (
     average_losses_across_data_parallel_group,
 )
@@ -39,7 +40,6 @@ try:
     from apex.transformer.pipeline_parallel.utils import (
         _reconfigure_microbatch_calculator,
         get_micro_batch_size,
-        get_num_microbatches,
     )
 
     HAVE_APEX = True
@@ -169,12 +169,17 @@ class ESM1nvModel(ESMnvMegatronBertModel):
         pad_size_divisible_by_8 = True if self._cfg.masked_softmax_fusion else False
         if self.cfg.pipeline_model_parallel_size > 1 and self.cfg.data.dynamic_padding:
             raise ValueError("Pipeline model parallelism does not support dynamic_padding.")
+        perturb_percent = self._cfg.data.get("perturb_percent", 0.1)
+        mask_percent = self._cfg.data.get("mask_percent", 0.8)
+        identity_percent = self._cfg.data.get("identity_percent", max(1 - (mask_percent + perturb_percent), 0))
         dataloader.collate_fn = ProteinBertCollate(
             tokenizer=self.tokenizer,
             seq_length=self._cfg.seq_length,
             pad_size_divisible_by_8=pad_size_divisible_by_8,
             modify_percent=self._cfg.data.modify_percent,
-            perturb_percent=self._cfg.data.perturb_percent,
+            perturb_token_percent=perturb_percent,
+            mask_token_percent=mask_percent,
+            identity_token_percent=identity_percent,
             dynamic_padding=self.cfg.data.dynamic_padding,
         ).collate_fn
 
@@ -278,6 +283,7 @@ class ESM1nvModel(ESMnvMegatronBertModel):
         """
         # TODO: upstream the `encode` function to NeMo as the current BERT class does not have one
 
+        # TODO [sichu] Potential duplication to bionemo/model/utils.py
         # Check whether the DDP is initialized. This is needed when running inference outside of the training loop.
         if parallel_state.is_unitialized():
 
@@ -303,16 +309,17 @@ class ESM1nvModel(ESMnvMegatronBertModel):
         global_batch_per_gpu = tokens_enc.size(0)
         encoder_seq_length = tokens_enc.size(1)
 
-        num_micro_batches_before_encode = get_num_microbatches()
         # Reconfigure microbatch calculator here to set num microbatches as expected by the encoding step.
         if reconfigure_microbatch:
+            global_batch_size = self.cfg.global_batch_size // self.cfg.micro_batch_size * global_batch_per_gpu
             _reconfigure_microbatch_calculator(
                 rank=app_state.global_rank,
                 rampup_batch_size=None,
-                global_batch_size=global_batch_per_gpu * parallel_state.get_data_parallel_world_size(),
+                global_batch_size=global_batch_size,
                 micro_batch_size=global_batch_per_gpu,  # Make sure that there is no "grad acc" while encoding.
                 data_parallel_size=parallel_state.get_data_parallel_world_size(),
             )
+
         tensor_shape = [
             encoder_seq_length,
             global_batch_per_gpu,
@@ -366,8 +373,8 @@ class ESM1nvModel(ESMnvMegatronBertModel):
             _reconfigure_microbatch_calculator(
                 rank=app_state.global_rank,
                 rampup_batch_size=None,
-                global_batch_size=global_batch_per_gpu * parallel_state.get_data_parallel_world_size(),
-                micro_batch_size=global_batch_per_gpu // num_micro_batches_before_encode,
+                global_batch_size=global_batch_size,
+                micro_batch_size=global_batch_per_gpu,
                 data_parallel_size=parallel_state.get_data_parallel_world_size(),
             )
 
@@ -542,21 +549,57 @@ class ESM2nvModel(ESM1nvModel):
         self,
         model_cfg: DictConfig,
         num_samples: Optional[int] = None,
-    ) -> Uniref90ClusterMappingDataset:
-        """Constructs a train dataset.
+    ) -> Union[Uniref90ClusterMappingDataset, CSVFieldsMemmapDataset]:
+        """Constructs a train dataset either
+            1. following the default training strategy in ESM2 publication, if model_cfg.data.train.custom_pretraining_fasta_path is None, or
+            2. from the manually specified fasta (model_cfg.data.train.custom_pretraining_fasta_path)
 
         Args:
             num_samples: The number of samples in the dataset
-            model_cfg: A config file that contains certain keys that tell us:
+            model_cfg: If no custom fasta is specified, a config file that contains certain keys that tell us:
                 1. Where the UF50 dataset lies
                 2. Where the UF90 dataset lies
                 3. How we want to map between the two etc.
         Returns:
-            train_dataset: A UF90 cluster mapping train dataset.
-
-        # TODO(@jomitchell) Enable creation of train dataset from single .fasta file.
+            train_dataset (Unionp[Uniref90ClusterMappingDataset, CSVFieldsMemmapDataset]): Training dataset.
         """
-        # Create the training dataset
+        # Create the custom training dataset
+        if model_cfg.data.train.custom_pretraining_fasta_path is None:
+            train_ds = self._build_uniref50_90_train_dataset(model_cfg=model_cfg, num_samples=num_samples)
+        else:
+            # overrride config with uf90 settings
+            model_cfg = copy.deepcopy(model_cfg)
+            model_cfg.data.train.data_impl = model_cfg.data.train.uf90.data_impl
+            model_cfg.data.train.data_impl_kwargs = model_cfg.data.train.uf90.data_impl_kwargs
+
+            # TODO raise exception if cannot read the dataset properly
+            train_ds = build_typed_dataset(
+                dataset_paths=os.path.join(model_cfg.data.train.dataset_path, 'train', model_cfg.data.train.range),
+                data_impl=model_cfg.data.train.uf90.data_impl,
+                cfg=model_cfg.data.train,
+                use_upsampling=model_cfg.data.train.use_upsampling,
+                num_samples=num_samples,
+            )
+
+        return train_ds
+
+    @staticmethod
+    def _build_uniref50_90_train_dataset(
+        model_cfg: DictConfig,
+        num_samples: Optional[int] = None,
+    ) -> Uniref90ClusterMappingDataset:
+        """Build a pretraining train dataset as described in ESM2 publication, in which each uniref90
+        sequence is mapped to a "cluster-center" in uniref50. Sampling is done at uniref50 level while
+        the actual training is on uniref90 sequences.
+
+        Ref: https://www.biorxiv.org/content/10.1101/2022.07.20.500902v1.full.pdf
+
+        Args:
+            num_samples (int) : The number of samples in the dataset.
+            model_cfg (DictConfig): ESM2 pretraining config.
+        Returns:
+            train_dataset (Uniref90ClusterMappingDataset): A UF90 cluster mapping train dataset.
+        """
         train_ds = build_typed_dataset(
             dataset_paths=os.path.join(model_cfg.data.train.dataset_path, 'train', model_cfg.data.train.range),
             data_impl=model_cfg.data.train.data_impl,
@@ -564,7 +607,6 @@ class ESM2nvModel(ESM1nvModel):
             use_upsampling=model_cfg.data.train.use_upsampling,
             num_samples=num_samples,
         )
-
         uniref90_dataset = build_typed_dataset(
             dataset_paths=os.path.join(
                 model_cfg.data.train.uf90.uniref90_path, 'uf90_csvs', model_cfg.data.train.range
@@ -728,12 +770,21 @@ class ESM2nvModel(ESM1nvModel):
         pad_size_divisible_by_8 = True if self._cfg.masked_softmax_fusion else False
         if self.cfg.pipeline_model_parallel_size > 1 and self.cfg.data.dynamic_padding:
             raise ValueError("Pipeline model parallelism does not support dynamic_padding.")
+        modify_percentage = self._cfg.data.get("modify_percent", 0.15)
+        perturb_percentage = self._cfg.data.get("perturb_percent", 0.1)
+        mask_percentage = self._cfg.data.get("mask_percent", 0.8)
+        identity_percentage = self._cfg.data.get(
+            "identity_percent", max(1 - (mask_percentage + perturb_percentage), 0)
+        )
+
         dataloader.collate_fn = ESM2BertCollate(
             tokenizer=self.tokenizer,
             seq_length=self._cfg.seq_length,
             pad_size_divisible_by_8=pad_size_divisible_by_8,
-            modify_percent=self._cfg.data.modify_percent,
-            perturb_percent=self._cfg.data.perturb_percent,
+            modify_percent=modify_percentage,
+            perturb_token_percent=perturb_percentage,
+            mask_token_percent=mask_percentage,
+            identity_token_percent=identity_percentage,
             dynamic_padding=self.cfg.data.dynamic_padding,
         ).collate_fn
         return dataloader

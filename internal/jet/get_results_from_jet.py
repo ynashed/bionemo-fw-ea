@@ -13,7 +13,7 @@ import logging
 import os
 from argparse import ArgumentParser
 from collections import OrderedDict
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 import pandas as pd
 import tqdm
@@ -45,11 +45,12 @@ def print_table_with_results(df: pd.DataFrame) -> None:
     Print table with essential information about the jobs to the console table
     """
     table_dict = OrderedDict()
-    table_dict["BioNeMo pipeline ID"] = df.bionemo_ci_pipeline_id
     table_dict["JET job ID"] = df.jet_ci_job_id
     table_dict["Job Type"] = df.job_type
     table_dict["Job Key"] = df.job_key.str.split("/", expand=True)[1]
     table_dict["Status"] = df.jet_ci_job_status
+    if "jet_test_status" in df:
+        table_dict["Test"] = df.jet_test_status
     table = tabulate(table_dict, headers=list(table_dict.keys()), tablefmt="psql")
 
     print(table)
@@ -88,19 +89,24 @@ def get_duration_stats(
 def query_jet_jobs(
     jet_instance: JETInstance,
     jet_workloads_ref: Optional[str] = None,
+    job_type: Optional[str] = None,
     pipeline_id: Optional[int] = None,
     job_id: Optional[int] = None,
     pipeline_type: Optional[str] = None,
     duration: Optional[str] = None,
     limit: Optional[int] = 1000,
     only_completed: bool = False,
+    fields_select: Optional[List[str]] = None,
+    label: Optional[str] = "bionemo",
 ) -> List[dict]:
     """
     Queries Kibana to get results for JET jobs according to the specifications.
     """
 
     log_service = jet_instance.log_service()
-    query = JETLogsQuery().filter(Field("obj_workload.obj_labels.origin") == "bionemo")
+    query = JETLogsQuery()
+    if label is not None:
+        query = query.filter(Field("obj_workload.obj_labels.origin") == label)
 
     if pipeline_type is not None:
         logging.info(f'Query results for pipeline_type: {pipeline_type}')
@@ -117,6 +123,10 @@ def query_jet_jobs(
     if job_id is not None:
         logging.info(f'Query results for Jet CI job id: {job_id}')
         query = query.filter(Field("obj_ci.l_job_id") == job_id)
+
+    if job_type is not None:
+        logging.info(f'Query results for Jet CI job type: {job_type}')
+        query = query.filter(Field("s_type") == job_type)
 
     if duration is not None:
         if any(duration.endswith(s) for s in ['d', 'w', 'M', 'y']):
@@ -136,6 +146,9 @@ def query_jet_jobs(
     if limit is not None:
         query = query.limit(limit)
 
+    if fields_select is not None:
+        query = query.select(*fields_select)
+
     # Getting results for all jobs in the query
     jobs_results = log_service.query(query)
     return jobs_results
@@ -154,6 +167,7 @@ def log_detailed_job_info(df: pd.DataFrame) -> None:
             f'\nJET pipeline id: {job_info["jet_ci_pipeline_id"]}, BioNeMo pipeline id: {job_info["bionemo_ci_pipeline_id"]} '
             f'JET job id: {job_info["jet_ci_job_id"]}, '
             f'job duration: {job_info["jet_ci_job_duration"]}, script duration: {job_info["script_duration"]}'
+            f'\nJET job id logs: https://gitlab-master.nvidia.com/dl/jet/ci/-/jobs/{job_info["jet_ci_job_id"]}'
         )
 
         if job_info["job_type"] == "build":
@@ -217,7 +231,6 @@ def get_job_info(job_raw_result: dict, save_dir: Optional[str]) -> dict:
         'script_duration': job_raw_result.get("d_duration", None),
         'timestamp': job_raw_result.get('@timestamp', None),
     }
-
     ci_info = job_raw_result.get("obj_ci", {})
     workloads_info = job_raw_result.get("obj_workloads_registry", {})
     obj_workload = job_raw_result.get("obj_workload", {})
@@ -261,6 +274,94 @@ def get_job_info(job_raw_result: dict, save_dir: Optional[str]) -> dict:
         raise ValueError("Only jobs of type 'recipe' or 'build' are supported.")
 
     return job_info
+
+
+def get_job_results(
+    jet_instance: JETInstance,
+    jet_workloads_ref: Optional[str] = None,
+    pipeline_id: Optional[int] = None,
+    job_id: Optional[int] = None,
+    pipeline_type: Optional[str] = None,
+    duration: Optional[str] = None,
+    limit: Optional[int] = 1000,
+    only_completed: bool = False,
+    save_dir: Optional[str] = None,
+    all_jobs: bool = False,
+) -> Tuple[Optional[pd.DataFrame], Optional[dict]]:
+    results_jobs = query_jet_jobs(
+        jet_instance=jet_instance,
+        jet_workloads_ref=jet_workloads_ref,
+        pipeline_id=pipeline_id,
+        job_id=job_id,
+        pipeline_type=pipeline_type,
+        duration=duration,
+        limit=limit,
+        only_completed=only_completed,
+    )
+    """
+    Queries and outputs results of jet jobs run in JET given related pipeline id in JET CI, job id or pipeline type.
+    """
+    if len(results_jobs) == 0:
+        logging.warning("No results found.")
+        return None, None
+
+    logging.info(f'Getting {len(results_jobs)} jobs from Kibana... \n')
+    output = []
+
+    jet_ci = jet_instance.gitlab_ci()
+    pipelines_info = {}
+    for result in tqdm.tqdm(results_jobs, desc="Getting results for JET tests "):
+        job_info = get_job_info(job_raw_result=result, save_dir=save_dir)
+
+        pipeline_id = job_info["jet_ci_pipeline_id"]
+        if job_info["jet_ci_pipeline_id"] not in pipelines_info:
+            obj_workload = result.get("obj_workload", {})
+            pipelines_info[pipeline_id] = obj_workload["obj_labels"]
+            pipelines_info[pipeline_id]["duration"] = jet_ci.project.pipelines.get(pipeline_id).duration
+        job_info["jet_ci_pipeline_duration"] = pipelines_info[pipeline_id]["duration"]
+        job_info["bionemo_ci_pipeline_id"] = pipelines_info[pipeline_id].get("bionemo_ci_pipeline_id", None)
+        job_info["pipeline_type"] = pipelines_info[pipeline_id].get("workload_ref", None)
+
+        output.append(job_info)
+
+    df = pd.DataFrame(output)
+
+    df.sort_values(by=["jet_ci_pipeline_id", "job_key", "timestamp"], inplace=True)
+
+    # Keeping only the most recent jobs per pipeline and job_key (to filter out jobs that were rerun)
+    if not all_jobs:
+        df = filter_out_failed_and_rerun_jobs(df=df, n_all_results=df.shape[0])
+    return df, pipelines_info
+
+
+def get_test_results(jet_instance: JETInstance, pipeline_ids: List[str]) -> Optional[pd.DataFrame]:
+    """
+    Queries and outputs results of jet test jobs run in JET given related pipeline id.
+    """
+    results_tests = []
+    for pipeline_id in pipeline_ids:
+        tests_raw = query_jet_jobs(
+            jet_instance=jet_instance,
+            pipeline_id=int(pipeline_id),
+            fields_select=["s_status", "obj_ci.l_pipeline_id", "s_workload_logs"],
+            job_type="test",
+            label=None,
+        )
+        results_tests.extend(tests_raw)
+
+    if len(results_tests) == 0:
+        logging.warning("No tests results found.")
+        return None
+
+    output = []
+    for test_raw in results_tests:
+        test_dict = {}
+        if "s_workload_logs" not in test_raw:
+            continue
+        test_dict["jet_ci_workload_id"] = test_raw["s_workload_logs"][0]
+        test_dict["jet_test_status"] = "Success" if test_raw["s_status"] == "pass" else "FAILED"
+        output.append(test_dict)
+    return pd.DataFrame(output)
 
 
 def get_results_from_jet(
@@ -326,7 +427,8 @@ def get_results_from_jet(
         return_df: a flag that determines whether to return pd.DataFrame with job details
     """
     jet_instance = JETInstance(env="prod")
-    results_jobs = query_jet_jobs(
+
+    df, pipelines_info = get_job_results(
         jet_instance=jet_instance,
         jet_workloads_ref=jet_workloads_ref,
         pipeline_id=pipeline_id,
@@ -335,38 +437,12 @@ def get_results_from_jet(
         duration=duration,
         limit=limit,
         only_completed=only_completed,
+        save_dir=save_dir,
+        all_jobs=all_jobs,
     )
 
-    if len(results_jobs) == 0:
-        logging.warning("No results found.")
-        return
-
-    logging.info(f'Getting {len(results_jobs)} jobs from Kibana... \n')
-    output = []
-
-    jet_ci = jet_instance.gitlab_ci()
-    pipelines_info = {}
-    for result in tqdm.tqdm(results_jobs, desc="Getting results for JET tests "):
-        job_info = get_job_info(job_raw_result=result, save_dir=save_dir)
-
-        pipeline_id = job_info["jet_ci_pipeline_id"]
-        if job_info["jet_ci_pipeline_id"] not in pipelines_info:
-            obj_workload = result.get("obj_workload", {})
-            pipelines_info[pipeline_id] = obj_workload["obj_labels"]
-            pipelines_info[pipeline_id]["duration"] = jet_ci.project.pipelines.get(pipeline_id).duration
-
-        job_info["jet_ci_pipeline_duration"] = pipelines_info[pipeline_id]["duration"]
-        job_info["bionemo_ci_pipeline_id"] = pipelines_info[pipeline_id].get("bionemo_ci_pipeline_id", None)
-        job_info["pipeline_type"] = pipelines_info[pipeline_id].get("workload_ref", None)
-
-        output.append(job_info)
-
-    df = pd.DataFrame(output)
-    df.sort_values(by=["jet_ci_pipeline_id", "job_key", "timestamp"], inplace=True)
-
-    # Keeping only the most recent jobs per pipeline and job_key (to filter out jobs that were rerun)
-    if not all_jobs:
-        df = filter_out_failed_and_rerun_jobs(df=df, n_all_results=df.shape[0])
+    df_test = get_test_results(jet_instance=jet_instance, pipeline_ids=list(pipelines_info.keys()))
+    df = pd.merge(df, df_test, on='jet_ci_workload_id', how='left')
 
     if verbosity_level >= 2:
         print_table_with_results(df=df)
@@ -381,10 +457,10 @@ def get_results_from_jet(
         log_detailed_job_info(df=df)
 
     if save_dir is not None:
-        filename = f'jet_query_{"_".join(pipelines_info.keys())}.csv'
+        filename = f'jet_query_{"_".join(pipelines_info.keys())}.json'
         filepath = os.path.join(save_dir, filename)
         logging.info(f"Saving query results to: {filepath}")
-        df.to_csv(filepath, index=False)
+        df.to_json(filepath, orient='records')
     if return_df:
         return df
 

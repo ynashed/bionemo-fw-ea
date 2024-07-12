@@ -17,18 +17,14 @@ launchers:
     ntasks_per_node: '{gpus}'
   name:dgxa100_dracooci:
     mounts:
-      /workspace/bionemo/models: /lustre/fsw/portfolios/convai/projects/convai_bionemo_training/jet/models
-      /workspace/bionemo/examples/tests/test_data/cellxgene_2023-12-15_small: /lustre/fsw/portfolios/convai/projects/convai_bionemo_training/jet/data/test_data/cellxgene_2023-12-15_small
-
+      /workspace/bionemo/models: /lustre/fsw/portfolios/healthcareeng/projects/healthcareeng_bionemo/jet/models
+      /workspace/bionemo/examples/tests/test_data/cellxgene_2023-12-15_small: /lustre/fsw/portfolios/healthcareeng/projects/healthcareeng_bionemo/jet/data/test_data/cellxgene_2023-12-15_small
 spec:
   build: bionemo
   scope: perf-infer
   platforms: [linux/amd64]
   BIONEMO_HOME: "/workspace/bionemo"
   MODEL_PATH: "/workspace/bionemo/models"
-  NGC_CLI_FORMAT_TYPE: ascii
-  NGC_CLI_ORG: nvidian
-  NGC_CLI_TEAM: clara-lifesciences
   config_path: "examples/tests/conf/"
   script_path: "bionemo/model"
   default_overwrites: "++exp_manager.exp_dir=/tmp/nemo_experiments/"
@@ -42,18 +38,23 @@ spec:
     ++create_dllogger_callbacks=True ++dllogger_callbacks_kwargs.use_existing_dllogger=True \
     ++dllogger_callbacks_kwargs.warmup={warmup} \
     ++dllogger_callbacks_kwargs.json_file={dllogger_file} ++assets_dir={assets_dir} ++logs_dir={logs_dir}
-  time_limit: 3600
+  time_limit: 1800
   artifacts: {}
-  metrics:
-    throughput_train:
-      goal: maximize
-      tags: [primary]
-    latency_train_mean:
-      goal: minimize
-      tags: [secondary]
-    train_loss:
-      goal: minimize
-      tags: [secondary]
+metrics:
+  throughput_train:
+    goal: maximize
+    tags: [primary]
+  latency_train_mean:
+    goal: minimize
+    tags: [secondary]
+  train_loss:
+    goal: minimize
+    tags: [secondary]
+tests_spec:
+  - logic_type: static
+    logic_spec:
+      exit_codes:
+        - 0
 products:
   - nodes: [1]
     gpus: [8]
