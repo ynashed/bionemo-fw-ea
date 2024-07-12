@@ -416,6 +416,7 @@ build() {
     DOCKER_BUILD_CMD="docker buildx build --network host \
         -t ${IMAGE_NAME}:${IMAGE_TAG} \
         --cache-to type=inline \
+        --cache-from=gitlab-master.nvidia.com:5005/clara-discovery/bionemo:cache\
         --secret id=GITLAB_TOKEN,env=GITLAB_TOKEN \
         --label com.nvidia.bionemo.short_git_sha=${BIONEMO_SHORT_GIT_HASH} \
         --label com.nvidia.bionemo.git_sha=${BIONEMO_GIT_HASH} \
