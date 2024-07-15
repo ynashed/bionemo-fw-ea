@@ -16,6 +16,7 @@
 """Script to download pretrained models from NGC or PBSS."""
 
 import argparse
+import logging
 import os
 import sys
 import tarfile
@@ -24,7 +25,6 @@ from subprocess import PIPE, Popen
 from typing import Dict, List, Literal, Optional, Tuple
 
 import yaml
-from nemo.utils import logging
 from pydantic import BaseModel
 
 
@@ -50,6 +50,7 @@ class ArtifactConfig(BaseModel):
     relative_download_dir: Optional[Path] = None
     extra_args: Optional[str] = None
     untar_dir: Optional[str] = None
+    unpack: bool = True
 
 
 class Config(BaseModel):
@@ -231,14 +232,17 @@ def download_artifacts(
         if retcode != 0:
             raise ValueError(f"Failed to download {download_artifact=}! {stderr=}")
         if artifact_type == "data":
-            tar_file = f"{str(complete_download_dir)}/{file_name}"
-            if Path(tar_file).is_file():
-                with tarfile.open(tar_file) as tar:
-                    extract_path = f"{str(complete_download_dir)}"
-                    if conf[download_artifact].untar_dir:
-                        extract_path = f"{extract_path}/{conf[download_artifact].untar_dir}"
-                    tar.extractall(path=extract_path)
-                Path(tar_file).unlink()
+            unpack: bool = getattr(conf[download_artifact], "unpack", True)
+            if unpack:
+                # Assume it is a tarfile
+                tar_file = f"{str(complete_download_dir)}/{file_name}"
+                if Path(tar_file).is_file():
+                    with tarfile.open(tar_file) as tar:
+                        extract_path = f"{str(complete_download_dir)}"
+                        if conf[download_artifact].untar_dir:
+                            extract_path = f"{extract_path}/{conf[download_artifact].untar_dir}"
+                        tar.extractall(path=extract_path)
+                    Path(tar_file).unlink()
 
         # Create symlinks, if necessary
         if conf[download_artifact].symlink:

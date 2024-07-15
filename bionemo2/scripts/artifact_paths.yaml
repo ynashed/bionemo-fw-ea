@@ -26,7 +26,21 @@ models:
         symlink:
             source: "../../geneformer-10M-240530-step-115430-wandb-4ij9ghox.nemo"
             target: "singlecell/geneformer/geneformer-10M-240530.nemo"
+    geneformer:
+        # A QA model for geneformer with randomly initialized weights.
+        pbss: "s3://bionemo-ci/models/geneformer-qa.nemo"
+        symlink:
+            source: "../../geneformer-qa.nemo"
+            target: "singlecell/geneformer/geneformer-qa.nemo"
 data:
     single_cell:
         pbss: "s3://bionemo-ci/test-data/singlecell/singlecell-testdata-20240506.tar.gz"
+        relative_download_dir: "test_data/"
+    single_cell_nemo1_geneformer_per_layer_outputs:
+        unpack: false
+        pbss: "s3://bionemo-ci/test-data/singlecell/nemo1-test-outputs-geneformer-qa.pt"
+        relative_download_dir: "test_data/"
+    single_cell_nemo1_geneformer_golden_vals:
+        unpack: false
+        pbss: "s3://bionemo-ci/test-data/singlecell/nemo1_geneformer_qa_test_golden_values.pt"
         relative_download_dir: "test_data/"

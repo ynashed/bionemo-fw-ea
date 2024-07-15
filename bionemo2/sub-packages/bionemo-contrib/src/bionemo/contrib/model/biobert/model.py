@@ -15,6 +15,7 @@
 
 
 import os
+import tarfile
 from dataclasses import dataclass
 from typing import Callable, Literal, Optional, Type, TypedDict, Union
 
@@ -39,6 +40,7 @@ from torch.optim import Optimizer
 
 from bionemo.contrib.model.biobert.transformer_specs import BiobertSpecOption, get_biobert_spec
 from bionemo.contrib.model.loss import BERTMLMLossWithReduction
+from bionemo.contrib.utils.weight_utils import nemo1_to_nemo2_biobert_key_mapping
 
 
 class BioBertOutput(TypedDict):
@@ -81,10 +83,14 @@ class MegatronBioBertModel(LanguageModule):
         position_embedding_type: Literal["learned_absolute", "rope"] = "learned_absolute",
         rotary_percent: float = 1.0,
         seq_len_interpolation_factor: Optional[float] = None,
-        add_binary_head=True,
-        return_embeddings=False,
-        use_full_attention_mask=False,
+        add_binary_head: bool = True,
+        return_embeddings: bool = False,
+        use_full_attention_mask: bool = False,
     ):
+        # TODO (@jstjohn) come up with a cleaner way for this model to return a set of things the user wants.
+        #  hidden states, embeddings, logits, etc. The defaults should work for training but we need to make it
+        #  customizable and easy to tell how to make it work well for inference as well as trouble shooting.
+        #  Also make sure that everything returned that the user wants gets transposed to the b,s,h format.
         super(MegatronBioBertModel, self).__init__(config=config)
         self.post_process = post_process
         self.add_binary_head = add_binary_head
@@ -127,7 +133,7 @@ class MegatronBioBertModel(LanguageModule):
             config=self.config,
             spec=self.transformer_layer_spec,
             pre_process=self.pre_process,
-            post_process=self.post_process,
+            post_process=self.post_process,  # NOTE: in bionemo1 this is hard-coded to True
         )
 
         # Output
@@ -325,6 +331,15 @@ class BioBertConfig(TransformerConfig):
     get_attention_mask_from_fusion: bool = False
 
     optimizer_fn: Optional[Callable[["MegatronBioBertModel"], Optimizer]] = None
+    # TODO (@skothenhill,@georgea) update to use the nemo2 checkpoint mixins
+    #  support HF (requires weight interleaving on qkv layer) and nemo1 checkpoints ideally.
+    # TODO (@skothenhill,@jstjohn) come up with a nice way of doing fine-tuning checkpoint loading,
+    #  where some acceptible layers (eg lm_head) may or may not be absent from the model, and others
+    #  (like a new head) may be new and missing from the initial checkpoint.
+    nemo1_ckpt_path: Optional[str] = None
+    # TODO (@jstjohn) come up with a cleaner way in the biobert module to return user requested
+    #  things as part of the workflow for inference and fine-tuning.
+    return_only_hidden_states: bool = False
 
     def configure_embedding(self, vocab_size, do_next_sentence=False) -> "LanguageModelEmbedding":
         """Configures and returns an instantiated object of embedding module
@@ -364,7 +379,7 @@ class BioBertConfig(TransformerConfig):
         vocab_size = get_vocab_size(self, tokenizer.vocab_size, self.make_vocab_size_divisible_by)
         lm_embedding = self.configure_embedding(vocab_size, do_next_sentence)
 
-        return MegatronBioBertModel(
+        model = MegatronBioBertModel(
             self,
             transformer_layer_spec=get_biobert_spec(self.biobert_spec_option, qk_layernorm=self.qk_layernorm),
             lm_embedding=lm_embedding,
@@ -382,6 +397,31 @@ class BioBertConfig(TransformerConfig):
             add_binary_head=do_next_sentence,
             use_full_attention_mask=use_full_attention_mask,
         )
+        # TODO (@skothenhill) this is a hack to load the old checkpoint.
+        # This should be removed once we have a proper checkpoint conversion
+        # see NeMo/nemo/collections/llm/gpt/model/mixtral.py for how we should do it.
+        # We should eventually have an adapter for nemo1 checkpoints, HF checkpoints (at least for ESM2 @georgea)
+        # and an adapter may also be the right way to handle expected missing/extra keys when importing
+        # a checkpoint for fine-tuning (eg ignore misisng lm_head, if not there in model, etc).
+        if self.nemo1_ckpt_path is not None:
+            with tarfile.open(self.nemo1_ckpt_path, "r") as old_ckpt:
+                ckpt_file = old_ckpt.extractfile("./model_weights.ckpt")
+                old_weights = torch.load(ckpt_file)
+                new_state_dict_from_old = {}
+                for k, v in old_weights.items():
+                    new_key = nemo1_to_nemo2_biobert_key_mapping(k, new_model_prefix="")
+                    new_state_dict_from_old[new_key] = v
+                model.load_state_dict(new_state_dict_from_old)
+
+        # TODO (@jstjohn) come up with a cleaner way in the biobert module to return hidden states.
+        #  maybe a suite of options like hugging face has so a user can ask for several or only one thing.
+        if self.return_only_hidden_states:
+            # this applies the final layernorm in the encoder to the hidden states which was
+            #  the default in nemo1.
+            model.post_process = False
+            model.encoder.post_process = True
+            model.encoder.post_layer_norm = True
+        return model
 
     def get_loss_reduction_class(self) -> Type[MegatronLossReduction]:
         # You could optionally return a different loss reduction class here based on the config settings.
