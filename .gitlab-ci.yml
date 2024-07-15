@@ -891,7 +891,7 @@ jet-trigger:
       retrier:
         enabled: true
         max_retries: 2
-        retry_on: ['1.2', '1.2.*']
+        retry_on: ['1.2', '1.2.*', '1.1.1.1']
         waiting_time: 60
         environment: jet-api
       launchers:
