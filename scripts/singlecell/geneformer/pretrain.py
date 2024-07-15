@@ -23,7 +23,7 @@
 import argparse
 import math
 from pathlib import Path
-from typing import Optional
+from typing import Optional, get_args
 
 from megatron.core.optimizer import OptimizerConfig
 from nemo import lightning as nl
@@ -249,7 +249,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--precision",
         type=str,
-        choices=[e.value for e in PrecisionTypes],
+        choices=get_args(PrecisionTypes),
         required=False,
         default="bf16-mixed",
         help="Precision type to use for training.",
@@ -333,6 +333,13 @@ if __name__ == "__main__":
         help="Number of steps to use for training. Default is 10000.",
     )
     parser.add_argument(
+        "--seq-length",
+        type=int,
+        required=False,
+        default=2048,
+        help="Sequence length of cell. Default is 2048.",
+    )
+    parser.add_argument(
         "--limit-val-batches",
         type=int,
         required=False,
@@ -362,7 +369,7 @@ if __name__ == "__main__":
         data_dir=args.data_dir,
         num_nodes=args.num_nodes,
         devices=args.num_gpus,
-        seq_length=2048,
+        seq_length=args.seq_length,
         result_dir=args.result_dir,
         wandb_project=args.wandb_project,
         wandb_offline=args.wandb_offline,

@@ -41,7 +41,7 @@ RUN git clone https://github.com/Dao-AILab/causal-conv1d.git && \
 # Full install of NeMo from source
 RUN git clone https://github.com/NVIDIA/NeMo.git && \
     cd NeMo && \
-    git checkout 17f295beb207a31c3f4dea40e311ccef3cbc08ff && \
+    git checkout 081a16374c3e0e58dc01e812393ae8645d1fc867 && \
     ./reinstall.sh
 
 # Install any additional dependencies
