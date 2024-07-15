@@ -399,7 +399,6 @@ build-docs-image:
 # gitlab-ci, therefore we split the docs image build and docs build into separate jobs,
 # where the latter doesn't require DIND.
 
-
 build-docs:
   image:
     name: "${IMAGE_NAME}${SUFFIX_DOCS}"

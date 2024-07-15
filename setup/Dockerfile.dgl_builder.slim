@@ -1,0 +1,8 @@
+FROM gitlab-master.nvidia.com:5005/clara-discovery/bionemo:dgl_builder_v1.1.3 AS base
+# Create a new directory without .git
+RUN mkdir /dgl_no_git && cp -R /dgl/.[^.]* /dgl_no_git/ && \
+    cp -R /dgl/* /dgl_no_git/ && \
+    rm -rf /dgl_no_git/.git
+
+FROM scratch AS final
+COPY --from=base /dgl_no_git/ /dgl

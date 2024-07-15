@@ -19,6 +19,8 @@
 # kept all dependencies necessary for nemo.collections.nlp, nemo.core, nemo.utils, nemo.collections.common
 
 ARG BASE_IMAGE=nvcr.io/nvidia/pytorch:23.10-py3
+ARG DGL_IMAGE=gitlab-master.nvidia.com:5005/clara-discovery/bionemo:dgl_builder_v1.1.4
+FROM ${DGL_IMAGE} AS dgl
 # build an image that includes only the nemo dependencies, ensures that dependencies
 # are included first for optimal caching, and useful for building a development
 # image (by specifying build target as `nemo-deps`)
@@ -116,7 +118,7 @@ WORKDIR /workspace/
 ENV HOME=/root
 # copy built DGL and install it
 # dgl_builder is created with setup/Dockerfile.dgl_builder
-COPY --from=gitlab-master.nvidia.com:5005/clara-discovery/bionemo:dgl_builder_v1.1.3 /dgl ./dgl
+COPY --from=dgl /dgl ./dgl
 RUN cd dgl/python && python setup.py install && cd ../.. && rm -rf dgl
 
 # Please populate the labels below if using a custom base container (ie not NeMo GA)
