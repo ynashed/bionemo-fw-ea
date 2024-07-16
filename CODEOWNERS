@@ -25,7 +25,8 @@ internal/ @broland @cye @dorotat @jomitchell @kdidi @jwilber @mgreaves @pbinder 
 setup/Dockerfile* @broland @cye @dorotat @jomitchell @jwilber @kdidi @mgreaves @pbinder @trvachov @yangzhang
 setup/requirements*.txt @broland @cye @dorotat @jomitchell @jwilber @kdidi @mgreaves @pbinder @trvachov @yangzhang
 CONTRIBUTING.md @broland @cye @dorotat @jomitchell @jwilber @kdidi @mgreaves @pbinder @trvachov @yangzhang
-
+.secrets.baseline @broland @cye @dorotat @jomitchell @jwilber @kdidi @mgreaves @pbinder @trvachov @yangzhang
+.pre-commit-config.yaml @broland @cye @dorotat @jomitchell @jwilber @kdidi @mgreaves @pbinder @trvachov @yangzhang
 
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #

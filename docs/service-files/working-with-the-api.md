@@ -51,7 +51,7 @@ https://api.bionemo.ngc.nvidia.com/v1/models \
 import requests
 
 API_HOST = "https://api.bionemo.ngc.nvidia.com/v1"
-API_KEY = "NGC_API_KEY"
+API_KEY = "<your secret NGC API key here!>"
 
 response = requests.get(
     f"{API_HOST}/models",

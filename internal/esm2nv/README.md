@@ -90,15 +90,14 @@ FLIP is a collection of tasks to benchmark the expressive-ness of embeddings fro
 ### (3.1) Download fasta directly from FLIP public source
 Different from FLIP preprocessed dataset in FLIP validation during pretraining, we need the sequences in fasta format un-processed. We can download the raw sequences from [public source](http://data.bioembeddings.com/public/FLIP/fasta).
 ```bash
-PWD=`pwd`
 DATA_PATH="${BIONEMO_HOME}/data/FLIP"
 mkdir -p ${DATA_PATH}
 
-cd ${DATA_PATH} && \
+pushd ${DATA_PATH} && \
 wget http://data.bioembeddings.com/public/FLIP/fasta/all_fastas.zip && \
 unzip all_fastas.zip && \
 rm all_fastas.zip && \
-cd ${PWD}
+popd
 ```
 
 ### (3.2) Extract ESM2 embeddings for specific FLIP task
