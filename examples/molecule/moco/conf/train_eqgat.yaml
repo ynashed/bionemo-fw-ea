@@ -1,5 +1,5 @@
-run_name: 'EQGAT_FW_TEST_6_28_charges_live_interpolant'
-outdir: /workspace/bionemo/bionemo/model/molecule/moco/models/results/eqgatdiff
+run_name: 'eqgat_test'
+outdir: /workspace/bionemo/results/eqgatdiff
 resume: null
 ema_resume: null
 wandb_params:
@@ -11,8 +11,8 @@ wandb_params:
 data:
   dataset_root: "/workspace/bionemo/data/pyg_geom_drug"
   processed_folder: "processed"
-  batch_size: &batch_size 150
-  inference_batch_size: 150
+  batch_size: &batch_size 200
+  inference_batch_size: 200
   removed_h: False
   data_loader_type: "midi"
 
@@ -85,7 +85,6 @@ interpolant:
       scheduler_cut: False
       time_type: *time_type
       nu: 1.0
-      # interpolant_type: null
       concat: 'h'
       num_classes: 6
       offset: 2
@@ -112,17 +111,55 @@ dynamics:
     timesteps: *timesteps
     time_type: *time_type
 
+self_conditioning:
+  name: "base"
+  variables:
+    - variable_name: h
+      hidden_dims: 32
+      fuse_softmax: True
+      vector: False
+      clamp_min: null
+      clamp_max: null
+    - variable_name: charges
+      hidden_dims: 16
+      fuse_softmax: True
+      vector: False
+      clamp_min: null
+      clamp_max: null
+
+    - variable_name: edge_attr
+      hidden_dims: 16
+      fuse_softmax: True
+      vector: False
+      clamp_min: null
+      clamp_max: null
+
+    - variable_name: x
+      hidden_dims: 1
+      fuse_softmax: False
+      vector: True
+      clamp_min: -100
+      clamp_max: 100
+
 sample:
   node_distribution: "/workspace/bionemo/data/pyg_geom_drug/processed/train_n_h.pickle" # null
 
 train:
   seed: 42
-  gpus: 1
-  n_epochs: 40
+  gpus: 4
+  n_epochs: 800
   enable_progress_bar: True
   gradient_clip_value: 10.0
   log_freq: 50
   val_freq: 5
+  checkpoint_monitor: mol_stable
+  checkpoint_monitor_mode: max
+  checkpoint_every_n_train_steps: 500
+
+evaluation:
+  batch_size: 100
+  n_molecules: 250
+  timesteps: *timesteps
 
 optimizer:
   type: adamw

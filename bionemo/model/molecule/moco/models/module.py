@@ -10,27 +10,23 @@
 
 
 import pickle
+from random import random
 
 import numpy as np
 import torch
 import torch.nn.functional as F
 from lightning import pytorch as pl
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 from torch_geometric.utils import dense_to_sparse, sort_edge_index
 from torch_scatter import scatter_mean
 from torch_sparse import coalesce
 from tqdm import tqdm
 
 # TODO create general data module class that can do 3dmg, sbdd, docking etc
-from bionemo.model.molecule.moco.data.molecule_dataset import full_atom_decoder
-from bionemo.model.molecule.moco.metrics.metrics import (
-    BasicMolecularMetrics,
-    get_molecules,
-)
-
 # TODO later on can create a Inference Class like Model Builder to handle all specfic benchmarking
 from bionemo.model.molecule.moco.models.denoising_models import ModelBuilder
 from bionemo.model.molecule.moco.models.interpolant import build_interpolant
+from bionemo.model.molecule.moco.models.self_conditioning import SelfConditioningBuilder
 from bionemo.model.molecule.moco.models.utils import InterpolantLossFunction
 
 
@@ -43,6 +39,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
         dynamics_params: DictConfig,
         interpolant_params: DictConfig,
         sampling_params: DictConfig,
+        self_cond_params: DictConfig = None,
     ):
         super(Graph3DInterpolantModel, self).__init__()
         self.save_hyperparameters()
@@ -59,6 +56,15 @@ class Graph3DInterpolantModel(pl.LightningModule):
         self.dynamics = ModelBuilder().create_model(
             dynamics_params.model_name, dynamics_params.model_args, dynamics_params.wrapper_args
         )
+        self.self_conditioning_module = None
+        if self_cond_params is not None:
+            self.self_conditioning_module = self.configure_self_cond(self_cond_params)
+
+    def configure_self_cond(self, self_cond_params):
+        self_cond_params = OmegaConf.to_container(self_cond_params, resolve=True)
+        for var in self_cond_params["variables"]:
+            var["inp_dim"] = self.interpolants[var["variable_name"]].num_classes
+        return SelfConditioningBuilder().create_self_cond(self_cond_params)
 
     def initialize_loss_functions(self):
         loss_functions = {}
@@ -288,22 +294,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
         time = self.sample_time(batch)
         out, batch, time = self(batch, time)
         loss, predictions = self.calculate_loss(batch, out, time, "val")
-        # self.sample(100)
         return loss
-
-    def on_validation_epoch_end(self) -> None:
-        try:
-            mol_dict = self.sample(100)
-            # TODO: put this into the wrapper since its assumes many things but can leave for now
-            mols = get_molecules(mol_dict, {"atom_decoder": full_atom_decoder})
-            mol_metrics = BasicMolecularMetrics({"atom_decoder": full_atom_decoder}, device=self.device)
-            stab_dict, valid_dict, stat_dict, valid_smi, stable_mols, valid_mols = mol_metrics(mols)
-            res = {**stab_dict, **valid_dict, **stat_dict}
-            print(res)
-            self.log_dict(res)
-        except Exception as e:
-            print(f"The sampling has been failed with the error {e}")
-        return super().on_validation_epoch_end()
 
     def training_step(self, batch, batch_idx):
         batch.h = batch.x
@@ -379,6 +370,8 @@ class Graph3DInterpolantModel(pl.LightningModule):
         batch = self.pre_format_molecules(batch, batch_size)
         batch = self.interpolate(batch, time)  #! discrete variables are one hot after this point
         #    batch = self.initialize_pair_embedding(batch) #! Do in the dynamics
+        if self.self_conditioning_module is not None:
+            batch, _ = self.self_conditioning(batch, time)
         batch = self.aggregate_discrete_variables(batch)
         out = self.dynamics(batch, time)
         out, batch = self.separate_discrete_variables(out, batch)
@@ -458,16 +451,22 @@ class Graph3DInterpolantModel(pl.LightningModule):
             else:
                 shape = (total_num_atoms, interpolant.num_classes)
                 data[f"{key}_t"] = prior[key] = interpolant.prior(batch_index, shape, self.device)
+        out = {}
         for idx in tqdm(list(range(len(DT))), total=len(DT)):
             t = timeline[idx]
             dt = DT[idx]
             time = torch.tensor([t] * num_samples).to(self.device)
             data = self.one_hot(data)
+            pre_conditioning_variables = {}
+            if self.self_conditioning_module is not None:
+                data, pre_conditioning_variables = self.self_conditioning(data, time, out)
             data = self.aggregate_discrete_variables(data)
             data["batch"] = batch_index
             data["edge_index"] = edge_index
-            out = self.dynamics(data, time)
+            out = self.dynamics(data, time, out)
             out, data = self.separate_discrete_variables(out, data)
+            for key in pre_conditioning_variables:
+                data[key] = pre_conditioning_variables[key]
             for key, interpolant in self.interpolants.items():
                 if interpolant is None:
                     continue
@@ -495,3 +494,22 @@ class Graph3DInterpolantModel(pl.LightningModule):
             if "offset" in interp_params:
                 samples[interp_params.variable_name] -= interp_params.offset
         return samples
+
+    def self_conditioning(self, batch, time, cond_batch=None):
+        pre_conditioning_variables = {}
+        if self.training:
+            with torch.no_grad():
+                batch = self.aggregate_discrete_variables(batch)
+                out = self.dynamics(batch, time)
+                cond_batch, batch = self.separate_discrete_variables(out, batch)
+                for key in cond_batch:
+                    cond_batch[key].detach()
+            batch, pre_conditioning_variables = self.self_conditioning_module(batch, cond_batch)
+            if random() <= 0.5:
+                for key in pre_conditioning_variables:
+                    # hack to avoid unused parameters error
+                    batch[key] = pre_conditioning_variables[key] + 0 * batch[key]
+        else:
+            if cond_batch is not None and len(cond_batch) > 0:
+                batch, pre_conditioning_variables = self.self_conditioning_module(batch, cond_batch)
+        return batch, pre_conditioning_variables

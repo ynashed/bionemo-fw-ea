@@ -551,6 +551,8 @@ class DGT_concat(nn.Module):
         """
         edge_x = kwargs['edge_x']
         cond_x = kwargs.get("cond_x", None)
+        cond_edge_x = kwargs.get("cond_edge_x", None)
+        cond_adj_2d = kwargs.get("cond_adj_2d", None)
 
         bs, n_nodes, dims = xh.shape
         pos = xh[:, :, 0:3].clone().reshape(bs * n_nodes, -1)
@@ -562,16 +564,9 @@ class DGT_concat(nn.Module):
 
         # extra structural features
         if cond_x is None:
-            cond_x = xh.clone()  # torch.zeros_like(xh)
-            cond_edge_x = edge_x.clone()  # torch.zeros_like(edge_x)
-            cond_adj_2d = edge_x[dense_index][
-                :, 0:1
-            ].clone()  # torch.ones((edge_index.size(1), 1), device=edge_x.device)
-        else:
-            with torch.no_grad():
-                cond_adj_2d = cond_edge_x[dense_index][:, 0:1].clone()
-                cond_adj_2d[cond_adj_2d >= self.edge_th] = 1.0
-                cond_adj_2d[cond_adj_2d < self.edge_th] = 0.0
+            cond_x = torch.zeros_like(xh)
+            cond_edge_x = torch.zeros_like(edge_x)
+            cond_adj_2d = torch.ones((edge_index.size(1), 1), device=edge_x.device)
 
         # concat self_cond node feature
         cond_pos = cond_x[:, :, 0:3].clone().reshape(bs * n_nodes, -1)
@@ -590,11 +585,11 @@ class DGT_concat(nn.Module):
 
         # obtain distance from self_cond position
         distances, cond_adj_spatial = coord2diff_adj(cond_pos, edge_index, self.spatial_cut_off)
-        if distances.sum() == 0:
-            distances = distances.repeat(1, self.dist_dim)
-        else:
-            if self.dist_gbf:
-                distances = self.dist_layer(distances, edge_time_emb)
+
+        if self.dist_gbf:
+            gbf_distances = self.dist_layer(distances, edge_time_emb)
+            distances = torch.where(distances.sum() == 0, distances.repeat(1, self.dist_dim), gbf_distances)
+
         cur_edge_attr = edge_x[dense_index]
         cond_edge_attr = cond_edge_x[dense_index]
 

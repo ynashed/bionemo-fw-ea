@@ -20,6 +20,7 @@ from nemo.utils import logging
 from omegaconf import DictConfig, OmegaConf
 
 from bionemo.model.molecule.moco.data.molecule_datamodule import MoleculeDataModule
+from bionemo.model.molecule.moco.metrics.molecule_evaluation_callback import MoleculeEvaluationCallback
 from bionemo.model.molecule.moco.models.module import Graph3DInterpolantModel
 from bionemo.model.molecule.moco.models.utils_train import EMACallback
 
@@ -35,10 +36,12 @@ def main(cfg: DictConfig) -> None:
     cfg.outdir = os.path.join(cfg.outdir, cfg.run_name)
     os.makedirs(cfg.outdir, exist_ok=True)
     os.makedirs(os.path.join(cfg.outdir, 'checkpoints'), exist_ok=True)
-
     if cfg.resume:
         if os.path.isdir(cfg.resume):
             cfg.resume = f"{cfg.resume}/last.ckpt"
+            ckpt = "last"
+        else:
+            ckpt = cfg.resume
         ema_dir = os.path.dirname(cfg.resume)
         if not cfg.ema_resume:
             latest_epoch = max(
@@ -51,10 +54,14 @@ def main(cfg: DictConfig) -> None:
             )
             cfg.ema_resume = f"{ema_dir}/ema_parameters_epoch_{latest_epoch}.pt"
         pl_module = Graph3DInterpolantModel.load_from_checkpoint(cfg.resume)
+        ema_state_dict = torch.load(cfg.ema_resume)[
+            'state_dict'
+        ]  #! Pytorch Saving does not save the device and requires_grad
         ema_callback = EMACallback(
-            torch.load(cfg.ema_resume)['parameters'],
+            pl_module.parameters(),
             dirpath=os.path.join(cfg.outdir, 'checkpoints'),
         )
+        ema_callback.load(ema_state_dict, pl_module.device)
     else:
         pl_module = Graph3DInterpolantModel(
             loss_params=cfg.loss,
@@ -63,8 +70,10 @@ def main(cfg: DictConfig) -> None:
             dynamics_params=cfg.dynamics,
             interpolant_params=cfg.interpolant,
             sampling_params=cfg.sample,
+            self_cond_params=OmegaConf.select(cfg, "self_conditioning", default=None),
         )
         ema_callback = EMACallback(pl_module.parameters(), dirpath=os.path.join(cfg.outdir, 'checkpoints'))
+        ckpt = None
 
     logger = pl.loggers.WandbLogger(
         save_dir=cfg.outdir,
@@ -80,17 +89,29 @@ def main(cfg: DictConfig) -> None:
 
     lr_monitor = LearningRateMonitor(logging_interval="step")
 
-    checkpoint_callback = ModelCheckpoint(
+    last_checkpoint_callback = ModelCheckpoint(
         dirpath=Path(cfg.outdir, 'checkpoints'),
-        save_top_k=3,
-        monitor="val/loss",
         save_last=True,
+        every_n_train_steps=cfg.train.checkpoint_every_n_train_steps,
+        save_on_train_epoch_end=True,
+        filename="last-{epoch}-{step}",
+    )
+    metric_name = cfg.train.checkpoint_monitor.replace("/", "_")
+    best_checkpoint_callback = ModelCheckpoint(
+        dirpath=Path(cfg.outdir, 'checkpoints'),
+        save_top_k=5,
+        monitor=cfg.train.checkpoint_monitor,
+        mode=cfg.train.checkpoint_monitor_mode,
+        filename="best-{epoch}-{step}--{" + metric_name + ":.3f}",
+    )
+    evaluation_callback = MoleculeEvaluationCallback(
+        n_graphs=cfg.evaluation.n_molecules, batch_size=cfg.evaluation.batch_size, timesteps=cfg.evaluation.timesteps
     )
 
     trainer = pl.Trainer(
         max_epochs=cfg.train.n_epochs,
         logger=logger,
-        callbacks=[lr_monitor, checkpoint_callback, ema_callback],
+        callbacks=[lr_monitor, ema_callback, evaluation_callback, last_checkpoint_callback, best_checkpoint_callback],
         enable_progress_bar=cfg.train.enable_progress_bar,
         accelerator='gpu',
         devices=cfg.train.gpus,
@@ -104,7 +125,7 @@ def main(cfg: DictConfig) -> None:
     datamodule = MoleculeDataModule(**cfg.data)
     train_loader = datamodule.train_dataloader()
     val_loader = datamodule.val_dataloader()
-    trainer.fit(model=pl_module, train_dataloaders=train_loader, val_dataloaders=val_loader, ckpt_path=cfg.resume)
+    trainer.fit(model=pl_module, train_dataloaders=train_loader, val_dataloaders=val_loader, ckpt_path=ckpt)
 
 
 if __name__ == "__main__":

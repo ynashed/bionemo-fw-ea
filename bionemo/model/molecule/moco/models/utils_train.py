@@ -24,15 +24,19 @@ class ExponentialMovingAverage:
           parameters: Iterable of `torch.nn.Parameter`; usually the result of
             `model.parameters()`.
           decay: The exponential decay.
-          use_num_updates: Whether to use number of updates when computing
+          use_num_updates: Whether to use the number of updates when computing
             averages.
         """
         if decay < 0.0 or decay > 1.0:
             raise ValueError('Decay must be between 0 and 1')
         self.decay = decay
         self.num_updates = 0 if use_num_updates else None
-        self.shadow_params = [p.clone().detach().cpu() for p in parameters if p.requires_grad]  # added cpu
+        self.shadow_params = [p.clone().detach() for p in parameters if p.requires_grad]
         self.collected_params = []
+
+    def to(self, device):
+        self.shadow_params = [p.to(device) for p in self.shadow_params]
+        self.collected_params = [p.to(device) for p in self.collected_params]
 
     def update(self, parameters):
         """
@@ -49,13 +53,13 @@ class ExponentialMovingAverage:
             decay = min(decay, (1 + self.num_updates) / (10 + self.num_updates))
         one_minus_decay = 1.0 - decay
         with torch.no_grad():
-            parameters = [p.cpu() for p in parameters if p.requires_grad]  # do all this on cpu to avoid error
+            parameters = [p for p in parameters if p.requires_grad]
             for s_param, param in zip(self.shadow_params, parameters):
                 s_param.sub_(one_minus_decay * (s_param - param))
 
     def copy_to(self, parameters):
         """
-        Copy current parameters into given collection of parameters.
+        Copy current parameters into the given collection of parameters.
         Args:
           parameters: Iterable of `torch.nn.Parameter`; the parameters to be
             updated with the stored moving averages.
@@ -105,15 +109,22 @@ class EMACallback(pl.Callback):
         self.dirpath = dirpath
         self.precaution = precaution
 
-    def on_train_batch_end(
-        self, trainer, pl_module, outputs, batch, batch_idx
-    ):  # (self, trainer, pl_module):on_train_start
+    def on_train_start(self, trainer, pl_module):
+        # Move EMA parameters to the correct device
+        self.ema.to(pl_module.device)
+
+    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
         if trainer.current_epoch > self.freeze_epoch:
             self.ema.update(pl_module.parameters())
         if trainer.global_step > 0 and trainer.global_step % self.precaution == 0:
-            ckpt = {"parameters": self.ema.shadow_params, "global_step": trainer.global_step, "batch_idx": batch_idx}
+            ckpt = {"state_dict": self.ema.state_dict(), "global_step": trainer.global_step, "batch_idx": batch_idx}
             torch.save(ckpt, os.path.join(self.dirpath, f"ema_parameters_epoch_{trainer.current_epoch}.pt"))
 
     def on_train_epoch_end(self, trainer, pl_module):
-        ckpt = {"parameters": self.ema.shadow_params, "global_step": trainer.global_step}
+        ckpt = {"state_dict": self.ema.state_dict(), "global_step": trainer.global_step}
         torch.save(ckpt, os.path.join(self.dirpath, f"ema_parameters_epoch_{trainer.current_epoch}.pt"))
+
+    def load(self, state_dict, device):
+        for param in state_dict['shadow_params']:
+            param.requires_grad = True
+        self.ema.load_state_dict(state_dict, device)

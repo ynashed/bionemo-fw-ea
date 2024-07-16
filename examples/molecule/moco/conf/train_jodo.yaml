@@ -1,4 +1,4 @@
-run_name: 'JODO_CHARGES'
+run_name: 'jodo_self_cond'
 outdir: /workspace/bionemo/results/jodo
 resume: null
 ema_resume: null
@@ -113,6 +113,7 @@ dynamics:
     trans_name: 'TransMixLayer'
 
   wrapper_args:
+    self_cond: True
     timesteps: *timesteps
     time_type: *time_type
 
@@ -127,6 +128,8 @@ train:
   gradient_clip_value: 10.0
   log_freq: 50
   val_freq: 5
+  checkpoint_monitor: mol_stable
+  checkpoint_monitor_mode: max
 
 #! The below are taken from EQGAT
 optimizer:
