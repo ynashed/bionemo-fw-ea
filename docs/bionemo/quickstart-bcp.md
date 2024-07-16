@@ -53,4 +53,4 @@ ngc batch run \\
 --workspace <workspace-id>:/data:RW
 ```
 
-You can explore the contents of the Docker container locally to understand different scripts and models available. Follow the [Quickstart Guide](./quickstart-fw.md) for instructions on running BioNeMo container locally.
+You can explore the contents of the Docker container locally to understand different scripts and models available.

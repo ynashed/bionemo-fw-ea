@@ -1,26 +1,14 @@
-# Prerequisites for Using BioNeMo Framework
+# Hardware and Software Prerequisites
 
 Before you begin using the BioNeMo framework, ensure the following prerequisites are met.
 
-BioNeMo is only supported on x86 Linux systems. If you are not on such a system, you must use the project's Docker images to develop and execute BioNeMo code.
-System Requirements:
+## Hardware
 
-Docker (with GPU support, docker engine >= 19.03).
-Python 3.10 or above
-Pytorch 1.13.1 or above
-NeMo pinned to version 1.20
-NVIDIA GPU, if you intend to do model training. BioNeMo is compatible with most NVIDIA GPUs, with some incompatibility:
+The BioNeMo Framework is compatible with environments that have access to NVIDIA GPUs. Bfloat16 precision requires an Ampere generation GPU or higher. Tested GPUs include: H100, A100, and RTX A6000. There is mixed support for GPUs without bfloat16 support, such as V100, T4, Quadro RTX 8000, and GeForce RTX 2080 Ti. GPUs with known issues include: Tesla K80.
 
-Tested GPUs:
-DGX-H100, A100, V100
-RTX A6000, A8000
-Tesla T4
-GeForce RTX 2080 Ti
+## Software
 
-GPUs with known issues:
-Tesla K80
-
-bfloat16 precision requires an Ampere generation GPU or higher.
+The BioNeMo Framework is supported on x86 Linux systems. Please use the project’s Docker images to develop and execute the code.
 
 To request access :
 

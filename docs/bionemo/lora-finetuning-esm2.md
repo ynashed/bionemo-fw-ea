@@ -8,7 +8,7 @@ LoRA is a parameter-efficient approach to adapt large pre-trained language to do
 
 **Before diving in, ensure you have all [necessary prerequisites](./pre-reqs.md). If this is your first time using BioNeMo, we recommend following the [quickstart guide](./quickstart-fw.md) first.**
 
-All commands should be executed inside the BioNeMo docker container.
+All commands should be executed inside the BioNeMo Framework container.
 
 ## Finetune ESM2 model in BioNeMo
 

@@ -9,6 +9,10 @@ For more information about how to launch DiffDock training using BCP script, you
 
 The commands below expect that you have NGC CLI installed on your machine. All of the commands below can then be run outside of BioNeMo Docker container.
 
+### Setup
+
+Before diving in, please ensure that you have completed all steps in the [Getting Started](./index.md) section.
+
 ### Step 1: Create a Workspace
 Create a new NGC workspace by running the following command. Make sure to replace `diffdock_bcp_train` with your desired workspace name and `nv-us-east-2` with your preferred ACE
 ```bash
@@ -104,7 +108,7 @@ $ head -n 2 ~/diffdock_data/data/splits/split_train
 
 This script performs pre-processing of train data for diffdock score model.
 
-If you followed the [Quickstart Guide](./quickstart-fw.md), you may already have a .env file in your root path. If so, run `source .env` to export all the necessary variables.
+If you followed the [Next Steps](./next-steps.md) section, you may already have a .env file in your root path. If so, run `source .env` to export all the necessary variables.
 If you don't have a .env file in your path, update and run the following commands to export necessary variables before running the commands below.
 
 ```
