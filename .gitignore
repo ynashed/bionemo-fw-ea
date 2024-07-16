@@ -1,3 +1,7 @@
+# Local configs
+.gitconfig
+.bash_history
+
 # Lightning and project output files
 test_data
 lightning_logs
@@ -45,6 +49,7 @@ htmlcov/
 .coverage
 .coverage.*
 .cache
+.local
 nosetests.xml
 coverage.xml
 *.cover
@@ -140,6 +145,8 @@ dmypy.json
 *.swo
 *~
 *#
+.viminfo
+.lesshst
 
 # macOS
 .DS_Store
