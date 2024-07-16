@@ -73,9 +73,33 @@ class SingleCellDataModule(BioNeMoDataModule):
         self.mask_token_prob = mask_token_prob
         self.random_token_prob = random_token_prob
         self.index_mapping_dir = cfg.data.get("index_mapping_dir", str(Path(self.data_path_train).parent))
-        self._train_dataset = SingleCellDataset(self.data_path_train, self.tokenizer, self.median_dict, self.max_len)
-        self._val_dataset = SingleCellDataset(self.data_path_val, self.tokenizer, self.median_dict, self.max_len)
-        self._test_dataset = SingleCellDataset(self.data_path_test, self.tokenizer, self.median_dict, self.max_len)
+        self._train_dataset = SingleCellDataset(
+            self.data_path_train,
+            self.tokenizer,
+            self.median_dict,
+            self.max_len,
+            mask_prob=self.mask_prob,
+            mask_token_prob=self.mask_token_prob,
+            random_token_prob=self.random_token_prob,
+        )
+        self._val_dataset = SingleCellDataset(
+            self.data_path_val,
+            self.tokenizer,
+            self.median_dict,
+            self.max_len,
+            mask_prob=self.mask_prob,
+            mask_token_prob=self.mask_token_prob,
+            random_token_prob=self.random_token_prob,
+        )
+        self._test_dataset = SingleCellDataset(
+            self.data_path_test,
+            self.tokenizer,
+            self.median_dict,
+            self.max_len,
+            mask_prob=self.mask_prob,
+            mask_token_prob=self.mask_token_prob,
+            random_token_prob=self.random_token_prob,
+        )
         self.init_num_samples()
 
     def sample_train_dataset(self, dataset):
