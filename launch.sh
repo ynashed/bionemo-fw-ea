@@ -8,7 +8,7 @@ IMAGE_TAG="bionemo2-${COMMIT}"
 CACHE_TAG="bionemo2-latest"
 
 # Defaults for `.env` file
-export LOCAL_REPO_PATH=$(realpath -s $(pwd)) 
+export LOCAL_REPO_PATH=$(realpath -s $(pwd))
 export DOCKER_REPO_PATH=${DOCKER_REPO_PATH:=/workspace/bionemo2}
 export LOCAL_RESULTS_PATH=${LOCAL_RESULTS_PATH:=${LOCAL_REPO_PATH}/results}
 export DOCKER_RESULTS_PATH=${DOCKER_RESULTS_PATH:=${DOCKER_REPO_PATH}/results}
