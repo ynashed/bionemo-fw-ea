@@ -95,7 +95,7 @@ examples/tests/test_data/molecule/dsmbind @farhadr @menliu
 tests/test_dsmbind_data_utils.py @farhadr @menliu
 tests/test_dsmbind_model.py @farhadr @menliu
 tests/test_dsmbind_inference.py @farhadr @menliu
-# MISSING DOCS
+docs/bionemo/models/dsmbind.md @farhadr @menliu
 
 ##
 ## enformer @srabhi (TODO FIXME: requires handoff to member of bionemo team!!!)

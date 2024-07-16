@@ -80,7 +80,7 @@ def save_checkpoint(epoch, model, optimizer, loss, checkpoint_dir):
     logging.info(f"Checkpoint saved at {checkpoint_path}")
 
 
-@hydra_runner(config_path="conf", config_name="train")
+@hydra_runner(config_path="conf", config_name="pretrain")
 def main(cfg) -> None:
     """
     This is the main function conducting data loading and model training for DSMBind.

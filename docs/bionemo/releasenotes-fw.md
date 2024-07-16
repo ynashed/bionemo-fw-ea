@@ -1,5 +1,7 @@
 # Release Notes
 ## BioNeMo Framework v1.7
+### New Models
+* [DSMBind](https://www.biorxiv.org/content/10.1101/2023.12.10.570461v1), developed under the BioNeMo framework, is a model which can produce comparative values for ranking protein-ligand binding affinities. This release features the capability to perform inference using a newly trained checkpoint.
 ### New Features
 * [EquiDock] Remove steric clashes as a post-processing step after equidock inference.
 * [Documentation] Updated Getting Started section which sequentially describes prerequisites, BioNeMo Framework access, startup instructions, and next steps.
@@ -11,7 +13,6 @@
 * [OpenFold] MLPerf feature 3.2 bug (mha_fused_gemm) fix has merged.
 * [OpenFold] MLPerf feature 3.10 integrated into bionemo framework.
 * [DiffDock] Updated data loading module for DiffDock model training, changing from sqlite3 backend to webdataset.
-
 
 ## BioNeMo Framework v1.5
 ### New Models
