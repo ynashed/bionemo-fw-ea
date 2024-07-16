@@ -2,6 +2,7 @@
 ## BioNeMo Framework v1.7
 ### New Features
 * [EquiDock] Remove steric clashes as a post-processing step after equidock inference.
+* [Documentation] Updated Getting Started section which sequentially describes prerequisites, BioNeMo Framework access, startup instructions, and next steps.
 
 ## BioNeMo Framework v1.6
 ### New Features
