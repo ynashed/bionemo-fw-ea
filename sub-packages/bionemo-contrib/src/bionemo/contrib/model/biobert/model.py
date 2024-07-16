@@ -106,7 +106,7 @@ class MegatronBioBertModel(LanguageModule):
         self.position_embedding_type = position_embedding_type
         self.add_binary_head = add_binary_head
         self.return_embeddings = return_embeddings
-
+        raise ValueError("Test")
         # megatron core pipelining currently depends on model type
         self.model_type = ModelType.encoder_or_decoder
 
