@@ -1,4 +1,8 @@
 # Release Notes
+## BioNeMo Framework v1.7
+### New Features
+* [EquiDock] Remove steric clashes as a post-processing step after equidock inference.
+
 ## BioNeMo Framework v1.6
 ### New Features
 * [Inference] `model.freeze_layers` inference config parameter added to freeze a specified number of layers. Thank you to github user [@nehap25](https://github.com/nehap25)!
