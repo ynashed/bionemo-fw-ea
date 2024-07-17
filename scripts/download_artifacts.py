@@ -23,8 +23,18 @@ from subprocess import PIPE, Popen
 from typing import Dict, List, Literal, Optional, Tuple
 
 import yaml
-from nemo.utils import logging
-from pydantic import BaseModel
+
+try:
+    from nemo.utils import logging
+except ImportError:
+    import logging
+    logging.basicConfig(level=logging.INFO)
+
+try:
+    from pydantic import BaseModel
+except ImportError:
+    class BaseModel:
+        pass
 
 
 ALL_KEYWORD = "all"
