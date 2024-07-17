@@ -181,7 +181,7 @@ a fruitful interaction across the team members.
         (perhaps in a dependent review change) to ease the pattern
         matching burden on your reviewers.
 
--   All reviewers may request an MR is too large if it is larger than
+-   All reviewers may request an PR is too large if it is larger than
     500 lines of net code addition. The only exception are MRs into
     the `bionemo2/contrib` directory, where larger MRs are permissible.
     This includes lines of code, but not something such as dummy data or
