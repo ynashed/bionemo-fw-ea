@@ -256,7 +256,7 @@ a fruitful interaction across the team members.
     that approves the change must review the entire change holistically
     If you are a code owner of a particular file, it is appropriate to only reviews the files you own.
 
--   If request an MR change their code, you are responsible for giving concrete
+-   If request an PR change their code, you are responsible for giving concrete
     recommendations for what could be changed to resolve the issue the
     patch addresses. If you feel strongly that a patch should NEVER be
     merged, you are responsible for defending your position and
