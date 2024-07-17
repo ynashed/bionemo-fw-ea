@@ -64,6 +64,11 @@ def filter_out_failed_and_rerun_jobs(df: pd.DataFrame, n_all_results: int) -> pd
     """
     Filters out records of jobs which have been rerun, ie due to infrastructure failures.
     """
+    if df["timestamp"].isna().any():
+        raise ValueError(
+            "The 'timestamp' column contains None values. Cannot specify time order of JET jobs"
+            " to determine the retried ones."
+        )
     df["tmp_label"] = df["jet_ci_pipeline_id"].astype(str) + df["job_key"]
     df.drop_duplicates("tmp_label", keep="last", inplace=True)
     df.drop(labels="tmp_label", axis=1, inplace=True)
@@ -307,8 +312,14 @@ def get_job_info(job_raw_result: dict, save_dir: Optional[str]) -> dict:
     """
     job_info = {
         "script_duration": job_raw_result.get("d_duration", None),
-        "timestamp": job_raw_result.get("@timestamp", None),
+        "timestamp": job_raw_result.get("ts_created", None),
     }
+    job_info["date"] = (
+        datetime.datetime.fromtimestamp(job_info["timestamp"] / 1000).strftime("%Y-%m-%dT%H:%M:%S.%f%z")
+        if job_info["timestamp"]
+        else None
+    )
+
     ci_info = job_raw_result.get("obj_ci", {})
     workloads_info = job_raw_result.get("obj_workloads_registry", {})
     obj_workload = job_raw_result.get("obj_workload", {})
