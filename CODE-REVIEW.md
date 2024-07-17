@@ -23,7 +23,7 @@ The code review process is progressive:
 
 ### 1. Team Review
 
-You should first ask your teammates to review your change. Your team can
+You should first ask contributors to review your change. The contributing team can
 provide the most contextualized feedback, and this review step is where
 most issues with the change should be caught and addressed.
 
