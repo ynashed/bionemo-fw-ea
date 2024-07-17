@@ -10,7 +10,8 @@
 
 
 import pickle
-from random import random
+from collections import defaultdict
+from functools import wraps
 
 import numpy as np
 import torch
@@ -28,6 +29,15 @@ from bionemo.model.molecule.moco.models.denoising_models import ModelBuilder
 from bionemo.model.molecule.moco.models.interpolant import build_interpolant
 from bionemo.model.molecule.moco.models.self_conditioning import SelfConditioningBuilder
 from bionemo.model.molecule.moco.models.utils import InterpolantLossFunction
+
+
+def no_grad_decorator(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        with torch.no_grad():
+            return func(*args, **kwargs)
+
+    return wrapper
 
 
 class Graph3DInterpolantModel(pl.LightningModule):
@@ -76,6 +86,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
                     aggregation=loss_params.aggregate,
                     continuous=loss_params.continuous,
                     use_distance=loss_params.use_distance,
+                    distance_scale=loss_params.distance_scale,
                 )
             else:
                 loss_functions[index] = InterpolantLossFunction(
@@ -351,7 +362,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
                 self.log(f"{stage}/distance_loss_tp", distance_loss_tp, batch_size=batch_size)
                 self.log(f"{stage}/distance_loss_tz", distance_loss_tz, batch_size=batch_size)
                 self.log(f"{stage}/distance_loss_pz", distance_loss_pz, batch_size=batch_size)
-                loss = loss + distance_loss
+                loss = loss + loss_fn.distance_scale * distance_loss
 
         self.log(f"{stage}/loss", loss, batch_size=batch_size)
         return loss, predictions
@@ -369,7 +380,6 @@ class Graph3DInterpolantModel(pl.LightningModule):
         batch_size = int(batch.batch.max()) + 1
         batch = self.pre_format_molecules(batch, batch_size)
         batch = self.interpolate(batch, time)  #! discrete variables are one hot after this point
-        #    batch = self.initialize_pair_embedding(batch) #! Do in the dynamics
         if self.self_conditioning_module is not None:
             batch, _ = self.self_conditioning(batch, time)
         batch = self.aggregate_discrete_variables(batch)
@@ -402,7 +412,10 @@ class Graph3DInterpolantModel(pl.LightningModule):
             n_nodes = None
         return n_nodes
 
-    def sample(self, num_samples, timesteps=500, time_discretization="linear"):
+    def sample(self, num_samples, timesteps=500, time_discretization="linear", batch=None):
+        """
+        Generates num_samples. Can supply a batch for inital starting points for conditional sampling for any interpolants set to None.
+        """
         time_type = self.interpolants[self.global_variable].time_type
         if time_type == "continuous":
             if time_discretization == "linear":
@@ -435,14 +448,19 @@ class Graph3DInterpolantModel(pl.LightningModule):
         data, prior = {}, {}
         total_num_atoms = num_atoms.sum().item()
 
+        # Sample from all Priors
         for key, interpolant in self.interpolants.items():
             if interpolant is None:
-                # TODO: remove the hard coded and switch interpolant_params to a dict and repkace the iterations
-                data[f"{key}_t"] = torch.zeros(
-                    (total_num_atoms, self.interpolant_param_variables[key].num_classes)
-                ).to(self.device)
-                if "offset" in self.interpolant_param_variables[key]:
-                    data[f"{key}_t"] += self.interpolant_param_variables[key].offset
+                if batch is not None:
+                    prior[key] = batch[key]
+                    data[f"{key}_t"] = prior[key]
+                else:
+                    # If no batch is supplied just give zeros
+                    data[f"{key}_t"] = torch.zeros(
+                        (total_num_atoms, self.interpolant_param_variables[key].num_classes)
+                    ).to(self.device)
+                    if "offset" in self.interpolant_param_variables[key]:
+                        data[f"{key}_t"] += self.interpolant_param_variables[key].offset
                 continue
             if "edge" in key:
                 shape = (edge_index.size(1), interpolant.num_classes)
@@ -451,19 +469,22 @@ class Graph3DInterpolantModel(pl.LightningModule):
             else:
                 shape = (total_num_atoms, interpolant.num_classes)
                 data[f"{key}_t"] = prior[key] = interpolant.prior(batch_index, shape, self.device)
+
+        # Iterate through time, query the dynamics, apply interpolant step update
         out = {}
         for idx in tqdm(list(range(len(DT))), total=len(DT)):
             t = timeline[idx]
             dt = DT[idx]
             time = torch.tensor([t] * num_samples).to(self.device)
             data = self.one_hot(data)
+            # Apply Self Conditioning
             pre_conditioning_variables = {}
             if self.self_conditioning_module is not None:
-                data, pre_conditioning_variables = self.self_conditioning(data, time, out)
+                data, pre_conditioning_variables = self.self_conditioning(data, time, conditional_batch=out)
             data = self.aggregate_discrete_variables(data)
             data["batch"] = batch_index
             data["edge_index"] = edge_index
-            out = self.dynamics(data, time, out)
+            out = self.dynamics(data, time, conditional_batch=out, timesteps=timesteps)
             out, data = self.separate_discrete_variables(out, data)
             for key in pre_conditioning_variables:
                 data[key] = pre_conditioning_variables[key]
@@ -495,21 +516,128 @@ class Graph3DInterpolantModel(pl.LightningModule):
                 samples[interp_params.variable_name] -= interp_params.offset
         return samples
 
-    def self_conditioning(self, batch, time, cond_batch=None):
+    def self_conditioning(self, batch, time, conditional_batch=None):
         pre_conditioning_variables = {}
         if self.training:
             with torch.no_grad():
                 batch = self.aggregate_discrete_variables(batch)
                 out = self.dynamics(batch, time)
-                cond_batch, batch = self.separate_discrete_variables(out, batch)
-                for key in cond_batch:
-                    cond_batch[key].detach()
-            batch, pre_conditioning_variables = self.self_conditioning_module(batch, cond_batch)
-            if random() <= 0.5:
+                conditional_batch, batch = self.separate_discrete_variables(out, batch)
+                for key in conditional_batch:
+                    conditional_batch[key].detach()
+            batch, pre_conditioning_variables = self.self_conditioning_module(batch, conditional_batch)
+            if torch.rand(1).item() <= 0.5:
                 for key in pre_conditioning_variables:
                     # hack to avoid unused parameters error
                     batch[key] = pre_conditioning_variables[key] + 0 * batch[key]
         else:
-            if cond_batch is not None and len(cond_batch) > 0:
-                batch, pre_conditioning_variables = self.self_conditioning_module(batch, cond_batch)
+            if conditional_batch is not None and len(conditional_batch) > 0:
+                batch, pre_conditioning_variables = self.self_conditioning_module(batch, conditional_batch)
         return batch, pre_conditioning_variables
+
+    @no_grad_decorator
+    def conditional_sample(
+        self,
+        batch,
+        conditional_variables=['h', 'edge_attr', 'charges'],
+        timesteps=500,
+        time_discretization="linear",
+        early_stop=None,
+        save_all=False,
+    ):
+        time_type = self.interpolants[self.global_variable].time_type
+        if time_type == "continuous":
+            if time_discretization == "linear":
+                timeline = torch.linspace(0, 1, timesteps + 1).tolist()  # [0, 1.0] timestpes + 1
+            elif time_discretization == "log":
+                timeline = (
+                    (1 - torch.logspace(-2, 0, timesteps + 1)).flip(dims=[0]).tolist()
+                )  # [0, 0.99] #timestpes + 1
+            # timeline = torch.logspace(-2, 0, timesteps + 1) #[0.01, 1.0]
+            DT = [t1 - t0 for t0, t1 in zip(timeline[:-1], timeline[1:])]  # timesteps
+        else:
+            timeline = torch.arange(timesteps + 1)
+            DT = [1 / timesteps] * timesteps
+
+        batch_size = int(batch.batch.max()) + 1
+        num_samples = batch_size
+        batch = self.pre_format_molecules(batch, batch_size)
+        batch_index = batch.batch
+        edge_index = batch.edge_index
+        total_num_atoms = batch["h"].shape[0]
+        data, prior = {}, {}
+        if save_all:
+            data_all = defaultdict(list)
+
+        for key, interpolant in self.interpolants.items():
+            if key in conditional_variables:
+                prior[key] = batch[key]
+                data[f"{key}_t"] = prior[key]
+            elif interpolant is None:
+                data[f"{key}_t"] = torch.zeros(
+                    (total_num_atoms, self.interpolant_param_variables[key].num_classes)
+                ).to(self.device)
+                if "offset" in self.interpolant_param_variables[key]:
+                    data[f"{key}_t"] += self.interpolant_param_variables[key].offset
+            elif "edge" in key:
+                shape = (edge_index.size(1), interpolant.num_classes)
+                prior[key], edge_index = interpolant.prior_edges(batch_index, shape, edge_index, self.device)
+                data[f"{key}_t"] = prior[key]
+            else:
+                shape = (total_num_atoms, interpolant.num_classes)
+                data[f"{key}_t"] = prior[key] = interpolant.prior(batch_index, shape, self.device)
+
+        if save_all:
+            for key in self.interpolants.keys():
+                data_all[key].append(data[f"{key}_t"])
+
+        for idx in tqdm(list(range(len(DT))), total=len(DT)):
+            if early_stop and idx >= early_stop:
+                break
+            t = timeline[idx]
+            dt = DT[idx]
+            time = torch.tensor([t] * num_samples).to(self.device)
+            data = self.one_hot(data)
+            data = self.aggregate_discrete_variables(data)
+            data["batch"] = batch_index
+            data["edge_index"] = edge_index
+            out = self.dynamics(data, time, timesteps=timesteps)
+            out, data = self.separate_discrete_variables(out, data)
+            for key, interpolant in self.interpolants.items():
+                if t / timesteps > 0.5 and key in conditional_variables:
+                    data[f"{key}_t"] = prior[key]
+                    continue
+                if interpolant is None:
+                    continue
+                if "edge" in key:
+                    edge_index, data[f"{key}_t"] = interpolant.step_edges(
+                        batch_index,
+                        edge_index=edge_index,
+                        edge_attr_t=data[f"{key}_t"],
+                        edge_attr_hat=out[f"{key}_hat"],
+                        time=time,
+                    )
+                else:
+                    data[f"{key}_t"] = interpolant.step(
+                        xt=data[f"{key}_t"],
+                        x_hat=out[f"{key}_hat"],
+                        x0=prior[key],
+                        batch=batch_index,
+                        time=time,
+                        dt=dt,
+                    )
+            if save_all:
+                for key in self.interpolants.keys():
+                    data_all[key].append(data[f"{key}_t"])
+
+        samples = {key: data[f"{key}_t"] for key in self.interpolants.keys()}
+        samples["batch"] = batch_index
+        samples["edge_index"] = edge_index
+        for interp_params in self.interpolant_params.variables:
+            if "offset" in interp_params:
+                samples[interp_params.variable_name] -= interp_params.offset
+        if save_all:
+            data_all["batch"].append(batch_index)
+            data_all["edge_index"].append(edge_index)
+            return samples, data_all
+        return samples

@@ -60,7 +60,13 @@ class PredictionHead(nn.Module):
 
 class InterpolantLossFunction(nn.Module):
     def __init__(
-        self, continuous=True, aggregation='mean', loss_scale=1.0, discrete_class_weight=None, use_distance=None
+        self,
+        continuous=True,
+        aggregation='mean',
+        loss_scale=1.0,
+        discrete_class_weight=None,
+        use_distance=None,
+        distance_scale=None,
     ):
         super().__init__()
         if continuous:
@@ -75,6 +81,7 @@ class InterpolantLossFunction(nn.Module):
         self.aggregation = aggregation
         self.scale = loss_scale
         self.use_distance = use_distance
+        self.distance_scale = distance_scale
 
     def forward(self, batch, logits, data, batch_weight=None, element_weight=None):
         # d (λx, λh, λe) = (3, 0.4, 2)
@@ -112,7 +119,7 @@ class InterpolantLossFunction(nn.Module):
             loss = self.scale * loss.sum()
         return loss, output
 
-    def distance_loss(self, batch, X_pred, X_true, Z_pred=None):
+    def distance_loss(self, batch, X_pred, X_true, Z_pred=None, time=None, time_cutoff=0.5):
         if Z_pred is None:
             true_distance = torch.tensor([], device=X_true.device)
             x_pred_distance = torch.tensor([], device=X_true.device)
@@ -128,8 +135,13 @@ class InterpolantLossFunction(nn.Module):
                 x_pred_distance = torch.cat([x_pred_distance, dist_pred], dim=-1)
             c_batch = torch.Tensor(c_batch).to(torch.int64).to(X_true.device)
             A = self.f_continuous(true_distance, x_pred_distance)
-            A = scatter_mean(A, c_batch, dim=0, dim_size=batch_size).mean()
-            return A, 0, 0
+            time_filter = time > time_cutoff
+            A = scatter_mean(A, c_batch, dim=0, dim_size=batch_size) * time_filter
+            if self.aggregation == "mean":
+                loss = A.mean()
+            elif self.aggregation == "sum":
+                loss = A.sum()
+            return loss, 0, 0
         else:
             true_distance = torch.tensor([], device=X_true.device)
             x_pred_distance = torch.tensor([], device=X_true.device)
@@ -150,10 +162,14 @@ class InterpolantLossFunction(nn.Module):
             A = self.f_continuous(true_distance, x_pred_distance)
             B = self.f_continuous(true_distance, z_pred_distance)
             C = self.f_continuous(x_pred_distance, z_pred_distance)
-            A = scatter_mean(A, c_batch, dim=0, dim_size=batch_size).mean()
-            B = scatter_mean(B, c_batch, dim=0, dim_size=batch_size).mean()
-            C = scatter_mean(C, c_batch, dim=0, dim_size=batch_size).mean()
-            return A, B, C
+            time_filter = time > time_cutoff
+            A = scatter_mean(A, c_batch, dim=0, dim_size=batch_size) * time_filter
+            B = scatter_mean(B, c_batch, dim=0, dim_size=batch_size) * time_filter
+            C = scatter_mean(C, c_batch, dim=0, dim_size=batch_size) * time_filter
+            if self.aggregation == "mean":
+                return A.mean(), B.mean(), C.mean()
+            elif self.aggregation == "sum":
+                return A.sum(), B.sum(), C.sum()
 
 
 if __name__ == "__main__":

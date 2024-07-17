@@ -46,6 +46,7 @@ class MoCo(nn.Module):
         edge_features=32,
         extra_discrete_classes=None,
         num_layers=5,
+        num_heads=10,
     ):
         super(MoCo, self).__init__()
         if extra_discrete_classes:
@@ -56,26 +57,25 @@ class MoCo(nn.Module):
         self.edge_embedder = nn.Linear(edge_classes, edge_features)
         self.layers = []
         for i in range(num_layers):
-            self.layers.append(EquivariantTransformerBlock(3, atom_features, edge_features, 10))
+            self.layers.append(EquivariantTransformerBlock(3, atom_features, edge_features, num_heads))
         self.layers = nn.ModuleList(self.layers)
         self.time_embedding = TimestepEmbedder(atom_features)
         self.ada_ln = AdaLN(atom_features, atom_features)
         self.num_atom_classes = atom_classes
         self.num_edge_classes = edge_classes
         #! TODO do we need coord prediction head which is mlp then 0 CoM?
-        self.atom_type_head = PredictionHead(atom_classes, atom_features)
+        self.atom_type_head = PredictionHead(atom_classes + num_extra_discrete, atom_features)
         self.edge_type_head = PredictionHead(edge_classes, edge_features, edge_prediction=True)
-        if num_extra_discrete > 0:
-            self.discrete_pred_heads = {}
-            for key, dim in extra_discrete_classes.items():
-                self.discrete_pred_heads[key] = PredictionHead(dim, atom_features)
+        self.distance_head = PredictionHead(1, atom_features, distance_prediction=True)
+        # if num_extra_discrete > 0:
+        #     self.discrete_pred_heads = {}
+        #     for key, dim in extra_discrete_classes.items():
+        #         self.discrete_pred_heads[key] = PredictionHead(dim, atom_features)
         self.num_extra_discrete = num_extra_discrete
-        # self.distance_head = PredictionHead(1, atom_features, distance_prediction=True)
+        # self.confidence_model = nn.Sequential([MLP(atom_features, 4*atom_features, 4*atom_features), nn.LayerNorm(4*atom_features), MLP(4*atom_features, 4*atom_features, 1, last_act='sigmoid')])
 
     def forward(self, batch, X, H, E_idx, E, t):
         # import ipdb; ipdb.set_trace()
-        # H = self.atom_embedder(F.one_hot(H, self.num_atom_classes).float())
-        # E = self.edge_embedder(F.one_hot(E, self.num_edge_classes).float())
         #! Now we assume the data is always 1 hot inputs
         H = self.atom_embedder(H)
         E = self.edge_embedder(E)
@@ -90,17 +90,17 @@ class MoCo(nn.Module):
             # print(X.sum().item(), H.sum().item(), E.sum().item(), Z.sum().item())
         h_logits, h_prob = self.atom_type_head(batch, H)  #! These values look weird H values blown up
         e_logits, e_prob = self.edge_type_head.predict_edges(batch, E, E_idx)
-        z_logits = None  # self.distance_head.predict_distances(batch, Z)
+        z_logits = self.distance_head.predict_distances(batch, Z)
+        # confidence = self.confidence_model(H)
         out = {
             "x_hat": X,
             "h_logits": h_logits,
-            # "h_hat": h_logits.argmax(dim=-1),
             "edge_attr_logits": e_logits,
-            # "edge_attr_hat":  e_logits.argmax(dim=-1),
             "Z_hat": z_logits,
+            # "confidence": confidence
         }
-        if self.num_extra_discrete > 0:
-            for key, predictor in self.discrete_pred_heads.items():
-                out
+        # if self.num_extra_discrete > 0:
+        #     for key, predictor in self.discrete_pred_heads.items():
+        #         out
 
         return out

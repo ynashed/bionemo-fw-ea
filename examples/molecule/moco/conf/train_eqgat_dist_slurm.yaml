@@ -1,7 +1,7 @@
-run_name: 'MOCO_triple_z_new_z_batch_100'
-outdir: /workspace/bionemo/bionemo/model/molecule/moco/models/results/eqgatdiff
-resume: null
-ema_resume: null
+run_name: 'EQGAT_FW_TEST_7_9_distance_loss_bs_100'
+outdir: /results/eqgatdiff
+resume: null # /workspace/bionemo/bionemo/model/molecule/moco/models/results/eqgatdiff/EQGAT_FW_TEST_7_1_distance_loss_0.1/checkpoints/last.ckpt
+ema_resume: null #/workspace/bionemo/bionemo/model/molecule/moco/models/results/eqgatdiff/EQGAT_FW_TEST_7_1_distance_loss_0.1/checkpoints/ema_parameters_epoch_25.pt
 wandb_params:
   mode: 'online'  # disabled, offline, online
   entity: 'clara-discovery'
@@ -9,10 +9,10 @@ wandb_params:
   project: 'MoCo'
 
 data:
-  dataset_root: "/workspace/bionemo/data/pyg_geom_drug"
+  dataset_root: "/data/pyg_geom_drug"
   processed_folder: "processed"
-  batch_size: &batch_size 100
-  inference_batch_size: 100
+  batch_size: &batch_size 200
+  inference_batch_size: 200
   removed_h: False
   data_loader_type: "midi"
 
@@ -23,6 +23,7 @@ loss:
       aggregate: 'sum'
       continuous: True
       use_distance: 'triple'
+      distance_scale: 1e-2
     - variable_name: 'h'
       loss_scale: 0.4
       aggregate: 'sum'
@@ -59,7 +60,7 @@ interpolant:
     - variable_name: 'h'
       interpolant_type: 'discrete_diffusion' #["discrete_diffusion", "discrete_flow_matching"]
       prior_type: 'custom' #['uniform', 'mask', 'custom']
-      custom_prior: '/workspace/bionemo/data/pyg_geom_drug/processed/train_types_h.npy'
+      custom_prior: '/data/pyg_geom_drug/processed/train_types_h.npy'
       timesteps: *timesteps
       num_classes: &num_atoms 16
       scheduler_type: *scheduler_type
@@ -69,7 +70,7 @@ interpolant:
     - variable_name: 'edge_attr'
       interpolant_type: 'discrete_diffusion' #["discrete_diffusion", "discrete_flow_matching"]
       prior_type: 'custom'
-      custom_prior: '/workspace/bionemo/data/pyg_geom_drug/processed/train_bond_types_h.npy'
+      custom_prior: '/data/pyg_geom_drug/processed/train_bond_types_h.npy'
       timesteps: *timesteps
       num_classes: 5
       scheduler_type: *scheduler_type
@@ -79,41 +80,50 @@ interpolant:
     - variable_name: 'charges'
       interpolant_type: 'discrete_diffusion' #["discrete_diffusion", "discrete_flow_matching"]
       prior_type: 'custom'
-      custom_prior: '/workspace/bionemo/data/pyg_geom_drug/processed/train_charges_prior.npy' #! had to manually create the marginal (h_prior*charge_h_prior[:, None]).sum(0)
+      custom_prior: '/data/pyg_geom_drug/processed/train_charges_prior.npy' #! had to manually create the marginal (h_prior*charge_h_prior[:, None]).sum(0)
       timesteps: *timesteps
       scheduler_type: *scheduler_type
       scheduler_cut: False
       time_type: *time_type
       nu: 1.0
+      # interpolant_type: null
       concat: 'h'
       num_classes: 6
       offset: 2
 
   
 dynamics:
-  model_name: "moco"
+  model_name: "eqgat"
   model_args:
-    atom_classes: 16
-    extra_discrete_classes: {"charges": 6}
-    edge_classes: 5
-    edge_features: 64
-    atom_features: 64
-    num_layers: 8
-    num_heads: 3
-
-  wrapper_args: null
+    hn_dim: [256, 256]
+    num_layers: 12
+    use_cross_product: False
+    num_atom_features: 22 # *num_atoms # + *num_charges
+    num_bond_types: 5
+    edge_dim: 128
+    vector_aggr: "mean"
+    fully_connected: True
+    recompute_edge_attributes: True
+    edge_mp: False
+    context_mapping: False
+    num_context_features: 0
+    bond_prediction: False
+    coords_param: data
+  wrapper_args:
+    timesteps: *timesteps
+    time_type: *time_type
 
 sample:
-  node_distribution: "/workspace/bionemo/data/pyg_geom_drug/processed/train_n_h.pickle" # null
+  node_distribution: "/data/pyg_geom_drug/processed/train_n_h.pickle" # null
 
 train:
   seed: 42
   gpus: 1
-  n_epochs: 40
+  n_epochs: 1000
   enable_progress_bar: True
   gradient_clip_value: 10.0
   log_freq: 50
-  val_freq: 2
+  val_freq: 5
 
 optimizer:
   type: adamw
