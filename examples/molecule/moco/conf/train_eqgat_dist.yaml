@@ -1,9 +1,9 @@
-run_name: 'MOCO_triple_z_new_z_batch_100'
+run_name: 'EQGAT_FW_new_attn_test_local'
 outdir: /workspace/bionemo/bionemo/model/molecule/moco/models/results/eqgatdiff
-resume: null
-ema_resume: null
+resume: null # /workspace/bionemo/bionemo/model/molecule/moco/models/results/eqgatdiff/EQGAT_FW_TEST_7_1_distance_loss_0.1/checkpoints/last.ckpt
+ema_resume: null #/workspace/bionemo/bionemo/model/molecule/moco/models/results/eqgatdiff/EQGAT_FW_TEST_7_1_distance_loss_0.1/checkpoints/ema_parameters_epoch_25.pt
 wandb_params:
-  mode: 'online'  # disabled, offline, online
+  mode: 'disabled'  # disabled, offline, online
   entity: 'clara-discovery'
   group: 'danny-testing'
   project: 'MoCo'
@@ -23,6 +23,7 @@ loss:
       aggregate: 'sum'
       continuous: True
       use_distance: 'triple'
+      distance_scale: 1e-2
     - variable_name: 'h'
       loss_scale: 0.4
       aggregate: 'sum'
@@ -91,17 +92,25 @@ interpolant:
 
   
 dynamics:
-  model_name: "moco"
+  model_name: "eqgat"
   model_args:
-    atom_classes: 16
-    extra_discrete_classes: {"charges": 6}
-    edge_classes: 5
-    edge_features: 64
-    atom_features: 64
-    num_layers: 8
-    num_heads: 3
-
-  wrapper_args: null
+    hn_dim: [256, 256]
+    num_layers: 12
+    use_cross_product: False
+    num_atom_features: 22 # *num_atoms # + *num_charges
+    num_bond_types: 5
+    edge_dim: 128
+    vector_aggr: "mean"
+    fully_connected: True
+    recompute_edge_attributes: True
+    edge_mp: False
+    context_mapping: False
+    num_context_features: 0
+    bond_prediction: False
+    coords_param: data
+  wrapper_args:
+    timesteps: *timesteps
+    time_type: *time_type
 
 sample:
   node_distribution: "/workspace/bionemo/data/pyg_geom_drug/processed/train_n_h.pickle" # null
@@ -113,7 +122,7 @@ train:
   enable_progress_bar: True
   gradient_clip_value: 10.0
   log_freq: 50
-  val_freq: 2
+  val_freq: 5
 
 optimizer:
   type: adamw

@@ -16,6 +16,8 @@ from torch_scatter import scatter_add
 
 from bionemo.model.molecule.moco.models.moco import MoCo
 from bionemo.model.molecule.moco.models.model_zoo.eqgat.eqgat_denoising_model import DenoisingEdgeNetwork
+
+# from bionemo.model.molecule.moco.models.model_zoo.eqgat.eqgat_denoising_model_distance import DenoisingEdgeNetwork
 from bionemo.model.molecule.moco.models.model_zoo.jodo import DGT_concat
 
 
@@ -71,7 +73,7 @@ class MOCOWrapper(MoCo):
         self.args = args_dict
         super().__init__(**args_dict)
 
-    def forward(self, batch, time, cond_batch=None):
+    def forward(self, batch, time, conditional_batch=None):
         """
         Forward pass of the MoCo model.
 
@@ -109,7 +111,7 @@ class EQGATWrapper(DenoisingEdgeNetwork):
         self.random_learning = random_learning
         super().__init__(**args_dict)
 
-    def forward(self, batch, time, cond_batch=None, timesteps=None):
+    def forward(self, batch, time, conditional_batch=None, timesteps=None):
         """
         Forward pass of the EQGAT model.
 
@@ -160,6 +162,7 @@ class EQGATWrapper(DenoisingEdgeNetwork):
             "x_hat": out["coords_pred"],
             "h_logits": out["atoms_pred"],
             "edge_attr_logits": out["bonds_pred"],
+            "Z_hat": out["Z_hat"] if "Z_hat" in out else None,
         }
         return out
 
@@ -180,7 +183,7 @@ class JODOWrapper(DGT_concat):
         self.self_cond = self_cond
         super().__init__(**args_dict)
 
-    def forward(self, batch, time, cond_batch=None, timesteps=None):
+    def forward(self, batch, time, conditional_batch=None, timesteps=None):
         """
         Forward pass of the JODO model.
 
@@ -191,8 +194,8 @@ class JODOWrapper(DGT_concat):
         Returns:
             dict: The output of the JODO model.
         """
-        if cond_batch is None:
-            cond_batch = {}
+        if conditional_batch is None:
+            conditional_batch = {}
 
         timesteps = timesteps if timesteps is not None else self.timesteps
         if self.time_type == "discrete" and timesteps is not None:
@@ -230,9 +233,9 @@ class JODOWrapper(DGT_concat):
                         cond_edge_x.detach()
 
             else:
-                if "cond_x" in cond_batch:
-                    cond_x = cond_batch["cond_x"]
-                    cond_edge_x = cond_batch["cond_edge_x"]
+                if "cond_x" in conditional_batch:
+                    cond_x = conditional_batch["cond_x"]
+                    cond_edge_x = conditional_batch["cond_edge_x"]
 
             if cond_edge_x is not None:
                 with torch.no_grad():

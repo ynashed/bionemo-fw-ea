@@ -43,9 +43,9 @@ class AttentionLayer(nn.Module):
         self.phi_x = MLP(invariant_node_feat_dim * self.num_heads, invariant_node_feat_dim, 1)
         self.coor_update_clamp_value = 10.0
         # TODO: Bring back once Z pipeline is done
-        # self.left_z = MLP(invariant_node_feat_dim, invariant_node_feat_dim, invariant_node_feat_dim)
-        # self.right_z = MLP(invariant_node_feat_dim, invariant_node_feat_dim, invariant_node_feat_dim)
-        # self.joint_z = MLP(invariant_node_feat_dim, invariant_node_feat_dim, invariant_node_feat_dim)
+        self.left_z = MLP(invariant_node_feat_dim, invariant_node_feat_dim, invariant_node_feat_dim)
+        self.right_z = MLP(invariant_node_feat_dim, invariant_node_feat_dim, invariant_node_feat_dim)
+        self.joint_z = MLP(invariant_node_feat_dim, invariant_node_feat_dim, invariant_node_feat_dim)
         self.phi_e = MLP(
             2 * invariant_node_feat_dim + equivariant_node_feature_dim + invariant_edge_feat_dim + self.num_heads,
             invariant_edge_feat_dim,
@@ -68,6 +68,7 @@ class AttentionLayer(nn.Module):
         Q = Q.view(num_edges, self.num_heads, head_dim)  # Shape: [num_edges, num_heads, head_dim]
         K = K.view(num_edges, self.num_heads, head_dim)  # Shape: [num_edges, num_heads, head_dim]
         V = V.view(num_edges, self.num_heads, head_dim)  # Shape: [num_edges, num_heads, head_dim]
+        # print(Z.shape)
         B = self.pair_bias(Z).view(num_nodes, num_nodes, self.num_heads, 1)
 
         # Attention scores
@@ -96,9 +97,12 @@ class AttentionLayer(nn.Module):
         X_out = X + x_update
         # Z update
         scatter(alpha_ij.mean(1), index=dst, dim=0, reduce='sum', dim_size=X.shape[0]).unsqueeze(1)
-        #! Skipping Z for now since not using it in the loss function yet
+        #! Z  is very close to X_pred likely due to alpha ij --> Can try a weaker update
         # z_update = self.joint_z(alpha * torch.einsum("...ik,...jk->...ijk", self.left_z(H), self.right_z(H)))
-        Z_out = Z  # + z_update
+        z_update = self.joint_z(torch.einsum("...ik,...jk->...ijk", self.left_z(H), self.right_z(H)))
+        # import ipdb; ipdb.set_trace()
+        z_update = 0.5 * (z_update + z_update.transpose(0, 1))
+        Z_out = Z + z_update
         # E update
         # import ipdb; ipdb.set_trace()
         e_inputs = torch.cat([alpha_ij, X_rel_norm, H[src], H[dst], E], dim=-1)

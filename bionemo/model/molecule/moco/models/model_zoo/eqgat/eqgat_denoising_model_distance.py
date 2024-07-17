@@ -27,6 +27,7 @@ from bionemo.model.molecule.moco.models.model_zoo.eqgat.eqgat_modules import (
     LayerNorm,
     SE3Norm,
 )
+from bionemo.model.molecule.moco.models.mpnn import MLP
 
 
 def cross_product(a: Tensor, b: Tensor, dim: int) -> Tensor:
@@ -133,6 +134,16 @@ class EQGATGlobalEdgeConvFinal(MessagePassing, ABC):
             norm_eps=eps,
             use_mlp=use_mlp_update,
         )
+
+        # self.left_z = MLP(self.si, self.si, self.so)
+        # self.right_z = MLP(self.si, self.si, self.so)
+        self.joint_z = MLP(
+            self.si, self.si, self.so
+        )  # DenseLayer(self.si, self.si, bias=True, activation=nn.SiLU())  # MLP(self.si, self.si, self.so) #
+        self.pair_bias = MLP(
+            self.si, 4 * self.si, 1
+        )  # DenseLayer(self.si, 1, bias=True, activation=nn.SiLU())  # MLP(self.si, 4 * self.si, 1) #
+        # self.equivariant_gate = DenseLayer(self.vi, 1, bias=False)
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -265,14 +276,14 @@ class EQGATGlobalEdgeConvFinal(MessagePassing, ABC):
 
     def forward(
         self,
-        x: Tuple[Tensor, Tensor, Tensor],
+        x: Tuple[Tensor, Tensor, Tensor, Tensor, Tensor, Tensor],
         edge_index: Tensor,
         edge_attr: Tuple[Tensor, Tensor, Tensor, Tensor],
         batch: Tensor,
         batch_lig: Tensor = None,
         pocket_mask: Tensor = None,
     ):
-        s, v, p = x
+        s, v, p, Z = x
         d, a, r, e = edge_attr
 
         e = self.edge_pre(e)
@@ -287,7 +298,7 @@ class EQGATGlobalEdgeConvFinal(MessagePassing, ABC):
             va=v,
             vb=self.vector_net(v),
             p=p,
-            edge_attr=(d, a, r, e),
+            edge_attr=(d, a, r, e, Z, edge_index),
             dim_size=s.size(0),
         )
 
@@ -310,7 +321,28 @@ class EQGATGlobalEdgeConvFinal(MessagePassing, ABC):
         s = ms + s
         v = mv + v
 
-        out = {"s": s, "v": v, "p": p, "e": e}
+        # import ipdb; ipdb.set_trace()
+        # update = torch.einsum("...ik,...jk->...ijk", s, s)
+        outer_products = []
+        num_atoms = 0
+        for molecule in range(max(batch.unique()) + 1):
+            molecule_indices = (batch == molecule).nonzero(as_tuple=True)[0]
+            molecule_features = s[molecule_indices]
+            # Compute the outer product for the current molecule
+            outer_product = molecule_features.unsqueeze(0) * molecule_features.unsqueeze(
+                1
+            )  # torch.einsum('ij,ik->ijk', molecule_features, molecule_features)
+            outer_product = outer_product + outer_product.transpose(0, 1)
+            outer_product = outer_product[~torch.eye(outer_product.size(0), dtype=torch.bool)].view(
+                outer_product.size(0), -1
+            )
+            outer_products.append(outer_product.reshape(-1, molecule_features.shape[-1]))
+            num_atoms += molecule_features.size(0)
+        update = torch.cat(outer_products, dim=0)
+        # import ipdb; ipdb.set_trace()
+        Z = Z + self.joint_z(update)
+
+        out = {"s": s, "v": v, "p": p, "e": e, "Z_hat": Z}
         return out
 
     def aggregate(
@@ -339,7 +371,7 @@ class EQGATGlobalEdgeConvFinal(MessagePassing, ABC):
         edge_attr: Tuple[Tensor, Tensor, Tensor, Tensor],
         dim_size: Optional[int],
     ) -> Tuple[Tensor, Tensor, Tensor, Tensor]:
-        d, a, r, e = edge_attr
+        d, a, r, e, Z, edge_index = edge_attr
 
         de0 = d.view(-1, 1)
         a0 = a.view(-1, 1)
@@ -374,9 +406,18 @@ class EQGATGlobalEdgeConvFinal(MessagePassing, ABC):
             vij0 = vij0.unsqueeze(1)
 
         # feature attention
+        # import ipdb; ipdb.set_trace()
+        #! Is the bias being added in the wrong place? should it be for the nv terms
+        B = self.pair_bias(Z)
+        # aij = aij  # + B  # [edge_index[0], edge_index[1]]
         aij = scatter_softmax(aij, index=index, dim=0, dim_size=dim_size)
         ns_j = aij * sb_j
-        nv0_j = r.unsqueeze(-1) * vij0
+        # import ipdb; ipdb.set_trace()
+        nv0_j = (
+            r.unsqueeze(-1)
+            * vij0
+            * (1 + scatter_softmax(B.unsqueeze(2) + vij0, index=index, dim=0, dim_size=dim_size))
+        )
 
         if self.has_v_in:
             nv1_j = vij1 * vb_j
@@ -508,6 +549,7 @@ class EQGATEdgeGNN(nn.Module):
         s: Tensor,
         v: Tensor,
         p: Tensor,
+        Z: Tensor,
         edge_index_global: Tensor,
         edge_attr_global: Tuple[Tensor, Tensor, Tensor, Tensor],
         z: OptTensor = None,
@@ -518,7 +560,6 @@ class EQGATEdgeGNN(nn.Module):
     ) -> Dict:
         # edge_attr_xyz (distances, cosines, relative_positions, edge_features)
         # (E, E, E x 3, E x F)
-
         for i in range(len(self.convs)):
             edge_index_in = edge_index_global
             edge_attr_in = edge_attr_global
@@ -527,7 +568,7 @@ class EQGATEdgeGNN(nn.Module):
                 s = s + context
             s, v = self.norms[i](x={"s": s, "v": v, "z": z}, batch=batch)
             out = self.convs[i](
-                x=(s, v, p),
+                x=(s, v, p, Z),
                 batch=batch,
                 edge_index=edge_index_in,
                 edge_attr=edge_attr_in,
@@ -536,6 +577,7 @@ class EQGATEdgeGNN(nn.Module):
             )
 
             s, v, p, e = out["s"], out["v"], out["p"], out["e"]
+            Z = out["Z_hat"]
             # p = p - scatter_mean(p, batch, dim=0)[batch]
             if self.recompute_edge_attributes:
                 edge_attr_global = self.calculate_edge_attrs(
@@ -548,7 +590,7 @@ class EQGATEdgeGNN(nn.Module):
 
             e = edge_attr_global[-1]
 
-        out = {"s": s, "v": v, "e": e, "p": p}
+        out = {"s": s, "v": v, "e": e, "p": p, "Z_hat": Z}
 
         return out
 
@@ -575,6 +617,8 @@ class PredictionHeadEdge(nn.Module):
         self.coords_lin = DenseLayer(in_features=self.vdim, out_features=1, bias=False)
         self.atoms_lin = DenseLayer(in_features=self.sdim, out_features=num_atom_features, bias=True)
 
+        self.Z_lin = DenseLayer(in_features=self.sdim, out_features=1, bias=True)
+
         self.coords_param = coords_param
 
         self.reset_parameters()
@@ -597,11 +641,11 @@ class PredictionHeadEdge(nn.Module):
         edge_mask: Tensor = None,
     ) -> Dict:
         s, v, p, e = x["s"], x["v"], x["p"], x["e"]
+        Z = x["Z_hat"]
         s = self.shared_mapping(s)
 
         coords_pred = self.coords_lin(v).squeeze()
         atoms_pred = self.atoms_lin(s)
-
         if batch_lig is not None and pocket_mask is not None:
             s = (s * pocket_mask)[pocket_mask.squeeze(), :]
             j, i = edge_index_global_lig
@@ -614,7 +658,7 @@ class PredictionHeadEdge(nn.Module):
             # )
             d = (coords_pred[i] - coords_pred[j]).pow(2).sum(-1, keepdim=True)
 
-        elif self.coords_param == "data":
+        elif self.coords_param == "data":  #! does this
             j, i = edge_index_global
             n = s.size(0)
             coords_pred = p + coords_pred
@@ -634,7 +678,7 @@ class PredictionHeadEdge(nn.Module):
             e_dense = 0.5 * (e_dense + e_dense.permute(1, 0, 2))
             e = e_dense[edge_index_global_lig[0], edge_index_global_lig[1], :]
         else:
-            e_dense = torch.zeros(n, n, e.size(-1), device=e.device)
+            e_dense = torch.zeros(n, n, e.size(-1), device=e.device)  #! does this path
             e_dense[edge_index_global[0], edge_index_global[1], :] = e
             e_dense = 0.5 * (e_dense + e_dense.permute(1, 0, 2))
             e = e_dense[edge_index_global[0], edge_index_global[1], :]
@@ -643,12 +687,13 @@ class PredictionHeadEdge(nn.Module):
         edge = torch.cat([f, d], dim=-1)
         bonds_pred = F.silu(self.bonds_lin_0(edge))
         bonds_pred = self.bonds_lin_1(bonds_pred)
+        # import ipdb; ipdb.set_trace()
+        z_dense = torch.zeros(n, n, Z.size(-1), device=e.device)
+        z_dense[edge_index_global[0], edge_index_global[1], :] = Z
+        z_dense = 0.5 * (z_dense + z_dense.permute(1, 0, 2))
+        Z = self.Z_lin(z_dense)
 
-        out = {
-            "coords_pred": coords_pred,
-            "atoms_pred": atoms_pred,
-            "bonds_pred": bonds_pred,
-        }
+        out = {"coords_pred": coords_pred, "atoms_pred": atoms_pred, "bonds_pred": bonds_pred, "Z_hat": Z}
 
         return out
 
@@ -832,6 +877,50 @@ class DenoisingEdgeNetwork(nn.Module):
             s = self.atom_context_mapping(s + cemb)
         s = self.atom_time_mapping(s + tnode)
 
+        # Z = s.unsqueeze(1) * s.unsqueeze(0)
+        outer_products = []
+        op_indicies = []
+        num_atoms = 0
+        for molecule in range(max(batch.unique()) + 1):
+            # Extract rows from H corresponding to the current molecule
+            # import ipdb; ipdb.set_trace()
+            molecule_indices = (batch == molecule).nonzero(as_tuple=True)[0]
+            molecule_features = s[molecule_indices]
+
+            # Compute the outer product for the current molecule
+            outer_product = molecule_features.unsqueeze(0) * molecule_features.unsqueeze(
+                1
+            )  # torch.einsum('ij,ik->ijk', molecule_features, molecule_features)
+            outer_product = outer_product + outer_product.transpose(0, 1)
+            # Set diagonal elements to 0
+            # outer_product[range(molecule_features.size(0)), range(molecule_features.size(0))] = 0
+            # mask = ~torch.eye(molecule_features.size(0)).bool()  # Create a boolean mask for the diagonal
+            # # Apply the mask to zero out the diagonals
+            # outer_product = outer_product.masked_fill(mask, 0)
+            outer_product = outer_product[~torch.eye(outer_product.size(0), dtype=torch.bool)].view(
+                outer_product.size(0), -1
+            )
+            # Compute Cartesian product of indices
+            cartesian = torch.cartesian_prod(
+                torch.arange(molecule_features.size(0)), torch.arange(molecule_features.size(0))
+            ).flip(1)
+            # Filter out diagonal elements
+            non_diagonal = cartesian[cartesian[:, 0] != cartesian[:, 1]]
+            indices = non_diagonal.T + num_atoms
+
+            op_indicies.append(indices)
+            # Append the outer product to the list
+            outer_products.append(outer_product.reshape(-1, molecule_features.shape[-1]))
+            num_atoms += molecule_features.size(0)
+        Z = torch.cat(outer_products, dim=0)
+        # import ipdb; ipdb.set_trace()
+        torch.cat(op_indicies, dim=1).to(Z.device)
+        # Compute the squared counts for each batch element
+        # unique_elements, counts = batch.unique(return_counts=True)
+        # squared_counts = counts.repeat_interleave(counts)
+        # Z_batch = torch.repeat_interleave(batch, squared_counts)
+        # import ipdb; ipdb.set_trace()
+
         if self.bond_prediction:
             # symmetric initial edge-feature
             d = (pos[edge_index_global[1]] - pos[edge_index_global[0]]).pow(2).sum(-1, keepdim=True).sqrt()
@@ -855,6 +944,7 @@ class DenoisingEdgeNetwork(nn.Module):
             v=v,
             p=pos,
             z=z,
+            Z=Z,
             edge_index_global=edge_index_global,
             edge_attr_global=edge_attr_global_transformed,
             batch=batch,

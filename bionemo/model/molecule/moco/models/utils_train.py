@@ -102,12 +102,12 @@ class ExponentialMovingAverage:
 
 
 class EMACallback(pl.Callback):
-    def __init__(self, parameters, dirpath, decay=0.999, freeze_epoch=-1, precaution=1000):
+    def __init__(self, parameters, dirpath, decay=0.999, freeze_epoch=-1, every_n_train_steps=100):
         super().__init__()
         self.ema = ExponentialMovingAverage(parameters, decay, use_num_updates=True)
         self.freeze_epoch = freeze_epoch
         self.dirpath = dirpath
-        self.precaution = precaution
+        self.every_n_train_steps = every_n_train_steps
 
     def on_train_start(self, trainer, pl_module):
         # Move EMA parameters to the correct device
@@ -116,7 +116,9 @@ class EMACallback(pl.Callback):
     def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
         if trainer.current_epoch > self.freeze_epoch:
             self.ema.update(pl_module.parameters())
-        if trainer.global_step > 0 and trainer.global_step % self.precaution == 0:
+        if trainer.global_step > 0 and trainer.global_step % self.every_n_train_steps == 0:
+            ckpt = {"state_dict": self.ema.state_dict(), "global_step": trainer.global_step, "batch_idx": batch_idx}
+        if trainer.global_step > 0 and trainer.global_step % self.every_n_train_steps == 0:
             ckpt = {"state_dict": self.ema.state_dict(), "global_step": trainer.global_step, "batch_idx": batch_idx}
             torch.save(ckpt, os.path.join(self.dirpath, f"ema_parameters_epoch_{trainer.current_epoch}.pt"))
 
