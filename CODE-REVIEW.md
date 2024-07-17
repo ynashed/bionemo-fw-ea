@@ -217,7 +217,7 @@ a fruitful interaction across the team members.
 
 
 -   We follow a revert + fix policy in the codebase for any showstopper
-    bug that might appear as a result of an MR introducing errors not
+    bug that might appear as a result of an PR introducing errors not
     caught by sanity. In exceptional circumstances when an MR cannot be
     reverted and there is a hotfix ready, leadership can consider
     merging without revert. However, this should be an exception.
