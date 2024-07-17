@@ -308,7 +308,7 @@ a fruitful interaction across the team members.
 
 -   Before providing a patch for review ask yourself these questions:
 
-    -   Is this MR the right size? If it's too long break it up.
+    -   Is this PR the right size? If it's too long break it up.
 
     -   Is this MR and all the changes included necessary? (all code has
         to be maintained)
