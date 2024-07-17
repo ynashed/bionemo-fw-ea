@@ -1,4 +1,4 @@
-(**NOTE:** _**delete** these instructional lines as you fill-out this MR template_)
+(**NOTE:** _**delete** these instructional lines as you fill-out this PR template_)
 
 (**NOTE:** _template is designed to be filled-in and used as the **squashed commit message for the entire PR**. _Italicized text_ is intended to be deleted as you fill in this template. Use the text between the `---`)
 
