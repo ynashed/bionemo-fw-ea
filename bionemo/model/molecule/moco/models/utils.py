@@ -13,7 +13,7 @@ import torch.nn.functional as F
 from torch import nn
 from torch_scatter import scatter_mean
 
-from bionemo.model.molecule.moco.models.mpnn import MLP
+from bionemo.model.molecule.moco.arch.scratch.mpnn import MLP
 
 
 class PredictionHead(nn.Module):

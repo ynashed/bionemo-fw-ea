@@ -62,6 +62,7 @@ class MLP(nn.Module):
         activation: str = 'silu',
         dropout: float = 0.0,
         last_act: str = None,
+        bias: bool = True,
     ):
         """
         Initialize the MLP.
@@ -85,7 +86,7 @@ class MLP(nn.Module):
         layers = []
 
         # Input layer
-        layers.append(nn.Linear(input_dim, hidden_size))
+        layers.append(nn.Linear(input_dim, hidden_size, bias=bias))
         layers.append(NONLINEARITIES[activation])
         if dropout > 0:
             layers.append(nn.Dropout(dropout))
@@ -93,13 +94,13 @@ class MLP(nn.Module):
         # Hidden layers
         if num_hidden_layers > 0:
             for _ in range(num_hidden_layers):
-                layers.append(nn.Linear(hidden_size, hidden_size))
+                layers.append(nn.Linear(hidden_size, hidden_size, bias=bias))
                 layers.append(NONLINEARITIES[activation])
                 if dropout > 0:
                     layers.append(nn.Dropout(dropout))
 
         # Output layer
-        layers.append(nn.Linear(hidden_size, output_dim))
+        layers.append(nn.Linear(hidden_size, output_dim, bias=bias))
         if last_act:
             layers.append(NONLINEARITIES[last_act])
 
@@ -244,6 +245,7 @@ class DiTBlock(nn.Module):
 # TODOL add QK noramlization from ESM3 stemming from https://proceedings.mlr.press/v202/dehghani23a/dehghani23a.pdf see https://github.com/kyegomez/MegaVIT/blob/main/mega_vit/main.py#L84 and https://github.com/evolutionaryscale/esm/blob/main/esm/layers/attention.py#L48
 
 
+# TODO: @Ali for EGNN should we remove the bias term from MLP's for X data?
 class XEGNN(MessagePassing):
     """
     X only EGNN
@@ -251,7 +253,7 @@ class XEGNN(MessagePassing):
 
     def __init__(
         self,
-        equivariant_node_feature_dim=3,
+        # equivariant_node_feature_dim=3,
         invariant_node_feat_dim=64,
         invariant_edge_feat_dim=0,
     ):
@@ -266,6 +268,7 @@ class XEGNN(MessagePassing):
         if self.use_cross_product:
             self.phi_x_cross = MLP(invariant_node_feat_dim, invariant_node_feat_dim, 1)
         self.x_norm = E3Norm()
+        # TODO: @Ali what is good weight inititalization for EGNN?
 
     #     self.apply(self.init_)
 
@@ -306,7 +309,7 @@ class XEGNN(MessagePassing):
             X_out = X_out + x_update_cross
 
         H_out = H
-        return X_out, H_out, edge_attr, m_ij
+        return X_out, H_out, edge_attr
 
 
 class SE3MixAttention(nn.Module):
@@ -321,17 +324,17 @@ class SE3MixAttention(nn.Module):
         self.invariant_node_feat_dim = invariant_node_feat_dim
         self.invariant_edge_feat_dim = invariant_edge_feat_dim
         self.KV = MLP(
-            invariant_node_feat_dim + 1,
-            2 * invariant_node_feat_dim,
-            2 * invariant_node_feat_dim,
+            invariant_node_feat_dim + 1, 2 * invariant_node_feat_dim, 2 * invariant_node_feat_dim, bias=False
         )
-        self.Q = MLP(invariant_node_feat_dim, invariant_node_feat_dim, invariant_node_feat_dim)
+        self.Q = MLP(invariant_node_feat_dim, invariant_node_feat_dim, invariant_node_feat_dim, bias=False)
         self.pair_bias = MLP(invariant_node_feat_dim, 4 * invariant_node_feat_dim, 1)
         self.gate = MLP(invariant_node_feat_dim, invariant_node_feat_dim, 1, last_act='sigmoid')
         self.phi_h = MLP(invariant_node_feat_dim, invariant_node_feat_dim, invariant_node_feat_dim)
-        self.phi_x = MLP(invariant_node_feat_dim, invariant_node_feat_dim, 1)
+        self.phi_x = MLP(invariant_node_feat_dim, invariant_node_feat_dim, 1, bias=False)
         self.coor_update_clamp_value = 10.0
         self.x_norm = E3Norm()
+        self.Q_norm = nn.LayerNorm(invariant_node_feat_dim)
+        self.K_norm = nn.LayerNorm(invariant_node_feat_dim)
 
     def forward(self, batch, X, H, E_idx, ZE):
         X = self.x_norm(X, batch)
@@ -342,12 +345,18 @@ class SE3MixAttention(nn.Module):
         X_rel_norm = rel_coors / (1 + torch.sqrt(rel_dist + 1e-8))
         kv_input = torch.cat([rel_dist, H[src]], dim=-1)
         K, V = self.KV(kv_input).split(self.invariant_node_feat_dim, dim=-1)
+
+        Q = self.Q_norm(Q)
+        K = self.K_norm(K)
+
         B = self.pair_bias(ZE)
         attention_scores = (Q * K).sum(dim=-1) / (self.invariant_node_feat_dim**0.5) + B
         alpha_ij = self.gate(H)[src, dst] * attention_scores
+
         attention_output = alpha_ij.unsqueeze(-1) * V  # [src]  # Shape: [num_edges, num_heads, head_dim]
-        AX = scatter(attention_output * X_rel_norm, dst, dim=0, dim_size=H.size(0), reduce='sum')
+
         A = scatter(attention_output, dst, dim=0, dim_size=H.size(0), reduce='sum')
+        AX = scatter(attention_output * X_rel_norm, dst, dim=0, dim_size=H.size(0), reduce='sum')
         AH = scatter(attention_output * H[dst], dst, dim=0, dim_size=H.size(0), reduce='sum')
 
         X_out = X + self.phi_x(A * AX)

@@ -20,6 +20,7 @@ from torch_geometric.typing import OptTensor
 from torch_scatter import scatter, scatter_mean, scatter_softmax
 from torch_sparse import SparseTensor
 
+from bionemo.model.molecule.moco.arch.scratch.mpnn import MLP
 from bionemo.model.molecule.moco.models.model_zoo.eqgat.eqgat_modules import (
     AdaptiveLayerNorm,
     DenseLayer,
@@ -27,7 +28,6 @@ from bionemo.model.molecule.moco.models.model_zoo.eqgat.eqgat_modules import (
     LayerNorm,
     SE3Norm,
 )
-from bionemo.model.molecule.moco.models.mpnn import MLP
 
 
 def cross_product(a: Tensor, b: Tensor, dim: int) -> Tensor:
