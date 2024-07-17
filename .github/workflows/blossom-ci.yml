@@ -34,7 +34,21 @@ jobs:
       
     # This job only runs for pull request comments
     if: |
-         github.event.comment.body == '/build-ci' && (github.actor == 'ohadmo' || github.actor == 'trvachov')
+         github.event.comment.body == '/build-ci' &&
+         (github.actor == 'ohadmo' ||
+          github.actor == 'trvachov' ||
+          github.actor == 'jstjohn' ||
+          github.actor == 'malcolmgreaves' ||
+          github.actor == 'gwarmstrong' ||
+          github.actor == 'farhadrgh' ||
+          github.actor == 'dorotat-nv' ||
+          github.actor == 'jomitchellnv' ||
+          github.actor == 'skothenhill-nv' ||
+          github.actor == 'yzhang123' ||
+          github.actor == 'ntadimeti' ||
+          github.actor == 'broland-hat' ||
+          github.actor == 'polinabinder1' ||
+          github.actor == 'camirr-nv')
     steps:
       - name: Check if comment is issued by authorized person
         run: blossom-ci
