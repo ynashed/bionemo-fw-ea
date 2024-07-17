@@ -250,5 +250,5 @@ class Interpolant(nn.Module):
             time_step = time_step * (1 - 2 * min_t) + min_t
         return time_step.to(device)
 
-    def snr_loss_weight(self, time):
+    def loss_weight_t(self, time):
         return torch.clamp(self.snr(time), min=0.05, max=1.5)

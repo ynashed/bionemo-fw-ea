@@ -311,7 +311,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
     def calculate_loss(self, batch, out, time, stage="train"):
         batch_geo = batch.batch
         batch_size = int(batch.batch.max()) + 1
-        ws_t = self.interpolants[self.global_variable].snr_loss_weight(time)
+        ws_t = self.interpolants[self.global_variable].loss_weight_t(time)
         loss = 0
         predictions = {}
         for key, loss_fn in self.loss_functions.items():

@@ -46,7 +46,7 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
         com_free: bool = True,
         noise_sigma: float = 0.0,
         optimal_transport: str = None,
-        max_t_sample: float = 0.99,
+        max_t: float = 0.99,
         clip_t: float = 0.9,
     ):
         super(ContinuousFlowMatchingInterpolant, self).__init__(prior_type, solver_type, timesteps, time_type)
@@ -57,7 +57,7 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
         self.noise_sigma = noise_sigma
         self.optimal_transport = optimal_transport
         self.init_schedulers(timesteps, scheduler_type, s, sqrt, nu, clip)
-        self.max_t_sample = max_t_sample
+        self.max_t = 1.0 - min_t
         self.clip_t = clip_t
 
     def init_schedulers(self, timesteps, scheduler_type, s, sqrt, nu, clip):
@@ -83,15 +83,15 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
             self.register_buffer('forward_data_schedule', alphas)
             self.register_buffer('reverse_data_schedule', 1.0 - self.alphas)
 
-    def snr_loss_weight(self, time):
+    def loss_weight_t(self, time):
         if self.time_type == "continuous":
             # return torch.clamp(time / (1 - time), min=0.05, max=1.5)
             # loss scale for "frameflow":
-            return (1 - torch.clamp(time, 0, self.max_t_sample)) / (1 - torch.clamp(time, 0, self.clip_t)) ** 2
+            return (1 - torch.clamp(time, 0, self.max_t)) / (1 - torch.clamp(time, 0, self.clip_t)) ** 2
         else:
             if self.schedule_type == "linear":
                 t = time / self.timesteps
-                return (1 - torch.clamp(t, 0, self.max_t_sample)) / (1 - torch.clamp(t, 0, self.clip_t)) ** 2
+                return (1 - torch.clamp(t, 0, self.max_t)) / (1 - torch.clamp(t, 0, self.clip_t)) ** 2
             else:
                 return torch.clamp(self.snr(time), min=0.05, max=1.5)
 
@@ -99,7 +99,7 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
         if self.vector_field_type == "endpoint":
             weight = torch.ones_like(t).to(t.device)
         elif self.vector_field_type == "standard":
-            weight = 1 / (1 - torch.clamp(t, 0, self.max_t_sample))  # [1, 0.1] for T = [0, 1]
+            weight = 1 / (1 - torch.clamp(t, 0, self.max_t))  # [1, 0.1] for T = [0, 1]
         return weight
 
     def forward_schedule(self, batch, time):
@@ -178,7 +178,7 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
         return x1, data_scale * x1 + noise_scale * x0 + interp_noise, x0
 
     def vector_field(self, x1, xt, time, batch):
-        return (x1 - xt) / (1.0 - torch.clamp(time[batch], self.max_t_sample))
+        return (x1 - xt) / (1.0 - torch.clamp(time[batch], self.max_t))
 
     def prior(self, batch, shape, device, x1=None):
         if self.prior_type == "gaussian" or self.prior_type == "normal":

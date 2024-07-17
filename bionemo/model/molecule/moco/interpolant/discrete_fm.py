@@ -47,6 +47,7 @@ class DiscreteFlowMatchingInterpolant(Interpolant):
         self.num_classes = num_classes
         self.vector_field_type = vector_field_type
         self.min_t = min_t
+        self.max_t = 1 - min_t
         self.custom_prior = custom_prior
         self.init_schedulers(timesteps, scheduler_type, s, sqrt, nu, clip)
 
@@ -73,7 +74,7 @@ class DiscreteFlowMatchingInterpolant(Interpolant):
             self.register_buffer('forward_data_schedule', alphas)
             self.register_buffer('reverse_data_schedule', 1.0 - self.alphas)
 
-    def snr_loss_weight(self, time):
+    def loss_weight_t(self, time):
         #! No loss weightining is used for discrete data in MultiFlow or Semla
         weight = torch.ones_like(time).to(time.device)
         return weight
@@ -189,6 +190,8 @@ class DiscreteFlowMatchingInterpolant(Interpolant):
             t = time
         else:
             t = time / self.timesteps
+        #! TODO max t is the same as min_t with shiftings so let's support both
+        t = torch.clamp(t, min=0, max=self.max_t)
 
         t = t[batch].unsqueeze(1)
         if self.prior_type in ["uniform", "data", "custom"]:
