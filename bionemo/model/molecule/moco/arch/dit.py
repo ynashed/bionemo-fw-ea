@@ -241,7 +241,7 @@ class DiTBlock(nn.Module):
         return x
 
 
-# TODO: Create Attnention with custom attention to allow Z bias term, refer to https://github.com/evolutionaryscale/esm/blob/main/esm/layers/attention.py but they just use standard no bias
+# TODO: Create Attnention with norm and rotary, refer to https://github.com/evolutionaryscale/esm/blob/main/esm/layers/attention.py but they just use standard no bias
 # TODOL add QK noramlization from ESM3 stemming from https://proceedings.mlr.press/v202/dehghani23a/dehghani23a.pdf see https://github.com/kyegomez/MegaVIT/blob/main/mega_vit/main.py#L84 and https://github.com/evolutionaryscale/esm/blob/main/esm/layers/attention.py#L48
 
 
