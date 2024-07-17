@@ -1,6 +1,8 @@
 # Local configs
 .gitconfig
 .bash_history
+.vscode-server
+.gnupg
 
 # Lightning and project output files
 test_data
@@ -56,6 +58,7 @@ coverage.xml
 *.py,cover
 .hypothesis/
 .pytest_cache/
+MNISTCustom/
 
 # Translations
 *.mo
