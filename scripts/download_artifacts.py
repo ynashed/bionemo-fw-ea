@@ -24,15 +24,19 @@ from typing import Dict, List, Literal, Optional, Tuple
 
 import yaml
 
+
 try:
     from nemo.utils import logging
 except ImportError:
+    # Use basic logging as a fallback
     import logging
+
     logging.basicConfig(level=logging.INFO)
 
 try:
     from pydantic import BaseModel
 except ImportError:
+    # do nothing as a fallback
     class BaseModel:
         pass
 
