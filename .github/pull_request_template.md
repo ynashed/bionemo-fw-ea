@@ -34,12 +34,12 @@ pytest -v tests/your/new/or/existing/test_functions.py::test_function
 ```
 
 
-(**NOTE:** _also **delete** this checklist as you fill-out this MR template_)
+(**NOTE:** _also **delete** this checklist as you fill-out this PR template_)
 
 **Most of the changes** to files with extensions `*.py`, `*.yaml`, `*.yml`, `Dockerfile*` or `requirements.txt` **DO REQUIRE both `pytest-` and `jet-` CI stages**.
 
 - [ ] Did you review the [Before your PR is "Ready for review" section](https://github.com/NVIDIA/bionemo-fw-ea/-/blob/dev/CONTRIBUTING.md?ref_type=heads#before-pr-ready) before asking for review?
 - [ ] Did you make sure your changes have tests? Did you test your changes locally?
-- [ ] Can you add [the `SKIP_CI` label](https://github.com/NVIDIA/bionemo-fw-ea/-/blob/dev/CONTRIBUTING.md?ref_type=heads#skip-ci) to your MR?
-- [ ] Can you add [the `PYTEST_NOT_REQUIRED` label](https://github.com/NVIDIA/bionemo-fw-ea/-/blob/dev/CONTRIBUTING.md?ref_type=heads#skip-pytest) to your MR?
-- [ ] Can you add [the `JET_NOT_REQUIRED` label](https://github.com/NVIDIA/bionemo-fw-ea/-/blob/dev/CONTRIBUTING.md?ref_type=heads#skip-jet) to your MR?
+- [ ] Can you add [the `SKIP_CI` label](https://github.com/NVIDIA/bionemo-fw-ea/-/blob/dev/CONTRIBUTING.md?ref_type=heads#skip-ci) to your PR?
+- [ ] Can you add [the `PYTEST_NOT_REQUIRED` label](https://github.com/NVIDIA/bionemo-fw-ea/-/blob/dev/CONTRIBUTING.md?ref_type=heads#skip-pytest) to your PR?
+- [ ] Can you add [the `JET_NOT_REQUIRED` label](https://github.com/NVIDIA/bionemo-fw-ea/-/blob/dev/CONTRIBUTING.md?ref_type=heads#skip-jet) to your PR?
