@@ -107,23 +107,6 @@ class DiscreteFlowMatchingInterpolant(Interpolant):
                 self.forward_noise_schedule[time].unsqueeze(1)[batch],
             )
 
-    # def reverse_schedule(self, batch, time, dt):
-    #     if self.time_type == "continuous":
-    #         if self.schedule_type == "linear":
-    #             data_scale = self.update_weight(time[batch]) * dt
-    #     else:
-    #         if self.schedule_type == "linear":
-    #             t = self.forward_data_schedule[time]
-    #             data_scale = self.update_weight(t[batch]) * dt
-    #         elif self.schedule_type == "vpe":  # FlowMol
-    #             data_scale = (
-    #                 self.derivative_forward_data_schedule[time] * dt / (1 - self.forward_data_schedule[time])
-    #             )[
-    #                 batch
-    #             ]  # alpha_prime[t]*dt/(1 - alpha[t]) #! EquiFm uses (1-a)^2 could be due to the definition of the scheduler FloMol uses cosine wheres EquiFm uses exp(- 0.5 * integral of betas(s)) where beta is some noise scheduler funtion
-
-    #     return data_scale.unsqueeze(1), (1 - data_scale).unsqueeze(1)
-
     def interpolate(self, batch, x1, time):
         """
         Interpolate using discrete interpolation method.
