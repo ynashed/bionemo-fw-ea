@@ -29,7 +29,7 @@ class Label2IDTokenizer(TokenizerSpec):
     structure prediction model, where each class is
     encoded with a character (ex. "C", "H", "E")
 
-        Examples:
+    Examples:
             >>> tokenizer = Label2IDTokenizer()
             >>> seqs = ['CHE', 'CCC', 'EHH']
             >>> tokenizer = tokenizer.build_vocab(s)
@@ -43,9 +43,7 @@ class Label2IDTokenizer(TokenizerSpec):
         self._update_index()
 
     def _update_index(self):
-        """
-        Updates the id_to_vocab index based on the current vocab
-        """
+        """Updates the id_to_vocab index based on the current vocab"""
         self.decode_vocab = {id_: token for token, id_ in self.vocab.items()}
 
     @property
@@ -70,7 +68,7 @@ class Label2IDTokenizer(TokenizerSpec):
         for token in tokens:
             id_ = self.vocab.get(token)
             if id_ is None:
-                raise ValueError(f'Do not recognize token: {token}')
+                raise ValueError(f"Do not recognize token: {token}")
             else:
                 ids.append(id_)
         return ids
@@ -86,7 +84,7 @@ class Label2IDTokenizer(TokenizerSpec):
         for id_ in ids:
             token = self.decode_vocab.get(id_)
             if token is None:
-                raise ValueError(f'Do not recognize ID: {id_}')
+                raise ValueError(f"Do not recognize ID: {id_}")
             tokens.append(token)
         return tokens
 
@@ -114,7 +112,6 @@ class Label2IDTokenizer(TokenizerSpec):
                 Otherwise, the vocabulary is progressively built
                 from all of the strings in `strings`.
         """
-
         if isinstance(strings, str):
             strings = [strings]
 

@@ -88,10 +88,32 @@ class SingleCellDataModule(pl.LightningDataModule):
         self.pin_memory = pin_memory
         self.index_mapping_dir = index_mapping_dir or str(Path(self.data_path_train).parent)
         self._train_dataset_ori = SingleCellDataset(
-            self.data_path_train, self.tokenizer, self.median_dict, self.max_len
+            self.data_path_train,
+            self.tokenizer,
+            self.median_dict,
+            self.max_len,
+            mask_prob=self.mask_prob,
+            mask_token_prob=self.mask_token_prob,
+            random_token_prob=self.random_token_prob,
         )
-        self._val_dataset_ori = SingleCellDataset(self.data_path_val, self.tokenizer, self.median_dict, self.max_len)
-        self._test_dataset_ori = SingleCellDataset(self.data_path_test, self.tokenizer, self.median_dict, self.max_len)
+        self._val_dataset_ori = SingleCellDataset(
+            self.data_path_val,
+            self.tokenizer,
+            self.median_dict,
+            self.max_len,
+            mask_prob=self.mask_prob,
+            mask_token_prob=self.mask_token_prob,
+            random_token_prob=self.random_token_prob,
+        )
+        self._test_dataset_ori = SingleCellDataset(
+            self.data_path_test,
+            self.tokenizer,
+            self.median_dict,
+            self.max_len,
+            mask_prob=self.mask_prob,
+            mask_token_prob=self.mask_token_prob,
+            random_token_prob=self.random_token_prob,
+        )
 
         # This is needed here, or you need to specify it in the megatron adapter thing TODO name?
         #  Note that this sampler is sequential, meaning it does not do any shuffling. Let's wrap our data in a shuffler.
@@ -125,9 +147,9 @@ class SingleCellDataModule(pl.LightningDataModule):
             num_val_samples = 1
 
         # This happens exactly once during setup.
-        self._train_ds = self._sample_and_shuffle_dataset(self._train_dataset_ori, num_train_samples, 'train')
-        self._validation_ds = self._sample_and_shuffle_dataset(self._val_dataset_ori, num_val_samples, 'val')
-        self._test_ds = self._sample_and_shuffle_dataset(self._test_dataset_ori, num_test_samples, 'test')
+        self._train_ds = self._sample_and_shuffle_dataset(self._train_dataset_ori, num_train_samples, "train")
+        self._validation_ds = self._sample_and_shuffle_dataset(self._val_dataset_ori, num_val_samples, "val")
+        self._test_ds = self._sample_and_shuffle_dataset(self._test_dataset_ori, num_test_samples, "test")
 
     def train_dataloader(self) -> TRAIN_DATALOADERS:
         return self._create_dataloader(self._train_ds)

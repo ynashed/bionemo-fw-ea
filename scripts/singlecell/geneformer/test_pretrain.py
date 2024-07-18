@@ -15,8 +15,11 @@
 
 import os
 import pathlib
+import shlex
+import subprocess
 from pathlib import Path
 
+from lightning.fabric.plugins.environments.lightning import find_free_network_port
 from pretrain import main
 
 # relative import since this is not a package
@@ -52,7 +55,7 @@ def test_main_runs(tmpdir):
         result_dir=result_dir,
         wandb_project=None,
         wandb_offline=True,
-        num_steps=10,
+        num_steps=55,
         limit_val_batches=1,
         val_check_interval=1,
         num_dataset_workers=0,
@@ -61,8 +64,8 @@ def test_main_runs(tmpdir):
         micro_batch_size=2,
         cosine_rampup_frac=0.01,
         cosine_hold_frac=0.01,
-        precision='bf16-mixed',
-        experiment_name='test_experiment',
+        precision="bf16-mixed",
+        experiment_name="test_experiment",
         resume_if_exists=False,
         create_tensorboard_logger=False,
     )
@@ -84,3 +87,34 @@ def test_main_runs(tmpdir):
     assert (
         result_dir / "test_experiment" / uq_rundir / "nemo_log_globalrank-0_localrank-0.txt"
     ).is_file(), "Could not find experiment log."
+
+
+def test_pretrain_cli(tmpdir):
+    result_dir = Path(tmpdir.mkdir("results"))
+    open_port = find_free_network_port()
+    # NOTE: if you need to change the following command, please update the README.md example.
+    cmd_str = f"""python  \
+    scripts/singlecell/geneformer/pretrain.py     \
+    --data-dir {str(data_path)}     \
+    --result-dir {str(result_dir)}     \
+    --experiment-name test_experiment     \
+    --num-gpus 1  \
+    --num-nodes 1 \
+    --val-check-interval 10 \
+    --num-dataset-workers 0 \
+    --num-steps 55 \
+    --seq-length 128 \
+    --limit-val-batches 2 \
+    --micro-batch-size 2
+    """.strip()
+    env = dict(**os.environ)  # a local copy of the environment
+    env["MASTER_PORT"] = str(open_port)
+    cmd = shlex.split(cmd_str)
+    result = subprocess.run(
+        cmd,
+        cwd=bionemo2_root,
+        env=env,
+        capture_output=True,
+    )
+    assert result.returncode == 0, f"Pretrain script failed: {cmd_str}"
+    assert (result_dir / "test_experiment").exists(), "Could not find test experiment directory."

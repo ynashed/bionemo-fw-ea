@@ -23,8 +23,7 @@ from torch.utils.data import Dataset
 
 class PRNGDatasetShuffler(Dataset):
     def __init__(self, dataset: Dataset, seed: int = 42, num_samples: Optional[int] = None):
-        """
-        Initializes the PRNGDatasetShuffler. PRNGDatasetShuffler shuffles a given dataset using a pseudo-random number generator (PRNG).
+        """Initializes the PRNGDatasetShuffler. PRNGDatasetShuffler shuffles a given dataset using a pseudo-random number generator (PRNG).
             This allows for reproducible shuffling by controlling the random seed, while not ever storing the list of indices in memory.
             It works by generating random indices assuming that the requesting function asks for them sequentially.
             Although random lookups are supported, random lookups will involve recomputing state which is slow, and involves
@@ -56,8 +55,7 @@ class PRNGDatasetShuffler(Dataset):
         return self.rng.randint(0, self.dataset_len - 1)
 
     def advance_state(self, num_to_advance: int):
-        """
-        Advances the PRNG state by generating n_to_advance random indices.
+        """Advances the PRNG state by generating n_to_advance random indices.
 
         Args:
             n_to_advance (int): The number of random state steps to advance.
@@ -66,8 +64,7 @@ class PRNGDatasetShuffler(Dataset):
             self.rand_idx()
 
     def __getitem__(self, index: int):
-        """
-        Returns the item from the dataset at the specified index.
+        """Returns the item from the dataset at the specified index.
 
         Args:
             index (int): The index of the item to retrieve.

@@ -154,8 +154,7 @@ class _MockGPTDataset(Dataset):
         }
 
     def _collate_fn(self, batch: DataT) -> DataT:
-        """
-        A default implementation of a collation function.
+        """A default implementation of a collation function.
         Users should override this method to define custom data loaders.
         """
         return data.dataloader.default_collate(batch)
@@ -174,7 +173,7 @@ class _MockGPTDataset(Dataset):
                 ....
         )
 
-        Returns
+        Returns:
         -------
             Collated batch, with or without types.
         """

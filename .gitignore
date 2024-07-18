@@ -1,3 +1,9 @@
+# Local configs
+.gitconfig
+.bash_history
+.vscode-server
+.gnupg
+
 # Lightning and project output files
 test_data
 lightning_logs
@@ -45,12 +51,14 @@ htmlcov/
 .coverage
 .coverage.*
 .cache
+.local
 nosetests.xml
 coverage.xml
 *.cover
 *.py,cover
 .hypothesis/
 .pytest_cache/
+MNISTCustom/
 
 # Translations
 *.mo
@@ -140,6 +148,8 @@ dmypy.json
 *.swo
 *~
 *#
+.viminfo
+.lesshst
 
 # macOS
 .DS_Store

@@ -1,6 +1,6 @@
 # bionemo-contrib
 
-Preview of In-Development Features and Landing Ground for External Contributions. 
+Preview of In-Development Features and Landing Ground for External Contributions.
 
 **NOTE** Breaking changes expected! No API stability guarentees!
 

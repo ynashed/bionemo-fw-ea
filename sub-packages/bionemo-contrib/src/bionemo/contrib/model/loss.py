@@ -12,7 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" A collection of megatron compatable losses """
+"""A collection of megatron compatable losses"""
+
 from typing import Dict, List, Tuple, TypedDict, Union
 
 import torch
@@ -106,8 +107,7 @@ class _Nemo2CompatibleLossReduceMixin:
 
 class BERTMLMLossWithReduction(_Nemo2CompatibleLossReduceMixin, MegatronLossReduction):
     def __init__(self, validation_step: bool = False, val_drop_last: bool = True) -> None:
-        """
-        Initializes the Model class.
+        """Initializes the Model class.
 
         Args:
             validation_step (bool, optional): Whether this object is being applied to the validation step. Defaults to False.
@@ -120,8 +120,7 @@ class BERTMLMLossWithReduction(_Nemo2CompatibleLossReduceMixin, MegatronLossRedu
         self.val_drop_last = val_drop_last
 
     def unreduced_token_loss_fn(self, logits: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
-        """
-        Computes the unreduced token loss given the logits and labels without regard to the loss mask.
+        """Computes the unreduced token loss given the logits and labels without regard to the loss mask.
 
         Args:
             logits (Tensor): The predicted logits of shape [batch_size, sequence_length, num_classes].
@@ -159,11 +158,10 @@ class BERTMLMLossWithReduction(_Nemo2CompatibleLossReduceMixin, MegatronLossRedu
         Taken from:
         https://github.com/NVIDIA/NeMo/blob/main/nemo/collections/nlp/models/language_modeling/megatron_gpt_model.py#L951-L976 .
         """
-
         if "labels" not in batch:
             raise ValueError("Labels not provided in the batch. These are required for this loss computation.")
 
-        unreduced_token_loss = self.unreduced_token_loss_fn(forward_out['token_logits'], batch['labels'])
+        unreduced_token_loss = self.unreduced_token_loss_fn(forward_out["token_logits"], batch["labels"])
 
         # TODO(@jstjohn) also handle different output keys, like the sequence loss.
 
@@ -177,7 +175,7 @@ class BERTMLMLossWithReduction(_Nemo2CompatibleLossReduceMixin, MegatronLossRedu
             #  This has something to do with context parallel, and there is probably a megatron or nemo function that adds this and
             #  other necessary keys to the batch. Thanks!
             loss_for_microbatch = masked_token_loss_context_parallel(
-                unreduced_token_loss, batch["loss_mask"], batch['num_valid_tokens_in_ub']
+                unreduced_token_loss, batch["loss_mask"], batch["num_valid_tokens_in_ub"]
             )
 
         # If we do not drop the last partial batch of validation, we need to do fancy reduction handling to support

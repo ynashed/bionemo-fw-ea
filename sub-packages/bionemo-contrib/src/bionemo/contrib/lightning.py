@@ -23,11 +23,11 @@ from megatron.core import parallel_state
 from nemo.lightning.megatron_parallel import DataT, MegatronLossReduction, ReductionT
 
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 def some_first(seq: Iterable[Optional[T]]) -> T:
-    '''returns the first non-None value from the sequence or fails'''
+    """Returns the first non-None value from the sequence or fails"""
     for s in seq:
         if s is not None:
             return s
@@ -83,7 +83,6 @@ def batch_collator(batches: Optional[Union[Tuple[ReductionT], List[ReductionT]]]
     Returns:
         A single batch of the same type as the elements of your input sequence.
     """
-
     match batches:
         case [torch.Tensor(), *_]:
             return torch.cat(batches, dim=0)
@@ -137,7 +136,6 @@ class PassthroughLossReduction(MegatronLossReduction):
 
 
 class LightningPassthroughPredictionMixin:
-
     """A mixin that allows your model to do inference on the predict step by hijacking the nemo loss
     reduction mechanism and passing the model output through.
     """
@@ -158,10 +156,10 @@ class LossLoggingCallback(pl.Callback):
         if torch.distributed.get_rank() == 0 and parallel_state.is_pipeline_last_stage():
             # TODO(@jstjohn): verify when the outputs are a dictionary of "loss" and when they are just one tensor value.
             if isinstance(outputs, dict):
-                outputs = outputs['loss']
+                outputs = outputs["loss"]
             # torch.distributed.all_reduce(outputs, op=torch.distributed.ReduceOp.AVG)
             loss = outputs
-            pl_module.log('train_loss', loss, on_step=True, prog_bar=True, logger=True, rank_zero_only=True)
+            pl_module.log("train_loss", loss, on_step=True, prog_bar=True, logger=True, rank_zero_only=True)
 
     def on_test_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0):
         # TODO(@jstjohn): Add a docstring with type hints for this lightning hook
@@ -169,7 +167,7 @@ class LossLoggingCallback(pl.Callback):
         if torch.distributed.get_rank() == 0 and parallel_state.is_pipeline_last_stage():
             # TODO(@jstjohn): verify when the outputs are a dictionary of "loss" and when they are just one tensor value.
             if isinstance(outputs, dict):
-                outputs = outputs['loss']
+                outputs = outputs["loss"]
             # TODO verify that losses are already reduced across ranks
             # torch.distributed.all_reduce(outputs, op=torch.distributed.ReduceOp.AVG)
             loss = outputs
@@ -181,7 +179,7 @@ class LossLoggingCallback(pl.Callback):
         if torch.distributed.get_rank() == 0 and parallel_state.is_pipeline_last_stage():
             # TODO(@jstjohn): verify when the outputs are a dictionary of "loss" and when they are just one tensor value.
             if isinstance(outputs, dict):
-                outputs = outputs['loss']
+                outputs = outputs["loss"]
             # TODO verify that losses are already reduced across ranks
             # torch.distributed.all_reduce(outputs, op=torch.distributed.ReduceOp.AVG)
             # TODO verify that losses are already reduced across ranks
@@ -194,7 +192,7 @@ class LossLoggingCallback(pl.Callback):
         if torch.distributed.get_rank() == 0 and parallel_state.is_pipeline_last_stage():
             if len(self.val_losses) > 0:
                 avg_val_loss = torch.stack(self.val_losses).mean()
-                pl_module.log('val_loss', avg_val_loss, prog_bar=True, logger=True, rank_zero_only=True)
+                pl_module.log("val_loss", avg_val_loss, prog_bar=True, logger=True, rank_zero_only=True)
                 self.val_losses.clear()
 
     def on_test_epoch_end(self, trainer, pl_module):
@@ -202,14 +200,14 @@ class LossLoggingCallback(pl.Callback):
         if torch.distributed.get_rank() == 0 and parallel_state.is_pipeline_last_stage():
             if len(self.test_losses) > 0:
                 avg_test_loss = torch.stack(self.test_losses).mean()
-                pl_module.log('test_loss', avg_test_loss, prog_bar=True, logger=True, rank_zero_only=True)
+                pl_module.log("test_loss", avg_test_loss, prog_bar=True, logger=True, rank_zero_only=True)
                 self.test_losses.clear()
 
 
 __all__ = [
-    'get_dtype_device',
-    'batch_collator',
-    'PassthroughLossReduction',
-    'LightningPassthroughPredictionMixin',
-    'LossLoggingCallback',
+    "get_dtype_device",
+    "batch_collator",
+    "PassthroughLossReduction",
+    "LightningPassthroughPredictionMixin",
+    "LossLoggingCallback",
 ]

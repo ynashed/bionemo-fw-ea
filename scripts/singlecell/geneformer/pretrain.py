@@ -23,7 +23,7 @@
 import argparse
 import math
 from pathlib import Path
-from typing import Optional
+from typing import Optional, get_args
 
 from megatron.core.optimizer import OptimizerConfig
 from nemo import lightning as nl
@@ -142,7 +142,7 @@ def main(
         tokenizer_vocab_path=train_data_path / "geneformer.vocab",
     )
     match preprocessor.preprocess():
-        case {'tokenizer': tokenizer, 'median_dict': median_dict}:
+        case {"tokenizer": tokenizer, "median_dict": median_dict}:
             logging.info("*************** Preprocessing Finished ************")
         case _:
             logging.error("Preprocessing failed.")
@@ -238,28 +238,28 @@ def main(
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Pretrain Geneformer with single cell data.')
+    parser = argparse.ArgumentParser(description="Pretrain Geneformer with single cell data.")
     parser.add_argument(
-        '--data-dir',
+        "--data-dir",
         type=Path,
         required=True,
-        help='Path to the data base directory, for example this might be '
-        '/workspace/bionemo2/data/cellxgene_2023-12-15_small',
+        help="Path to the data base directory, for example this might be "
+        "/workspace/bionemo2/data/cellxgene_2023-12-15_small",
     )
     parser.add_argument(
-        '--precision',
+        "--precision",
         type=str,
-        choices=[e.value for e in PrecisionTypes],
+        choices=get_args(PrecisionTypes),
         required=False,
         default="bf16-mixed",
         help="Precision type to use for training.",
     )
     parser.add_argument(
-        '--lr',
+        "--lr",
         type=float,
         required=False,
         default=1e-4,
-        help='Learning rate for training. Default is 1e-4. With bigger global batches try 1e-3',
+        help="Learning rate for training. Default is 1e-4. With bigger global batches try 1e-3",
     )
     parser.add_argument(
         "--create-tensorboard-logger", action="store_true", default=False, help="Create a tensorboard logger."
@@ -298,11 +298,11 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        '--num-gpus',
+        "--num-gpus",
         type=int,
         required=False,
         default=1,
-        help='Number of GPUs to use for training. Default is 1.',
+        help="Number of GPUs to use for training. Default is 1.",
     )
     parser.add_argument(
         "--num-nodes",
@@ -331,6 +331,13 @@ if __name__ == "__main__":
         required=False,
         default=10000,
         help="Number of steps to use for training. Default is 10000.",
+    )
+    parser.add_argument(
+        "--seq-length",
+        type=int,
+        required=False,
+        default=2048,
+        help="Sequence length of cell. Default is 2048.",
     )
     parser.add_argument(
         "--limit-val-batches",
@@ -362,7 +369,7 @@ if __name__ == "__main__":
         data_dir=args.data_dir,
         num_nodes=args.num_nodes,
         devices=args.num_gpus,
-        seq_length=2048,
+        seq_length=args.seq_length,
         result_dir=args.result_dir,
         wandb_project=args.wandb_project,
         wandb_offline=args.wandb_offline,

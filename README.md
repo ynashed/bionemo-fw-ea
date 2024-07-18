@@ -44,17 +44,23 @@ aws s3 cp \
   --endpoint-url https://pbss.s8k.io
 ```
 #### Running
+
+The following command runs a very small example of geneformer.
+
 ```bash
-NVTE_APPLY_QK_LAYER_SCALING=1   \
-  python scripts/singlecell/geneformer/pretrain.py     \
-  --data-dir /workspace/bionemo2/data/cellxgene_2023-12-15_small/processed_data     \
-  --num-gpus 1     \
-  --num-nodes 1 \
-  --val-check-interval 10 \
-  --num-dataset-workers 0 \
-  --num-steps 100 \
-  --limit-val-batches 2 \
-  --micro-batch-size 32
+python  \
+    scripts/singlecell/geneformer/pretrain.py     \
+    --data-dir /workspace/bionemo2/data/cellxgene_2023-12-15_small/processed_data    \
+    --result-dir ./results     \
+    --experiment-name test_experiment     \
+    --num-gpus 1  \
+    --num-nodes 1 \
+    --val-check-interval 10 \
+    --num-dataset-workers 0 \
+    --num-steps 55 \
+    --seq-length 128 \
+    --limit-val-batches 2 \
+    --micro-batch-size 2
 ```
 
 #### Updating License Header on Python Files
@@ -63,4 +69,3 @@ which is defined in the development dependencies. If you add new Python (`.py`) 
 ```bash
 license-check --license-header ./license_header --check . --modify --replace
 ```
-

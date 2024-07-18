@@ -23,23 +23,23 @@ from bionemo.contrib.lightning import batch_collator, get_dtype_device
 
 def test_batch_collate_tuple():
     result = batch_collator(tuple((torch.tensor([i]), torch.tensor([i + 1])) for i in range(10)))
-    assert isinstance(result, tuple), 'expect output container to be the same type as input (tuple)'
+    assert isinstance(result, tuple), "expect output container to be the same type as input (tuple)"
     assert torch.equal(result[0], torch.tensor(list(range(10))))
     assert torch.equal(result[1], torch.tensor([i + 1 for i in range(10)]))
 
 
 def test_batch_collate_dict():
     result = batch_collator(
-        [{'fixed key1': torch.tensor([i]), 'fixed key2': torch.tensor([i + 1])} for i in range(10)]
+        [{"fixed key1": torch.tensor([i]), "fixed key2": torch.tensor([i + 1])} for i in range(10)]
     )
-    assert isinstance(result, dict), 'expect output container to be the same type as input (dict)'
-    assert torch.equal(result['fixed key1'], torch.tensor(list(range(10))))
-    assert torch.equal(result['fixed key2'], torch.tensor([i + 1 for i in range(10)]))
+    assert isinstance(result, dict), "expect output container to be the same type as input (dict)"
+    assert torch.equal(result["fixed key1"], torch.tensor(list(range(10))))
+    assert torch.equal(result["fixed key2"], torch.tensor([i + 1 for i in range(10)]))
 
 
 def test_batch_collate_list():
     result = batch_collator([[torch.tensor([i]), torch.tensor([i + 1])] for i in range(10)])
-    assert isinstance(result, list), 'expect output container to be the same type as input (list)'
+    assert isinstance(result, list), "expect output container to be the same type as input (list)"
     assert torch.equal(result[0], torch.tensor(list(range(10))))
     assert torch.equal(result[1], torch.tensor([i + 1 for i in range(10)]))
 
@@ -98,7 +98,7 @@ def test_nested_dtype():
 
 
 def test_dict_tensor_dtype():
-    dtype, _ = get_dtype_device({'tensor': torch.tensor(5, dtype=torch.float32)})
+    dtype, _ = get_dtype_device({"tensor": torch.tensor(5, dtype=torch.float32)})
     assert dtype == torch.float32
 
 
@@ -128,7 +128,7 @@ def test_empty_list_fails():
 def test_garbage_fails():
     # String not a valid input type, should work for other garbage values too.
     with pytest.raises(TypeError, match="Got something we didnt expect"):
-        get_dtype_device('flkasdflasd')
+        get_dtype_device("flkasdflasd")
 
 
 class MyModule(nn.Module):

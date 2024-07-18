@@ -32,7 +32,6 @@ def nemo1_to_nemo2_biobert_key_mapping(
     Returns:
         str: New key name
     """
-
     # add the . to the end of the input prefixes if they are not the empty string,
     #  unless the user has already done so.
     if old_model_prefix != "":
