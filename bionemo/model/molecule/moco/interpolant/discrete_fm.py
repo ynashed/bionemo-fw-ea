@@ -28,7 +28,6 @@ class DiscreteFlowMatchingInterpolant(Interpolant):
 
     def __init__(
         self,
-        # schedule_params: dict = {'type': 'linear', 'time': 'uniform', 'time_type': 'continuous'},
         prior_type: str = "uniform",
         vector_field_type: str = "standard",
         solver_type: str = "ode",
@@ -42,6 +41,8 @@ class DiscreteFlowMatchingInterpolant(Interpolant):
         sqrt: bool = False,
         nu: float = 1.0,
         clip: bool = True,
+        temp: float = 0.1,
+        stochasticity: float = 10.0,
     ):
         super(DiscreteFlowMatchingInterpolant, self).__init__(prior_type, solver_type, timesteps, time_type)
         self.num_classes = num_classes
@@ -49,6 +50,8 @@ class DiscreteFlowMatchingInterpolant(Interpolant):
         self.min_t = min_t
         self.max_t = 1 - min_t
         self.custom_prior = custom_prior
+        self.stochasticity = stochasticity
+        self.temp = temp
         self.init_schedulers(timesteps, scheduler_type, s, sqrt, nu, clip)
 
     def init_schedulers(self, timesteps, scheduler_type, s, sqrt, nu, clip):
@@ -112,6 +115,7 @@ class DiscreteFlowMatchingInterpolant(Interpolant):
         """
         Interpolate using discrete interpolation method.
         """
+        # TODO: how to get the mask out when we only want discrete loss on masked states?
         if self.prior_type in ["mask", "absorb", "uniform"]:
             x0 = self.prior(batch, x1.shape, self.num_classes, x1.device).unsqueeze(1)
             if self.time_type == "continuous":
@@ -144,8 +148,7 @@ class DiscreteFlowMatchingInterpolant(Interpolant):
             x0 = F.one_hot(x0, num_classes=self.num_classes)
         return x0.to(device)
 
-    def clean_edges(self, edge_index, edge_attr_next):
-        assert False
+    def clean_edges(self, edge_index, edge_attr_next, one_hot=False, return_masks=False):
         j, i = edge_index
         mask = j < i
         mask_i = i[mask]
@@ -160,7 +163,163 @@ class DiscreteFlowMatchingInterpolant(Interpolant):
             edge_attr=edge_attr_global,
             sort_by_row=False,
         )
-        return edge_index_global, edge_attr_global, mask, mask_i
+        if not one_hot:
+            edge_attr_global = edge_attr_global.argmax(1)
+        if return_masks:
+            return edge_index_global, edge_attr_global, mask, mask_i
+        else:
+            return edge_index_global, edge_attr_global
+
+    def step_uniform(
+        self,
+        batch,
+        xt,  #! if takes in one hot it will convert it
+        x_hat,  #! assumes input is logits
+        time,
+        dt,
+    ):
+        """
+        Perform a euler step in the discrete interpolant method.
+        """
+        if len(xt.shape) > 1:
+            xt = xt.argmax(dim=-1)
+
+        S = self.num_classes
+        if self.time_type == "continuous":
+            t = time
+        else:
+            t = time / self.timesteps
+        t = t[batch].unsqueeze(1)
+        N = torch.zeros_like(t)
+        N[t + dt < 1.0] = self.stochasticity
+
+        t = torch.clamp(t, min=self.min_t, max=self.max_t)
+
+        logits_1 = x_hat
+        pt_x1_probs = F.softmax(logits_1 / self.temp, dim=-1)
+        pt_x1_eq_xt_prob = torch.gather(pt_x1_probs, dim=-1, index=xt.long().unsqueeze(-1))
+
+        first = dt * pt_x1_probs * ((1 + N + N * (S - 1) * t) / (1 - t))
+        second = dt * N * pt_x1_eq_xt_prob
+        step_probs = (first + second).clamp(max=1.0)
+
+        # On-diagonal step probs
+        step_probs.scatter_(-1, xt.long().unsqueeze(-1), 0.0)
+        diags = (1.0 - step_probs.sum(dim=-1, keepdim=True)).clamp(min=0.0)
+        step_probs.scatter_(-1, xt.long().unsqueeze(-1), diags)
+
+        samples = torch.distributions.Categorical(step_probs).sample()
+        return samples
+
+    def step_absorb(
+        self,
+        batch,
+        xt,  #! if takes in one hot it will convert it
+        x_hat,  #! assumes input is logits
+        time,
+        dt,
+        absorb_step="purity",  # "sample_first" "sample_last"
+    ):
+        """
+        Perform a euler step in the discrete interpolant method.
+        """
+        if len(xt.shape) > 1:
+            xt = xt.argmax(dim=-1)
+
+        N = self.stochasticity
+        S = self.num_classes
+        MASK_TOKEN_INDEX = S - 1
+        if self.time_type == "continuous":
+            t = time
+        else:
+            t = time / self.timesteps
+        t = t[batch].unsqueeze(1)
+
+        t = torch.clamp(t, min=self.min_t, max=self.max_t)
+        xt_is_mask = (xt == MASK_TOKEN_INDEX).view(-1, 1).float()
+        limit = dt * ((1 + (N * t)) / ((1 - t)))
+        import ipdb
+
+        ipdb.set_trace()
+        if absorb_step == "sample_first":
+            xt_is_mask = xt_is_mask.squeeze(1)
+            pt_x1_probs = F.softmax(x_hat / self.temp, dim=-1)
+            x_next = torch.distributions.Categorical(pt_x1_probs).sample()
+
+            unmask = torch.rand_like(xt.float()) < limit.squeeze(1)
+            unmask = unmask * xt_is_mask
+
+            # Choose elements to mask
+            mask = torch.rand_like(xt.float()) < (N * dt)
+            mask = mask * (1 - xt_is_mask)
+            mask[t.squeeze(1) + dt >= 1.0] = 0.0
+
+            xt[unmask == 1] = x_next[unmask == 1]
+            xt[mask == 1] = MASK_TOKEN_INDEX
+            x_next = xt
+        elif absorb_step == "sample_last":
+            mask_one_hot = torch.zeros((S,), device=xt.device)
+            mask_one_hot[MASK_TOKEN_INDEX] = 1.0
+            logits_1 = x_hat
+            logits_1[:, MASK_TOKEN_INDEX] = -1e9
+
+            pt_x1_probs = F.softmax(logits_1 / self.temp, dim=-1)
+
+            xt_is_mask = (xt == MASK_TOKEN_INDEX).view(-1, 1).float()
+            step_probs = limit * pt_x1_probs  #!UNMASK
+            step_probs += dt * N * (1 - xt_is_mask) * mask_one_hot.view(1, -1)  #!MASK UNMASKED STATES
+            step_probs = step_probs.clamp(min=0, max=1.0)
+            # On-diagonal step probs
+            step_probs.scatter_(-1, xt.long().unsqueeze(-1), 0.0)
+            diags = (1.0 - step_probs.sum(dim=-1, keepdim=True)).clamp(min=0.0)
+            step_probs.scatter_(-1, xt.long().unsqueeze(-1), diags)
+
+            x_next = torch.multinomial(step_probs.view(-1, S), num_samples=1).view(xt.shape)
+        elif absorb_step == "purity":
+            logits_1 = x_hat
+            aatypes_t = xt
+            num_res, S = logits_1.shape
+            noise = self.stochasticity
+            assert aatypes_t.shape == (num_res, 1)
+            assert S == self.num_classes
+            device = logits_1.device
+            MASK_TOKEN_INDEX = S - 1
+
+            logits_1_wo_mask = logits_1[:, 0:-1]  # (D, S-1)
+            pt_x1_probs = F.softmax(logits_1_wo_mask / self.temp, dim=-1)  # (B, D, S-1)
+            max_logprob = torch.max(torch.log(pt_x1_probs), dim=-1)[0]  # (B, D)
+            # bias so that only currently masked positions get chosen to be unmasked
+            max_logprob = max_logprob - (aatypes_t != MASK_TOKEN_INDEX).float() * 1e9
+            torch.argsort(max_logprob, dim=-1, descending=True)  # (B, D)
+
+            unmask_probs = (dt * ((1 + noise * t) / (1 - t)).to(device)).clamp(max=1)  # scalar
+
+            torch.binomial(count=torch.count_nonzero(aatypes_t == MASK_TOKEN_INDEX, dim=-1).float(), prob=unmask_probs)
+            torch.multinomial(pt_x1_probs.view(-1, S - 1), num_samples=1).view(num_res, 1)
+
+            import ipdb
+
+            ipdb.set_trace()
+            # D_grid = torch.arange(num_res, device=device).view(1, -1).repeat(batch_size, 1)
+            # mask1 = (D_grid < number_to_unmask.view(-1, 1)).float()
+            # inital_val_max_logprob_idcs = sorted_max_logprobs_idcs[:, 0].view(-1, 1).repeat(1, num_res)
+            # masked_sorted_max_logprobs_idcs = (
+            #     mask1 * sorted_max_logprobs_idcs + (1 - mask1) * inital_val_max_logprob_idcs
+            # ).long()
+            # mask2 = torch.zeros((batch_size, num_res), device=device)
+            # mask2.scatter_(
+            #     dim=1, index=masked_sorted_max_logprobs_idcs, src=torch.ones((batch_size, num_res), device=device)
+            # )
+            # unmask_zero_row = (number_to_unmask == 0).view(-1, 1).repeat(1, num_res).float()
+            # mask2 = mask2 * (1 - unmask_zero_row)
+            # aatypes_t = aatypes_t * (1 - mask2) + unmasked_samples * mask2
+
+            # # re-mask
+            # u = torch.rand(batch_size, num_res, device=self._device)
+            # re_mask_mask = (u < d_t * self._aatypes_cfg.noise).float()
+            # aatypes_t = aatypes_t * (1 - re_mask_mask) + du.MASK_TOKEN_INDEX * re_mask_mask
+
+        return x_next
 
     def step(
         self,
@@ -169,121 +328,267 @@ class DiscreteFlowMatchingInterpolant(Interpolant):
         x_hat,  #! assumes input is logits
         time,
         dt,
-        x0=None,
-        stochasticity=1,
-        temp=0.1,
-        use_purity=False,
-        last_step=False,
     ):
         """
         Perform a euler step in the discrete interpolant method.
         """
-        # TODO: Take a look at FlowMol since we can remove this last step stuff and clean_up the code can change it to if time == 1 then we do armax
-        # TODO: take all arguments that are not x time and batch and set them up as class variables
-        assert False
-        if len(xt.shape) > 1:
-            xt = xt.argmax(dim=-1)
-        N = stochasticity
-        S = self.num_classes
-        MASK_TOKEN_INDEX = S - 1
-        if self.time_type == "continuous":
-            t = time
-        else:
-            t = time / self.timesteps
-        #! TODO max t is the same as min_t with shiftings so let's support both
-        t = torch.clamp(t, min=0, max=self.max_t)
-
-        t = t[batch].unsqueeze(1)
         if self.prior_type in ["uniform", "data", "custom"]:
-            logits_1 = x_hat
-            if last_step:
-                x_next = torch.argmax(logits_1, dim=-1)
-            else:
-                pt_x1_probs = F.softmax(logits_1 / temp, dim=-1)
-                pt_x1_eq_xt_prob = torch.gather(pt_x1_probs, dim=-1, index=xt.long().unsqueeze(-1))
-                step_probs = dt * (pt_x1_probs * ((1 + N + N * (S - 1) * t) / (1 - t)) + N * pt_x1_eq_xt_prob)
+            x_next = self.step_uniform(batch, xt, x_hat.clone(), time, dt)
 
-                step_probs = self._regularize_step_probs(step_probs, xt)
-                x_next = torch.multinomial(step_probs.view(-1, S), num_samples=1).view(xt.shape)  # Same as categorical
         elif self.prior_type in ["mask", "absorb"]:
             #! Masking is initalized with one more column as the mask state
-            logits_1 = x_hat.clone()
-            device = logits_1.device
-            if last_step:
-                logits_1[:, MASK_TOKEN_INDEX] = -1e9
-                x_next = torch.argmax(logits_1, dim=-1)
-            else:
-                if use_purity:
-                    x_next = self.discrete_purity_step(dt, t, logits_1, xt, batch, noise=stochasticity, temp=temp)
-                else:
-                    mask_one_hot = torch.zeros((S,), device=device)
-                    mask_one_hot[MASK_TOKEN_INDEX] = 1.0
-
-                    logits_1[:, MASK_TOKEN_INDEX] = -1e9
-
-                    pt_x1_probs = F.softmax(logits_1 / temp, dim=-1)
-
-                    xt_is_mask = (xt == MASK_TOKEN_INDEX).view(-1, 1).float()
-                    step_probs = dt * pt_x1_probs * ((1 + N * t) / ((1 - t)))  #!UNMASK
-                    step_probs += dt * (1 - xt_is_mask) * mask_one_hot.view(1, -1) * N  #!MASK UNMASKED STATES
-
-                    step_probs = self._regularize_step_probs(step_probs, xt)
-
-                    x_next = torch.multinomial(step_probs.view(-1, S), num_samples=1).view(
-                        xt.shape
-                    )  # Same as categorical
+            x_next = self.step_absorb(batch, xt, x_hat.clone(), time, dt)
 
         return x_next
 
-    def _regularize_step_probs(self, step_probs, aatypes_t):
-        #! TODO look into if Batch matters here but should not since everything is -1 so over atom classes
-        num_res, S = step_probs.shape
-        device = step_probs.device
-        step_probs = torch.clamp(step_probs, min=0.0, max=1.0)
-        # TODO replace with torch._scatter
-        step_probs[torch.arange(num_res, device=device), aatypes_t.long().flatten()] = 0
-        step_probs[torch.arange(num_res, device=device), aatypes_t.long().flatten()] = (
-            1.0 - torch.sum(step_probs, dim=-1).flatten()
-        )
-        step_probs = torch.clamp(step_probs, min=0.0, max=1.0)
-        return step_probs
+    # def _regularize_step_probs(self, step_probs, aatypes_t):
+    #     #! TODO look into if Batch matters here but should not since everything is -1 so over atom classes
+    #     num_res, S = step_probs.shape
+    #     device = step_probs.device
+    #     step_probs = torch.clamp(step_probs, min=0.0, max=1.0)
+    #     # TODO replace with torch._scatter
+    #     step_probs[torch.arange(num_res, device=device), aatypes_t.long().flatten()] = 0
+    #     step_probs[torch.arange(num_res, device=device), aatypes_t.long().flatten()] = (
+    #         1.0 - torch.sum(step_probs, dim=-1).flatten()
+    #     )
+    #     step_probs = torch.clamp(step_probs, min=0.0, max=1.0)
+    #     return step_probs
 
-    def discrete_purity_step(self, d_t, t, logits_1, aatypes_t, batch_ligand, noise=5, temp=0.1):
-        pass
-        # num_res, S = logits_1.shape
+    # def discrete_purity_step(self, d_t, t, logits_1, aatypes_t, batch_ligand, noise=5, temp=0.1):
+    #     num_res, S = logits_1.shape
 
-        # assert aatypes_t.shape == (num_res, 1)
-        # assert S == self.num_classes
-        # device = logits_1.device
-        # MASK_TOKEN_INDEX = S-1
+    #     assert aatypes_t.shape == (num_res, 1)
+    #     assert S == self.num_classes
+    #     device = logits_1.device
+    #     MASK_TOKEN_INDEX = S-1
 
-        # logits_1_wo_mask = logits_1[:, 0:-1] # (D, S-1)
-        # pt_x1_probs = F.softmax(logits_1_wo_mask / temp, dim=-1) # (B, D, S-1)
-        # # step_probs = (d_t * pt_x1_probs * (1/(1-t))).clamp(max=1) # (B, D, S-1)
-        # max_logprob = torch.max(torch.log(pt_x1_probs), dim=-1)[0] # (B, D)
-        # # bias so that only currently masked positions get chosen to be unmasked
-        # max_logprob = max_logprob - (aatypes_t != MASK_TOKEN_INDEX).float() * 1e9
-        # sorted_max_logprobs_idcs = torch.argsort(max_logprob, dim=-1, descending=True) # (B, D)
+    #     logits_1_wo_mask = logits_1[:, 0:-1] # (D, S-1)
+    #     pt_x1_probs = F.softmax(logits_1_wo_mask / temp, dim=-1) # (B, D, S-1)
+    #     # step_probs = (d_t * pt_x1_probs * (1/(1-t))).clamp(max=1) # (B, D, S-1)
+    #     max_logprob = torch.max(torch.log(pt_x1_probs), dim=-1)[0] # (B, D)
+    #     # bias so that only currently masked positions get chosen to be unmasked
+    #     max_logprob = max_logprob - (aatypes_t != MASK_TOKEN_INDEX).float() * 1e9
+    #     sorted_max_logprobs_idcs = torch.argsort(max_logprob, dim=-1, descending=True) # (B, D)
 
-        # unmask_probs = (d_t * ( (1 + noise * t) / (1-t)).to(device)).clamp(max=1) # scalar
+    #     unmask_probs = (d_t * ( (1 + noise * t) / (1-t)).to(device)).clamp(max=1) # scalar
 
-        # number_to_unmask = torch.binomial(count=torch.count_nonzero(aatypes_t == MASK_TOKEN_INDEX, dim=-1).float(),prob=unmask_probs)
-        # unmasked_samples = torch.multinomial(pt_x1_probs.view(-1, S-1), num_samples=1).view(num_res, 1)
+    #     number_to_unmask = torch.binomial(count=torch.count_nonzero(aatypes_t == MASK_TOKEN_INDEX, dim=-1).float(),prob=unmask_probs)
+    #     unmasked_samples = torch.multinomial(pt_x1_probs.view(-1, S-1), num_samples=1).view(num_res, 1)
 
-        #! TODO figure out how to do this for no batch size
-        # D_grid = torch.arange(num_res, device=device).view(1, -1) #.repeat(batch_size, 1)
-        # mask1 = (D_grid < number_to_unmask.view(-1, 1)).float()
-        # inital_val_max_logprob_idcs = sorted_max_logprobs_idcs[:, 0].view(-1, 1) #.repeat(1, num_res)
-        # masked_sorted_max_logprobs_idcs = (mask1 * sorted_max_logprobs_idcs + (1-mask1) * inital_val_max_logprob_idcs).long()
-        # mask2 = torch.zeros((num_res, 1), device=device)
-        # mask2.scatter_(dim=1, index=masked_sorted_max_logprobs_idcs, src=torch.ones((num_res, 1), device=device))
-        # unmask_zero_row = (number_to_unmask == 0).view(-1, 1).repeat(1, num_res).float()
-        # mask2 = mask2 * (1 - unmask_zero_row)
-        # aatypes_t = aatypes_t * (1 - mask2) + unmasked_samples * mask2
+    #     # ! TODO figure out how to do this for no batch size
+    #     D_grid = torch.arange(num_res, device=device).view(1, -1) #.repeat(batch_size, 1)
+    #     mask1 = (D_grid < number_to_unmask.view(-1, 1)).float()
+    #     inital_val_max_logprob_idcs = sorted_max_logprobs_idcs[:, 0].view(-1, 1) #.repeat(1, num_res)
+    #     masked_sorted_max_logprobs_idcs = (mask1 * sorted_max_logprobs_idcs + (1-mask1) * inital_val_max_logprob_idcs).long()
+    #     mask2 = torch.zeros((num_res, 1), device=device)
+    #     mask2.scatter_(dim=1, index=masked_sorted_max_logprobs_idcs, src=torch.ones((num_res, 1), device=device))
+    #     unmask_zero_row = (number_to_unmask == 0).view(-1, 1).repeat(1, num_res).float()
+    #     mask2 = mask2 * (1 - unmask_zero_row)
+    #     aatypes_t = aatypes_t * (1 - mask2) + unmasked_samples * mask2
 
-        # # re-mask
-        # u = torch.rand(batch_size, num_res, device=device) #! Need to have the ligand index
-        # re_mask_mask = (u < d_t * noise).float()
-        # aatypes_t = aatypes_t * (1 - re_mask_mask) + MASK_TOKEN_INDEX * re_mask_mask
+    #     # re-mask
+    #     u = torch.rand(batch_size, num_res, device=device) #! Need to have the ligand index
+    #     re_mask_mask = (u < d_t * noise).float()
+    #     aatypes_t = aatypes_t * (1 - re_mask_mask) + MASK_TOKEN_INDEX * re_mask_mask
 
-        # return aatypes_t
+    #     return aatypes_t
+
+
+if __name__ == "__main__":
+    ligand_pos = torch.rand((75, 3))
+    batch_ligand = torch.Tensor(
+        [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+        ]
+    ).to(torch.int64)
+    ligand_feats = torch.Tensor(
+        [
+            2,
+            4,
+            2,
+            4,
+            2,
+            4,
+            4,
+            3,
+            2,
+            2,
+            1,
+            1,
+            1,
+            1,
+            1,
+            5,
+            1,
+            3,
+            1,
+            1,
+            1,
+            2,
+            4,
+            2,
+            4,
+            2,
+            4,
+            4,
+            3,
+            2,
+            2,
+            1,
+            1,
+            1,
+            1,
+            1,
+            5,
+            1,
+            3,
+            1,
+            1,
+            1,
+            2,
+            2,
+            2,
+            2,
+            12,
+            2,
+            5,
+            2,
+            3,
+            5,
+            1,
+            5,
+            2,
+            4,
+            2,
+            4,
+            2,
+            4,
+            4,
+            3,
+            2,
+            2,
+            1,
+            1,
+            1,
+            1,
+            1,
+            5,
+            1,
+            3,
+            1,
+            1,
+            12,
+        ]
+    ).to(torch.int64)
+    num_classes = 13
+    # Initialize the adjacency matrix with zeros
+    adj_matrix = torch.zeros((75, 75, 5), dtype=torch.int64)
+    no_bond = torch.zeros(5)
+    no_bond[0] = 1
+    # Using broadcasting to create the adjacency matrix
+    adj_matrix[batch_ligand.unsqueeze(1) == batch_ligand] = 1
+    for idx, i in enumerate(batch_ligand):
+        for jdx, j in enumerate(batch_ligand):
+            if idx == jdx:
+                adj_matrix[idx][jdx] = no_bond
+            elif i == j:
+                adj_matrix[idx][jdx] = torch.nn.functional.one_hot(torch.randint(0, 5, (1,)), 5).squeeze(0)
+
+    atom_embedder = torch.nn.Linear(num_classes, 64)
+    X = ligand_pos
+    H = atom_embedder(F.one_hot(ligand_feats, num_classes).float())
+    A = adj_matrix
+    mask = batch_ligand.unsqueeze(1) == batch_ligand.unsqueeze(0)  # Shape: (75, 75)
+    E_idx = mask.nonzero(as_tuple=False).t()
+    self_loops = E_idx[0] != E_idx[1]
+    E_idx = E_idx[:, self_loops]
+
+    # import ipdb; ipdb.set_trace()
+    dfm = DiscreteFlowMatchingInterpolant(num_classes=num_classes)
+    xt = ligand_feats
+    x_hat = torch.rand((75, num_classes))
+    time = torch.tensor([0.2, 0.4, 0.6, 0.8])
+    res = dfm.step(batch_ligand, xt, x_hat, time, dt=1 / 500)
+    import ipdb
+
+    ipdb.set_trace()
+    dfm = DiscreteFlowMatchingInterpolant(num_classes=num_classes, prior_type="absorb")
+    xt = ligand_feats
+    x_hat = torch.rand((75, num_classes))
+    time = torch.tensor([0.2, 0.4, 0.6, 0.8])
+    res = dfm.step(batch_ligand, xt, x_hat, time, dt=1 / 500)
+    print("Success")

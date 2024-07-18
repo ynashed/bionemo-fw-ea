@@ -46,8 +46,9 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
         com_free: bool = True,
         noise_sigma: float = 0.0,
         optimal_transport: str = None,
-        max_t: float = 0.99,
         clip_t: float = 0.9,
+        loss_weight_type: str = 'standard',  # 'uniform'
+        loss_t_scale: float = 0.1,  # this makes max scale 1
     ):
         super(ContinuousFlowMatchingInterpolant, self).__init__(prior_type, solver_type, timesteps, time_type)
         self.num_classes = num_classes
@@ -59,6 +60,8 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
         self.init_schedulers(timesteps, scheduler_type, s, sqrt, nu, clip)
         self.max_t = 1.0 - min_t
         self.clip_t = clip_t
+        self.loss_weight_type = loss_weight_type
+        self.loss_t_scale = loss_t_scale
 
     def init_schedulers(self, timesteps, scheduler_type, s, sqrt, nu, clip):
         self.schedule_type = scheduler_type
@@ -74,7 +77,6 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
             # self.alphas, self.alphas_prime = cosine_beta_schedule_fm(
             #     schedule_params, timesteps
             # )  # FlowMol defines alpha as 1 - cos ^2
-            # self.forward_data_schedule = self.alphas
             self.scheduler = build_scheduler(scheduler_type, timesteps, s, sqrt, nu, clip)
             alphas, betas = self.scheduler.get_alphas_and_betas()
             self.register_buffer('alphas', alphas)
@@ -84,14 +86,16 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
             self.register_buffer('reverse_data_schedule', 1.0 - self.alphas)
 
     def loss_weight_t(self, time):
+        if self.loss_weight_type == "uniform":
+            return torch.ones_like(time).to(time.device)
+
         if self.time_type == "continuous":
-            # return torch.clamp(time / (1 - time), min=0.05, max=1.5)
-            # loss scale for "frameflow":
-            return (1 - torch.clamp(time, 0, self.max_t)) / (1 - torch.clamp(time, 0, self.clip_t)) ** 2
+            # loss scale for "frameflow": # [1, 0.1] for T = [0, 1]
+            return (self.loss_t_scale * (1 / (1 - torch.clamp(time, self.min_t, self.clip_t)))) ** 2
         else:
             if self.schedule_type == "linear":
                 t = time / self.timesteps
-                return (1 - torch.clamp(t, 0, self.max_t)) / (1 - torch.clamp(t, 0, self.clip_t)) ** 2
+                return (self.loss_t_scale * (1 / (1 - torch.clamp(t, self.min_t, self.clip_t)))) ** 2
             else:
                 return torch.clamp(self.snr(time), min=0.05, max=1.5)
 
@@ -99,7 +103,7 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
         if self.vector_field_type == "endpoint":
             weight = torch.ones_like(t).to(t.device)
         elif self.vector_field_type == "standard":
-            weight = 1 / (1 - torch.clamp(t, 0, self.max_t))  # [1, 0.1] for T = [0, 1]
+            weight = 1 / (1 - torch.clamp(t, self.min_t, self.max_t))
         return weight
 
     def forward_schedule(self, batch, time):
@@ -177,8 +181,8 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
             interp_noise = 0
         return x1, data_scale * x1 + noise_scale * x0 + interp_noise, x0
 
-    def vector_field(self, x1, xt, time, batch):
-        return (x1 - xt) / (1.0 - torch.clamp(time[batch], self.max_t))
+    def vector_field(self, batch, x1, xt, time):
+        return (x1 - xt) / (1.0 - torch.clamp(time[batch], self.min_t, self.max_t))
 
     def prior(self, batch, shape, device, x1=None):
         if self.prior_type == "gaussian" or self.prior_type == "normal":
@@ -203,13 +207,13 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
         Perform a euler step in the continuous flow matching method.
         Here we allow two options for the choice of update: vector field as a function of t and end point vector field
          A) VF = x1 - xt /(1-t) --> x_next = xt + 1/(1-t) * dt * (x_hat - xt) see Lipman et al. https://arxiv.org/pdf/2210.02747
-         B) Linear with dynamics as data prediction VF = x1 - x0 --> x_next = xt +  dt * (x_hat - x0) see Tong et al. https://arxiv.org/pdf/2302.00482
+         B) Linear with dynamics as data prediction VF = x1 - x0 --> x_next = xt +  dt * (x_hat - x0) see Tong et al. https://arxiv.org/pdf/2302.00482 sec 3.2.2 basic I-CFM
         Both of which can add additional noise.
         """
         if self.vector_field_type == "standard":
             data_scale, noise_scale = self.reverse_schedule(
                 batch, time, dt
-            )  #! this is same as xt + vf*df where vf = (xhat-xt)/(1-t) and can use hte vector_field function
+            )  #! this is same as xt + vf*df where vf = (xhat-xt)/(1-t) and can use the vector_field function
             x_next = data_scale * x_hat + noise_scale * xt
         elif self.vector_field_type == "endpoint":
             data_scale, _ = self.reverse_schedule(batch, time, dt)

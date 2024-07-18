@@ -22,7 +22,7 @@ from torch_scatter import scatter_mean
 from torch_sparse import coalesce
 from tqdm import tqdm
 
-from bionemo.model.molecule.moco.interpolant.interpolant import build_interpolant
+from bionemo.model.molecule.moco.interpolant.builder import build_interpolant
 
 # TODO create general data module class that can do 3dmg, sbdd, docking etc
 # TODO later on can create a Inference Class like Model Builder to handle all specfic benchmarking
