@@ -208,7 +208,7 @@ if __name__ == "__main__":
         pipeline_dtype=torch.float32,
     )
     data_module = MockDataModule(seq_length=seq_length, global_batch_size=32)
-    # (georgea) why do I need to configure a dataset before loading a model? can the tokenizer be removed? if so, can it be added later?
+    # TODO(georgea) why do I need to configure a dataset before loading a model? can the tokenizer be removed? if so, can it be added later?
     model = llm.GPTModel(gpt_config, tokenizer=data_module.tokenizer)
 
     resume = AutoResume(path=pathlib.Path(ckpt_path).parent)
@@ -219,9 +219,18 @@ if __name__ == "__main__":
 
     model.model_transform = peft
 
-    # TODO append modeltransorm callback?
     trainer.callbacks.append(ModelTransform())
 
-    # TODO update a trained model with additional heads?
+    # TODO(georgea) update a trained model with additional heads?
+    # maybe use adapters/adapter-wrappers?
+    # examples:
+    # https://github.com/NVIDIA/NeMo/blob/8035dd0bf558d745471fd253c2882bc0d600db2f/nemo/lightning/pytorch/callbacks/peft.py#L144-L149
+    # https://github.com/NVIDIA/NeMo/blob/234ac8b8cf184e1c00032799d3d20a9c36e3dca5/nemo/collections/llm/peft/lora.py#L11-L26
+    # possibly use the MLPHeadAdapter? But it lacks an activation, so just check on that
+    # https://github.com/NVIDIA/NeMo/blob/main/nemo/collections/nlp/modules/common/megatron/adapters/parallel_adapters.py#L392
 
     trainer.fit(model, data_module)
+    checkpoint_out_path = pathlib.Path(trainer.logger.log_dir) / "ckpt"
+    print(f"ckpt_path: {checkpoint_out_path}")
+    # TODO(georgea) this not saving any weights to state_dict
+    trainer.save_checkpoint(checkpoint_out_path)
