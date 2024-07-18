@@ -161,7 +161,7 @@ class AlphaFold(ModelPT):
 
         Args:
             cfg (Union[omegaconf.DictConfig, Dict]): model config containing architectural, loss,
-            and data parameters.
+            and data parameters..
 
             Please refer to the following configs inside bionemo.model.protein.openfold.conf:
                 1. base_config - for all architecture and loss parameters.
