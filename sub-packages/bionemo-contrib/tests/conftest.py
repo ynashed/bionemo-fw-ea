@@ -16,14 +16,15 @@
 
 # conftest.py
 import pathlib
-
+import os
 import pytest
 
 
+_BNMO_ROOT = pathlib.Path(os.path.abspath(os.path.dirname(__file__))).parent.parent.parent
 @pytest.fixture(scope="session")
 def bionemo2_root_path():
     # TODO: os.env("BIONEMO_HOME") when its setup.
-    return pathlib.Path("/workspace/bionemo2")
+    return _BNMO_ROOT
 
 
 @pytest.fixture(scope="session")
