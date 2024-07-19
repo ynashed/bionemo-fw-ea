@@ -209,10 +209,8 @@ class SingleCellDataset(Dataset):
 
     def __getitem__(self, idx: int) -> Item:
         """Performs a lookup and the required transformation for the model"""
-        idx = 0
         gene_data, col_idxs, feature_ids = self.lookup_cell_by_idx(idx)
-        # Two calls with the same idx always returns the same example, so there is nothing there happening
-        first = process_item(
+        return process_item(
             gene_data,
             col_idxs,
             feature_ids,
@@ -224,20 +222,6 @@ class SingleCellDataset(Dataset):
             random_token_prob=self.random_token_prob,
             prepend_cls_token=self.prepend_cls_token,
         )
-        second = process_item(
-            gene_data,
-            col_idxs,
-            feature_ids,
-            self.tokenizer,
-            gene_median=self.gene_medians,
-            max_len=self.max_len,
-            mask_token_prob=self.mask_token_prob,
-            mask_prob=self.mask_prob,
-            random_token_prob=self.random_token_prob,
-            prepend_cls_token=self.prepend_cls_token,
-        )
-        print(first["text"].sum(), second["text"].sum())
-        return first
 
 
 def process_item(
@@ -328,8 +312,6 @@ def process_item(
     mask = None
     mask_tokens_positions = None
     random_tokens_positions = None
-    # Set seed on every call to get deterministic outputs (hopefully)
-    np.random.seed(1337)
     # - masked tokens
     if mask_prob > 0.0:
         probs = np.full(token_ids.shape[0], mask_prob)
@@ -371,7 +353,6 @@ def process_item(
         token_ids[random_tokens_positions] = np.random.randint(5, len(tokenizer.vocab), random_tokens_positions.sum())
 
     # NeMo megatron assumes this return structure.
-    print("Token IDs in selected 0th example", token_ids.sum())
     item = {
         "text": token_ids.astype(np.int64),
         "types": np.zeros_like(token_ids).astype(np.int64),
