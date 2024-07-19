@@ -148,28 +148,6 @@ class DiscreteFlowMatchingInterpolant(Interpolant):
             x0 = F.one_hot(x0, num_classes=self.num_classes)
         return x0.to(device)
 
-    def clean_edges(self, edge_index, edge_attr_next, one_hot=False, return_masks=False):
-        j, i = edge_index
-        mask = j < i
-        mask_i = i[mask]
-        mask_j = j[mask]
-        j = torch.concat([mask_j, mask_i])
-        i = torch.concat([mask_i, mask_j])
-        edge_index_global = torch.stack([j, i], dim=0)
-        edges_triu = F.one_hot(edge_attr_next, self.num_classes).float()
-        edge_attr_global = torch.concat([edges_triu, edges_triu], dim=0)
-        edge_index_global, edge_attr_global = sort_edge_index(
-            edge_index=edge_index_global,
-            edge_attr=edge_attr_global,
-            sort_by_row=False,
-        )
-        if not one_hot:
-            edge_attr_global = edge_attr_global.argmax(1)
-        if return_masks:
-            return edge_index_global, edge_attr_global, mask, mask_i
-        else:
-            return edge_index_global, edge_attr_global
-
     def step_uniform(
         self,
         batch,
@@ -361,6 +339,45 @@ class DiscreteFlowMatchingInterpolant(Interpolant):
             x_next = self.step_absorb(batch, xt, x_hat.clone(), time, dt)
 
         return x_next
+
+    def step_edges(self, batch, edge_index, edge_attr_t, edge_attr_hat, time):
+        """
+        Given N*N input predictions only work on lower triangluar portion.
+        """
+        j, i = edge_index
+        mask = j < i
+        mask_i = i[mask]
+        edge_attr_t = edge_attr_t[mask]
+        edge_attr_hat = edge_attr_hat[mask]
+        edge_attr_next = self.step(batch[mask_i], edge_attr_t, edge_attr_hat, time)
+        return self.clean_edges(edge_index, edge_attr_next)
+
+    def clean_edges(self, edge_index, edge_attr_next, one_hot=False, return_masks=False):
+        """
+        Takes lower triangular edge tensor and creates fully symmetric square.
+        Example: If i --> j now j --> i
+        Note Semla predicts full N^2 unike EQGAT
+        """
+        j, i = edge_index
+        mask = j < i
+        mask_i = i[mask]
+        mask_j = j[mask]
+        j = torch.concat([mask_j, mask_i])
+        i = torch.concat([mask_i, mask_j])
+        edge_index_global = torch.stack([j, i], dim=0)
+        edges_triu = F.one_hot(edge_attr_next, self.num_classes).float()
+        edge_attr_global = torch.concat([edges_triu, edges_triu], dim=0)
+        edge_index_global, edge_attr_global = sort_edge_index(
+            edge_index=edge_index_global,
+            edge_attr=edge_attr_global,
+            sort_by_row=False,
+        )
+        if not one_hot:
+            edge_attr_global = edge_attr_global.argmax(1)
+        if return_masks:
+            return edge_index_global, edge_attr_global, mask, mask_i
+        else:
+            return edge_index_global, edge_attr_global
 
 
 if __name__ == "__main__":

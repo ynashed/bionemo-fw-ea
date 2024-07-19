@@ -182,6 +182,9 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
         return x1, data_scale * x1 + noise_scale * x0 + interp_noise, x0
 
     def vector_field(self, batch, x1, xt, time):
+        """
+        Return (x1 - xt) / (1 - t)
+        """
         return (x1 - xt) / (1.0 - torch.clamp(time[batch], self.min_t, self.max_t))
 
     def prior(self, batch, shape, device, x1=None):

@@ -120,7 +120,6 @@ class DiscreteDiffusionInterpolant(Interpolant):
             self.register_buffer('forward_noise_schedule', log_1_min_a(log_alpha_bar))
 
     def forward_schedule(self, batch, time):
-        # t = 1 - t
         t_idx = self.timesteps - 1 - time
         return self.forward_data_schedule[t_idx][batch], self.forward_noise_schedule[t_idx][batch]
 
@@ -218,24 +217,10 @@ class DiscreteDiffusionInterpolant(Interpolant):
         """
         if self.solver_type == "sde" and self.diffusion_type == "d3pm":
             assert self.discrete_time_only
-            # if len(x_hat.shape) <= 1:
-            #     x_hat = F.one_hot(x_hat, num_classes=self.num_classes).float()
             if len(xt.shape) <= 1:
                 xt = F.one_hot(xt, num_classes=self.num_classes).float()
             t_idx = self.timesteps - 1 - time[batch]
 
-            # a = torch.einsum("nj, nji -> ni", [xt, self.Qt[t_idx].transpose(-2, -1)])
-            # b = torch.einsum("nj, nji -> ni", [x_hat, self.Qt_prev_bar[t_idx]])
-            # p0 = a * b
-            # # (n, k)
-            # p1 = torch.einsum("nj, nji -> ni", [x_hat, self.Qt_bar[t_idx]])
-            # p1 = (p1 * xt).sum(-1, keepdims=True)
-            # # (n, 1)
-
-            # probs = p0 / p1
-            # check = torch.all((probs.sum(-1) - 1.0).abs() < 1e-4)
-            # assert check
-            # ! The above is the exact same but uses one more einsum so probably slower
             A = torch.einsum("nj, nji -> ni", [xt, self.Qt[t_idx].permute(0, 2, 1)]).unsqueeze(1)  # [A, 1, 16]
             B = self.Qt_prev_bar[t_idx]  # [A, 16, 16]
             p0 = A * B
