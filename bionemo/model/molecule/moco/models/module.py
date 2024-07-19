@@ -77,7 +77,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
                     aggregation=loss_params.aggregate,
                     continuous=loss_params.continuous,
                     use_distance=loss_params.use_distance,
-                    distance_scale=loss_params.distance_scale,
+                    distance_scale=loss_params.distance_scale,  # TODO make these optional
                 )
             else:
                 loss_functions[index] = InterpolantLossFunction(
@@ -158,6 +158,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
             method=self.interpolant_params.sample_time_method,
             mean=self.interpolant_params.sample_time_mean,
             scale=self.interpolant_params.sample_time_scale,
+            min_t=self.interpolant_params.min_t,
         )
         return time
 
@@ -410,7 +411,9 @@ class Graph3DInterpolantModel(pl.LightningModule):
         time_type = self.interpolants[self.global_variable].time_type
         if time_type == "continuous":
             if time_discretization == "linear":
-                timeline = torch.linspace(0, 1, timesteps + 1).tolist()  # [0, 1.0] timestpes + 1
+                timeline = torch.linspace(
+                    self.interpolant_params.min_t, 1, timesteps + 1
+                ).tolist()  # [0, 1.0] timestpes + 1
             elif time_discretization == "log":
                 timeline = (
                     (1 - torch.logspace(-2, 0, timesteps + 1)).flip(dims=[0]).tolist()

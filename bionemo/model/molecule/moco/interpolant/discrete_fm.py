@@ -116,8 +116,8 @@ class DiscreteFlowMatchingInterpolant(Interpolant):
         Interpolate using discrete interpolation method.
         """
         # TODO: how to get the mask out when we only want discrete loss on masked states?
-        if self.prior_type in ["mask", "absorb", "uniform"]:
-            x0 = self.prior(batch, x1.shape, self.num_classes, x1.device).unsqueeze(1)
+        if self.prior_type in ["mask", "absorb", "uniform", "custom"]:
+            x0 = self.prior(batch, x1.shape, x1.device).unsqueeze(1)
             if self.time_type == "continuous":
                 t = time
             else:
@@ -130,6 +130,19 @@ class DiscreteFlowMatchingInterpolant(Interpolant):
             raise ValueError("Only uniform and mask are supported")
 
         return x1, xt.squeeze(1), x0.squeeze(1)
+
+    def interpolate_edges(self, batch, x1, x1_index, time):
+        """
+        Interpolate using discrete interpolation method.
+        Similar to sample_edges_categorical https://github.com/tuanle618/eqgat-diff/blob/68aea80691a8ba82e00816c82875347cbda2c2e5/eqgat_diff/experiments/diffusion/categorical.py#L242
+        """
+        j, i = x1_index
+        mask = j < i
+        mask_i = i[mask]
+        edge_attr_triu = x1[mask]
+        _, edge_attr_t, upper_probs = self.interpolate(batch[mask_i], edge_attr_triu, time)
+        edge_index_global_perturbed, edge_attr_global_perturbed = self.clean_edges(x1_index, edge_attr_t)
+        return x1, edge_attr_global_perturbed, _
 
     def prior(self, batch, shape, device, one_hot=False):
         """

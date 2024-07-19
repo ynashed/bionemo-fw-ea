@@ -151,8 +151,10 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
         # Create matrix with data on outer axis and noise on inner axis
         for data in data_batch:
             best_noise = [permute_and_slice(noise, data) for noise in noise_batch]
-            sub_batch = torch.arange(len(noise_batch)).repeat_interleave(data.shape[0])
-            best_noise = align_structures(torch.cat(best_noise, dim=1), sub_batch, data, broadcast_reference=True)
+            sub_batch = torch.arange(len(noise_batch)).repeat_interleave(data.shape[0]).to(data.device)
+            best_noise, _, _ = align_structures(
+                torch.cat(best_noise, dim=0), sub_batch, data, broadcast_reference=True
+            )
             best_noise = best_noise.reshape((len(noise_batch), data.shape[0], 3))
             best_costs = pairwise_distances(
                 best_noise, data.repeat(len(noise_batch), 1).reshape(len(noise_batch), data.shape[0], 3)
@@ -160,11 +162,11 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
                 :, 0
             ]  # B x 1
             mol_matrix.append(best_noise)  # B x N x 3
-            cost_matrix.append(best_costs.numpy())
+            cost_matrix.append(best_costs.cpu().numpy())
 
         row_indices, col_indices = linear_sum_assignment(np.array(cost_matrix))
         optimal_noise = [mol_matrix[r][c] for r, c in zip(row_indices, col_indices)]
-        return torch.cat(optimal_noise, dim=-1)  #! returns N tot x 3 where this matches data_chunk
+        return torch.cat(optimal_noise, dim=0)  #! returns N tot x 3 where this matches data_chunk
 
     def interpolate(self, batch, x1, time):
         """
@@ -191,17 +193,17 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
         if self.prior_type == "gaussian" or self.prior_type == "normal":
             x0 = torch.randn(shape).to(device)
             if self.com_free:
-                if batch:
+                if batch is not None:
                     x0 = x0 - scatter_mean(x0, batch, dim=0)[batch]
                 else:
                     x0 = x0 - x0.mean(0)
         else:
             raise ValueError("Only Gaussian is supported")
         if self.optimal_transport == "scale_ot":
-            if batch:
+            if batch is not None:
                 scale = 0.2 * torch.log(torch.bincount(batch) + 1)[batch]
             else:
-                scale = 0.2 * torch.log(x0.shape[0] + 1)
+                scale = 0.2 * np.log(x0.shape[0] + 1)  # torch can't log scalar
             x0 = x0 * scale
         return x0.to(device)
 

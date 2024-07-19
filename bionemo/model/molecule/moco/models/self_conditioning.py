@@ -82,7 +82,7 @@ class BaseSelfConditioningModule(nn.Module):
             if clamp[0] is not None or clamp[1] is not None:
                 x_cond = torch.clamp(x_cond, min=clamp[0], max=clamp[1])
 
-            if not vec:
+            if not vec:  #! TODO clean up this logic and rename vec / vector in config
                 x = torch.cat([x, x_cond], dim=-1)
                 x = self.modules_dict[key](x)
             else:

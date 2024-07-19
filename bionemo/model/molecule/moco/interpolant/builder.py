@@ -33,14 +33,14 @@ def build_interpolant(
     min_t: float = 1e-2,
     custom_prior: torch.Tensor = None,
     com_free: bool = True,
-    # variable_name: str = None,
-    # concat: str = None,
-    # offset: int = 0,
+    variable_name: str = None,
+    concat: str = None,
+    offset: int = 0,
     noise_sigma: float = 0.0,
     optimal_transport: str = None,
     clip_t: float = 0.0,
     loss_weight_type: str = 'standard',  # 'uniform'
-    loss_t_scale: float = 0.1  # this makes max scale 1
+    loss_t_scale: float = 0.1,  # this makes max scale 1
     # TODO: here is where we add all the possible things that could go into any interpolant class
 ):
     """

@@ -158,13 +158,15 @@ class EQGATWrapper(DenoisingEdgeNetwork):
             batch=batch["batch"],
             batch_edge_global=batch["batch"][batch["edge_index"][0]],
         )
-        out = {
+        result = {
             "x_hat": out["coords_pred"],
             "h_logits": out["atoms_pred"],
             "edge_attr_logits": out["bonds_pred"],
-            "Z_hat": out["Z_hat"] if "Z_hat" in out else None,
+            # "Z_hat": out["Z_hat"] if "Z_hat" in out,
         }
-        return out
+        if "Z_hat" in out:
+            result["Z_hat"] = out["Z_hat"]
+        return result
 
 
 class JODOWrapper(DGT_concat):

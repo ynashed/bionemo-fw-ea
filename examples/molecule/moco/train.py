@@ -25,6 +25,7 @@ from bionemo.model.molecule.moco.models.module import Graph3DInterpolantModel
 from bionemo.model.molecule.moco.models.utils_train import EMACallback
 
 
+# local command to run CUDA_VISIBLE_DEVICES=0 python train.py --config-name "train_eqgat_flow"
 @hydra_runner(config_path="conf", config_name="train")
 def main(cfg: DictConfig) -> None:
     """

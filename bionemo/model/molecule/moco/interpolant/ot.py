@@ -18,34 +18,34 @@ def scale_prior(prior, batch, num_atoms, c=0.2):
     return c * prior * np.log(num_atoms + 1)[batch]
 
 
-def equivariant_ot_prior(self, data_chunk, batch):
-    """Permute the from_mols batch so that it forms an approximate mini-batch OT map with to_mols"""
-    #! prior has to be as big as the largets input and then we throw stuff away
-    #! noise_batch is a list of beath elements of max atom num x 3
-    batch_size = int(max(batch) + 1)
-    data_batch = [data_chunk[batch == idx] for idx in range(batch_size)]
-    max_num_atoms = max([x.shape[0] for x in data_batch])
-    noise_batch = [self.prior(max_num_atoms) for _ in range(batch_size)]
-    mol_matrix = []
-    cost_matrix = []
+# def equivariant_ot_prior(self, data_chunk, batch):
+#     """Permute the from_mols batch so that it forms an approximate mini-batch OT map with to_mols"""
+#     #! prior has to be as big as the largets input and then we throw stuff away
+#     #! noise_batch is a list of beath elements of max atom num x 3
+#     batch_size = int(max(batch) + 1)
+#     data_batch = [data_chunk[batch == idx] for idx in range(batch_size)]
+#     max_num_atoms = max([x.shape[0] for x in data_batch])
+#     noise_batch = [self.prior(max_num_atoms) for _ in range(batch_size)]
+#     mol_matrix = []
+#     cost_matrix = []
 
-    # Create matrix with data on outer axis and noise on inner axis
-    for data in data_batch:
-        best_noise = [permute_and_slice(noise, data) for noise in noise_batch]
-        sub_batch = torch.arange(len(noise_batch)).repeat_interleave(data.shape[0])
-        best_noise = align_structures(torch.cat(best_noise, dim=0), sub_batch, data, broadcast_reference=True)
-        best_noise = best_noise.reshape((len(noise_batch), data.shape[0], 3))
-        best_costs = pairwise_distances(
-            best_noise, data.repeat(len(noise_batch), 1).reshape(len(noise_batch), data.shape[0], 3)
-        )[
-            :, 0
-        ]  # B x 1
-        mol_matrix.append(best_noise)  # B x N x 3
-        cost_matrix.append(best_costs.numpy())
+#     # Create matrix with data on outer axis and noise on inner axis
+#     for data in data_batch:
+#         best_noise = [permute_and_slice(noise, data) for noise in noise_batch]
+#         sub_batch = torch.arange(len(noise_batch)).repeat_interleave(data.shape[0])
+#         best_noise = align_structures(torch.cat(best_noise, dim=0), sub_batch, data, broadcast_reference=True)
+#         best_noise = best_noise.reshape((len(noise_batch), data.shape[0], 3))
+#         best_costs = pairwise_distances(
+#             best_noise, data.repeat(len(noise_batch), 1).reshape(len(noise_batch), data.shape[0], 3)
+#         )[
+#             :, 0
+#         ]  # B x 1
+#         mol_matrix.append(best_noise)  # B x N x 3
+#         cost_matrix.append(best_costs.numpy())
 
-    row_indices, col_indices = linear_sum_assignment(np.array(cost_matrix))
-    optimal_noise = [mol_matrix[r][c] for r, c in zip(row_indices, col_indices)]
-    return torch.cat(optimal_noise, dim=0)  #! returns N tot x 3 where this matches data_chunk
+#     row_indices, col_indices = linear_sum_assignment(np.array(cost_matrix))
+#     optimal_noise = [mol_matrix[r][c] for r, c in zip(row_indices, col_indices)]
+#     return torch.cat(optimal_noise, dim=0)  #! returns N tot x 3 where this matches data_chunk
 
 
 def pairwise_distances(tensor1, tensor2):
@@ -72,7 +72,7 @@ def permute_and_slice(noise, data):
     noise_indices = torch.arange(M)
     noise = noise[noise_indices, :]
     cost_matrix = torch.cdist(noise, data) ** 2
-    _, noise_indices = linear_sum_assignment(cost_matrix.numpy())
+    _, noise_indices = linear_sum_assignment(cost_matrix.cpu().numpy())
     noise = noise[noise_indices, :]
     return noise
 
