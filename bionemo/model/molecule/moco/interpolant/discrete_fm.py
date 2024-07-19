@@ -218,7 +218,7 @@ class DiscreteFlowMatchingInterpolant(Interpolant):
         x_hat,  #! assumes input is logits
         time,
         dt,
-        absorb_step="purity",  # "sample_first" "sample_last"
+        absorb_step="sample_first",  # "sample_first" "sample_last", "purity"
     ):
         """
         Perform a euler step in the discrete interpolant method.
@@ -233,15 +233,14 @@ class DiscreteFlowMatchingInterpolant(Interpolant):
             t = time
         else:
             t = time / self.timesteps
+        og_time = t
         t = t[batch].unsqueeze(1)
 
         t = torch.clamp(t, min=self.min_t, max=self.max_t)
         xt_is_mask = (xt == MASK_TOKEN_INDEX).view(-1, 1).float()
         limit = dt * ((1 + (N * t)) / ((1 - t)))
-        import ipdb
-
-        ipdb.set_trace()
         if absorb_step == "sample_first":
+            # Matches Semla and MultiFlow Paper but not Code
             xt_is_mask = xt_is_mask.squeeze(1)
             pt_x1_probs = F.softmax(x_hat / self.temp, dim=-1)
             x_next = torch.distributions.Categorical(pt_x1_probs).sample()
@@ -258,6 +257,7 @@ class DiscreteFlowMatchingInterpolant(Interpolant):
             xt[mask == 1] = MASK_TOKEN_INDEX
             x_next = xt
         elif absorb_step == "sample_last":
+            # matches MultiFlow Code but not Paper
             mask_one_hot = torch.zeros((S,), device=xt.device)
             mask_one_hot[MASK_TOKEN_INDEX] = 1.0
             logits_1 = x_hat
@@ -277,47 +277,68 @@ class DiscreteFlowMatchingInterpolant(Interpolant):
             x_next = torch.multinomial(step_probs.view(-1, S), num_samples=1).view(xt.shape)
         elif absorb_step == "purity":
             logits_1 = x_hat
-            aatypes_t = xt
-            num_res, S = logits_1.shape
+            aatypes_t = xt.unsqueeze(1)
+            num_atoms, S = logits_1.shape
             noise = self.stochasticity
-            assert aatypes_t.shape == (num_res, 1)
+            assert aatypes_t.shape == (num_atoms, 1)
             assert S == self.num_classes
             device = logits_1.device
             MASK_TOKEN_INDEX = S - 1
+            logits_1_wo_mask = logits_1[:, 0:-1]  # (N, S-1)
+            pt_x1_probs = F.softmax(logits_1_wo_mask / self.temp, dim=-1)  # (N, S-1)
+            #! Things need to be in batches to have things per molecule
 
-            logits_1_wo_mask = logits_1[:, 0:-1]  # (D, S-1)
-            pt_x1_probs = F.softmax(logits_1_wo_mask / self.temp, dim=-1)  # (B, D, S-1)
-            max_logprob = torch.max(torch.log(pt_x1_probs), dim=-1)[0]  # (B, D)
+            unique_values, counts = batch.unique(return_counts=True)
+            batch_size = max(unique_values).item() + 1
+            batch_pt_x1_probs = torch.zeros((batch_size, max(counts), S - 1)).to(x_hat.device)
+            batch_aatypes_t = torch.zeros((batch_size, max(counts))).to(x_hat.device)
+            for b in range(batch_size):
+                batch_pt_x1_probs[b, : counts[b], :] = pt_x1_probs[batch == b]
+                batch_aatypes_t[b, : counts[b]] = aatypes_t[batch == b].view(1, -1)
+            # max_logprob = torch.max(torch.log(pt_x1_probs), dim=-1)[0]  # (N)
+            max_logprob = torch.max(torch.log(batch_pt_x1_probs), dim=-1)[0]  # B x N
+
             # bias so that only currently masked positions get chosen to be unmasked
-            max_logprob = max_logprob - (aatypes_t != MASK_TOKEN_INDEX).float() * 1e9
-            torch.argsort(max_logprob, dim=-1, descending=True)  # (B, D)
+            # max_logprob = max_logprob - (aatypes_t.squeeze(1) != MASK_TOKEN_INDEX).float() * 1e9
+            max_logprob = max_logprob - (batch_aatypes_t != MASK_TOKEN_INDEX).float() * 1e9
+            sorted_max_logprobs_idcs = torch.argsort(max_logprob, dim=-1, descending=True)  # (N)
 
-            unmask_probs = (dt * ((1 + noise * t) / (1 - t)).to(device)).clamp(max=1)  # scalar
+            # unmask_probs = (dt * ((1 + noise * t) / (1 - t)).to(device)).clamp(max=1)  # (N, 1)
+            unmask_probs = (dt * ((1 + noise * og_time) / (1 - og_time)).to(device)).clamp(max=1)
+            # number_to_unmask = torch.binomial(count=torch.count_nonzero(aatypes_t.squeeze(1) == MASK_TOKEN_INDEX, dim=-1).float(), prob=unmask_probs.squeeze(1)) #(N)
+            number_to_unmask = torch.binomial(
+                count=torch.count_nonzero(batch_aatypes_t == MASK_TOKEN_INDEX, dim=-1).float(), prob=unmask_probs
+            )
+            unmasked_samples = torch.multinomial(pt_x1_probs.view(-1, S - 1), num_samples=1).view(num_atoms, 1)
+            batch_unmasked_samples = torch.zeros((batch_size, max(counts))).to(x_hat.device)
+            for b in range(batch_size):
+                batch_unmasked_samples[b, : counts[b]] = unmasked_samples[batch == b].view(1, -1)
+            num_res = max(counts)
 
-            torch.binomial(count=torch.count_nonzero(aatypes_t == MASK_TOKEN_INDEX, dim=-1).float(), prob=unmask_probs)
-            torch.multinomial(pt_x1_probs.view(-1, S - 1), num_samples=1).view(num_res, 1)
-
-            import ipdb
-
-            ipdb.set_trace()
-            # D_grid = torch.arange(num_res, device=device).view(1, -1).repeat(batch_size, 1)
-            # mask1 = (D_grid < number_to_unmask.view(-1, 1)).float()
-            # inital_val_max_logprob_idcs = sorted_max_logprobs_idcs[:, 0].view(-1, 1).repeat(1, num_res)
-            # masked_sorted_max_logprobs_idcs = (
-            #     mask1 * sorted_max_logprobs_idcs + (1 - mask1) * inital_val_max_logprob_idcs
-            # ).long()
-            # mask2 = torch.zeros((batch_size, num_res), device=device)
-            # mask2.scatter_(
-            #     dim=1, index=masked_sorted_max_logprobs_idcs, src=torch.ones((batch_size, num_res), device=device)
-            # )
-            # unmask_zero_row = (number_to_unmask == 0).view(-1, 1).repeat(1, num_res).float()
-            # mask2 = mask2 * (1 - unmask_zero_row)
+            D_grid = torch.arange(num_res, device=device).view(1, -1).repeat(batch_size, 1)  # batch x num_atoms
+            mask1 = (D_grid < number_to_unmask.view(-1, 1)).float()
+            inital_val_max_logprob_idcs = sorted_max_logprobs_idcs[:, 0].view(-1, 1).repeat(1, num_res)
+            masked_sorted_max_logprobs_idcs = (
+                mask1 * sorted_max_logprobs_idcs + (1 - mask1) * inital_val_max_logprob_idcs
+            ).long()
+            mask2 = torch.zeros((batch_size, num_res), device=device)
+            mask2.scatter_(
+                dim=1, index=masked_sorted_max_logprobs_idcs, src=torch.ones((batch_size, num_res), device=device)
+            )
+            unmask_zero_row = (number_to_unmask == 0).view(-1, 1).repeat(1, num_res).float()
+            mask2 = mask2 * (1 - unmask_zero_row)
             # aatypes_t = aatypes_t * (1 - mask2) + unmasked_samples * mask2
-
-            # # re-mask
-            # u = torch.rand(batch_size, num_res, device=self._device)
-            # re_mask_mask = (u < d_t * self._aatypes_cfg.noise).float()
-            # aatypes_t = aatypes_t * (1 - re_mask_mask) + du.MASK_TOKEN_INDEX * re_mask_mask
+            batch_aatypes_t = batch_aatypes_t * (1 - mask2) + batch_unmasked_samples * mask2
+            # re-mask
+            u = torch.rand(batch_size, num_res, device=x_hat.device)
+            re_mask_mask = (u < dt * noise).float()
+            # aatypes_t = aatypes_t * (1 - re_mask_mask) + MASK_TOKEN_INDEX * re_mask_mask
+            batch_aatypes_t = batch_aatypes_t * (1 - re_mask_mask) + MASK_TOKEN_INDEX * re_mask_mask
+            x_next = torch.zeros(num_atoms).to(x_hat.device)
+            counter = 0
+            for b in range(batch_size):
+                x_next[counter : counter + counts[b]] = batch_aatypes_t[b, : counts[b]]
+                counter += counts[b]
 
         return x_next
 
@@ -340,58 +361,6 @@ class DiscreteFlowMatchingInterpolant(Interpolant):
             x_next = self.step_absorb(batch, xt, x_hat.clone(), time, dt)
 
         return x_next
-
-    # def _regularize_step_probs(self, step_probs, aatypes_t):
-    #     #! TODO look into if Batch matters here but should not since everything is -1 so over atom classes
-    #     num_res, S = step_probs.shape
-    #     device = step_probs.device
-    #     step_probs = torch.clamp(step_probs, min=0.0, max=1.0)
-    #     # TODO replace with torch._scatter
-    #     step_probs[torch.arange(num_res, device=device), aatypes_t.long().flatten()] = 0
-    #     step_probs[torch.arange(num_res, device=device), aatypes_t.long().flatten()] = (
-    #         1.0 - torch.sum(step_probs, dim=-1).flatten()
-    #     )
-    #     step_probs = torch.clamp(step_probs, min=0.0, max=1.0)
-    #     return step_probs
-
-    # def discrete_purity_step(self, d_t, t, logits_1, aatypes_t, batch_ligand, noise=5, temp=0.1):
-    #     num_res, S = logits_1.shape
-
-    #     assert aatypes_t.shape == (num_res, 1)
-    #     assert S == self.num_classes
-    #     device = logits_1.device
-    #     MASK_TOKEN_INDEX = S-1
-
-    #     logits_1_wo_mask = logits_1[:, 0:-1] # (D, S-1)
-    #     pt_x1_probs = F.softmax(logits_1_wo_mask / temp, dim=-1) # (B, D, S-1)
-    #     # step_probs = (d_t * pt_x1_probs * (1/(1-t))).clamp(max=1) # (B, D, S-1)
-    #     max_logprob = torch.max(torch.log(pt_x1_probs), dim=-1)[0] # (B, D)
-    #     # bias so that only currently masked positions get chosen to be unmasked
-    #     max_logprob = max_logprob - (aatypes_t != MASK_TOKEN_INDEX).float() * 1e9
-    #     sorted_max_logprobs_idcs = torch.argsort(max_logprob, dim=-1, descending=True) # (B, D)
-
-    #     unmask_probs = (d_t * ( (1 + noise * t) / (1-t)).to(device)).clamp(max=1) # scalar
-
-    #     number_to_unmask = torch.binomial(count=torch.count_nonzero(aatypes_t == MASK_TOKEN_INDEX, dim=-1).float(),prob=unmask_probs)
-    #     unmasked_samples = torch.multinomial(pt_x1_probs.view(-1, S-1), num_samples=1).view(num_res, 1)
-
-    #     # ! TODO figure out how to do this for no batch size
-    #     D_grid = torch.arange(num_res, device=device).view(1, -1) #.repeat(batch_size, 1)
-    #     mask1 = (D_grid < number_to_unmask.view(-1, 1)).float()
-    #     inital_val_max_logprob_idcs = sorted_max_logprobs_idcs[:, 0].view(-1, 1) #.repeat(1, num_res)
-    #     masked_sorted_max_logprobs_idcs = (mask1 * sorted_max_logprobs_idcs + (1-mask1) * inital_val_max_logprob_idcs).long()
-    #     mask2 = torch.zeros((num_res, 1), device=device)
-    #     mask2.scatter_(dim=1, index=masked_sorted_max_logprobs_idcs, src=torch.ones((num_res, 1), device=device))
-    #     unmask_zero_row = (number_to_unmask == 0).view(-1, 1).repeat(1, num_res).float()
-    #     mask2 = mask2 * (1 - unmask_zero_row)
-    #     aatypes_t = aatypes_t * (1 - mask2) + unmasked_samples * mask2
-
-    #     # re-mask
-    #     u = torch.rand(batch_size, num_res, device=device) #! Need to have the ligand index
-    #     re_mask_mask = (u < d_t * noise).float()
-    #     aatypes_t = aatypes_t * (1 - re_mask_mask) + MASK_TOKEN_INDEX * re_mask_mask
-
-    #     return aatypes_t
 
 
 if __name__ == "__main__":
@@ -577,15 +546,12 @@ if __name__ == "__main__":
     self_loops = E_idx[0] != E_idx[1]
     E_idx = E_idx[:, self_loops]
 
-    # import ipdb; ipdb.set_trace()
     dfm = DiscreteFlowMatchingInterpolant(num_classes=num_classes)
     xt = ligand_feats
     x_hat = torch.rand((75, num_classes))
     time = torch.tensor([0.2, 0.4, 0.6, 0.8])
     res = dfm.step(batch_ligand, xt, x_hat, time, dt=1 / 500)
-    import ipdb
-
-    ipdb.set_trace()
+    # import ipdb;ipdb.set_trace()
     dfm = DiscreteFlowMatchingInterpolant(num_classes=num_classes, prior_type="absorb")
     xt = ligand_feats
     x_hat = torch.rand((75, num_classes))
