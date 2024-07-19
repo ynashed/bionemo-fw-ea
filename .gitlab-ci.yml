@@ -701,7 +701,6 @@ jet-configure:
 # default deadline under corresponding section in base_config.yaml: https://gitlab-master.nvidia.com/dl/jet/ci/-/blob/bionemo/base_config.yaml?ref_type=heads#L33
 jet-trigger:
   extends: [.jet-trigger-template]
-  allow_failure: true
   variables:
     JET_WORKLOADS_FILTER: type == 'recipe'
     JET_CUSTOM_CONFIG: |
