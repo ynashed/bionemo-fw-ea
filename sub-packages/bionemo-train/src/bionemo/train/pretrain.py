@@ -24,7 +24,7 @@ import argparse
 import math
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, List, Literal, Optional, Protocol, Union, get_args
+from typing import Any, Callable, List, Literal, Optional, Protocol, Union, get_args
 
 import pytorch_lightning as pl
 from megatron.core.optimizer import OptimizerConfig
@@ -302,12 +302,18 @@ MakePreprocessor = Callable[[PretrainConfig], Preprocessor]
 MakeDataModule = Callable[[PretrainConfig, PreprocessResources], pl.LightningDataModule]
 
 
+BionemoModelConfig = Any
+
+MakeModelConfig = Callable[[PretrainConfig], BionemoModelConfig]
+
+
 def refactored_main(
     pretrain_config: PretrainConfig,
     wandb_config: Optional[WanDbConfig],
     strategy_or_config: Union[MegatronStrategyConfig, nl.MegatronStrategy],
     make_preprocessor: MakePreprocessor,
     make_datamodule: MakeDataModule,
+    make_model_config: MakeModelConfig,
     make_optimizer: MakeOptimizer,
     model_specification: ModuleSpec,
     training_callbacks: Optional[List[pl.Callback]] = None,
@@ -405,37 +411,38 @@ def refactored_main(
     #     num_workers=num_dataset_workers,
     # )
 
-    geneformer_config = BioBertConfig(
-        num_layers=6,
-        hidden_size=256,
-        ffn_hidden_size=512,
-        num_attention_heads=4,
-        seq_length=seq_length,
-        fp32_residual_connection=False,  # TODO(@jstjohn) check this
-        hidden_dropout=0.02,
-        init_method_std=0.02,
-        kv_channels=None,
-        apply_query_key_layer_scaling=True,
-        make_vocab_size_divisible_by=128,
-        masked_softmax_fusion=True,  # TODO(@jstjohn) check this
-        fp16_lm_cross_entropy=False,
-        params_dtype=get_autocast_dtype(precision),
-        pipeline_dtype=get_autocast_dtype(precision),
-        autocast_dtype=get_autocast_dtype(precision),  # setting this speeds things up a lot
-        gradient_accumulation_fusion=False,  # THIS BREAKS STUFF, leave False
-        layernorm_zero_centered_gamma=False,  # TODO(@jstjohn) check this
-        layernorm_epsilon=1.0e-12,
-        activation_func=F.relu,  # TODO(@jstjohn) check this
-        qk_layernorm=True,  # TODO(@jstjohn) check this
-        apply_residual_connection_post_layernorm=False,  # False is new default, True was BERT pub.
-        bias_activation_fusion=False,  # TODO(@jstjohn) check this
-        bias_dropout_fusion=True,  # TODO(@jstjohn) check this
-        get_attention_mask_from_fusion=False,
-        attention_dropout=0.1,
-        share_embeddings_and_output_weights=True,
-        enable_autocast=True,  # This has to be set to True if we use the mixed precision plugin
-        biobert_spec_option=biobert_spec_option,
-    )
+    geneformer_config = make_model_config(pretrain_config, precision, model_specification)
+    # geneformer_config = BioBertConfig(
+    #     num_layers=6,
+    #     hidden_size=256,
+    #     ffn_hidden_size=512,
+    #     num_attention_heads=4,
+    #     seq_length=seq_length,
+    #     fp32_residual_connection=False,  # TODO(@jstjohn) check this
+    #     hidden_dropout=0.02,
+    #     init_method_std=0.02,
+    #     kv_channels=None,
+    #     apply_query_key_layer_scaling=True,
+    #     make_vocab_size_divisible_by=128,
+    #     masked_softmax_fusion=True,  # TODO(@jstjohn) check this
+    #     fp16_lm_cross_entropy=False,
+    #     params_dtype=get_autocast_dtype(precision),
+    #     pipeline_dtype=get_autocast_dtype(precision),
+    #     autocast_dtype=get_autocast_dtype(precision),  # setting this speeds things up a lot
+    #     gradient_accumulation_fusion=False,  # THIS BREAKS STUFF, leave False
+    #     layernorm_zero_centered_gamma=False,  # TODO(@jstjohn) check this
+    #     layernorm_epsilon=1.0e-12,
+    #     activation_func=F.relu,  # TODO(@jstjohn) check this
+    #     qk_layernorm=True,  # TODO(@jstjohn) check this
+    #     apply_residual_connection_post_layernorm=False,  # False is new default, True was BERT pub.
+    #     bias_activation_fusion=False,  # TODO(@jstjohn) check this
+    #     bias_dropout_fusion=True,  # TODO(@jstjohn) check this
+    #     get_attention_mask_from_fusion=False,
+    #     attention_dropout=0.1,
+    #     share_embeddings_and_output_weights=True,
+    #     enable_autocast=True,  # This has to be set to True if we use the mixed precision plugin
+    #     biobert_spec_option=biobert_spec_option,
+    # )
 
     # The lightning class owns a copy of the actual model, and a loss function, both of which are configured
     #  and lazily returned by the `geneformer_config` object defined above.
