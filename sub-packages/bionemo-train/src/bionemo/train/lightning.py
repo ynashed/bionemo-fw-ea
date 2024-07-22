@@ -13,14 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from abc import ABC, abstractmethod
-from typing import Dict, Generic, Iterable, List, Optional, Protocol, Tuple, Type, TypedDict, TypeVar, Union
+from typing import Any, Dict, Generic, Iterable, List, Optional, Protocol, Tuple, Type, TypedDict, TypeVar, Union
 
 import pytorch_lightning as pl
 import torch
 import torch.distributed
 from megatron.core import parallel_state
 from megatron.core.optimizer import OptimizerConfig
-from nemo.collections.common.tokenizers.tokenizer_spec import TokenizerSpec
 from nemo.lightning import io as nlio
 from nemo.lightning.megatron_parallel import DataT, MegatronLossReduction, ReductionT
 from nemo.lightning.pytorch.optim import MegatronOptimizerModule
@@ -226,7 +225,9 @@ BionemoModel = TypeVar("BionemoModel", bound=BionemoModelBase)
 
 
 class BionemoModelConfig(Generic[BionemoModel, Loss], Protocol):
-    def configure_model(self) -> BionemoModel: ...
+    def configure_model(self, **kwargs) -> BionemoModel: ...
+
+    # NOTE: all must have **kwargs o/w passing in extras will cause it to break!
 
     def get_loss_reduction_class(self) -> Type[Loss]: ...
 
@@ -234,21 +235,27 @@ class BionemoModelConfig(Generic[BionemoModel, Loss], Protocol):
 BMC = TypeVar("BMC", bounnd=BionemoModelConfig)
 
 
+class BionemoDataConfig(Protocol):
+    def get_parameters_for_model(self) -> Dict[str, Any]: ...
+
+
 class BionemoLightningModule(
     pl.LightningModule, nlio.IOMixin, nlio.ConnectorMixin, LightningPassthroughPredictionMixin, Generic[BMC], ABC
 ):
     def __init__(
         self,
-        config: BMC,
+        model_config: BMC,
         # TODO: Add transformer_layer_spec when we update mcore
-        tokenizer: Optional[TokenizerSpec] = None,
+        # tokenizer: Optional[TokenizerSpec] = None,
+        configure_model_inputs: Dict[str, Any],
         optimizer: MegatronOptimizerModule = MegatronOptimizerModule(
             config=OptimizerConfig(lr=1e-4, optimizer="adam", use_distributed_optimizer=True),
         ),
     ) -> None:
         super().__init__()
-        self.config = config
-        self.tokenizer = tokenizer
+        self.config = model_config
+        # self.tokenizer = tokenizer
+        self.configure_model_inputs = configure_model_inputs
         self.loss_reduction_class = self.config.get_loss_reduction_class()
         # TODO replace the self.configure_optimizer call with the optimizer below
         #  once it all works. This is the future direction for how things are going.
@@ -258,7 +265,11 @@ class BionemoLightningModule(
 
     def configure_model(self) -> None:
         if self.module is None:
-            self.module = self.config.configure_model(self.tokenizer)
+            # self.module = self.config.configure_model(self.tokenizer)
+            # TODO [malcolmgreaves] FANCY -- we call this once, so ok to take a bit more time
+            #                       We **could maybe** inspect the self.config.configure_model call
+            #                       to see its kwarg names and then pull only these out @ runtime.
+            self.module = self.config.configure_model(**self.configure_model_inputs)
 
     def forward(
         self,

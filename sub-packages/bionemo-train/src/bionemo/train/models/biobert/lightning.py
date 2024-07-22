@@ -43,7 +43,7 @@ __all__ = (
 class BioBertLightningModule(BionemoLightningModule):
     def __init__(
         self,
-        config: BioBertConfig,
+        model_config: BioBertConfig,
         # TODO: Add transformer_layer_spec when we update mcore
         tokenizer: Optional[TokenizerSpec] = None,
         optimizer: MegatronOptimizerModule = MegatronOptimizerModule(
@@ -56,7 +56,7 @@ class BioBertLightningModule(BionemoLightningModule):
         need to modify the various step and forward functions towards the bottom of this file to handle new/different keys in the batch. In the future some of
         those functions may need to be refactored out into the config object or a different place so that they live closer to the model definition.
         """
-        super().__init__(config, tokenizer, optimizer)
+        super().__init__(model_config, tokenizer, optimizer)
 
     def data_step(self, dataloader_iter) -> Dict[str, torch.Tensor]:
         return biobert_data_step(dataloader_iter)
