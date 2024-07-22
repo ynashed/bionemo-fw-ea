@@ -711,7 +711,7 @@ jet-trigger:
         max_retries: 2
         retry_on: ['1.2', '1.2.*', '1.1.1.1']
         waiting_time: 60
-        environment: jet-api
+        environment: jet-auto-retrier
       launchers:
         dgxa100_dracooci:
           additional_flags:
