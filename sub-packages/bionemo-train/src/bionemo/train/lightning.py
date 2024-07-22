@@ -24,6 +24,7 @@ from nemo.lightning.megatron_parallel import DataT, MegatronLossReduction, Reduc
 
 
 __all__ = (
+    "some_first",
     "get_dtype_device",
     "batch_collator",
     "PassthroughLossReduction",
@@ -205,55 +206,3 @@ class LossLoggingCallback(_OnBatchEnd, _OnEpochEnd, pl.Callback):
         if avg_test_loss := self._on_epoch_end(self.test_losses):
             pl_module.log("test_loss", avg_test_loss, prog_bar=True, logger=True, rank_zero_only=True)
             self.test_losses.clear()
-
-    # def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx) -> None:
-    #     # Assuming the loss is computed internally and stored in pl_modules
-    #     if torch.distributed.get_rank() == 0 and parallel_state.is_pipeline_last_stage():
-    #         # TODO(@jstjohn): verify when the outputs are a dictionary of "loss" and when they are just one tensor value.
-    #         if isinstance(outputs, dict):
-    #             outputs = outputs["loss"]
-    #         # torch.distributed.all_reduce(outputs, op=torch.distributed.ReduceOp.AVG)
-    #         loss = outputs
-    #         pl_module.log("train_loss", loss, on_step=True, prog_bar=True, logger=True, rank_zero_only=True)
-    #
-    # def on_test_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0) -> None:
-    #     # TODO(@jstjohn): Add a docstring with type hints for this lightning hook
-    #     # Assuming the loss is computed internally and stored in pl_module
-    #     if torch.distributed.get_rank() == 0 and parallel_state.is_pipeline_last_stage():
-    #         # TODO(@jstjohn): verify when the outputs are a dictionary of "loss" and when they are just one tensor value.
-    #         if isinstance(outputs, dict):
-    #             outputs = outputs["loss"]
-    #         # TODO verify that losses are already reduced across ranks
-    #         # torch.distributed.all_reduce(outputs, op=torch.distributed.ReduceOp.AVG)
-    #         loss = outputs
-    #         self.test_losses.append(loss)
-    #
-    # def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0) -> None:
-    #     # TODO(@jstjohn): Add a docstring with type hints for this lightning hook
-    #     # Assuming the loss is computed internally and stored in pl_module
-    #     if torch.distributed.get_rank() == 0 and parallel_state.is_pipeline_last_stage():
-    #         # TODO(@jstjohn): verify when the outputs are a dictionary of "loss" and when they are just one tensor value.
-    #         if isinstance(outputs, dict):
-    #             outputs = outputs["loss"]
-    #         # TODO verify that losses are already reduced across ranks
-    #         # torch.distributed.all_reduce(outputs, op=torch.distributed.ReduceOp.AVG)
-    #         # TODO verify that losses are already reduced across ranks
-    #         # torch.distributed.all_reduce(outputs, op=torch.distributed.ReduceOp.AVG)
-    #         loss = outputs
-    #         self.val_losses.append(loss)
-    #
-    # def on_validation_epoch_end(self, trainer, pl_module) -> None:
-    #     # TODO(@jstjohn): Add a docstring with type hints for this lightning hook
-    #     if torch.distributed.get_rank() == 0 and parallel_state.is_pipeline_last_stage():
-    #         if len(self.val_losses) > 0:
-    #             avg_val_loss = torch.stack(self.val_losses).mean()
-    #             pl_module.log("val_loss", avg_val_loss, prog_bar=True, logger=True, rank_zero_only=True)
-    #             self.val_losses.clear()
-    #
-    # def on_test_epoch_end(self, trainer, pl_module) -> None:
-    #     # TODO(@jstjohn): Add a docstring with type hints for this lightning hook
-    #     if torch.distributed.get_rank() == 0 and parallel_state.is_pipeline_last_stage():
-    #         if len(self.test_losses) > 0:
-    #             avg_test_loss = torch.stack(self.test_losses).mean()
-    #             pl_module.log("test_loss", avg_test_loss, prog_bar=True, logger=True, rank_zero_only=True)
-    #             self.test_losses.clear()
