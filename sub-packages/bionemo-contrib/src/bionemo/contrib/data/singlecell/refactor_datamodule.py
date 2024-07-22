@@ -32,7 +32,6 @@ D = TypeVar('D', bound=torch.data.Dataset)
 
 class DataConfig(Protocol):
 
-
     def configure_dataset(self, **kwargs) -> D:
         ...
 
