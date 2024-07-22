@@ -27,6 +27,7 @@ from nemo.lightning.pytorch.optim import MegatronOptimizerModule
 
 
 __all__ = (
+    "BionemoLightningModule",
     "some_first",
     "get_dtype_device",
     "batch_collator",

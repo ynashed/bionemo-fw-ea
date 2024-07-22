@@ -24,7 +24,7 @@ import argparse
 import math
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, get_args, Literal
+from typing import Literal, Optional, get_args
 
 from megatron.core.optimizer import OptimizerConfig
 from megatron.core.transformer.spec_utils import ModuleSpec
@@ -37,12 +37,7 @@ from nemo.utils import logging
 from pytorch_lightning.callbacks import LearningRateMonitor, RichModelSummary
 from torch.nn import functional as F
 
-# from bionemo.contrib.data.singlecell.datamodule import SingleCellDataModule
-# from bionemo.contrib.data.singlecell.preprocess import GeneformerPreprocess
 from bionemo.contrib.lightning import LossLoggingCallback
-
-# from bionemo.contrib.model.biobert.lightning import BioBertLightningModule
-# from bionemo.contrib.model.biobert.model import BioBertConfig, BiobertSpecOption
 from bionemo.contrib.utils.dtypes import PrecisionTypes, get_autocast_dtype
 from bionemo.contrib.utils.logger_utils import WandbLoggerOptions, setup_nemo_lightning_logger
 
@@ -264,17 +259,17 @@ class PretrainConfig:
 
 @dataclass(frozen=True)
 class MegatronStrategyConfig:
-
     pipeline_model_parallel_size: int = 1
     tensor_model_parallel_size: int = 1
 
     @property
-    def ddp(self) -> Literal['megatron']:
-        return 'megatron'
+    def ddp(self) -> Literal["megatron"]:
+        return "megatron"
+
 
 def refactored_main(
     pretrain_config: PretrainConfig,
-    strategy: MegatronStrategyConfig | ,
+    strategy: MegatronStrategyConfig,
     model_specification: ModuleSpec,
 ):
     """Train a Geneformer model on single cell data.
