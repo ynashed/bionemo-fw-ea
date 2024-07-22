@@ -22,8 +22,9 @@
 
 import argparse
 import math
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, get_args
+from typing import Optional, get_args, Literal
 
 from megatron.core.optimizer import OptimizerConfig
 from megatron.core.transformer.spec_utils import ModuleSpec
@@ -239,28 +240,42 @@ def main(
     )
 
 
+@dataclass(frozen=True)
+class PretrainConfig:
+    data_dir: Path
+    num_nodes: int
+    devices: int
+    result_dir: Path
+    num_steps: int
+    limit_val_batches: int
+    val_check_interval: int
+    num_dataset_workers: int
+    lr: float
+    micro_batch_size: int
+    cosine_rampup_frac: float
+    cosine_hold_frac: float
+    experiment_name: str
+    resume_if_exists: bool
+    precision: PrecisionTypes
+    wandb_project: Optional[str]
+    wandb_entity: str = "clara-discovery"
+    create_tensorboard_logger: bool = False
+
+
+@dataclass(frozen=True)
+class MegatronStrategyConfig:
+
+    pipeline_model_parallel_size: int = 1
+    tensor_model_parallel_size: int = 1
+
+    @property
+    def ddp(self) -> Literal['megatron']:
+        return 'megatron'
+
 def refactored_main(
-    data_dir: Path,
-    num_nodes: int,
-    devices: int,
-    seq_length: int,
-    result_dir: Path,
-    wandb_project: Optional[str],
-    wandb_offline: bool,
-    num_steps: int,
-    limit_val_batches: int,
-    val_check_interval: int,
-    num_dataset_workers: int,
-    specification: ModuleSpec,
-    lr: float,
-    micro_batch_size: int,
-    cosine_rampup_frac: float,
-    cosine_hold_frac: float,
-    experiment_name: str,
-    resume_if_exists: bool,
-    precision: PrecisionTypes,
-    wandb_entity: str = "clara-discovery",
-    create_tensorboard_logger: bool = False,
+    pretrain_config: PretrainConfig,
+    strategy: MegatronStrategyConfig | ,
+    model_specification: ModuleSpec,
 ):
     """Train a Geneformer model on single cell data.
 
@@ -287,22 +302,23 @@ def refactored_main(
         resume_if_exists (bool): attempt to resume if the checkpoint exists [FIXME @skothenhill this doesn't work yet]
         wandb_entity (str): the group to use for the wandb run, sometimes called a team, could also be your username
         create_tensorboard_logger (bool): create the tensorboard logger
-
-
     """
+
+    if not pretrain_config.data_dir.is_dir():
+        raise ValueError(f"Expecting data directory to exist: {pretrain_config.data_dir}")
+
     # Create the result directory if it does not exist.
-    result_dir.mkdir(parents=True, exist_ok=True)
+    pretrain_config.result_dir.mkdir(parents=True, exist_ok=True)
 
     # Setup train/test/val data paths
-    train_data_path = data_dir / "train"
-    val_data_path = data_dir / "val"
-    test_data_path = data_dir / "test"
+    train_data_path = pretrain_config.data_dir / "train"
+    val_data_path = pretrain_config.data_dir / "val"
+    test_data_path = pretrain_config.data_dir / "test"
 
     # Setup the strategy and trainer
-    pipeline_model_parallel_size = 1
     strategy = nl.MegatronStrategy(
-        tensor_model_parallel_size=1,
-        pipeline_model_parallel_size=pipeline_model_parallel_size,
+        tensor_model_parallel_size=pretrain_config.tensor_model_parallel_size,
+        pipeline_model_parallel_size=pretrain_config.pipeline_model_parallel_size,
         ddp="megatron",
         find_unused_parameters=True,
         enable_nemo_ckpt_io=False,
