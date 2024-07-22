@@ -155,6 +155,7 @@ class LightningPassthroughPredictionMixin:
 
     def predict_loss_reduction(self) -> PassthroughLossReduction:
         """For the predict step, pass through the forward pass output."""
+        # TODO [malcolm]: Under active design in megatron!
         return PassthroughLossReduction()
 
 
