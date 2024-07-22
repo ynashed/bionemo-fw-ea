@@ -107,7 +107,7 @@ def main(cfg: DictConfig) -> None:
     )
     evaluation_callback = MoleculeEvaluationCallback(
         n_graphs=cfg.evaluation.n_molecules, batch_size=cfg.evaluation.batch_size, timesteps=cfg.evaluation.timesteps
-    )
+    )  #! This is where the validation epoch end but control is still done as we would in the config
 
     trainer = pl.Trainer(
         max_epochs=cfg.train.n_epochs,

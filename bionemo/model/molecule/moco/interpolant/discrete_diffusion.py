@@ -239,7 +239,7 @@ class DiscreteDiffusionInterpolant(Interpolant):
         return x_next
 
     def step_edges(
-        self, batch, edge_index, edge_attr_t, edge_attr_hat, time, mask=None, mask_i=None, return_masks=False
+        self, batch, edge_index, edge_attr_t, edge_attr_hat, time, mask=None, mask_i=None, return_masks=False, dt=None
     ):
         if mask is None or mask_i is None:
             j, i = edge_index

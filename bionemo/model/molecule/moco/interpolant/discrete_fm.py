@@ -117,7 +117,7 @@ class DiscreteFlowMatchingInterpolant(Interpolant):
         """
         # TODO: how to get the mask out when we only want discrete loss on masked states?
         if self.prior_type in ["mask", "absorb", "uniform", "custom"]:
-            x0 = self.prior(batch, x1.shape, x1.device).unsqueeze(1)
+            x0 = self.prior(None, x1.shape, x1.device).unsqueeze(1)
             if self.time_type == "continuous":
                 t = time
             else:
@@ -140,6 +140,7 @@ class DiscreteFlowMatchingInterpolant(Interpolant):
         mask = j < i
         mask_i = i[mask]
         edge_attr_triu = x1[mask]
+        batch = batch[mask_i]
         _, edge_attr_t, upper_probs = self.interpolate(batch[mask_i], edge_attr_triu, time)
         edge_index_global_perturbed, edge_attr_global_perturbed = self.clean_edges(x1_index, edge_attr_t)
         return x1, edge_attr_global_perturbed, _
@@ -160,6 +161,26 @@ class DiscreteFlowMatchingInterpolant(Interpolant):
         if one_hot:
             x0 = F.one_hot(x0, num_classes=self.num_classes)
         return x0.to(device)
+
+    def prior_edges(self, batch, shape, index, device, one_hot=False, return_masks=False):
+        """
+        Returns discrete index (num_samples,) or one hot if True (num_samples, num_classes)
+        similar to initialize_edge_attrs_reverse https://github.com/tuanle618/eqgat-diff/blob/68aea80691a8ba82e00816c82875347cbda2c2e5/eqgat_diff/experiments/diffusion/utils.py#L18
+        """
+        num_samples = shape[0]
+        j, i = index
+        mask = j < i
+        mask_i = i[mask]
+        num_upper_E = len(mask_i)
+        num_samples = num_upper_E
+        edge_attr_triu = self.prior(None, (num_samples, self.num_classes), device)
+        edge_index_global, edge_attr_global, mask, mask_i = self.clean_edges(index, edge_attr_triu, return_masks=True)
+        if one_hot:
+            edge_attr_global = F.one_hot(edge_attr_global, num_classes=self.num_classes).float()
+        if return_masks:
+            return edge_attr_global.to(device), edge_index_global.to(device), mask, mask_i
+        else:
+            return edge_attr_global.to(device), edge_index_global.to(device)
 
     def step_uniform(
         self,
@@ -340,6 +361,7 @@ class DiscreteFlowMatchingInterpolant(Interpolant):
         x_hat,  #! assumes input is logits
         time,
         dt,
+        x0=None,
     ):
         """
         Perform a euler step in the discrete interpolant method.
@@ -353,7 +375,7 @@ class DiscreteFlowMatchingInterpolant(Interpolant):
 
         return x_next
 
-    def step_edges(self, batch, edge_index, edge_attr_t, edge_attr_hat, time):
+    def step_edges(self, batch, edge_index, edge_attr_t, edge_attr_hat, time, dt):
         """
         Given N*N input predictions only work on lower triangluar portion.
         """
@@ -362,7 +384,7 @@ class DiscreteFlowMatchingInterpolant(Interpolant):
         mask_i = i[mask]
         edge_attr_t = edge_attr_t[mask]
         edge_attr_hat = edge_attr_hat[mask]
-        edge_attr_next = self.step(batch[mask_i], edge_attr_t, edge_attr_hat, time)
+        edge_attr_next = self.step(batch[mask_i], edge_attr_t, edge_attr_hat, time, dt)
         return self.clean_edges(edge_index, edge_attr_next)
 
     def clean_edges(self, edge_index, edge_attr_next, one_hot=False, return_masks=False):
@@ -581,7 +603,6 @@ if __name__ == "__main__":
     x_hat = torch.rand((75, num_classes))
     time = torch.tensor([0.2, 0.4, 0.6, 0.8])
     res = dfm.step(batch_ligand, xt, x_hat, time, dt=1 / 500)
-    # import ipdb;ipdb.set_trace()
     dfm = DiscreteFlowMatchingInterpolant(num_classes=num_classes, prior_type="absorb")
     xt = ligand_feats
     x_hat = torch.rand((75, num_classes))

@@ -297,6 +297,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
         time = self.sample_time(batch)
         out, batch, time = self(batch, time)
         loss, predictions = self.calculate_loss(batch, out, time, "val")
+        # result = self.sample(100)
         return loss
 
     def training_step(self, batch, batch_idx):
@@ -441,7 +442,6 @@ class Graph3DInterpolantModel(pl.LightningModule):
 
         data, prior = {}, {}
         total_num_atoms = num_atoms.sum().item()
-
         # Sample from all Priors
         for key, interpolant in self.interpolants.items():
             if interpolant is None:
@@ -492,6 +492,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
                         edge_attr_t=data[f"{key}_t"],
                         edge_attr_hat=out[f"{key}_hat"],
                         time=time,
+                        dt=dt,
                     )
                 else:
                     data[f"{key}_t"] = interpolant.step(

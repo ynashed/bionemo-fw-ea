@@ -1,9 +1,9 @@
-run_name: 'eqgat_flow_test'
+run_name: 'eqgat_flow_local_sample'
 outdir: /workspace/bionemo/results/eqgatdiff
 resume: null
 ema_resume: null
 wandb_params:
-  mode: 'disabled'  # disabled, offline, online
+  mode: 'online'  # disabled, offline, online
   entity: 'clara-discovery'
   group: 'danny-testing'
   project: 'MoCo'

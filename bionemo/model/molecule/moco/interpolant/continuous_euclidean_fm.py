@@ -143,6 +143,10 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
         data_batch = [data_chunk[batch == idx] for idx in range(batch_size)]
         max_num_atoms = max([x.shape[0] for x in data_batch])
         noise_batch = [self.prior(None, (max_num_atoms, 3), data_chunk.device) for _ in range(batch_size)]
+        for xidx, x0 in enumerate(noise_batch):
+            if self.optimal_transport == "scale_ot":
+                scale = 0.2 * np.log(x0.shape[0] + 1)  # torch can't log scalar
+                noise_batch[xidx] = x0 * scale
         # if scale:
         #      noise_batch = [x*0.2*np.log(max_num_atoms + 1) for x in noise_batch]
         mol_matrix = []
@@ -199,12 +203,6 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
                     x0 = x0 - x0.mean(0)
         else:
             raise ValueError("Only Gaussian is supported")
-        if self.optimal_transport == "scale_ot":
-            if batch is not None:
-                scale = 0.2 * torch.log(torch.bincount(batch) + 1)[batch]
-            else:
-                scale = 0.2 * np.log(x0.shape[0] + 1)  # torch can't log scalar
-            x0 = x0 * scale
         return x0.to(device)
 
     def step(self, batch, xt, x_hat, time, x0=None, dt=None):
