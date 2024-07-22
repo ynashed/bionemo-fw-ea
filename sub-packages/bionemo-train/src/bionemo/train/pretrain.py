@@ -24,8 +24,9 @@ import argparse
 import math
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, Optional, get_args
+from typing import Callable, List, Literal, Optional, Protocol, Union, get_args
 
+import pytorch_lightning as pl
 from megatron.core.optimizer import OptimizerConfig
 from megatron.core.transformer.spec_utils import ModuleSpec
 from nemo import lightning as nl
@@ -37,9 +38,10 @@ from nemo.utils import logging
 from pytorch_lightning.callbacks import LearningRateMonitor, RichModelSummary
 from torch.nn import functional as F
 
-from bionemo.contrib.lightning import LossLoggingCallback
+from bionemo.contrib.data.singlecell.preprocess import PreprocessResources
 from bionemo.contrib.utils.dtypes import PrecisionTypes, get_autocast_dtype
 from bionemo.contrib.utils.logger_utils import WandbLoggerOptions, setup_nemo_lightning_logger
+from bionemo.train.lightning import LossLoggingCallback
 
 
 def main(
@@ -236,6 +238,17 @@ def main(
 
 
 @dataclass(frozen=True)
+class WanDbConfig:
+    project: str
+    offline: bool
+    entity: str
+    log_model: bool = False
+
+    def to_dict(self) -> dict:
+        return dict(**self.__dict__)
+
+
+@dataclass(frozen=True)
 class PretrainConfig:
     data_dir: Path
     num_nodes: int
@@ -252,8 +265,7 @@ class PretrainConfig:
     experiment_name: str
     resume_if_exists: bool
     precision: PrecisionTypes
-    wandb_project: Optional[str]
-    wandb_entity: str = "clara-discovery"
+    amp_O2: bool = False
     create_tensorboard_logger: bool = False
 
 
@@ -267,10 +279,17 @@ class MegatronStrategyConfig:
         return "megatron"
 
 
+class Preprocessor(Protocol):
+    def preprocess(self) -> PreprocessResources: ...
+
+
 def refactored_main(
     pretrain_config: PretrainConfig,
-    strategy: MegatronStrategyConfig,
+    wandb_config: Optional[WanDbConfig],
+    strategy_or_config: Union[MegatronStrategyConfig, nl.MegatronStrategy],
+    make_preprocessor: Callable[[Path], Preprocessor],
     model_specification: ModuleSpec,
+    training_callbacks: Optional[List[pl.Callback]] = None,
 ):
     """Train a Geneformer model on single cell data.
 
@@ -311,51 +330,44 @@ def refactored_main(
     test_data_path = pretrain_config.data_dir / "test"
 
     # Setup the strategy and trainer
-    strategy = nl.MegatronStrategy(
-        tensor_model_parallel_size=pretrain_config.tensor_model_parallel_size,
-        pipeline_model_parallel_size=pretrain_config.pipeline_model_parallel_size,
-        ddp="megatron",
-        find_unused_parameters=True,
-        enable_nemo_ckpt_io=False,
-    )
-
-    wandb_options: Optional[WandbLoggerOptions] = (
-        None
-        if wandb_project is None
-        else WandbLoggerOptions(
-            offline=wandb_offline,
-            project=wandb_project,
-            entity=wandb_entity,
-            log_model=False,
+    if isinstance(strategy_or_config, MegatronStrategyConfig):
+        strategy: nl.MegatronStrategy = nl.MegatronStrategy(
+            tensor_model_parallel_size=strategy_or_config.tensor_model_parallel_size,
+            pipeline_model_parallel_size=strategy_or_config.pipeline_model_parallel_size,
+            ddp="megatron",
+            find_unused_parameters=True,
+            enable_nemo_ckpt_io=False,
         )
-    )
+    else:
+        strategy = strategy_or_config
+
     trainer = nl.Trainer(
-        devices=devices,
-        max_steps=num_steps,
+        devices=pretrain_config.devices,
+        max_steps=pretrain_config.num_steps,
         accelerator="gpu",
         strategy=strategy,
-        limit_val_batches=limit_val_batches,  # This controls upsampling and downsampling
-        val_check_interval=val_check_interval,  # TODO(@jstjohn) Checkpoint saving is currently broken, fix and change this.
-        num_nodes=num_nodes,
-        callbacks=[LossLoggingCallback(), RichModelSummary(max_depth=4), LearningRateMonitor()],
-        plugins=nl.MegatronMixedPrecision(precision=precision, amp_O2=False),
+        limit_val_batches=pretrain_config.limit_val_batches,  # This controls upsampling and downsampling
+        val_check_interval=pretrain_config.val_check_interval,  # TODO(@jstjohn) Checkpoint saving is currently broken, fix and change this.
+        num_nodes=pretrain_config.num_nodes,
+        callbacks=(
+            [LossLoggingCallback(), RichModelSummary(max_depth=4), LearningRateMonitor()]
+            if training_callbacks is None
+            else training_callbacks
+        ),
+        plugins=nl.MegatronMixedPrecision(precision=pretrain_config.precision, amp_O2=pretrain_config.amp_O2),
     )
 
     # Preprocess the data to get the tokenizer and median dictionary
-    preprocessor = GeneformerPreprocess(
-        download_directory=train_data_path,
-        medians_file_path=train_data_path / "medians.json",
-        tokenizer_vocab_path=train_data_path / "geneformer.vocab",
-    )
+    preprocessor = make_preprocessor(train_data_path)
     match preprocessor.preprocess():
         case {"tokenizer": tokenizer, "median_dict": median_dict}:
             logging.info("*************** Preprocessing Finished ************")
         case _:
-            logging.error("Preprocessing failed.")
+            raise ValueError(f"Preprocessing failed! ({type(preprocessor)}): {preprocessor=}")
 
     # Configure the data module and model
     data = SingleCellDataModule(
-        seq_length=seq_length,
+        seq_length=preseq_length,
         tokenizer=tokenizer,
         train_dataset_path=train_data_path,
         val_dataset_path=val_data_path,
@@ -369,6 +381,7 @@ def refactored_main(
         pin_memory=False,
         num_workers=num_dataset_workers,
     )
+
     geneformer_config = BioBertConfig(
         num_layers=6,
         hidden_size=256,
@@ -430,7 +443,7 @@ def refactored_main(
         root_dir=result_dir,
         name=experiment_name,
         initialize_tensorboard_logger=create_tensorboard_logger,
-        wandb_kwargs=wandb_options,
+        wandb_kwargs=None if wandb_config is None else wandb_config.to_dict(),
     )
 
     llm.train(

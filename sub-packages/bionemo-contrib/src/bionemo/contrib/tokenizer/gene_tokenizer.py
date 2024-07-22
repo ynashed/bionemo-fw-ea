@@ -22,7 +22,7 @@ from typing import Dict, List, Tuple, Union
 from .label2id_tokenizer import Label2IDTokenizer
 
 
-__all__ = ["GeneTokenizer"]
+__all__ = ("GeneTokenizer",)
 
 
 class GeneTokenizer(Label2IDTokenizer):

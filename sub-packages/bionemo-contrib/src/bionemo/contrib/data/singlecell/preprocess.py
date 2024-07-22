@@ -19,13 +19,25 @@ import os
 import pickle
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, List, Literal
+from typing import Dict, List, Optional, TypedDict
 
+from nemo.collections.common.tokenizers.tokenizer_spec import TokenizerSpec
 from nemo.utils import logging
 
 from bionemo.contrib.data.preprocess import ResourcePreprocessor
 from bionemo.contrib.tokenizer.gene_tokenizer import GeneTokenizer
 from bionemo.contrib.utils.remote import RemoteResource
+
+
+__all__ = (
+    "GeneformerPreprocess",
+    "Preprocessed",
+)
+
+
+class PreprocessResources(TypedDict):
+    tokenizer: Optional[TokenizerSpec]
+    median_dict: Dict[str, float]
 
 
 @dataclass
@@ -61,12 +73,12 @@ class GeneformerResourcePreprocessor(ResourcePreprocessor):
         """
         return resource.download_resource()
 
-    def prepare(self):
+    def prepare(self) -> List[str]:
         return [self.prepare_resource(resource) for resource in self.get_remote_resources()]
 
 
 class GeneformerPreprocess:
-    def __init__(self, download_directory: Path, medians_file_path: Path, tokenizer_vocab_path: Path):
+    def __init__(self, download_directory: Path, medians_file_path: Path, tokenizer_vocab_path: Path) -> None:
         """Downloads HGNC symbols
 
         preproc_dir (str): Directory to store the reference preproc in
@@ -77,11 +89,9 @@ class GeneformerPreprocess:
         self.download_directory = download_directory
         self.medians_file_path = medians_file_path
         self.tokenizer_vocab_path = tokenizer_vocab_path
-        self._validate_tokenizer_args(
-            self.tokenizer_vocab_path,
-        )
+        self._validate_tokenizer_args(self.tokenizer_vocab_path)
 
-    def build_and_save_tokenizer(self, median_dict, gene_to_ens, vocab_output_name):
+    def build_and_save_tokenizer(self, median_dict, gene_to_ens, vocab_output_name) -> GeneTokenizer:
         """Builds the GeneTokenizer using the median dictionary
         then serializes and saves the dictionary to disk.
         """
@@ -94,10 +104,10 @@ class GeneformerPreprocess:
         if vocab_exists:
             logging.warning(f"Tokenizer vocab file: {vocab_output_name} already exists. Overwriting...")
 
-    def preprocess(self) -> dict[Literal["tokenizer", "median_dict"], Any]:
+    def preprocess(self) -> PreprocessResources:
         """Preprocesses for the Geneformer model"""
         gene_name_dict_fn, gene_median_dict_fn = GeneformerResourcePreprocessor(
-            dest_directory=self.download_directory,
+            dest_directory=str(self.download_directory)
         ).prepare()
 
         # Load artifacts
@@ -108,10 +118,10 @@ class GeneformerPreprocess:
             median_dict = pickle.load(fd)
 
         # Save converted artifacts to JSON to prevent pickle issues.
-        medians_dir = os.path.dirname(self.medians_file_path)
-        if not os.path.exists(medians_dir):
-            os.makedirs(medians_dir, exist_ok=True)  # ensure the dir exists but be ok with race conditions.
-        with open(self.medians_file_path, "w") as fp:
+        medians_dir = self.medians_file_path.parent
+        if not medians_dir.is_dir():
+            medians_dir.mkdir(exist_ok=True)  # ensure the dir exists but be ok with race conditions.
+        with open(self.medians_file_path, "wt") as fp:
             json.dump(median_dict, fp)
 
         if self.tokenizer_vocab_path is not None:
@@ -124,6 +134,3 @@ class GeneformerPreprocess:
             tokenizer = None
 
         return {"tokenizer": tokenizer, "median_dict": median_dict}
-
-
-__all__ = ["GeneformerPreprocess"]
