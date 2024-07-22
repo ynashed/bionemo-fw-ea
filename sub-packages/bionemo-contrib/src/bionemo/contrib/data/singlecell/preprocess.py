@@ -107,7 +107,7 @@ class GeneformerPreprocess:
     def preprocess(self) -> PreprocessResources:
         """Preprocesses for the Geneformer model"""
         gene_name_dict_fn, gene_median_dict_fn = GeneformerResourcePreprocessor(
-            dest_directory=str(self.download_directory)
+            dest_directory=str(self.download_directory.absolute())
         ).prepare()
 
         # Load artifacts

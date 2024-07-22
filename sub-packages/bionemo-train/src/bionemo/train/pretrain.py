@@ -440,9 +440,9 @@ def refactored_main(
 
     # Setup the logger and train the model
     nemo_logger = setup_nemo_lightning_logger(
-        root_dir=result_dir,
-        name=experiment_name,
-        initialize_tensorboard_logger=create_tensorboard_logger,
+        root_dir=str(pretrain_config.result_dir.absolute()),
+        name=pretrain_config.experiment_name,
+        initialize_tensorboard_logger=pretrain_config.create_tensorboard_logger,
         wandb_kwargs=None if wandb_config is None else wandb_config.to_dict(),
     )
 
@@ -451,8 +451,10 @@ def refactored_main(
         data=data,
         trainer=trainer,
         log=nemo_logger,
-        # FIXME @skothenhill this doesn't work yet, but this is probably close to what we are supposed to do
-        resume=AutoResume(resume_if_exists=resume_if_exists, resume_ignore_no_checkpoint=True),
+        resume=(
+            # FIXME @skothenhill this doesn't work yet, but this is probably close to what we are supposed to do
+            AutoResume(resume_if_exists=pretrain_config.resume_if_exists, resume_ignore_no_checkpoint=True)
+        ),
     )
 
 
