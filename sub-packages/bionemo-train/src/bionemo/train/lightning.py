@@ -12,15 +12,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
-from typing import Iterable, List, Optional, Tuple, TypedDict, TypeVar, Union
+from abc import ABC, abstractmethod
+from typing import Dict, Generic, Iterable, List, Optional, Protocol, Tuple, Type, TypedDict, TypeVar, Union
 
 import pytorch_lightning as pl
 import torch
 import torch.distributed
 from megatron.core import parallel_state
+from megatron.core.optimizer import OptimizerConfig
+from nemo.collections.common.tokenizers.tokenizer_spec import TokenizerSpec
+from nemo.lightning import io as nlio
 from nemo.lightning.megatron_parallel import DataT, MegatronLossReduction, ReductionT
+from nemo.lightning.pytorch.optim import MegatronOptimizerModule
 
 
 __all__ = (
@@ -204,3 +207,96 @@ def _on_epoch_end(losses: List[torch.Tensor]) -> Optional[torch.Tensor]:
             avg_val_loss = torch.stack(losses).mean()
             return avg_val_loss
     return None
+
+
+Loss = TypeVar("Loss", bound=MegatronLossReduction)
+
+
+NamedTensors = Dict[str, torch.Tensor]
+
+
+# BionemoModel = TypeVar('BionemoModel', bound=MegatronModel)
+class BionemoModelBase(Protocol):
+    def forward(self, *args, **kwargs) -> NamedTensors | torch.Tensor: ...
+
+
+BionemoModel = TypeVar("BionemoModel", bound=BionemoModelBase)
+
+
+class BionemoModelConfig(Generic[BionemoModel, Loss], Protocol):
+    def configure_model(self) -> BionemoModel: ...
+
+    def get_loss_reduction_class(self) -> Type[Loss]: ...
+
+
+BMC = TypeVar("BMC", bounnd=BionemoModelConfig)
+
+
+class BionemoLightningModule(
+    pl.LightningModule, nlio.IOMixin, nlio.ConnectorMixin, LightningPassthroughPredictionMixin, Generic[BMC], ABC
+):
+    def __init__(
+        self,
+        config: BMC,
+        # TODO: Add transformer_layer_spec when we update mcore
+        tokenizer: Optional[TokenizerSpec] = None,
+        optimizer: MegatronOptimizerModule = MegatronOptimizerModule(
+            config=OptimizerConfig(lr=1e-4, optimizer="adam", use_distributed_optimizer=True),
+        ),
+    ) -> None:
+        super().__init__()
+        self.config = config
+        self.tokenizer = tokenizer
+        self.loss_reduction_class = self.config.get_loss_reduction_class()
+        # TODO replace the self.configure_optimizer call with the optimizer below
+        #  once it all works. This is the future direction for how things are going.
+        self.optim = optimizer
+        self.optim.connect(self)  # This will bind the `configure_optimizers` method
+        self.module: Optional[BionemoModel] = None
+
+    def configure_model(self) -> None:
+        if self.module is None:
+            self.module = self.config.configure_model(self.tokenizer)
+
+    def forward(
+        self,
+        *args,
+        **kwargs,
+    ) -> torch.Tensor:
+        """Call the forward method of the underlying model, and return whatever it outputs."""
+        if self.module is None:
+            raise ValueError("Must call the .configure_model() method before running forward pass!")
+        output_tensor = self.module(*args, **kwargs)  # for now just pass through to the underlying model
+        return output_tensor
+
+    @abstractmethod
+    def data_step(self, dataloader_iter) -> NamedTensors:
+        raise NotImplementedError()
+
+    @abstractmethod
+    def forward_step(self, batch) -> torch.Tensor:
+        raise NotImplementedError()
+
+    def training_step(self, batch, batch_idx: Optional[int] = None) -> torch.Tensor:
+        # In mcore the loss-function is part of the forward-pass (when labels are provided)
+        return self.forward_step(batch)
+
+    def validation_step(self, batch, batch_idx: Optional[int] = None) -> torch.Tensor:
+        # In mcore the loss-function is part of the forward-pass (when labels are provided)
+        return self.forward_step(batch)
+
+    def predict_step(self, batch, batch_idx: Optional[int] = None) -> torch.Tensor:
+        return self.forward_step(batch)
+
+    def training_loss_reduction(self) -> Loss:
+        # This is the function that takes batch['loss_mask'] and the logits output by the model and reduces the loss
+        #  This function will
+        return self.loss_reduction_class()
+
+    # The predict step comes from the LightningPassthroughPredictionMixin
+
+    def validation_loss_reduction(self) -> Loss:
+        return self.loss_reduction_class(validation_step=True)
+
+    def test_loss_reduction(self) -> Loss:
+        return self.loss_reduction_class(validation_step=True)

@@ -28,8 +28,16 @@ from nemo.lightning.megatron_parallel import DataT, MegatronLossReduction
 from nemo.lightning.pytorch.optim import MegatronOptimizerModule
 from torch.optim import Optimizer
 
-from bionemo.contrib.lightning import LightningPassthroughPredictionMixin
-from bionemo.contrib.model.biobert.model import BioBertConfig
+from bionemo.models.biobert.model import BioBertConfig
+from bionemo.train.lightning import LightningPassthroughPredictionMixin
+
+
+__all__ = (
+    "BioBertLightningModule",
+    "biobert_data_step",
+    "bert_forward_step",
+    "bert_default_optimizer",
+)
 
 
 class BioBertLightningModule(
@@ -256,11 +264,3 @@ def get_packed_seq_params(batch: Dict[str, torch.Tensor]) -> PackedSeqParams:
         max_seqlen_kv=max_seqlen,
         qkv_format="thd",
     )
-
-
-__all__ = [
-    "BioBertLightningModule",
-    "biobert_data_step",
-    "bert_forward_step",
-    "bert_default_optimizer",
-]
