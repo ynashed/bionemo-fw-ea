@@ -26,6 +26,9 @@ from nemo.lightning.megatron_parallel import (
 )
 
 
+__all__ = ("BERTMLMLossWithReduction",)
+
+
 class PerTokenLossDict(TypedDict):
     """This is the return type for a loss that is computed per token in the batch, supporting microbatches of varying sizes."""
 
@@ -73,7 +76,9 @@ class _Nemo2CompatibleLossReduceMixin:
         dummy_tensor = torch.tensor(0.0).cuda()
         return dummy_tensor
 
-    def reduce(self, losses_reduced_per_micro_batch: List[Union[PerTokenLossDict, SameSizeLossDict]]) -> torch.Tensor:
+    def reduce(
+        self, losses_reduced_per_micro_batch: Union[List[PerTokenLossDict], List[SameSizeLossDict]]
+    ) -> torch.Tensor:
         # NOTE(SKH) This requires two passes over the data instead of one in the `loss_sum_and_microbatch_size` case.
 
         # Expect two elements: losses, num_tokens. We only care about the num_tokens index.
@@ -138,10 +143,10 @@ class BERTMLMLossWithReduction(_Nemo2CompatibleLossReduceMixin, MegatronLossRedu
         loss = loss.transpose(0, 1).contiguous()
         return loss
 
-    def unreduced_sequence_loss_fn(self, logits: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
-        # TODO (@jstjohn): implement this function to handle the next sequence prediction task
-        # TODO (@jstjohn): determine expected shapes of logits/labels in this case and add that to the docstring
-        raise NotImplementedError("Sequence loss not implemented yet.")
+    # def unreduced_sequence_loss_fn(self, logits: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
+    #     # TODO (@jstjohn): implement this function to handle the next sequence prediction task
+    #     # TODO (@jstjohn): determine expected shapes of logits/labels in this case and add that to the docstring
+    #     raise NotImplementedError("Sequence loss not implemented yet.")
 
     def forward(
         self, batch: Dict[str, torch.Tensor], forward_out: Dict[str, torch.Tensor]
@@ -209,6 +214,3 @@ class BERTMLMLossWithReduction(_Nemo2CompatibleLossReduceMixin, MegatronLossRedu
         # average the losses across the data parallel group, but also return the unreduced loss
         reduced_loss = average_losses_across_data_parallel_group([loss_for_microbatch])
         return loss_for_microbatch * cp_size, {"avg": reduced_loss}
-
-
-__all__ = ["BERTMLMLossWithReduction"]

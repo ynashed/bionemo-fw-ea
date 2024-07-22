@@ -20,7 +20,6 @@ from megatron.core.fusions.fused_bias_dropout import get_bias_dropout_add
 from megatron.core.fusions.fused_layer_norm import FusedLayerNorm
 from megatron.core.models.bert import bert_layer_specs
 from megatron.core.tensor_parallel.layers import ColumnParallelLinear, RowParallelLinear
-from megatron.core.transformer import spec_utils
 from megatron.core.transformer.attention import SelfAttention, SelfAttentionSubmodules
 from megatron.core.transformer.custom_layers.transformer_engine import (
     TEDotProductAttention,
@@ -31,6 +30,7 @@ from megatron.core.transformer.dot_product_attention import DotProductAttention
 from megatron.core.transformer.enums import AttnMaskType
 from megatron.core.transformer.identity_op import IdentityOp
 from megatron.core.transformer.mlp import MLP, MLPSubmodules
+from megatron.core.transformer.spec_utils import ModuleSpec
 from megatron.core.transformer.transformer_layer import TransformerLayer, TransformerLayerSubmodules
 
 from bionemo.contrib.model.layers import TELayerNorm
@@ -53,7 +53,7 @@ class BiobertSpecOption(str, Enum):
     bert_layer_with_transformer_engine_and_qk_ln_spec = "bert_layer_with_transformer_engine_and_qk_ln_spec"
 
 
-def get_biobert_spec(biobert_spec_option: BiobertSpecOption, qk_layernorm: bool = False) -> spec_utils.ModuleSpec:
+def get_biobert_spec(biobert_spec_option: BiobertSpecOption, qk_layernorm: bool = False) -> ModuleSpec:
     """Get the spec for the Biobert model.
 
     Args:
@@ -66,10 +66,10 @@ def get_biobert_spec(biobert_spec_option: BiobertSpecOption, qk_layernorm: bool 
     #
     # BEGIN define several specs that are a function of `qk_layernorm`
     #
-    bert_layer_with_transformer_engine_and_qk_ln_spec = spec_utils.ModuleSpec(
+    bert_layer_with_transformer_engine_and_qk_ln_spec = ModuleSpec(
         module=TransformerLayer,
         submodules=TransformerLayerSubmodules(
-            self_attention=spec_utils.ModuleSpec(
+            self_attention=ModuleSpec(
                 module=SelfAttention,
                 params={"attn_mask_type": AttnMaskType.padding},
                 submodules=SelfAttentionSubmodules(
@@ -81,7 +81,7 @@ def get_biobert_spec(biobert_spec_option: BiobertSpecOption, qk_layernorm: bool 
                 ),
             ),
             self_attn_bda=get_bias_dropout_add,
-            mlp=spec_utils.ModuleSpec(
+            mlp=ModuleSpec(
                 module=MLP,
                 submodules=MLPSubmodules(
                     linear_fc1=TELayerNormColumnParallelLinear,
@@ -92,11 +92,11 @@ def get_biobert_spec(biobert_spec_option: BiobertSpecOption, qk_layernorm: bool 
         ),
     )
     # Use this spec for an implementation using only modules in megatron core
-    bert_layer_local_spec_with_qk_ln = spec_utils.ModuleSpec(
+    bert_layer_local_spec_with_qk_ln = ModuleSpec(
         module=TransformerLayer,
         submodules=TransformerLayerSubmodules(
             input_layernorm=FusedLayerNorm,
-            self_attention=spec_utils.ModuleSpec(
+            self_attention=ModuleSpec(
                 module=SelfAttention,
                 params={"attn_mask_type": AttnMaskType.padding},
                 submodules=SelfAttentionSubmodules(
@@ -109,7 +109,7 @@ def get_biobert_spec(biobert_spec_option: BiobertSpecOption, qk_layernorm: bool 
             ),
             self_attn_bda=get_bias_dropout_add,
             pre_mlp_layernorm=FusedLayerNorm,
-            mlp=spec_utils.ModuleSpec(
+            mlp=ModuleSpec(
                 module=MLP,
                 submodules=MLPSubmodules(
                     linear_fc1=ColumnParallelLinear,
