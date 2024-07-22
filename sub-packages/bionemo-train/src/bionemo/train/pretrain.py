@@ -301,7 +301,6 @@ MakePreprocessor = Callable[[PretrainConfig], Preprocessor]
 
 MakeDataModule = Callable[[PretrainConfig, PreprocessResources], pl.LightningDataModule]
 
-
 BionemoModelConfig = Any
 
 MakeModelConfig = Callable[[PretrainConfig], BionemoModelConfig]
