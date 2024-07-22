@@ -8,15 +8,10 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
-import numpy as np
 import torch
-from rdkit import Chem
 
-from bionemo.model.molecule.moco.data.molecule_dataset import full_atom_decoder
-from bionemo.model.molecule.moco.metrics.metrics import (
-    BasicMolecularMetrics,
-    get_molecules,
-)
+from bionemo.model.molecule.moco.data.molecule_datamodule import MoleculeDataModule
+from bionemo.model.molecule.moco.metrics.molecule_evaluation_callback import MoleculeEvaluationCallback
 from bionemo.model.molecule.moco.models.module import Graph3DInterpolantModel
 from bionemo.model.molecule.moco.models.utils_train import ExponentialMovingAverage as EMA
 
@@ -27,10 +22,30 @@ if __name__ == "__main__":
     res_dir = "/workspace/bionemo/results/eqgatdiff/eqgat_big_self_cond/checkpoints"
     ckpt_path = f"{res_dir}/epoch=214-step=315199.ckpt"
     ema_weights = f"{res_dir}/ema_parameters_epoch_214.pt"
-    n_graphs = 5000
+    n_graphs = 100
     batch_size = 100
-    save_n = 20
+    # to load previous weights
+    # from omegaconf import OmegaConf
+    # cfg = OmegaConf.load('/workspace/bionemo/examples/molecule/moco/conf/train_eqgat.yaml')
+    # model = Graph3DInterpolantModel.load_from_checkpoint(ckpt_path, loss_params=cfg.loss)
     model = Graph3DInterpolantModel.load_from_checkpoint(ckpt_path)
+    datamodule = MoleculeDataModule(
+        dataset_root="/workspace/bionemo/data/pyg_geom_drug",
+        processed_folder="processed",
+        batch_size=150,
+        inference_batch_size=150,
+        removed_h=False,
+        data_loader_type="midi",
+    )
+
+    eval_callback = MoleculeEvaluationCallback(
+        n_graphs=n_graphs,
+        batch_size=batch_size,
+        timesteps=500,
+        compute_train_data_metrics=False,
+        train_smiles=datamodule.train_dataset.smiles,
+        statistics=datamodule.statistics,
+    )
 
     if ema_weights is not None:
         ema_weights = torch.load(ema_weights, map_location="cuda")
@@ -40,30 +55,5 @@ if __name__ == "__main__":
 
     model.cuda()
     model.eval()
-    mols = []
-    with torch.no_grad():
-        while len(mols) < n_graphs:
-            current = min(n_graphs - len(mols), batch_size)
-            generated = model.sample(current)
-            mols.extend(get_molecules(generated, {"atom_decoder": full_atom_decoder}))
 
-            mol_metrics = BasicMolecularMetrics({"atom_decoder": full_atom_decoder}, device=model.device)
-            stab_dict, valid_dict, stat_dict, valid_smi, stable_mols, valid_mols = mol_metrics(mols)
-            res = {**stab_dict, **valid_dict, **stat_dict}
-            print(res)
-
-    mol_metrics = BasicMolecularMetrics({"atom_decoder": full_atom_decoder}, device=model.device)
-    stab_dict, valid_dict, stat_dict, valid_smi, stable_mols, valid_mols = mol_metrics(mols)
-    res = {**stab_dict, **valid_dict, **stat_dict}
-    print(res)
-
-    idxs = set(np.random.randint(0, len(valid_mols), save_n))
-
-    mols_to_save = [valid_mols[i].rdkit_mol for i in idxs]
-
-    with Chem.SDWriter("_tmp/eqgat_sc.sdf") as w:
-        for mol in mols_to_save:
-            try:
-                w.write(mol)
-            except Exception:
-                pass
+    eval_callback.evaluate_molecules(model)

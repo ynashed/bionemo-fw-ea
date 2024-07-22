@@ -15,7 +15,7 @@
 # located in examples/molecule/moco/conf/train.yaml
 
 BIONEMO_IMAGE="nvcr.io/nvidian/cvai_bnmo_trng/bionemo:moco" # BioNeMo container image
-WANDB_API_KEY=40eca22e1f13673f579d3b59efb30d6425fae9e5 # Add your WANDB API KEY
+WANDB_API_KEY=1f8cf899b892656eec7d02bc90efd1f97a5bb71c # Add your WANDB API KEY
 
 CONFIG_NAME="train_eqgat" 
 
