@@ -268,6 +268,18 @@ class PretrainConfig:
     amp_O2: bool = False
     create_tensorboard_logger: bool = False
 
+    @property
+    def train_data_path(self) -> Path:
+        return self.data_dir / "train"
+
+    @property
+    def val_data_path(self) -> Path:
+        return self.data_dir / "val"
+
+    @property
+    def test_data_path(self) -> Path:
+        return self.data_dir / "test"
+
 
 @dataclass(frozen=True)
 class MegatronStrategyConfig:
@@ -283,11 +295,20 @@ class Preprocessor(Protocol):
     def preprocess(self) -> PreprocessResources: ...
 
 
+MakeOptimizer = Callable[[PretrainConfig], MegatronOptimizerModule]
+
+MakePreprocessor = Callable[[PretrainConfig], Preprocessor]
+
+MakeDataModule = Callable[[PretrainConfig, PreprocessResources], pl.LightningDataModule]
+
+
 def refactored_main(
     pretrain_config: PretrainConfig,
     wandb_config: Optional[WanDbConfig],
     strategy_or_config: Union[MegatronStrategyConfig, nl.MegatronStrategy],
-    make_preprocessor: Callable[[Path], Preprocessor],
+    make_preprocessor: MakePreprocessor,
+    make_datamodule: MakeDataModule,
+    make_optimizer: MakeOptimizer,
     model_specification: ModuleSpec,
     training_callbacks: Optional[List[pl.Callback]] = None,
 ):
@@ -324,11 +345,6 @@ def refactored_main(
     # Create the result directory if it does not exist.
     pretrain_config.result_dir.mkdir(parents=True, exist_ok=True)
 
-    # Setup train/test/val data paths
-    train_data_path = pretrain_config.data_dir / "train"
-    val_data_path = pretrain_config.data_dir / "val"
-    test_data_path = pretrain_config.data_dir / "test"
-
     # Setup the strategy and trainer
     if isinstance(strategy_or_config, MegatronStrategyConfig):
         strategy: nl.MegatronStrategy = nl.MegatronStrategy(
@@ -358,29 +374,36 @@ def refactored_main(
     )
 
     # Preprocess the data to get the tokenizer and median dictionary
-    preprocessor = make_preprocessor(train_data_path)
-    match preprocessor.preprocess():
+    preprocessor = make_preprocessor(pretrain_config)
+    # preprocessor = GeneformerPreprocess(
+    #     download_directory=train_data_path,
+    #     medians_file_path=train_data_path / "medians.json",
+    #     tokenizer_vocab_path=train_data_path / "geneformer.vocab",
+    # )
+    preprocessed_resources = preprocessor.preprocess()
+    match preprocessed_resources:
         case {"tokenizer": tokenizer, "median_dict": median_dict}:
             logging.info("*************** Preprocessing Finished ************")
         case _:
             raise ValueError(f"Preprocessing failed! ({type(preprocessor)}): {preprocessor=}")
 
     # Configure the data module and model
-    data = SingleCellDataModule(
-        seq_length=preseq_length,
-        tokenizer=tokenizer,
-        train_dataset_path=train_data_path,
-        val_dataset_path=val_data_path,
-        test_dataset_path=test_data_path,
-        random_token_prob=0.1,  # this is the incorrect setting we originally used.
-        median_dict=median_dict,
-        micro_batch_size=micro_batch_size,
-        global_batch_size=micro_batch_size * int(num_nodes * devices / pipeline_model_parallel_size),
-        # persistent workers is supported when num_dataset_workers > 0
-        persistent_workers=num_dataset_workers > 0,
-        pin_memory=False,
-        num_workers=num_dataset_workers,
-    )
+    data = make_datamodule(pretrain_config, preprocessed_resources)
+    # data = SingleCellDataModule(
+    #     seq_length=preseq_length,
+    #     tokenizer=tokenizer,
+    #     train_dataset_path=train_data_path,
+    #     val_dataset_path=val_data_path,
+    #     test_dataset_path=test_data_path,
+    #     random_token_prob=0.1,  # this is the incorrect setting we originally used.
+    #     median_dict=median_dict,
+    #     micro_batch_size=micro_batch_size,
+    #     global_batch_size=micro_batch_size * int(num_nodes * devices / pipeline_model_parallel_size),
+    #     # persistent workers is supported when num_dataset_workers > 0
+    #     persistent_workers=num_dataset_workers > 0,
+    #     pin_memory=False,
+    #     num_workers=num_dataset_workers,
+    # )
 
     geneformer_config = BioBertConfig(
         num_layers=6,
