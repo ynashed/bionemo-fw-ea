@@ -18,6 +18,9 @@ import transformer_engine as te
 from megatron.core.transformer.transformer_config import TransformerConfig
 
 
+__all__ = ("TELayerNorm",)
+
+
 class TELayerNorm(te.pytorch.LayerNorm):
     def __init__(self, config: TransformerConfig, *args, **kwargs):
         """A wrapper around transformer engine layernorm that allows it to be initialized with a TransformerConfig.
@@ -34,6 +37,3 @@ class TELayerNorm(te.pytorch.LayerNorm):
             sequence_parallel=config.sequence_parallel,
             **kwargs,
         )
-
-
-__all__ = ["TELayerNorm"]

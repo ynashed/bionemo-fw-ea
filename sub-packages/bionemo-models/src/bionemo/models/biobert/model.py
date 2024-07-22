@@ -17,15 +17,16 @@
 import os
 import tarfile
 from dataclasses import dataclass
-from typing import Callable, Literal, Optional, Type, TypedDict, Union
+from typing import Callable, Literal, Optional, Type, TypedDict, TypeVar, Union
 
 import torch
-from megatron.core import parallel_state, tensor_parallel
 from megatron.core.models.bert.bert_lm_head import BertLMHead
 from megatron.core.models.bert.pooler import Pooler
 from megatron.core.models.common.embeddings.language_model_embedding import LanguageModelEmbedding
 from megatron.core.models.common.embeddings.rotary_pos_embedding import RotaryEmbedding
 from megatron.core.models.common.language_module.language_module import LanguageModule
+from megatron.core.parallel_state import is_pipeline_first_stage, is_pipeline_last_stage
+from megatron.core.tensor_parallel import ColumnParallelLinear
 from megatron.core.transformer import spec_utils
 from megatron.core.transformer.enums import ModelType
 from megatron.core.transformer.transformer_block import TransformerBlock
@@ -41,6 +42,21 @@ from torch.optim import Optimizer
 from bionemo.contrib.model.biobert.transformer_specs import BiobertSpecOption, get_biobert_spec
 from bionemo.contrib.model.loss import BERTMLMLossWithReduction
 from bionemo.contrib.utils.weight_utils import nemo1_to_nemo2_biobert_key_mapping
+
+
+__all__ = (
+    "BioBertConfig",
+    "BioBertConfig",
+    "PositionType",
+    "MegatronBioBertModel",
+)
+
+
+PositionType = Literal["learned_absolute", "rope"]
+
+LME = TypeVar("LME", bound=LanguageModelEmbedding)
+
+Loss = TypeVar("Loss", bound=MegatronLossReduction)
 
 
 class BioBertOutput(TypedDict):
@@ -80,13 +96,13 @@ class MegatronBioBertModel(LanguageModule):
         fp16_lm_cross_entropy: bool = False,
         parallel_output: bool = True,
         share_embeddings_and_output_weights: bool = False,
-        position_embedding_type: Literal["learned_absolute", "rope"] = "learned_absolute",
+        position_embedding_type: PositionType = "learned_absolute",
         rotary_percent: float = 1.0,
         seq_len_interpolation_factor: Optional[float] = None,
         add_binary_head: bool = True,
         return_embeddings: bool = False,
         use_full_attention_mask: bool = False,
-    ):
+    ) -> None:
         # TODO (@jstjohn) come up with a cleaner way for this model to return a set of things the user wants.
         #  hidden states, embeddings, logits, etc. The defaults should work for training but we need to make it
         #  customizable and easy to tell how to make it work well for inference as well as trouble shooting.
@@ -118,18 +134,22 @@ class MegatronBioBertModel(LanguageModule):
 
         # Embeddings.
         if self.pre_process:
-            self.embedding = lm_embedding
+            self.embedding: Optional[LanguageModelEmbedding] = lm_embedding
+        else:
+            self.embedding = None
 
         if self.position_embedding_type == "rope":
-            self.rotary_pos_emb = RotaryEmbedding(
+            self.rotary_pos_emb: Optional[RotaryEmbedding] = RotaryEmbedding(
                 kv_channels=self.config.kv_channels,
                 rotary_percent=rotary_percent,
                 rotary_interleaved=self.config.rotary_interleaved,
                 seq_len_interpolation_factor=seq_len_interpolation_factor,
             )
+        else:
+            self.rotary_pos_emb = None
 
         # Transformer.
-        self.encoder = TransformerBlock(
+        self.encoder: TransformerBlock = TransformerBlock(
             config=self.config,
             spec=self.transformer_layer_spec,
             pre_process=self.pre_process,
@@ -139,12 +159,12 @@ class MegatronBioBertModel(LanguageModule):
         # Output
         if post_process:
             # TODO: Make sure you are passing in the mpu_vocab_size properly
-            self.lm_head = BertLMHead(
+            self.lm_head: Optional[BertLMHead] = BertLMHead(
                 config.hidden_size,
                 config,
             )
 
-            self.output_layer = tensor_parallel.ColumnParallelLinear(
+            self.output_layer: Optional[ColumnParallelLinear] = ColumnParallelLinear(
                 config.hidden_size,
                 self.vocab_size,
                 config=config,
@@ -155,14 +175,24 @@ class MegatronBioBertModel(LanguageModule):
                 skip_weight_param_allocation=pre_process and share_embeddings_and_output_weights,
             )
 
-            self.binary_head = None
             if self.add_binary_head:
                 # TODO: Shoudl switch this to TE ?
-                self.binary_head = get_linear_layer(
+                self.binary_head: Optional[torch.nn.Linear] = get_linear_layer(
                     config.hidden_size, 2, config.init_method, config.perform_initialization
                 )
 
-                self.pooler = Pooler(config.hidden_size, config.init_method, config, config.sequence_parallel)
+                self.pooler: Optional[Pooler] = Pooler(
+                    config.hidden_size, config.init_method, config, config.sequence_parallel
+                )
+            else:
+                self.binary_head = None
+                self.pooler = None
+        else:
+            self.lm_head = None
+            self.output_layer = None
+            self.binary_head = None
+            self.pooler = None
+
         if self.pre_process or self.post_process:
             self.setup_embeddings_and_output_layer()
 
@@ -201,12 +231,11 @@ class MegatronBioBertModel(LanguageModule):
 
         return extended_attention_mask
 
-    def bert_position_ids(self, token_ids):
+    def bert_position_ids(self, token_ids: Tensor) -> Tensor:
         # Create position ids
         seq_length = token_ids.size(1)
         position_ids = torch.arange(seq_length, dtype=torch.long, device=token_ids.device)
         position_ids = position_ids.unsqueeze(0).expand_as(token_ids)
-
         return position_ids
 
     def set_input_tensor(self, input_tensor: Tensor) -> None:
@@ -229,9 +258,9 @@ class MegatronBioBertModel(LanguageModule):
         self,
         input_ids: Tensor,
         attention_mask: Tensor,
-        tokentype_ids: Tensor = None,
-        lm_labels: Tensor = None,
-        inference_params=None,
+        tokentype_ids: Optional[Tensor] = None,
+        lm_labels: Optional[Tensor] = None,
+        inference_params: Optional[dict] = None,
     ) -> Union[BioBertOutput, Tensor]:
         """Forward function of BERT model
 
@@ -246,7 +275,7 @@ class MegatronBioBertModel(LanguageModule):
         #  change the following line to ~self.bert... and see if it helps if we upgrade to TE 1.7 and NeMo/Megatron have not compensated.
         extended_attention_mask = self.bert_extended_attention_mask(attention_mask)
 
-        if parallel_state.is_pipeline_first_stage():
+        if is_pipeline_first_stage():
             input_ids = input_ids
             position_ids = self.bert_position_ids(input_ids)
         else:
@@ -262,12 +291,14 @@ class MegatronBioBertModel(LanguageModule):
             encoder_input = None
 
         # Rotary positional embeddings (Why not move this into BERT/GPTEmberdding ?)
-        rotary_pos_emb = None
-        if self.position_embedding_type == "rope":
+
+        if self.rotary_pos_emb is not None:
             rotary_seq_len = self.rotary_pos_emb.get_rotary_seq_len(
                 inference_params, self.encoder, encoder_input, self.config
             )
             rotary_pos_emb = self.rotary_pos_emb(rotary_seq_len)
+        else:
+            rotary_pos_emb = None
 
         # Run encoder.
         hidden_states = self.encoder(
@@ -279,7 +310,8 @@ class MegatronBioBertModel(LanguageModule):
         if not self.post_process:
             return hidden_states
 
-        if self.add_binary_head:
+        # model has added binary head
+        if self.pooler is not None:
             pooled_output = self.pooler(hidden_states, 0)
 
         if self.return_embeddings:
@@ -296,16 +328,18 @@ class MegatronBioBertModel(LanguageModule):
             return output
 
         # logits and loss
-        output_weight = None
         if self.share_embeddings_and_output_weights:
             output_weight = self.shared_embedding_or_output_weight()
+        else:
+            output_weight = None
 
         hidden_states_after_lm_head = self.lm_head(hidden_states=hidden_states)
         logits, _ = self.output_layer(hidden_states_after_lm_head, weight=output_weight)
 
-        binary_logits = None
         if self.binary_head is not None:
             binary_logits = self.binary_head(pooled_output)
+        else:
+            binary_logits = None
 
         # [s b h] => [b s h]  # move batch to the first dimension after forward
         logits = logits.transpose(0, 1).contiguous()
@@ -315,12 +349,12 @@ class MegatronBioBertModel(LanguageModule):
 @dataclass
 class BioBertConfig(TransformerConfig):
     # From megatron.core.models.gpt.bert_model.GPTModel
-    embed_module_cls: Type[LanguageModelEmbedding] = LanguageModelEmbedding
+    embed_module_cls: Type[LME] = LanguageModelEmbedding
     fp16_lm_cross_entropy: bool = False
     parallel_output: bool = True
     share_embeddings_and_output_weights: bool = False  # try True
     make_vocab_size_divisible_by: int = 128
-    position_embedding_type: Literal["learned_absolute", "rope"] = "learned_absolute"
+    position_embedding_type: PositionType = "learned_absolute"
     rotary_base: int = 10000
     rotary_percent: float = 1.0
     seq_len_interpolation_factor: Optional[float] = None
@@ -341,15 +375,15 @@ class BioBertConfig(TransformerConfig):
     #  things as part of the workflow for inference and fine-tuning.
     return_only_hidden_states: bool = False
 
-    def configure_embedding(self, vocab_size, do_next_sentence=False) -> "LanguageModelEmbedding":
+    def configure_embedding(self, vocab_size: int, do_next_sentence: bool = False) -> LME:
         """Configures and returns an instantiated object of embedding module
 
         Args:
-            vocab_size (int): size of the vocabulary
-            do_next_sentence (bool, optional): add binary head. Defaults to False.
+            vocab_size: size of the vocabulary
+            do_next_sentence: add binary head. Defaults to False.
 
         Returns:
-            LanguageModelEmbedding: an instantiated object of embedding module
+            An instantiated object of embedding module
         """
         return self.embed_module_cls(
             config=self,
@@ -361,7 +395,7 @@ class BioBertConfig(TransformerConfig):
 
     def configure_model(self, tokenizer) -> "MegatronBioBertModel":
         vp_size = self.virtual_pipeline_model_parallel_size
-        if vp_size:
+        if vp_size > 0:
             p_size = self.pipeline_model_parallel_size
             assert (
                 self.num_layers // p_size
@@ -392,8 +426,8 @@ class BioBertConfig(TransformerConfig):
             rotary_percent=self.rotary_percent,
             seq_len_interpolation_factor=self.seq_len_interpolation_factor,
             return_embeddings=False,
-            pre_process=parallel_state.is_pipeline_first_stage(),
-            post_process=parallel_state.is_pipeline_last_stage(),  # set to False for inference
+            pre_process=is_pipeline_first_stage(),
+            post_process=is_pipeline_last_stage(),  # set to False for inference
             add_binary_head=do_next_sentence,
             use_full_attention_mask=use_full_attention_mask,
         )
@@ -423,9 +457,6 @@ class BioBertConfig(TransformerConfig):
             model.encoder.post_layer_norm = True
         return model
 
-    def get_loss_reduction_class(self) -> Type[MegatronLossReduction]:
+    def get_loss_reduction_class(self) -> Type[Loss]:
         # You could optionally return a different loss reduction class here based on the config settings.
         return BERTMLMLossWithReduction
-
-
-__all__ = ["BioBertConfig", "MegatronBioBertModel"]

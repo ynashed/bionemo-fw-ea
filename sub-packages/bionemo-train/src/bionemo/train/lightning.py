@@ -25,6 +25,14 @@ from nemo.lightning.megatron_parallel import DataT, MegatronLossReduction, Reduc
 
 T = TypeVar("T")
 
+__all__ = (
+    "get_dtype_device",
+    "batch_collator",
+    "PassthroughLossReduction",
+    "LightningPassthroughPredictionMixin",
+    "LossLoggingCallback",
+)
+
 
 def some_first(seq: Iterable[Optional[T]]) -> T:
     """Returns the first non-None value from the sequence or fails"""
@@ -34,7 +42,7 @@ def some_first(seq: Iterable[Optional[T]]) -> T:
     raise ValueError("non-None value not found")
 
 
-def get_dtype_device(torch_object) -> Tuple[torch.dtype, torch.device]:
+def get_dtype_device(torch_object: list | dict | torch.nn.Module) -> Tuple[torch.dtype, torch.device]:
     match torch_object:
         case []:
             raise ValueError("Looking up dtype on an empty list")
@@ -202,12 +210,3 @@ class LossLoggingCallback(pl.Callback):
                 avg_test_loss = torch.stack(self.test_losses).mean()
                 pl_module.log("test_loss", avg_test_loss, prog_bar=True, logger=True, rank_zero_only=True)
                 self.test_losses.clear()
-
-
-__all__ = [
-    "get_dtype_device",
-    "batch_collator",
-    "PassthroughLossReduction",
-    "LightningPassthroughPredictionMixin",
-    "LossLoggingCallback",
-]

@@ -36,6 +36,12 @@ from megatron.core.transformer.transformer_layer import TransformerLayer, Transf
 from bionemo.contrib.model.layers import TELayerNorm
 
 
+__all__ = (
+    "BiobertSpecOption",
+    "get_biobert_spec",
+)
+
+
 class BiobertSpecOption(str, Enum):
     """Options for the BiobertSpec. The spec defines the architecture of the transformer (BERT) block in the biobert model.
     This is a `str, Enum` type so that argparse can use the string names as choices.
@@ -129,6 +135,3 @@ def get_biobert_spec(biobert_spec_option: BiobertSpecOption, qk_layernorm: bool 
             return bert_layer_with_transformer_engine_and_qk_ln_spec
         case _:
             raise NotImplementedError(f"Spec option {biobert_spec_option} not implemented")
-
-
-__all__ = ["BiobertSpecOption", "get_biobert_spec"]
