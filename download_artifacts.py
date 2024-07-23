@@ -8,7 +8,7 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
-"""Script to download pretrained models from NGC or PBSS. """
+"""Script to download pretrained models from NGC or PBSS... """
 import argparse
 import os
 import sys
