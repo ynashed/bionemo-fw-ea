@@ -28,12 +28,11 @@ from bionemo.contrib.data.resamplers import PRNGDatasetShuffler
 from bionemo.contrib.data.singlecell.dataset import SingleCellDataset
 
 
-D = TypeVar('D', bound=torch.data.Dataset)
+D = TypeVar("D", bound=torch.data.Dataset)
+
 
 class DataConfig(Protocol):
-
-    def configure_dataset(self, **kwargs) -> D:
-        ...
+    def configure_dataset(self, **kwargs) -> D: ...
 
 
 class SingleCellDataModule(pl.LightningDataModule):
@@ -80,7 +79,7 @@ class SingleCellDataModule(pl.LightningDataModule):
         persistent_workers: bool = True,
         pin_memory: bool = True,
         ####
-        train_data_config: DataConfig,
+        # train_data_config: DataConfig,
     ):
         super().__init__()
         self.data_path_train = train_dataset_path
@@ -97,7 +96,6 @@ class SingleCellDataModule(pl.LightningDataModule):
         self.persistent_workers = persistent_workers
         self.pin_memory = pin_memory
         self.index_mapping_dir = index_mapping_dir or str(Path(self.data_path_train).parent)
-
 
         self.data_config = data_config
 
