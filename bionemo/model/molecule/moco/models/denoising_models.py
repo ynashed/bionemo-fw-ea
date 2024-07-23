@@ -149,7 +149,7 @@ class EQGATWrapper(DenoisingEdgeNetwork):
                 if "x" in selected:
                     pos = batch["x"] + 0 * pos
 
-        out = super().forward(
+        _out = super().forward(
             x=x,
             t=temb,  # should be in [0, 1]?
             pos=pos,
@@ -158,12 +158,14 @@ class EQGATWrapper(DenoisingEdgeNetwork):
             batch=batch["batch"],
             batch_edge_global=batch["batch"][batch["edge_index"][0]],
         )
+
         out = {
-            "x_hat": out["coords_pred"],
-            "h_logits": out["atoms_pred"],
-            "edge_attr_logits": out["bonds_pred"],
-            "Z_hat": out["Z_hat"] if "Z_hat" in out else None,
+            "x_hat": _out["coords_pred"],
+            "h_logits": _out["atoms_pred"],
+            "edge_attr_logits": _out["bonds_pred"],
         }
+        if "Z_hat" in _out:
+            out["Z_hat"] = _out["Z_hat"]
         return out
 
 
