@@ -154,6 +154,7 @@ class MoleculeDataset(InMemoryDataset):
             hybridization=torch.from_numpy(np.load(self.processed_paths[9])).float(),
             bond_lengths=load_pickle(self.processed_paths[10]),
             bond_angles=torch.from_numpy(np.load(self.processed_paths[11])).float(),
+            dihedrals=torch.from_numpy(np.load(self.processed_paths[12])).float(),
         )
         self.smiles = load_pickle(self.processed_paths[6])
 
@@ -177,4 +178,5 @@ class MoleculeDataset(InMemoryDataset):
             f"{self.split}_hybridization_{h}.npy",
             f"{self.split}_bond_lengths_{h}.pickle",
             f"{self.split}_angles_{h}.npy",
+            f"{self.split}_dihedrals_{h}.npy",
         ]

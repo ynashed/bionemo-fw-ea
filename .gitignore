@@ -1,6 +1,8 @@
 # log and data files
 output
 result
+results
+_tmp
 *.pt
 .DS_Store
 bert.pt.json
