@@ -10,3 +10,4 @@ virtualenv==20.26.3
 ipdb==0.13.11
 # https://gitlab-master.nvidia.com/clara-discovery/infra-bionemo
 #infra-bionemo==0.3.1
+tach==0.8.1
