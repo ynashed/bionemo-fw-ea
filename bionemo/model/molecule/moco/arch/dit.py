@@ -362,3 +362,194 @@ class SE3MixAttention(nn.Module):
         X_out = X + self.phi_x(A * AX)
         H_out = H + self.phi_h(A * AH)
         return X_out, H_out
+
+    if __name__ == "__main__":
+        ligand_pos = torch.rand((75, 3))
+    batch_ligand = torch.Tensor(
+        [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            2,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+            3,
+        ]
+    ).to(torch.int64)
+    ligand_feats = torch.Tensor(
+        [
+            2,
+            4,
+            2,
+            4,
+            2,
+            4,
+            4,
+            3,
+            2,
+            2,
+            1,
+            1,
+            1,
+            1,
+            1,
+            5,
+            1,
+            3,
+            1,
+            1,
+            1,
+            2,
+            4,
+            2,
+            4,
+            2,
+            4,
+            4,
+            3,
+            2,
+            2,
+            1,
+            1,
+            1,
+            1,
+            1,
+            5,
+            1,
+            3,
+            1,
+            1,
+            1,
+            2,
+            2,
+            2,
+            2,
+            12,
+            2,
+            5,
+            2,
+            3,
+            5,
+            1,
+            5,
+            2,
+            4,
+            2,
+            4,
+            2,
+            4,
+            4,
+            3,
+            2,
+            2,
+            1,
+            1,
+            1,
+            1,
+            1,
+            5,
+            1,
+            3,
+            1,
+            1,
+            1,
+        ]
+    ).to(torch.int64)
+    num_classes = 13
+    # Initialize the adjacency matrix with zeros
+    adj_matrix = torch.zeros((75, 75, 5), dtype=torch.int64)
+    no_bond = torch.zeros(5)
+    no_bond[0] = 1
+    # Using broadcasting to create the adjacency matrix
+    adj_matrix[batch_ligand.unsqueeze(1) == batch_ligand] = 1
+    for idx, i in enumerate(batch_ligand):
+        for jdx, j in enumerate(batch_ligand):
+            if idx == jdx:
+                adj_matrix[idx][jdx] = no_bond
+            elif i == j:
+                adj_matrix[idx][jdx] = torch.nn.functional.one_hot(torch.randint(0, 5, (1,)), 5).squeeze(0)
+
+    atom_embedder = nn.Linear(num_classes, 64)
+    X = ligand_pos
+    H = atom_embedder(F.one_hot(ligand_feats, num_classes).float())
+    A = adj_matrix
+    mask = batch_ligand.unsqueeze(1) == batch_ligand.unsqueeze(0)  # Shape: (75, 75)
+    E_idx = mask.nonzero(as_tuple=False).t()
+    self_loops = E_idx[0] != E_idx[1]
+    E_idx = E_idx[:, self_loops]
+    Z = atom_embedder(F.one_hot(ligand_feats, num_classes).float()).unsqueeze(1) * atom_embedder(
+        F.one_hot(ligand_feats, num_classes).float()
+    ).unsqueeze(0)
+
+    import ipdb
+
+    ipdb.set_trace()
+    print("Success")
