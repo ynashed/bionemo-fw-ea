@@ -13,14 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from contextlib import contextmanager
+from typing import Iterator
 
 import numpy as np
 
 
 @contextmanager
-def random_numpy_context(seed: int = 42):
+def random_numpy_context(seed: int = 42) -> Iterator[None]:
+    state = np.random.get_state()  # just fail if this fails
     try:
-        state = np.random.get_state()
         np.random.seed(seed)
         yield
     finally:
