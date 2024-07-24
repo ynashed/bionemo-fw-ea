@@ -669,9 +669,14 @@ def test_inference_loss_10m_released_checkpoint(geneformer_config: BioBertConfig
         #  of the megatron implementation. Since we manually passed experiment 1 this experiment
         #  will define our initial "golden value" test target.
         target: float = 2.368649959564209
-        # test that we are within 0.01 or better
-        test_pass = mean_loss < target or mean_loss == pytest.approx(target, abs=1e-2, rel=None)
         if break_model:
-            assert not test_pass
+            # In one run, this gave a mean_loss of 7.9! Very much broke the model.
+            #  note that the model can be trained to work with relu and produces similar loss curves
+            #  but the weights trained one way are not compatible with the other.
+            # Our HF model was at 3, so 5 is pretty clearly out of expected range. This shows how
+            #  sensitive the checkpoint is to a real change in the underlying function.
+            #  Perhaps a future model is more robust, so if this value needs to come down we can
+            #  do that.
+            assert mean_loss > 5
         else:
-            assert test_pass
+            assert mean_loss < target or mean_loss == pytest.approx(target, abs=1e-2, rel=None)
