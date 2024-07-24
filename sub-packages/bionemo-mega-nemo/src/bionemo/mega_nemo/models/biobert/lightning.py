@@ -27,8 +27,8 @@ from nemo.lightning.megatron_parallel import DataT
 from nemo.lightning.pytorch.optim import MegatronOptimizerModule
 from torch.optim import Optimizer
 
+from bionemo.mega_nemo.lightning import BionemoLightningModule
 from bionemo.models.biobert.model import BioBertConfig
-from bionemo.train.lightning import BionemoLightningModule
 
 
 __all__ = (

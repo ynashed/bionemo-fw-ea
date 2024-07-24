@@ -41,7 +41,7 @@ from torch.nn import functional as F
 from bionemo.contrib.data.singlecell.preprocess import PreprocessResources
 from bionemo.contrib.utils.dtypes import PrecisionTypes, get_autocast_dtype
 from bionemo.contrib.utils.logger_utils import WandbLoggerOptions, setup_nemo_lightning_logger
-from bionemo.train.lightning import LossLoggingCallback
+from bionemo.mega_nemo.lightning import LossLoggingCallback
 
 
 def main(
