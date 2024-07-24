@@ -11,7 +11,6 @@
 
 import pickle
 from collections import defaultdict
-from functools import wraps
 
 import numpy as np
 import torch
@@ -29,15 +28,6 @@ from bionemo.model.molecule.moco.models.denoising_models import ModelBuilder
 from bionemo.model.molecule.moco.models.interpolant import build_interpolant
 from bionemo.model.molecule.moco.models.self_conditioning import SelfConditioningBuilder
 from bionemo.model.molecule.moco.models.utils import InterpolantLossFunction
-
-
-def no_grad_decorator(func):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        with torch.no_grad():
-            return func(*args, **kwargs)
-
-    return wrapper
 
 
 class Graph3DInterpolantModel(pl.LightningModule):
@@ -412,6 +402,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
             n_nodes = None
         return n_nodes
 
+    @torch.no_grad()
     def sample(self, num_samples, timesteps=500, time_discretization="linear", batch=None):
         """
         Generates num_samples. Can supply a batch for inital starting points for conditional sampling for any interpolants set to None.
@@ -535,7 +526,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
                 batch, pre_conditioning_variables = self.self_conditioning_module(batch, conditional_batch)
         return batch, pre_conditioning_variables
 
-    @no_grad_decorator
+    @torch.no_grad()
     def conditional_sample(
         self,
         batch,

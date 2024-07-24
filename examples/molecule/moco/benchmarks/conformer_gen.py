@@ -31,7 +31,7 @@ from bionemo.model.molecule.moco.metrics.metrics import (
 from bionemo.model.molecule.moco.models.module import Graph3DInterpolantModel
 
 
-def calc_performance_stats(rmsd_array):
+def calc_performance_stats(rmsd_array, threshold):
     coverage_recall = np.mean(rmsd_array.min(axis=1, keepdims=True) < threshold, axis=0)
     amr_recall = rmsd_array.min(axis=1).mean()
     coverage_precision = np.mean(rmsd_array.min(axis=0, keepdims=True) < np.expand_dims(threshold, 1), axis=1)
@@ -48,6 +48,33 @@ def clean_confs(smi, confs):
         if conf_smi == smi:
             good_ids.append(i)
     return [confs[i] for i in good_ids]
+
+
+def worker_fn(job):
+    smi, correct_smi, i_true, true_mols, model_preds, only_alignmol = job
+    true_confs = true_mols[smi]
+    model_confs = model_preds[correct_smi]
+    tc = true_confs[i_true]
+
+    rmsds = []
+    for mc in model_confs:
+        try:
+            if only_alignmol:
+                rmsd = AllChem.AlignMol(Chem.RemoveHs(tc), Chem.RemoveHs(mc))
+            else:
+                rmsd = AllChem.GetBestRMS(Chem.RemoveHs(tc), Chem.RemoveHs(mc))
+            rmsds.append(rmsd)
+        except Exception as e:
+            print(e)
+            print('Additional failure', smi, correct_smi)
+            rmsds = [np.nan] * len(model_confs)
+            break
+    return smi, correct_smi, i_true, rmsds
+
+
+def populate_results(res, results):
+    smi, correct_smi, i_true, rmsds = res
+    results[(smi, correct_smi)]['rmsd'][i_true] = rmsds
 
 
 def run_benchmark(model_preds, test_data, true_mols, outpath, n_workers=10, dataset="drugs", only_alignmol=False):
@@ -86,55 +113,26 @@ def run_benchmark(model_preds, test_data, true_mols, outpath, n_workers=10, data
             'rmsd': np.nan * np.ones((n_true, n_model)),
         }
         for i_true in range(n_true):
-            jobs.append((smi, corrected_smi, i_true))
-
-    def worker_fn(job):
-        smi, correct_smi, i_true = job
-        true_confs = true_mols[smi]
-        model_confs = model_preds[correct_smi]
-        tc = true_confs[i_true]
-
-        rmsds = []
-        for mc in model_confs:
-            try:
-                if only_alignmol:
-                    rmsd = AllChem.AlignMol(Chem.RemoveHs(tc), Chem.RemoveHs(mc))
-                else:
-                    rmsd = AllChem.GetBestRMS(Chem.RemoveHs(tc), Chem.RemoveHs(mc))
-                rmsds.append(rmsd)
-            except Exception as e:
-                print(e)
-                print('Additional failure', smi, correct_smi)
-                rmsds = [np.nan] * len(model_confs)
-                break
-        return smi, correct_smi, i_true, rmsds
-
-    def populate_results(res):
-        smi, correct_smi, i_true, rmsds = res
-        results[(smi, correct_smi)]['rmsd'][i_true] = rmsds
+            jobs.append((smi, corrected_smi, i_true, true_mols, model_preds, only_alignmol))
 
     random.shuffle(jobs)
     if n_workers > 1:
-        p = Pool(n_workers)
-        map_fn = p.imap_unordered
-        p.__enter__()
+        with Pool(n_workers) as pool:
+            for res in tqdm(pool.imap_unordered(worker_fn, jobs), total=len(jobs)):
+                populate_results(res, results)
     else:
-        map_fn = map
-
-    for res in tqdm(map_fn(worker_fn, jobs), total=len(jobs)):
-        populate_results(res)
-
-    if n_workers > 1:
-        p.__exit__(None, None, None)
+        for res in tqdm(map(worker_fn, jobs), total=len(jobs)):
+            populate_results(res, results)
 
     stats = []
+    threshold = np.arange(0, 2.5, 0.125)
     for res in results.values():
-        stats_ = calc_performance_stats(res['rmsd'])
+        stats_ = calc_performance_stats(res['rmsd'], threshold)
         cr, mr, cp, mp = stats_
         stats.append(stats_)
     coverage_recall, amr_recall, coverage_precision, amr_precision = zip(*stats)
 
-    for i, thresh in enumerate(threshold_ranges):
+    for i, thresh in enumerate(threshold):
         print('threshold', thresh)
         coverage_recall_vals = [stat[i] for stat in coverage_recall] + [0] * num_failures
         coverage_precision_vals = [stat[i] for stat in coverage_precision] + [0] * num_failures

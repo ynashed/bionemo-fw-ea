@@ -23,6 +23,7 @@ loss:
       aggregate: 'sum'
       continuous: True
       use_distance: null
+      distance_scale: null
     - variable_name: 'h'
       loss_scale: 0.4
       aggregate: 'sum'
@@ -110,6 +111,7 @@ dynamics:
   wrapper_args:
     timesteps: *timesteps
     time_type: *time_type
+    random_learning: False
 
 self_conditioning:
   name: "base"
@@ -160,6 +162,10 @@ evaluation:
   batch_size: 100
   n_molecules: 250
   timesteps: *timesteps
+  compute_2D_metrics: True
+  compute_3D_metrics: True
+  compute_dihedrals: False
+  compute_train_data_metrics: True
 
 optimizer:
   type: adamw
