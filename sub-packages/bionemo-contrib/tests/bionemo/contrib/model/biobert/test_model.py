@@ -585,7 +585,8 @@ def test_geneformer_inference_nemo1_v_nemo2_golden_values_by_layer(
                 )
 
 
-def test_inference_loss_10m_released_checkpoint(geneformer_config: BioBertConfig, seed: int = 42):
+@pytest.mark.parametrize("break_model", [True, False])
+def test_inference_loss_10m_released_checkpoint(geneformer_config: BioBertConfig, break_model: bool, seed: int = 42):
     data_dir = pathlib.Path(data_path)
     train_data_path = data_dir / "train"
     test_data_path = data_dir / "test"
@@ -605,6 +606,10 @@ def test_inference_loss_10m_released_checkpoint(geneformer_config: BioBertConfig
         geneformer_config_logit = deepcopy(geneformer_config)
         geneformer_config_logit.return_only_hidden_states = False  # return logits
         geneformer_config_logit.nemo1_ckpt_path = nemo1_release_checkpoint_path  # release checkpoint is important
+        if break_model:
+            # introduce a breaking change with a future xfail as a negative control for our test
+            geneformer_config_logit.activation_func = torch.nn.functional.relu  # the model should be gelu
+            geneformer_config_logit.bias_activation_fusion = False  # this needs to be off for ReLu support
         new_model = geneformer_config_logit.configure_model(tokenizer).eval().cuda()
         # NOTE: a small change to randomization in the single-cell dataset could throw our test below off by a small amount
         #  maybe 0.02 or so, if the value is above that range then disable the 200 batch limit and check the global number
@@ -665,4 +670,8 @@ def test_inference_loss_10m_released_checkpoint(geneformer_config: BioBertConfig
         #  will define our initial "golden value" test target.
         target: float = 2.368649959564209
         # test that we are within 0.01 or better
-        assert mean_loss < target or mean_loss == pytest.approx(target, abs=1e-2, rel=None)
+        test_pass = mean_loss < target or mean_loss == pytest.approx(target, abs=1e-2, rel=None)
+        if break_model:
+            assert not test_pass
+        else:
+            assert test_pass
