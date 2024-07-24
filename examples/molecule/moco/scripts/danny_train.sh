@@ -17,13 +17,13 @@
 BIONEMO_IMAGE="nvcr.io/nvidian/cvai_bnmo_trng/bionemo:moco" # BioNeMo container image
 WANDB_API_KEY=40eca22e1f13673f579d3b59efb30d6425fae9e5 # Add your WANDB API KEY
 
-CONFIG_NAME="train_eqgat_dist_slurm" 
+CONFIG_NAME="train_eqgat_flow_slurm" 
 
 
 # Logging
 # =========================
 EXP_GROUP="danny-iad-testing"
-EXP_NAME="eqgat_dist_slurm_z_triple_d"
+EXP_NAME="eqgat_flow_slurm"
 WANDB_ENTITY="clara-discovery"
 WANDB_GROUP=${EXP_GROUP}
 WANDB_PROJECT="MoCo"
