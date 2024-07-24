@@ -1,6 +1,6 @@
-run_name: 'eqgat_flow_local_sample'
+run_name: 'eqgat_flow_local_sample_100_less_random_e3norm'
 outdir: /workspace/bionemo/results/eqgatdiff
-resume: null
+resume:  null #/workspace/bionemo/results/eqgatdiff/eqgat_flow_local_sample_100/checkpoints/last.ckpt #null
 ema_resume: null
 wandb_params:
   mode: 'online'  # disabled, offline, online
@@ -17,7 +17,7 @@ data:
   data_loader_type: "midi"
 
 loss:
-  variables:
+  variables: #! TODO can try mean
     - variable_name: 'x'
       loss_scale: 1.0
       aggregate: 'sum'
@@ -38,7 +38,7 @@ loss:
       continuous: False
 
 interpolant:
-  timesteps: &timesteps 500
+  timesteps: &timesteps 100
   time_type: &time_type "continuous" #["discrete, "continuous]
   scheduler_type: &scheduler_type "linear" #["cosine_adaptive, "linear"]
   sample_time_method: "uniform" # ["symmetric", "uniform", "stab_mode", "logit_normal", "beta"]
@@ -153,14 +153,14 @@ train:
   enable_progress_bar: True
   gradient_clip_value: 10.0
   log_freq: 50
-  val_freq: 5
+  val_freq: 1
   checkpoint_monitor: mol_stable
   checkpoint_monitor_mode: max
   checkpoint_every_n_train_steps: 500
 
 evaluation:
   batch_size: 100
-  n_molecules: 250
+  n_molecules: 100
   timesteps: *timesteps
 
 optimizer:

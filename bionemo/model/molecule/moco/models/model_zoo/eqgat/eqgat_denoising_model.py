@@ -27,6 +27,7 @@ from bionemo.model.molecule.moco.models.model_zoo.eqgat.eqgat_modules import (
     LayerNorm,
     SE3Norm,
 )
+from bionemo.model.molecule.moco.models.mpnn import E3Norm
 
 
 def cross_product(a: Tensor, b: Tensor, dim: int) -> Tensor:
@@ -457,13 +458,18 @@ class EQGATEdgeGNN(nn.Module):
             norm_module = LayerNorm
 
         self.norms = nn.ModuleList([norm_module(dims=hn_dim, latent_dim=latent_dim) for _ in range(num_layers)])
-
+        self.use_e_norm = False
+        if self.use_e_norm:
+            self.e_norms = nn.ModuleList([nn.LayerNorm(edge_dim) for _ in range(num_layers)])
         self.reset_parameters()
 
     def reset_parameters(self):
         for conv, norm in zip(self.convs, self.norms):
             conv.reset_parameters()
             norm.reset_parameters()
+        if self.use_e_norm:
+            for norm in self.e_norms:
+                norm.reset_parameters()
 
     def calculate_edge_attrs(
         self,
@@ -537,6 +543,8 @@ class EQGATEdgeGNN(nn.Module):
 
             s, v, p, e = out["s"], out["v"], out["p"], out["e"]
             # p = p - scatter_mean(p, batch, dim=0)[batch]
+            if self.use_e_norm:
+                e = self.e_norms[i](e)
             if self.recompute_edge_attributes:
                 edge_attr_global = self.calculate_edge_attrs(
                     edge_index=edge_index_global,
@@ -576,6 +584,7 @@ class PredictionHeadEdge(nn.Module):
         self.atoms_lin = DenseLayer(in_features=self.sdim, out_features=num_atom_features, bias=True)
 
         self.coords_param = coords_param
+        self.coord_norm = E3Norm()
 
         self.reset_parameters()
 
@@ -585,6 +594,7 @@ class PredictionHeadEdge(nn.Module):
         self.atoms_lin.reset_parameters()
         self.bonds_lin_0.reset_parameters()
         self.bonds_lin_1.reset_parameters()
+        self.coord_norm.reset_parameters()
 
     def forward(
         self,
@@ -598,8 +608,8 @@ class PredictionHeadEdge(nn.Module):
     ) -> Dict:
         s, v, p, e = x["s"], x["v"], x["p"], x["e"]
         s = self.shared_mapping(s)
-
-        coords_pred = self.coords_lin(v).squeeze()
+        #! Trying to add norm here can also bump to in the GNN layer
+        coords_pred = self.coords_lin(self.coord_norm(v, batch)).squeeze()
         atoms_pred = self.atoms_lin(s)
 
         if batch_lig is not None and pocket_mask is not None:
@@ -638,11 +648,25 @@ class PredictionHeadEdge(nn.Module):
             e_dense[edge_index_global[0], edge_index_global[1], :] = e
             e_dense = 0.5 * (e_dense + e_dense.permute(1, 0, 2))
             e = e_dense[edge_index_global[0], edge_index_global[1], :]
-
+        #! FM Issue comes here for NaN's in edges
         f = s[i] + s[j] + self.bond_mapping(e)
         edge = torch.cat([f, d], dim=-1)
-        bonds_pred = F.silu(self.bonds_lin_0(edge))
-        bonds_pred = self.bonds_lin_1(bonds_pred)
+        _bonds_pred = F.silu(self.bonds_lin_0(edge))
+        bonds_pred = self.bonds_lin_1(_bonds_pred)
+        # if torch.isnan(bonds_pred).any().item():
+        #     print(torch.isnan(e).nonzero(as_tuple=False))
+        #     print(torch.isinf(e).nonzero(as_tuple=False))
+        #     print(torch.isnan(f).nonzero(as_tuple=False))
+        #     print(torch.isinf(f).nonzero(as_tuple=False))
+        #     print(torch.isnan(edge).nonzero(as_tuple=False))
+        #     print(torch.isnan(self.bonds_lin_0(edge)).nonzero(as_tuple=False))
+        #     print(torch.isinf(self.bonds_lin_0(edge)).nonzero(as_tuple=False))
+        #     print(torch.isnan( F.silu(self.bonds_lin_0(edge))).nonzero(as_tuple=False))
+        #     print(torch.isnan(_bonds_pred).nonzero(as_tuple=False))
+        #     # print(torch.isnan(bonds_pred).nonzero(as_tuple=False))
+        #     print(torch.isnan(bonds_pred).nonzero(as_tuple=False))
+        #     import ipdb; ipdb.set_trace()
+        #     test = None
 
         out = {
             "coords_pred": coords_pred,

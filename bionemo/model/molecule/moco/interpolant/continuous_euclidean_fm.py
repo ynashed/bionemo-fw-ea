@@ -44,10 +44,10 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
         nu: float = 1.0,
         clip: bool = True,
         com_free: bool = True,
-        noise_sigma: float = 0.0,
+        noise_sigma: float = 0.0,  #! Semla uses 0.2
         optimal_transport: str = None,
         clip_t: float = 0.9,
-        loss_weight_type: str = 'standard',  # 'uniform'
+        loss_weight_type: str = 'uniform',  # 'uniform' 'frameflow' (0.1/(1-t))**2 [0.01, 100] 'snr' t/(1-t)
         loss_t_scale: float = 0.1,  # this makes max scale 1
     ):
         super(ContinuousFlowMatchingInterpolant, self).__init__(prior_type, solver_type, timesteps, time_type)
@@ -90,8 +90,11 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
             return torch.ones_like(time).to(time.device)
 
         if self.time_type == "continuous":
-            # loss scale for "frameflow": # [1, 0.1] for T = [0, 1]
-            return (self.loss_t_scale * (1 / (1 - torch.clamp(time, self.min_t, self.clip_t)))) ** 2
+            if self.loss_weight_type == "frameflow":
+                # loss scale for "frameflow": # [0.01, 100] for T = [0, 1]
+                return (self.loss_t_scale * (1 / (1 - torch.clamp(time, self.min_t, self.clip_t)))) ** 2
+            elif self.loss_weight_type == "snr":
+                return torch.clamp(time, self.min_t, self.clip_t) / (1 - torch.clamp(time, self.min_t, self.clip_t))
         else:
             if self.schedule_type == "linear":
                 t = time / self.timesteps
@@ -142,7 +145,7 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
         batch_size = int(max(batch) + 1)
         data_batch = [data_chunk[batch == idx] for idx in range(batch_size)]
         max_num_atoms = max([x.shape[0] for x in data_batch])
-        noise_batch = [self.prior(None, (max_num_atoms, 3), data_chunk.device) for _ in range(batch_size)]
+        noise_batch = [self.prior_func(None, (max_num_atoms, 3), data_chunk.device) for _ in range(batch_size)]
         for xidx, x0 in enumerate(noise_batch):
             if self.optimal_transport == "scale_ot":
                 scale = 0.2 * np.log(x0.shape[0] + 1)  # torch can't log scalar
@@ -179,10 +182,10 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
         if self.optimal_transport in ["equivariant_ot", "scale_ot"]:
             x0 = self.equivariant_ot_prior(batch, x1)
         else:
-            x0 = self.prior(batch, x1.shape, x1.device)
+            x0 = self.prior_func(batch, x1.shape, x1.device)
         data_scale, noise_scale = self.forward_schedule(batch, time)
         if self.noise_sigma > 0:
-            interp_noise = self.prior(batch, x1.shape, x1.device) * self.noise_sigma
+            interp_noise = self.prior_func(batch, x1.shape, x1.device) * self.noise_sigma
         else:
             interp_noise = 0
         return x1, data_scale * x1 + noise_scale * x0 + interp_noise, x0
@@ -193,7 +196,7 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
         """
         return (x1 - xt) / (1.0 - torch.clamp(time[batch], self.min_t, self.max_t))
 
-    def prior(self, batch, shape, device, x1=None):
+    def prior_func(self, batch, shape, device, x1=None):
         if self.prior_type == "gaussian" or self.prior_type == "normal":
             x0 = torch.randn(shape).to(device)
             if self.com_free:
@@ -204,6 +207,16 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
         else:
             raise ValueError("Only Gaussian is supported")
         return x0.to(device)
+
+    def prior(self, batch, shape, device, x1=None):
+        sample = self.prior_func(batch, shape, device, x1)
+        if self.optimal_transport in [
+            "scale_ot"
+        ]:  #! this is here to allow for inference to access the sacle part but not the OT
+            _, counts = torch.unique(batch, return_counts=True)
+            scale = 0.2 * torch.log(counts + 1).unsqueeze(1)
+            sample = sample * scale[batch]
+        return sample
 
     def step(self, batch, xt, x_hat, time, x0=None, dt=None):
         """
@@ -225,5 +238,5 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
             raise ValueError(f"f{self.vector_field_type} is not a recognized vector_field_type")
 
         if self.noise_sigma > 0:
-            x_next += self.prior(batch, x_hat.shape, x_hat.device) * self.noise_sigma  # torch.randn_like(x_hat)
+            x_next += self.prior_func(batch, x_hat.shape, x_hat.device) * self.noise_sigma  # torch.randn_like(x_hat)
         return x_next

@@ -54,7 +54,7 @@ def main(cfg: DictConfig) -> None:
                 default=-1,
             )
             cfg.ema_resume = f"{ema_dir}/ema_parameters_epoch_{latest_epoch}.pt"
-        pl_module = Graph3DInterpolantModel.load_from_checkpoint(cfg.resume)
+        pl_module = Graph3DInterpolantModel.load_from_checkpoint(cfg.resume, strict=False)
         ema_state_dict = torch.load(cfg.ema_resume)[
             'state_dict'
         ]  #! Pytorch Saving does not save the device and requires_grad
@@ -126,6 +126,10 @@ def main(cfg: DictConfig) -> None:
     datamodule = MoleculeDataModule(**cfg.data)
     train_loader = datamodule.train_dataloader()
     val_loader = datamodule.val_dataloader()
+    # pl_module.eval()
+    # pl_module.self_conditioning_module = None
+    # evaluation_callback.evaluate_molecules(trainer, pl_module)
+    # pl_module.train()
     trainer.fit(model=pl_module, train_dataloaders=train_loader, val_dataloaders=val_loader, ckpt_path=ckpt)
 
 

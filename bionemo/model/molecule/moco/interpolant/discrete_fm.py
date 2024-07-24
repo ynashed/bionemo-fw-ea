@@ -41,8 +41,8 @@ class DiscreteFlowMatchingInterpolant(Interpolant):
         sqrt: bool = False,
         nu: float = 1.0,
         clip: bool = True,
-        temp: float = 0.1,
-        stochasticity: float = 10.0,
+        temp: float = 1.0,  # 0.1,
+        stochasticity: float = 1.0,  # 10 #! Current run has too much noise lets tone it down
     ):
         super(DiscreteFlowMatchingInterpolant, self).__init__(prior_type, solver_type, timesteps, time_type)
         self.num_classes = num_classes
