@@ -113,6 +113,7 @@ dynamics:
   wrapper_args:
     timesteps: *timesteps
     time_type: *time_type
+    
 self_conditioning:
   name: "base"
   variables:
