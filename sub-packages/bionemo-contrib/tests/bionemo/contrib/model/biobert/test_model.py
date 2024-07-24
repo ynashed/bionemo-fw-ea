@@ -649,11 +649,15 @@ def test_inference_loss_10m_released_checkpoint(geneformer_config: BioBertConfig
         # NOTE: the values in the table were from the average of averages of 8 sized batches
         # Experiment 1) loaded the 10M model and did the mean of mean loss with 8 sized batches
         #  this gives: 2.3558831214904785 vs 2.357126723703872, so we actually do better!
+        # For NVIDIA employees see work here:
+        #   https://docs.google.com/document/d/1CofamqHbQlp5U8SjmW7NR7PbTbF72Lj9L9xz1W5t3ZI/edit
+        # Experiment 2)
         #  With a proper loss (sum/n) and limiting to 200 _random_ batches of size 8 for speed
         #  we get a similar range number of 2.368649959564209.
         #  a small change that has lower impact than the change between models is probably acceptable.
         #  the target is defined as described above for the 10M checkpoint based on our first pass
-        #  of the megatron implementation.
+        #  of the megatron implementation. Since we manually passed experiment 1 this experiment
+        #  will define our initial "golden value" test target.
         target: float = 2.368649959564209
         # test that we are within 0.01 or better
         assert mean_loss < target or mean_loss == pytest.approx(target, abs=1e-2, rel=None)

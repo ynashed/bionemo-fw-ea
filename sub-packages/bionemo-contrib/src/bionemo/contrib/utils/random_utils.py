@@ -12,16 +12,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import numpy as np
 from contextlib import contextmanager
+
+import numpy as np
 
 
 @contextmanager
-def random_numpy_context(seed:int=42):
+def random_numpy_context(seed: int = 42):
     try:
         state = np.random.get_state()
         np.random.seed(seed)
         yield
     finally:
         np.random.set_state(state)
-
