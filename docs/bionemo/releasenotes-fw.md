@@ -6,6 +6,9 @@
 * [EquiDock] Remove steric clashes as a post-processing step after equidock inference.
 * [Documentation] Updated Getting Started section which sequentially describes prerequisites, BioNeMo Framework access, startup instructions, and next steps.
 
+### Known Issues
+* There is a known security vulnerability with NLTK that can allow for arbitrary code execution via pickle files that are external assets downloaded via nltk.download() (https://github.com/nltk/nltk/issues/3266). BioNeMo itself does not use this dependency in any way, however parts of NeMo text-to-speech (nemo.collections.tts) does use this vulnerable codepath. Since NeMo is installed in the BioNeMo release containers, users are urged to exercise caution when using  nemo.collections.tts or nltk.
+
 ## BioNeMo Framework v1.6
 ### New Features
 * [Model Fine-tuning] `model.freeze_layers` fine-tuning config parameter added to freeze a specified number of layers. Thank you to github user [@nehap25](https://github.com/nehap25)!

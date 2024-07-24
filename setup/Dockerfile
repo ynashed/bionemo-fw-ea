@@ -95,10 +95,6 @@ RUN git clone -b v$NEMO_VERSION https://github.com/NVIDIA/NeMo.git && \
     pip install -r requirements/requirements_nlp.txt && \
     pip install ".[nlp]"
 
-# Remove lightning-app. Nemo and BioNeMo doesn't use it, and it introduces security vulnerabilities:
-# https://github.com/advisories/GHSA-cgwc-qvrx-rf7f
-# https://github.com/advisories/GHSA-mr7h-w2qc-ffc2
-RUN rm -rf /usr/local/lib/python3.10/dist-packages/lightning/app
 
 # need this for backward compatibility: pytests rely on configs in /workspace/nemo/examples
 RUN mkdir -p /workspace/nemo/
@@ -304,6 +300,12 @@ COPY bionemo ${BIONEMO_HOME}/bionemo
 WORKDIR ${BIONEMO_HOME}
 # we already install dependencies earlier, directly from the requirements*.txt files
 RUN pip install --no-deps -e .
+
+# Remove lightning-app. Nemo and BioNeMo doesn't use it, and it introduces security vulnerabilities:
+# https://github.com/advisories/GHSA-cgwc-qvrx-rf7f
+# https://github.com/advisories/GHSA-mr7h-w2qc-ffc2
+RUN rm -rf /usr/local/lib/python3.10/dist-packages/lightning/app
+
 
 # FIXME: If BIONEMO_HOME _is not_ /workspace/bionemo, then this ENTRYPOINT is invalid!
 ENTRYPOINT ["/workspace/bionemo/setup/startup.sh"]
