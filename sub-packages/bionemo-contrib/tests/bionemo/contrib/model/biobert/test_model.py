@@ -606,6 +606,11 @@ def test_inference_loss_10m_released_checkpoint(geneformer_config: BioBertConfig
         geneformer_config_logit.return_only_hidden_states = False  # return logits
         geneformer_config_logit.nemo1_ckpt_path = nemo1_release_checkpoint_path  # release checkpoint is important
         new_model = geneformer_config_logit.configure_model(tokenizer).eval().cuda()
+        # NOTE: a small change to randomization in the single-cell dataset could throw our test below off by a small amount
+        #  maybe 0.02 or so, if the value is above that range then disable the 200 batch limit and check the global number
+        #  going back to `n += 1` and `loss += F.cross_entropy(logits[loss_mask], target[loss_mask], reduction="mean")`
+        #  for consistency with the old results. Then if those look good, redefine the target with our seeds and the
+        #  updated dataset.
         ds = SingleCellDataset(
             test_data_path,
             tokenizer=tokenizer,
