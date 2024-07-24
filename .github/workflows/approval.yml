@@ -1,0 +1,36 @@
+name: Final Approval
+
+on: [pull_request]
+# gh api  -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" "/orgs/NVIDIA/teams/bionemo-final-approvers/members" --jq '.[].login'
+jobs:
+  final-approval:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: "Check for final approval"
+        run: |
+          APPROVED_BY=$(gh pr view ${{ github.event.number }} --repo https://github.com/NVIDIA/bionemo-fw-ea --json "reviews" --jq '.reviews[] | select(.state == "APPROVED") | .author.login')
+
+           gh api  -H "Accept: application/vnd.github+json"  "/orgs/NVIDIA/teams/bionemo-final-approvers/members" --jq '.[].login'
+
+          echo $APPROVED_BY
+          echo "$FINAL_APPROVERS_LIST" | tr ' ' '\n' > final_approvers.txt
+
+          for user in $CURRENTLY_APPROVED_BY; do
+            if grep -q "^${user}$" final_approvers.txt; then
+              INTERSECT=true
+              break
+            fi
+          done
+
+          if [ "$INTERSECT" = true ]; then
+            echo "Final approval received."
+          else
+            echo "Waiting for final approval from: ${FINAL_APPROVERS_LIST}"
+            exit 1
+          fi
+
+          # Clean up
+          rm approvers.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
