@@ -31,6 +31,7 @@ NONLINEARITIES = {
 
 
 class E3Norm(nn.Module):
+    #! needs to be 0 CoM
     def __init__(self, eps: float = 1e-5):
         super().__init__()
         self.eps = eps
@@ -233,6 +234,9 @@ class DiTBlock(nn.Module):
             hidden_size, mlp_hidden_dim, bias=False
         )  # MLP(input_dim=hidden_size, hidden_size=mlp_hidden_dim, output_dim=hidden_size, num_hidden_layers=0, dropout=0, activation="gelu_tanh")
         self.adaLN_modulation = nn.Sequential(nn.SiLU(), nn.Linear(hidden_size, 6 * hidden_size, bias=True))
+
+    def qkv(self, x):
+        return x
 
     def forward(self, x, t_emb, z=None):
         shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = self.adaLN_modulation(t_emb).chunk(6, dim=1)
@@ -552,4 +556,8 @@ class SE3MixAttention(nn.Module):
     import ipdb
 
     ipdb.set_trace()
+    time = torch.tensor([0.2, 0.4, 0.6, 0.8])
+    temb = TimestepEmbedder(64)(time, batch_ligand)
+    dit = DiTBlock(64, 8)
+    out = dit(H, temb[batch_ligand])
     print("Success")
