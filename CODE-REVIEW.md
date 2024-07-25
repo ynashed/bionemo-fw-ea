@@ -144,7 +144,7 @@ the areas of code it touches.
 Code ownership information is stored in CODEOWNERS file. Since these CODEOWNERS file are stored in the
 repository, changing them follows the same process as changing code.
 
-To become an owner, add your email address to the CODEOWNERS file that you
+To become an owner, add your github username to the CODEOWNERS file that you
 want to be a part of, and submit the change to Gitlab. The change to the
 CODEOWNERS file will follow the same review process as any other code
 change. The existing owners will decide whether to delegate ownership to
