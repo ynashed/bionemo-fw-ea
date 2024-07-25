@@ -40,7 +40,7 @@ ownership structures tend to mirror team structures; a single team is
 often responsible for a functional component.
 
 You must receive approval from **at least one** owner of **every** file
-you change.
+you change. Unless the file(s) do not have any owners specified in the `CODEOWNERS` file.
 
 *If your change only modifies files owned by your team, owner review
 happens implicitly in the team review step (i.e. in many cases you may
