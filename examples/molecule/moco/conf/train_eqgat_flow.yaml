@@ -1,6 +1,6 @@
 run_name: 'eqgat_flow_local_sample_100_less_random_e3norm'
 outdir: /workspace/bionemo/results/eqgatdiff
-resume:  null #/workspace/bionemo/results/eqgatdiff/eqgat_flow_local_sample_100/checkpoints/last.ckpt #null
+resume:  /workspace/bionemo/results/eqgatdiff/eqgat_flow_local_sample_100_less_random_e3norm/checkpoints/last.ckpt #null
 ema_resume: null
 wandb_params:
   mode: 'online'  # disabled, offline, online

@@ -33,6 +33,7 @@ class MoleculeEvaluationCallback(pl.Callback):
         mol_metrics = BasicMolecularMetrics({"atom_decoder": self.full_atom_decoder}, device=pl_module.device)
         stab_dict, valid_dict, stat_dict, valid_smi, stable_mols, valid_mols = mol_metrics(mols)
         res = {**stab_dict, **valid_dict, **stat_dict}
+        # import ipdb; ipdb.set_trace()
         if trainer.global_rank == 0:
             print(res)
         return res
