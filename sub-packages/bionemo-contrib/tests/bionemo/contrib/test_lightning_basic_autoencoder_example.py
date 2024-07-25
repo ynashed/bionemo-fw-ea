@@ -22,7 +22,7 @@ from bionemo.contrib.testing import megatron_parallel_state_utils
 
 
 def test_mixin_strategy_contract_get_loss_reduction():
-    with megatron_parallel_state_utils.distributed_model_parallel_state():
+    with megatron_parallel_state_utils.clean_parallel_state_context():
         strategy = nl.MegatronStrategy(
             tensor_model_parallel_size=1,
             pipeline_model_parallel_size=1,
@@ -38,7 +38,7 @@ def test_mixin_strategy_contract_get_loss_reduction():
 
 @pytest.mark.needs_gpu
 def test_train_mnist_litautoencoder_with_megatron_strategy_single_gpu():
-    with megatron_parallel_state_utils.distributed_model_parallel_state():
+    with megatron_parallel_state_utils.clean_parallel_state_context():
         model = lb.LitAutoEncoder(config=lb.ExampleConfig())
         strategy = nl.MegatronStrategy(
             tensor_model_parallel_size=1,
@@ -49,5 +49,4 @@ def test_train_mnist_litautoencoder_with_megatron_strategy_single_gpu():
         )
         trainer = nl.Trainer(accelerator="gpu", devices=1, strategy=strategy, max_steps=10, num_nodes=1)
         data_module = lb.MNISTDataModule()
-        data_module.trainer = trainer
         trainer.fit(model, data_module)
