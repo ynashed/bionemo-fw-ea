@@ -8,14 +8,18 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
+import functools
 import math
 
+import einops
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.nn import MessagePassing
 from torch_geometric.nn.norm import LayerNorm as BatchLayerNorm
 from torch_scatter import scatter, scatter_mean
+
+from bionemo.model.molecule.moco.arch.rotary import RotaryEmbedding
 
 
 NONLINEARITIES = {
@@ -183,8 +187,12 @@ class AdaLN(nn.Module):
         return (1 + scale[batch]) * self.layernorm(h, batch) + shift[batch]
 
 
+# def modulate(x, shift, scale):
+#     return x * (1 + scale.unsqueeze(1)) + shift.unsqueeze(1)
+
+
 def modulate(x, shift, scale):
-    return x * (1 + scale.unsqueeze(1)) + shift.unsqueeze(1)
+    return x * (1 + scale) + shift
 
 
 #! Below are taken from ESM3 for now
@@ -222,31 +230,124 @@ class DiTBlock(nn.Module):
     Mimics DiT block
     """
 
-    def __init__(self, hidden_size, num_heads, mlp_expansion_ratio=4.0, **block_kwargs):
+    def __init__(
+        self,
+        hidden_size,
+        num_heads,
+        mlp_expansion_ratio=4.0,
+        use_z=True,
+        mask_z=True,
+        use_rotary=False,
+        **block_kwargs,
+    ):
         super().__init__()
+        self.hidden_size = hidden_size
+        self.num_heads = num_heads
         self.norm1 = nn.LayerNorm(hidden_size, elementwise_affine=False, eps=1e-6)
-        self.attn = nn.MultiheadAttention(
-            embed_dim=hidden_size, num_heads=num_heads, bias=True, **block_kwargs
-        )  # Attention(hidden_size, num_heads=num_heads, qkv_bias=True, **block_kwargs)
+        # self.attn = nn.MultiheadAttention(
+        # embed_dim=hidden_size, num_heads=num_heads, bias=True, **block_kwargs
+        # )
         self.norm2 = nn.LayerNorm(hidden_size, elementwise_affine=False, eps=1e-6)
-        mlp_hidden_dim = int(hidden_size * mlp_expansion_ratio)
-        self.mlp = swiglu_ln_ffn(
-            hidden_size, mlp_hidden_dim, bias=False
-        )  # MLP(input_dim=hidden_size, hidden_size=mlp_hidden_dim, output_dim=hidden_size, num_hidden_layers=0, dropout=0, activation="gelu_tanh")
+        # mlp_hidden_dim = int(hidden_size * mlp_expansion_ratio)
+        self.ffn = swiglu_ln_ffn(hidden_size, mlp_expansion_ratio, bias=False)
         self.adaLN_modulation = nn.Sequential(nn.SiLU(), nn.Linear(hidden_size, 6 * hidden_size, bias=True))
 
-    def qkv(self, x):
-        return x
+        # Single linear layer for QKV projection
+        self.qkv_proj = nn.Linear(hidden_size, 3 * hidden_size, bias=False)
+        self.norm_q = nn.LayerNorm(hidden_size, elementwise_affine=False, eps=1e-6)
+        self.norm_k = nn.LayerNorm(hidden_size, elementwise_affine=False, eps=1e-6)
+        self.out_projection = nn.Linear(hidden_size, hidden_size, bias=False)
 
-    def forward(self, x, t_emb, z=None):
+        self.use_rotary = use_rotary
+        if use_rotary:
+            self.d_head = hidden_size // num_heads
+            self.rotary = RotaryEmbedding(self.d_head)
+
+        if use_z:
+            self.use_z = use_z
+            self.pair_bias = nn.Sequential(nn.SiLU(), nn.Linear(hidden_size, 1, bias=False))
+            self.mask_z = mask_z
+
+    def _apply_rotary(self, q: torch.Tensor, k: torch.Tensor):
+        q = q.unflatten(-1, (self.num_heads, self.d_head))
+        k = k.unflatten(-1, (self.num_heads, self.d_head))
+        q, k = self.rotary(q, k)
+        q = q.flatten(-2, -1)
+        k = k.flatten(-2, -1)
+        return q, k
+
+    def forward(self, batch: torch.Tensor, x: torch.Tensor, t_emb: torch.Tensor, Z: torch.Tensor = None):
+        """
+        This assume pytorch geometric batching so batch size of 1 so skip rotary as it depends on having an actual batch
+        """
+        if Z is not None:
+            assert self.use_z
+
         shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = self.adaLN_modulation(t_emb).chunk(6, dim=1)
-        x = x + gate_msa.unsqueeze(1) * self.attn(modulate(self.norm1(x), shift_msa, scale_msa))
-        x = x + gate_mlp.unsqueeze(1) * self.mlp(modulate(self.norm2(x), shift_mlp, scale_mlp))
+
+        # Normalize x
+        x_norm = modulate(self.norm1(x), shift_msa, scale_msa)
+
+        # QKV projection
+        qkv = self.qkv_proj(x_norm)
+        Q, K, V = qkv.chunk(3, dim=-1)
+        Q, K = self.norm_q(Q), self.norm_k(K)
+        # Reshape Q, K, V to (1, seq_len, num_heads*head_dim)
+        if x.dim() == 2:
+            Q = Q.unsqueeze(0)
+            K = K.unsqueeze(0)
+            V = V.unsqueeze(0)
+            self.use_rotary = False
+
+        if self.use_rotary:
+            self._apply_rotary(Q, K)
+
+        reshaper = functools.partial(einops.rearrange, pattern="b s (h d) -> b h s d", h=self.num_heads)
+        # Reshape Q, K, V to (1, num_heads, seq_len, head_dim)
+        Q, K, V = map(reshaper, (Q, K, V))
+
+        if x.dim() == 2:
+            attn_mask = batch.unsqueeze(0) == batch.unsqueeze(1)
+            attn_mask = attn_mask.unsqueeze(0).unsqueeze(
+                0
+            )  #! if float it is added as the biasbut would still need a mask s -infs?
+        else:
+            attn_mask = batch
+
+        if Z is not None:
+            if x.dim() == 2:
+                mask = torch.ones((x.size(0), x.size(0)))
+                if self.mask_z:
+                    mask.fill_diagonal_(0)
+                attn_mask = attn_mask.float()
+                attn_mask = attn_mask.masked_fill(attn_mask == 0, float('-inf'))
+                attn_mask = attn_mask.masked_fill(attn_mask == 1, 0.0)
+                bias = (self.pair_bias(Z).squeeze(-1) * mask).unsqueeze(0).unsqueeze(0)
+                attn_mask += bias
+            else:
+                raise ValueError("Have not implemented Batch wise pair embedding update")
+
+        attn_output = F.scaled_dot_product_attention(
+            Q, K, V, attn_mask=attn_mask
+        )  # mask [1 1 num_atoms num_atoms] QKV = [1, num_heads, num_atoms, hidden//num_heads]
+        attn_output = einops.rearrange(attn_output, "b h s d -> b s (h d)").squeeze(0)
+        y = self.out_projection(attn_output)
+
+        # TODO: need to add in gate unsqueeze when we use batch dim
+        # Gated Residual
+        x = x + gate_msa * y
+        # Feed Forward
+        x = x + gate_mlp * self.ffn(modulate(self.norm2(x), shift_mlp, scale_mlp))
+        if Z is not None:
+            Z = Z + x.unsqueeze(1) * x.unsqueeze(0)  # Z outer product
+            if self.mask_z:
+                Z = Z * mask.unsqueeze(-1)
+            return x, Z
         return x
 
 
-# TODO: Create Attnention with norm and rotary, refer to https://github.com/evolutionaryscale/esm/blob/main/esm/layers/attention.py but they just use standard no bias
-# TODOL add QK noramlization from ESM3 stemming from https://proceedings.mlr.press/v202/dehghani23a/dehghani23a.pdf see https://github.com/kyegomez/MegaVIT/blob/main/mega_vit/main.py#L84 and https://github.com/evolutionaryscale/esm/blob/main/esm/layers/attention.py#L48
+# Done: Create Attnention with norm and rotary, refer to https://github.com/evolutionaryscale/esm/blob/main/esm/layers/attention.py but they just use standard no bias
+# Done add QK noramlization from ESM3 stemming from https://proceedings.mlr.press/v202/dehghani23a/dehghani23a.pdf see https://github.com/kyegomez/MegaVIT/blob/main/mega_vit/main.py#L84 and https://github.com/evolutionaryscale/esm/blob/main/esm/layers/attention.py#L48
 
 
 # TODO: @Ali for EGNN should we remove the bias term from MLP's for X data?
@@ -559,5 +660,5 @@ class SE3MixAttention(nn.Module):
     time = torch.tensor([0.2, 0.4, 0.6, 0.8])
     temb = TimestepEmbedder(64)(time, batch_ligand)
     dit = DiTBlock(64, 8)
-    out = dit(H, temb[batch_ligand])
+    out = dit(batch_ligand, H, temb[batch_ligand], Z)
     print("Success")
