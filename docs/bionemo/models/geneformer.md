@@ -16,11 +16,11 @@ Cell x Gene census, public repository for sc-RNA experiments: [CZ CELLxGENE Disc
 
 
 
-### Model Architecture: 
+### Model Architecture:
 **Architecture Type:** [Bidirectional Encoder Representations from Transformers (BERT)](https://arxiv.org/abs/1810.04805)  <br>
 **Network Architecture:** [Geneformer](https://rdcu.be/ddrx0) <br>
 
-### Input: 
+### Input:
 **Input Type(s):** Number (Row represents cell, containing gene names and single cell expression counts) <br>
 **Input Format(s):**  Array [AnnData](https://anndata.readthedocs.io/en/latest/)<br>
 **Input Parameters:** 1D <br>
@@ -30,11 +30,11 @@ Cell x Gene census, public repository for sc-RNA experiments: [CZ CELLxGENE Disc
 **Output Type(s):** Vector (Dense Embedding Predictions)embeddings. <br>
 **Output Format:** NumPy <br>
 **Output Parameters:** 1D <br>
-**Other Properties Related to Output:** Numeric floating point vector (fp16, bf16, or fp32); geneformer-10M-240530 outputs 256 dimensional embeddings; geneformer-106M-240530 outputs 768 dimensional embeddings <br> 
+**Other Properties Related to Output:** Numeric floating point vector (fp16, bf16, or fp32); geneformer-10M-240530 outputs 256 dimensional embeddings; geneformer-106M-240530 outputs 768 dimensional embeddings <br>
 
 
 ### Software Integration:
-**Runtime Engine(s):** 
+**Runtime Engine(s):**
 * BioNeMo, NeMo 1.2 <br>
 
 **Supported Hardware Microarchitecture Compatibility:** <br>
@@ -45,9 +45,9 @@ Cell x Gene census, public repository for sc-RNA experiments: [CZ CELLxGENE Disc
 **[Preferred/Supported] Operating System(s):** <br>
 * Linux <br>
 
-### Model Version(s): 
+### Model Version(s):
 * geneformer-10M-240530  <br>
-    * 10.3M parameter geneformer variant. 
+    * 10.3M parameter geneformer variant.
     * 25429 ensemble ID based gene tokens
     * 256 hidden dimensions with 4 heads, 6 layers and an 512 dimensional FFN
     * relu activation
@@ -55,7 +55,7 @@ Cell x Gene census, public repository for sc-RNA experiments: [CZ CELLxGENE Disc
     * bf16 mixed precision training with 32 bit residual connections
     * 2% hidden dropout, 10% attention dropout
 * geneformer-106M-240530
-    * 106M parameter geneformer variant. 
+    * 106M parameter geneformer variant.
     * 25429 ensemble ID based gene tokens
     * 768 hidden dimensions with 12 heads, 12 layers and an 3072 dimensional FFN
     * relu activation
@@ -63,14 +63,14 @@ Cell x Gene census, public repository for sc-RNA experiments: [CZ CELLxGENE Disc
     * bf16 mixed precision training with 32 bit residual connections
     * 2% hidden dropout, 10% attention dropout
 
-## Training & Evaluation: 
+## Training & Evaluation:
 
 ### Training Dataset:
 Single cell expression counts from CELLxGENE Census used for the direct download of data matching similar criteria to those described in the geneformer publication. limiting cell data to organism=”Homo sapiens”, with a non “na” suspension_type, is_primary_data=True, and disease=”normal” to limit to non-diseased tissues that are also the primary data source per cell to make sure that cells are only included once in the download. We tracked metadata including “assay”, “sex”, “development_stage”, “tissue_general”, “dataset_id” and “self_reported_ethnicity”. The metadata “assay”, “tissue_general”, and “dataset_id” were used to construct dataset splits into train, validation, and test sets.
 
-The training set represented 99% of the downloaded cells. We partitioned the data by dataset_id into a train set (99%) and a hold-out set (1%), to make sure that the hold-out datasets were independently collected single cell experiments, which helps evaluate generalizability to new future datasets. 
+The training set represented 99% of the downloaded cells. We partitioned the data by dataset_id into a train set (99%) and a hold-out set (1%), to make sure that the hold-out datasets were independently collected single cell experiments, which helps evaluate generalizability to new future datasets.
 
-In this training split, we made sure that all “assay” and “tissue_general” labels were present in the training set so that our model would have maximal visibility into different tissues and assay biases. 
+In this training split, we made sure that all “assay” and “tissue_general” labels were present in the training set so that our model would have maximal visibility into different tissues and assay biases.
 
 The 1% hold-out evaluation set was split further into a validation and test set. This final split was mostly done randomly by cell; however, we set aside a full dataset into the test split so that we could evaluate performance after training on a completely unseen dataset, including when monitoring the validation loss during training.
 
@@ -84,11 +84,11 @@ The 1% hold-out evaluation set was split further into a validation and test set.
 
 
 
-**Properties (Quantity, Dataset Descriptions, Sensor(s)):**  
+**Properties (Quantity, Dataset Descriptions, Sensor(s)):**
 23.64 million non-diseased and human-derived single cells were chosen from the CZI CELLxGENE census, which is characterized as follows:  <br>
 * Assay Bias:
-    * The vast majority of the dataset is one of the 10x genomics assays, Approximately 20M of 26M cells are genomic assays, 4M are sci-RNA-seq, while Remaining assays (microwell-seq, drop-seq, bd rhapsody, smart-seq, seq-well, and MARS-seq) represent small fractions of the full datasets. 
-* Sex: 
+    * The vast majority of the dataset is one of the 10x genomics assays, Approximately 20M of 26M cells are genomic assays, 4M are sci-RNA-seq, while Remaining assays (microwell-seq, drop-seq, bd rhapsody, smart-seq, seq-well, and MARS-seq) represent small fractions of the full datasets.
+* Sex:
     * 12.5M are male-derived cells; 10M are female  derived cells. The remaining cells are not annotated.
 * Self-Reported Ethnicity:
     * Approximately 12M cells are not annotated; 9M are annotated as “European.” .5M are annotated as “Han Chinese.” followed by “African American”.
@@ -97,10 +97,10 @@ The 1% hold-out evaluation set was split further into a validation and test set.
 * Tissue Type Bias:
     * 9M cells are “brain” derived. 4M are blood derived, followed by “lung”, “breast”, “heart” and “eye” at approximately 1M cells each.
 
-Dataset was derived from a limited number of public sources where methods and protocols may not represent sufficiently diverse sources to capture the full scope of gene expression.  
+Dataset was derived from a limited number of public sources where methods and protocols may not represent sufficiently diverse sources to capture the full scope of gene expression.
 
 ## Evaluation Dataset:
-Adamson et al 2016 PERTURB-seq dataset, accessed by Harvard dataverse. 
+Adamson et al 2016 PERTURB-seq dataset, accessed by Harvard dataverse.
 **Link:**  [adamson.zip - Harvard Dataverse](https://dataverse.harvard.edu/file.xhtml?fileId=6154417) <br>
 ** Data Collection Method by dataset <br>
 * Human <br>
@@ -108,7 +108,7 @@ Adamson et al 2016 PERTURB-seq dataset, accessed by Harvard dataverse.
 ** Labeling Method by dataset <br>
 * Automated - Molecular Barcoding <br>
 
-**Properties (Quantity, Dataset Descriptions, Sensor(s)):** There are ~20k single cells, half of which represent unperturbed control samples, and the other half which contain an additional datatable containing the CRISPR knock-out targets for each cell.  
+**Properties (Quantity, Dataset Descriptions, Sensor(s)):** There are ~20k single cells, half of which represent unperturbed control samples, and the other half which contain an additional datatable containing the CRISPR knock-out targets for each cell.
 
 **Link:** [CZ CELLxGENE Discover - Cellular Visualization Tool (cziscience.com)](https://cellxgene.cziscience.com/) <br>
 ** Data Collection Method by dataset <br>
@@ -117,7 +117,7 @@ Adamson et al 2016 PERTURB-seq dataset, accessed by Harvard dataverse.
 ** Labeling Method by dataset <br>
 * Hybrid: Automated, Human <br>
 
-**Properties (Quantity, Dataset Descriptions, Sensor(s)):**  
+**Properties (Quantity, Dataset Descriptions, Sensor(s)):**
 * 240,000 single cells were chosen from the CZI cell x gene census such that they did not share a `dataset_id` with any cell in the training data described previously.
 
 
@@ -164,7 +164,7 @@ The following describes the bert MLM token loss. Like in the original BERT paper
 | geneformer-106M-240530         | 2.50       |
 
 #### Downstream task accuracy
-Here we benchmark four models, with two baselines. These models are tasked with cell type classification, using the Chron's disease small intestine dataset from 
+Here we benchmark four models, with two baselines. These models are tasked with cell type classification, using the Chron's disease small intestine dataset from
 Elmentaite et al. (2020), Developmental Cell. This dataset contains approximately 22,500 single cells from both healthy children aged 4-13 and chidlren with Chron's disease. This dataset contains 31 unique cell types which we assume to be annotated accurately. This dataset was held out of our pre-training dataset as all diseased samples were removed.
 
 - Baseline 1) scRNA workflow: this model uses PCA with 10 components and random forest on normalized and log transformed expression counts to produce a result.

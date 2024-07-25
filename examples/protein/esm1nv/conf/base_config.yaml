@@ -5,7 +5,7 @@ restore_from_path: null # used when starting from a .nemo file
 
 trainer:
   devices: 2 # number of GPUs or CPUs
-  num_nodes: 1 
+  num_nodes: 1
   accelerator: gpu #gpu or cpu
   precision: 16-mixed # 16-mixed, bf16-mixed or 32
   logger: False # logger is provided by NeMo exp_manager
@@ -25,7 +25,7 @@ exp_manager:
   name: ${name}
   exp_dir: ${oc.env:BIONEMO_HOME}/results/nemo_experiments/${.name}/${.wandb_logger_kwargs.name}
   explicit_log_dir: ${.exp_dir}
-  create_wandb_logger: True 
+  create_wandb_logger: True
   create_tensorboard_logger: True
   wandb_logger_kwargs:
     project: ${name}_pretraining
@@ -49,7 +49,7 @@ exp_manager:
 
 
 model:
-  # model parallelism 
+  # model parallelism
   micro_batch_size: 8 # NOTE: adjust to occupy ~ 90% of GPU memory
   tensor_model_parallel_size: 1  # model parallelism
   pipeline_model_parallel_size: 1 # model parallelism. If enabled, you need to set data.dynamic_padding to False as pipeline parallelism requires fixed-length padding.
@@ -79,7 +79,7 @@ model:
     type: 'BertWordPieceLowerCase'
     model: null
     vocab_file: null
-    merge_file: null 
+    merge_file: null
 
   # precision
   native_amp_init_scale: 4294967296 # 2 ** 32
@@ -95,7 +95,7 @@ model:
 
   # not implemented in NeMo yet
   activations_checkpoint_method: null # 'uniform', 'block'
-  activations_checkpoint_num_layers: 1 
+  activations_checkpoint_num_layers: 1
 
   data:
     ngc_registry_target: uniref50_2022_05
@@ -117,7 +117,7 @@ model:
     pin_memory: False
     index_mapping_dir: null # path to store cached indexing files (if empty, will be stored in the same directory as dataset_path)
     data_impl: "csv_mmap"
-    # Supported kwargs (with default values): 
+    # Supported kwargs (with default values):
     #     text_mmap (newline_int=10, header_lines=0, workers=None, sort_dataset_paths=True)
     #     csv_mmap (newline_int=10, header_lines=0,workers=None, sort_dataset_paths=True, data_col=1, data_sep=",")
     data_impl_kwargs:
@@ -132,19 +132,19 @@ model:
     use_upsampling: True # if the data should be upsampled to max number of steps in the training
     seed: ${model.seed} # Random seed
     max_seq_length: ${model.seq_length} # Maximum input sequence length. Longer sequences are truncated
-    dynamic_padding: False # If True, each batch is padded to the maximum sequence length within that batch. 
+    dynamic_padding: False # If True, each batch is padded to the maximum sequence length within that batch.
               #    Set it to False when model.pipeline_model_parallel_size > 1, as pipeline parallelism requires fixed-length padding.
 
   optim:
     name: fused_adam # fused optimizers used by Megatron model
     lr: 2e-4
-    weight_decay: 0.01 
-    betas: 
+    weight_decay: 0.01
+    betas:
     - 0.9
     - 0.98
     sched:
       name: CosineAnnealing
-      warmup_steps: 500 # use to set warmup_steps explicitly or leave as null to calculate 
+      warmup_steps: 500 # use to set warmup_steps explicitly or leave as null to calculate
       constant_steps: 50000
       min_lr: 2e-5
 

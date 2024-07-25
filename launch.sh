@@ -301,7 +301,7 @@ build() {
       echo "ERROR: need to set GITLAB_TOKEN to build the docker image. Please see instructions at https://confluence.nvidia.com/display/CLD/Onboarding+Guide#OnboardingGuide-GitLabDockerRegistry"
       exit 1
     fi
-    
+
     local PACKAGE=0
     local CLEAN=0
     local use_stable_bionemo_image_name=0
@@ -358,7 +358,7 @@ build() {
 
     # local IMG_NAME=($(echo ${BIONEMO_IMAGE} | tr ":" "\n"))
     local IMAGE_NAME=$(image_repo)
-    
+
     local IMAGE_TAG
     if [[ "${use_stable_bionemo_image_name}" == "1" ]]; then
         IMAGE_TAG=$(stable_image_tag)
@@ -379,7 +379,7 @@ build() {
     #         -- an environment variable
     #         -- a file
     #       Into a docker build process. This includes passing in an env var via --build-args.
-    #       
+    #
     #       This is to ensure that the secret's value is never leaked: doing any of the above means
     #       that the secret value will be **persisted in the image**. Thus, when a user creates a container
     #       from the image, they will have access to this secret value (if it's a file or ENV). Or, they will
@@ -416,6 +416,7 @@ build() {
     DOCKER_BUILD_CMD="docker buildx build --network host \
         -t ${IMAGE_NAME}:${IMAGE_TAG} \
         --cache-to type=inline \
+        --cache-from=gitlab-master.nvidia.com:5005/clara-discovery/bionemo:cache\
         --secret id=GITLAB_TOKEN,env=GITLAB_TOKEN \
         --label com.nvidia.bionemo.short_git_sha=${BIONEMO_SHORT_GIT_HASH} \
         --label com.nvidia.bionemo.git_sha=${BIONEMO_GIT_HASH} \
@@ -568,10 +569,10 @@ image_to_run() {
         >&2 echo "Start development container for BIONEMO_IMAGE: ${BIONEMO_IMAGE}"
         IMAGE_TO_RUN="${BIONEMO_IMAGE}"
 
-    elif [[ "${use_stable_bionemo_image_name}" == "0" ]]; then 
+    elif [[ "${use_stable_bionemo_image_name}" == "0" ]]; then
         local COMMIT=$(git rev-parse HEAD)
         >&2 echo "Starting development container from latest working code ${COMMIT}"
-        
+
         git diff-index --quiet HEAD --
         if [[ "$?" != "0" ]]; then
             >&2 echo "WARNING! Dirty git repository detected! Image will be out-of-sync. " \

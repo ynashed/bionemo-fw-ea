@@ -11,9 +11,10 @@
 import datetime
 import logging
 import os
+import textwrap
 from argparse import ArgumentParser
 from collections import OrderedDict
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
 import tqdm
@@ -23,19 +24,57 @@ from tabulate import tabulate
 
 
 # using logging not from NeMo to run this script outside a container
-logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
+logging.basicConfig(format="%(asctime)s - %(message)s", level=logging.INFO)
+
+
+# ANSI escape sequences for colors and formatting
+class AnsiCodes:
+    RED = "\033[31m"
+    GREEN = "\033[32m"
+    BOLD = "\033[1m"
+    RESET = "\033[0m"
+
+
+def _apply_color_str(text: str, color: str) -> str:
+    """
+    Incorporates colouring to string and resets it at the end of string.
+    Args:
+        text: some string
+        color: intended color of the string in ANSI colour format
+    Returns: a coloured string with the reset colour appended
+
+    """
+    return color + text + AnsiCodes.RESET
+
+
+def _wrap_text(text: str, width: int = 90) -> str:
+    """
+    Adds text wrapper around string to ensure it will break across many lines
+    Args:
+        text: a string
+        width: max number of elements in string in a single line
+    Returns: a string with additional "\n" indicating line breaking
+
+    """
+    wrapped_text = textwrap.fill(text, width=width)
+    return wrapped_text
 
 
 def filter_out_failed_and_rerun_jobs(df: pd.DataFrame, n_all_results: int) -> pd.DataFrame:
     """
     Filters out records of jobs which have been rerun, ie due to infrastructure failures.
     """
+    if df["timestamp"].isna().any():
+        raise ValueError(
+            "The 'timestamp' column contains None values. Cannot specify time order of JET jobs"
+            " to determine the retried ones."
+        )
     df["tmp_label"] = df["jet_ci_pipeline_id"].astype(str) + df["job_key"]
-    df.drop_duplicates('tmp_label', keep='last', inplace=True)
+    df.drop_duplicates("tmp_label", keep="last", inplace=True)
     df.drop(labels="tmp_label", axis=1, inplace=True)
     print("\n")
     logging.info(
-        f'Keeping only the most recent jobs per pipeline id and job key: ' f'{df.shape[0]}/{n_all_results} jobs \n'
+        f"Keeping only the most recent jobs per pipeline id and job key: " f"{df.shape[0]}/{n_all_results} jobs \n"
     )
     return df
 
@@ -44,22 +83,45 @@ def print_table_with_results(df: pd.DataFrame) -> None:
     """
     Print table with essential information about the jobs to the console table
     """
-    table_dict = OrderedDict()
-    table_dict["JET job ID"] = df.jet_ci_job_id
-    table_dict["Job Type"] = df.job_type
-    table_dict["Job Key"] = df.job_key.str.split("/", expand=True)[1]
-    table_dict["Status"] = df.jet_ci_job_status
-    if "jet_test_status" in df:
-        table_dict["Test"] = df.jet_test_status
-    table = tabulate(table_dict, headers=list(table_dict.keys()), tablefmt="psql")
+    table_list = []
+    for _, row in df.iterrows():
+        table_dict = OrderedDict()
+        table_dict["JET job ID"] = row["jet_ci_job_id"]
+        table_dict["Job Type"] = row["job_type"]
+        table_dict["Job Key"] = _wrap_text(text=row["job_key"].split("/")[1])
+        table_dict["Job Status"] = row["jet_ci_job_status"].lower()
 
+        # Determine condition for failure
+        if "jet_test_status" in row:
+            table_dict["Test Status"] = (
+                row["jet_test_status"].lower() if isinstance(row["jet_test_status"], str) else ""
+            )
+            condition = table_dict["Test Status"] == "failed"
+        else:
+            condition = table_dict["Job Status"] == "failed"
+
+        # Apply red color if the status is 'failed'
+        if condition:
+            for key in table_dict:
+                table_dict[key] = _apply_color_str(str(table_dict[key]), color=AnsiCodes.RED)
+
+        table_list.append(table_dict)
+
+    # Creating table with tabulate
+    table = tabulate(table_list, headers="keys", tablefmt="grid")
     print(table)
-    if not all(df.exit_code == 0):
+
+    if any(df.jet_ci_job_status.str.lower() != "success"):
         logging.error(
             "Some jobs failed to complete successfully. Detailed information about jobs is available by appending -vv\n"
         )
     else:
         logging.info("All jobs completed successfully!")
+
+    if "jet_test_status" in df and any(df.dropna(subset=["jet_test_status"]).jet_test_status.str.lower() != "success"):
+        logging.error("Some tests failed. Detailed information about tests is available by appending -vv\n")
+    else:
+        logging.info("All tests completed successfully!")
 
 
 def get_duration_stats(
@@ -69,7 +131,7 @@ def get_duration_stats(
     Calculates duration statistics for pipelines(s) and included jobs. Differentiates between
     job duration (including queuing time) and script duration (excluding queuing time)
     """
-    print('\n')
+    print("\n")
     N = len(job_durations)
     pipelines_duration = pd.Series([v["duration"] for _, v in pipelines_info.items()])
     logging.info(f"Duration information for {N} jobs in {len(pipelines_info)} pipeline(s)\n")
@@ -109,32 +171,32 @@ def query_jet_jobs(
         query = query.filter(Field("obj_workload.obj_labels.origin") == label)
 
     if pipeline_type is not None:
-        logging.info(f'Query results for pipeline_type: {pipeline_type}')
+        logging.info(f"Query results for pipeline_type: {pipeline_type}")
         query = query.filter(Field("obj_workload.obj_labels.workload_ref") == f"bionemo/{pipeline_type}")
 
     if jet_workloads_ref is not None:
-        logging.info(f'Query results for jet_workloads_ref: {jet_workloads_ref}')
+        logging.info(f"Query results for jet_workloads_ref: {jet_workloads_ref}")
         query = query.filter(Field("obj_workloads_registry.s_commit_ref") == jet_workloads_ref)
 
     if pipeline_id is not None:
-        logging.info(f'Query results for Jet CI pipeline id: {pipeline_id}')
+        logging.info(f"Query results for Jet CI pipeline id: {pipeline_id}")
         query = query.filter(Field("obj_ci.l_pipeline_id") == pipeline_id)
 
     if job_id is not None:
-        logging.info(f'Query results for Jet CI job id: {job_id}')
+        logging.info(f"Query results for Jet CI job id: {job_id}")
         query = query.filter(Field("obj_ci.l_job_id") == job_id)
 
     if job_type is not None:
-        logging.info(f'Query results for Jet CI job type: {job_type}')
+        logging.info(f"Query results for Jet CI job type: {job_type}")
         query = query.filter(Field("s_type") == job_type)
 
     if duration is not None:
-        if any(duration.endswith(s) for s in ['d', 'w', 'M', 'y']):
-            query = query.filter(Field('ts_created') >= f'now-{duration}')
+        if any(duration.endswith(s) for s in ["d", "w", "M", "y"]):
+            query = query.filter(Field("ts_created") >= f"now-{duration}")
         else:
             try:
                 datetime.date.fromisoformat(duration)
-                query = query.filter(Field('ts_created') >= duration)
+                query = query.filter(Field("ts_created") >= duration)
 
             except ValueError:
                 logging.error(f"Invalid duration string: {str}. Proceeding without filtering results by date")
@@ -159,37 +221,58 @@ def log_detailed_job_info(df: pd.DataFrame) -> None:
     Logs to the console detailed summary of JET test execution such as job id and the status of the job,
     its duration as well as script to execute if the job failed
     """
-    logging.info('Additional information about jobs in JET listed below')
+    logging.info("Additional information about jobs in JET listed below")
 
     for _, job_info in df.iterrows():
-        msg = (
-            f'{job_info["job_key"]} with status: {job_info["jet_ci_job_status"]} '
-            f'\nJET pipeline id: {job_info["jet_ci_pipeline_id"]}, BioNeMo pipeline id: {job_info["bionemo_ci_pipeline_id"]} '
-            f'JET job id: {job_info["jet_ci_job_id"]}, '
-            f'job duration: {job_info["jet_ci_job_duration"]}, script duration: {job_info["script_duration"]}'
-            f'\nJET job id logs: https://gitlab-master.nvidia.com/dl/jet/ci/-/jobs/{job_info["jet_ci_job_id"]}'
+        error_line = (
+            f"\nJET job error code: {job_info['jet_ci_job_status_code']}, JET job error msg: "
+            f"{job_info['jet_ci_job_status']}"
+            if job_info["jet_ci_job_status"].lower() != "success"
+            else ""
         )
-
+        jet_job_status = "success" if job_info["jet_ci_job_status"].lower() == "success" else "failed"
         if job_info["job_type"] == "build":
-            msg = f"DOCKER BUILD {msg}"
-            for k, v in job_info[job_info.index.str.startswith('docker_')].items():
+            header_str = f'DOCKER BUILD {job_info["job_key"]}\nJOB status: {jet_job_status}'
+            color = AnsiCodes.RED if job_info["jet_ci_job_status"].lower() == "failed" else AnsiCodes.GREEN
+            msg = f"{_apply_color_str(text=header_str, color=color)}"
+            msg += f"{error_line}"
+            for k, v in job_info[job_info.index.str.startswith("docker_")].items():
                 msg += f"\nDocker info: \n{k}: {v}\n"
 
         elif job_info["job_type"] == "recipe":
             if "conv" in job_info["job_key"]:
-                prefix = "CONVERGENCE TEST"
+                prefix = "CONVERGENCE TEST: "
             elif "perf" in job_info["job_key"]:
-                prefix = "PERFORMANCE TEST"
+                prefix = "PERFORMANCE TEST: "
             else:
-                prefix = "TEST"
-            msg = f'{prefix} {msg}'
+                prefix = "SMOKE TEST: "
+            color = AnsiCodes.RED if job_info["jet_test_status"].lower() == "failed" else AnsiCodes.GREEN
+            header_str = (
+                f'{prefix}{job_info["job_key"]}\n{AnsiCodes.BOLD}'
+                f'TEST status: {job_info["jet_test_status"].lower()}{AnsiCodes.BOLD}, JOB status: {jet_job_status}'
+            )
+            test_job_log = (
+                f'\nJET test job id log: https://gitlab-master.nvidia.com/dl/jet/ci/-/jobs/{job_info["jet_ci_job_id_test"]}'
+                if job_info["jet_ci_job_id_test"] != "nan"
+                else ""
+            )
+            msg = (
+                f'{_apply_color_str(text=header_str, color=color)}'
+                f'\nTEST: {job_info["jest_test_check"]}'
+                f'{error_line}\n'
+                f'\nJET pipeline id: {job_info["jet_ci_pipeline_id"]}, BioNeMo pipeline id: {job_info["bionemo_ci_pipeline_id"]}'
+                f'JET job id: {job_info["jet_ci_job_id"]}, JET test job id: {job_info["jet_ci_job_id_test"] if job_info["jet_ci_job_id_test"] else "N/A"}'
+                f'\nJET job id log: https://gitlab-master.nvidia.com/dl/jet/ci/-/jobs/{job_info["jet_ci_job_id"]}'
+                f'{test_job_log}'
+                f'\nscript duration in sec: {round(job_info["script_duration"], 2)}, job duration in sec (SLURM queue + JET setup + script duration): {round(job_info["jet_ci_job_duration"], 2)}'
+            )
 
-            for k, v in job_info[job_info.index.str.startswith('log_')].items():
+            for k, v in job_info[job_info.index.str.startswith("log_")].items():
                 msg += f'\n{k.replace("log_", "")}: {v}'
 
-            if job_info["exit_code"] != 0:
+            if job_info["jet_ci_job_status"].lower() != "success":
                 msg += f"\n\nScript:\n {job_info['script']}\n\n"
-        logging.info(msg + '\n')
+        logging.info(msg + "\n")
 
 
 def get_docker_info(docker_info: dict) -> dict:
@@ -209,11 +292,11 @@ def get_job_logs_info(job_logs: dict) -> dict:
     """
     new_job_info = {}
     for asset in job_logs:
-        if asset["s_name"] == 'dllogger.json':
+        if asset["s_name"] == "dllogger.json":
             name = "log_dllogger"
-        elif asset["s_name"] == 'output_script-0.log':
+        elif asset["s_name"] == "output_script-0.log":
             name = "log_output_script"
-        elif asset["s_name"] == 'trainer_logs.json':
+        elif asset["s_name"] == "trainer_logs.json":
             name = "log_trainer_logs"
         elif asset["s_name"] == "error_msg.txt":
             name = "log_error_msg"
@@ -228,13 +311,19 @@ def get_job_info(job_raw_result: dict, save_dir: Optional[str]) -> dict:
     Parse information about JET job from results obtained from JET
     """
     job_info = {
-        'script_duration': job_raw_result.get("d_duration", None),
-        'timestamp': job_raw_result.get('@timestamp', None),
+        "script_duration": job_raw_result.get("d_duration", None),
+        "timestamp": job_raw_result.get("ts_created", None),
     }
+    job_info["date"] = (
+        datetime.datetime.fromtimestamp(job_info["timestamp"] / 1000).strftime("%Y-%m-%dT%H:%M:%S.%f%z")
+        if job_info["timestamp"]
+        else None
+    )
+
     ci_info = job_raw_result.get("obj_ci", {})
     workloads_info = job_raw_result.get("obj_workloads_registry", {})
     obj_workload = job_raw_result.get("obj_workload", {})
-    obj_status = job_raw_result['obj_status']
+    obj_status = job_raw_result["obj_status"]
 
     pipeline_id = str(ci_info.get("l_pipeline_id"))
 
@@ -257,7 +346,9 @@ def get_job_info(job_raw_result: dict, save_dir: Optional[str]) -> dict:
         else int(job_raw_result.get("b_invalid", 1))
     )
     if "recipe" in job_info["job_key"]:
-        job_info["script"] = obj_workload['obj_spec'].get('s_script', None)
+        job_info["script"] = obj_workload["obj_spec"].get("s_script", None)
+        if "conv" in job_info["job_key"]:
+            job_info["wandb_project_name"] = obj_workload["obj_spec"].get("s_wandb_project_name", None)
 
     if job_info["job_type"] == "build":
         docker_info = get_docker_info(docker_info=obj_workload["obj_spec"]["obj_source"])
@@ -288,6 +379,9 @@ def get_job_results(
     save_dir: Optional[str] = None,
     all_jobs: bool = False,
 ) -> Tuple[Optional[pd.DataFrame], Optional[dict]]:
+    """
+    Queries and outputs results of jet jobs run in JET given related pipeline id in JET CI, job id or pipeline type.
+    """
     results_jobs = query_jet_jobs(
         jet_instance=jet_instance,
         jet_workloads_ref=jet_workloads_ref,
@@ -298,14 +392,10 @@ def get_job_results(
         limit=limit,
         only_completed=only_completed,
     )
-    """
-    Queries and outputs results of jet jobs run in JET given related pipeline id in JET CI, job id or pipeline type.
-    """
     if len(results_jobs) == 0:
-        logging.warning("No results found.")
-        return None, None
+        raise ValueError("No entries matched the requested query in the JET logs.")
 
-    logging.info(f'Getting {len(results_jobs)} jobs from Kibana... \n')
+    logging.info(f"Getting {len(results_jobs)} jobs from Kibana... \n")
     output = []
 
     jet_ci = jet_instance.gitlab_ci()
@@ -334,6 +424,22 @@ def get_job_results(
     return df, pipelines_info
 
 
+def _get_tests_check_str(check_dict: Dict[str, str]) -> str:
+    """
+    Converts standard dict with JET test checks information to string
+    Args:
+        check_dict: dict with keys s_name, s_status and, in case a check failure, s_status_message
+    Returns: str
+
+    """
+    check_str = f"{check_dict['s_name']}: {check_dict['s_status']}"
+
+    # Append the status message if it is present in the dictionary
+    if "s_status_message" in check_dict:
+        check_str += f" ({check_dict['s_status_message']})"
+    return f"[{check_str}]"
+
+
 def get_test_results(jet_instance: JETInstance, pipeline_ids: List[str]) -> Optional[pd.DataFrame]:
     """
     Queries and outputs results of jet test jobs run in JET given related pipeline id.
@@ -343,7 +449,7 @@ def get_test_results(jet_instance: JETInstance, pipeline_ids: List[str]) -> Opti
         tests_raw = query_jet_jobs(
             jet_instance=jet_instance,
             pipeline_id=int(pipeline_id),
-            fields_select=["s_status", "obj_ci.l_pipeline_id", "s_workload_logs"],
+            fields_select=["s_status", "obj_ci.l_pipeline_id", "obj_ci.l_job_id", "s_workload_logs", "nested_checks"],
             job_type="test",
             label=None,
         )
@@ -359,9 +465,20 @@ def get_test_results(jet_instance: JETInstance, pipeline_ids: List[str]) -> Opti
         if "s_workload_logs" not in test_raw:
             continue
         test_dict["jet_ci_workload_id"] = test_raw["s_workload_logs"][0]
-        test_dict["jet_test_status"] = "Success" if test_raw["s_status"] == "pass" else "FAILED"
+        test_dict["jet_test_status"] = "success" if test_raw["s_status"] == "pass" else "failed"
+        test_dict["jest_test_check"] = " AND ".join([_get_tests_check_str(d) for d in test_raw["nested_checks"]])
+        test_dict["jet_ci_job_id_test"] = (
+            str(test_raw["obj_ci"]["l_job_id"]) if test_raw["obj_ci"].get("l_job_id", None) else None
+        )
         output.append(test_dict)
     return pd.DataFrame(output)
+
+
+def log_wandb_project_links(project_names: List[str]):
+    print(project_names)
+    logging.info(
+        f'Training curves available at {", ".join(["https://wandb.ai/clara-discovery/"+name for name in project_names if isinstance(name, str)])}\n'
+    )
 
 
 def get_results_from_jet(
@@ -442,10 +559,14 @@ def get_results_from_jet(
     )
 
     df_test = get_test_results(jet_instance=jet_instance, pipeline_ids=list(pipelines_info.keys()))
-    df = pd.merge(df, df_test, on='jet_ci_workload_id', how='left')
-
+    if df_test.shape[0] > 0:
+        df = pd.merge(df, df_test, on="jet_ci_workload_id", how="left")
+    df.loc[(df["job_key"].str.contains("recipe")) & (df["jet_test_status"].isna()), "jet_test_status"] = "failed"
     if verbosity_level >= 2:
         print_table_with_results(df=df)
+
+    if verbosity_level >= 2 and "wandb_project_name" in df:
+        log_wandb_project_links(project_names=df["wandb_project_name"].unique())
 
     # Calculating duration-related analytics (overall, pipeline and job specific)
     if verbosity_level > 0 and df.shape[0] > 2:
@@ -460,45 +581,45 @@ def get_results_from_jet(
         filename = f'jet_query_{"_".join(pipelines_info.keys())}.json'
         filepath = os.path.join(save_dir, filename)
         logging.info(f"Saving query results to: {filepath}")
-        df.to_json(filepath, orient='records')
+        df.to_json(filepath, orient="records")
     if return_df:
         return df
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument(
-        '--jet_workloads_ref', type=str, default=None, help='Reference (branch) in JET Workloads Registry, optional'
+        "--jet_workloads_ref", type=str, default=None, help="Reference (branch) in JET Workloads Registry, optional"
     )
-    parser.add_argument('--pipeline_id', type=int, default=None, help='Pipeline ID in JET CI, optional')
-    parser.add_argument('--job_id', type=int, default=None, help='Job ID in JET CI, optional')
-    parser.add_argument('--d', type=str, default=None, help='Specifies period in the past to include jobs from')
+    parser.add_argument("--pipeline_id", type=int, default=None, help="Pipeline ID in JET CI, optional")
+    parser.add_argument("--job_id", type=int, default=None, help="Job ID in JET CI, optional")
+    parser.add_argument("--d", type=str, default=None, help="Specifies period in the past to include jobs from")
     parser.add_argument(
-        '--pipeline_type',
+        "--pipeline_type",
         type=str,
         default=None,
         help="Specifies type of BioNeMo's CI pipeline(s) to get jet logs for, optional. Can be either 'merge_request' "
         "or name of the git branch in BioNeMo repo, ie 'dev'",
     )
-    parser.add_argument('--save_dir', type=str, default=None, help='Directory to save csv with results, optional')
+    parser.add_argument("--save_dir", type=str, default=None, help="Directory to save csv with results, optional")
     parser.add_argument(
-        '--return_df',
-        action='store_true',
-        help='A flag that determines whether to return pd.DataFrame with job results',
+        "--return_df",
+        action="store_true",
+        help="A flag that determines whether to return pd.DataFrame with job results",
     )
     parser.add_argument(
-        '--only_completed',
-        action='store_true',
-        help='A flag that determines whether to keep only ' 'successfully completed jobs (exit status != 0)',
+        "--only_completed",
+        action="store_true",
+        help="A flag that determines whether to keep only " "successfully completed jobs (exit status != 0)",
     )
     parser.add_argument(
-        '--all',
-        action='store_true',
-        help='A flag that determines whether to take all jobs in the pipeline or keep only the most recent jobs for each job key. '
-        'Useful when some jobs have been rerun due to infrastructure issues.',
+        "--all",
+        action="store_true",
+        help="A flag that determines whether to take all jobs in the pipeline or keep only the most recent jobs for each job key. "
+        "Useful when some jobs have been rerun due to infrastructure issues.",
     )
-    parser.add_argument('--limit', type=int, default=1000, help='Limit number of printed results')
-    parser.add_argument('-v', '--verbose', action='count', default=0, help='a flag that determines verbosity level')
+    parser.add_argument("--limit", type=int, default=1000, help="Limit number of printed results")
+    parser.add_argument("-v", "--verbose", action="count", default=0, help="a flag that determines verbosity level")
 
     args = parser.parse_args()
     get_results_from_jet(

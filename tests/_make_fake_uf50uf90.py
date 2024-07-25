@@ -8,10 +8,10 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
-alphabet = 'ARNDCQEGHILKMFPSTWYV'
+alphabet = "ARNDCQEGHILKMFPSTWYV"
 
 cluster_mapping = {}
-with open('Fake50.fasta', 'w') as fd:
+with open("Fake50.fasta", "w") as fd:
     for length in range(50, 1000, 50):
         for base in alphabet:
             fd.write(f">UniRef50_{base}_{length}\n")
@@ -20,7 +20,7 @@ with open('Fake50.fasta', 'w') as fd:
             cluster_mapping[f"UniRef50_{base}_{length}"] = []
 
 
-with open('Fake90.fasta', 'w') as fd:
+with open("Fake90.fasta", "w") as fd:
     num_clusters = 10
     for length in range(50, 1000, 50):
         for base in alphabet:
@@ -32,7 +32,7 @@ with open('Fake90.fasta', 'w') as fd:
             num_clusters += 1
 
 
-with open("mapping.tsv", 'w') as fd:
+with open("mapping.tsv", "w") as fd:
     fd.write("dumbheader\n")
     for key, values in cluster_mapping.items():
         str_ = key + "\t" + ",".join(values)

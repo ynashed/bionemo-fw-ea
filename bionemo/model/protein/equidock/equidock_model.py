@@ -82,8 +82,8 @@ class NeMoExtension(ModelPT):
         self.intersection_loss_weight = self.cfg.intersection_loss_weight
 
     def log_stats(self):
-        lr = self._optimizer.param_groups[0]['lr']
-        self.log('lr', lr, batch_size=self.cfg.micro_batch_size)
+        lr = self._optimizer.param_groups[0]["lr"]
+        self.log("lr", lr, batch_size=self.cfg.micro_batch_size)
 
     def equidock_build_dataloader(self, data_config, dataset):
         return DataLoader(
@@ -150,7 +150,7 @@ class NeMoExtension(ModelPT):
             sync_dist=True,
         )
 
-        rmsd_log = metrics_statistics(self.metrics_train, 'train')
+        rmsd_log = metrics_statistics(self.metrics_train, "train")
 
         self.log_dict(
             rmsd_log,
@@ -167,7 +167,7 @@ class NeMoExtension(ModelPT):
         return loss
 
     def on_test_epoch_end(self):
-        rmsd_log = metrics_statistics(self.metrics_test, 'test')
+        rmsd_log = metrics_statistics(self.metrics_test, "test")
 
         logging.info("\n")
         logging.info(f"Testing rmsd computed for  {rmsd_log['test_shape']} / {len(self._test_ds)} points!")
@@ -191,7 +191,7 @@ class NeMoExtension(ModelPT):
         )
 
     def on_validation_epoch_end(self):
-        rmsd_log = metrics_statistics(self.metrics_val, 'val')
+        rmsd_log = metrics_statistics(self.metrics_val, "val")
 
         logging.info("\n")
         logging.info(f"Validation rmsd computed for  {rmsd_log['val_shape']} / {len(self._validation_ds)} points!")
@@ -252,7 +252,7 @@ class NeMoExtension(ModelPT):
             bound_ligand_repres_nodes_loc_array_list,
             pocket_coors_receptor_list,
             bound_receptor_repres_nodes_loc_array_list,
-            dataset_type='validation',
+            dataset_type="validation",
         )
 
         val_log = {
@@ -296,7 +296,7 @@ class NeMoExtension(ModelPT):
             bound_ligand_repres_nodes_loc_array_list,
             pocket_coors_receptor_list,
             bound_receptor_repres_nodes_loc_array_list,
-            dataset_type='testing',
+            dataset_type="testing",
         )
 
         test_loss = {
@@ -324,7 +324,7 @@ class NeMoExtension(ModelPT):
         bound_ligand_repres_nodes_loc_array_list: List[Tensor],
         pocket_coors_receptor_list: List[Tensor],
         bound_receptor_repres_nodes_loc_array_list: List[Tensor],
-        dataset_type: str = 'train',
+        dataset_type: str = "train",
     ):
         pocket_ot_loss_weight = self.pocket_ot_loss_weight
         intersection_loss_weight = self.intersection_loss_weight
@@ -340,7 +340,7 @@ class NeMoExtension(ModelPT):
         batch_ot_loss = torch.zeros([]).to(device)
         batch_intersection_loss = torch.zeros([]).to(device)
 
-        loss_fn_coors = torch.nn.MSELoss(reduction='mean')
+        loss_fn_coors = torch.nn.MSELoss(reduction="mean")
 
         for i in range(len(model_ligand_coors_deform_list)):
             # Compute average MSE loss (which is 3 times smaller than average squared RMSD)
@@ -371,7 +371,7 @@ class NeMoExtension(ModelPT):
                 intersection_surface_ct,
             )
 
-            if i < 2 or dataset_type.startswith('val') or dataset_type.startswith('test') or (random.random() < 0.1):
+            if i < 2 or dataset_type.startswith("val") or dataset_type.startswith("test") or (random.random() < 0.1):
                 complex_rmsd, ligand_rmsd, receptor_rmsd = rmsd_compute(
                     model_ligand_coors_deform_list[i],
                     bound_receptor_repres_nodes_loc_array_list[i],
@@ -379,13 +379,13 @@ class NeMoExtension(ModelPT):
                     bound_receptor_repres_nodes_loc_array_list[i],
                 )
 
-                if dataset_type.startswith('val'):
+                if dataset_type.startswith("val"):
                     for cnt, cur_rmsd in enumerate([complex_rmsd, ligand_rmsd, receptor_rmsd]):
                         self.metrics_val[cnt].update(cur_rmsd)
-                elif dataset_type.startswith('test'):
+                elif dataset_type.startswith("test"):
                     for cnt, cur_rmsd in enumerate([complex_rmsd, ligand_rmsd, receptor_rmsd]):
                         self.metrics_test[cnt].update(cur_rmsd)
-                elif dataset_type.startswith('train'):
+                elif dataset_type.startswith("train"):
                     for cnt, cur_rmsd in enumerate([complex_rmsd, ligand_rmsd, receptor_rmsd]):
                         self.metrics_train[cnt].update(cur_rmsd)
                 else:
@@ -438,12 +438,12 @@ class NeMoExtension(ModelPT):
         )
 
         if self.cfg.input_edge_feats_dim < 0:
-            self.cfg.input_edge_feats_dim = ligand_graph.edata['he'].shape[1]
+            self.cfg.input_edge_feats_dim = ligand_graph.edata["he"].shape[1]
 
-        ligand_graph.ndata['new_x'] = ligand_graph.ndata['x']
+        ligand_graph.ndata["new_x"] = ligand_graph.ndata["x"]
 
         assert (
-            np.linalg.norm(bound_ligand_repres_nodes_loc_clean_array - ligand_graph.ndata['x'].detach().cpu().numpy())
+            np.linalg.norm(bound_ligand_repres_nodes_loc_clean_array - ligand_graph.ndata["x"].detach().cpu().numpy())
             < 1e-1
         )
 

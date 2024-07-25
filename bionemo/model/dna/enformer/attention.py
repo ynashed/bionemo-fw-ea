@@ -37,7 +37,7 @@ def get_positional_embed(seq_len, feature_size, device):
     num_components = len(feature_functions) * 2
 
     if (feature_size % num_components) != 0:
-        raise ValueError(f'feature size is not divisible by number of components ({num_components})')
+        raise ValueError(f"feature size is not divisible by number of components ({num_components})")
 
     num_basis_per_class = feature_size // num_components
 
@@ -101,7 +101,7 @@ class AttentionPool(nn.Module):
     def __init__(self, dim, pool_size=2):
         super().__init__()
         self.pool_size = pool_size
-        self.pool_fn = Rearrange('b d (n p) -> b d n p', p=pool_size)
+        self.pool_fn = Rearrange("b d (n p) -> b d n p", p=pool_size)
         self.to_attn_logits = nn.Conv2d(dim, dim, 1, bias=False)
 
     def forward(self, x):
@@ -160,24 +160,24 @@ class Attention(nn.Module):
         k = self.to_k(x)
         v = self.to_v(x)
 
-        q, k, v = (rearrange(t, 'b n (h d) -> b h n d', h=h) for t in (q, k, v))
+        q, k, v = (rearrange(t, "b n (h d) -> b h n d", h=h) for t in (q, k, v))
 
         q = q * self.scale
 
-        content_logits = einsum('b h i d, b h j d -> b h i j', q + self.rel_content_bias, k)
+        content_logits = einsum("b h i d, b h j d -> b h i j", q + self.rel_content_bias, k)
 
         positions = get_positional_embed(n, self.num_rel_pos_features, device)
         positions = self.pos_dropout(positions)
         rel_k = self.to_rel_k(positions)
 
-        rel_k = rearrange(rel_k, 'n (h d) -> h n d', h=h)
-        rel_logits = einsum('b h i d, h j d -> b h i j', q + self.rel_pos_bias, rel_k)
+        rel_k = rearrange(rel_k, "n (h d) -> h n d", h=h)
+        rel_logits = einsum("b h i d, h j d -> b h i j", q + self.rel_pos_bias, rel_k)
         rel_logits = relative_shift(rel_logits)
 
         logits = content_logits + rel_logits
         attn = logits.softmax(dim=-1)
         attn = self.attn_dropout(attn)
 
-        out = einsum('b h i j, b h j d -> b h i d', attn, v)
-        out = rearrange(out, 'b h n d -> b n (h d)')
+        out = einsum("b h i j, b h j d -> b h i d", attn, v)
+        out = rearrange(out, "b h n d -> b n (h d)")
         return self.to_out(out)

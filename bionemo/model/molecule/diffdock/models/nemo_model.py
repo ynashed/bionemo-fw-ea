@@ -149,7 +149,7 @@ class TensorProductScoreModelBase(ModelPT):
             dataset = dataset.shuffle(size=5000, rng=random.Random(self.cfg.seed))
 
         num_batches = len(dataset) // self.cfg.global_batch_size + (len(dataset) % self.cfg.global_batch_size != 0)
-        if self.cfg.confidence_mode or not self.cfg.get('apply_size_control', False):
+        if self.cfg.confidence_mode or not self.cfg.get("apply_size_control", False):
             dataset = (
                 dataset.batched(
                     data_config.micro_batch_size,
@@ -162,7 +162,7 @@ class TensorProductScoreModelBase(ModelPT):
             estimate_num_cross_edges = self.cfg.estimate_memory_usage.estimate_num_cross_edges
 
             def num_cross_edge_upper_bound_estimate(n1, n2, n3, n4):
-                tmpdict = {'ligand': n1, 'ligand_ligand': n2, 'receptor': n3, 'receptor_receptor': n4}
+                tmpdict = {"ligand": n1, "ligand_ligand": n2, "receptor": n3, "receptor_receptor": n4}
                 num_edges = 0.0
                 for term in estimate_num_cross_edges.terms:
                     tmp = term[0]
@@ -174,10 +174,10 @@ class TensorProductScoreModelBase(ModelPT):
 
             def estimate_size(g):
                 n1, n2, n3, n4 = (
-                    g['ligand'].num_nodes,
-                    g['ligand', 'ligand'].num_edges,
-                    g['receptor'].num_nodes,
-                    g['receptor', 'receptor'].num_edges,
+                    g["ligand"].num_nodes,
+                    g["ligand", "ligand"].num_edges,
+                    g["receptor"].num_nodes,
+                    g["receptor", "receptor"].num_edges,
                 )
                 # estimate the upper bound of the number of cross edges
                 # the number of cross edges roughly increases w.r.t. the diffusion step t (sampled from uniform(0,1))
@@ -191,7 +191,7 @@ class TensorProductScoreModelBase(ModelPT):
                 max_total_size=(
                     self.cfg.max_total_size
                     if self.cfg.get("max_total_size", None) is not None
-                    else (0.85 * torch.cuda.get_device_properties('cuda:0').total_memory / 2**20)
+                    else (0.85 * torch.cuda.get_device_properties("cuda:0").total_memory / 2**20)
                 ),
                 size_fn=estimate_size,
             )
@@ -263,7 +263,7 @@ class TensorProductScoreModelBase(ModelPT):
                 tor_base_loss,
             ) = self.loss_function(tr_pred, rot_pred, tor_pred, batch=train_batch)
 
-        train_log = {'train_loss': loss.cpu().detach()}
+        train_log = {"train_loss": loss.cpu().detach()}
         self.log_dict(
             train_log,
             prog_bar=True,
@@ -311,7 +311,7 @@ class TensorProductScoreModelBase(ModelPT):
             complex_t_tr, complex_t_rot, complex_t_tor = [
                 val_batch.complex_t[noise_type] for noise_type in ["tr", "rot", "tor"]
             ]
-            num_intervals = self.cfg.get('num_intervals', 10) or 10
+            num_intervals = self.cfg.get("num_intervals", 10) or 10
             sigma_index_tr = torch.round(complex_t_tr.cpu() * (num_intervals - 1)).int()
 
             for k in range(num_intervals):
@@ -348,7 +348,7 @@ class TensorProductScoreModelBase(ModelPT):
                 batch = Batch.from_data_list(
                     val_batch[: (self.local_num_denoising_inference_complexes - self.local_inference_complex_count)]
                 )
-                batch['ligand'].pos = batch['ligand'].aligned_pos
+                batch["ligand"].pos = batch["ligand"].aligned_pos
 
                 rmsds = self._denoising_inference_step(batch, batch_idx)
 
@@ -370,7 +370,7 @@ class TensorProductScoreModelBase(ModelPT):
             elif (
                 (self.current_epoch + 1) % self.cfg.val_denoising_inference_freq != 0
                 and batch_idx == 0
-                and 'valinf_rmsds_lt2' not in self.trainer.callback_metrics  # TODO restart not loading this value
+                and "valinf_rmsds_lt2" not in self.trainer.callback_metrics  # TODO restart not loading this value
             ):
                 # return fake 0 as checkpoint saving is expecting these values
                 inf_metrics = {
@@ -449,18 +449,18 @@ class TensorProductScoreModelBase(ModelPT):
 
             orig_complex_graph = orig_complex_graphs[k]
             if self.cfg.diffusion.no_torsion:
-                orig_complex_graph['ligand'].orig_pos = (
-                    orig_complex_graph['ligand'].pos.cpu().numpy() + orig_complex_graph.original_center.cpu().numpy()
+                orig_complex_graph["ligand"].orig_pos = (
+                    orig_complex_graph["ligand"].pos.cpu().numpy() + orig_complex_graph.original_center.cpu().numpy()
                 )
 
-            filterHs = torch.not_equal(predictions_list[0]['ligand'].x[:, 0], 0).cpu().numpy()
+            filterHs = torch.not_equal(predictions_list[0]["ligand"].x[:, 0], 0).cpu().numpy()
 
             if isinstance(orig_complex_graph["ligand"].orig_pos, list):
                 orig_complex_graph["ligand"].orig_pos = orig_complex_graph["ligand"].orig_pos[0]
 
-            ligand_pos = np.asarray([predictions_list[0]['ligand'].pos.cpu().numpy()[filterHs]])
+            ligand_pos = np.asarray([predictions_list[0]["ligand"].pos.cpu().numpy()[filterHs]])
             orig_ligand_pos = np.expand_dims(
-                orig_complex_graph['ligand'].orig_pos[filterHs] - orig_complex_graph.original_center.cpu().numpy(),
+                orig_complex_graph["ligand"].orig_pos[filterHs] - orig_complex_graph.original_center.cpu().numpy(),
                 axis=0,
             )
             rmsd = np.sqrt(((ligand_pos - orig_ligand_pos) ** 2).sum(axis=2).mean(axis=1))
@@ -507,7 +507,7 @@ class TensorProductScoreModelBase(ModelPT):
                 dtype=torch.float,
             )
             tor_loss = (tor_pred - tor_score) ** 2 / tor_score_norm2
-            tor_base_loss = ((tor_score**2 / tor_score_norm2)).detach()
+            tor_base_loss = (tor_score**2 / tor_score_norm2).detach()
             if apply_mean:
                 tor_loss = self.empty_safe_mean(tor_loss, dim=0, keepdim=True)
                 tor_base_loss = self.empty_safe_mean(tor_base_loss, dim=0, keepdim=True)

@@ -542,8 +542,8 @@ class CorePromoterResourcePreparer(ResourcePreprocessor):
         return [r.download_resource() for r in resources]
 
 
-Organism = Literal['human', 'mouse']
-Subset = Literal['train', 'valid', 'test']
+Organism = Literal["human", "mouse"]
+Subset = Literal["train", "valid", "test"]
 
 
 class BasenjiDatasetPreprocessor:
@@ -563,26 +563,26 @@ class BasenjiDatasetPreprocessor:
         self.cfg = dataset_cfg
 
     def _src_pth(self, organism: Organism):
-        return os.path.join(self.cfg.tfdata_path, 'data', organism)
+        return os.path.join(self.cfg.tfdata_path, "data", organism)
 
     def _dst_pth(self, organism: Organism):
         return os.path.join(self.cfg.webdataset_path, organism)
 
     def _get_tfrecords_iterator(self, organism: Organism, subset: Subset) -> Iterator[Any]:
         tfrecords = sorted(
-            glob.glob(os.path.join(self._src_pth(organism), 'tfrecords', f'{subset}-*.tfr')),
-            key=lambda x: int(x.split('-')[-1].split('.')[0]),
+            glob.glob(os.path.join(self._src_pth(organism), "tfrecords", f"{subset}-*.tfr")),
+            key=lambda x: int(x.split("-")[-1].split(".")[0]),
         )
         for tfrecord_path in tfrecords:
             # store in float16 as original data is stored in float16
             # casting to 32bit precision should be done through dataloaders
             tfrecords_dataset = TFRecordDataset(
-                tfrecord_path, index_path=None, description={"target": "float16"}, compression_type='zlib'
+                tfrecord_path, index_path=None, description={"target": "float16"}, compression_type="zlib"
             )
             yield from tfrecords_dataset
 
     def _write_single_split(self, organism: Organism, subset: Subset):
-        metadata = json.load(open(os.path.join(self._src_pth(organism), 'statistics.json')))
+        metadata = json.load(open(os.path.join(self._src_pth(organism), "statistics.json")))
         os.makedirs(self._dst_pth(organism), exist_ok=True)
         wd_subset_pattern = os.path.join(self._dst_pth(organism), f"{subset}-%04d.tar")
         tfrecords_iterator = self._get_tfrecords_iterator(organism, subset)
@@ -591,13 +591,13 @@ class BasenjiDatasetPreprocessor:
         with wds.ShardWriter(pattern=wd_subset_pattern, maxsize=5e8, compress=self.cfg.compress, mode=0o777) as sink:
             for example in tfrecords_iterator:
                 sample = {
-                    '__key__': str(processed_count),
-                    'target.pth': example['target'].reshape(metadata['target_length'], metadata['num_targets']),
+                    "__key__": str(processed_count),
+                    "target.pth": example["target"].reshape(metadata["target_length"], metadata["num_targets"]),
                 }
                 sink.write(sample)
                 processed_count += 1
 
-        if processed_count != metadata[f'{subset}_seqs']:
+        if processed_count != metadata[f"{subset}_seqs"]:
             warnings.warn(
                 f"Read {processed_count} examples from TFrecords but \
                           manifest says there should be {metadata[f'{subset}_seqs']}. \
@@ -608,38 +608,40 @@ class BasenjiDatasetPreprocessor:
     def _download(self) -> subprocess.CompletedProcess:
         # despite gsutil available via Python API, it does not offer multiprocessing download
         os.makedirs(self.cfg.tfdata_path, exist_ok=True)
-        cmd = ['gsutil', '-m', 'cp', '-n', '-r', f'gs://{self.cfg.bucket_name}/*', self.cfg.tfdata_path]
+        cmd = ["gsutil", "-m", "cp", "-n", "-r", f"gs://{self.cfg.bucket_name}/*", self.cfg.tfdata_path]
         return subprocess.run(cmd)
 
     def _decompress_atlas(self, organism: Organism):
         from bionemo.data.dna.enformer.basenji_dataset import ATLAS_NAMES
 
         org_atlas_name = ATLAS_NAMES[organism]
-        atlas_src_path = os.path.join(self.cfg.tfdata_path, f'{org_atlas_name}.gz')
+        atlas_src_path = os.path.join(self.cfg.tfdata_path, f"{org_atlas_name}.gz")
         atlas_dst_path = os.path.join(self._dst_pth(organism), org_atlas_name)
 
-        with gzip.open(atlas_src_path, 'r') as f_in, open(atlas_dst_path, 'wb') as f_out:
+        with gzip.open(atlas_src_path, "r") as f_in, open(atlas_dst_path, "wb") as f_out:
             logging.info(f"Decompressing {atlas_src_path} to {atlas_dst_path}")
             shutil.copyfileobj(f_in, f_out)
 
     def _move_metadata(self, organism: Organism):
         org_dest = self._dst_pth(organism)
         os.makedirs(org_dest, exist_ok=True)
-        for file in glob.glob(os.path.join(self._src_pth(organism), '*.*')):
+        for file in glob.glob(os.path.join(self._src_pth(organism), "*.*")):
             logging.info(f"Copying {file} to {org_dest}")
             shutil.copy2(file, org_dest)
 
     def process(self):
         download_result = self._download()
         if download_result.returncode == 0:
-            for organism in ['human', 'mouse']:
+            for organism in ["human", "mouse"]:
                 self._move_metadata(organism)
                 self._decompress_atlas(organism)
-                for subset in ['train', 'valid', 'test']:
+                for subset in ["train", "valid", "test"]:
                     self._write_single_split(organism=organism, subset=subset)
 
         else:
-            msg = " Requester pays bucket requires authenthication and a project the transfer fee should be billed to. \
+            msg = (
+                " Requester pays bucket requires authenthication and a project the transfer fee should be billed to. \
                    Please make sure you these set up. \
                    For more information please visit https://cloud.google.com/storage/docs/using-requester-pays#using "
+            )
             raise RuntimeError(msg)

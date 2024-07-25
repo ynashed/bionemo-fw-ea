@@ -79,73 +79,73 @@ expected_5mer_ids = [
 ]
 
 expected_3mer_vocab = {
-    '<PAD>': 0,
-    '<UNK>': 1,
-    '<CLS>': 2,
-    '<SEP>': 3,
-    '<MASK>': 4,
-    'ACG': 5,
-    'CGT': 6,
-    'GTC': 7,
-    'TCA': 8,
-    'CAG': 9,
-    'AGA': 10,
-    'GAC': 11,
-    'CGN': 12,
-    'GNN': 13,
-    'NNA': 14,
-    'NAC': 15,
-    'DOG': 16,
-    'CAT': 17,
-    'ATD': 18,
-    'TDO': 19,
+    "<PAD>": 0,
+    "<UNK>": 1,
+    "<CLS>": 2,
+    "<SEP>": 3,
+    "<MASK>": 4,
+    "ACG": 5,
+    "CGT": 6,
+    "GTC": 7,
+    "TCA": 8,
+    "CAG": 9,
+    "AGA": 10,
+    "GAC": 11,
+    "CGN": 12,
+    "GNN": 13,
+    "NNA": 14,
+    "NAC": 15,
+    "DOG": 16,
+    "CAT": 17,
+    "ATD": 18,
+    "TDO": 19,
 }
 
 expected_3mer_decode_vocab = {
-    0: '<PAD>',
-    1: '<UNK>',
-    2: '<CLS>',
-    3: '<SEP>',
-    4: '<MASK>',
-    5: 'ACG',
-    6: 'CGT',
-    7: 'GTC',
-    8: 'TCA',
-    9: 'CAG',
-    10: 'AGA',
-    11: 'GAC',
-    12: 'CGN',
-    13: 'GNN',
-    14: 'NNA',
-    15: 'NAC',
-    16: 'DOG',
-    17: 'CAT',
-    18: 'ATD',
-    19: 'TDO',
+    0: "<PAD>",
+    1: "<UNK>",
+    2: "<CLS>",
+    3: "<SEP>",
+    4: "<MASK>",
+    5: "ACG",
+    6: "CGT",
+    7: "GTC",
+    8: "TCA",
+    9: "CAG",
+    10: "AGA",
+    11: "GAC",
+    12: "CGN",
+    13: "GNN",
+    14: "NNA",
+    15: "NAC",
+    16: "DOG",
+    17: "CAT",
+    18: "ATD",
+    19: "TDO",
 }
 
-single_string_example = 'ACGTA'
+single_string_example = "ACGTA"
 
 single_string_3mer_vocab = {
-    '<PAD>': 0,
-    '<UNK>': 1,
-    '<CLS>': 2,
-    '<SEP>': 3,
-    '<MASK>': 4,
-    'ACG': 5,
-    'CGT': 6,
-    'GTA': 7,
+    "<PAD>": 0,
+    "<UNK>": 1,
+    "<CLS>": 2,
+    "<SEP>": 3,
+    "<MASK>": 4,
+    "ACG": 5,
+    "CGT": 6,
+    "GTA": 7,
 }
 
 single_string_3mer_vocab_saved = [
-    '<PAD>\n',
-    '<UNK>\n',
-    '<CLS>\n',
-    '<SEP>\n',
-    '<MASK>\n',
-    'ACG\n',
-    'CGT\n',
-    'GTA\n',
+    "<PAD>\n",
+    "<UNK>\n",
+    "<CLS>\n",
+    "<SEP>\n",
+    "<MASK>\n",
+    "ACG\n",
+    "CGT\n",
+    "GTA\n",
 ]
 
 
@@ -190,7 +190,7 @@ def test_5mer_text_to_ids(test_input, expected):
 def test_3mer_text_to_ids_with_unk():
     tokenizer = KmerTokenizer(3)
     tokenizer.build_vocab(example_strings)
-    text = 'CATDOGANDFISHDOG'
+    text = "CATDOGANDFISHDOG"
     expected_tokens = [
         17,
         18,
@@ -212,8 +212,8 @@ def test_3mer_text_to_ids_with_unk():
 
 
 def test_save_vocab():
-    model_file = tempfile.NamedTemporaryFile(suffix='.model')
-    vocab_file = tempfile.NamedTemporaryFile(suffix='.vocab')
+    model_file = tempfile.NamedTemporaryFile(suffix=".model")
+    vocab_file = tempfile.NamedTemporaryFile(suffix=".vocab")
 
     tokenizer = KmerTokenizer(3)
     tokenizer.build_vocab(single_string_example)
@@ -224,7 +224,7 @@ def test_save_vocab():
     assert observed_vocab == single_string_3mer_vocab_saved
 
     expected_k = [
-        '3',
+        "3",
     ]
     observed_k = open(model_file.name).readlines()
     assert observed_k == expected_k
@@ -234,13 +234,13 @@ def test_save_vocab():
 
 
 def test_load_vocab():
-    model_file = tempfile.NamedTemporaryFile(suffix='.model')
-    vocab_file = tempfile.NamedTemporaryFile(suffix='.vocab')
+    model_file = tempfile.NamedTemporaryFile(suffix=".model")
+    vocab_file = tempfile.NamedTemporaryFile(suffix=".vocab")
 
-    with open(model_file.name, 'w') as f:
-        f.write('3')
+    with open(model_file.name, "w") as f:
+        f.write("3")
 
-    with open(vocab_file.name, 'w') as f:
+    with open(vocab_file.name, "w") as f:
         for word in single_string_3mer_vocab_saved:
             f.write(word)
 

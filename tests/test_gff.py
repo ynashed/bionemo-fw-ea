@@ -25,37 +25,37 @@ def test_midpoint():
     # 3, 22
     odds = [
         GFFEntry(
-            seqid='seqid',
-            source='source',
-            type='exon',
+            seqid="seqid",
+            source="source",
+            type="exon",
             start=1,
             end=2,
-            score='.',
-            strand='+',
-            phase='.',
-            attributes='',
+            score=".",
+            strand="+",
+            phase=".",
+            attributes="",
         ),
         GFFEntry(
-            seqid='seqid',
-            source='source',
-            type='exon',
+            seqid="seqid",
+            source="source",
+            type="exon",
             start=5,
             end=20,
-            score='.',
-            strand='+',
-            phase='.',
-            attributes='',
+            score=".",
+            strand="+",
+            phase=".",
+            attributes="",
         ),
         GFFEntry(
-            seqid='seqid',
-            source='source',
-            type='exon',
+            seqid="seqid",
+            source="source",
+            type="exon",
             start=25,
             end=30,
-            score='.',
-            strand='+',
-            phase='.',
-            attributes='',
+            score=".",
+            strand="+",
+            phase=".",
+            attributes="",
         ),
     ]
 
@@ -65,37 +65,37 @@ def test_midpoint():
     # 3, 22
     evens = [
         GFFEntry(
-            seqid='seqid',
-            source='source',
-            type='exon',
+            seqid="seqid",
+            source="source",
+            type="exon",
             start=1,
             end=2,
-            score='.',
-            strand='+',
-            phase='.',
-            attributes='',
+            score=".",
+            strand="+",
+            phase=".",
+            attributes="",
         ),
         GFFEntry(
-            seqid='seqid',
-            source='source',
-            type='exon',
+            seqid="seqid",
+            source="source",
+            type="exon",
             start=4,
             end=20,
-            score='.',
-            strand='+',
-            phase='.',
-            attributes='',
+            score=".",
+            strand="+",
+            phase=".",
+            attributes="",
         ),
         GFFEntry(
-            seqid='seqid',
-            source='source',
-            type='exon',
+            seqid="seqid",
+            source="source",
+            type="exon",
             start=24,
             end=30,
-            score='.',
-            strand='+',
-            phase='.',
-            attributes='',
+            score=".",
+            strand="+",
+            phase=".",
+            attributes="",
         ),
     ]
     result = _get_intron_midpoints(evens)
@@ -110,15 +110,15 @@ def test_midpoint_empty():
 def test_midpoint_singleton():
     exon = [
         GFFEntry(
-            seqid='seqid',
-            source='source',
-            type='exon',
+            seqid="seqid",
+            source="source",
+            type="exon",
             start=1,
             end=2,
-            score='.',
-            strand='+',
-            phase='.',
-            attributes='',
+            score=".",
+            strand="+",
+            phase=".",
+            attributes="",
         ),
     ]
     result = _get_intron_midpoints(exon)
@@ -135,15 +135,15 @@ def test_donor_acceptor_empty():
 def test_donor_acceptor_singleton():
     exons = [
         GFFEntry(
-            seqid='seqid',
-            source='source',
-            type='exon',
+            seqid="seqid",
+            source="source",
+            type="exon",
             start=1,
             end=2,
-            score='.',
-            strand='+',
-            phase='.',
-            attributes='',
+            score=".",
+            strand="+",
+            phase=".",
+            attributes="",
         ),
     ]
     expected = ([], [])
@@ -159,37 +159,37 @@ def test_donor_acceptor():
     # >>>[1   2]d---a[10   12]d---a[20   22]>>>
     forward_exons = [
         GFFEntry(
-            seqid='seqid',
-            source='source',
-            type='exon',
+            seqid="seqid",
+            source="source",
+            type="exon",
             start=1,
             end=2,
-            score='.',
-            strand='+',
-            phase='.',
-            attributes='',
+            score=".",
+            strand="+",
+            phase=".",
+            attributes="",
         ),
         GFFEntry(
-            seqid='seqid',
-            source='source',
-            type='exon',
+            seqid="seqid",
+            source="source",
+            type="exon",
             start=10,
             end=12,
-            score='.',
-            strand='+',
-            phase='.',
-            attributes='',
+            score=".",
+            strand="+",
+            phase=".",
+            attributes="",
         ),
         GFFEntry(
-            seqid='seqid',
-            source='source',
-            type='exon',
+            seqid="seqid",
+            source="source",
+            type="exon",
             start=20,
             end=22,
-            score='.',
-            strand='+',
-            phase='.',
-            attributes='',
+            score=".",
+            strand="+",
+            phase=".",
+            attributes="",
         ),
     ]
 
@@ -198,37 +198,37 @@ def test_donor_acceptor():
     # <<<[1   2]a---d[10   12]a---d[20   22]<<<
     reverse_exons = [
         GFFEntry(
-            seqid='seqid',
-            source='source',
-            type='exon',
+            seqid="seqid",
+            source="source",
+            type="exon",
             start=1,
             end=2,
-            score='.',
-            strand='-',
-            phase='.',
-            attributes='',
+            score=".",
+            strand="-",
+            phase=".",
+            attributes="",
         ),
         GFFEntry(
-            seqid='seqid',
-            source='source',
-            type='exon',
+            seqid="seqid",
+            source="source",
+            type="exon",
             start=10,
             end=12,
-            score='.',
-            strand='-',
-            phase='.',
-            attributes='',
+            score=".",
+            strand="-",
+            phase=".",
+            attributes="",
         ),
         GFFEntry(
-            seqid='seqid',
-            source='source',
-            type='exon',
+            seqid="seqid",
+            source="source",
+            type="exon",
             start=20,
             end=22,
-            score='.',
-            strand='-',
-            phase='.',
-            attributes='',
+            score=".",
+            strand="-",
+            phase=".",
+            attributes="",
         ),
     ]
 
@@ -260,18 +260,18 @@ def test_end_to_end():
     for _, (donors, acceptors, _) in donor_acceptors_midpoints.items():
         # We expect AT/TC(GA), note that the acceptor is reverse complimented.
         # TODO: are there other cases there is some revcomp nonsense going on?
-        d_seqs = map(str, (fasta['16'][x : x + 2] for x in donors))
+        d_seqs = map(str, (fasta["16"][x : x + 2] for x in donors))
         d_counter.update(d_seqs)
 
-        a_seqs = map(str, (fasta['16'][x : x + 2] for x in acceptors))
+        a_seqs = map(str, (fasta["16"][x : x + 2] for x in acceptors))
         a_counter.update(a_seqs)
 
     # We expect 'GT'
     ((first_key, first_count), (_, second_count)) = d_counter.most_common(2)
-    assert first_key == 'GT'
+    assert first_key == "GT"
     assert second_count / first_count < 0.35
 
     # We expect revcomp of 'AG' = 'CT'
     ((first_key, first_count), (_, second_count)) = a_counter.most_common(2)
-    assert first_key == 'CT'
+    assert first_key == "CT"
     assert second_count / first_count < 0.35

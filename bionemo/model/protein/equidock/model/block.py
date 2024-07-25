@@ -42,24 +42,24 @@ class IEGMN(NeuralModule):
         """
         super(IEGMN, self).__init__()
 
-        self.debug = args['debug']
-        self.graph_nodes = args['graph_nodes']
+        self.debug = args["debug"]
+        self.graph_nodes = args["graph_nodes"]
 
-        self.rot_model = args['rot_model']
+        self.rot_model = args["rot_model"]
 
-        self.noise_decay_rate = args['noise_decay_rate']
-        self.noise_initial = args['noise_initial']
+        self.noise_decay_rate = args["noise_decay_rate"]
+        self.noise_initial = args["noise_initial"]
 
-        self.use_edge_features_in_gmn = args['use_edge_features_in_gmn']
+        self.use_edge_features_in_gmn = args["use_edge_features_in_gmn"]
 
-        self.use_mean_node_features = args['use_mean_node_features']
+        self.use_mean_node_features = args["use_mean_node_features"]
 
         # 21 types of amino-acid types
         # if we want to use ESM llm model we should replace it here!
-        self.residue_emb_layer = nn.Embedding(num_embeddings=21, embedding_dim=args['residue_emb_dim'])
+        self.residue_emb_layer = nn.Embedding(num_embeddings=21, embedding_dim=args["residue_emb_dim"])
 
-        assert self.graph_nodes == 'residues'
-        input_node_feats_dim = args['residue_emb_dim']  # One residue type
+        assert self.graph_nodes == "residues"
+        input_node_feats_dim = args["residue_emb_dim"]  # One residue type
 
         if self.use_mean_node_features:
             input_node_feats_dim += 5  # Additional features from mu_r_norm
@@ -70,17 +70,17 @@ class IEGMN(NeuralModule):
             IEGMN_Layer(
                 orig_h_feats_dim=input_node_feats_dim,
                 h_feats_dim=input_node_feats_dim,
-                out_feats_dim=args['iegmn_lay_hid_dim'],
+                out_feats_dim=args["iegmn_lay_hid_dim"],
                 fine_tune=fine_tune,
                 args=args,
             )
         )
 
-        if args['shared_layers']:
+        if args["shared_layers"]:
             interm_lay = IEGMN_Layer(
                 orig_h_feats_dim=input_node_feats_dim,
-                h_feats_dim=args['iegmn_lay_hid_dim'],
-                out_feats_dim=args['iegmn_lay_hid_dim'],
+                h_feats_dim=args["iegmn_lay_hid_dim"],
+                out_feats_dim=args["iegmn_lay_hid_dim"],
                 args=args,
                 fine_tune=fine_tune,
             )
@@ -92,18 +92,18 @@ class IEGMN(NeuralModule):
                 self.iegmn_layers.append(
                     IEGMN_Layer(
                         orig_h_feats_dim=input_node_feats_dim,
-                        h_feats_dim=args['iegmn_lay_hid_dim'],
-                        out_feats_dim=args['iegmn_lay_hid_dim'],
+                        h_feats_dim=args["iegmn_lay_hid_dim"],
+                        out_feats_dim=args["iegmn_lay_hid_dim"],
                         args=args,
                         fine_tune=fine_tune,
                     )
                 )
 
-        assert args['rot_model'] == 'kb_att'
+        assert args["rot_model"] == "kb_att"
 
         # Attention layers
-        self.num_att_heads = args['num_att_heads']
-        self.out_feats_dim = args['iegmn_lay_hid_dim']
+        self.num_att_heads = args["num_att_heads"]
+        self.out_feats_dim = args["iegmn_lay_hid_dim"]
 
         self.att_mlp_key_ROT = nn.Sequential(
             nn.Linear(self.out_feats_dim, self.num_att_heads * self.out_feats_dim, bias=False),
@@ -114,8 +114,8 @@ class IEGMN(NeuralModule):
 
         self.mlp_h_mean_ROT = nn.Sequential(
             nn.Linear(self.out_feats_dim, self.out_feats_dim),
-            nn.Dropout(args['dropout']),
-            get_non_lin(args['nonlin'], args['leakyrelu_neg_slope']),
+            nn.Dropout(args["dropout"]),
+            get_non_lin(args["nonlin"], args["leakyrelu_neg_slope"]),
         )
 
     def reset_parameters(self):
@@ -127,47 +127,47 @@ class IEGMN(NeuralModule):
 
     def forward(self, batch_hetero_graph):
         device = batch_hetero_graph.device
-        orig_coors_ligand = batch_hetero_graph.nodes['ligand'].data['new_x']
-        orig_coors_receptor = batch_hetero_graph.nodes['receptor'].data['x']
+        orig_coors_ligand = batch_hetero_graph.nodes["ligand"].data["new_x"]
+        orig_coors_receptor = batch_hetero_graph.nodes["receptor"].data["x"]
 
-        coors_ligand = batch_hetero_graph.nodes['ligand'].data['new_x']
-        coors_receptor = batch_hetero_graph.nodes['receptor'].data['x']
+        coors_ligand = batch_hetero_graph.nodes["ligand"].data["new_x"]
+        coors_receptor = batch_hetero_graph.nodes["receptor"].data["x"]
 
         # Embed residue types with a lookup table.
         h_feats_ligand = self.residue_emb_layer(
-            batch_hetero_graph.nodes['ligand'].data['res_feat'].view(-1).long()
+            batch_hetero_graph.nodes["ligand"].data["res_feat"].view(-1).long()
         )  # (N_res, emb_dim)
         h_feats_receptor = self.residue_emb_layer(
-            batch_hetero_graph.nodes['receptor'].data['res_feat'].view(-1).long()
+            batch_hetero_graph.nodes["receptor"].data["res_feat"].view(-1).long()
         )  # (N_res, emb_dim)
 
         if self.debug:
-            logging.info(torch.max(h_feats_ligand), 'h_feats_ligand before layers ')
+            logging.info(torch.max(h_feats_ligand), "h_feats_ligand before layers ")
 
         if self.use_mean_node_features:
             h_feats_ligand = torch.cat(
-                [h_feats_ligand, torch.log(batch_hetero_graph.nodes['ligand'].data['mu_r_norm'])], dim=1
+                [h_feats_ligand, torch.log(batch_hetero_graph.nodes["ligand"].data["mu_r_norm"])], dim=1
             )
             h_feats_receptor = torch.cat(
-                [h_feats_receptor, torch.log(batch_hetero_graph.nodes['receptor'].data['mu_r_norm'])], dim=1
+                [h_feats_receptor, torch.log(batch_hetero_graph.nodes["receptor"].data["mu_r_norm"])], dim=1
             )
 
         if self.debug:
             logging.info(
                 torch.max(h_feats_ligand),
                 torch.norm(h_feats_ligand),
-                'h_feats_ligand before layers but after mu_r_norm',
+                "h_feats_ligand before layers but after mu_r_norm",
             )
 
         original_ligand_node_features = h_feats_ligand
         original_receptor_node_features = h_feats_receptor
 
-        original_edge_feats_ligand = batch_hetero_graph.edges['ll'].data['he'] * self.use_edge_features_in_gmn
-        original_edge_feats_receptor = batch_hetero_graph.edges['rr'].data['he'] * self.use_edge_features_in_gmn
+        original_edge_feats_ligand = batch_hetero_graph.edges["ll"].data["he"] * self.use_edge_features_in_gmn
+        original_edge_feats_receptor = batch_hetero_graph.edges["rr"].data["he"] * self.use_edge_features_in_gmn
 
         for i, layer in enumerate(self.iegmn_layers):
             if self.debug:
-                logging.info('layer ', i)
+                logging.info("layer ", i)
 
             coors_ligand, h_feats_ligand, coors_receptor, h_feats_receptor = layer(
                 hetero_graph=batch_hetero_graph,
@@ -184,13 +184,13 @@ class IEGMN(NeuralModule):
             )
 
         if self.debug:
-            logging.info(torch.max(h_feats_ligand), 'h_feats_ligand after MPNN')
-            logging.info(torch.max(coors_ligand), 'coors_ligand before after MPNN')
+            logging.info(torch.max(h_feats_ligand), "h_feats_ligand after MPNN")
+            logging.info(torch.max(coors_ligand), "coors_ligand before after MPNN")
 
-        batch_hetero_graph.nodes['ligand'].data['x_iegmn_out'] = coors_ligand
-        batch_hetero_graph.nodes['receptor'].data['x_iegmn_out'] = coors_receptor
-        batch_hetero_graph.nodes['ligand'].data['hv_iegmn_out'] = h_feats_ligand
-        batch_hetero_graph.nodes['receptor'].data['hv_iegmn_out'] = h_feats_receptor
+        batch_hetero_graph.nodes["ligand"].data["x_iegmn_out"] = coors_ligand
+        batch_hetero_graph.nodes["receptor"].data["x_iegmn_out"] = coors_receptor
+        batch_hetero_graph.nodes["ligand"].data["hv_iegmn_out"] = h_feats_ligand
+        batch_hetero_graph.nodes["receptor"].data["hv_iegmn_out"] = h_feats_receptor
 
         list_hetero_graph = dgl.unbatch(batch_hetero_graph)
 
@@ -205,13 +205,13 @@ class IEGMN(NeuralModule):
             # (m, d)
             self.device = hetero_graph.device
 
-            H_receptor_feats = hetero_graph.nodes['receptor'].data['hv_iegmn_out']
+            H_receptor_feats = hetero_graph.nodes["receptor"].data["hv_iegmn_out"]
             H_receptor_feats_att_mean_ROT = torch.mean(
                 self.mlp_h_mean_ROT(H_receptor_feats), dim=0, keepdim=True
             )  # (1, d)
 
             # (n, d)
-            H_ligand_feats = hetero_graph.nodes['ligand'].data['hv_iegmn_out']
+            H_ligand_feats = hetero_graph.nodes["ligand"].data["hv_iegmn_out"]
             H_ligand_feats_att_mean_ROT = torch.mean(
                 self.mlp_h_mean_ROT(H_ligand_feats), dim=0, keepdim=True
             )  # (1, d)
@@ -220,15 +220,16 @@ class IEGMN(NeuralModule):
             assert d == self.out_feats_dim
 
             # Z coordinates
-            Z_receptor_coors = hetero_graph.nodes['receptor'].data['x_iegmn_out']
+            Z_receptor_coors = hetero_graph.nodes["receptor"].data["x_iegmn_out"]
 
-            Z_ligand_coors = hetero_graph.nodes['ligand'].data['x_iegmn_out']
+            Z_ligand_coors = hetero_graph.nodes["ligand"].data["x_iegmn_out"]
 
             #################### AP 1: compute two point clouds of K_heads points each, then do Kabsch  #########################
             # Att weights to compute the receptor centroid. They query is the average_h_ligand. Keys are each h_receptor_j
             att_weights_receptor_ROT = torch.softmax(
                 # (K_heads, m_rec, d)
-                self.att_mlp_key_ROT(H_receptor_feats).view(-1, self.num_att_heads, d).transpose(0, 1) @
+                self.att_mlp_key_ROT(H_receptor_feats).view(-1, self.num_att_heads, d).transpose(0, 1)
+                @
                 # (K_heads, d, 1)
                 self.att_mlp_query_ROT(H_ligand_feats_att_mean_ROT)
                 .view(1, self.num_att_heads, d)
@@ -273,14 +274,14 @@ class IEGMN(NeuralModule):
                 or torch.min(torch.abs((S**2).view(1, 3) - (S**2).view(3, 1) + torch.eye(3).to(device))) < 1e-2
             ):
                 if self.debug:
-                    logging.info('S inside loop ', num_it, ' is ', S, ' and A = ', A)
+                    logging.info("S inside loop ", num_it, " is ", S, " and A = ", A)
 
                 A = A + torch.rand(3, 3).to(device) * torch.eye(3).to(device)
                 U, S, Vt = torch.linalg.svd(A)
                 num_it += 1
 
                 if num_it > 10:
-                    message = 'SVD consistently numerically unstable! Exitting ... '
+                    message = "SVD consistently numerically unstable! Exitting ... "
                     warnings.warn(message)
                     logging.info(message)
                     sys.exit(1)
@@ -293,8 +294,8 @@ class IEGMN(NeuralModule):
             #################### end AP 1 #########################
 
             if self.debug:
-                logging.info('DEBUG: Y_receptor_att_ROT_mean', Y_receptor_att_ROT_mean)
-                logging.info('DEBUG: Y_ligand_att_ROT_mean', Y_ligand_att_ROT_mean)
+                logging.info("DEBUG: Y_receptor_att_ROT_mean", Y_receptor_att_ROT_mean)
+                logging.info("DEBUG: Y_ligand_att_ROT_mean", Y_ligand_att_ROT_mean)
 
             all_T_align_list.append(T_align)
             all_b_align_list.append(b_align)

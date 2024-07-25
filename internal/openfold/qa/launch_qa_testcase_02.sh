@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --account=healthcareeng_bionemo
 #SBATCH --partition=interactive
-#SBATCH 
+#SBATCH
 #SBATCH --nodes=1
 #SBATCH --gpus-per-node 8
 #SBATCH --time 01:00:00                 # wall time
@@ -37,7 +37,7 @@
 #   (1) There is a single slurm job
 #   (2) Estimated run time: Once the job is started, it should take less than 10 minutes.
 #   (3) Users should obtain a checkpoint file, in the directory ${OUTPUT_DIR}/artifacts/checkpoints, called
-#       openfold--multisessionstep=6.0--step=6--val_lddt_ca=*.ckpt     
+#       openfold--multisessionstep=6.0--step=6--val_lddt_ca=*.ckpt
 #
 # updated / reviewed: 2024-05-22
 #
@@ -76,9 +76,9 @@ srun --mpi=pmix \
          cd /workspace/bionemo &&
          echo 'launch_qa_testcase_02.sh - before download_artifacts.py' &&
          python download_artifacts.py  --data_dir  /workspace/bionemo --data openfold_training --source pbss --verbose --model_dir models  --models openfold_initial_training_inhouse &&
-         echo 'launch_qa_testcase_02.sh - after download_artifacts.py' &&                                                                                         
-         echo 'launch_qa_testcase_02.sh - before install_third_party.sh' &&                                                                                       
-         ./examples/protein/openfold/scripts/install_third_party.sh &&                                                                                                 
+         echo 'launch_qa_testcase_02.sh - after download_artifacts.py' &&
+         echo 'launch_qa_testcase_02.sh - before install_third_party.sh' &&
+         ./examples/protein/openfold/scripts/install_third_party.sh &&
          echo 'launch_qa_testcase_02.sh - after install_third_party.sh' &&
          echo 'launch_qa_testcase_02.sh - before train.py' &&
          python examples/protein/openfold/train.py \
@@ -96,5 +96,3 @@ srun --mpi=pmix \
 	"
 set +x
 printf "${MESSAGE_TEMPLATE}" "end with success"
-
-

@@ -74,7 +74,7 @@ class InferenceWrapper:
     def sample_seqs(self, seqs: List[str]) -> List[List[str]]:
         result = send_seqs_for_inference(self.samplings_client, SEQUENCES, seqs)
         generated: np.ndarray = result[GENERATED]
-        sequences = np.char.decode(generated.astype('bytes'), 'utf-8')
+        sequences = np.char.decode(generated.astype("bytes"), "utf-8")
         return sequences.tolist()
 
     def hiddens_to_embedding(self, hidden_states: torch.Tensor, masks: torch.Tensor) -> torch.Tensor:
@@ -84,7 +84,7 @@ class InferenceWrapper:
         embeddings = torch.sum(hidden_states * masks.unsqueeze(-1), dim=1) / lengths
         return embeddings
 
-    def __enter__(self) -> 'InferenceWrapper':
+    def __enter__(self) -> "InferenceWrapper":
         return self
 
     def __exit__(self, *args, **kwargs) -> None:
@@ -117,19 +117,19 @@ def complete_model_name(
 
 
 @click.command()
-@click.option('--config-path', required=True, help="Path to Hydra config directory where configuration date lives.")
+@click.option("--config-path", required=True, help="Path to Hydra config directory where configuration date lives.")
 @click.option(
-    '--config-name',
-    default='infer.yaml',
+    "--config-name",
+    default="infer.yaml",
     show_default=True,
     required=True,
     help="Name of YAML config file in --config-path to load from.",
 )
 @click.option(
-    '--nav', is_flag=True, help="If present, load runtime optimized with model navigator. Requires export beforehand."
+    "--nav", is_flag=True, help="If present, load runtime optimized with model navigator. Requires export beforehand."
 )
 @click.option(
-    '--model-name-base',
+    "--model-name-base",
     required=True,
     default=BIONEMO_MODEL,
     help="Common prefix to use to group all of the loaded model's bound inference functions. "

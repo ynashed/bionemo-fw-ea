@@ -86,7 +86,7 @@ class SingleCellDataset(Dataset):
         path = Path(data_path)
 
         # - metadata
-        self.metadata = json.load(open(path / 'metadata.json', 'r'))
+        self.metadata = json.load(open(path / "metadata.json", "r"))
 
         # - median dict
         self.gene_medians = median_dict
@@ -95,14 +95,14 @@ class SingleCellDataset(Dataset):
         total_el = sum([v["num_el"] for _, v in self.metadata.items()])
         self.num_samples = sum([v["shape"][0] for _, v in self.metadata.items()])
         # - load data
-        self.gene_data = np.memmap(path / 'gene_expression_data.npy', dtype='float32', mode='r', shape=(total_el,))
+        self.gene_data = np.memmap(path / "gene_expression_data.npy", dtype="float32", mode="r", shape=(total_el,))
 
         self.gene_data_indices = np.memmap(
-            path / 'gene_expression_ind.npy', dtype='int32', mode='r', shape=(total_el,)
+            path / "gene_expression_ind.npy", dtype="int32", mode="r", shape=(total_el,)
         )
 
         self.gene_data_ptr = np.memmap(
-            path / 'gene_expression_ptr.npy', dtype='int64', mode='r', shape=(self.num_samples + 1,)
+            path / "gene_expression_ptr.npy", dtype="int64", mode="r", shape=(self.num_samples + 1,)
         )
         self.tokenizer = tokenizer
 
@@ -141,7 +141,7 @@ class SingleCellDataset(Dataset):
         return gene_data, col_idxs, metadata
 
     def __getitem__(self, idx: int) -> dict[str, Any]:
-        '''Performs a lookup and the required transformation for the model'''
+        """Performs a lookup and the required transformation for the model"""
         gene_data, col_idxs, metadata = self.lookup_cell_by_idx(idx)
         return process_item(
             gene_data,

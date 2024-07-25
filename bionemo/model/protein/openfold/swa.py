@@ -18,13 +18,13 @@ from nemo.collections.common.callbacks import EMA
 from torch import Tensor  # noqa
 
 from bionemo.model.protein.openfold.triton.fused_adam_swa import FusedAdamSWA
-from bionemo.model.protein.openfold.utils.logging_utils import (
+from bionemo.utils.logging_utils import (
     log_with_nemo_at_level,
 )
 
 
 def all_parameters(param_groups: Iterable[Dict]) -> Tuple[Tensor]:
-    return (param for group in param_groups for param in group['params'])
+    return (param for group in param_groups for param in group["params"])
 
 
 class AlphaFoldEMA(EMA):
@@ -88,7 +88,7 @@ class AlphaFoldEMA(EMA):
         log_with_nemo_at_level("""AlphaFoldEMA.swap_model_weights, begin""")
 
         optimizer = trainer.optimizers[0]
-        for src_param, dst_param in zip(optimizer.swa_param_groups[0]['params'], optimizer.param_groups[0]['params']):
+        for src_param, dst_param in zip(optimizer.swa_param_groups[0]["params"], optimizer.param_groups[0]["params"]):
             swap_tensor_values(src_param, dst_param)
 
         log_with_nemo_at_level("""AlphaFoldEMA.swap_model_weights, end""")
@@ -134,19 +134,19 @@ class AlphaFoldEMA(EMA):
         checkpoint_callback = trainer.checkpoint_callback
 
         ckpt_path = trainer.ckpt_path
-        if ckpt_path and checkpoint_callback is not None and 'NeMo' in type(checkpoint_callback).__name__:
+        if ckpt_path and checkpoint_callback is not None and "NeMo" in type(checkpoint_callback).__name__:
             ext = checkpoint_callback.FILE_EXTENSION
-            if ckpt_path.endswith(f'-EMA{ext}'):
+            if ckpt_path.endswith(f"-EMA{ext}"):
                 print(
                     "loading EMA based weights. "
                     "The callback will treat the loaded EMA weights as the main weights"
                     " and create a new EMA copy when training."
                 )
                 return
-            ema_path = ckpt_path.replace(ext, f'-EMA{ext}')
+            ema_path = ckpt_path.replace(ext, f"-EMA{ext}")
             if os.path.exists(ema_path):
-                ema_state_dict = torch.load(ema_path, map_location=torch.device('cpu'))
-                checkpoint['optimizer_states'] = ema_state_dict['optimizer_states']
+                ema_state_dict = torch.load(ema_path, map_location=torch.device("cpu"))
+                checkpoint["optimizer_states"] = ema_state_dict["optimizer_states"]
                 del ema_state_dict
                 print("EMA state has been restored.")
             else:

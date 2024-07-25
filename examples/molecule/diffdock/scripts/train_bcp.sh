@@ -13,7 +13,7 @@
 
 # Below is a sample set of parameters for launching DiffDock model training with BioNeMo on BCP clusters
 # Any parameters not specified in this script can be changed in the yaml config file
-# located in examples/molecule/diffdock/conf/train_score.yaml and 
+# located in examples/molecule/diffdock/conf/train_score.yaml and
 # examples/molecule/diffdock/conf/train_confidence.yaml
 
 # set your Weights and Biases API KEY
@@ -42,7 +42,7 @@ if [[ "${MODEL_TYPE}" != "score" && "${MODEL_TYPE}" != "confidence" ]]; then
   exit 1
 fi
 
-CONFIG_NAME="train_${MODEL_TYPE}" # name of the yaml config file with parameters 
+CONFIG_NAME="train_${MODEL_TYPE}" # name of the yaml config file with parameters
 
 # NGC specific parameters
 TIME_LIMIT=${TIME_LIMIT:-"2h"}

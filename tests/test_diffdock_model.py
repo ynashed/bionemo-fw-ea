@@ -47,8 +47,8 @@ torch_geometric.seed_everything(0)
 
 BIONEMO_HOME = os.getenv("BIONEMO_HOME")
 THIS_FILE_DIR = os.path.dirname(os.path.realpath(__file__))
-PREPEND_CONFIG_DIR = os.path.join(THIS_FILE_DIR, './conf')
-ROOT_DIR = 'diffdock'
+PREPEND_CONFIG_DIR = os.path.join(THIS_FILE_DIR, "./conf")
+ROOT_DIR = "diffdock"
 
 assert BIONEMO_HOME is not None, "environment variable BIONEMO_HOME is not set"
 fname_checkpoint_score_model = os.path.join(BIONEMO_HOME, "models/molecule/diffdock/diffdock_score.nemo")
@@ -99,13 +99,13 @@ def test_diffdock_score_model_layers(cfg):
         if isinstance(layer, FullyConnectedTensorProductConv):
             name_batch_norm, has_batch_norm = re.subn(re_conv_layer, r"\1batch_norm\2", name)
             inputs = model_layers_io[name]
-            expected = inputs['output']
-            irreps_node = inputs['irreps_node']
-            edge_indices_tpconv = inputs['edge_indices_tpconv']
-            irreps_sh = inputs['irreps_sh']
-            edge_emb = inputs['edge_emb']
-            src_scalars = inputs['src_scalars']
-            dst_scalars = inputs['dst_scalars']
+            expected = inputs["output"]
+            irreps_node = inputs["irreps_node"]
+            edge_indices_tpconv = inputs["edge_indices_tpconv"]
+            irreps_sh = inputs["irreps_sh"]
+            edge_emb = inputs["edge_emb"]
+            src_scalars = inputs["src_scalars"]
+            dst_scalars = inputs["dst_scalars"]
             edge_indices = edge_indices_tpconv.flip(dims=(0,))
             result = layer(
                 irreps_node,
@@ -126,10 +126,10 @@ def test_diffdock_score_model_layers(cfg):
                 result = layer_batch_norm(result)
             torch.testing.assert_close(result, expected)
             # check the gradients
-            result.backward(inputs['dLdy'])
+            result.backward(inputs["dLdy"])
             assert layer.mlp is not None, f"score model's layer {name} doesn't have a MLP"
-            torch.testing.assert_close(layer.mlp[-1].weight.grad, inputs['mlp[-1].weight.grad'])
-            torch.testing.assert_close(layer.mlp[-1].bias.grad, inputs['mlp[-1].bias.grad'])
+            torch.testing.assert_close(layer.mlp[-1].weight.grad, inputs["mlp[-1].weight.grad"])
+            torch.testing.assert_close(layer.mlp[-1].bias.grad, inputs["mlp[-1].bias.grad"])
 
 
 fname_score_model_io = os.path.join(dirname_test_data, "score_model_io.pt")
@@ -150,11 +150,11 @@ def test_diffdock_score_model(cfg):
     model.eval()
 
     model_io = torch.load(fname_score_model_io)
-    t_tr = model_io['t_tr']
-    t_rot = model_io['t_rot']
-    t_tor = model_io['t_tor']
-    samples_per_complex = model_io['samples_per_complex']
-    batch_size = model_io['batch_size']
+    t_tr = model_io["t_tr"]
+    t_rot = model_io["t_rot"]
+    t_tor = model_io["t_tor"]
+    samples_per_complex = model_io["samples_per_complex"]
+    batch_size = model_io["batch_size"]
     device = torch.device("cuda")
 
     _, _, _, test_loader = build_inference_datasets(cfg)
@@ -170,12 +170,12 @@ def test_diffdock_score_model(cfg):
             b = complex_graph_batch.num_graphs
             complex_graph_batch = complex_graph_batch.to(device)
             set_time(complex_graph_batch, t_tr, t_rot, t_tor, b, False, model.device)
-            complex_graph_batch['ligand'].pos = model_io[name]['ligand_pos']
+            complex_graph_batch["ligand"].pos = model_io[name]["ligand_pos"]
             with torch.no_grad():
                 tr_score, rot_score, tor_score = model.model.net(complex_graph_batch)
-            torch.testing.assert_close(tr_score, model_io[name]['tr_score'], atol=1e-3, rtol=1e-3)
-            torch.testing.assert_close(rot_score, model_io[name]['rot_score'], atol=1e-3, rtol=1e-3)
-            torch.testing.assert_close(tor_score, model_io[name]['tor_score'], atol=1e-3, rtol=1e-3)
+            torch.testing.assert_close(tr_score, model_io[name]["tr_score"], atol=1e-3, rtol=1e-3)
+            torch.testing.assert_close(rot_score, model_io[name]["rot_score"], atol=1e-3, rtol=1e-3)
+            torch.testing.assert_close(tor_score, model_io[name]["tor_score"], atol=1e-3, rtol=1e-3)
 
 
 fname_score_model_grad_io = os.path.join(dirname_test_data, "score_model_grad_io.pt")
@@ -197,10 +197,10 @@ def test_diffdock_score_model_grad(cfg):
     model.requires_grad_()
 
     model_grad_io = torch.load(fname_score_model_grad_io)
-    batch_size = model_grad_io['batch_size']
-    t_tr = model_grad_io['t_tr']
-    t_rot = model_grad_io['t_rot']
-    t_tor = model_grad_io['t_tor']
+    batch_size = model_grad_io["batch_size"]
+    t_tr = model_grad_io["t_tr"]
+    t_rot = model_grad_io["t_rot"]
+    t_tor = model_grad_io["t_tor"]
     device = torch.device("cuda")
 
     _, _, _, test_loader = build_inference_datasets(cfg)
@@ -216,14 +216,14 @@ def test_diffdock_score_model_grad(cfg):
             b = complex_graph_batch.num_graphs
             complex_graph_batch = complex_graph_batch.to(device)
             set_time(complex_graph_batch, t_tr, t_rot, t_tor, b, False, model.device)
-            complex_graph_batch['ligand'].pos = model_grad_io[name]['ligand_pos']
+            complex_graph_batch["ligand"].pos = model_grad_io[name]["ligand_pos"]
             seed_everything(seed=0, workers=True)
             torch_geometric.seed_everything(0)
             model.zero_grad(set_to_none=True)
             tr_score, rot_score, tor_score = model.model.net(complex_graph_batch)
-            torch.testing.assert_close(tr_score, model_grad_io[name]['tr_score'])
-            torch.testing.assert_close(rot_score, model_grad_io[name]['rot_score'])
-            torch.testing.assert_close(tor_score, model_grad_io[name]['tor_score'])
+            torch.testing.assert_close(tr_score, model_grad_io[name]["tr_score"])
+            torch.testing.assert_close(rot_score, model_grad_io[name]["rot_score"])
+            torch.testing.assert_close(tor_score, model_grad_io[name]["tor_score"])
             loss = (
                 ((tr_score - torch.ones_like(tr_score, device=device)) ** 2).mean()
                 + ((rot_score - torch.ones_like(rot_score, device=device)) ** 2).mean()
@@ -236,11 +236,11 @@ def test_diffdock_score_model_grad(cfg):
                     result_dict[k] = v.grad.clone()
 
             assert (
-                result_dict.keys() == model_grad_io[name]['param_grad'].keys()
+                result_dict.keys() == model_grad_io[name]["param_grad"].keys()
             ), "result parameter names are different than the expected names"
 
             for k, v_grad in result_dict.items():
-                torch.testing.assert_close(v_grad, model_grad_io[name]['param_grad'][k])
+                torch.testing.assert_close(v_grad, model_grad_io[name]["param_grad"][k])
 
 
 fname_confidence_model_layers_io = os.path.join(dirname_test_data, "confidence_model_layers_io.pt")
@@ -269,13 +269,13 @@ def test_diffdock_confidence_model_layers(cfg):
         if isinstance(layer, FullyConnectedTensorProductConv):
             name_batch_norm, has_batch_norm = re.subn(re_conv_layer, r"\1batch_norm\2", name)
             inputs = model_layers_io[name]
-            expected = inputs['output']
-            irreps_node = inputs['irreps_node']
-            edge_indices_tpconv = inputs['edge_indices_tpconv']
-            irreps_sh = inputs['irreps_sh']
-            edge_emb = inputs['edge_emb']
-            src_scalars = inputs['src_scalars']
-            dst_scalars = inputs['dst_scalars']
+            expected = inputs["output"]
+            irreps_node = inputs["irreps_node"]
+            edge_indices_tpconv = inputs["edge_indices_tpconv"]
+            irreps_sh = inputs["irreps_sh"]
+            edge_emb = inputs["edge_emb"]
+            src_scalars = inputs["src_scalars"]
+            dst_scalars = inputs["dst_scalars"]
             edge_indices = edge_indices_tpconv.flip(dims=(0,))
             result = layer(
                 irreps_node,
@@ -296,10 +296,10 @@ def test_diffdock_confidence_model_layers(cfg):
                 result = layer_batch_norm(result)
             torch.testing.assert_close(result, expected)
             # check the gradients
-            result.backward(inputs['dLdy'])
+            result.backward(inputs["dLdy"])
             assert layer.mlp is not None, f"score model's layer {name} doesn't have a MLP"
-            torch.testing.assert_close(layer.mlp[-1].weight.grad, inputs['mlp[-1].weight.grad'])
-            torch.testing.assert_close(layer.mlp[-1].bias.grad, inputs['mlp[-1].bias.grad'])
+            torch.testing.assert_close(layer.mlp[-1].weight.grad, inputs["mlp[-1].weight.grad"])
+            torch.testing.assert_close(layer.mlp[-1].bias.grad, inputs["mlp[-1].bias.grad"])
 
 
 fname_confidence_model_io = os.path.join(dirname_test_data, "confidence_model_io.pt")
@@ -320,11 +320,11 @@ def test_diffdock_confidence_model(cfg):
     model.eval()
 
     model_io = torch.load(fname_confidence_model_io)
-    t_tr = model_io['t_tr']
-    t_rot = model_io['t_rot']
-    t_tor = model_io['t_tor']
-    samples_per_complex = model_io['samples_per_complex']
-    batch_size = model_io['batch_size']
+    t_tr = model_io["t_tr"]
+    t_rot = model_io["t_rot"]
+    t_tor = model_io["t_tor"]
+    samples_per_complex = model_io["samples_per_complex"]
+    batch_size = model_io["batch_size"]
     device = torch.device("cuda")
 
     _, _, confidence_test_dataset, _ = build_inference_datasets(cfg)
@@ -340,10 +340,10 @@ def test_diffdock_confidence_model(cfg):
             b = complex_graph_batch.num_graphs
             complex_graph_batch = complex_graph_batch.to(device)
             set_time(complex_graph_batch, t_tr, t_rot, t_tor, b, True, model.device)
-            complex_graph_batch['ligand'].pos = model_io[name]['ligand_pos']
+            complex_graph_batch["ligand"].pos = model_io[name]["ligand_pos"]
             with torch.no_grad():
                 confidence_score = model.model.net(complex_graph_batch)
-            torch.testing.assert_close(confidence_score, model_io[name]['confidence_score'], atol=1e-3, rtol=1e-3)
+            torch.testing.assert_close(confidence_score, model_io[name]["confidence_score"], atol=1e-3, rtol=1e-3)
 
 
 fname_confidence_model_grad_io = os.path.join(dirname_test_data, "confidence_model_grad_io.pt")
@@ -365,10 +365,10 @@ def test_diffdock_confidence_model_grad(cfg):
     model.requires_grad_()
 
     model_grad_io = torch.load(fname_confidence_model_grad_io)
-    batch_size = model_grad_io['batch_size']
-    t_tr = model_grad_io['t_tr']
-    t_rot = model_grad_io['t_rot']
-    t_tor = model_grad_io['t_tor']
+    batch_size = model_grad_io["batch_size"]
+    t_tr = model_grad_io["t_tr"]
+    t_rot = model_grad_io["t_rot"]
+    t_tor = model_grad_io["t_tor"]
     device = torch.device("cuda")
 
     _, _, confidence_test_dataset, _ = build_inference_datasets(cfg)
@@ -385,13 +385,13 @@ def test_diffdock_confidence_model_grad(cfg):
             b = complex_graph_batch.num_graphs
             complex_graph_batch = complex_graph_batch.to(device)
             set_time(complex_graph_batch, t_tr, t_rot, t_tor, b, True, model.device)
-            complex_graph_batch['ligand'].pos = model_grad_io[name]['ligand_pos']
+            complex_graph_batch["ligand"].pos = model_grad_io[name]["ligand_pos"]
             seed_everything(seed=0, workers=True)
             torch_geometric.seed_everything(0)
             model.zero_grad(set_to_none=True)
 
             confidence_score = model.model.net(complex_graph_batch)
-            torch.testing.assert_close(confidence_score, model_grad_io[name]['confidence_score'])
+            torch.testing.assert_close(confidence_score, model_grad_io[name]["confidence_score"])
             target_score = torch.ones_like(confidence_score, device=device)
             loss = ((confidence_score - target_score) ** 2).mean()
             loss.backward()
@@ -402,8 +402,8 @@ def test_diffdock_confidence_model_grad(cfg):
                     result_dict[k] = v.grad.clone()
 
             assert (
-                result_dict.keys() == model_grad_io[name]['param_grad'].keys()
+                result_dict.keys() == model_grad_io[name]["param_grad"].keys()
             ), "result parameter names are different than the expected names"
 
             for k, v_grad in result_dict.items():
-                torch.testing.assert_close(v_grad, model_grad_io[name]['param_grad'][k])
+                torch.testing.assert_close(v_grad, model_grad_io[name]["param_grad"][k])

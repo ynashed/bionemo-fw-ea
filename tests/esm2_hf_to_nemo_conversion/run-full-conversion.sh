@@ -7,7 +7,7 @@ set -x
 SKIP_META_HF_CONVERSION=false # Convert META to HF Checkpoint
 SKIP_HF_NEMO_CONVERSION=false # Convert HF to NeMo Checkpoint
 SKIP_TP_CONVERSION=false # Change TP Partitions of NeMo checkpoint
-CHECK_TP_CONVERSION=true # Performs inference and compares results 
+CHECK_TP_CONVERSION=true # Performs inference and compares results
 
 ESM_MODEL="esm2_t6_8M_UR50D" # possible values: "esm2_t12_35M_UR50D", "esm2_t30_150M_UR50D", "esm2_t33_650M_UR50D", "esm2_t36_3B_UR50D", "esm2_t48_15B_UR50D"
 TARGET_TP_SIZE=2 # The target size for Tensor Parallel for changing the model's partitions (if `SKIP_TP_CONVERSION` is false)
@@ -93,7 +93,7 @@ fi
 
 # Convert HF checkpoint to NEMO checkpoint
 if [ "$SKIP_HF_NEMO_CONVERSION" = false ]; then
-    rm -f "$TP1_NEMO_FILE" 
+    rm -f "$TP1_NEMO_FILE"
     convert_to_nemo_checkpoint "$HF_CKPT" "$TP1_NEMO_FILE" "$PRECISION"
 else
     echo "Skipping HF to NEMO checkpoint conversion."
@@ -118,4 +118,4 @@ if [ "$SKIP_TP_CONVERSION" = false ]; then
     fi
 else
     echo "Skipping TP partition conversion."
-fi 
+fi

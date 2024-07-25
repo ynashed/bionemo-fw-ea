@@ -23,7 +23,7 @@ __all__: Sequence[str] = ("BIONEMO_PY_ROOT",)
 # TODO [mgreaves]: Refactor, don't modify global state on bionemo import.
 #                  Instead, perform this registration on a per-model-train basis.
 register_scheduler(
-    'LinearWarmupHoldDecayPolicy',
+    "LinearWarmupHoldDecayPolicy",
     LinearWarmupHoldDecayPolicy,
     LinearWarmupHoldDecayParams,
 )

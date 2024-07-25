@@ -58,19 +58,19 @@ class MegaMolBARTRetroModel(MolEncDecModelBase):
         pass
 
     def setup_training_data(self, cfg: DictConfig):
-        if hasattr(self, '_train_ds'):
+        if hasattr(self, "_train_ds"):
             consumed_samples = self.compute_consumed_samples(0)
             self._train_dl = self.build_data_loader(
                 self._train_ds, consumed_samples, num_workers=self._cfg.data.num_workers
             )
 
     def setup_validation_data(self, cfg: DictConfig):
-        if hasattr(self, '_validation_ds'):
+        if hasattr(self, "_validation_ds"):
             consumed_samples = 0
             self._validation_dl = self.build_data_loader(self._validation_ds, consumed_samples, num_workers=0)
 
     def setup_test_data(self, cfg: DictConfig):
-        if hasattr(self, '_test_ds'):
+        if hasattr(self, "_test_ds"):
             consumed_samples = 0
             self._test_dl = self.build_data_loader(self._test_ds, consumed_samples, num_workers=0)
 
@@ -80,8 +80,8 @@ class MegaMolBARTRetroModel(MolEncDecModelBase):
         predicted_tokens_ids, log_probs = self.decode(tokens_enc, enc_mask, self._cfg.max_position_embeddings)
         predicted_tokens_ids = predicted_tokens_ids.cpu().detach().numpy().tolist()
         log_probs = log_probs.cpu().detach().numpy().tolist()
-        response = {'tokens_enc': tokens_enc}
+        response = {"tokens_enc": tokens_enc}
         sampled_smiles, predicted_tokens_pruned = self._process_predicted_tokens_ids(predicted_tokens_ids)
-        response['predicted_tokens'] = list(zip(sampled_smiles, predicted_tokens_pruned, log_probs))
+        response["predicted_tokens"] = list(zip(sampled_smiles, predicted_tokens_pruned, log_probs))
         self.unfreeze()
         return response

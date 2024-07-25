@@ -6,7 +6,7 @@ trainer:
   devices: 8
   num_nodes: 8
 
-model: 
+model:
   name: small_span_aug
   # model architecture
   num_layers: 6

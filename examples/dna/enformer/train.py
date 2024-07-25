@@ -37,10 +37,10 @@ class LinearLRParams(SchedulerParams):
 
 @hydra_runner(config_path="conf", config_name="enformer_pretrain")
 def main(cfg) -> None:
-    register_scheduler(name='LinearLR', scheduler=LinearLR, scheduler_params=LinearLRParams)
+    register_scheduler(name="LinearLR", scheduler=LinearLR, scheduler_params=LinearLRParams)
 
     logging.info("\n\n************** Experiment configuration ***********")
-    logging.info(f'\n{OmegaConf.to_yaml(cfg)}')
+    logging.info(f"\n{OmegaConf.to_yaml(cfg)}")
     missing_keys: set[str] = OmegaConf.missing_keys(cfg)
     if missing_keys:
         raise RuntimeError(f"Got missing required keys in config:\n{missing_keys}")
@@ -70,5 +70,5 @@ def main(cfg) -> None:
         trainer.test(enformer)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

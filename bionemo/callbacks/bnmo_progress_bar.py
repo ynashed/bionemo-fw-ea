@@ -32,7 +32,7 @@ class BnmoTqdm(Tqdm):
         time_now = time()
         formatted_dict = super(Tqdm, self).format_dict
 
-        elapsed = time_now - self.start_t if hasattr(self, 'start_t') else 0  # same as tqdm
+        elapsed = time_now - self.start_t if hasattr(self, "start_t") else 0  # same as tqdm
         formatted_dict["elapsed"] = elapsed
         if self.warmup_t is not None:
             elapsed_since_warmup = time_now - self.warmup_t

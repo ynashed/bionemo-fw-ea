@@ -20,7 +20,7 @@ from bionemo.data.protein.openfold.dataloaders import TrainBatchProperties
 from bionemo.data.protein.openfold.datasets import InitialTrainingDataset
 from bionemo.data.protein.openfold.helpers import collate
 from bionemo.data.protein.openfold.samplers import InitialTrainingSampler
-from bionemo.model.protein.openfold.utils.logging_utils import log_with_nemo_at_level
+from bionemo.utils.logging_utils import log_with_nemo_at_level
 
 
 # ----------------------------------------------------------------------------

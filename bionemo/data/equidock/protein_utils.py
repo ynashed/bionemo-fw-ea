@@ -42,27 +42,27 @@ torch.set_float32_matmul_precision("high")
 
 
 PDB_DF_COLUMNS = {
-    'chain_id': 'chain',
-    'residue_number': 'residue',
-    'residue_name': 'resname',
-    'x_coord': 'x',
-    'y_coord': 'y',
-    'z_coord': 'z',
-    'element_symbol': 'element',
+    "chain_id": "chain",
+    "residue_number": "residue",
+    "residue_name": "resname",
+    "x_coord": "x",
+    "y_coord": "y",
+    "z_coord": "z",
+    "element_symbol": "element",
 }
 
 
 def extract_to_dir(zipfile, dir):
-    with ZipFile(zipfile, 'r') as zipper:
+    with ZipFile(zipfile, "r") as zipper:
         # extracting all the files
         zipper.extractall(dir)
 
 
 def get_residues(pdb_filename):
-    df = PandasPdb().read_pdb(pdb_filename).df['ATOM']
+    df = PandasPdb().read_pdb(pdb_filename).df["ATOM"]
     df.rename(columns=PDB_DF_COLUMNS, inplace=True)
     # Not the same as sequence order !
-    residues = list(df.groupby(['chain', 'residue', 'resname']))
+    residues = list(df.groupby(["chain", "residue", "resname"]))
     return residues
 
 
@@ -72,24 +72,24 @@ def get_residues_DIPS(dill_filename):
     df0 = x.df0
     df0.rename(columns=PDB_DF_COLUMNS, inplace=True)
     # Not the same as sequence order !
-    residues0 = list(df0.groupby(['chain', 'residue', 'resname']))
+    residues0 = list(df0.groupby(["chain", "residue", "resname"]))
     # print("Inside get_residues_DIPS df1")
     df1 = x.df1
     df1.rename(columns=PDB_DF_COLUMNS, inplace=True)
     # Not the same as sequence order !
-    residues1 = list(df1.groupby(['chain', 'residue', 'resname']))
+    residues1 = list(df1.groupby(["chain", "residue", "resname"]))
 
     # print("Done get_residues_DIPS")
     return residues0, residues1
 
 
 def get_coords(filename, all_atoms=True):
-    df = PandasPdb().read_pdb(filename).df['ATOM']
+    df = PandasPdb().read_pdb(filename).df["ATOM"]
     if not all_atoms:
-        df = df[df['atom_name'] == 'CA']
-        coords = df[['x_coord', 'y_coord', 'z_coord']].to_numpy().squeeze().astype(np.float32)
+        df = df[df["atom_name"] == "CA"]
+        coords = df[["x_coord", "y_coord", "z_coord"]].to_numpy().squeeze().astype(np.float32)
     else:
-        coords = df[['x_coord', 'y_coord', 'z_coord']].to_numpy().squeeze().astype(np.float32)
+        coords = df[["x_coord", "y_coord", "z_coord"]].to_numpy().squeeze().astype(np.float32)
     return torch.from_numpy(coords)
 
 
@@ -98,8 +98,8 @@ def get_rot_mat(euler_angles):
     yaw = euler_angles[1]
     pitch = euler_angles[2]
 
-    tensor_0 = torch.zeros([])
-    tensor_1 = torch.ones([])
+    tensor_0 = torch.zeros([], device=euler_angles.device, dtype=euler_angles.dtype)
+    tensor_1 = torch.ones([], device=euler_angles.device, dtype=euler_angles.dtype)
     cos = torch.cos
     sin = torch.sin
 
@@ -237,25 +237,25 @@ def distance_list_featurizer(dist_list):
     transformed_dist = transformed_dist.reshape((num_edge, -1))
 
     processed_features = {}
-    processed_features['he'] = torch.from_numpy(transformed_dist.astype(np.float32))
+    processed_features["he"] = torch.from_numpy(transformed_dist.astype(np.float32))
     return processed_features
 
 
 def residue_list_featurizer_dips_one_hot(predic):
-    residue_list = [term[1]['resname'].iloc[0] for term in predic]
+    residue_list = [term[1]["resname"].iloc[0] for term in predic]
     feature_list = [residue_type_one_hot_dips(residue) for residue in residue_list]
     feature_list = np.stack(feature_list)
     processed_features = {}
-    processed_features['res_feat'] = torch.from_numpy(feature_list.astype(np.float32))
+    processed_features["res_feat"] = torch.from_numpy(feature_list.astype(np.float32))
     return processed_features
 
 
 def residue_list_featurizer_dips_NOT_one_hot(predic):
-    residue_list = [term[1]['resname'].iloc[0] for term in predic]
+    residue_list = [term[1]["resname"].iloc[0] for term in predic]
     feature_list = [[residue_type_one_hot_dips_not_one_hot(residue)] for residue in residue_list]
     feature_list = np.array(feature_list)
     processed_features = {}
-    processed_features['res_feat'] = torch.from_numpy(feature_list.astype(np.float32))  # (N_res, 1)
+    processed_features["res_feat"] = torch.from_numpy(feature_list.astype(np.float32))  # (N_res, 1)
     return processed_features
 
 
@@ -267,9 +267,9 @@ def preprocess_unbound_bound_dips(file_loc, graph_nodes, pos_cutoff=8.0, inferen
         residues_filtered = []
         for residue in residues:
             df = residue[1]
-            Natom = df[df['atom_name'] == 'N']
-            alphaCatom = df[df['atom_name'] == 'CA']
-            Catom = df[df['atom_name'] == 'C']
+            Natom = df[df["atom_name"] == "N"]
+            alphaCatom = df[df["atom_name"] == "CA"]
+            Catom = df[df["atom_name"] == "C"]
 
             if Natom.shape[0] == 1 and alphaCatom.shape[0] == 1 and Catom.shape[0] == 1:
                 residues_filtered.append(residue)
@@ -294,8 +294,8 @@ def preprocess_unbound_bound_dips(file_loc, graph_nodes, pos_cutoff=8.0, inferen
         bound_alphaC_loc_clean_list = []
         for residue in bound_predic_clean_list:
             df = residue[1]
-            alphaCatom = df[df['atom_name'] == 'CA']
-            alphaC_loc = alphaCatom[['x', 'y', 'z']].to_numpy().squeeze().astype(np.float32)
+            alphaCatom = df[df["atom_name"] == "CA"]
+            alphaC_loc = alphaCatom[["x", "y", "z"]].to_numpy().squeeze().astype(np.float32)
             assert alphaC_loc.shape == (
                 3,
             ), f"alphac loc shape problem, shape: {alphaC_loc.shape} residue {df} resid {df['residue']}"
@@ -306,7 +306,7 @@ def preprocess_unbound_bound_dips(file_loc, graph_nodes, pos_cutoff=8.0, inferen
 
     ####################
 
-    assert graph_nodes == 'residues'
+    assert graph_nodes == "residues"
     bound_receptor_repres_nodes_loc_array = get_alphaC_loc_array(bound_predic_receptor_clean_list)
     bound_ligand_repres_nodes_loc_array = get_alphaC_loc_array(bound_predic_ligand_clean_list)
 
@@ -326,11 +326,11 @@ def preprocess_unbound_bound_dips(file_loc, graph_nodes, pos_cutoff=8.0, inferen
             assert np.max(np.linalg.norm(ligand_pocket_coors - receptor_pocket_coors, axis=1)) <= pos_cutoff
             pocket_coors = 0.5 * (ligand_pocket_coors + receptor_pocket_coors)
             print(
-                'Num pocket nodes = ',
+                "Num pocket nodes = ",
                 len(active_ligand),
-                ' total nodes = ',
+                " total nodes = ",
                 bound_ligand_repres_nodes_loc_array.shape[0],
-                ' graph_nodes = ',
+                " graph_nodes = ",
                 graph_nodes,
             )
 
@@ -358,9 +358,9 @@ def preprocess_unbound_bound(
         residues_filtered = []
         for residue in residues:
             df = residue[1]
-            Natom = df[df['atom_name'] == 'N']
-            alphaCatom = df[df['atom_name'] == 'CA']
-            Catom = df[df['atom_name'] == 'C']
+            Natom = df[df["atom_name"] == "N"]
+            alphaCatom = df[df["atom_name"] == "CA"]
+            Catom = df[df["atom_name"] == "C"]
 
             if Natom.shape[0] == 1 and alphaCatom.shape[0] == 1 and Catom.shape[0] == 1:
                 residues_filtered.append(residue)
@@ -385,8 +385,8 @@ def preprocess_unbound_bound(
         bound_alphaC_loc_clean_list = []
         for residue in bound_predic_clean_list:
             df = residue[1]
-            alphaCatom = df[df['atom_name'] == 'CA']
-            alphaC_loc = alphaCatom[['x', 'y', 'z']].to_numpy().squeeze().astype(np.float32)
+            alphaCatom = df[df["atom_name"] == "CA"]
+            alphaC_loc = alphaCatom[["x", "y", "z"]].to_numpy().squeeze().astype(np.float32)
             assert alphaC_loc.shape == (
                 3,
             ), f"alphac loc shape problem, shape: {alphaC_loc.shape} residue {df} resid {df['residue']}"
@@ -397,7 +397,7 @@ def preprocess_unbound_bound(
 
     ####################
 
-    assert graph_nodes == 'residues'
+    assert graph_nodes == "residues"
     bound_receptor_repres_nodes_loc_array = get_alphaC_loc_array(bound_predic_receptor_clean_list)
     bound_ligand_repres_nodes_loc_array = get_alphaC_loc_array(bound_predic_ligand_clean_list)
 
@@ -417,11 +417,11 @@ def preprocess_unbound_bound(
             assert np.max(np.linalg.norm(ligand_pocket_coors - receptor_pocket_coors, axis=1)) <= pos_cutoff
             pocket_coors = 0.5 * (ligand_pocket_coors + receptor_pocket_coors)
             print(
-                'Num pocket nodes = ',
+                "Num pocket nodes = ",
                 len(active_ligand),
-                ' total nodes = ',
+                " total nodes = ",
                 bound_ligand_repres_nodes_loc_array.shape[0],
-                ' graph_nodes = ',
+                " graph_nodes = ",
                 graph_nodes,
             )
 
@@ -488,20 +488,20 @@ def protein_to_graph_unbound_bound_residuesonly(
 
         for residue in l_or_r_predic:
             df = residue[1]
-            coord = df[['x', 'y', 'z']].to_numpy().astype(np.float32)  # (N_atoms, 3)
+            coord = df[["x", "y", "z"]].to_numpy().astype(np.float32)  # (N_atoms, 3)
             l_or_r_all_atom_coords_in_residue_list.append(coord)
 
-            Natom = df[df['atom_name'] == 'N']
-            alphaCatom = df[df['atom_name'] == 'CA']
-            Catom = df[df['atom_name'] == 'C']
+            Natom = df[df["atom_name"] == "N"]
+            alphaCatom = df[df["atom_name"] == "CA"]
+            Catom = df[df["atom_name"] == "C"]
 
             if Natom.shape[0] != 1 or alphaCatom.shape[0] != 1 or Catom.shape[0] != 1:
                 print(df.iloc[0, :])
                 raise ValueError("protein utils protein_to_graph_unbound_bound, no N/CA/C exists")
 
-            N_loc = Natom[['x', 'y', 'z']].to_numpy().squeeze().astype(np.float32)
-            alphaC_loc = alphaCatom[['x', 'y', 'z']].to_numpy().squeeze().astype(np.float32)
-            C_loc = Catom[['x', 'y', 'z']].to_numpy().squeeze().astype(np.float32)
+            N_loc = Natom[["x", "y", "z"]].to_numpy().squeeze().astype(np.float32)
+            alphaC_loc = alphaCatom[["x", "y", "z"]].to_numpy().squeeze().astype(np.float32)
+            C_loc = Catom[["x", "y", "z"]].to_numpy().squeeze().astype(np.float32)
 
             u_i = (N_loc - alphaC_loc) / LA.norm(N_loc - alphaC_loc)
             t_i = (C_loc - alphaC_loc) / LA.norm(C_loc - alphaC_loc)
@@ -516,9 +516,9 @@ def protein_to_graph_unbound_bound_residuesonly(
             if residue_loc_is_alphaC:
                 l_or_r_residue_representatives_loc_list.append(alphaC_loc)
             else:
-                heavy_df = df[df['element'] != 'H']
+                heavy_df = df[df["element"] != "H"]
                 residue_loc = (
-                    heavy_df[['x', 'y', 'z']].mean(axis=0).to_numpy().astype(np.float32)
+                    heavy_df[["x", "y", "z"]].mean(axis=0).to_numpy().astype(np.float32)
                 )  # average of all atom coordinates
                 l_or_r_residue_representatives_loc_list.append(residue_loc)
 
@@ -573,9 +573,9 @@ def protein_to_graph_unbound_bound_residuesonly(
         l_or_r_residue_representatives_loc_feat = (
             (ret_R_l_or_r @ (l_or_r_residue_representatives_loc_feat).T) + ret_t_l_or_r
         ).T
-        l_or_r_n_i_feat = ((ret_R_l_or_r @ (l_or_r_n_i_feat).T)).T
-        l_or_r_u_i_feat = ((ret_R_l_or_r @ (l_or_r_u_i_feat).T)).T
-        l_or_r_v_i_feat = ((ret_R_l_or_r @ (l_or_r_v_i_feat).T)).T
+        l_or_r_n_i_feat = (ret_R_l_or_r @ (l_or_r_n_i_feat).T).T
+        l_or_r_u_i_feat = (ret_R_l_or_r @ (l_or_r_u_i_feat).T).T
+        l_or_r_v_i_feat = (ret_R_l_or_r @ (l_or_r_v_i_feat).T).T
         return l_or_r_residue_representatives_loc_feat, l_or_r_n_i_feat, l_or_r_u_i_feat, l_or_r_v_i_feat
 
     (
@@ -648,7 +648,7 @@ def protein_to_graph_unbound_bound_residuesonly(
 
             valid_dist_np = l_or_r_distance[i, valid_src]
             sigma = np.array([1.0, 2.0, 5.0, 10.0, 30.0]).reshape((-1, 1))
-            weights = softmax(-valid_dist_np.reshape((1, -1)) ** 2 / sigma, axis=1)  # (sigma_num, neigh_num)
+            weights = softmax(-(valid_dist_np.reshape((1, -1)) ** 2) / sigma, axis=1)  # (sigma_num, neigh_num)
             assert weights[0].sum() > 1 - 1e-2 and weights[0].sum() < 1.01
             diff_vecs = (
                 l_or_r_residue_representatives_loc_feat[valid_dst, :]
@@ -691,15 +691,15 @@ def protein_to_graph_unbound_bound_residuesonly(
             l_or_r_edge_feat_ori_list.append(s_ij)
         l_or_r_edge_feat_ori_feat = np.stack(l_or_r_edge_feat_ori_list, axis=0)  # shape (num_edges, 4, 3)
         l_or_r_edge_feat_ori_feat = torch.from_numpy(l_or_r_edge_feat_ori_feat.astype(np.float32))
-        l_or_r_protein_graph.edata['he'] = torch.cat(
-            (l_or_r_protein_graph.edata['he'], l_or_r_edge_feat_ori_feat), axis=1
+        l_or_r_protein_graph.edata["he"] = torch.cat(
+            (l_or_r_protein_graph.edata["he"], l_or_r_edge_feat_ori_feat), axis=1
         )  # (num_edges, 17)
 
         l_or_r_residue_representatives_loc_feat = torch.from_numpy(
             l_or_r_residue_representatives_loc_feat.astype(np.float32)
         )
-        l_or_r_protein_graph.ndata['x'] = l_or_r_residue_representatives_loc_feat
-        l_or_r_protein_graph.ndata['mu_r_norm'] = torch.from_numpy(np.array(l_or_r_mean_norm_list).astype(np.float32))
+        l_or_r_protein_graph.ndata["x"] = l_or_r_residue_representatives_loc_feat
+        l_or_r_protein_graph.ndata["mu_r_norm"] = torch.from_numpy(np.array(l_or_r_mean_norm_list).astype(np.float32))
 
         return l_or_r_protein_graph
 

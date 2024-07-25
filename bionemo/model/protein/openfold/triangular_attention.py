@@ -62,7 +62,7 @@ class TriangleAttention(nn.Module):
         self._is_starting = {"starting": True, "ending": False}[ta_type]
         self.layer_norm = LayerNorm(c_z)
         self.linear = Linear(c_z, num_heads, bias=False, init="normal")
-        if OptimHub.config('mha_fused_gemm'):  # [optim-hub]
+        if OptimHub.config("mha_fused_gemm"):  # [optim-hub]
             self.mha = SelfAttentionWithGate(
                 c_qkv=c_z,
                 c_hidden=c_hidden,
@@ -115,7 +115,7 @@ class TriangleAttention(nn.Module):
         triangle_bias = triangle_bias.unsqueeze(-4)
         # triangle_bias: [batch, 1, num_heads, N_res, N_res]
 
-        if OptimHub.config('mha_fused_gemm'):
+        if OptimHub.config("mha_fused_gemm"):
             triangle_bias = self.linear(z).movedim(-1, -3).unsqueeze(-4).contiguous()
             z = self.mha(
                 input_qkv=z,

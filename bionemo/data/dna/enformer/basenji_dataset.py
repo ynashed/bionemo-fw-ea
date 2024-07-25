@@ -20,7 +20,7 @@ from more_itertools import peekable
 from .genome_interval import GenomeIntervalDataset
 
 
-ATLAS_NAMES = {'human': 'hg38.ml.fa', 'mouse': 'mm10.ml.fa'}
+ATLAS_NAMES = {"human": "hg38.ml.fa", "mouse": "mm10.ml.fa"}
 
 
 class WebBasenji(wds.pipeline.DataPipeline, wds.compat.FluidInterface):
@@ -37,7 +37,7 @@ class WebBasenji(wds.pipeline.DataPipeline, wds.compat.FluidInterface):
         super().__init__()
         self.base_path = os.path.join(dataset_path, organism)
         self.organism = organism
-        urls = glob.glob(os.path.join(self.base_path, f'{subset}-*.tar'))
+        urls = glob.glob(os.path.join(self.base_path, f"{subset}-*.tar"))
         assert subset in {"train", "valid", "test"}
 
         if subset == "train":
@@ -50,16 +50,16 @@ class WebBasenji(wds.pipeline.DataPipeline, wds.compat.FluidInterface):
             shift_augs = (0, 0)
         nodesplitter = wds.shardlists.split_by_node
         self.dataset = wds.WebDataset(urls, shardshuffle=shuffle, nodesplitter=nodesplitter)
-        self.dataset = self.dataset.decode().rename(target='target.pth')
+        self.dataset = self.dataset.decode().rename(target="target.pth")
         if shuffle:
             self.dataset = self.dataset.shuffle(20)
         if repeat:
             self.dataset = self.dataset.repeat()
 
         self.extended_ds = GenomeIntervalDataset(
-            bed_file=os.path.join(self.base_path, 'sequences.bed'),
+            bed_file=os.path.join(self.base_path, "sequences.bed"),
             fasta_file=os.path.join(self.base_path, ATLAS_NAMES[organism]),
-            filter_df_fn=lambda df: df.filter(pl.col('column_4') == subset),
+            filter_df_fn=lambda df: df.filter(pl.col("column_4") == subset),
             context_length=context_length,
             return_augs=return_augs,
             shift_augs=shift_augs,
@@ -68,7 +68,7 @@ class WebBasenji(wds.pipeline.DataPipeline, wds.compat.FluidInterface):
 
         def collate_basenji(batch):
             batch_cl = torch.utils.data.default_collate(batch)
-            return {'head_name': self.organism, **batch_cl}
+            return {"head_name": self.organism, **batch_cl}
 
         self.dataset = self.dataset.map(self._extend)
         self.dataset = self.dataset.batched(batch_size, collation_fn=collate_basenji)
@@ -78,17 +78,17 @@ class WebBasenji(wds.pipeline.DataPipeline, wds.compat.FluidInterface):
         # Keys:
         # num_targets, train_seqs, valid_seqs, test_seqs, seq_length,
         # pool_width, crop_bp, target_length
-        path = os.path.join(self.base_path, 'statistics.json')
-        with open(path, 'r') as f:
+        path = os.path.join(self.base_path, "statistics.json")
+        with open(path, "r") as f:
             return json.load(f)
 
     def _extend(self, sample):
-        key = int(sample['__key__'])
+        key = int(sample["__key__"])
         ex_sequence, _, rc_aug = self.extended_ds[key]
-        target = torch.tensor(sample['target'])
+        target = torch.tensor(sample["target"])
         if rc_aug:
             target = torch.flipud(target)
-        return {'sequence': ex_sequence, 'target': target.float()}
+        return {"sequence": ex_sequence, "target": target.float()}
 
     def __iter__(self):
         it = iter(self.dataset)
@@ -105,10 +105,10 @@ class WebBasenji(wds.pipeline.DataPipeline, wds.compat.FluidInterface):
 class WebCombinedBasenji(torch.utils.data.IterableDataset):
     def __init__(self, dataset_path: str, context_length: int = 196_608, batch_size: int = 1):
         self.human_dataset = WebBasenji(
-            dataset_path, 'train', 'human', repeat=True, context_length=context_length, batch_size=batch_size
+            dataset_path, "train", "human", repeat=True, context_length=context_length, batch_size=batch_size
         )
         self.mouse_dataset = WebBasenji(
-            dataset_path, 'train', 'mouse', repeat=True, context_length=context_length, batch_size=batch_size
+            dataset_path, "train", "mouse", repeat=True, context_length=context_length, batch_size=batch_size
         )
 
     def __iter__(self):

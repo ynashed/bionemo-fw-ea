@@ -46,7 +46,7 @@ def passthrough_patch(func):
     tmp = func
     cls = func.__self__.__class__
     module = cls.__module__
-    name = f'{module}.{cls.__qualname__}.{func.__name__}'
+    name = f"{module}.{cls.__qualname__}.{func.__name__}"
     with patch(name) as p:
         p.side_effect = lambda x: tmp(x)
         yield p
@@ -60,7 +60,7 @@ protein_sequences = [
 
 def get_tokenizer_model_paths():
     tokenizer_dir = os.path.join(
-        os.environ["BIONEMO_HOME"], 'tokenizers/protein/*/vocab/protein_sequence_sentencepiece.model'
+        os.environ["BIONEMO_HOME"], "tokenizers/protein/*/vocab/protein_sequence_sentencepiece.model"
     )
     file_list = glob.glob(tokenizer_dir)
     file_list = [str(x) for x in file_list]
@@ -308,7 +308,7 @@ def test_collated_probabilistic_convergence(model_path):
         n_perturbed_tokens = torch.sum(
             (
                 (collated_output["text"] != collated_output["labels"])
-                & (collated_output['text'] != tokenizer.get_mask_id())
+                & (collated_output["text"] != tokenizer.get_mask_id())
             )
             * collated_output["loss_mask"]
         ).item()
@@ -368,8 +368,8 @@ def test_collated_probabilistic_convergence(model_path):
             ), f"Risk that {setting_name} setting is being used instead of mask_token!"
 
         # Check that tokens outside of the loss mask are either identity or all the same non-identity value
-        non_loss_tokens = collated_output['text'][collated_output['loss_mask'] == 0]
-        non_loss_labels = collated_output['labels'][collated_output['loss_mask'] == 0]
+        non_loss_tokens = collated_output["text"][collated_output["loss_mask"] == 0]
+        non_loss_labels = collated_output["labels"][collated_output["loss_mask"] == 0]
 
         # Make sure non-loss tokens are sane. They should eitehr be identity, or some random non-identity value
         all_others_identity = torch.all(

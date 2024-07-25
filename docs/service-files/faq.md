@@ -12,7 +12,7 @@ import json
 import time
 
 API_HOST = "https://api.bionemo.ngc.nvidia.com/v1"
-API_KEY = "NGC_API_KEY"
+API_KEY = "<your secret NGC API key here!>"
 
 response = requests.post(
     f"{API_HOST}/protein-structure/alphafold2/predict",

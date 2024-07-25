@@ -47,8 +47,8 @@ __all__: Sequence[str] = (
 )
 
 INPUT_NAMES: Sequence[str] = (
-    'tokens',
-    'mask',
+    "tokens",
+    "mask",
 )
 
 
@@ -71,7 +71,7 @@ def load_and_save_nav_optimized_model(cfg: DictConfig) -> str:
 def tokenize_batches(inferer: M, dataloader: DataLoader) -> List[Tuple[torch.Tensor, torch.Tensor]]:
     batches = []
     for batch in dataloader:
-        tokens_enc, enc_mask = inferer.tokenize(batch['sequence'])
+        tokens_enc, enc_mask = inferer.tokenize(batch["sequence"])
         batches.append((tokens_enc, enc_mask))
     return batches
 
@@ -120,15 +120,15 @@ def verification_function(
     def verify_func(ys_runner: List[Dict[str, Any]], ys_expected: List[Dict[str, Any]]) -> bool:
         for y_runner, y_expected in zip(ys_runner, ys_expected):
             for k in y_runner:
-                print(f'KEY: {k}')
+                print(f"KEY: {k}")
                 exp_range = np.percentile(y_expected[k], (0, 10, 50, 90, 100))
                 runner_range = np.percentile(y_runner[k], (0, 10, 50, 90, 100))
                 adiff = np.abs(y_runner[k] - y_expected[k]).max()
                 rdiff = np.abs(1 - y_runner[k] / y_expected[k]).max()
                 print(f"expected:  {exp_range}")
-                print(f'runner:    {runner_range}')
-                print(f'abs. diff: {adiff}')
-                print(f'rel. diff: {rdiff}')
+                print(f"runner:    {runner_range}")
+                print(f"abs. diff: {adiff}")
+                print(f"rel. diff: {rdiff}")
         return True
 
     return verify_func
@@ -137,7 +137,7 @@ def verification_function(
 @hydra_runner(config_path="conf", config_name="infer")
 def entrypoint(cfg) -> None:
     nav_path = load_and_save_nav_optimized_model(cfg)
-    print(f'Exported to {nav_path}')
+    print(f"Exported to {nav_path}")
 
 
 if __name__ == "__main__":

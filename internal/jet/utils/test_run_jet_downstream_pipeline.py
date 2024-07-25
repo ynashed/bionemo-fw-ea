@@ -27,15 +27,15 @@ pytest.skip(
     "Testing internal tools that access various NVIDIA APIs and rely on internet connection", allow_module_level=True
 )
 
-JET_REF = 'bionemo/new-model-dev'
-JET_REF_EPH = 'test_branch'
+JET_REF = "bionemo/new-model-dev"
+JET_REF_EPH = "test_branch"
 JET_REF_TEST = "test_branch"
-JET_WORKLOADS_PATH = os.path.join(os.path.dirname(os.getcwd()), "test_repo", 'workloads-registry')
+JET_WORKLOADS_PATH = os.path.join(os.path.dirname(os.getcwd()), "test_repo", "workloads-registry")
 
-GIT_REPO = 'repo_name_temp'
-GIT_BRANCH = 'branch_name_tmp'
+GIT_REPO = "repo_name_temp"
+GIT_BRANCH = "branch_name_tmp"
 DOCKERFILE = "/TMP/Dockerfile"
-DOCKER_IMAGE = 'docker_image_tmp'
+DOCKER_IMAGE = "docker_image_tmp"
 
 CONFIG_PATH = "config_path_tmp"
 CONFIG_NAME = "config_name_tmp"
@@ -43,8 +43,8 @@ SCRIPT_PATH = "script_path_tmp"
 
 EXTRA_OVERWRITES = "extra_overwrites_tmp"
 D_WARMUP = 20
-MODEL = 'model_tmp'
-VARIANT = 'variant_tmp'
+MODEL = "model_tmp"
+VARIANT = "variant_tmp"
 BATCH_SIZE = [2, 4]
 NODES = [1, 4]
 GPUS = [1, 8]
@@ -61,28 +61,28 @@ def check_if_jet_workloads_path_exists():
 
 
 def check_if_jet_config_exists():
-    assert os.path.exists(os.path.join(JET_WORKLOADS_PATH, 'builds', CONFIG_BUILD_NAME_DOCKER_IMAGE))
-    assert os.path.exists(os.path.join(JET_WORKLOADS_PATH, 'recipes', CONFIG_NAME_RECIPE_PERF))
+    assert os.path.exists(os.path.join(JET_WORKLOADS_PATH, "builds", CONFIG_BUILD_NAME_DOCKER_IMAGE))
+    assert os.path.exists(os.path.join(JET_WORKLOADS_PATH, "recipes", CONFIG_NAME_RECIPE_PERF))
 
 
 def check_if_docker_image_matches():
-    with open(os.path.join(JET_WORKLOADS_PATH, 'builds', CONFIG_BUILD_NAME_DOCKER_IMAGE), "r+") as stream:
+    with open(os.path.join(JET_WORKLOADS_PATH, "builds", CONFIG_BUILD_NAME_DOCKER_IMAGE), "r+") as stream:
         config = next(yaml.load_all(stream, Loader=yaml.BaseLoader))
-        assert config['spec']['source']['image'] == DOCKER_IMAGE
+        assert config["spec"]["source"]["image"] == DOCKER_IMAGE
 
 
 def check_if_dockerfile_spec_matches():
-    with open(os.path.join(JET_WORKLOADS_PATH, 'builds', CONFIG_BUILD_NAME_DOCKER_IMAGE), "r+") as stream:
+    with open(os.path.join(JET_WORKLOADS_PATH, "builds", CONFIG_BUILD_NAME_DOCKER_IMAGE), "r+") as stream:
         config = next(yaml.load_all(stream, Loader=yaml.BaseLoader))
 
-        assert config['spec']['source']['repo'] == GIT_REPO
-        assert config['spec']['source']['ref'] == GIT_BRANCH
-        assert config['spec']['source']['dockerfile'] == DOCKERFILE
-        assert ~("image" in config['spec']['source'].keys())
+        assert config["spec"]["source"]["repo"] == GIT_REPO
+        assert config["spec"]["source"]["ref"] == GIT_BRANCH
+        assert config["spec"]["source"]["dockerfile"] == DOCKERFILE
+        assert ~("image" in config["spec"]["source"].keys())
 
 
 def check_if_test_spec_matches():
-    with open(os.path.join(JET_WORKLOADS_PATH, 'recipes', CONFIG_NAME_RECIPE_PERF), "r+") as stream:
+    with open(os.path.join(JET_WORKLOADS_PATH, "recipes", CONFIG_NAME_RECIPE_PERF), "r+") as stream:
         config = next(yaml.load_all(stream, Loader=yaml.BaseLoader))
 
         assert config["spec"]["config_path"] == CONFIG_PATH
@@ -95,17 +95,17 @@ def check_if_test_spec_matches():
 
 
 def check_if_cases_spec_matches(batch_size, nodes, gpus, precision):
-    with open(os.path.join(JET_WORKLOADS_PATH, 'recipes', CONFIG_NAME_RECIPE_PERF), "r+") as stream:
+    with open(os.path.join(JET_WORKLOADS_PATH, "recipes", CONFIG_NAME_RECIPE_PERF), "r+") as stream:
         config = next(yaml.load_all(stream, Loader=yaml.BaseLoader))
         assert (
-            [int(a) for a in config['products'][0]["batch_size"]] == batch_size
+            [int(a) for a in config["products"][0]["batch_size"]] == batch_size
             if isinstance(batch_size, list)
             else [batch_size]
         )
-        assert [int(a) for a in config['products'][0]["nodes"]] == nodes if isinstance(nodes, list) else [nodes]
-        assert [int(a) for a in config['products'][0]["gpus"]] == gpus if isinstance(gpus, list) else [gpus]
+        assert [int(a) for a in config["products"][0]["nodes"]] == nodes if isinstance(nodes, list) else [nodes]
+        assert [int(a) for a in config["products"][0]["gpus"]] == gpus if isinstance(gpus, list) else [gpus]
         assert (
-            [int(a) for a in config['products'][0]["precision"]] == precision
+            [int(a) for a in config["products"][0]["precision"]] == precision
             if isinstance(precision, list)
             else [precision]
         )
@@ -120,7 +120,7 @@ def check_if_ephemeral_branch_exists(ref: Optional[str] = None):
         assert repo.active_branch.name.startswith(prefix)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     if os.path.exists(JET_WORKLOADS_PATH):
         shutil.rmtree(JET_WORKLOADS_PATH)
     config_kwargs = {"config_path": CONFIG_PATH, "config_name": CONFIG_NAME, "script_path": SCRIPT_PATH}

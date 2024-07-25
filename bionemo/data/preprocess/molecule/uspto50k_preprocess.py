@@ -20,7 +20,7 @@ from bionemo.data.utils import download_registry_from_ngc, get_ngc_registry_file
 
 
 HUMAN_DOWNLOAD_PATH = "https://az.app.box.com/s/7eci3nd9vy0xplqniitpk02rbg9q2zcq/file/854847820319"
-MD5_CHECKSUM = 'd956c753c757f19c8e9d913f51cf0eed'
+MD5_CHECKSUM = "d956c753c757f19c8e9d913f51cf0eed"
 
 
 class USPTO50KPreprocess:
@@ -32,17 +32,17 @@ class USPTO50KPreprocess:
     def __init__(self, data_dir: str, max_smiles_length: Optional[str] = None, checksum: Optional[str] = MD5_CHECKSUM):
         self.data_dir = data_dir
         self.max_smiles_length = max_smiles_length
-        self.download_dir = os.path.join(data_dir, 'raw')
-        output_file = 'uspto_50.pickle'
+        self.download_dir = os.path.join(data_dir, "raw")
+        output_file = "uspto_50.pickle"
         datapath_raw = os.path.join(self.download_dir, output_file)
         self.checksum = checksum
         if os.path.exists(datapath_raw) and verify_checksum_matches(datapath_raw, checksum):
             self.datapath_raw = datapath_raw
         else:
             self.datapath_raw = None
-        self.processed_dir = os.path.join(data_dir, 'processed')
-        self.data_file = 'data.csv'
-        self.splits = ['train', 'val', 'test']
+        self.processed_dir = os.path.join(data_dir, "processed")
+        self.data_file = "data.csv"
+        self.splits = ["train", "val", "test"]
 
     def get_split_dir(self, split: str) -> str:
         return os.path.join(self.processed_dir, split)
@@ -62,7 +62,7 @@ class USPTO50KPreprocess:
             force (bool): if the generation of the dataset should be forced
         """
         if os.path.exists(self.processed_dir) and not force:
-            logging.info(f'Path to the processed dataset {self.processed_dir} exists!')
+            logging.info(f"Path to the processed dataset {self.processed_dir} exists!")
             return
         download_file = True
         if self.datapath_raw is not None and os.path.exists(self.datapath_raw):
@@ -71,8 +71,8 @@ class USPTO50KPreprocess:
         if download_file:
             if ngc_registry_target is None or ngc_registry_version is None:
                 raise ValueError(
-                    'Internal Nvidia employees must provide NGC registry target and version must be defined to download the dataset, or alternatively you must first '
-                    f'manually download from {HUMAN_DOWNLOAD_PATH} and place in {self.download_dir} with the name uspto_50.pickle.'
+                    "Internal Nvidia employees must provide NGC registry target and version must be defined to download the dataset, or alternatively you must first "
+                    f"manually download from {HUMAN_DOWNLOAD_PATH} and place in {self.download_dir} with the name uspto_50.pickle."
                 )
             self.datapath_raw = self.download_raw_data_file(
                 ngc_registry_target=ngc_registry_target, ngc_registry_version=ngc_registry_version
@@ -96,26 +96,26 @@ class USPTO50KPreprocess:
             output_path (str): path to the location of the downloaded file
         """
         logging.info(
-            f'Downloading dataset from target {ngc_registry_target} and version '
-            f'{ngc_registry_version} from NGC ...'
+            f"Downloading dataset from target {ngc_registry_target} and version "
+            f"{ngc_registry_version} from NGC ..."
         )
         if not os.path.exists(self.download_dir):
             os.makedirs(self.download_dir, exist_ok=True)
 
         try:
-            assert os.environ.get('NGC_CLI_API_KEY', False), AssertionError(
+            assert os.environ.get("NGC_CLI_API_KEY", False), AssertionError(
                 """NGC API key not defined as environment variable "NGC_CLI_API_KEY".
                                                                             Aborting resource download."""
             )
-            ngc_org = os.environ.get('NGC_CLI_ORG', None)
-            assert ngc_org, AssertionError('NGC org must be defined by the environment variable NGC_CLI_ORG')
-            ngc_team = os.environ.get('NGC_CLI_TEAM', None)
+            ngc_org = os.environ.get("NGC_CLI_ORG", None)
+            assert ngc_org, AssertionError("NGC org must be defined by the environment variable NGC_CLI_ORG")
+            ngc_team = os.environ.get("NGC_CLI_TEAM", None)
 
             # Check if resource already exists at final destination
             file_list = get_ngc_registry_file_list(ngc_registry_target, ngc_registry_version, ngc_org, ngc_team)
             file_exists = False
             if len(file_list) > 1:
-                logging.info('Checksum verification not supported if resource contains more than one file.')
+                logging.info("Checksum verification not supported if resource contains more than one file.")
             else:
                 file_name = file_list[0]
                 output_path = os.path.join(self.download_dir, file_name)
@@ -139,15 +139,15 @@ class USPTO50KPreprocess:
                     self.download_dir, file_name
                 )  # Ensures output_path is defined when file is downloaded
                 shutil.copyfile(tmp_download_path, output_path)
-                logging.info(f'Download complete at {output_path}.')
+                logging.info(f"Download complete at {output_path}.")
             else:
-                logging.info(f'File download skipped because file exists at {output_path} and has expected checksum.')
+                logging.info(f"File download skipped because file exists at {output_path} and has expected checksum.")
 
             return output_path
 
         except Exception as e:
             logging.error(
-                f'Could not download from NGC dataset from target {ngc_registry_target} and version {ngc_registry_version}: {e}'
+                f"Could not download from NGC dataset from target {ngc_registry_target} and version {ngc_registry_version}: {e}"
             )
             raise e
 
@@ -162,31 +162,31 @@ class USPTO50KPreprocess:
         )
 
         df = pd.read_pickle(datapath_raw)
-        assert all(col in df for col in ['reactants_mol', 'products_mol', 'reaction_type', 'set'])
+        assert all(col in df for col in ["reactants_mol", "products_mol", "reaction_type", "set"])
 
         # TODO parallelize in the future!
-        for name in ['reactants', 'products']:
-            df[f'{name}_correct'] = df[f'{name}_mol'].apply(
+        for name in ["reactants", "products"]:
+            df[f"{name}_correct"] = df[f"{name}_mol"].apply(
                 lambda mol: True if Chem.MolToSmiles(mol, canonical=True) else False
             )
 
-        df = df[df['reactants_correct'] & df['products_correct']]
-        for name in ['reactants', 'products']:
-            df[name] = df[f'{name}_mol'].apply(lambda mol: Chem.MolToSmiles(mol, canonical=False))
-            df[f'{name}_len'] = df[f'{name}'].apply(lambda smi: len(smi))
+        df = df[df["reactants_correct"] & df["products_correct"]]
+        for name in ["reactants", "products"]:
+            df[name] = df[f"{name}_mol"].apply(lambda mol: Chem.MolToSmiles(mol, canonical=False))
+            df[f"{name}_len"] = df[f"{name}"].apply(lambda smi: len(smi))
 
-        df.dropna(axis=0, how='any', subset=['reactants', 'products'], inplace=True)
+        df.dropna(axis=0, how="any", subset=["reactants", "products"], inplace=True)
         if self.max_smiles_length:
-            df = df[(df['reactants_len'] <= self.max_smiles_length) & (df['products_len'] <= self.max_smiles_length)]
-        df.drop(columns=set(df.columns) - {'reactants', 'products', 'set', 'reaction_type'}, inplace=True)
-        df.set.replace(to_replace='valid', value='val', inplace=True)
+            df = df[(df["reactants_len"] <= self.max_smiles_length) & (df["products_len"] <= self.max_smiles_length)]
+        df.drop(columns=set(df.columns) - {"reactants", "products", "set", "reaction_type"}, inplace=True)
+        df.set.replace(to_replace="valid", value="val", inplace=True)
 
         for split in self.splits:
-            df_tmp = df[df['set'] == split]
+            df_tmp = df[df["set"] == split]
             df_tmp.reset_index(drop=True, inplace=True)
             dir_tmp = self.get_split_dir(split)
             if not os.path.exists(dir_tmp):
                 os.makedirs(dir_tmp, exist_ok=True)
-            df_tmp.to_csv(f'{dir_tmp}/{self.data_file}', index=False)
-            with open(f'{dir_tmp}/metadata.txt', 'w') as f:
+            df_tmp.to_csv(f"{dir_tmp}/{self.data_file}", index=False)
+            with open(f"{dir_tmp}/metadata.txt", "w") as f:
                 f.write(f"file size: {df_tmp.shape[0]} \n")

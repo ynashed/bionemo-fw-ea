@@ -21,7 +21,7 @@ from testbook import testbook
 MODEL_NAME = "prott5nv"
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope="module")
 def server(bionemo_home: Path) -> Popen:
     # Must be a seperate process, otherwise runs into known error w/ meagtron's/nemo's CUDA initialization
     # for DDP becoming incompatible with Jupyter notebook's kernel process management.
@@ -30,7 +30,7 @@ def server(bionemo_home: Path) -> Popen:
     open_port = find_free_network_port()
     triton = Popen(
         [
-            shutil.which('python'),
+            shutil.which("python"),
             "bionemo/triton/inference_wrapper.py",
             "--config-path",
             str(bionemo_home / "examples" / "protein" / MODEL_NAME / "conf"),
@@ -46,7 +46,7 @@ def server(bionemo_home: Path) -> Popen:
     triton.kill()
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope="module")
 def notebook_path(bionemo_home: Path) -> Path:
     return (bionemo_home / "examples" / "protein" / MODEL_NAME / "nbs" / "Inference.ipynb").absolute()
 

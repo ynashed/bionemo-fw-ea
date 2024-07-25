@@ -2,8 +2,16 @@ do_training: False
 do_testing: False
 seed: 1204518
 
+postprocess:
+  remove_clashes: False # True: postproces Equidock predictions, False: Equidock final results
+  min_clash_loss: 0.5 # minimum intersection loss
+  max_iteration: 2000 # maximum number of SGD iterations
+  fast_optimizer: True # Fast optimizer using CudaGraph Capture
+  lr: 0.001 # Learning rate
+  half_precision: False # use torch.float16 for postprocessing
+
 data:
-  data_name: db5 # Train first over this dataset, [db5, dips] for now only train on db5
+  data_name: dips # Train first over this dataset, [db5, dips] for now only train on db5
   num_workers: 0 # Should left 0 to avoid creating cuda content on a child thread
   pin_memory: True
   micro_batch_size: ${model.micro_batch_size}
@@ -132,7 +140,7 @@ model:
 
 
 trainer:
-  devices: 2
+  devices: 1
   num_nodes: 1
   precision: 32 # to activate AMP set to 16-mixed or 'bf16-mixed'; otherwise will be float32
   accelerator: gpu # gpu or cpu

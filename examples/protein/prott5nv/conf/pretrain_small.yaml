@@ -19,7 +19,7 @@ model:
       val: x[000..049]
     data_impl: csv_mmap # mmap, retmmap, text_mmap, csv_mmap (.csv will be added to dataset file names if missing)
     data_impl_kwargs: # currently used only for text_mmap, csv_mmap (should be data_impl dependant)
-    # Supported kwargs (with default values): 
+    # Supported kwargs (with default values):
     #     text_mmap (newline_int=10, header_lines=0, workers=None, sort_dataset_paths=True)
     #     csv_mmap (newline_int=10, header_lines=0,workers=None, sort_dataset_paths=True, data_col=1, data_sep=",")
       csv_mmap:

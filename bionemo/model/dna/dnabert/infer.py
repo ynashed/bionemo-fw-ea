@@ -49,10 +49,10 @@ class DNABERTInference(BaseEncoderInference):
         return token_ids
 
     def tokenize(self, sequences: List[str]):
-        '''
+        """
         Note that the parent includes padding, likely not necessary for DNABERT.
         This actually fails if you let it call the parent super class, since it expects padding to be a thing.
-        '''
+        """
         return self._tokenize(sequences)
 
     def seq_to_hiddens(self, sequences: List[str]):

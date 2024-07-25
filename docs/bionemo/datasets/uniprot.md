@@ -33,7 +33,7 @@ A visual demo of the ESM sampling process is below:
 
 ## ESM-2nv v
 
-We follow the ESM2 data preparation approach to create UniRef50 and UniRef90 sequence sets used for pre-training ESM2. This dataset can be used by BioNeMo users to pre-train ESM-2nv models from scratch.  
+We follow the ESM2 data preparation approach to create UniRef50 and UniRef90 sequence sets used for pre-training ESM2. This dataset can be used by BioNeMo users to pre-train ESM-2nv models from scratch.
 The UniRef from 04/2021 was used for creating the pre-training dataset. The representative sequence for each cluster was selected, resulting in approximately 49M protein sequences. A random fraction of 250K sequences was removed for validation after training. The remaining sequences were filtered to remove any training sequences with high sequence similarity to the validation dataset, resulting in 49,425,807 training sequences. The training sequences were randomly split with 3400 sequences in validation, 1M sequences in test, and the remaining in train. A corresponding set of UniRef90 cluster members and the train sequences were also curated to enable sampling during training. UniRef90 cluster members were augmented with sequence data based on data availability in the UniRef100 representative sequence set.
 
 ## ESM-1nv

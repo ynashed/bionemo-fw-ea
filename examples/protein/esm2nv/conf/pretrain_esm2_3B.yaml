@@ -16,4 +16,3 @@ model:
 
   # model/data parallelism
   tensor_model_parallel_size: 2 # model parallelism
-

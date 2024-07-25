@@ -24,7 +24,7 @@ Below, hyperparameters and recommendations for their adjustment are provided. Th
 * Switch to `trainer.precision=32` if training is unstable with bf16 or 16-bit.
 
 ### Gradient Clipping
-  
+
 * Configure with: `trainer.gradient_clip_val=1.0`
 * Recommended alternative values: 0.5, 0.1
 * Reduce value if training is unstable.
@@ -48,12 +48,12 @@ Below, hyperparameters and recommendations for their adjustment are provided. Th
 * Keep `model.global_batch_size=null` to compute global batch size at run-time.
 * Further increase the effective global batch size by using gradient accumulation (for example, `trainer.accumulate_grad_batches=2`).
 
-### Model Parallelism 
-  
+### Model Parallelism
+
 * For large models (that is > 1B parameters) use model tensor parallelism `model.tensor_model_parallel_size=N`
 * For larger models (that is > 5B parameters) add also model pipeline parallelism `model.pipeline_model_parallel_size=N`
 * The various parallelism options are independent and can be combined as needed.
-  
+
 ### Dropout
 
 * Configure with: `model.hidden_dropout=0.1`, `model.attention_dropout=0.1`

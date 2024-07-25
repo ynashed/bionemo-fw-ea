@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --account=healthcareeng_bionemo
 #SBATCH --partition=interactive
-#SBATCH 
+#SBATCH
 #SBATCH --nodes=1
 #SBATCH --gpus-per-node 8
 #SBATCH --time 01:00:00                 # wall time
@@ -32,13 +32,13 @@
 #   (a) Load model from checkpoint
 #   (b) Run inference on sequences
 #   (c) Inference results are outputted
-#   
+#
 # expected results / success criteria:
 #   (1) There is a single slurm job
 #   (2) Estimated run time: Once the slurm job has started, the run will take less than 10 minutes
 #   (3) Users should obtain a file in the directory ${OUTPUT_DIR}/artifacts/ called
 #         first.pdb
-#       
+#
 #
 # updated / reviewed: 2024-05-22
 #
@@ -86,8 +86,6 @@ srun --mpi=pmix \
 
 	 echo "'date=$(date +'%Y%m%dT%H%M')'" &&
   	 echo 'launch_qa_testcase_06.sh - after everything'
-	 " 
+	 "
 set +x
 printf "${MESSAGE_TEMPLATE}" "end with success"
-
-

@@ -72,7 +72,7 @@ class KmerTokenizer(TokenizerSpec):
     @staticmethod
     def _infer_vocab_file(model_file, vocab_file):
         if vocab_file is None:
-            vocab_file = os.path.splitext(model_file)[0] + '.vocab'
+            vocab_file = os.path.splitext(model_file)[0] + ".vocab"
         return vocab_file
 
     def save_vocab(self, model_file, vocab_file=None):
@@ -88,12 +88,12 @@ class KmerTokenizer(TokenizerSpec):
 
         vocab_file = KmerTokenizer._infer_vocab_file(model_file, vocab_file)
 
-        with open(model_file, 'w') as f:
+        with open(model_file, "w") as f:
             f.write(str(self.k))
 
-        with open(vocab_file, 'w') as f:
+        with open(vocab_file, "w") as f:
             for i in range(len(self.vocab)):
-                f.write(self.decode_vocab[i] + '\n')
+                f.write(self.decode_vocab[i] + "\n")
 
     @staticmethod
     def from_vocab_file(model_file, vocab_file=None):
@@ -160,7 +160,7 @@ class KmerTokenizer(TokenizerSpec):
         return tokens
 
     def tokens_to_text(self, tokens):
-        raise NotImplementedError('Non-ambiguous mapping from tokens to text does not' 'exist.')
+        raise NotImplementedError("Non-ambiguous mapping from tokens to text does not" "exist.")
 
     def tokens_to_ids(self, tokens: List[str]) -> List[int]:
         """Convert tokens to indexes/ids
@@ -186,7 +186,7 @@ class KmerTokenizer(TokenizerSpec):
         for id_ in ids:
             token = self.decode_vocab.get(id_)
             if token is None:
-                raise ValueError(f'Do not recognize ID: {id_}')
+                raise ValueError(f"Do not recognize ID: {id_}")
             tokens.append(token)
         return tokens
 
@@ -204,7 +204,7 @@ class KmerTokenizer(TokenizerSpec):
         return self.tokens_to_ids(tokens)
 
     def ids_to_text(self, ids):
-        raise NotImplementedError('Non-ambiguous mapping from IDs to text does not' 'exist.')
+        raise NotImplementedError("Non-ambiguous mapping from IDs to text does not" "exist.")
 
     def build_vocab(self, strings: Union[str, Iterable[str]]):
         """Builds the vocabulary of the tokenizer from strings
@@ -245,6 +245,6 @@ class KmerTokenizer(TokenizerSpec):
         """
 
         if alphabet is None:
-            alphabet = ['A', 'C', 'G', 'T']
+            alphabet = ["A", "C", "G", "T"]
         for kmer in product(alphabet, repeat=self.k):
-            self.build_vocab(''.join(kmer))
+            self.build_vocab("".join(kmer))

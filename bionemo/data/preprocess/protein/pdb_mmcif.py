@@ -27,7 +27,7 @@ from bionemo.data.protein.openfold.helpers import apply_func_parallel
 from bionemo.data.protein.openfold.mmcif import compress_mmcif_dict_atoms, load_mmcif_gz_file, parse_mmcif_string
 
 
-__all__ = ['PDBMMCIFPreprocess']
+__all__ = ["PDBMMCIFPreprocess"]
 
 
 def create_mmcif_dict(
@@ -195,9 +195,9 @@ class PDBMMCIFPreprocess:
             Defaults to False.
         """
         self.dataset_root_path = Path(dataset_root_path)
-        self.pdb_mmcif_dirpath = self.dataset_root_path / 'pdb_mmcif'
-        self.original_dirpath = self.pdb_mmcif_dirpath / 'original'
-        self.processed_dirpath = self.pdb_mmcif_dirpath / 'processed'
+        self.pdb_mmcif_dirpath = self.dataset_root_path / "pdb_mmcif"
+        self.original_dirpath = self.pdb_mmcif_dirpath / "original"
+        self.processed_dirpath = self.pdb_mmcif_dirpath / "processed"
         self.processed_dirpath.mkdir(exist_ok=True, parents=True)
 
         self.mmcif_ref = mmcif_ref or "rsync.rcsb.org::ftp_data/structures/divided/mmCIF/"
@@ -225,22 +225,22 @@ class PDBMMCIFPreprocess:
         # 1. Download PDB MMCIFs
 
         rsync_mmcif_cmd = [
-            'rsync',
-            '--recursive',
-            '--links',
-            '--perms',
-            '--times',
-            '--compress',
-            '--info=progress2',
-            '--delete',
-            '--port=33444',
+            "rsync",
+            "--recursive",
+            "--links",
+            "--perms",
+            "--times",
+            "--compress",
+            "--info=progress2",
+            "--delete",
+            "--port=33444",
         ]
         # add source and donwload location
         pdb_mmcif_raw_dirpath = self.original_dirpath / "raw"
         rsync_mmcif_cmd.extend([self.mmcif_ref, str(pdb_mmcif_raw_dirpath)])
-        rsync_mmcif_cmd_txt = ' '.join(rsync_mmcif_cmd)
+        rsync_mmcif_cmd_txt = " ".join(rsync_mmcif_cmd)
 
-        logging.info(f'Running {rsync_mmcif_cmd_txt}')
+        logging.info(f"Running {rsync_mmcif_cmd_txt}")
         # raise unhandled if download fails
         subprocess.check_output(rsync_mmcif_cmd)
 
@@ -362,7 +362,7 @@ class PDBMMCIFPreprocess:
         output_filepath = pdb_mmcif_dicts_dirpath / subdirname
         if not self.force:
             if output_filepath.exists():
-                raise FileExistsError(f'{output_filepath} already exists.')
+                raise FileExistsError(f"{output_filepath} already exists.")
         with open(output_filepath, "wb") as f:
             pickle.dump(mmcif_dicts, f)
 

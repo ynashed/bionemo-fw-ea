@@ -226,7 +226,7 @@ def _assert_attr(o, attr, scope):
 
 class BioNeMoBertModel(MegatronBertModel):
     def __init__(self, cfg, trainer, *args, **kwargs):
-        _assert_attr(self, 'data_module', 'BioNeMoBertModel.__init__()')
+        _assert_attr(self, "data_module", "BioNeMoBertModel.__init__()")
         super().__init__(cfg, trainer, *args, **kwargs)
 
     def setup_training_data(self, cfg):
@@ -234,7 +234,7 @@ class BioNeMoBertModel(MegatronBertModel):
         self.data_module.adjust_train_dataloader(self, self._train_dl)
 
     def setup_validation_data(self, cfg):
-        if hasattr(self, '_validation_ds'):
+        if hasattr(self, "_validation_ds"):
             consumed_samples = 0
             self._validation_dl = self.build_pretraining_data_loader(
                 self._validation_ds, consumed_samples, num_workers=0
@@ -242,7 +242,7 @@ class BioNeMoBertModel(MegatronBertModel):
             self.data_module.adjust_val_dataloader(self, self._validation_dl)
 
     def setup_test_data(self, cfg):
-        if hasattr(self, '_test_ds'):
+        if hasattr(self, "_test_ds"):
             consumed_samples = 0
             self._test_dl = self.build_pretraining_data_loader(self._test_ds, consumed_samples, num_workers=0)
             self.data_module.adjust_test_dataloader(self, self._test_dl)
@@ -260,22 +260,22 @@ class BioNeMoBertModel(MegatronBertModel):
     # The functions after this are _highly_ similar to the code
     # in ESM model, we should regroup it:
     def build_train_valid_test_datasets(self):
-        logging.info('Building Bert datasets.')
+        logging.info("Building Bert datasets.")
 
         self._train_ds = self.data_module.get_sampled_train_dataset()
         self._validation_ds = self.data_module.get_sampled_val_dataset()
         self._test_ds = self.data_module.get_sampled_test_dataset()
 
-        logging.info(f'Length of train dataset: {len(self._train_ds)}')
-        logging.info(f'Length of val dataset: {len(self._validation_ds)}')
-        logging.info(f'Length of test dataset: {len(self._test_ds)}')
-        logging.info('Finished building Bert datasets.')
+        logging.info(f"Length of train dataset: {len(self._train_ds)}")
+        logging.info(f"Length of val dataset: {len(self._validation_ds)}")
+        logging.info(f"Length of test dataset: {len(self._test_ds)}")
+        logging.info("Finished building Bert datasets.")
         return self._train_ds, self._validation_ds, self._test_ds
 
     def build_pretraining_data_loader(self, dataset, consumed_samples, num_workers=None):
         """Buld dataloader given an input dataset."""
 
-        assert self._cfg.data.dataloader_type == 'single', AssertionError(
+        assert self._cfg.data.dataloader_type == "single", AssertionError(
             f'Only the Megatron sequential ("single") sampler is currently supported. {self._cfg.data.dataloader_type} was chosen.'
         )
 
@@ -287,7 +287,7 @@ class BioNeMoBertModel(MegatronBertModel):
             global_batch_size=self.cfg.global_batch_size,
             data_parallel_rank=parallel_state.get_data_parallel_rank(),
             data_parallel_size=parallel_state.get_data_parallel_world_size(),
-            drop_last=self.cfg.get('drop_last', True),
+            drop_last=self.cfg.get("drop_last", True),
         )
 
         if num_workers is None:

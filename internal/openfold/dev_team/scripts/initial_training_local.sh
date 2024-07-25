@@ -7,7 +7,7 @@
 #   (3)
 #
 #
-#   
+#
 # description:
 #   Run initial training..
 #
@@ -67,11 +67,11 @@ export NEMO_TESTING=1 &&
 cd \$BIONEMO_HOME &&
 if [[ ! -d "${DATA_PATH_IN_CONTAINER}" ]]; then
     export AWS_ENDPOINT_URL=https://pbss.s8k.io
-    export AWS_ACCESS_KEY_ID=team-bionemo 
+    export AWS_ACCESS_KEY_ID=team-bionemo
     ./examples/protein/openfold/scripts/download_data_sample.sh -data_path ${BIONEMO_HOME}/examples/tests/test_data/ -pbss
 fi &&
 if [[ ! -f /usr/local/bin/hhalign ]]; then
-    examples/protein/openfold/scripts/install_third_party.sh 
+    examples/protein/openfold/scripts/install_third_party.sh
 fi &&
 python examples/protein/openfold/train.py \\
     --config-name=${CONFIG_NAME} \\
@@ -86,16 +86,16 @@ python examples/protein/openfold/train.py \\
     ++exp_manager.exp_dir=${EXP_DIR} \\
     ++exp_manager.create_wandb_logger=${CREATE_WANDB_LOGGER} \\
     &> train_${DATE_OF_SCRIPT}.log;
-    
+
 EOF
 
 # =========================
-# Execute command 
+# Execute command
 # ==========================
 eval "${COMMAND}"
 
 # =========================
-# Post-ample command 
+# Post-ample command
 # ==========================
 printf "${MESSAGE_TEMPLATE}" "end with success"
 

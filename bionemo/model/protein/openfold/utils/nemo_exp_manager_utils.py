@@ -34,7 +34,7 @@ from typing import Iterable, List, Tuple
 
 from omegaconf import DictConfig
 
-from bionemo.model.protein.openfold.utils.logging_utils import log_with_nemo_at_level
+from bionemo.utils.logging_utils import log_with_nemo_at_level
 
 
 def isolate_last_checkpoint(entire_cfg: DictConfig) -> Tuple[List[str], List[str], int]:

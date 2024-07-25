@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --account=healthcareeng_bionemo
 #SBATCH --partition=interactive
-#SBATCH 
+#SBATCH
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node 8
 #SBATCH --gpus-per-node 8
@@ -38,10 +38,10 @@
 # expected results / success criteria:
 #   (1) There is a single slurm job
 #   (2) Expected runtime: ToDo
-#   (3) There is a log file at ${OUTPUT_DIR}/logs/slurm-%j.out, that ends with 
+#   (3) There is a log file at ${OUTPUT_DIR}/logs/slurm-%j.out, that ends with
 #       a log message containing the string:
-#       
-#       "_sample_worker(), sample_pqueue.put() raises EOFError or BrokenPipeError"    
+#
+#       "_sample_worker(), sample_pqueue.put() raises EOFError or BrokenPipeError"
 #
 # updated / reviewed: 2024-05-20
 #
@@ -55,7 +55,7 @@ set -xe
 
 # (1) set some task-specific parameters
 IMAGE_NAME=nvcr.io/nvidian/cvai_bnmo_trng/bionemo:qa_202405_smoke_20240513T1827
-INPUT_DIR=/lustre/fsw/portfolios/healthcareeng/projects/healthcareeng_bionemo/openfold/openfold_from_tgrzegorzek_20240228 
+INPUT_DIR=/lustre/fsw/portfolios/healthcareeng/projects/healthcareeng_bionemo/openfold/openfold_from_tgrzegorzek_20240228
 OUTPUT_DIR=/lustre/fsw/portfolios/healthcareeng/users/broland/qa/qa_202405/testcase_09_${DATETIME_SCRIPT_START}
 
 # (2) create output directories
@@ -75,9 +75,9 @@ srun --mpi=pmix \
   echo "'date=$(date +'%Y%m%dT%H%M')'" &&
   export HYDRA_FULL_ERROR=1 &&
   cd /workspace/bionemo &&
-  echo 'launch_qa_testcase_09.sh - before install_third_party.sh' &&  
+  echo 'launch_qa_testcase_09.sh - before install_third_party.sh' &&
   ./examples/protein/openfold/scripts/install_third_party.sh &&
-  echo 'launch_qa_testcase_09.sh - after install_third_party.sh' &&  
+  echo 'launch_qa_testcase_09.sh - after install_third_party.sh' &&
   echo 'launch_qa_testcase_09.sh - before train.py' &&
   python examples/protein/openfold/train.py \
     --config-name openfold_initial_training \

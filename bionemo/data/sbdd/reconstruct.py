@@ -14,6 +14,7 @@ https://github.com/mattragoza/liGAN/blob/master/fitting.py
 License: GNU General Public License v2.0
 https://github.com/mattragoza/liGAN/blob/master/LICENSE
 """
+
 import itertools
 from typing import Dict, Literal
 
@@ -42,7 +43,7 @@ def reachable_r(a, b, seenbonds):
 
 
 def reachable(a, b):
-    '''Return true if atom b is reachable from a without using the bond between them.'''
+    """Return true if atom b is reachable from a without using the bond between them."""
     if a.GetExplicitDegree() == 1 or b.GetExplicitDegree() == 1:
         return False  # this is the _only_ bond for one atom
     # otherwise do recursive traversal
@@ -51,11 +52,11 @@ def reachable(a, b):
 
 
 def forms_small_angle(a, b, cutoff=60):
-    '''Return true if bond between a and b is part of a small angle
+    """Return true if bond between a and b is part of a small angle
     with a neighbor of a only.
     a and b are openbabel atom objects.
     cutoff: definition of samll angle in degrees
-    '''
+    """
 
     for nbr in ob.OBAtomAtomIter(a):
         if nbr != b:
@@ -66,13 +67,13 @@ def forms_small_angle(a, b, cutoff=60):
 
 
 def make_obmol(xyz, atomic_numbers):
-    '''
+    """
     This method takes in 3D coordinates and atom types and
     creates an openbabel molecule object.
 
     xyz: list of 3D coordinate tuples
     atomic_numbers: list of atomic numbers
-    '''
+    """
     mol = ob.OBMol()
     mol.BeginModify()
     atoms = []
@@ -87,13 +88,13 @@ def make_obmol(xyz, atomic_numbers):
 
 
 def connect_the_dots(mol, atoms, indicators, covalent_factor=1.3):
-    '''Custom implementation of ConnectTheDots.  This is similar to
+    """Custom implementation of ConnectTheDots.  This is similar to
     OpenBabel's version, but is more willing to make long bonds
     (up to maxbond long) to keep the molecule connected.  It also
     attempts to respect atom type information from struct.
     atoms and struct need to correspond in their order
     Assumes no hydrogens or existing bonds.
-    '''
+    """
 
     """
     for now, indicators only include 'is_aromatic'
@@ -145,8 +146,8 @@ def connect_the_dots(mol, atoms, indicators, covalent_factor=1.3):
             mol.DeleteBond(bond)
 
     def get_bond_info(biter):
-        '''Return bonds sorted by their distortion
-        biter is the openbabel bond iterable'''
+        """Return bonds sorted by their distortion
+        biter is the openbabel bond iterable"""
         bonds = list(biter)
         binfo = []
         for bond in bonds:
@@ -206,7 +207,7 @@ def connect_the_dots(mol, atoms, indicators, covalent_factor=1.3):
 
 
 def convert_ob_mol_to_rd_mol(ob_mol, struct=None):
-    '''Convert OBMol to RDKit mol, fixing up issues'''
+    """Convert OBMol to RDKit mol, fixing up issues"""
     ob_mol.DeleteHydrogens()
     n_atoms = ob_mol.NumAtoms()
     rd_mol = Chem.RWMol()
@@ -240,7 +241,7 @@ def convert_ob_mol_to_rd_mol(ob_mol, struct=None):
         elif bond_order == 3:
             rd_mol.AddBond(i, j, Chem.BondType.TRIPLE)
         else:
-            raise Exception('unknown bond order {}'.format(bond_order))
+            raise Exception("unknown bond order {}".format(bond_order))
 
         if ob_bond.IsAromatic():
             bond = rd_mol.GetBondBetweenAtoms(i, j)
@@ -310,8 +311,8 @@ def convert_ob_mol_to_rd_mol(ob_mol, struct=None):
 
 
 def calc_valence(rdatom):
-    '''Can call GetExplicitValence before sanitize, but need to
-    know this to fix up the molecule to prevent sanitization failures'''
+    """Can call GetExplicitValence before sanitize, but need to
+    know this to fix up the molecule to prevent sanitization failures"""
     cnt = 0.0
     for bond in rdatom.GetBonds():
         cnt += bond.GetBondTypeAsDouble()
@@ -319,10 +320,10 @@ def calc_valence(rdatom):
 
 
 def count_nbrs_of_elem(atom, atomic_num):
-    '''
+    """
     Count the number of neighbors atoms
     of atom with the given atomic_num.
-    '''
+    """
     count = 0
     for nbr in ob.OBAtomAtomIter(atom):
         if nbr.GetAtomicNum() == atomic_num:
@@ -331,8 +332,8 @@ def count_nbrs_of_elem(atom, atomic_num):
 
 
 def fixup(atoms, mol, indicators):
-    '''Set atom properties to match channel.  Keep doing this
-    to beat openbabel over the head with what we want to happen.'''
+    """Set atom properties to match channel.  Keep doing this
+    to beat openbabel over the head with what we want to happen."""
 
     """
     for now, indicators only include 'is_aromatic'
@@ -371,7 +372,7 @@ def fixup(atoms, mol, indicators):
 
 
 def raw_obmol_from_generated(data):
-    '''Convert model predictions to molecule object'''
+    """Convert model predictions to molecule object"""
     xyz = data.ligand_context_pos.clone().cpu().tolist()
     atomic_nums = data.ligand_context_element.clone().cpu().tolist()
 
@@ -437,7 +438,7 @@ def postprocess_rd_mol_2(rdmol):
             atom_by_symb = {}
             for atom_idx in ring_a:
                 symb = rdmol.GetAtomWithIdx(atom_idx).GetSymbol()
-                if symb != 'C':
+                if symb != "C":
                     non_carbon.append(atom_idx)
                 if symb not in atom_by_symb:
                     atom_by_symb[symb] = [atom_idx]
@@ -445,13 +446,13 @@ def postprocess_rd_mol_2(rdmol):
                     atom_by_symb[symb].append(atom_idx)
             if len(non_carbon) == 2:
                 rdmol_edit.RemoveBond(*non_carbon)
-            if 'O' in atom_by_symb and len(atom_by_symb['O']) == 2:
-                rdmol_edit.RemoveBond(*atom_by_symb['O'])
-                rdmol_edit.GetAtomWithIdx(atom_by_symb['O'][0]).SetNumExplicitHs(
-                    rdmol_edit.GetAtomWithIdx(atom_by_symb['O'][0]).GetNumExplicitHs() + 1
+            if "O" in atom_by_symb and len(atom_by_symb["O"]) == 2:
+                rdmol_edit.RemoveBond(*atom_by_symb["O"])
+                rdmol_edit.GetAtomWithIdx(atom_by_symb["O"][0]).SetNumExplicitHs(
+                    rdmol_edit.GetAtomWithIdx(atom_by_symb["O"][0]).GetNumExplicitHs() + 1
                 )
-                rdmol_edit.GetAtomWithIdx(atom_by_symb['O'][1]).SetNumExplicitHs(
-                    rdmol_edit.GetAtomWithIdx(atom_by_symb['O'][1]).GetNumExplicitHs() + 1
+                rdmol_edit.GetAtomWithIdx(atom_by_symb["O"][1]).SetNumExplicitHs(
+                    rdmol_edit.GetAtomWithIdx(atom_by_symb["O"][1]).GetNumExplicitHs() + 1
                 )
     rdmol = rdmol_edit.GetMol()
 
@@ -514,7 +515,7 @@ def reconstruct_from_generated(xyz, atomic_nums, aromatic=None, basic_mode=True)
 
     mol.PerceiveBondOrders()
     rd_mol = convert_ob_mol_to_rd_mol(mol)
-    if type(rd_mol) == tuple:
+    if isinstance(rd_mol, tuple):
         return rd_mol[1]
     try:
         # Post-processing
@@ -557,132 +558,132 @@ def get_bond_order_batch(atoms1, atoms2, distances):
 margin1, margin2, margin3 = 3, 2, 1
 
 allowed_bonds = {
-    'H': 1,
-    'C': 4,
-    'N': 3,
-    'O': 2,
-    'F': 1,
-    'B': 3,
-    'Al': 3,
-    'Si': 4,
-    'P': [3, 5],
-    'S': 4,
-    'Cl': 1,
-    'As': 3,
-    'Br': 1,
-    'I': 1,
-    'Hg': [1, 2],
-    'Bi': [3, 5],
+    "H": 1,
+    "C": 4,
+    "N": 3,
+    "O": 2,
+    "F": 1,
+    "B": 3,
+    "Al": 3,
+    "Si": 4,
+    "P": [3, 5],
+    "S": 4,
+    "Cl": 1,
+    "As": 3,
+    "Br": 1,
+    "I": 1,
+    "Hg": [1, 2],
+    "Bi": [3, 5],
 }
 
 # Bond lengths from:
 # http://www.wiredchemist.com/chemistry/data/bond_energies_lengths.html
 # And:
 # http://chemistry-reference.com/tables/Bond%20Lengths%20and%20Enthalpies.pdf
-Element = Literal['H', 'C', 'N', 'O', 'F', 'B', 'Si', 'P', 'As', 'S', 'Cl', 'Br', 'I']
+Element = Literal["H", "C", "N", "O", "F", "B", "Si", "P", "As", "S", "Cl", "Br", "I"]
 bonds1: Dict[Element, Dict[Element, int]] = {
-    'H': {
-        'H': 74,
-        'C': 109,
-        'N': 101,
-        'O': 96,
-        'F': 92,
-        'B': 119,
-        'Si': 148,
-        'P': 144,
-        'As': 152,
-        'S': 134,
-        'Cl': 127,
-        'Br': 141,
-        'I': 161,
+    "H": {
+        "H": 74,
+        "C": 109,
+        "N": 101,
+        "O": 96,
+        "F": 92,
+        "B": 119,
+        "Si": 148,
+        "P": 144,
+        "As": 152,
+        "S": 134,
+        "Cl": 127,
+        "Br": 141,
+        "I": 161,
     },
-    'C': {
-        'H': 109,
-        'C': 154,
-        'N': 147,
-        'O': 143,
-        'F': 135,
-        'Si': 185,
-        'P': 184,
-        'S': 182,
-        'Cl': 177,
-        'Br': 194,
-        'I': 214,
+    "C": {
+        "H": 109,
+        "C": 154,
+        "N": 147,
+        "O": 143,
+        "F": 135,
+        "Si": 185,
+        "P": 184,
+        "S": 182,
+        "Cl": 177,
+        "Br": 194,
+        "I": 214,
     },
-    'N': {'H': 101, 'C': 147, 'N': 145, 'O': 140, 'F': 136, 'Cl': 175, 'Br': 214, 'S': 168, 'I': 222, 'P': 177},
-    'O': {
-        'H': 96,
-        'C': 143,
-        'N': 140,
-        'O': 148,
-        'F': 142,
-        'Br': 172,
-        'S': 151,
-        'P': 163,
-        'Si': 163,
-        'Cl': 164,
-        'I': 194,
+    "N": {"H": 101, "C": 147, "N": 145, "O": 140, "F": 136, "Cl": 175, "Br": 214, "S": 168, "I": 222, "P": 177},
+    "O": {
+        "H": 96,
+        "C": 143,
+        "N": 140,
+        "O": 148,
+        "F": 142,
+        "Br": 172,
+        "S": 151,
+        "P": 163,
+        "Si": 163,
+        "Cl": 164,
+        "I": 194,
     },
-    'F': {
-        'H': 92,
-        'C': 135,
-        'N': 136,
-        'O': 142,
-        'F': 142,
-        'S': 158,
-        'Si': 160,
-        'Cl': 166,
-        'Br': 178,
-        'P': 156,
-        'I': 187,
+    "F": {
+        "H": 92,
+        "C": 135,
+        "N": 136,
+        "O": 142,
+        "F": 142,
+        "S": 158,
+        "Si": 160,
+        "Cl": 166,
+        "Br": 178,
+        "P": 156,
+        "I": 187,
     },
-    'B': {'H': 119, 'Cl': 175},
-    'Si': {'Si': 233, 'H': 148, 'C': 185, 'O': 163, 'S': 200, 'F': 160, 'Cl': 202, 'Br': 215, 'I': 243},
-    'Cl': {
-        'Cl': 199,
-        'H': 127,
-        'C': 177,
-        'N': 175,
-        'O': 164,
-        'P': 203,
-        'S': 207,
-        'B': 175,
-        'Si': 202,
-        'F': 166,
-        'Br': 214,
+    "B": {"H": 119, "Cl": 175},
+    "Si": {"Si": 233, "H": 148, "C": 185, "O": 163, "S": 200, "F": 160, "Cl": 202, "Br": 215, "I": 243},
+    "Cl": {
+        "Cl": 199,
+        "H": 127,
+        "C": 177,
+        "N": 175,
+        "O": 164,
+        "P": 203,
+        "S": 207,
+        "B": 175,
+        "Si": 202,
+        "F": 166,
+        "Br": 214,
     },
-    'S': {
-        'H': 134,
-        'C': 182,
-        'N': 168,
-        'O': 151,
-        'S': 204,
-        'F': 158,
-        'Cl': 207,
-        'Br': 225,
-        'Si': 200,
-        'P': 210,
-        'I': 234,
+    "S": {
+        "H": 134,
+        "C": 182,
+        "N": 168,
+        "O": 151,
+        "S": 204,
+        "F": 158,
+        "Cl": 207,
+        "Br": 225,
+        "Si": 200,
+        "P": 210,
+        "I": 234,
     },
-    'Br': {'Br': 228, 'H': 141, 'C': 194, 'O': 172, 'N': 214, 'Si': 215, 'S': 225, 'F': 178, 'Cl': 214, 'P': 222},
-    'P': {'P': 221, 'H': 144, 'C': 184, 'O': 163, 'Cl': 203, 'S': 210, 'F': 156, 'N': 177, 'Br': 222},
-    'I': {'H': 161, 'C': 214, 'Si': 243, 'N': 222, 'O': 194, 'S': 234, 'F': 187, 'I': 266},
-    'As': {'H': 152},
+    "Br": {"Br": 228, "H": 141, "C": 194, "O": 172, "N": 214, "Si": 215, "S": 225, "F": 178, "Cl": 214, "P": 222},
+    "P": {"P": 221, "H": 144, "C": 184, "O": 163, "Cl": 203, "S": 210, "F": 156, "N": 177, "Br": 222},
+    "I": {"H": 161, "C": 214, "Si": 243, "N": 222, "O": 194, "S": 234, "F": 187, "I": 266},
+    "As": {"H": 152},
 }
 
 bonds2: Dict[Element, Dict[Element, int]] = {
-    'C': {'C': 134, 'N': 129, 'O': 120, 'S': 160},
-    'N': {'C': 129, 'N': 125, 'O': 121},
-    'O': {'C': 120, 'N': 121, 'O': 121, 'P': 150},
-    'P': {'O': 150, 'S': 186},
-    'S': {'P': 186, 'C': 160},
+    "C": {"C": 134, "N": 129, "O": 120, "S": 160},
+    "N": {"C": 129, "N": 125, "O": 121},
+    "O": {"C": 120, "N": 121, "O": 121, "P": 150},
+    "P": {"O": 150, "S": 186},
+    "S": {"P": 186, "C": 160},
 }
 
 
 bonds3: Dict[Element, Dict[Element, int]] = {
-    'C': {'C': 120, 'N': 116, 'O': 113},
-    'N': {'C': 116, 'N': 110},
-    'O': {'C': 113},
+    "C": {"C": 120, "N": 116, "O": 113},
+    "N": {"C": 116, "N": 110},
+    "O": {"C": 113},
 }
 
 bond_dict = [
@@ -696,22 +697,22 @@ bond_dict = [
 # https://en.wikipedia.org/wiki/Covalent_radius#Radii_for_multiple_bonds
 # (2022/08/14)
 covalent_radii = {
-    'H': 32,
-    'C': 60,
-    'N': 54,
-    'O': 53,
-    'F': 53,
-    'B': 73,
-    'Al': 111,
-    'Si': 102,
-    'P': 94,
-    'S': 94,
-    'Cl': 93,
-    'As': 106,
-    'Br': 109,
-    'I': 125,
-    'Hg': 133,
-    'Bi': 135,
+    "H": 32,
+    "C": 60,
+    "N": 54,
+    "O": 53,
+    "F": 53,
+    "B": 73,
+    "Al": 111,
+    "Si": 102,
+    "P": 94,
+    "S": 94,
+    "Cl": 93,
+    "As": 106,
+    "Br": 109,
+    "I": 125,
+    "Hg": 133,
+    "Bi": 135,
 }
 
 # ------------------------------------------------------------------------------
@@ -726,7 +727,7 @@ CA_C_DIST = 1.53
 N_CA_C_ANGLE = 110 * np.pi / 180
 crossdocked_bonds1 = []
 # atypes = ['H', 'C', 'C-aro', 'N', 'N-aro', 'O', 'O-aro', 'F', 'P', 'P-aro', 'S', 'S-aro', 'Cl'] # Leaving the true types as reference to understand the logic below
-atypes = ['H', 'C', 'C', 'N', 'N', 'O', 'O', 'F', 'P', 'P', 'S', 'S', 'Cl']
+atypes = ["H", "C", "C", "N", "N", "O", "O", "F", "P", "P", "S", "S", "Cl"]
 for a in atypes:
     value = []
     for b in atypes:

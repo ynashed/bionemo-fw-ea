@@ -57,13 +57,13 @@ class TensorProductScoreModel(torch.nn.Module):
         confidence_no_batchnorm = False
         confidence_dropout = 0
         batch_norm = not cfg.no_batch_norm
-        batch_norm_with_shift = cfg.get('batch_norm_with_shift', True)
+        batch_norm_with_shift = cfg.get("batch_norm_with_shift", True)
         dropout = cfg.dropout
         use_second_order_repr = cfg.tensor_product.use_second_order_repr
-        tp_dtype = cfg.tensor_product.get('dtype', torch.float32)
-        if tp_dtype in [16, '16']:
+        tp_dtype = cfg.tensor_product.get("dtype", torch.float32)
+        if tp_dtype in [16, "16"]:
             tp_dtype = torch.float16
-        elif tp_dtype == 'bf16':
+        elif tp_dtype == "bf16":
             tp_dtype = torch.bfloat16
         else:
             tp_dtype = torch.float32
@@ -93,12 +93,10 @@ class TensorProductScoreModel(torch.nn.Module):
         self.timestep_emb_func = timestep_emb_func
         self.confidence_mode = cfg.confidence_mode
         self.num_conv_layers = cfg.num_conv_layers
-        self.clamp = cfg.get('clamp', False)
-        self.estimate_memory_usage = cfg.get('estimate_memory_usage', None)
+        self.clamp = cfg.get("clamp", False)
+        self.estimate_memory_usage = cfg.get("estimate_memory_usage", None)
         if self.estimate_memory_usage is not None and self.estimate_memory_usage.maximal is None:
-            self.estimate_memory_usage.maximal = (
-                0.75 * torch.cuda.get_device_properties('cuda:0').total_memory / 2**20
-            )
+            self.estimate_memory_usage.maximal = 0.75 * torch.cuda.get_device_properties("cuda:0").total_memory / 2**20
 
         # embedding layers
         self.lig_node_embedding = AtomEncoder(
@@ -178,9 +176,9 @@ class TensorProductScoreModel(torch.nn.Module):
                 "sh_irreps": self.sh_irreps,
                 "out_irreps": out_irreps,
                 "batch_norm": False,
-                'mlp_channels': [3 * ns, 3 * ns],
-                'mlp_activation': nn.Sequential(nn.ReLU(), nn.Dropout(dropout)),
-                'e3nn_compat_mode': True,
+                "mlp_channels": [3 * ns, 3 * ns],
+                "mlp_activation": nn.Sequential(nn.ReLU(), nn.Dropout(dropout)),
+                "e3nn_compat_mode": True,
             }
 
             lig_layer = FullyConnectedTensorProductConv(**parameters)
@@ -346,7 +344,7 @@ class TensorProductScoreModel(torch.nn.Module):
             return (
                 0.0 * lig_node_attr[: len(data.name), :3],
                 0.0 * lig_node_attr[: len(data.name), :3],
-                0.0 * lig_edge_attr.reshape(-1)[: data['ligand'].edge_mask.sum().item()],
+                0.0 * lig_edge_attr.reshape(-1)[: data["ligand"].edge_mask.sum().item()],
             )
         cross_edge_attr = self.cross_edge_embedding(cross_edge_attr)
 
@@ -355,13 +353,13 @@ class TensorProductScoreModel(torch.nn.Module):
             total_memory = estimate_memory_usage(data, cross_edge_attr.shape[0], self.estimate_memory_usage)
             if total_memory > self.estimate_memory_usage.maximal:
                 logging.warning(
-                    f'Estimated memory {total_memory} exceeds maximal = {self.estimate_memory_usage.maximal} '
-                    f' for batch: {data.name} with {cross_edge_attr.shape[0]} cross edges, skipping'
+                    f"Estimated memory {total_memory} exceeds maximal = {self.estimate_memory_usage.maximal} "
+                    f" for batch: {data.name} with {cross_edge_attr.shape[0]} cross edges, skipping"
                 )
                 return (
                     0.0 * lig_node_attr[: len(data.name), :3],
                     0.0 * lig_node_attr[: len(data.name), :3],
-                    0.0 * lig_edge_attr.reshape(-1)[: data['ligand'].edge_mask.sum().item()],
+                    0.0 * lig_edge_attr.reshape(-1)[: data["ligand"].edge_mask.sum().item()],
                 )
 
         for l in range(len(self.lig_conv_layers)):

@@ -20,7 +20,7 @@ from bionemo.utils.connectors import BioNeMoSaveRestoreConnector
 @hydra_runner(config_path="conf", config_name="downstream_retro_uspto50k")
 def main(cfg):
     logging.info("\n\n************** Experiment configuration ***********")
-    logging.info(f'\n{OmegaConf.to_yaml(cfg)}')
+    logging.info(f"\n{OmegaConf.to_yaml(cfg)}")
 
     if cfg.do_training:
         trainer = setup_trainer(cfg)
@@ -51,7 +51,7 @@ def main(cfg):
 
         logging.info("************** Model parameters and their sizes ***********")
         for name, param in model.named_parameters():
-            logging.info(f'{name}: {param.size()}')
+            logging.info(f"{name}: {param.size()}")
             logging.info("***********************************************************")
 
         logging.info("cfg.************ Starting Training ***********")
@@ -78,5 +78,5 @@ def main(cfg):
         logging.info("************** Finished Data PreProcessing ***********")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -90,7 +90,7 @@ def compare_predictions(outputs_file_x: pathlib.Path, outputs_file_y: pathlib.Pa
     """
     predictions_1 = pickle.load(open(outputs_file_x, "rb"))
     predictions_2 = pickle.load(open(outputs_file_y, "rb"))
-    compare_outputs(torch.Tensor(predictions_1[1]['hiddens']), torch.Tensor(predictions_2[1]['hiddens']))
+    compare_outputs(torch.Tensor(predictions_1[1]["hiddens"]), torch.Tensor(predictions_2[1]["hiddens"]))
 
 
 def get_args():

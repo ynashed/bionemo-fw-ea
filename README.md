@@ -21,9 +21,9 @@ The `./launch.sh` script can be run in a backwards compatible mode using the `-s
 With `-s`, the program will use the tag that's specified in the `.env` file at the repository's root. This flag makes the script mirror its prior behavior.
 
 #### `launch.sh` Using Commit Hash as Image Tag
-Now, `launch.sh` will default to using the current `git` commit hash as the image tag. 
+Now, `launch.sh` will default to using the current `git` commit hash as the image tag.
 
-This change makes it clear to the user what exact version of code is present in the image, eliminating a reoccurring 
+This change makes it clear to the user what exact version of code is present in the image, eliminating a reoccurring
 source of confusion for folks developing and using the BioNeMo FW image. Moreover, the `build` and `push` commands will
 fail fast if there are uncommitted changes to tracked files.
 
@@ -63,7 +63,7 @@ NGC_CLI_ORG= # Your organization name
 ./launch.sh -s dev
 ```
 
-Once the container is running, you can run the training and inference examples, see [BioNeMo Framework Tutorials](https://docs.nvidia.com/bionemo-framework/latest/tutorials-fw.html), or develop and test your own code.
+Once the container is running, you can run the training and inference examples, see [BioNeMo Framework Tutorials](https://docs.nvidia.com/bionemo-framework/latest/next-steps.html), or develop and test your own code.
 
 As an example, For ESM1-nv, ESM2-nv, and ProtT5-nv, we provide the `bionemo.model.infer` module to run inference in offline mode (without running a remote inference client).
 Users must specify an input CSV file with sequence data, and a CONFIG file with model specifics and data paths. Example config files are provided at  `examples/protein/<MODEL_NAME>/conf`. Example input data file is provided at `examples/tests/test_data/protein/test/x000.csv`.
@@ -266,4 +266,4 @@ Once a container has been built, it can be started in interactive mode with `./l
 ### Quick Links
 For a detailed guide on setting up the repo and launching example jobs, checkout the [Quickstart Guide](https://docs.nvidia.com/bionemo-framework/latest/quickstart-fw.html) in the documentation.
 
-For example data-processing, pretraining and inference setup, checkout the [Tutorials](https://docs.nvidia.com/bionemo-framework/latest/tutorials-fw.html).
+For example data-processing, pretraining and inference setup, checkout the [Tutorials](https://docs.nvidia.com/bionemo-framework/latest/next-steps.html).

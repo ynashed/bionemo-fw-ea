@@ -25,6 +25,7 @@ has the methods required by the BERT collate function.
 A generic interface for random samples used by the collate function is also
 introduced.
 """
+
 import copy
 import math
 import random
@@ -38,11 +39,11 @@ from pytest import approx
 
 
 __all__ = [
-    'TokenSampler',
-    'TokenizerAdapterSpec',
-    'SentencePieceTokenizerAdapter',
-    'BertCollate',
-    'BertMasking',
+    "TokenSampler",
+    "TokenizerAdapterSpec",
+    "SentencePieceTokenizerAdapter",
+    "BertCollate",
+    "BertMasking",
 ]
 
 
@@ -269,7 +270,7 @@ class SentencePieceTokenizerAdapter(TokenizerAdapterSpec):
             str: mask token
 
         """
-        return '<mask>'
+        return "<mask>"
 
     def get_mask_id(self):
         """Gets the mask id
@@ -289,7 +290,7 @@ class SentencePieceTokenizerAdapter(TokenizerAdapterSpec):
         Returns:
             bool: True if `token` is a special token. False otherwise.
         """
-        return token.startswith('<')
+        return token.startswith("<")
 
     def vocab_list(self):
         """A list representation of the vocabulary.
@@ -594,14 +595,14 @@ class BertCollate:
         # Encoder
         tokens = self.tokenize_batch(batch)
         encoder_dict = self._prepare_tokens_and_masks(tokens, mask_data=True)
-        encoder_tokens = encoder_dict['tokens']
-        loss_mask = encoder_dict['mask']
+        encoder_tokens = encoder_dict["tokens"]
+        loss_mask = encoder_dict["mask"]
         enc_token_ids = [self.tokenizer.tokens_to_ids(t) for t in encoder_tokens]
         enc_token_ids, loss_mask, padding_mask = self._pad_seqs(enc_token_ids, loss_mask, self.tokenizer.get_pad_id())
 
         label_dict = self._prepare_tokens_and_masks(tokens, mask_data=False)
-        label_tokens = label_dict['tokens']
-        label_mask = label_dict['mask']
+        label_tokens = label_dict["tokens"]
+        label_mask = label_dict["mask"]
         label_ids = [self.tokenizer.tokens_to_ids(t) for t in label_tokens]
         label_ids, _, _ = self._pad_seqs(label_ids, label_mask, self.tokenizer.get_pad_id())
 
@@ -613,13 +614,13 @@ class BertCollate:
         sentence_order = torch.arange(len(enc_token_ids)).long()  # expected by training & validation methods
 
         collate_output = {
-            'text': enc_token_ids,
-            'types': types,
-            'is_random': sentence_order,
-            'loss_mask': loss_mask,
-            'labels': label_ids,
-            'padding_mask': padding_mask,
-            'batch': batch,
+            "text": enc_token_ids,
+            "types": types,
+            "is_random": sentence_order,
+            "loss_mask": loss_mask,
+            "labels": label_ids,
+            "padding_mask": padding_mask,
+            "batch": batch,
         }
 
         return collate_output

@@ -1,40 +1,45 @@
-# What does this MR do?
+(**NOTE:** _**delete** these instructional lines as you fill-out this MR template_)
 
-Add a one-line overview of what this PR aims to accomplish.
+(**NOTE:** _template is designed to be filled-in and used as the **squashed commit message for the entire PR**. _Italicized text_ is intended to be deleted as you fill in this template. Use the text between the `---`)
 
-**Collection**: [Note which collection this MR will affect. e.g., molecule, protein, or core (for generic contributions)]
+---
 
-# Usage
-* You can potentially add a usage example below
+_High level summary of changes. Try to keep this as short and informative as possible: less is more._
 
+_Describe your changes. You can be more detailed and descriptive here. If it is a code change, Be sure to answer:_
+  - _What is changing?_
+  - _What is the new or fixed functionality?_
+  - _Why or when would someone want to use these changes?_
+  - _How can someone use these changes?_
+---
+
+## Summary
+_High level summary of changes. Try to keep this as short and informative as possible: less is more._
+
+## Details
+_Describe your changes. You can be more detailed and descriptive here._
+
+## Usage
+_How does a user interact with the changed code?_
 ```python
-# Add a code snippet demonstrating how to use this 
+python -m your.new.module -and -all -options
 ```
 
-# Before your PR is "Ready for review?"
-**Pre checks**:
-- [ ] Did you make sure that all tests pass? (run `pytest` in root of bionemo)
-- [ ] Did you make sure that training and inference-related scripts results in errors of small discrepancies in expected results? (run `pytest examples/tests/test_model_pretrain_and_downstream.py -k test_model_training` in the root of bionemo, only applicable if you have implemented changes to training and inference-related objects. See `CONTRIBUTING.md` for more details.
-- [ ] Did you set `SKIP_CI` label as one of this MR's labels if your MR is eligible for NOT running BioNeMo CI? See `CONTRIBUTING.md` for information.
-- [ ] Did you set `JET_NOT_REQUIRED` label as one of this MR's labels if your MR is eligible for NOT running `jet` stage (and tests in JET)? See `CONTRIBUTING.md` for information.
-- [ ] Did you write any new necessary unit tests of added utilities (added to `tests`) or of training and inference for a new model (in `examples/tests`)? See `CONTRIBUTING.md` for more details.
-- [ ] Did you add or update any necessary documentation (including comments in config files for all new config values)?
-  
+## Testing
+_How do you prove that your code behaves the way you claim?_
 
-# When to label your MR as `SKIP_CI` or `JET_NOT_REQUIRED`
-Most of the changes to files with extensions `*.py`, `*.yaml`, `*.yml`,  `Dockerfile*` or `requirements.txt` DO REQUIRE both BioNeMo CI and `jet` stage to be run, should be carefully tested and ARE NOT eligible to use `SKIP_CI` or `JET_NOT_REQUIRE` label as they affect container deployment and model performance or convergence. 
-The changes to the codebase that are eligible for using `SKIP_CI` label are:
-* changes to the files with extension `.md` or `.ipynb`
-* changes under folders `docs`, `LICENSE`, 
-* changes to the files with extension `.sh` under `examples/**/scripts/*.sh` related to training scripts of models
-* changes to the other files with extension `.sh` not affecting container build, models and data download for unit test or JET tests
-* updating files with extensions different than `*.sh`, `*.py`, `*.yaml`, `*.yml`,  `Dockerfile*` or `requirements.txt` that **DO NOT** affect model checkpoints or data download, docker building, unit tests and model performance or convergence
-
-The changes to the codebase that are eligible for using `JET_NOT_REQUIRE` label are:
-* docstrings update in `.py` files
-* code cleanup not related to refactoring of code (ie deleting unused imports or blank lines, improving lines formatting) in `*.py` files
-* improving hydra configs docstrings (comments and descriptions) in  `*.yaml`, `*.yml`
-* changes to `Dockerfile` or `requirements.txt` that **DO NOT** affect model performance or convergence. Changes that **REQUIRE** `jet` stage are, for instance, python package update or a NeMo container version update.
-* updating files with extensions different that `*.py`, `*.yaml`, `*.yml`,  `Dockerfile` or `requirements.txt` that **DO NOT** affect model performance or convergence
+Tests for these changes can be run via:
+```shell
+pytest -v tests/your/new/or/existing/test_functions.py::test_function
+```
 
 
+(**NOTE:** _also **delete** this checklist as you fill-out this MR template_)
+
+**Most of the changes** to files with extensions `*.py`, `*.yaml`, `*.yml`, `Dockerfile*` or `requirements.txt` **DO REQUIRE both `pytest-` and `jet-` CI stages**.
+
+- [ ] Did you review the [Before your PR is "Ready for review" section](https://gitlab-master.nvidia.com/clara-discovery/bionemo/-/blob/dev/CONTRIBUTING.md?ref_type=heads#before-pr-ready) before asking for review?
+- [ ] Did you make sure your changes have tests? Did you test your changes locally?
+- [ ] Can you add [the `SKIP_CI` label](https://gitlab-master.nvidia.com/clara-discovery/bionemo/-/blob/dev/CONTRIBUTING.md?ref_type=heads#skip-ci) to your MR?
+- [ ] Can you add [the `PYTEST_NOT_REQUIRED` label](https://gitlab-master.nvidia.com/clara-discovery/bionemo/-/blob/dev/CONTRIBUTING.md?ref_type=heads#skip-pytest) to your MR?
+- [ ] Can you add [the `JET_NOT_REQUIRED` label](https://gitlab-master.nvidia.com/clara-discovery/bionemo/-/blob/dev/CONTRIBUTING.md?ref_type=heads#skip-jet) to your MR?

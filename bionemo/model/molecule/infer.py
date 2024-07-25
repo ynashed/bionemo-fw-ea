@@ -22,9 +22,9 @@ __all__: Sequence[str] = ("MolInference",)
 
 
 class MolInference(BaseEncoderDecoderInference):
-    '''
+    """
     All inference functions
-    '''
+    """
 
     def __init__(
         self,
@@ -65,7 +65,7 @@ class MolInference(BaseEncoderDecoderInference):
         return token_ids
 
     def seq_to_hiddens(self, sequences: List[str]) -> Tuple[torch.Tensor, torch.Tensor]:
-        '''
+        """
         Transforms Sequences into hidden state.
         Should be implemented in a child class, since it is model specific.
         This method returns hidden states and masks.
@@ -78,7 +78,7 @@ class MolInference(BaseEncoderDecoderInference):
         Returns:
             hiddens (torch.Tensor, float):
             enc_mask (torch.Tensor, long): boolean mask for padded sections
-        '''
+        """
         token_ids, enc_mask = self.tokenize(sequences)
         hiddens = self.model.encode(
             tokens_enc=token_ids,
@@ -106,7 +106,7 @@ class MolInference(BaseEncoderDecoderInference):
         override_generate_num_tokens: Optional[int] = None,
         **kwargs,
     ) -> SeqsOrBatch:
-        '''
+        """
         Transforms hidden state into sequences (i.e., sampling in most cases).
         This class should be implemented in a child class, since it is model specific.
         This class should return the sequence with special tokens such as
@@ -119,7 +119,7 @@ class MolInference(BaseEncoderDecoderInference):
                 If provided, we override the saved model's values (may be useful for speed if you know you only need shorter sequences.)
         Returns:
             sequences (list[str]) or list[list[str]]): list of sequences
-        '''
+        """
         if enc_mask is not None:
             assert (
                 enc_mask.shape == hiddens.shape[:2]

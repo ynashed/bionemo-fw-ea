@@ -215,7 +215,7 @@ Pre-trained checkpoints are also provided based on the models described in the [
 | MolMIM                | 128 Tokens (SMILES)              | Representation Learning, Structure Prediction, Molecule Generation, Guided molecular generation (see ./notebooks/cma_es_guided_molecular_optimization_molmim.ipynb) |
 
 
-To enable support for longer sequences, customize configuration parameters to allow sequence lengths, assuming the user has the computational resources to support expansion. Taking ProtT5nv as example, several different configuration options are available in the _.yaml_ file. Under `examples/protein/prott5nv/conf/` the `base_config.yaml` file is the basis for production-level work. More information about how to use checkpoints can be found in the [Quickstart Guide](./quickstart-fw.md) and in the [Save-Restore Connectors](#save-restore-connectors) section below.
+To enable support for longer sequences, customize configuration parameters to allow sequence lengths, assuming the user has the computational resources to support expansion. Taking ProtT5nv as example, several different configuration options are available in the _.yaml_ file. Under `examples/protein/prott5nv/conf/` the `base_config.yaml` file is the basis for production-level work. More information about how to use checkpoints can be found in the [Save-Restore Connectors](#save-restore-connectors) section below.
 
 ### Save-Restore Connectors
 
@@ -271,7 +271,7 @@ However, the pipelines can be modified for different datasets. The following thr
 
 ### API Setup
 
-Enabling integration with Weights & Biases is highly recommended. To leverage this feature, ensure the `.env` file contains a WANDB API key entered for the variable `WANDB_API_KEY`. Check the Weights and Biases user guide for further instructions on obtaining an API key. Refer to the [Quickstart Guide](./quickstart-fw.md#optional-weights-and-biases-setup) for details on setup.
+Enabling integration with Weights & Biases is highly recommended. To leverage this feature, ensure the `.env` file contains a WANDB API key entered for the variable `WANDB_API_KEY`. Check the Weights and Biases user guide for further instructions on obtaining an API key. Refer to the [Next Steps](./next-steps.md) section for details on setup.
 
 ### Weights and Biases Charts
 

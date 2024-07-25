@@ -1,7 +1,7 @@
 # MolMIM
 # Model Overview
 ## Description:
-MolMIM: 
+MolMIM:
 
 * Allows users to generate molecules similar to the seed molecule in SMILES format by randomly perturbing (eg by adding 0 centered gaussian noise with a desired variance) the latent space encoded from a seed molecule and decoding that back into SMILES.
 * performs optimization with the CMA-ES algorithm[1] in the model’s latent space and sample molecules with improved values of the desired scoring function.
@@ -22,7 +22,7 @@ This model is for research and development only.
 MolMIM is provided under the {{model_license_slug}}.
 
 ## Model Architecture:
-**Architecture Type:** Encoder-Decoder 
+**Architecture Type:** Encoder-Decoder
 
 MolMIM utilizes a Perceiver encoder architecture which outputs a fixed-size representation, where molecules of various lengths are mapped into a latent space. MolMIM’s decoder architecture is a Transformer. Both encoder and decoder container 6 layers with a hidden size of 512, 8 attention heads, and a feed-forward dimension of 2048. Total number of parameters in MolMIM is 65.2M. The model was trained with A-MIM learning. <br>
 
@@ -37,7 +37,7 @@ MolMIM utilizes a Perceiver encoder architecture which outputs a fixed-size repr
 **Output Type(s):** Text, Numerical <br>
 **Output Format:** [SMILES] <br>
 **Output Parameters:** [2D] <br>
-**Other Properties Related to Output:** Maximum output length is 512 tokens <br> 
+**Other Properties Related to Output:** Maximum output length is 512 tokens <br>
 
 ## Software Integration:
 **Runtime Engine(s):**
@@ -56,7 +56,7 @@ MolMIM utilizes a Perceiver encoder architecture which outputs a fixed-size repr
     * Trained with log variance sampling loss, but left out the portion of the encoder that used the sampled log variance as an input to the hiddens -> z_mean transformation. We found that this was not needed to achieve performance on the tasks we are currently measuring, and simplified radius sampling.
     * See the [molmim model training notebook](../notebooks/model_training_molmim.ipynb) for more information about how the model was trained and which config was used.
 
-# Training & Evaluation: 
+# Training & Evaluation:
 
 ## Training Dataset:
 

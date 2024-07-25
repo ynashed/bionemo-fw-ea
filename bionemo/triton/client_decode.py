@@ -54,14 +54,14 @@ def send_masked_embeddings_for_inference(
 
 @click.command()
 @click.option(
-    '--triton-url',
+    "--triton-url",
     type=str,
     default="http://localhost:8000",
     help="Url to Triton server (e.g. grpc://localhost:8001). "
     "HTTP protocol with default port is used if parameter is not provided",
     show_default=True,
 )
-@click.option('--model', type=str, default="bionemo_model", help="Name of model in Triton.", show_default=True)
+@click.option("--model", type=str, default="bionemo_model", help="Name of model in Triton.", show_default=True)
 @click.option(
     "--input",
     type=str,
@@ -93,9 +93,9 @@ def entrypoint(
     print(f"Input JSON file:    {input}")
     print(f"Input tensor name:  {in_name}")
     print(f"Output to file?:    {output}")
-    print('-' * 90)
+    print("-" * 90)
 
-    with open(input, 'rt') as rt:
+    with open(input, "rt") as rt:
         request = json.load(rt)
 
     if in_name not in request:
@@ -118,7 +118,7 @@ def entrypoint(
             print(s)
     else:
         print(f"Writing {len(seqs)} decoded sequences as a JSON list.")
-        with open(output, 'wt') as wt:
+        with open(output, "wt") as wt:
             json.dump(seqs, wt, indent=2)
 
     print("Complete!")

@@ -208,7 +208,7 @@ class get_data:
                         cur_label.append(l)
                         if self.mask_col[i] is not None:
                             m = line[header.index(self.mask_col[i])]
-                            m = np.array(list(m.strip()), dtype='int')
+                            m = np.array(list(m.strip()), dtype="int")
                         else:
                             m = np.array([1] * len(l))
                         cur_mask.append(m)

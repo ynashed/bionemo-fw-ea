@@ -25,7 +25,7 @@ from bionemo.model.utils import (
 @hydra_runner(config_path="conf", config_name="finetune_config")
 def main(cfg) -> None:
     logging.info("\n\n************* Fintune config ****************")
-    logging.info(f'\n{OmegaConf.to_yaml(cfg)}')
+    logging.info(f"\n{OmegaConf.to_yaml(cfg)}")
 
     # Do preprocessing if preprocess
     if cfg.do_preprocessing:
@@ -72,5 +72,5 @@ def main(cfg) -> None:
         logging.info("************** Finished Testing ***********")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

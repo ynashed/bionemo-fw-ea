@@ -38,8 +38,8 @@ from bionemo.utils.tests import teardown_apex_megatron_cuda
 
 # Each "cell" is an ordered list of gene names
 SEQS = [
-    ['SCYGR3', 'NBPF3', 'SCYGR6', 'RNA5SP114', 'MIR561', 'GULP1', 'RNU6-298P', 'TEFM', 'PFN1P10'],
-    ['RNU2-38P', 'RNVU1-24', 'SLC25A34', 'SLC25A34-AS1', 'TMEM82', 'FBLIM1', 'SUZ12P1', 'CRLF3'],
+    ["SCYGR3", "NBPF3", "SCYGR6", "RNA5SP114", "MIR561", "GULP1", "RNU6-298P", "TEFM", "PFN1P10"],
+    ["RNU2-38P", "RNVU1-24", "SLC25A34", "SLC25A34-AS1", "TMEM82", "FBLIM1", "SUZ12P1", "CRLF3"],
 ]
 
 MODEL_NAME = "geneformer"
@@ -48,7 +48,7 @@ NAME_EMBEDDINGS = complete_model_name(MODEL_NAME, EMBEDDINGS)
 NAME_HIDDENS = complete_model_name(MODEL_NAME, HIDDENS)
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope="module")
 def cfg(bionemo_home: Path) -> DictConfig:
     return load_model_config(
         config_path=str(bionemo_home / "examples" / "singlecell" / MODEL_NAME / "conf"),
@@ -57,7 +57,7 @@ def cfg(bionemo_home: Path) -> DictConfig:
     )
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope="module")
 def model(cfg: DictConfig) -> GeneformerInference:
     # TODO [mgreaves] replace with this in !553
     # model = load_model_for_inference(cfg, interactive=False)
@@ -65,7 +65,7 @@ def model(cfg: DictConfig) -> GeneformerInference:
     teardown_apex_megatron_cuda()
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope="module")
 def server(cfg: DictConfig, model: GeneformerInference) -> Triton:
     triton = Triton()
     bind_embedding(triton, cfg, model, nav=False, triton_model_name=NAME_EMBEDDINGS)

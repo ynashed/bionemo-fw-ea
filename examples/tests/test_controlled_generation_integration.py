@@ -30,10 +30,10 @@ def scoring_function(smis: List[str], reference: str, **kwargs) -> np.ndarray:
     return -1 * scores
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope="session")
 def bionemo_home() -> Path:
     try:
-        x = os.environ['BIONEMO_HOME']
+        x = os.environ["BIONEMO_HOME"]
     except KeyError:
         raise ValueError("Need to set BIONEMO_HOME in order to run unit tests! See docs for instructions.")
     else:

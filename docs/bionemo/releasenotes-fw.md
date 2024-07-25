@@ -1,4 +1,14 @@
 # Release Notes
+## BioNeMo Framework v1.7
+### New Models
+* [DSMBind](https://www.biorxiv.org/content/10.1101/2023.12.10.570461v1), developed under the BioNeMo framework, is a model which can produce comparative values for ranking protein-ligand binding affinities. This release features the capability to perform inference using a newly trained checkpoint.
+### New Features
+* [EquiDock] Remove steric clashes as a post-processing step after equidock inference.
+* [Documentation] Updated Getting Started section which sequentially describes prerequisites, BioNeMo Framework access, startup instructions, and next steps.
+
+### Known Issues
+* There is a known security vulnerability with NLTK that can allow for arbitrary code execution via pickle files that are external assets downloaded via nltk.download() (https://github.com/nltk/nltk/issues/3266). BioNeMo itself does not use this dependency in any way, however parts of NeMo text-to-speech (nemo.collections.tts) does use this vulnerable codepath. Since NeMo is installed in the BioNeMo release containers, users are urged to exercise caution when using  nemo.collections.tts or nltk.
+
 ## BioNeMo Framework v1.6
 ### New Features
 * [Model Fine-tuning] `model.freeze_layers` fine-tuning config parameter added to freeze a specified number of layers. Thank you to github user [@nehap25](https://github.com/nehap25)!
@@ -6,7 +16,6 @@
 * [OpenFold] MLPerf feature 3.2 bug (mha_fused_gemm) fix has merged.
 * [OpenFold] MLPerf feature 3.10 integrated into bionemo framework.
 * [DiffDock] Updated data loading module for DiffDock model training, changing from sqlite3 backend to webdataset.
-
 
 ## BioNeMo Framework v1.5
 ### New Models

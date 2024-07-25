@@ -1,0 +1,11 @@
+defaults:
+  - pretrain
+
+hydra:
+  searchpath:
+     - ${oc.env:BIONEMO_HOME}/examples/molecule/dsmbind/conf
+
+name: dsmbind_training_test
+
+train:
+  ckpt_dir: ${oc.env:BIONEMO_HOME}/test_results/${name} # directory to checkpoints

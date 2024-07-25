@@ -352,7 +352,7 @@ class InterpVarGaussianHiddenTransform(MegatronBaseHiddenTransform):
 for hidden_transform in [SampledVarGaussianHiddenTransform, InterpVarGaussianHiddenTransform]:
     register_hidden_transform(
         hidden_transform.__NAME__,
-        inspect.getmodule(hidden_transform).__name__ + '.' + hidden_transform.__qualname__,
+        inspect.getmodule(hidden_transform).__name__ + "." + hidden_transform.__qualname__,
     )
 
 # NOTE: to register all hidden losses use: register_hidden_loss("loss_name", inspect.getmodule(LossClass).__name__ + '.' + LossClass.__qualname__)

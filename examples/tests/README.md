@@ -23,7 +23,7 @@ For the stop-and-go tests to work properly, there are two conditions that need t
 1. The metadata that is saved and later used for comparison should be saved at the same time as the checkpoint from which training is resumed later on so that the numbers match.
 2. The kill signal should occur after both the metadata and the corresponding checkpoint have been saved. A training run with 8 training steps was chosen to keep the test duration short, with validation and therefore checkpoint saving happening every 2 steps.
 
-### Callback Setup 
+### Callback Setup
 
 The metadata saving and the killing of the process are two separate callbacks. The kill callback is now executed with the hook on_training_batch_start, executing at at the start of every training batch. To prevent it from killing the job at the start of training, we make the execution of the kill callback conditional on the presence of the metadata file: if there is no metadata file detected, the kill callback will do nothing. Once a metadata file is detected, the job is killed, meaning the job is killed as soon as the first training batch after the validation epoche starts, mimicking the desired behavior from option 1 closely.
 
@@ -50,7 +50,7 @@ Stop-and-go tests can be extended in two main ways:
 
 #### Add support for a new model
 
-For adding a new model, the `TEST_PARAMS` dictionary in `examples/tests/test_stop_and_go.py` should be extended with an entry for this new model. This entry should include 
+For adding a new model, the `TEST_PARAMS` dictionary in `examples/tests/test_stop_and_go.py` should be extended with an entry for this new model. This entry should include
 
 - the path to the training script for this model (`script_path`)
 - the key of the metadata (i.e. a parameter) that should be checked between restarts (`metadata_keys`). The valid arguments here are defined in `getter_function_map` in `bionemo/callbacks/testing_callbacks.py`.

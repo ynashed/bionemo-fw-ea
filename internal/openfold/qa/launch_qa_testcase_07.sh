@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --account=healthcareeng_bionemo
 #SBATCH --partition=cpu_long
-#SBATCH 
+#SBATCH
 #SBATCH --nodes=1
 #SBATCH --time=4-00:00:00                 # wall time
 #SBATCH --mail-type=FAIL           # only send email on failure
@@ -31,10 +31,10 @@
 #   (a) Load model from checkpoint
 #   (b) Run inference on sequences
 #   (c) Inference results are outputted
-#   
+#
 # expected results / success criteria:
 #   (1) Estimated run time: 2 days
-#   (2) At ${OUTPUT_DIR}/data_out/artifacts/ you should find the 
+#   (2) At ${OUTPUT_DIR}/data_out/artifacts/ you should find the
 #       directories and files:
 #     ├── open_protein_set
 #     │   ├── original  # unchanged
@@ -87,9 +87,9 @@ srun --mpi=pmix \
     	 export HYDRA_FULL_ERROR=1 &&
          echo "'date=$(date +'%Y%m%dT%H%M')'" &&
          cd /workspace/bionemo &&
-	 echo 'launch_qa_testcase_07.sh - before install_third_party.sh' &&  
+	 echo 'launch_qa_testcase_07.sh - before install_third_party.sh' &&
 	 ./examples/protein/openfold/scripts/install_third_party.sh &&
- 	 echo 'launch_qa_testcase_07.sh - after install_third_party.sh' &&  
+ 	 echo 'launch_qa_testcase_07.sh - after install_third_party.sh' &&
   	 echo 'launch_qa_testcase_07.sh - before train.py' &&
          python examples/protein/openfold/train.py \
  	 	do_training=False \
@@ -99,8 +99,6 @@ srun --mpi=pmix \
 
 	 echo "'date=$(date +'%Y%m%dT%H%M')'" &&
   	 echo 'launch_qa_testcase_07.sh - after everything'
-	 " 
+	 "
 set +x
 printf "${MESSAGE_TEMPLATE}" "end with success"
-
-

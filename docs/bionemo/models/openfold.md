@@ -1,4 +1,4 @@
-# OpenFold 
+# OpenFold
 # Model Overview
 
 ## User guide
@@ -8,12 +8,12 @@ We provide example training and inference scripts under `examples/protein/openfo
 python download_artifacts.py --models openfold_finetuning_inhouse --model_dir models  # NGC setup is required
 ```
 
-If users are interested in diving into BioNeMo in details, users can refer to `bionemo/model/protein/openfold` for the model class and `bionemo/data/protein/openfold` for data utilities. Configuration parsing is handled by [hydra config](https://hydra.cc/docs/intro/) and default parameters are stored in yaml format.
+If users are interested in diving into BioNeMo in details, users can refer to `bionemo/model/protein/openfold` for the model class and `bionemo/data/protein/openfold` for data utilities. Configuration parsing is handled by [hydra config](https://hydra.cc/docs/intro/) and default parameters are stored in yaml format.  Find these config yamls in examples/protein/openfold/config.
 
 ### Inference
-Users can initiate inference with `examples/protein/openfold/infer.py` and provide the input sequence(s) and optional multiple sequence alignment(s) (MSA) for inference. There is MSA data in ${model.data.dataset_path}/inference/msas/, and users can follow a step-by-step guidance in jupyter notebook in `nbs/inference.ipynb` if desired. If the notebook fails due to a timeout error, increate inference_timeout_s to 300 at `ModelClient("localhost", "bionemo_openfold", inference_timeout_s= 180)`.
+Users can initiate inference with `examples/protein/openfold/infer.py` and provide the input sequence(s) and optional multiple sequence alignment(s) (MSA) for inference. There is MSA data in ${model.data.dataset_path}/inference/msas/, and users can follow a step-by-step guidance in jupyter notebook in `nbs/inference.ipynb` if desired. If the notebook fails due to a timeout error, increase inference_timeout_s to 300 at `ModelClient("localhost", "bionemo_openfold", inference_timeout_s= 180)`.
 
-For additional template-based inference, users would provide template hhr or generate templates on-the-fly after installing the necessary alignment software under `scripts/install_third_party.sh`. Alternatively, users can download the pdb70 database. To do this, download http://wwwuser.gwdg.de/~compbiol/data/hhsuite/databases/hhsuite_dbs/old-releases/pdb70_from_mmcif_200401.tar.gz. Then, perform alignments on the desired sequences with `scripts/precompute_alignments`. Then, generate_templates_if_missing should be set to True and the value pdb70_database_path in conf/infer.yaml to should be set to the pdb directory. 
+For additional template-based inference, users would provide template hhr or generate templates on-the-fly after installing the necessary alignment software under `scripts/install_third_party.sh`. Alternatively, users can download the pdb70 database. To do this, download http://wwwuser.gwdg.de/~compbiol/data/hhsuite/databases/hhsuite_dbs/old-releases/pdb70_from_mmcif_200401.tar.gz. Then, perform alignments on the desired sequences with `scripts/precompute_alignments`. Then, generate_templates_if_missing should be set to True and the value pdb70_database_path in conf/infer.yaml to should be set to the pdb directory.
 
 More details are available in `conf/infer.yaml`.
 
@@ -34,7 +34,7 @@ python examples/protein/openfold/train.py --config-name openfold_finetuning.yaml
 ```
 
 ## Description:
-<!-- This document gives a brief summary of the BioNeMo framework's implementation of OpenFold. This implementation is derived from public OpenFold and DeepMind AlphaFold-2.  Below we summarize 
+<!-- This document gives a brief summary of the BioNeMo framework's implementation of OpenFold. This implementation is derived from public OpenFold and DeepMind AlphaFold-2.  Below we summarize
 - user guide on inference and training
 - dataset and preprocessing
 - accuracy and runtime results -->
@@ -151,7 +151,7 @@ OpenFold under BioNeMo framework  <br>
 
 ## Accuracy Benchmarks
 
-Accuracy and performance benchmarks were obtain with the following machine configurations:
+Accuracy and performance benchmarks were obtained with the following machine configurations:
 
 
 ### Cluster specs
@@ -169,12 +169,12 @@ The following parameters are described and configured in the current version of 
 
 #### Optimisations
 
-In the BioNeMo - OpenFold project, we integrate optimisations from the NVIDIA team that submits code to [MLPerf benchmarks](https://mlcommons.org/benchmarks/training-hpc/). Here we give more detail on the specific optimisations available in the BioNeMo Project. 
+In the BioNeMo - OpenFold project, we integrate optimisations from the NVIDIA team that submits code to [MLPerf benchmarks](https://mlcommons.org/benchmarks/training-hpc/). Here we give more detail on the specific optimisations available in the BioNeMo Project.
 
-| optimisation setting                     | integrated        | employed in training speed benchmark|
+| optimisation setting                     | integrated into bionemo        | employed in training speed benchmark|
 | :--------------------------------------: | :---------------: | :---------------------------: |
 | model.optimisations=[mha_fused_gemm]     |       yes         |       no                      |
-| model.optimisations=[dataloader_pq]      |       yes         |       no                      |
+| model.optimisations=[dataloader_pq]      |       yes         |       yes                     |
 | trainer.precision=bf16-mixed precision   |       yes         |       yes                     |
 | model.optimisations=[layernorm_inductor] |       yes         |       yes                     |
 | model.optimisations=[layernorm_triton]   |       yes         |       yes                     |
@@ -183,30 +183,8 @@ In the BioNeMo - OpenFold project, we integrate optimisations from the NVIDIA te
 
 ### Initial Training
 
-In the table below, we show the results of initial training benchmarks, with the following protocol.  
-We run training with a large value of 'trainer.max_steps' and when we see the validation metric (lddt-ca) for 
-the EMA model above 89%, we manually end the training job.  As a post-processing step we compute metrics
-
-$$ \text{crossing-step}  = \text{the first training step when the validation metric is larger than 89\%} $$
-
-$$ \text{time-wo-val-days } = \text{ training time without validation phase, in days, until the crossing-step } $$
-$$ \text{time-wi-val-days } = \text{ training time with validation phase, in days, until the crossing-step } $$
-$$ \text{training-speed-kpi} = \frac{\text{sum of training step times with no optimizations, until the crossing-step}}{\text{sum of training step times with optimization setting X, until the crossing-step}} $$
-
-These training jobs are conducted with the settings in the config file 
-`examples/protein/openfold/config/openfold_initial_training.yaml`, 
-with certain parameters having the override values in the table.  Each training 
-job is a sequence of sub-jobs, each sub-job managed by 
-[slurm](https://slurm.schedmd.com/sbatch.html) with a 4h walltime.
-
-| model.optimisations                             | trainer.precision | machine spec | job completion date | level | crossing-step | training step time [secs] |time-wo-val-days | time-wi-val-days  | training-speed-kpi |
-| :----------------------------------------------: | :------: | :----: | :----: | :--:| :----: | :----: | :----: | :----: | :----: |
-| []                                               |   32   | O| 2024-05-28 | 89.0 | 44773 | 7.28 | 3.77 |  3.92 | 1 |
-| [layernorm_inductor,layernorm_triton,mha_triton] |   bf16-mixed   | O | 2024-06-13 | 89.0 | 44372 | 6.21 | 3.19 | 3.34 | 1.18 |
-
-
-and in another set of runs:
-
+We conducted a set of training experiments, for a fixed number of 80,000 steps, and report the final value
+of the validation metric, LDDT-CA [%], compute on the Evaluation Dataset described above.
 
 | model.optimisations                             | trainer.precision | model.num_steps_per_epoch | machine spec | LDDT-CA [%] | job-completion date |
 | :------------------------------------------------: | :------: | :----: | :----: | :--:| :----: |
@@ -214,10 +192,13 @@ and in another set of runs:
 | []                                                |   32   | 80,000 | O | 90.030 | 2024-04-29 |
 | [layernorm_inductor,layernorm_triton,mha_triton]  |   bf16-mixed   | 80,000 | O | 90.025 | 2024-04-19 |
 
-These runs were carried out with
-1. trainer.max_epochs=1
+For the row above labeled 'no optimisations implemented with this version', the parameter
+'model.optimistaions' did not exist
+
 
 ### Fine tuning
+
+We conducted a set of fine-tuning experiments, with a pre-specified fixed number of 12,000 steps.
 
 | model.optimisations                              | trainer.precision | model.num_steps_per_epoch | machine spec | LDDT-CA [%] | job-completion date |
 | :----------------------------------------------: | :------: | :----: | :----: | :--: | :------: |
@@ -228,17 +209,36 @@ These runs were carried out with
 
 ### Initial Training
 
-| model.optimisations                                | trainer.precision | model.num_steps_per_epoch | machine spec | time per training step (sec) | speed-up | job-completion date |
-| :------------------------------------------------: | :------: | :----: | :----: | :---: | :---: | :---: |
-| []                                                |   32   | 1000 | O | 6.71 | 1.0 | 2024-04-02 |
-| [layernorm_inductor,layernorm_triton,mha_triton]  |   bf16-mixed   | 1000 | O | 6.00 | 1.12 | 2024-04-03 |
+In the table below, we show the results of initial training benchmarks, with the following protocol.
+For run 'a', we run training with a large value of 'trainer.max_steps' and when we see the validation metric (lddt-ca) for
+the EMA model above 89%, we manually end the training job.  As a post-processing step we compute metrics
 
-These runs were carried out with
-1. trainer.max_epochs=1
-2. The first 20 training steps are ommited from the 'time per training step', since they are consider 'warm-up'.
+$$ \text{crossing-step}  = \text{the first training step when the validation metric is larger than 89\%} $$
 
+For the other runs 'b' and 'c', we run training until the step execeeds the crossing step for run 'a'
+
+For all runs 'a', 'b', 'c', we set the termination-step to the value of the crossing-step obtained for run 'a',
+and then we compute:
+
+$$ \text{time-wo-val-days } = \text{ training time without validation phase, in days, until the termination-step} $$
+$$ \text{time-wi-val-days } = \text{ training time with validation phase, in days, until the termination-step } $$
+$$ \text{training-speed-kpi} = \frac{\text{sum of training step times for run 'a', until the termination-step}}{\text{sum of training step times with optimization setting X, until the termination-step}} $$
+
+These training jobs are conducted with the settings in the config file
+`examples/protein/openfold/config/openfold_initial_training.yaml`,
+with certain parameters having the override values in the table.  Each training
+job is a sequence of sub-jobs, each sub-job managed by
+[slurm](https://slurm.schedmd.com/sbatch.html) with a 4h walltime.
+
+| run id | model.optimisations                             | trainer.precision | machine spec | job completion date | termination-step | training step time [secs] |time-wo-val-days | time-wi-val-days  | training-speed-kpi |
+|:---: | :----------------------------------------------: | :------: | :----: | :----: | :--:| :----: | :----: | :----: | :----: |
+| a | []                                               |   32   | O| 2024-05-28 | 44773 | 7.28 | 3.77 |  3.92 | 1 |
+| b | [layernorm_inductor,layernorm_triton,mha_triton] |   bf16-mixed   | O | 2024-06-13 | 44773 | 6.21 | 3.19 | 3.34 | 1.18 |
+| c | [layernorm_inductor,layernorm_triton,mha_triton, dataloader_pq] |   bf16-mixed   | O | 2024-06-22 | 44773 | 5.92 | 3.07 | 3.22 | 1.23 |
 
 ### Fine-tuning
+
+For fine-tuning, we conducted a single experiment with a fixed number of steps: 12,000.
 
 | model.optimisations                              | trainer.precision | model.num_steps_per_epoch | machine spec | time per training step (sec) | job-completion date |
 | :----------------------------------------------: | :---------------: | :----------------------:  | :----------: | :--------:  | :-----------------: |

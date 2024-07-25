@@ -110,10 +110,10 @@ def _score_small_eps(omega, eps):
 
 if os.path.exists(os.path.join(package_path, ".so3.npz")):
     so3 = np.load(os.path.join(package_path, ".so3.npz"))
-    _omegas_array = so3['_omegas_array']
-    _cdf_vals = so3['_cdf_vals']
-    _score_norms = so3['_score_norms']
-    _exp_score_norms = so3['_exp_score_norms']
+    _omegas_array = so3["_omegas_array"]
+    _cdf_vals = so3["_cdf_vals"]
+    _score_norms = so3["_score_norms"]
+    _exp_score_norms = so3["_exp_score_norms"]
 else:
     _eps_array = (10 ** np.linspace(np.log10(MIN_EPS), np.log10(MAX_EPS), N_EPS)).astype(np.float128)
     _omegas_array = np.linspace(0, np.pi, X_N + 1)[1:].astype(np.float128)

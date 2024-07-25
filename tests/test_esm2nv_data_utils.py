@@ -11,6 +11,7 @@
 """
 This file tests the data-related utilities for ESM2.
 """
+
 import os
 
 import pytest
@@ -25,7 +26,7 @@ from bionemo.utils.tests import teardown_apex_megatron_cuda
 
 @pytest.fixture(scope="function")
 def cfg(config_path_for_tests):
-    cfg = load_model_config(config_name='esm2nv_data_test', config_path=config_path_for_tests)
+    cfg = load_model_config(config_name="esm2nv_data_test", config_path=config_path_for_tests)
     # Ensure default ESM2 pretraining behavior
     assert cfg.model.data.train.custom_pretraining_fasta_path is None
     assert cfg.model.data.val.custom_pretraining_fasta_path is None
@@ -52,8 +53,8 @@ def test_esm2nv_model_creates_train_dataset_with_expected_number_of_samples(mode
     assert len(train_dataset) == 10
     assert sample is not None
     assert isinstance(sample, dict)
-    assert isinstance(sample['sequence'], str)
-    assert isinstance(sample['sequence_id'], str)
+    assert isinstance(sample["sequence"], str)
+    assert isinstance(sample["sequence_id"], str)
 
 
 def test_esm2nv_model_creates_train_dataset_fails_when_num_samples_is_none(model, cfg):
@@ -72,8 +73,8 @@ def test_esm2nv_model_creates_validation_dataset_with_valid_outputs_given_num_sa
     assert len(val_dataset) == 200
     assert sample is not None
     assert isinstance(sample, dict)
-    assert isinstance(sample['sequence'], str)
-    assert isinstance(sample['sequence_id'], str)
+    assert isinstance(sample["sequence"], str)
+    assert isinstance(sample["sequence_id"], str)
 
 
 def test_esm2nv_model_creates_validation_dataset_with_set_length(model, cfg):
@@ -86,8 +87,8 @@ def test_esm2nv_model_creates_validation_dataset_with_set_length(model, cfg):
 
     assert sample is not None
     assert isinstance(sample, dict)
-    assert isinstance(sample['sequence'], str)
-    assert isinstance(sample['sequence_id'], str)
+    assert isinstance(sample["sequence"], str)
+    assert isinstance(sample["sequence_id"], str)
 
 
 def test_esm2nv_model_creates_test_dataset_with_valid_outputs(model, cfg):
@@ -97,8 +98,8 @@ def test_esm2nv_model_creates_test_dataset_with_valid_outputs(model, cfg):
     sample = next(iter(test_dataset))
     assert sample is not None
     assert isinstance(sample, dict)
-    assert isinstance(sample['sequence'], str)
-    assert isinstance(sample['sequence_id'], str)
+    assert isinstance(sample["sequence"], str)
+    assert isinstance(sample["sequence_id"], str)
 
 
 def test_esm2nv_model_creates_test_dataset_with_set_length(model, cfg):
@@ -112,8 +113,8 @@ def test_esm2nv_model_creates_test_dataset_with_set_length(model, cfg):
     sample = next(iter(test_dataset))
     assert sample is not None
     assert isinstance(sample, dict)
-    assert isinstance(sample['sequence'], str)
-    assert isinstance(sample['sequence_id'], str)
+    assert isinstance(sample["sequence"], str)
+    assert isinstance(sample["sequence_id"], str)
 
 
 def test_esm2nv_model_build_train_valid_test_datasets_returns_valid_datasets(model):

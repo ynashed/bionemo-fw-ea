@@ -82,22 +82,22 @@ class OpenFoldSampleCreator:
     ]
     SAMPLE_UNICLUST30_IDS = [
         # the first 16 uniclust30 ids
-        'A0A009JVE4',
-        'A0A010PP53',
-        'A0A010Q9I4',
-        'A0A010QBD7',
-        'A0A010QES4',
-        'A0A010QS11',
-        'A0A010QU37',
-        'A0A010QX93',
-        'A0A010R2Y6',
-        'A0A010RA97',
-        'A0A010RHX7',
-        'A0A010RKM9',
-        'A0A010RW12',
-        'A0A010Z0A0',
-        'A0A011NJF4',
-        'A0A011PLK7',
+        "A0A009JVE4",
+        "A0A010PP53",
+        "A0A010Q9I4",
+        "A0A010QBD7",
+        "A0A010QES4",
+        "A0A010QS11",
+        "A0A010QU37",
+        "A0A010QX93",
+        "A0A010R2Y6",
+        "A0A010RA97",
+        "A0A010RHX7",
+        "A0A010RKM9",
+        "A0A010RW12",
+        "A0A010Z0A0",
+        "A0A011NJF4",
+        "A0A011PLK7",
     ]
 
     def __init__(
@@ -105,8 +105,8 @@ class OpenFoldSampleCreator:
         dataset_root_path: Union[str, Path],
         output_root_path: Optional[Union[str, Path]] = None,
         num_shards: int = 3,
-        source_variant: str = 'processed',
-        sample_variant: str = 'processed_sample',
+        source_variant: str = "processed",
+        sample_variant: str = "processed_sample",
         force: bool = False,
     ):
         """Initialises OpenFoldSampleCreator
@@ -174,11 +174,11 @@ class OpenFoldSampleCreator:
         # In case self.source_variant or self.sample_variant change (intentionally), we create input
         # and output dirs dynamically here
 
-        input_pdb_mmcif_dirpath = self.dataset_root_path / 'pdb_mmcif' / self.source_variant
-        input_open_protein_set_dirpath = self.dataset_root_path / 'open_protein_set' / self.source_variant
+        input_pdb_mmcif_dirpath = self.dataset_root_path / "pdb_mmcif" / self.source_variant
+        input_open_protein_set_dirpath = self.dataset_root_path / "open_protein_set" / self.source_variant
 
-        output_pdb_mmcif_dirpath = self.output_root_path / 'pdb_mmcif' / self.sample_variant
-        output_open_protein_set_dirpath = self.output_root_path / 'open_protein_set' / self.sample_variant
+        output_pdb_mmcif_dirpath = self.output_root_path / "pdb_mmcif" / self.sample_variant
+        output_open_protein_set_dirpath = self.output_root_path / "open_protein_set" / self.sample_variant
 
         # Create output directories for the `processed_sample` variant:
         output_pdb_mmcif_dirpath.mkdir(exist_ok=True, parents=True)
@@ -206,7 +206,7 @@ class OpenFoldSampleCreator:
 
         # Load and filter uniclust30_targets for the `processed_sample` variant:
         if sample_uniclust30_ids is not None:
-            with open(input_open_protein_set_dirpath / 'uniclust30_targets' / 'super.index') as f:
+            with open(input_open_protein_set_dirpath / "uniclust30_targets" / "super.index") as f:
                 input_uniclust30_targets_super_index = json.load(f)
 
             output_uniclust30_targets = {}
@@ -214,7 +214,7 @@ class OpenFoldSampleCreator:
                 output_uniclust30_target = load_uniclust30_target(
                     targets_super_index=input_uniclust30_targets_super_index,
                     target_key=sample_uniclust30_id,
-                    uniclust30_targets_dirpath=input_open_protein_set_dirpath / 'uniclust30_targets',
+                    uniclust30_targets_dirpath=input_open_protein_set_dirpath / "uniclust30_targets",
                 )
                 output_uniclust30_targets[sample_uniclust30_id] = output_uniclust30_target
 
@@ -304,24 +304,24 @@ def _save_processed_sample_uniclust30_targets(
     output_uniclust30_targets_super_index = {}
 
     for shard_id, shard_data in shards.items():
-        shard_filepath = output_uniclust30_targets_filepath / f'{shard_id}.db'
-        with shard_filepath.open('wb') as f_out:
+        shard_filepath = output_uniclust30_targets_filepath / f"{shard_id}.db"
+        with shard_filepath.open("wb") as f_out:
             start = 0
             for uniclust30_id, output_uniclust30_target in shard_data:
                 f_out.write(output_uniclust30_target)
 
                 # Update super index
-                target_files = input_uniclust30_targets_super_index[uniclust30_id]['files']
+                target_files = input_uniclust30_targets_super_index[uniclust30_id]["files"]
                 assert len(target_files) == 1
 
                 size = len(output_uniclust30_target)
                 output_uniclust30_targets_super_index[uniclust30_id] = {
-                    'db': f'{shard_id}.db',
-                    'files': [[uniclust30_id, start, size]],
+                    "db": f"{shard_id}.db",
+                    "files": [[uniclust30_id, start, size]],
                 }
                 start += size
 
-    with (output_uniclust30_targets_filepath / 'super.index').open('w') as f:
+    with (output_uniclust30_targets_filepath / "super.index").open("w") as f:
         json.dump(output_uniclust30_targets_super_index, f)
 
 

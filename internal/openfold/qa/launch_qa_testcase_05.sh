@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --account=healthcareeng_bionemo
 #SBATCH --partition=interactive
-#SBATCH 
+#SBATCH
 #SBATCH --nodes=1
 #SBATCH --gpus-per-node 8
 #SBATCH --time 01:00:00                 # wall time
@@ -33,13 +33,13 @@
 #   (a) Load model from checkpoint
 #   (b) Run inference on sequences
 #   (c) Inference results are outputted
-#   
+#
 # expected results / success criteria:
 #   (1) There is a single slurm job
 #   (2) Estimated run time: Once the slurm job has started, the run will take less than 10 minutes
 #   (3) Users should obtain 10 files, in the directory ${OUTPUT_DIR}/artifacts/inference-cli, called
 #         one.pdb, two.pdb, … ten.pdb, each around 12kb
-#       
+#
 #
 # updated / reviewed: 2024-05-22
 #
@@ -88,12 +88,10 @@ srun --mpi=pmix \
 	++model.data.msa_a3m_filepaths=null \
         trainer.num_nodes=1 \
         trainer.devices=1 \
-	++exp_manager.exp_dir=/result			
+	++exp_manager.exp_dir=/result
 
 	echo "'date=$(date +'%Y%m%dT%H%M')'" &&
   	echo 'launch_qa_testcase_05.sh - after everything'
 	"
 set +x
 printf "${MESSAGE_TEMPLATE}" "end with success"
-
-

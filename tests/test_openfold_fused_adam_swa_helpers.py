@@ -8,8 +8,7 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
-"""Test module to check correct functionality of
-"""
+"""Test module to check correct functionality of"""
 
 import torch
 from torch import Tensor  # noqa

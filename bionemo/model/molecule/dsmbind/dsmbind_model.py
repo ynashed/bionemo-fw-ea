@@ -83,9 +83,7 @@ class DSMBind(nn.Module):
         )
         dist = (
             bind_X.view(B, N * self.max_residue_atoms, 1, 3) - tgt_X.view(B, 1, M * self.max_residue_atoms, 3)
-        ).norm(
-            dim=-1
-        )  # [B,N*self.max_residue_atoms,M*self.max_residue_atoms]
+        ).norm(dim=-1)  # [B,N*self.max_residue_atoms,M*self.max_residue_atoms]
         mask_2D = mask_2D * (dist < self.threshold).float()
 
         # Compute the energy
@@ -133,9 +131,7 @@ class DSMBind(nn.Module):
         )
         dist = (
             bind_X.view(B, N * self.max_residue_atoms, 1, 3) - tgt_X.view(B, 1, M * self.max_residue_atoms, 3)
-        ).norm(
-            dim=-1
-        )  # [B,N*self.max_residue_atoms,M*self.max_residue_atoms]
+        ).norm(dim=-1)  # [B,N*self.max_residue_atoms,M*self.max_residue_atoms]
         mask_2D = mask_2D * (dist < self.threshold).float()
 
         h = self.encoder(

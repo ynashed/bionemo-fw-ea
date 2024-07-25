@@ -33,8 +33,8 @@ class SingleValueDataset(Dataset):
         max_seq_length,
         emb_batch_size=None,
         model=None,
-        input_column: str = 'SMILES',
-        target_column: str = 'y',
+        input_column: str = "SMILES",
+        target_column: str = "y",
         task: str = "regression",
         shuffle=False,
     ):
@@ -116,13 +116,13 @@ class SingleValueDataset(Dataset):
     @staticmethod
     def prepare_batch(batch, data, task):
         if task == "regression":
-            target = batch['target'].float().to("cuda").reshape(-1, 1)
+            target = batch["target"].float().to("cuda").reshape(-1, 1)
         elif task == "classification":
-            target = batch['target'].long().to("cuda").reshape(-1)
-        if type(batch['embeddings'][0]) is np.str_:
-            embeddings = batch['embeddings']
+            target = batch["target"].long().to("cuda").reshape(-1)
+        if type(batch["embeddings"][0]) is np.str_:
+            embeddings = batch["embeddings"]
         else:
-            embeddings = batch['embeddings'].float().to("cuda")
+            embeddings = batch["embeddings"].float().to("cuda")
         return embeddings, target
 
 

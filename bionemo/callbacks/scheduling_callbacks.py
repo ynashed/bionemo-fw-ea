@@ -45,7 +45,7 @@ class ParameterMultiplicativeScheduler(Callback):
 
     def setup(self, trainer: Trainer, pl_module: LightningModule, stage: str) -> None:
         super().setup(trainer, pl_module, stage)
-        if self.state['parameter'] is None:
+        if self.state["parameter"] is None:
             # Initialize the parameter if it is None (eg not loaded from a checkpoint)
             self.state["parameter"] = self.get_attr(pl_module, self.module_parameter_path)
         self.update_parameter(pl_module, log=False)  # Don't log in setup.

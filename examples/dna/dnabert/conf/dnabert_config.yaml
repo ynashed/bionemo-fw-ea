@@ -1,7 +1,7 @@
 defaults:
   - dnabert_base_config
 
-# 2 devices 
+# 2 devices
 trainer:
   devices: 2
   val_check_interval: 10000

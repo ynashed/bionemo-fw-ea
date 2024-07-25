@@ -36,7 +36,7 @@ from bionemo.utils.hydra import load_model_config
 from bionemo.utils.tests import teardown_apex_megatron_cuda
 
 
-SEQS = ['MSLKRKNIALIPAAGIGVRFGADKPKQYVEIGSKTVLEHVL', 'MIQSQINRNIRLDLADAILLSKAKKDLSFAEIADGTGLA']
+SEQS = ["MSLKRKNIALIPAAGIGVRFGADKPKQYVEIGSKTVLEHVL", "MIQSQINRNIRLDLADAILLSKAKKDLSFAEIADGTGLA"]
 
 MODEL_NAME = "esm1nv"
 
@@ -44,7 +44,7 @@ NAME_EMBEDDINGS = complete_model_name(MODEL_NAME, EMBEDDINGS)
 NAME_HIDDENS = complete_model_name(MODEL_NAME, HIDDENS)
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope="module")
 def cfg(bionemo_home: Path) -> DictConfig:
     return load_model_config(
         config_path=str(bionemo_home / "examples" / "protein" / MODEL_NAME / "conf"),
@@ -53,7 +53,7 @@ def cfg(bionemo_home: Path) -> DictConfig:
     )
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope="module")
 def model(cfg: DictConfig) -> ESM1nvInference:
     # TODO [mgreaves] replace with this in !553
     # model = load_model_for_inference(cfg, interactive=False)
@@ -61,7 +61,7 @@ def model(cfg: DictConfig) -> ESM1nvInference:
     teardown_apex_megatron_cuda()
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope="module")
 def server(cfg: DictConfig, model: ESM1nvInference) -> Triton:
     triton = Triton()
     bind_embedding(triton, cfg, model, nav=False, triton_model_name=NAME_EMBEDDINGS)

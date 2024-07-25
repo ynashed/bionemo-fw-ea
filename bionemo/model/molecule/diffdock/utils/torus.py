@@ -42,15 +42,15 @@ SIGMA_MIN, SIGMA_MAX, SIGMA_N = 3e-3, 2, 5000  # relative to pi
 x = 10 ** np.linspace(np.log10(X_MIN), 0, X_N + 1) * np.pi
 sigma = 10 ** np.linspace(np.log10(SIGMA_MIN), np.log10(SIGMA_MAX), SIGMA_N + 1) * np.pi
 
-if os.path.exists(os.path.join(package_path, '.torus.npz')):
-    torus = np.load(os.path.join(package_path, '.torus.npz'))
-    p_ = torus['p_']
-    score_ = torus['score_']
+if os.path.exists(os.path.join(package_path, ".torus.npz")):
+    torus = np.load(os.path.join(package_path, ".torus.npz"))
+    p_ = torus["p_"]
+    score_ = torus["score_"]
 else:
     p_ = p(x, sigma[:, None], N=100)
     score_ = grad(x, sigma[:, None], N=100) / p_
 
-    np.savez(os.path.join(package_path, '.torus.npz'), p_=p_, score_=score_)
+    np.savez(os.path.join(package_path, ".torus.npz"), p_=p_, score_=score_)
 
 
 def score(x, sigma):

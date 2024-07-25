@@ -57,7 +57,7 @@ class MSAColumnAttention(nn.Module):
     ) -> None:
         super(MSAColumnAttention, self).__init__()
         self.layer_norm_m = LayerNorm(c_m)
-        if OptimHub.config('mha_fused_gemm'):  # [optim-hub]
+        if OptimHub.config("mha_fused_gemm"):  # [optim-hub]
             self.mha = SelfAttentionWithGate(
                 c_qkv=c_m,
                 c_hidden=c_hidden,
@@ -102,7 +102,7 @@ class MSAColumnAttention(nn.Module):
         # mask: [batch, N_res, 1, 1, N_seq]
 
         m_transposed_normalized = self.layer_norm_m(m_transposed)
-        if OptimHub.config('mha_fused_gemm'):
+        if OptimHub.config("mha_fused_gemm"):
             m = self.mha(
                 input_qkv=m_transposed_normalized,
                 mask=mask,

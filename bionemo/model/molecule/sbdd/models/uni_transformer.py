@@ -32,9 +32,9 @@ class BaseX2HAttLayer(nn.Module):
         n_heads,
         edge_feat_dim,
         r_feat_dim,
-        act_fn='relu',
+        act_fn="relu",
         norm=True,
-        ew_net_type='r',
+        ew_net_type="r",
         out_fc=True,
     ):
         super().__init__()
@@ -57,9 +57,9 @@ class BaseX2HAttLayer(nn.Module):
 
         # attention query func
         self.hq_func = MLP(input_dim, output_dim, hidden_dim, norm=norm, act_fn=act_fn)
-        if ew_net_type == 'r':
+        if ew_net_type == "r":
             self.ew_net = nn.Sequential(nn.Linear(r_feat_dim, 1), nn.Sigmoid())
-        elif ew_net_type == 'm':
+        elif ew_net_type == "m":
             self.ew_net = nn.Sequential(nn.Linear(output_dim, 1), nn.Sigmoid())
 
         if self.out_fc:
@@ -81,9 +81,9 @@ class BaseX2HAttLayer(nn.Module):
         # compute v
         v = self.hv_func(kv_input)
 
-        if self.ew_net_type == 'r':
+        if self.ew_net_type == "r":
             e_w = self.ew_net(r_feat)
-        elif self.ew_net_type == 'm':
+        elif self.ew_net_type == "m":
             e_w = self.ew_net(v[..., : self.hidden_dim])
         elif e_w is not None:
             e_w = e_w.view(-1, 1)
@@ -120,9 +120,9 @@ class BaseH2XAttLayer(nn.Module):
         n_heads,
         edge_feat_dim,
         r_feat_dim,
-        act_fn='relu',
+        act_fn="relu",
         norm=True,
-        ew_net_type='r',
+        ew_net_type="r",
     ):
         super().__init__()
         self.input_dim = input_dim
@@ -139,7 +139,7 @@ class BaseH2XAttLayer(nn.Module):
         self.xk_func = MLP(kv_input_dim, output_dim, hidden_dim, norm=norm, act_fn=act_fn)
         self.xv_func = MLP(kv_input_dim, self.n_heads, hidden_dim, norm=norm, act_fn=act_fn)
         self.xq_func = MLP(input_dim, output_dim, hidden_dim, norm=norm, act_fn=act_fn)
-        if ew_net_type == 'r':
+        if ew_net_type == "r":
             self.ew_net = nn.Sequential(nn.Linear(r_feat_dim, 1), nn.Sigmoid())
 
     def forward(self, h, rel_x, r_feat, edge_feat, edge_index, e_w=None):
@@ -155,9 +155,9 @@ class BaseH2XAttLayer(nn.Module):
 
         k = self.xk_func(kv_input).view(-1, self.n_heads, self.output_dim // self.n_heads)
         v = self.xv_func(kv_input)
-        if self.ew_net_type == 'r':
+        if self.ew_net_type == "r":
             e_w = self.ew_net(r_feat)
-        elif self.ew_net_type == 'm':
+        elif self.ew_net_type == "m":
             e_w = 1.0
         elif e_w is not None:
             e_w = e_w.view(-1, 1)
@@ -184,14 +184,14 @@ class AttentionLayerO2TwoUpdateNodeGeneral(nn.Module):
         n_heads,
         num_r_gaussian,
         edge_feat_dim,
-        act_fn='relu',
+        act_fn="relu",
         norm=True,
         num_x2h=1,
         num_h2x=1,
         r_min=0.0,
         r_max=10.0,
         num_node_types=8,
-        ew_net_type='r',
+        ew_net_type="r",
         x2h_out_fc=True,
         sync_twoup=False,
     ):
@@ -287,10 +287,10 @@ class UniTransformerO2TwoUpdateGeneral(nn.Module):
         num_r_gaussian=50,
         edge_feat_dim=0,
         num_node_types=8,
-        act_fn='relu',
+        act_fn="relu",
         norm=True,
-        cutoff_mode='radius',
-        ew_net_type='r',
+        cutoff_mode="radius",
+        ew_net_type="r",
         num_init_x2h=1,
         num_init_h2x=0,
         num_x2h=1,
@@ -323,7 +323,7 @@ class UniTransformerO2TwoUpdateGeneral(nn.Module):
         self.x2h_out_fc = x2h_out_fc
         self.sync_twoup = sync_twoup
         self.distance_expansion = GaussianSmearing(0.0, r_max, num_gaussians=num_r_gaussian)
-        if self.ew_net_type == 'global':
+        if self.ew_net_type == "global":
             self.edge_pred_layer = MLP(num_r_gaussian, 1, hidden_dim)
 
         self.init_h_emb_layer = self._build_init_h_layer()
@@ -379,16 +379,16 @@ class UniTransformerO2TwoUpdateGeneral(nn.Module):
         return nn.ModuleList(base_block)
 
     def _connect_edge(self, x, mask_ligand, batch):
-        if self.cutoff_mode == 'radius':
-            edge_index = radius_graph(x, r=self.r, batch=batch, flow='source_to_target')
-        elif self.cutoff_mode == 'knn':
-            edge_index = knn_graph(x, k=self.k, batch=batch, flow='source_to_target')
-        elif self.cutoff_mode == 'hybrid':
+        if self.cutoff_mode == "radius":
+            edge_index = radius_graph(x, r=self.r, batch=batch, flow="source_to_target")
+        elif self.cutoff_mode == "knn":
+            edge_index = knn_graph(x, k=self.k, batch=batch, flow="source_to_target")
+        elif self.cutoff_mode == "hybrid":
             edge_index = batch_hybrid_edge_connection(
                 x, k=self.k, mask_ligand=mask_ligand, batch=batch, add_p_index=True
             )
         else:
-            raise ValueError(f'Not supported cutoff mode: {self.cutoff_mode}')
+            raise ValueError(f"Not supported cutoff mode: {self.cutoff_mode}")
         return edge_index
 
     @staticmethod
@@ -422,7 +422,7 @@ class UniTransformerO2TwoUpdateGeneral(nn.Module):
 
             # edge type (dim: 4)
             edge_type = self._build_edge_type(edge_index, mask_ligand)
-            if self.ew_net_type == 'global':
+            if self.ew_net_type == "global":
                 dist = torch.norm(x[dst] - x[src], p=2, dim=-1, keepdim=True)
                 dist_feat = self.distance_expansion(dist)
                 logits = self.edge_pred_layer(dist_feat)
@@ -435,7 +435,7 @@ class UniTransformerO2TwoUpdateGeneral(nn.Module):
             all_x.append(x)
             all_h.append(h)
 
-        outputs = {'x': x, 'h': h}
+        outputs = {"x": x, "h": h}
         if return_all:
-            outputs.update({'all_x': all_x, 'all_h': all_h})
+            outputs.update({"all_x": all_x, "all_h": all_h})
         return outputs

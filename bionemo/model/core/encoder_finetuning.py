@@ -133,7 +133,7 @@ class EncoderFineTuning(ModelPT, Exportable, ABC):
             self.setup_training_data(self.cfg)
         if self.trainer.limit_val_batches > 0:
             self.setup_validation_data(self.cfg)
-        if hasattr(self, '_test_ds'):
+        if hasattr(self, "_test_ds"):
             self.setup_test_data(self.cfg)
 
     def on_test_start(self):
@@ -174,7 +174,7 @@ class EncoderFineTuning(ModelPT, Exportable, ABC):
     def training_step(self, batch, batch_idx):
         loss, _, _ = self._calc_step(batch, batch_idx)
         reduced_loss = average_losses_across_data_parallel_group([loss])
-        self.log('reduced_train_loss', reduced_loss, prog_bar=True)
+        self.log("reduced_train_loss", reduced_loss, prog_bar=True)
         # if we wanted to enable gradient accumulation across batches we could
         # do something more sophisticated like megatron BERT:
         # https://github.com/NVIDIA/NeMo/blob/c9811f14fa1e1f990fd29f1aed1ae08e2ff6b014/nemo/collections/nlp/models/language_modeling/megatron_bert_model.py#L132-L154
@@ -182,11 +182,11 @@ class EncoderFineTuning(ModelPT, Exportable, ABC):
         return loss
 
     def log_stats(self):
-        lr = self._optimizer.param_groups[0]['lr']
-        self.log('lr', lr)
-        self.log('global_step', self.trainer.global_step, prog_bar=True)
+        lr = self._optimizer.param_groups[0]["lr"]
+        self.log("lr", lr)
+        self.log("global_step", self.trainer.global_step, prog_bar=True)
         self.log(
-            'consumed_samples',
+            "consumed_samples",
             compute_consumed_samples(self, self.trainer.global_step - self.init_global_step + 1),
             prog_bar=True,
         )
@@ -198,8 +198,8 @@ class EncoderFineTuning(ModelPT, Exportable, ABC):
             return None
 
         # Megatron sampler
-        if hasattr(self.cfg.data, 'dataloader_type') and self.cfg.data.dataloader_type is not None:
-            if self.cfg.data.dataloader_type == 'single':
+        if hasattr(self.cfg.data, "dataloader_type") and self.cfg.data.dataloader_type is not None:
+            if self.cfg.data.dataloader_type == "single":
                 batch_sampler = MegatronPretrainingSampler(
                     total_samples=len(dataset),
                     consumed_samples=consumed_samples,
@@ -207,7 +207,7 @@ class EncoderFineTuning(ModelPT, Exportable, ABC):
                     data_parallel_rank=parallel_state.get_data_parallel_rank(),
                     data_parallel_size=parallel_state.get_data_parallel_world_size(),
                 )
-            elif self.cfg.data.dataloader_type == 'cyclic':
+            elif self.cfg.data.dataloader_type == "cyclic":
                 batch_sampler = MegatronPretrainingRandomSampler(
                     total_samples=len(dataset),
                     consumed_samples=consumed_samples,
@@ -261,28 +261,28 @@ class EncoderFineTuning(ModelPT, Exportable, ABC):
         self.test_step_outputs.clear()
 
     def setup_training_data(self, cfg):
-        if hasattr(self, '_train_ds'):
+        if hasattr(self, "_train_ds"):
             consumed_samples = compute_consumed_samples(self, 0)
             logging.info(
-                f'Setting up train dataloader with len(len(self._train_ds)): {len(self._train_ds)} and consumed samples: {consumed_samples}'
+                f"Setting up train dataloader with len(len(self._train_ds)): {len(self._train_ds)} and consumed samples: {consumed_samples}"
             )
             self._train_dl = self.build_pretraining_data_loader(self._train_ds, consumed_samples)
             self.data_module.adjust_train_dataloader(self, self._train_dl)
 
     def setup_validation_data(self, cfg):
-        if hasattr(self, '_validation_ds'):
+        if hasattr(self, "_validation_ds"):
             consumed_samples = 0
             logging.info(
-                f'Setting up validation dataloader with len(len(self._validation_ds)): {len(self._validation_ds)} and consumed samples: {consumed_samples}'
+                f"Setting up validation dataloader with len(len(self._validation_ds)): {len(self._validation_ds)} and consumed samples: {consumed_samples}"
             )
             self._validation_dl = self.build_pretraining_data_loader(self._validation_ds, consumed_samples)
             self.data_module.adjust_val_dataloader(self, self._validation_dl)
 
     def setup_test_data(self, cfg):
-        if hasattr(self, '_test_ds'):
+        if hasattr(self, "_test_ds"):
             consumed_samples = 0
             logging.info(
-                f'Setting up test dataloader with len(len(self._test_ds)): {len(self._test_ds)} and consumed samples: {consumed_samples}'
+                f"Setting up test dataloader with len(len(self._test_ds)): {len(self._test_ds)} and consumed samples: {consumed_samples}"
             )
             self._test_dl = self.build_pretraining_data_loader(self._test_ds, consumed_samples)
             self.data_module.adjust_test_dataloader(self, self._test_dl)

@@ -24,17 +24,17 @@ from nemo.utils import logging
 from bionemo.data.utils import handle_index
 
 
-__all__ = ['MappedDataset', 'SliceDataset', 'OnlineSampleMapping', 'ResamplingMappedDataset', 'FilteredMappedDataset']
+__all__ = ["MappedDataset", "SliceDataset", "OnlineSampleMapping", "ResamplingMappedDataset", "FilteredMappedDataset"]
 
 
 class SliceIndex:
     def __init__(self, dataset, start, end):
         if start < 0:
-            raise ValueError(f'start must be > 0: {start}')
+            raise ValueError(f"start must be > 0: {start}")
         if end < start:
-            raise ValueError(f'end must be >= start: {end} not >= {start}')
+            raise ValueError(f"end must be >= start: {end} not >= {start}")
         if end > len(dataset):
-            raise ValueError(f'end must be <= dataset length: {end} not <= {len(dataset)}')
+            raise ValueError(f"end must be <= dataset length: {end} not <= {len(dataset)}")
 
         self.start = start
         self.end = end
@@ -131,19 +131,19 @@ class SliceDataset(MappedDataset):
 
 def _infer_kwarg_values(cfg, data_prefix, max_seq_length, seed):
     if data_prefix is None:
-        data_prefix = cfg.get('data_prefix')
+        data_prefix = cfg.get("data_prefix")
 
     if max_seq_length is None:
-        max_seq_length = cfg['seq_length'] - 2
+        max_seq_length = cfg["seq_length"] - 2
 
     if seed is None:
-        seed = cfg['seed']
+        seed = cfg["seed"]
 
     return data_prefix, max_seq_length, seed
 
 
 class Uniref90ClusterMappingDataset(MappedDataset):
-    '''
+    """
     MappedDataset class with 'create_sample_mapping' implementation. 'create_sample_mapping(dataset)'
 
     Resulting `sample_mapping` field maps nemo_upsampling_dataset indicies to uniref90_dataset indicies.
@@ -158,11 +158,11 @@ class Uniref90ClusterMappingDataset(MappedDataset):
     UniRef50_A0A009F6T5     Cluster: Concanavalin A-like lectin/glucanases superfamily protein (Fragment)   A0A009F6T5
     UniRef50_A0A009F825     Cluster: Uncharacterized protein        A0A009F825; A0A7X5RNJ4; A0A829RTI8; UPI00112C051E; UPI001580B9E7; UPI00158
     0D784; UPI00070F2CF0; UPI001D187985; UPI00227B0253
-    '''
+    """
 
     def __init__(
         self,
-        uniref50_dataset: 'ResamplingMappedDataset',
+        uniref50_dataset: "ResamplingMappedDataset",
         uniref90_dataset: Dataset,
         cluster_map_starts_fn: str,
         cluster_map_counts_fn: str,
@@ -206,14 +206,14 @@ class Uniref90ClusterMappingDataset(MappedDataset):
 
     @staticmethod
     def create_cluster_map_from_files(cluster_map_counts_fn, cluster_map_starts_fn, dtype=np.uint64) -> Dict[str, str]:
-        '''Creates a mapping from cluster_id to cluster_members. This is specifically for mapping samples from
+        """Creates a mapping from cluster_id to cluster_members. This is specifically for mapping samples from
         Uniref50 to Uniref90.
 
         Json file is expected to be an exact production (meaning, json.loads is sufficient)
-        '''
+        """
         return {
-            'counts': np.memmap(cluster_map_counts_fn, dtype=dtype, mode='r'),
-            'starts': np.memmap(cluster_map_starts_fn, dtype=dtype, mode='r'),
+            "counts": np.memmap(cluster_map_counts_fn, dtype=dtype, mode="r"),
+            "starts": np.memmap(cluster_map_starts_fn, dtype=dtype, mode="r"),
         }
 
     def _sample_mapping_filename(
@@ -229,10 +229,10 @@ class Uniref90ClusterMappingDataset(MappedDataset):
             indexmap_filename = os.path.join(index_mapping_dir, os.path.basename(data_prefix))
         else:
             indexmap_filename = data_prefix
-        indexmap_filename += '_{}_custersamplemap'.format(name)
-        indexmap_filename += '_{}mns'.format(num_samples)
-        indexmap_filename += '_{}s'.format(seed)
-        indexmap_filename += '.npy'
+        indexmap_filename += "_{}_custersamplemap".format(name)
+        indexmap_filename += "_{}mns".format(num_samples)
+        indexmap_filename += "_{}s".format(seed)
+        indexmap_filename += ".npy"
         return indexmap_filename
 
     def _create_sample_mapping(self, uniref50_dataset, sample_mapping_file, cluster_map, buffer_size=int(1e6)):
@@ -258,10 +258,10 @@ class Uniref90ClusterMappingDataset(MappedDataset):
         rank = torch.distributed.get_rank()
         is_distributed = True
         if rank == 0:
-            sample_map = np.memmap(sample_mapping_file, dtype=int, mode='w+', shape=(n_samples,))
+            sample_map = np.memmap(sample_mapping_file, dtype=int, mode="w+", shape=(n_samples,))
 
             logging.info(f"Creating uf50->uf90 sample mapping for {n_samples} samples on rank {rank}.")
-            cluster_counts = cluster_map['counts']
+            cluster_counts = cluster_map["counts"]
             buffer_start = 0
             np.random.seed(self.seed)
             while buffer_start < n_samples:
@@ -270,14 +270,14 @@ class Uniref90ClusterMappingDataset(MappedDataset):
                 sample_slice = np.random.rand(len(cluster_slice))
                 cluster_count_slice = cluster_counts[cluster_slice]
                 sampled_relative_indices = np.floor(sample_slice * cluster_count_slice)
-                sample_map[buffer_start:buffer_end] = cluster_map['starts'][cluster_slice] + sampled_relative_indices
+                sample_map[buffer_start:buffer_end] = cluster_map["starts"][cluster_slice] + sampled_relative_indices
                 buffer_start = buffer_end
             sample_map.flush()
 
         if is_distributed:
             torch.distributed.barrier()
         logging.info(f"Loading uf50-uf90 sample mapping on rank {rank}.")
-        sample_map = np.memmap(sample_mapping_file, dtype=int, mode='r')
+        sample_map = np.memmap(sample_mapping_file, dtype=int, mode="r")
 
         return sample_map
 
@@ -522,12 +522,12 @@ class ResamplingMappedDataset(MappedDataset):
             num_samples = len(dataset)
 
         if num_samples == 0:
-            raise ValueError('Number of samples is 0. Cannot be sampled.')
+            raise ValueError("Number of samples is 0. Cannot be sampled.")
 
         # TODO: change default to 'online' once validated (and remove support in memmap?)
-        index_mapping_type = self.cfg.get('index_mapping_type', 'memmap')
+        index_mapping_type = self.cfg.get("index_mapping_type", "memmap")
         # map dataset samples to the desired num_samples
-        if index_mapping_type == 'online':
+        if index_mapping_type == "online":
             samples_mapping = OnlineSampleMapping(
                 dataset_size=len(dataset),
                 num_samples=num_samples,
@@ -543,7 +543,7 @@ class ResamplingMappedDataset(MappedDataset):
                 logging.warning(
                     f"Requested {num_samples} samples, but only {samples_mapping.num_samples} samples were generated due to truncation to block_size boundary."
                 )
-        elif index_mapping_type == 'memmap':
+        elif index_mapping_type == "memmap":
             # TODO: remove support for memmap and use OnlineSampleMapping instead (more efficient)
             samples_mapping = get_samples_mapping(
                 indexed_dataset=dataset,
@@ -554,7 +554,7 @@ class ResamplingMappedDataset(MappedDataset):
                 max_seq_length=self.max_seq_length,
                 short_seq_prob=0,
                 seed=self.seed,
-                name=self.data_prefix.split('/')[-1] if self.name is None else self.name,
+                name=self.data_prefix.split("/")[-1] if self.name is None else self.name,
                 binary_head=False,
                 index_mapping_dir=self.index_mapping_dir,
             )

@@ -40,7 +40,7 @@
 
 2. **What is the best way to run inference on multiple different checkpoints from the same container?** <br><br>
 
-    First, mount the checkpoint files in the container using the `-v` flag when executing the docker run command. The script below is a modification of ``bionemo/tests/test_esm1nv_inference.py``. 
+    First, mount the checkpoint files in the container using the `-v` flag when executing the docker run command. The script below is a modification of ``bionemo/tests/test_esm1nv_inference.py``.
 
     ```python
     import logging
@@ -71,7 +71,7 @@
     def main():
 
         for ckpt in checkpoint_files:
-            
+
             with initialize(config_path=CONFIG_PATH):
                 cfg = compose(config_name="infer")
                 cfg.model.downstream_task.input_base_model = ckpt
@@ -85,9 +85,9 @@
                     assert embedding.shape[0] == len(seqs)
                     assert len(embedding.shape) == 2
                     print(embedding)
-                    
 
-    if __name__ == "__main__":          
+
+    if __name__ == "__main__":
         main()
     ```
     <br><br>
@@ -101,13 +101,13 @@
     Sometimes the model parameters are changed by other, model specific, initialization steps, which interferes with their updates. To fix this, the desired changes will need to be made manually in the pre-training script after the model is loaded. The OmegaConf `open_dict` function can be used to manually edit the configuration. The updates for the model will need to made to the `cfg.model` section. <br><br>
 
 5. **How can an interactive session be launched on BCP using `ngc batch`?** <br><br>
-    
+
     The following will launch an interactive session and start a Jupyter lab instance:
 
     ```bash
     ngc batch run --name "JOB_NAME" \
     --priority HIGH \
-    --preempt RUNONCE	\ 
+    --preempt RUNONCE	\
     --total-runtime 3600000s 	\
     --ace ACE_NAME 	\
     --instance dgxa100.80g.8.norm 	\
@@ -115,11 +115,11 @@
     --result /results 	\
     --array-type "PYTORCH" 	\
     --replicas "4" 	\
-    --image IMAGE_LINK \ 
-    --org ORG_ID 
-    --workspace WORKSPACE_INFO 
-    --port 8888 
-    --port 9999 
+    --image IMAGE_LINK \
+    --org ORG_ID
+    --workspace WORKSPACE_INFO
+    --port 8888
+    --port 9999
     --order 50
     ```
     <br><br>
@@ -130,16 +130,16 @@
 
     ```yaml
     input_base_model: "/model/protein/esm1nv/custom_esm1nv.nemo"
-    ```    
+    ```
     <br><br>
 
 7. **What are some other relevant fine-tuning examples?** <br><br>
-    
+
     The NeMo repo contains a [T5 fine-tuning example](https://github.com/NVIDIA/NeMo/blob/main/examples/nlp/language_modeling/megatron_t5_seq2seq_finetune.py). <br><br>
 
 8. **How can a trained model be shared with other NGC users? What about moving the model to AWS machines?** <br><br>
 
-    To share within the same NGC org and/or team, use a workspace. For sharing with external users, use an NGC private catalog. To transfer a trained model from an NGC workspace to AWS, use the NGC CLI utility. Once the model is copied to a directory on an AWS instance, load it by updating the path in `infer.yaml` to specify trained model folder location (as above) and relaunch the ```startup.sh``` script from inside the container to reflect the changes for the new inference model.  
+    To share within the same NGC org and/or team, use a workspace. For sharing with external users, use an NGC private catalog. To transfer a trained model from an NGC workspace to AWS, use the NGC CLI utility. Once the model is copied to a directory on an AWS instance, load it by updating the path in `infer.yaml` to specify trained model folder location (as above) and relaunch the ```startup.sh``` script from inside the container to reflect the changes for the new inference model.
 
     For running BioNeMo container on AWS, AWS's "parallel cluster" comes pre-configured with SLURM and Pyxis/Enroot. This is not currently officially supported but it closely mirrors the configuration of internal clusters used for development and testing. <br><br>
 

@@ -28,7 +28,7 @@ from bionemo.data.protein.openfold.helpers import (
 from bionemo.data.protein.openfold.protein import Protein
 
 
-__all__ = ['OpenProteinSetPreprocess']
+__all__ = ["OpenProteinSetPreprocess"]
 
 NUM_PHYSICAL_CPU_CORES = psutil.cpu_count(logical=False)
 
@@ -68,7 +68,7 @@ def load_uniclust30_target(targets_super_index: dict, target_key: str, uniclust3
 
 
 class OpenProteinSetPreprocess:
-    S3_BUCKET = 's3://openfold'
+    S3_BUCKET = "s3://openfold"
 
     def __init__(
         self,
@@ -98,9 +98,9 @@ class OpenProteinSetPreprocess:
         """
 
         self.dataset_root_path = Path(dataset_root_path)
-        self.open_protein_set_dirpath = self.dataset_root_path / 'open_protein_set'
-        self.original_dirpath = self.open_protein_set_dirpath / 'original'
-        self.processed_dirpath = self.open_protein_set_dirpath / 'processed'
+        self.open_protein_set_dirpath = self.dataset_root_path / "open_protein_set"
+        self.original_dirpath = self.open_protein_set_dirpath / "original"
+        self.processed_dirpath = self.open_protein_set_dirpath / "processed"
         self.processed_dirpath.mkdir(exist_ok=True, parents=True)
 
         self.num_shards = num_shards
@@ -110,11 +110,11 @@ class OpenProteinSetPreprocess:
     def _download_s3(self, filepath, recursive=False):
         bucket_filepath = os.path.join(self.S3_BUCKET, filepath)
         local_filepath = os.path.join(self.original_dirpath, filepath)
-        cmd = ['aws', 's3', 'cp', '--no-sign-request', str(bucket_filepath), str(local_filepath)]
+        cmd = ["aws", "s3", "cp", "--no-sign-request", str(bucket_filepath), str(local_filepath)]
         if recursive:
-            cmd += ['--recursive']
+            cmd += ["--recursive"]
 
-        logging.info(f'Running {cmd}')
+        logging.info(f"Running {cmd}")
         # do not try to recover if subcommand fails
         subprocess.check_output(cmd)
 
@@ -127,19 +127,19 @@ class OpenProteinSetPreprocess:
             )
 
         logging.warning(
-            'The following script is going to download around 1.1 TB of data.'
-            'Please make sure you have anough space in destination path.'
+            "The following script is going to download around 1.1 TB of data."
+            "Please make sure you have anough space in destination path."
         )
         # download root files:
-        self._download_s3('LICENSE')
-        self._download_s3('duplicate_pdb_chains.txt')
+        self._download_s3("LICENSE")
+        self._download_s3("duplicate_pdb_chains.txt")
 
         # download pdb directory:
-        self._download_s3('pdb', recursive=True)
+        self._download_s3("pdb", recursive=True)
 
         # download uniclust30 directory:
 
-        self._download_s3('uniclust30', recursive=True)
+        self._download_s3("uniclust30", recursive=True)
 
     def prepare(
         self,
@@ -268,7 +268,7 @@ class OpenProteinSetPreprocess:
             f"Found {len(open_protein_set_pdb_subdirpaths)} subdirectories" f" inside {open_protein_set_pdb_dirpath}."
         )
 
-        output_pdb_alignments_dirpath = self.processed_dirpath / 'pdb_alignments'
+        output_pdb_alignments_dirpath = self.processed_dirpath / "pdb_alignments"
         output_pdb_alignments_dirpath.mkdir(exist_ok=True)
 
         logging.info(f"output pdb alignments shards will be saved to {output_pdb_alignments_dirpath}")

@@ -80,7 +80,7 @@ function run_server_kill_on_exit_start_notebook() {
     echo "Server started as ${SERVER_PID}"
     # stop the inference server when this program exits
     trap "kill -9 ${SERVER_PID}" EXIT
-    
+
     echo "Starting Jupyter notebook for '${NB_PATH}' on port 8888"
     jupyter lab \
         --no-browser \
@@ -97,7 +97,7 @@ function run_server_kill_on_exit_start_notebook() {
 # start an interactive bash shell, or execute an arbitrary command & then exit.
 # If no input is specified, then the help text is displayed & exited with code 1.
 if [[ "$MODEL" == "esm-1nv" ]]; then
-    
+
     run_server_kill_on_exit_start_notebook "${EXAMPLE_BASE}/protein/esm1nv/"
 
 elif [[ "$MODEL" == "esm-2nv" ]]; then
@@ -105,15 +105,15 @@ elif [[ "$MODEL" == "esm-2nv" ]]; then
     run_server_kill_on_exit_start_notebook "${EXAMPLE_BASE}/protein/esm2nv/"
 
 elif [[ "$MODEL" == "prott5nv" ]]; then
-    
+
     run_server_kill_on_exit_start_notebook "${EXAMPLE_BASE}/protein/prott5nv/"
 
 elif [[ "$MODEL" == "megamolbart" ]]; then
-    
+
     run_server_kill_on_exit_start_notebook "${EXAMPLE_BASE}/molecule/megamolbart"
 
 elif [[ "$MODEL" == "molmim" ]]; then
-    
+
     run_server_kill_on_exit_start_notebook "${EXAMPLE_BASE}/molecule/molmim"
 
 elif [[ "$MODEL" == "bash" ]]; then

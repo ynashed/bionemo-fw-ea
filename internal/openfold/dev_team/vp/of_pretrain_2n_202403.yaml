@@ -60,7 +60,7 @@ docker_tag: br_cd-3173_debug_dataloader_pq_20240426T0909
 #docker_tag: br_cd-2858_validation_metric_debug_step_from_filename_20240403T1552
 
 defaults:
- - /cluster: ord2  
+ - /cluster: ord2
  - _self_
 
 cluster:
@@ -91,7 +91,7 @@ run:
   echo 'of_pretrain_2n_202403.yaml - before install_third_party.sh';
   cd /workspace/bionemo;
   ./examples/protein/openfold/scripts/install_third_party.sh;
-  echo 'of_pretrain_2n_202403.yaml - before train.py';  
+  echo 'of_pretrain_2n_202403.yaml - before train.py';
   export HYDRA_FULL_ERROR=1;
   cd /workspace/bionemo;
   python examples/protein/openfold/train.py \\
@@ -117,5 +117,3 @@ run:
   date;
 
  name: bionemo-openfold-initial-training-${prod_level_in}-${total_nodes_in}-${ntasks_per_node_in}
-
-

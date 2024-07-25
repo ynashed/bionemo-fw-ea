@@ -62,7 +62,7 @@ class MSARowAttentionWithPairBias(nn.Module):
         self.layer_norm_m = LayerNorm(c_m)
         self.layer_norm_z = LayerNorm(c_z)
         self.linear_z = Linear(c_z, num_heads, bias=False, init="normal")
-        if OptimHub.config('mha_fused_gemm'):  # [optim-hub]
+        if OptimHub.config("mha_fused_gemm"):  # [optim-hub]
             self.mha = SelfAttentionWithGate(
                 c_qkv=c_m,
                 c_hidden=c_hidden,
@@ -111,7 +111,7 @@ class MSARowAttentionWithPairBias(nn.Module):
         # z: [batch, 1, num_heads, N_res, N_res]
 
         m = self.layer_norm_m(m)
-        if OptimHub.config('mha_fused_gemm'):
+        if OptimHub.config("mha_fused_gemm"):
             m = self.mha(
                 input_qkv=m,
                 mask=mask,

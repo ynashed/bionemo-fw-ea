@@ -495,7 +495,7 @@ class SelfDistillationDataset(Dataset):
 
     def _load_target_dict(self, target_key: str) -> dict:
         pdb_bytes = load_uniclust30_target(self.targets_super_index, target_key, self.uniclust30_targets_dirpath)
-        pdb_string = pdb_bytes.decode('utf-8')
+        pdb_string = pdb_bytes.decode("utf-8")
         protein = Protein.from_pdb_string(pdb_str=pdb_string)
         target_dict = {
             "id": target_key,
@@ -582,15 +582,15 @@ class PredictDataset(Dataset):
         self.seq_names = seq_names
         if self.seq_names is None or len(seq_names) != len(sequences):
             raise ValueError(
-                'Each sequence must have a name if sequence names are provided.'
-                'Please check length of sequence list and how many names were provided.'
+                "Each sequence must have a name if sequence names are provided."
+                "Please check length of sequence list and how many names were provided."
             )
         self.msa_a3m_filepaths = msa_a3m_filepaths
         self.template_hhr_filepaths = template_hhr_filepaths
         self.generate_templates_if_missing = generate_templates_if_missing
         if self.generate_templates_if_missing:
             if pdb70_database_path is None:
-                raise ValueError('User must provide pdb70_database_path if generate_templates_if_missing.')
+                raise ValueError("User must provide pdb70_database_path if generate_templates_if_missing.")
             self.hhsearch_pdb70_runner = HHSearch(
                 databases=[pdb70_database_path],
             )
@@ -632,7 +632,7 @@ class PredictDataset(Dataset):
             for msa_a3m_filepath in ex_msa_a3m_filepaths:
                 with open(msa_a3m_filepath, "r") as f:
                     a3m_string = f.read()
-                    if 'uniref' in msa_a3m_filepath:
+                    if "uniref" in msa_a3m_filepath:
                         uniref90_msa_as_a3m = a3m_string
                     a3m_strings.append(a3m_string)
 
@@ -642,11 +642,11 @@ class PredictDataset(Dataset):
         elif self.generate_templates_if_missing and uniref90_msa_as_a3m:
             hhr_string = self.hhsearch_pdb70_runner.query(uniref90_msa_as_a3m)
         else:
-            hhr_string = ''
+            hhr_string = ""
 
         sequence_features = create_sequence_features(
             sequence=sequence,
-            domain_name='description',  # TODO: is description required here?
+            domain_name="description",  # TODO: is description required here?
         )
 
         if hhr_string:  # search template only when generate_if_missing or template hhr is given
@@ -660,8 +660,8 @@ class PredictDataset(Dataset):
                 shuffling_seed=None,
             )
         else:
-            logging.warning(f'No template hhr is given/found for sequence {idx}. Pass empty template features.')
-            seq_len = len(sequence_features['residue_index'])
+            logging.warning(f"No template hhr is given/found for sequence {idx}. Pass empty template features.")
+            seq_len = len(sequence_features["residue_index"])
             template_features = create_empty_template_feats(seq_len)
 
         msa_features = create_msa_features(
@@ -677,9 +677,9 @@ class PredictDataset(Dataset):
             mode="predict",
             seed=self.cfg.seed,
         )
-        sample['seq_index'] = idx
+        sample["seq_index"] = idx
         if self.seq_names:
-            sample['seq_name'] = self.seq_names[idx]
+            sample["seq_name"] = self.seq_names[idx]
         # return index so it might be saved with predictiona
         return sample
 

@@ -80,9 +80,9 @@ class GeneformerPreprocess:
         )
 
     def build_and_save_tokenizer(self, median_dict, gene_to_ens, vocab_output_name):
-        '''Builds the GeneTokenizer using the median dictionary
+        """Builds the GeneTokenizer using the median dictionary
         then serializes and saves the dictionary to disk.
-        '''
+        """
         tokenizer = GeneTokenizer.from_medians_and_genes_dicts(median_dict, gene_to_ens)
         tokenizer.save_vocab(vocab_output_name)
         return tokenizer
@@ -92,24 +92,24 @@ class GeneformerPreprocess:
         if vocab_exists:
             logging.warning(f"Tokenizer vocab file: {vocab_output_name} already exists. Overwriting...")
 
-    def preprocess(self) -> dict[Literal['tokenizer', 'median_dict'], Any]:
+    def preprocess(self) -> dict[Literal["tokenizer", "median_dict"], Any]:
         """Preprocesses for the Geneformer model"""
         gene_name_dict_fn, gene_median_dict_fn = GeneformerResourcePreprocessor(
             dest_directory=self.download_directory,
         ).prepare()
 
         # Load artifacts
-        with open(gene_name_dict_fn, 'rb') as fd:
+        with open(gene_name_dict_fn, "rb") as fd:
             gene_ens = pickle.load(fd)
 
-        with open(gene_median_dict_fn, 'rb') as fd:
+        with open(gene_median_dict_fn, "rb") as fd:
             median_dict = pickle.load(fd)
 
         # Save converted artifacts to JSON to prevent pickle issues.
         medians_dir = os.path.dirname(self.medians_file_path)
         if not os.path.exists(medians_dir):
             os.makedirs(medians_dir, exist_ok=True)  # ensure the dir exists but be ok with race conditions.
-        with open(self.medians_file_path, 'w') as fp:
+        with open(self.medians_file_path, "w") as fp:
             json.dump(median_dict, fp)
 
         if self.tokenizer_vocab_path is not None:
@@ -121,7 +121,7 @@ class GeneformerPreprocess:
         else:
             tokenizer = None
 
-        return {'tokenizer': tokenizer, 'median_dict': median_dict}
+        return {"tokenizer": tokenizer, "median_dict": median_dict}
 
 
 class AdamsonResources(ResourcePreprocessor):
@@ -132,65 +132,65 @@ class AdamsonResources(ResourcePreprocessor):
     def get_remote_resources(self) -> List[RemoteResource]:
         data_url = {
             "adamson.zip": "https://dataverse.harvard.edu/api/access/datafile/6154417",
-            "gene2go_all.pkl": 'https://dataverse.harvard.edu/api/access/datafile/6153417',
+            "gene2go_all.pkl": "https://dataverse.harvard.edu/api/access/datafile/6153417",
             "all_pert_genes": "https://dataverse.harvard.edu/api/access/datafile/6934320",
         }
 
         resources = [
             RemoteResource(
                 dest_directory=self.dest_directory,
-                dest_filename='gene2go_all.pkl',
+                dest_filename="gene2go_all.pkl",
                 root_directory=self.root_directory,
-                checksum='77c9af0c61c30ea4d7a85680f4d122dc',
-                url=data_url['gene2go_all.pkl'],
+                checksum="77c9af0c61c30ea4d7a85680f4d122dc",
+                url=data_url["gene2go_all.pkl"],
             ),
             RemoteResource(
                 dest_directory=self.dest_directory,
-                dest_filename='adamson.zip',
+                dest_filename="adamson.zip",
                 root_directory=self.root_directory,
-                checksum='0bde631bae60ee8c105991ff0e0d4a20',
-                url=data_url['adamson.zip'],
+                checksum="0bde631bae60ee8c105991ff0e0d4a20",
+                url=data_url["adamson.zip"],
             ),
             RemoteResource(
                 dest_directory=self.dest_directory,
-                dest_filename='all_pert_genes.pkl',
+                dest_filename="all_pert_genes.pkl",
                 root_directory=self.root_directory,
                 checksum=None,
-                url=data_url['all_pert_genes'],
+                url=data_url["all_pert_genes"],
             ),
         ]
         return resources
 
     def prepare(self) -> List[str]:
-        '''
+        """
         Downloads the pickle file and zip file associated with the adamson dataset and
         unzips the zip file.
 
         Returns (in this order): [gene2go_all.pkl, go.csv, perturbed_processed.hdf5, all_pert_genes.pkl]
-        '''
+        """
         artifacts = []
         for resource in self.get_remote_resources():
-            if resource.dest_filename == 'adamson.zip':
-                with ZipFile(resource.download_resource(), 'r') as zip_ref:
+            if resource.dest_filename == "adamson.zip":
+                with ZipFile(resource.download_resource(), "r") as zip_ref:
                     zip_ref.extractall(self.dest_directory)
                 dest = resource.fully_qualified_dest_folder
-                artifacts.extend([f'{dest}/adamson/go.csv', f'{dest}/adamson/perturb_processed.h5ad'])
+                artifacts.extend([f"{dest}/adamson/go.csv", f"{dest}/adamson/perturb_processed.h5ad"])
             else:
                 artifacts.append(resource.download_resource())
         return artifacts  # gene2go_all.pkl, go.csv, perturbed_processed.hdf5, all_pert_genes.pkl
 
     def prepare_annotated(self) -> dict:
-        '''same method as `prepare` but annotates the outputs in a dictionary.'''
+        """same method as `prepare` but annotates the outputs in a dictionary."""
         gene2go, go, perturbed, pert_genes = self.prepare()
-        return {'gene2go_pkl': gene2go, 'go_csv': go, 'perturbed_h5ad': perturbed, 'pert_genes_pkl': pert_genes}
+        return {"gene2go_pkl": gene2go, "go_csv": go, "perturbed_h5ad": perturbed, "pert_genes_pkl": pert_genes}
 
 
 def preprocess_adamson(
     adamson_perturbed_processed_fn: str,
     gene2go_pkl_fn: str,
     all_pert_genes_pkl_fn: str,
-    dest_preprocessed_anndata_fn: str = 'perturb_preprocessed.hdf5',
-    dest_target_gep_fn: str = 'target_gep.npy',
+    dest_preprocessed_anndata_fn: str = "perturb_preprocessed.hdf5",
+    dest_target_gep_fn: str = "target_gep.npy",
 ):
     """
     Preprocesses the Adamson perturbed data. This is done in two steps:
@@ -211,17 +211,17 @@ def preprocess_adamson(
     """
     data = scanpy.read_h5ad(adamson_perturbed_processed_fn)
 
-    with open(gene2go_pkl_fn, 'rb') as f:
+    with open(gene2go_pkl_fn, "rb") as f:
         gene2go = pickle.load(f)
 
-    with open(all_pert_genes_pkl_fn, 'rb') as f:
+    with open(all_pert_genes_pkl_fn, "rb") as f:
         pert_names = pickle.load(f)
 
     # TODO: lift process_dataset into this namespace and out of the Adamson namespace.
     preprocessed_anndata, target_gep = process_adamson_dataset(data, gene2go, pert_names)
 
     preprocessed_anndata.write(dest_preprocessed_anndata_fn)
-    with open(dest_target_gep_fn, 'wb') as f:
+    with open(dest_target_gep_fn, "wb") as f:
         np.save(f, target_gep)
     return dest_preprocessed_anndata_fn, dest_target_gep_fn
 
@@ -287,7 +287,7 @@ def _filter_pert_in_go(condition: str, pert_names: set[str]) -> bool:
     if condition == "ctrl":
         return True
     else:
-        splits = condition.split('+')
+        splits = condition.split("+")
         num_perts = (splits[0] in pert_names) + (splits[1] in pert_names)
         num_ctrl = (splits[0] == "ctrl") + (splits[1] == "ctrl")
 

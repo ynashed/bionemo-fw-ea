@@ -1,7 +1,7 @@
-# Getting Started with BCP 
+# Getting Started with BCP
 
 
-NVIDIA Base Command Platform (BCP) includes a central user interface with a set of managed compute resources. It can be used to manage datasets, workspaces, and jobs, as well as users within an organization and team. This creates a convenient hub for monitoring job execution, viewing metrics and logs, and monitoring resource utilization. NVIDIA DGX Cloud is powered by Base Command Platform. 
+NVIDIA Base Command Platform (BCP) includes a central user interface with a set of managed compute resources. It can be used to manage datasets, workspaces, and jobs, as well as users within an organization and team. This creates a convenient hub for monitoring job execution, viewing metrics and logs, and monitoring resource utilization. NVIDIA DGX Cloud is powered by Base Command Platform.
 
 More information and CLI documentation can be found on the [BCP website](https://docs.nvidia.com/base-command-platform/index.html).
 
@@ -9,7 +9,7 @@ Before beginning, NGC CLI must be installed and configured to perform command-li
 
 ## Training BioNeMo Models with BCP
 
-The following reference script can be used to launch a job on a cluster running BCP from a local workstation using the NGC CLI. The [NGC web UI](https://docs.nvidia.com/base-command-platform/user-guide/index.html#jobs-and-gpu-instances) can also be used to configure and launch the job interactively. 
+The following reference script can be used to launch a job on a cluster running BCP from a local workstation using the NGC CLI. The [NGC web UI](https://docs.nvidia.com/base-command-platform/user-guide/index.html#jobs-and-gpu-instances) can also be used to configure and launch the job interactively.
 
 ### Data Processing on BCP
 **Note:** The command below is incomplete. Please replace all `< >` with appropriate values. You can reach out to NGC customer support if you're not sure what these values should be.
@@ -53,4 +53,4 @@ ngc batch run \\
 --workspace <workspace-id>:/data:RW
 ```
 
-You can explore the contents of the Docker container locally to understand different scripts and models available. Follow the [Quickstart Guide](./quickstart-fw.md) for instructions on running BioNeMo container locally.
+You can explore the contents of the Docker container locally to understand different scripts and models available.

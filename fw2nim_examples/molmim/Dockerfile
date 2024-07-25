@@ -20,7 +20,7 @@ RUN rm -rf fw2nim/
 # copy over MolMIM model
 RUN mkdir -p ${BIONEMO_HOME}/models/molecule/molmim
 COPY ./models/molmim_70m_24_3.nemo ${BIONEMO_HOME}/models/molmim_70m_24_3.nemo
-RUN ln -s ${BIONEMO_HOME}/models/molmim_70m_24_3.nemo ${BIONEMO_HOME}/models/molecule/molmim/molmim_70m_24_3.nemo 
+RUN ln -s ${BIONEMO_HOME}/models/molmim_70m_24_3.nemo ${BIONEMO_HOME}/models/molecule/molmim/molmim_70m_24_3.nemo
 
 # install molmim types
 COPY ./fw2nim_examples/ ${BIONEMO_HOME}/fw2nim_examples/

@@ -1,6 +1,6 @@
-name: admson 
+name: admson
 defaults:
-  - geneformer_config 
+  - geneformer_config
     # allow this config to override defaults
   - _self_
 
@@ -17,10 +17,10 @@ infer_target: bionemo.model.singlecell.geneformer.infer.GeneformerInference # ta
 
 trainer:
   devices: 2 # number of GPUs or CPUs
-  num_nodes: 1 
-  max_epochs: 1 
+  num_nodes: 1
+  max_epochs: 1
   val_check_interval: 50
-  precision: 32 
+  precision: 32
   max_steps: 300
 
 exp_manager:
@@ -58,7 +58,7 @@ model:
     num_workers: 12
     max_seq_length: ${model.seq_length}
     emb_batch_size: ${model.micro_batch_size}
-  
+
   finetuning_optim: # optimizer parameters for downstream task model
     name: adam
     lr: 0.0001

@@ -4,7 +4,7 @@ PyTriton provides a light-weight wrapper that allows you to set up the Triton In
 
 Note that you should follow the instructions from [the general BioNeMo PyTriton inference documentation](./inference-triton-md) first before proceeding with this detailed example.
 
-## Detailed Example with ESM-1nv 
+## Detailed Example with ESM-1nv
 
 In this example, the **Sequence to Embedding** task for ESM1 will be used as an example. The solution will consist of two components - server that performs the inference, and a client that queries this server.
 
@@ -85,7 +85,7 @@ If your shapes are incorrect, then Triton will fail to perform inference!
 :::
 
 :::{warning}
-When using the `@batch` decorator, it is **vital** that the `infer_fn` parmaeter names align exactly with what is 
+When using the `@batch` decorator, it is **vital** that the `infer_fn` parmaeter names align exactly with what is
 deinfed for `inputs` to the `.bind()` call. These names are how PyTriton ensures that the right tensors are passed
 along. Similiarly, the keys in the returned dictionary must align 1:1 with the names defined in the output tensors.
 :::
@@ -116,4 +116,3 @@ print(f"{embeddings.shape=}\n{embeddings}")"
 * Use the client to interact with any Triton server, not necessarily set up with PyTriton
 
 4. Finally, PyTriton provides variety of options to customize the server. Refer to the [PyTriton documentation](https://triton-inference-server.github.io/pytriton/latest).
-

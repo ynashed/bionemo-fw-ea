@@ -92,7 +92,7 @@ python pretrain.py \
     trainer.accumulate_grad_batches=${ACCUMULATE_GRAD_BATCHES} \
     trainer.val_check_interval=${VAL_CHECK_INTERVAL} \
     model.micro_batch_size=${MICRO_BATCH_SIZE} \
-    model.tensor_model_parallel_size=${TENSOR_MODEL_PARALLEL_SIZE} 
+    model.tensor_model_parallel_size=${TENSOR_MODEL_PARALLEL_SIZE}
 
 EOF
 

@@ -13,7 +13,7 @@ import pkgutil
 import pytest
 
 
-MODULE = 'dgl'
+MODULE = "dgl"
 
 
 @pytest.mark.needs_gpu

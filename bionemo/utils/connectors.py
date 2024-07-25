@@ -22,7 +22,7 @@ from omegaconf import OmegaConf
 from pytorch_lightning.trainer.trainer import Trainer
 
 
-__all__: Sequence[str] = ('BioNeMoSaveRestoreConnector',)
+__all__: Sequence[str] = ("BioNeMoSaveRestoreConnector",)
 
 
 class BioNeMoSaveRestoreConnector(NLPSaveRestoreConnector):
@@ -50,11 +50,11 @@ class BioNeMoSaveRestoreConnector(NLPSaveRestoreConnector):
         trainer: Trainer = None,
     ):
         with tarfile.open(restore_path, "r") as tar:
-            _yaml = tar.extractfile('./model_config.yaml')
+            _yaml = tar.extractfile("./model_config.yaml")
             obj = yaml.safe_load(_yaml)
 
-        if 'target' in obj:
-            if not obj['target'] == f"{calling_cls.__module__}.{calling_cls.__name__}":
+        if "target" in obj:
+            if not obj["target"] == f"{calling_cls.__module__}.{calling_cls.__name__}":
                 logging.warning(
                     f"Restored model is not the same class as the model invoked. restored: {obj['target']}, invoked: {calling_cls}"
                 )

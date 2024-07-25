@@ -23,11 +23,11 @@ from bionemo.utils.testing import pretty_size, timeit
 # NOTE: To see example output call python tests/test_online_sample_mapping.py
 
 
-@pytest.mark.parametrize('seed', (1, 2, 3, 4))
-@pytest.mark.parametrize('shuffle', (False, True))
-@pytest.mark.parametrize('block_size', (3, 5))
-@pytest.mark.parametrize('dataset_size', (5, 7, 10))
-@pytest.mark.parametrize('num_samples_coef', (1, 2, 3))
+@pytest.mark.parametrize("seed", (1, 2, 3, 4))
+@pytest.mark.parametrize("shuffle", (False, True))
+@pytest.mark.parametrize("block_size", (3, 5))
+@pytest.mark.parametrize("dataset_size", (5, 7, 10))
+@pytest.mark.parametrize("num_samples_coef", (1, 2, 3))
 def test_online_upsampling(seed, shuffle, block_size, dataset_size, num_samples_coef):
     if not shuffle and seed != 1:
         pytest.skip("skipping non-shuffled test with seed != 1")

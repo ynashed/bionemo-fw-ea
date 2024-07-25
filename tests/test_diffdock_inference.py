@@ -99,5 +99,5 @@ def test_diffdock_inference(cfg):
     ref_ligand = np.load(os.path.join(os.path.dirname(cfg.protein_path), "ref_ligand.npz"))
 
     # TODO: fix larger noise when running on H100 with multiple unit tests together.
-    assert np.allclose(ligand_pos, ref_ligand['ref_ligand_pos'], atol=1.0e-3)
-    assert np.allclose(confidence, ref_ligand['ref_confidence'])
+    assert np.allclose(ligand_pos, ref_ligand["ref_ligand_pos"], atol=1.0e-3)
+    assert np.allclose(confidence, ref_ligand["ref_confidence"])

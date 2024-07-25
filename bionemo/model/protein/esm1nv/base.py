@@ -79,7 +79,7 @@ class ESMnvEmbedding(Embedding):
         num_tokentypes=0,
         dtype=torch.float32,
         fp32_residual_connection=False,
-        position_embedding_type='learned_absolute',
+        position_embedding_type="learned_absolute",
         transpose_batch_sequence=True,
         # BIONEMO NEW ARGS
         token_dropout=False,
@@ -133,11 +133,11 @@ class ESMnvEmbedding(Embedding):
             ).to(words_embeddings.dtype)
         # END BIONEMO
 
-        if self.position_embedding_type == 'learned_absolute':
+        if self.position_embedding_type == "learned_absolute":
             assert position_ids is not None
             position_embeddings = self.position_embeddings(position_ids)
             embeddings = words_embeddings + position_embeddings
-        elif self.position_embedding_type == 'learned_parameters':
+        elif self.position_embedding_type == "learned_parameters":
             embeddings = words_embeddings + self.position_embeddings
         else:
             embeddings = words_embeddings
@@ -203,17 +203,17 @@ class ESMnvTransformerLanguageModel(TransformerLanguageModel):
         fp32_residual_connection=False,
         activations_checkpoint_method=None,
         activations_checkpoint_num_layers=1,
-        normalization='layernorm',
+        normalization="layernorm",
         layernorm_epsilon=1e-5,
         bias_activation_fusion=True,
         bias_dropout_add_fusion=True,
         bias=True,
         masked_softmax_fusion=True,
-        activation='gelu',
+        activation="gelu",
         headscale=False,
-        transformer_block_type='pre_ln',
+        transformer_block_type="pre_ln",
         normalize_attention_scores=True,
-        position_embedding_type='learned_absolute',
+        position_embedding_type="learned_absolute",
         rotary_percentage=1.0,
         multi_query_attention=False,
         share_embeddings_and_output_weights=True,  # to decide whether use a new linear layer to compute final scores (False) or reuse embedding weights (True)
@@ -230,7 +230,7 @@ class ESMnvTransformerLanguageModel(TransformerLanguageModel):
         fp8_margin=0,
         fp8_interval=1,
         fp8_amax_history_len=1024,
-        fp8_amax_compute_algo='max',
+        fp8_amax_compute_algo="max",
         reduce_amax=True,
         use_emha=False,
         ub_tp_comm_overlap=False,
@@ -272,7 +272,7 @@ class ESMnvTransformerLanguageModel(TransformerLanguageModel):
         if kv_channels is None:
             assert (
                 hidden_size % num_attention_heads == 0
-            ), 'hidden_size must be divisible by num_attention_heads if kv_channels is None'
+            ), "hidden_size must be divisible by num_attention_heads if kv_channels is None"
             kv_channels = hidden_size // num_attention_heads
 
         # Embeddings.
@@ -295,9 +295,9 @@ class ESMnvTransformerLanguageModel(TransformerLanguageModel):
                 use_attention_mask=embedding_use_attention_mask,
                 mask_token_id=mask_token_id,
             )
-            self._embedding_key = 'embedding'
+            self._embedding_key = "embedding"
 
-        if position_embedding_type == 'rope':
+        if position_embedding_type == "rope":
             rotary_dim = self.hidden_size // num_attention_heads if kv_channels is None else kv_channels
             assert 0 < rotary_percentage <= 1
             if rotary_percentage < 1:
@@ -309,7 +309,7 @@ class ESMnvTransformerLanguageModel(TransformerLanguageModel):
                 rotary_base=rotary_base,
             )
 
-        elif position_embedding_type == 'alibi':
+        elif position_embedding_type == "alibi":
             # TODO: If this is used for encoder-decodemax_position_embeddingsr model, implement proper logic and following
             # addition for decoder. Currently it is only used for decoder model only.
             # Encoder-decoder model, such as T5 is implemented in token_level_encoder_decoder.py
@@ -321,7 +321,7 @@ class ESMnvTransformerLanguageModel(TransformerLanguageModel):
                 max_seq_len=max_position_embeddings,
             )
 
-        elif position_embedding_type == 'kerple':
+        elif position_embedding_type == "kerple":
             # TODO: If this is used for encoder-decodemax_position_embeddingsr model, implement proper logic and following
             # addition for decoder. Currently it is only used for decoder model only.
             # Encoder-decoder model, such as T5 is implemented in token_level_encoder_decoder.py
@@ -334,7 +334,7 @@ class ESMnvTransformerLanguageModel(TransformerLanguageModel):
             )
             assert use_flash_attention is False, "flash-attention not supported with kerple at this point"
 
-        elif position_embedding_type == 'sandwich':
+        elif position_embedding_type == "sandwich":
             self.encoder_relative_position_embedding = SandwichRelativePositionEmbedding(
                 bidirectional=encoder_attn_mask_type != AttnMaskType.causal,
                 num_attention_heads=num_attention_heads,
@@ -401,7 +401,7 @@ class ESMnvTransformerLanguageModel(TransformerLanguageModel):
             use_pt_layernorm=use_pt_layernorm,
             use_pt_mlp_out=use_pt_mlp_out,
         )
-        self._encoder_key = 'encoder'
+        self._encoder_key = "encoder"
 
         # Decoder
         if self.add_decoder:
@@ -441,13 +441,13 @@ class ESMnvTransformerLanguageModel(TransformerLanguageModel):
                 position_embedding_type=position_embedding_type,
                 use_flash_attention=use_flash_attention,
             )
-            self._decoder_key = 'decoder'
+            self._decoder_key = "decoder"
 
         if self.post_process:
             # Pooler.
             if self.add_pooler:
                 self.pooler = Pooler(self.hidden_size, self.init_method, sequence_parallel=self.sequence_parallel)
-                self._pooler_key = 'pooler'
+                self._pooler_key = "pooler"
 
             if not self.share_embeddings_and_output_weights:
                 self.output_layer = tensor_parallel.ColumnParallelLinear(
@@ -457,7 +457,7 @@ class ESMnvTransformerLanguageModel(TransformerLanguageModel):
                     bias=False,  # Setting bias to False always to keep it consistent with embedding tying that also does not have a bias.
                     init_method=self.init_method,
                 )
-                self._output_layer_key = 'output_layer'
+                self._output_layer_key = "output_layer"
         self.set_accepted_adapter_types([PromptEncoderAdapterConfig._target_])
 
     def forward(
@@ -518,12 +518,12 @@ class ESMnvTransformerLanguageModel(TransformerLanguageModel):
 
         rotary_pos_emb = None
         encoder_self_attention_relative_position_bias = None
-        if self.position_embedding_type == 'rope':
+        if self.position_embedding_type == "rope":
             rotary_pos_emb = self.rotary_pos_emb(enc_seq_length)
         elif (
-            self.position_embedding_type == 'alibi'
-            or self.position_embedding_type == 'sandwich'
-            or self.position_embedding_type == 'kerple'
+            self.position_embedding_type == "alibi"
+            or self.position_embedding_type == "sandwich"
+            or self.position_embedding_type == "kerple"
         ):
             encoder_self_attention_relative_position_bias = self.encoder_relative_position_embedding(
                 query_seq_length=enc_seq_length,
@@ -612,16 +612,16 @@ def esm_get_language_model(
     fp32_residual_connection=False,
     activations_checkpoint_method=None,
     activations_checkpoint_num_layers=1,
-    normalization='layernorm',
+    normalization="layernorm",
     layernorm_epsilon=1e-5,
     bias_activation_fusion=True,
     masked_softmax_fusion=True,
-    activation='gelu',
+    activation="gelu",
     headscale=False,
-    transformer_block_type='pre_ln',
+    transformer_block_type="pre_ln",
     normalize_attention_scores=True,
-    position_embedding_type='learned_absolute',
-    attention_type='multihead',
+    position_embedding_type="learned_absolute",
+    attention_type="multihead",
     share_embeddings_and_output_weights=True,
     rotary_percentage=1.0,
     multi_query_attention=False,
@@ -640,7 +640,7 @@ def esm_get_language_model(
     fp8_margin=0,
     fp8_interval=1,
     fp8_amax_history_len=1024,
-    fp8_amax_compute_algo='max',
+    fp8_amax_compute_algo="max",
     reduce_amax=True,
     use_emha=False,
     ub_tp_comm_overlap=False,
@@ -661,7 +661,7 @@ def esm_get_language_model(
     if kv_channels is None:
         assert (
             hidden_size % num_attention_heads == 0
-        ), 'hidden_size must be divisible by num_attention_heads if kv_channels is None'
+        ), "hidden_size must be divisible by num_attention_heads if kv_channels is None"
         kv_channels = hidden_size // num_attention_heads
 
     if init_method is None:
@@ -745,7 +745,7 @@ def esm_get_language_model(
         use_pt_mlp_out=use_pt_mlp_out,
     )
     # key used for checkpoints.
-    language_model_key = 'language_model'
+    language_model_key = "language_model"
 
     return language_model, language_model_key
 
@@ -785,7 +785,7 @@ class ESMnvBertModel(BertModel):
         add_binary_head=True,
         megatron_legacy=False,
         sequence_parallel=False,
-        position_embedding_type='learned_absolute',
+        position_embedding_type="learned_absolute",
         # BIONEMO: use custom arguments
         share_embeddings_and_output_weights=True,
         embedding_token_dropout=False,
@@ -873,11 +873,11 @@ class ESMnvBertModel(BertModel):
                 openai_gelu,
                 onnx_safe,
             )
-            self._lm_head_key = 'lm_head'
+            self._lm_head_key = "lm_head"
             self.binary_head = None
             if self.add_binary_head:
                 self.binary_head = get_linear_layer(hidden_size, 2, init_method)
-                self._binary_head_key = 'binary_head'
+                self._binary_head_key = "binary_head"
 
 
 class ESMnvMegatronBertModel(MegatronBertModel):
@@ -892,32 +892,32 @@ class ESMnvMegatronBertModel(MegatronBertModel):
             max_position_embeddings=cfg.max_position_embeddings,
             num_layers=cfg.num_layers,
             num_attention_heads=cfg.num_attention_heads,
-            apply_query_key_layer_scaling=cfg.get('apply_query_key_layer_scaling', True),
-            kv_channels=cfg.get('kv_channels', None),
+            apply_query_key_layer_scaling=cfg.get("apply_query_key_layer_scaling", True),
+            kv_channels=cfg.get("kv_channels", None),
             ffn_hidden_size=cfg.ffn_hidden_size,
             num_tokentypes=num_tokentypes,
             parallel_output=True,
             pre_process=pre_process,
             post_process=post_process,
-            init_method_std=cfg.get('init_method_std', 0.02),
-            fp16_lm_cross_entropy=cfg.get('fp16_lm_cross_entropy', False),
-            megatron_amp_O2=self.cfg.get('megatron_amp_O2', False),
-            hidden_dropout=cfg.get('hidden_dropout', 0.1),
-            precision=cfg.get('precision', 16),
-            fp32_residual_connection=cfg.get('fp32_residual_connection', False),
-            activations_checkpoint_granularity=self.cfg.get('activations_checkpoint_granularity', None),
-            activations_checkpoint_method=self.cfg.get('activations_checkpoint_method', None),
-            activations_checkpoint_num_layers=self.cfg.get('activations_checkpoint_num_layers', 1),
+            init_method_std=cfg.get("init_method_std", 0.02),
+            fp16_lm_cross_entropy=cfg.get("fp16_lm_cross_entropy", False),
+            megatron_amp_O2=self.cfg.get("megatron_amp_O2", False),
+            hidden_dropout=cfg.get("hidden_dropout", 0.1),
+            precision=cfg.get("precision", 16),
+            fp32_residual_connection=cfg.get("fp32_residual_connection", False),
+            activations_checkpoint_granularity=self.cfg.get("activations_checkpoint_granularity", None),
+            activations_checkpoint_method=self.cfg.get("activations_checkpoint_method", None),
+            activations_checkpoint_num_layers=self.cfg.get("activations_checkpoint_num_layers", 1),
             activations_checkpoint_layers_per_pipeline=self.cfg.get(
-                'activations_checkpoint_layers_per_pipeline', None
+                "activations_checkpoint_layers_per_pipeline", None
             ),
-            layernorm_epsilon=cfg.get('layernorm_epsilon', 1e-5),
-            masked_softmax_fusion=cfg.get('masked_softmax_fusion', True),
-            bias_gelu_fusion=cfg.get('bias_gelu_fusion', True),
+            layernorm_epsilon=cfg.get("layernorm_epsilon", 1e-5),
+            masked_softmax_fusion=cfg.get("masked_softmax_fusion", True),
+            bias_gelu_fusion=cfg.get("bias_gelu_fusion", True),
             bias_dropout_add_fusion=cfg.get("bias_dropout_add_fusion", True),
-            onnx_safe=cfg.get('onnx_safe', False),
+            onnx_safe=cfg.get("onnx_safe", False),
             add_binary_head=cfg.bert_binary_head,
-            megatron_legacy=cfg.get('megatron_legacy', False),
+            megatron_legacy=cfg.get("megatron_legacy", False),
             position_embedding_type=self.cfg.get("position_embedding_type", "learned_absolute"),
             # BIONEMO: use custom flags
             share_embeddings_and_output_weights=self.cfg.get("share_embeddings_and_output_weights", True),

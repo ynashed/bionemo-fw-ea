@@ -35,21 +35,21 @@ from bionemo.model.utils import setup_trainer
 
 
 def read_benchmarking_data(benchmark_dir_path: str, allow_missing_msa: bool) -> pd.DataFrame:
-    meta = pd.read_csv(os.path.join(benchmark_dir_path, 'meta.csv'), names=['pdb_id', 'length', 'seq'])
-    msa_path = os.path.join(benchmark_dir_path, 'msa')
-    meta['msa'] = meta.apply(lambda row: glob.glob(f'{msa_path}/{row["pdb_id"]}*.a3m'), axis=1)
+    meta = pd.read_csv(os.path.join(benchmark_dir_path, "meta.csv"), names=["pdb_id", "length", "seq"])
+    msa_path = os.path.join(benchmark_dir_path, "msa")
+    meta["msa"] = meta.apply(lambda row: glob.glob(f'{msa_path}/{row["pdb_id"]}*.a3m'), axis=1)
     # benchmarking usually assumes full data will be used, if any of the sequences has no
     # MSA in the msa catalog, raise an error if allow_missing_msa is not turned on
     # otherwise issue a warning
-    missing_msa_indices = np.where(~meta['msa'].astype(bool))[0]  # FIXME: where
+    missing_msa_indices = np.where(~meta["msa"].astype(bool))[0]  # FIXME: where
     if missing_msa_indices.size:
-        pdb_id_missing_msa = meta.iloc[missing_msa_indices]['pdb_id'].tolist()
-        pdb_id_missing_msa = ' '.join(pdb_id_missing_msa)
-        msg = f'The following sequences has no MSA provided: {pdb_id_missing_msa}. '
+        pdb_id_missing_msa = meta.iloc[missing_msa_indices]["pdb_id"].tolist()
+        pdb_id_missing_msa = " ".join(pdb_id_missing_msa)
+        msg = f"The following sequences has no MSA provided: {pdb_id_missing_msa}. "
         if allow_missing_msa:
             logging.warning(msg)
         else:
-            raise Exception(msg + 'If this is expected, use allow_missing_msa flag to ignore the warning ')
+            raise Exception(msg + "If this is expected, use allow_missing_msa flag to ignore the warning ")
     return meta
 
 
@@ -57,29 +57,29 @@ def read_benchmarking_data(benchmark_dir_path: str, allow_missing_msa: bool) -> 
 def main(cfg) -> None:
     cfg = instantiate(cfg)
     logging.info("\n\n************** Experiment configuration ***********")
-    logging.info(f'\n{OmegaConf.to_yaml(cfg)}')
+    logging.info(f"\n{OmegaConf.to_yaml(cfg)}")
     missing_keys: set[str] = OmegaConf.missing_keys(cfg)
     if missing_keys:
         raise RuntimeError(f"Got missing required keys in config:\n{missing_keys}")
 
     b_df = read_benchmarking_data(cfg.benchmark_dir_path, cfg.allow_missing_msa)
-    sequences = b_df['seq'].to_list()
-    seq_names = b_df['pdb_id'].to_list()
-    msa_filepaths = b_df['msa'].to_list()
+    sequences = b_df["seq"].to_list()
+    seq_names = b_df["pdb_id"].to_list()
+    msa_filepaths = b_df["msa"].to_list()
     np.random.seed(cfg.model.seed)
     pl.seed_everything(cfg.model.seed)
 
     writer = PredictionPDBWriter(cfg.results_path)
     trainer = setup_trainer(cfg, callbacks=[writer])
 
-    if cfg.get('restore_from_path', None):
+    if cfg.get("restore_from_path", None):
         # TODO: consider blocking restore if stage is not 'fine-tune'
         alphafold = AlphaFold.restore_from(
             restore_path=cfg.restore_from_path, override_config_path=cfg, trainer=trainer
         )
     else:
         alphafold = AlphaFold(cfg=cfg.model, trainer=trainer)
-        if cfg.get('torch_restore', None):
+        if cfg.get("torch_restore", None):
             import torch
 
             alphafold.load_state_dict(torch.load(cfg.torch_restore))
@@ -104,5 +104,5 @@ def main(cfg) -> None:
     trainer.predict(alphafold, dl, return_predictions=False)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

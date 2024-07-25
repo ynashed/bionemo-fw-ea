@@ -16,7 +16,7 @@ infer_target: bionemo.model.protein.esm1nv.infer.ESM1nvInference # target infere
 
 trainer:
   devices: 1 # number of GPUs or CPUs
-  num_nodes: 1 
+  num_nodes: 1
   max_epochs: 1 # # use max_steps instead with NeMo Megatron model
   max_steps: 10 # consumed_samples = global_step * micro_batch_size * data_parallel_size * accumulate_grad_batches
   val_check_interval: 10
@@ -47,7 +47,7 @@ model:
     enabled: True # indicates whether we intend to use PEFT technique
     peft_scheme: "lora"  # currently supported: lora
     restore_from_path: null #set to null to initialize random weights and train
-    
+
     lora_tuning:
       adapter_dim: 32
       adapter_dropout: 0.0
@@ -56,7 +56,7 @@ model:
       layer_selection:  null  # selects in which layers to add lora adapters. e.g. [1,12] will add lora to layer 1 (lowest) and 12. null will apply adapters to all layers
       weight_tying: False
       position_embedding_strategy: null # used only when weight_tying is True
-  
+
   data:
     task_name: secondary_structure # options: aav, bind, conservation, gb1, meltome, sav, scl, secondary_structure
     task_type: 'token-level-classification'  # alternative: classification, regression
@@ -66,13 +66,13 @@ model:
       train: x000
       test: x000
       val: x000
-    sequence_column: "sequence" 
-    target_column: ["3state"] # names of label columns in csv file 
-    target_sizes: [3] # number of classes in each label 
+    sequence_column: "sequence"
+    target_column: ["3state"] # names of label columns in csv file
+    target_sizes: [3] # number of classes in each label
     mask_column: ["resolved"] # names of mask columns in csv file, masks must be 0 or 1
     num_workers: 8
     max_seq_length: ${model.seq_length}
-  
+
   finetuning_optim:
     name: adam
     lr: 0.001

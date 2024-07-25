@@ -20,12 +20,12 @@ from bionemo.utils.hydra import load_model_config
 
 
 def generate_random_key(num_keys: int):
-    return ''.join(random.choice(string.ascii_lowercase) for _ in range(num_keys))
+    return "".join(random.choice(string.ascii_lowercase) for _ in range(num_keys))
 
 
 def generate_random_value(num_keys: int):
     return random.choice(
-        [random.randint(1, 100), random.uniform(0.0, 1.0), ''.join(random.choices(string.ascii_letters, k=num_keys))]
+        [random.randint(1, 100), random.uniform(0.0, 1.0), "".join(random.choices(string.ascii_letters, k=num_keys))]
     )
 
 

@@ -62,4 +62,3 @@ echo "Done. Security scan took ${duration} seconds."
 
 echo "Here is a list of CRITICAL and HIGH vulnerabilities:"
 jq '.vulnerabilities[] | select(.severity == "High" or .severity == "Critical") | {package, fix}' $TMP_IMAGE_SAVE_DIR/results/vulns.json
-

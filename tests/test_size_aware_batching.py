@@ -31,9 +31,9 @@ def collate_fn(batch):
     return Sample(name=names, size=sizes)
 
 
-@pytest.mark.parametrize('dataset_size', (113, 256))
-@pytest.mark.parametrize('max_size', (1, 7, 9))
-@pytest.mark.parametrize('max_total_size', (1, 32, 100))
+@pytest.mark.parametrize("dataset_size", (113, 256))
+@pytest.mark.parametrize("max_size", (1, 7, 9))
+@pytest.mark.parametrize("max_total_size", (1, 32, 100))
 def test_size_aware_batching_order(dataset_size, max_size, max_total_size):
     order = np.random.permutation(range(dataset_size))
     sizes = np.random.randint(1, max_size + 1, dataset_size)
@@ -60,8 +60,8 @@ def test_size_aware_batching_order(dataset_size, max_size, max_total_size):
         assert (unique_sample == expected_order[: len(unique_sample)]).all(), "incorrect_order"
 
 
-@pytest.mark.parametrize('dataset_size', (1, 10))
-@pytest.mark.parametrize('max_total_size', (17, 153))
+@pytest.mark.parametrize("dataset_size", (1, 10))
+@pytest.mark.parametrize("max_total_size", (17, 153))
 def test_too_small_batch_size(dataset_size, max_total_size):
     sizes = np.random.randint(max_total_size + 1, max_total_size + 100, dataset_size)
     dataset = [Sample(name=idx, size=sizes[idx]) for idx in range(dataset_size)]

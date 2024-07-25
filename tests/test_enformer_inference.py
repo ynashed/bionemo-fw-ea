@@ -82,14 +82,14 @@ def enformer_test_data(config_path: str, data_path: str) -> DataLoader:
     return data_loader
 
 
-def detect_gpu_architecture() -> Literal['a6000', 'a100', 'a10g']:
+def detect_gpu_architecture() -> Literal["a6000", "a100", "a10g"]:
     gpu_name = torch.cuda.get_device_name(0)
-    if 'A6000' in gpu_name:
-        return 'a6000'
-    elif 'A100' in gpu_name:
-        return 'a100'
-    elif 'A10G' in gpu_name:
-        return 'a10g'
+    if "A6000" in gpu_name:
+        return "a6000"
+    elif "A100" in gpu_name:
+        return "a100"
+    elif "A10G" in gpu_name:
+        return "a10g"
     else:
         raise ValueError(f"Unrecognized GPU architecture: {gpu_name}")
 
@@ -97,7 +97,7 @@ def detect_gpu_architecture() -> Literal['a6000', 'a100', 'a10g']:
 def gv_path_and_pbss_download(
     base_dir: Path,
     precision: Literal[16, 32],
-    architecture: Literal['a6000', 'a100', 'a10g'],
+    architecture: Literal["a6000", "a100", "a10g"],
     pbss_bucket: str,
     pbss_key_prefix: str,
 ) -> Path:
@@ -161,10 +161,10 @@ def _test_enformer_inference(
 
     trainer = enformer_inferer.trainer
     predictions = trainer.predict(enformer_inferer, enformer_test_data)
-    expression_preds = predictions[0]['pred']
+    expression_preds = predictions[0]["pred"]
 
-    expression_preds2 = trainer.predict(enformer_inferer, enformer_test_data)[0]['pred']
-    expression_preds3 = trainer.predict(enformer_inferer, enformer_test_data)[0]['pred']
+    expression_preds2 = trainer.predict(enformer_inferer, enformer_test_data)[0]["pred"]
+    expression_preds3 = trainer.predict(enformer_inferer, enformer_test_data)[0]["pred"]
 
     assert enformer_inferer.training is False
     assert expression_preds is not None

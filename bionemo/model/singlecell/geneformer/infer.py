@@ -118,7 +118,7 @@ class GeneformerInference(BaseEncoderInference):
         return self.model.autocast_dtype != torch.float32 and self.device.type != "cpu"
 
     def seq_to_hiddens(self, sequences: List[List[str]]) -> Tuple[Tensor, Tensor]:
-        '''
+        """
         Transforms Sequences into hidden state.
         Should be implemented in a child class, since it is model specific.
         This method returns hidden states and masks.
@@ -131,7 +131,7 @@ class GeneformerInference(BaseEncoderInference):
         Returns:
             hiddens (torch.Tensor, float):
             enc_mask (torch.Tensor, long): boolean mask for padded sections
-        '''
+        """
         token_ids, enc_mask = self.tokenize(sequences)
         if self.needs_tokentype_embeddings():
             token_type_ids = torch.zeros_like(token_ids)
@@ -212,7 +212,7 @@ class GeneformerInference(BaseEncoderInference):
             logits = tensor_parallel.gather_from_tensor_model_parallel_region(hiddens[0])
             if "labels" in batch:
                 output["loss"] = torch.nn.functional.cross_entropy(
-                    logits[batch['loss_mask']][:, : len(self.tokenizer.vocab)], batch['labels'][batch['loss_mask']]
+                    logits[batch["loss_mask"]][:, : len(self.tokenizer.vocab)], batch["labels"][batch["loss_mask"]]
                 )
         else:
             embeddings = self.hiddens_to_embedding(hiddens, batch["padding_mask"])

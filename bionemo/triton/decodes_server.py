@@ -31,16 +31,16 @@ __all__: Sequence[str] = ()
 
 
 @click.command()
-@click.option('--config-path', required=True, help="Path to Hydra config directory where configuration date lives.")
+@click.option("--config-path", required=True, help="Path to Hydra config directory where configuration date lives.")
 @click.option(
-    '--config-name',
-    default='infer.yaml',
+    "--config-name",
+    default="infer.yaml",
     show_default=True,
     required=True,
     help="Name of YAML config file in --config-path to load from.",
 )
 @click.option(
-    '--nav', is_flag=True, help="If present, load runtime optimized with model navigator. Requires export beforehand."
+    "--nav", is_flag=True, help="If present, load runtime optimized with model navigator. Requires export beforehand."
 )
 def entrypoint(config_path: str, config_name: str, nav: bool) -> None:  # pragma: no cover
     main(config_path=config_path, config_name=config_name, nav=nav, decode=BIONEMO_MODEL)

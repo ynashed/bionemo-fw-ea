@@ -26,10 +26,10 @@ class GaussianSmearing(nn.Module):
         else:
             offset = torch.linspace(start, stop, num_gaussians)
         self.coeff = -0.5 / (offset[1] - offset[0]).item() ** 2
-        self.register_buffer('offset', offset)
+        self.register_buffer("offset", offset)
 
     def __repr__(self):
-        return f'GaussianSmearing(start={self.start}, stop={self.stop}, num_gaussians={self.num_gaussians})'
+        return f"GaussianSmearing(start={self.start}, stop={self.stop}, num_gaussians={self.num_gaussians})"
 
     def forward(self, dist):
         dist = dist.view(-1, 1) - self.offset.view(1, -1)
@@ -42,7 +42,7 @@ class AngleExpansion(nn.Module):
         l_mul = 1.0 / torch.linspace(stop, start, half_expansion)
         r_mul = torch.linspace(start, stop, half_expansion)
         coeff = torch.cat([l_mul, r_mul], dim=-1)
-        self.register_buffer('coeff', coeff)
+        self.register_buffer("coeff", coeff)
 
     def forward(self, angle):
         return torch.cos(angle.view(-1, 1) * self.coeff.view(1, -1))
@@ -63,14 +63,14 @@ NONLINEARITIES = {
     "softplus": nn.Softplus(),
     "elu": nn.ELU(),
     "swish": Swish(),
-    'silu': nn.SiLU(),
+    "silu": nn.SiLU(),
 }
 
 
 class MLP(nn.Module):
     """MLP with the same hidden dim across all layers."""
 
-    def __init__(self, in_dim, out_dim, hidden_dim, num_layer=2, norm=True, act_fn='relu', act_last=False):
+    def __init__(self, in_dim, out_dim, hidden_dim, num_layer=2, norm=True, act_fn="relu", act_last=False):
         super().__init__()
         layers = []
         for layer_idx in range(num_layer):
@@ -101,10 +101,10 @@ def outer_product(*vectors):
 
 
 def get_h_dist(dist_metric: str, hi: torch.Tensor, hj: torch.Tensor):
-    if dist_metric == 'euclidean':
+    if dist_metric == "euclidean":
         h_dist = torch.sum((hi - hj) ** 2, -1, keepdim=True)
         return h_dist
-    elif dist_metric == 'cos_sim':
+    elif dist_metric == "cos_sim":
         hi_norm = torch.norm(hi, p=2, dim=-1, keepdim=True)
         hj_norm = torch.norm(hj, p=2, dim=-1, keepdim=True)
         h_dist = torch.sum(hi * hj, -1, keepdim=True) / (hi_norm * hj_norm)
@@ -112,10 +112,10 @@ def get_h_dist(dist_metric: str, hi: torch.Tensor, hj: torch.Tensor):
 
 
 def compose_context(h_protein, h_ligand, pos_protein, pos_ligand, batch_protein, batch_ligand):
-    '''Given torch tensors for the protein and ligand features and 3D positions create a
+    """Given torch tensors for the protein and ligand features and 3D positions create a
     stacked batch as well as appropriate indicies for model input. This function is equivalent
     to a torch.stack but over multiple objects sorted by their appropriate
-    linkage ie specfic ligand to protein'''
+    linkage ie specfic ligand to protein"""
     batch_ctx = torch.cat([batch_protein, batch_ligand], dim=0)
     sort_idx = torch.sort(batch_ctx, stable=True).indices
 
@@ -150,7 +150,7 @@ def hybrid_edge_connection(
     ligand_index: torch.Tensor,
     protein_index: torch.Tensor,
 ):
-    '''Here defines the logic for edge creation for the EGNN architecture'''
+    """Here defines the logic for edge creation for the EGNN architecture"""
     # fully-connected for ligand atoms
     dst = torch.repeat_interleave(ligand_index, len(ligand_index))
     src = ligand_index.repeat(len(ligand_index))
@@ -173,7 +173,7 @@ def hybrid_edge_connection(
 def batch_hybrid_edge_connection(
     x: torch.Tensor, k: int, mask_ligand: torch.Tensor, batch: torch.Tensor, add_p_index=False
 ):
-    '''Batch operation for edge definition for EGNN architecture'''
+    """Batch operation for edge definition for EGNN architecture"""
     batch_size = batch.max().item() + 1
     batch_ll_edge_index, batch_pl_edge_index, batch_p_edge_index = [], [], []
     with torch.no_grad():
@@ -188,7 +188,7 @@ def batch_hybrid_edge_connection(
             batch_pl_edge_index.append(pl_edge_index)
             if add_p_index:
                 all_pos = torch.cat([protein_pos, ligand_pos], 0)
-                p_edge_index = knn_graph(all_pos, k=k, flow='source_to_target')
+                p_edge_index = knn_graph(all_pos, k=k, flow="source_to_target")
                 p_edge_index = p_edge_index[:, p_edge_index[1] < len(protein_pos)]
                 p_src, p_dst = p_edge_index
                 all_index = torch.cat([protein_index, ligand_index], 0)

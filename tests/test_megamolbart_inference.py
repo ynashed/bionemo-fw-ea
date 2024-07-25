@@ -51,7 +51,7 @@ def _smis() -> List[str]:
 def megamolbart_inferer(bionemo_home: Path) -> Generator[MegaMolBARTInference, None, None]:
     model_name = "megamolbart"
     cfg_path = get_config_dir(bionemo_home, model_name)
-    cfg = load_model_config(config_name='infer', config_path=cfg_path)
+    cfg = load_model_config(config_name="infer", config_path=cfg_path)
     with distributed_model_parallel_state():
         inferer = get_inference_class(model_name)(
             cfg=cfg, inference_batch_size_for_warmup=2
@@ -116,11 +116,11 @@ def test_beam_search_product_megamolbart(megamolbart_inferer: MegaMolBARTInferen
 @pytest.mark.parametrize(
     "sampling_method",
     [
-        'greedy-perturbate',
-        'topkp-perturbate',
-        'beam-search-perturbate',
-        'beam-search-perturbate-sample',
-        'beam-search-single-sample',
+        "greedy-perturbate",
+        "topkp-perturbate",
+        "beam-search-perturbate",
+        "beam-search-perturbate-sample",
+        "beam-search-single-sample",
     ],
 )
 def test_interpolate_megamolbart(megamolbart_inferer: MegaMolBARTInference, _smis: List[str], sampling_method: str):

@@ -1,6 +1,7 @@
 status=0
 
-jet_pipeline_id=$(curl --silent --header "PRIVATE-TOKEN: ${RO_API_TOKEN}" "https://gitlab-master.nvidia.com/api/v4/projects/${CI_PROJECT_ID}/pipelines/${CI_PIPELINE_ID}/bridges" | jq '.[0].downstream_pipeline.id')
+jet_pipeline_id=$(curl --silent --header "PRIVATE-TOKEN: ${RO_API_TOKEN}" "https://gitlab-master.nvidia.com//api/v4/projects/${CI_PROJECT_ID}/pipelines/${CI_PIPELINE_ID}/bridges" | jq '.[] | select(.name == "jet-trigger") | .downstream_pipeline.id')
+
 echo "JET_PIPELINE_ID=${jet_pipeline_id}"
 python internal/jet/get_results_from_jet.py --pipeline_id $jet_pipeline_id  --save_dir . -vvv
 
@@ -23,7 +24,7 @@ echo "==========================================================================
 for (( i=1; i<${#test_status[@]}; ++i)); do
   jet_test_status=${test_status[$i]}
   job_key=${job_keys[$i]}
-  if [[ "${job_key}" == recipe/* && "${jet_test_status}" != "Success" ]]; then
+  if [[ "${job_key}" == recipe/* && "${jet_test_status}" != "success" ]]; then
       echo -e "\nJOB_KEY: ${job_key}, TEST: ${jet_test_status}"
       status+=1
   fi
