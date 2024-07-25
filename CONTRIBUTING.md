@@ -2,6 +2,8 @@
 
 Note: For code review standards please see [CODE-REVIEW](CODE-REVIEW.md)
 
+Note: For all PRs, an approved NVIDIA staff member must sign off and trigger the continuous integration (CI) tests. These are initiated by the member commenting `/build-ci` directly on the PR. All PRs must have successful CI runs and sufficient code review before being merged.
+
 
 ## Python Coding Standards
 
