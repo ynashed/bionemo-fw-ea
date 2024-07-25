@@ -137,6 +137,7 @@ models:
         symlink:
             source: "../../geneformer-10M-240530-step-115430-wandb-4ij9ghox.nemo"
             target: "singlecell/geneformer/geneformer-10M-240530.nemo"
+        md5sum: 375ebb9431419f4936fa3aa2bce6e7d6 # pragma: allowlist secret
     geneformer_106M_240530:
         # A pretrained 106M parameter geneformer (BERT) on 23M unique single cells and 25429 ENSG based tokens,
         #   padded to a final shape of 25472 for GPU efficiency.
@@ -146,6 +147,7 @@ models:
         symlink:
             source: "../../geneformer-106M-240530-step-115430-wandb-KZxWJ0I5.nemo"
             target: "singlecell/geneformer/geneformer-106M-240530.nemo"
+        md5sum: 375ebb9431419f4936fa3aa2bce6e7d6 #pragma: allowlist secret
     geneformer:
         # A QA model for geneformer with randomly initialized weights.
         pbss: "s3://bionemo-ci/models/geneformer-qa.nemo"
@@ -190,6 +192,7 @@ data:
     single_cell:
         pbss: "s3://bionemo-ci/test-data/singlecell/singlecell-testdata-20240506.tar.gz"
         relative_download_dir: "examples/tests/test_data/"
+        md5sum: dd6b0d791bf2b3301d9793a1d6663c75 #pragma: allowlist secret
     diffdock_sample:
         pbss: "s3://bionemo-ci/test-data/diffdock/diffdock_vprocessed_sample_05022024/"
         relative_download_dir: "examples/tests/test_data/molecule/diffdock"
