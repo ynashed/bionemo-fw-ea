@@ -149,7 +149,10 @@ class TimestepEmbedder(nn.Module):
     def forward(self, t, batch):
         t_freq = self.timestep_embedding(t, self.frequency_embedding_size)
         t_emb = self.mlp(t_freq)
-        return t_emb
+        if batch is not None:
+            return t_emb[batch]
+        else:
+            return t_emb
 
 
 class AdaLN(nn.Module):

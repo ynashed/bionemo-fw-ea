@@ -8,12 +8,12 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
-from model.molecule.moco.models.utils import PredictionHead
 from torch import nn
 from torch_scatter import scatter_mean
 
 from bionemo.model.molecule.moco.arch.scratch.attention import AttentionLayer
 from bionemo.model.molecule.moco.arch.scratch.mpnn import AdaLN, EquivariantMessagePassingLayer, TimestepEmbedder
+from bionemo.model.molecule.moco.models.utils import PredictionHead
 
 
 class EquivariantTransformerBlock(nn.Module):

@@ -358,12 +358,10 @@ class XEGNN(MessagePassing):
 
     def __init__(
         self,
-        # equivariant_node_feature_dim=3,
         invariant_node_feat_dim=64,
-        invariant_edge_feat_dim=0,
     ):
         super().__init__(node_dim=0, aggr=None, flow="source_to_target")  #! This should be target to source
-        self.message_input_size = invariant_node_feat_dim + invariant_node_feat_dim + 1 + invariant_edge_feat_dim
+        self.message_input_size = 2 * invariant_node_feat_dim + 1  # + invariant_edge_feat_dim
         self.phi_message = MLP(self.message_input_size, invariant_node_feat_dim, invariant_node_feat_dim)
         self.phi_x = MLP(invariant_node_feat_dim, invariant_node_feat_dim, 1)
         self.coor_update_clamp_value = 10.0
@@ -385,12 +383,13 @@ class XEGNN(MessagePassing):
     #         nn.init.zeros_(module.bias)
 
     def forward(self, batch, X, H, edge_index, edge_attr=None):
+        X = X - scatter_mean(X, index=batch, dim=0, dim_size=X.shape[0])
         X = self.x_norm(X, batch)
         H = self.h_norm(H, batch)
         source, target = edge_index
         rel_coors = X[source] - X[target]
         rel_dist = (rel_coors**2).sum(dim=-1, keepdim=True)
-        if edge_attr:
+        if edge_attr is not None:
             edge_attr_feat = torch.cat([edge_attr, rel_dist], dim=-1)
         else:
             edge_attr_feat = rel_dist
@@ -414,7 +413,177 @@ class XEGNN(MessagePassing):
             X_out = X_out + x_update_cross
 
         H_out = H
+        return X_out, H_out
+
+
+class EdgeMixInLayer(MessagePassing):
+    def __init__(
+        self,
+        equivariant_node_feature_dim=3,
+        invariant_node_feat_dim=64,
+        invariant_edge_feat_dim=32,
+    ):
+        super().__init__(node_dim=0, aggr=None, flow="source_to_target")  #! This should be target to source
+        # self.pre_edge = MLP(invariant_edge_feat_dim, invariant_edge_feat_dim, invariant_edge_feat_dim)
+        # self.edge_lin = MLP(2 * invariant_edge_feat_dim + 3, invariant_edge_feat_dim, invariant_edge_feat_dim)
+        self.message_input_size = invariant_node_feat_dim + invariant_node_feat_dim + 1 + invariant_edge_feat_dim
+        self.phi_message = MLP(self.message_input_size, invariant_node_feat_dim, invariant_node_feat_dim)
+        self.message_gate = MLP(invariant_node_feat_dim, invariant_node_feat_dim, 1, last_act="sigmoid")
+        self.phi_x = MLP(invariant_node_feat_dim, invariant_node_feat_dim, 1)
+        self.h_input_size = 2 * invariant_node_feat_dim
+        self.phi_h = MLP(self.h_input_size, invariant_node_feat_dim, invariant_node_feat_dim)
+        self.coor_update_clamp_value = 10.0
+        # self.reset_parameters()
+        self.h_norm = BatchLayerNorm(invariant_node_feat_dim)
+        self.use_cross_product = True
+        if self.use_cross_product:
+            self.phi_x_cross = MLP(invariant_node_feat_dim, invariant_node_feat_dim, 1)
+        self.x_norm = E3Norm()
+
+    #     self.apply(self.init_)
+
+    # # def reset_parameters(self):
+    # def init_(self, module): #! this made it worse
+    #     if type(module) in {nn.Linear}:
+    #         # seems to be needed to keep the network from exploding to NaN with greater depths
+    #         nn.init.xavier_normal_(module.weight)
+    #         nn.init.zeros_(module.bias)
+
+    def forward(self, batch, X, H, edge_index, edge_attr):
+        X = X - scatter_mean(X, index=batch, dim=0, dim_size=X.shape[0])
+        X = self.x_norm(X, batch)
+        H = self.h_norm(H, batch)
+        source, target = edge_index
+        rel_coors = X[source] - X[target]
+        rel_dist = (rel_coors**2).sum(dim=-1, keepdim=True)
+        edge_attr_feat = torch.cat([edge_attr, rel_dist], dim=-1)
+        m_ij = self.phi_message(torch.cat([H[target], H[source], edge_attr_feat], dim=-1))
+        coor_wij = self.phi_x(m_ij)  # E x 3
+        if self.coor_update_clamp_value:
+            coor_wij.clamp_(min=-self.coor_update_clamp_value, max=self.coor_update_clamp_value)
+        X_rel_norm = rel_coors / (1 + torch.sqrt(rel_dist + 1e-8))
+        x_update = scatter(X_rel_norm * coor_wij, index=target, dim=0, reduce='sum', dim_size=X.shape[0])
+        X_out = X + x_update
+        if self.use_cross_product:
+            mean = scatter(X, index=batch, dim=0, reduce='mean', dim_size=X.shape[0])
+            x_src = X[source] - mean[source]
+            x_tgt = X[target] - mean[target]
+            cross = torch.cross(x_src, x_tgt, dim=1)
+            cross = cross / (1 + torch.linalg.norm(cross, dim=1, keepdim=True))
+            coor_wij_cross = self.phi_x_cross(m_ij)
+            if self.coor_update_clamp_value:
+                coor_wij_cross.clamp_(min=-self.coor_update_clamp_value, max=self.coor_update_clamp_value)
+            x_update_cross = scatter(cross * coor_wij_cross, index=target, dim=0, reduce='sum', dim_size=X.shape[0])
+            X_out = X_out + x_update_cross
+
+        # m_i, m_ij = self.aggregate(inputs = m_ij * self.message_gate(m_ij), index = i, dim_size = X.shape[0])
+        m_i = scatter(
+            m_ij * self.message_gate(m_ij), index=target, dim=0, reduce='sum', dim_size=X.shape[0]
+        )  #! Sigmoid over the gate matters a lot
+        H_out = H + self.phi_h(torch.cat([H, m_i], dim=-1))  # self.h_norm(H, batch)
+        return X_out, H_out
+
+
+class EdgeMixOutLayer(MessagePassing):
+    def __init__(
+        self,
+        equivariant_node_feature_dim=3,
+        invariant_node_feat_dim=64,
+        invariant_edge_feat_dim=32,
+    ):
+        super().__init__(node_dim=0, aggr=None, flow="source_to_target")  #! This should be target to source
+        self.pre_edge = MLP(invariant_node_feat_dim, invariant_node_feat_dim, invariant_edge_feat_dim)
+        # self.edge_lin = MLP(2 * invariant_edge_feat_dim + 3, invariant_edge_feat_dim, invariant_edge_feat_dim)
+        self.message_input_size = invariant_node_feat_dim + invariant_node_feat_dim + 1
+        self.phi_message = MLP(self.message_input_size, invariant_node_feat_dim, invariant_node_feat_dim)
+        self.message_gate = MLP(invariant_node_feat_dim, invariant_node_feat_dim, 1, last_act="sigmoid")
+        self.phi_x = MLP(invariant_node_feat_dim, invariant_node_feat_dim, 1)
+        self.h_input_size = 2 * invariant_node_feat_dim
+        self.phi_h = MLP(self.h_input_size, invariant_node_feat_dim, invariant_node_feat_dim)
+        self.coor_update_clamp_value = 10.0
+        # self.reset_parameters()
+        self.h_norm = BatchLayerNorm(invariant_node_feat_dim)
+        self.use_cross_product = True
+        if self.use_cross_product:
+            self.phi_x_cross = MLP(invariant_node_feat_dim, invariant_node_feat_dim, 1)
+        self.x_norm = E3Norm()
+
+    #     self.apply(self.init_)
+
+    # # def reset_parameters(self):
+    # def init_(self, module): #! this made it worse
+    #     if type(module) in {nn.Linear}:
+    #         # seems to be needed to keep the network from exploding to NaN with greater depths
+    #         nn.init.xavier_normal_(module.weight)
+    #         nn.init.zeros_(module.bias)
+
+    def forward(self, batch, X, H, edge_index):
+        X = X - scatter_mean(X, index=batch, dim=0, dim_size=X.shape[0])
+        X = self.x_norm(X, batch)
+        H = self.h_norm(H, batch)
+        source, target = edge_index
+        rel_coors = X[source] - X[target]
+        rel_dist = (rel_coors**2).sum(dim=-1, keepdim=True)
+        edge_attr_feat = rel_dist  # torch.cat([edge_attr, rel_dist], dim=-1)
+        m_ij = self.phi_message(torch.cat([H[target], H[source], edge_attr_feat], dim=-1))
+        coor_wij = self.phi_x(m_ij)  # E x 3
+        if self.coor_update_clamp_value:
+            coor_wij.clamp_(min=-self.coor_update_clamp_value, max=self.coor_update_clamp_value)
+        X_rel_norm = rel_coors / (1 + torch.sqrt(rel_dist + 1e-8))
+        x_update = scatter(X_rel_norm * coor_wij, index=target, dim=0, reduce='sum', dim_size=X.shape[0])
+        X_out = X + x_update
+        if self.use_cross_product:
+            mean = scatter(X, index=batch, dim=0, reduce='mean', dim_size=X.shape[0])
+            x_src = X[source] - mean[source]
+            x_tgt = X[target] - mean[target]
+            cross = torch.cross(x_src, x_tgt, dim=1)
+            cross = cross / (1 + torch.linalg.norm(cross, dim=1, keepdim=True))
+            coor_wij_cross = self.phi_x_cross(m_ij)
+            if self.coor_update_clamp_value:
+                coor_wij_cross.clamp_(min=-self.coor_update_clamp_value, max=self.coor_update_clamp_value)
+            x_update_cross = scatter(cross * coor_wij_cross, index=target, dim=0, reduce='sum', dim_size=X.shape[0])
+            X_out = X_out + x_update_cross
+
+        # m_i, m_ij = self.aggregate(inputs = m_ij * self.message_gate(m_ij), index = i, dim_size = X.shape[0])
+        m_i = scatter(
+            m_ij * self.message_gate(m_ij), index=target, dim=0, reduce='sum', dim_size=X.shape[0]
+        )  #! Sigmoid over the gate matters a lot
+        H_out = H + self.phi_h(torch.cat([H, m_i], dim=-1))
+
+        edge_attr = self.pre_edge(m_ij)
         return X_out, H_out, edge_attr
+
+
+class BondRefine(MessagePassing):
+    def __init__(
+        self,
+        invariant_node_feat_dim=64,
+        invariant_edge_feat_dim=32,
+    ):
+        super().__init__(node_dim=0, aggr=None, flow="source_to_target")
+        # self.x_norm = E3Norm()
+        self.h_norm = BatchLayerNorm(invariant_node_feat_dim)
+        self.edge_norm = BatchLayerNorm(invariant_edge_feat_dim)
+        self.bond_norm = torch.nn.LayerNorm(invariant_edge_feat_dim)
+        in_feats = 2 * invariant_node_feat_dim + 1 + invariant_edge_feat_dim
+        self.refine_layer = torch.nn.Sequential(
+            torch.nn.Linear(in_feats, invariant_edge_feat_dim),
+            torch.nn.SiLU(inplace=False),
+            torch.nn.Linear(invariant_edge_feat_dim, invariant_edge_feat_dim),
+        )
+
+    def forward(self, batch, X, H, edge_index, edge_attr):
+        X = X - scatter_mean(X, index=batch, dim=0, dim_size=X.shape[0])
+        # X = self.x_norm(X, batch)
+        H = self.h_norm(H, batch)
+
+        source, target = edge_index
+        rel_coors = X[source] - X[target]
+        rel_dist = (rel_coors**2).sum(dim=-1, keepdim=True)
+
+        edge_attr = self.edge_norm(edge_attr, batch)
+        infeats = torch.cat([H[target], H[source], rel_dist, edge_attr], dim=-1)
+        return self.bond_norm(self.refine_layer(infeats), batch)
 
 
 class SE3MixAttention(nn.Module):
@@ -454,8 +623,8 @@ class SE3MixAttention(nn.Module):
         Q = self.Q_norm(Q)
         K = self.K_norm(K)
 
-        B = self.pair_bias(ZE)
-        attention_scores = (Q * K).sum(dim=-1) / (self.invariant_node_feat_dim**0.5) + B
+        # B = self.pair_bias(ZE)
+        attention_scores = (Q * K).sum(dim=-1) / (self.invariant_node_feat_dim**0.5)  # + B
         alpha_ij = self.gate(H)[src, dst] * attention_scores
 
         attention_output = alpha_ij.unsqueeze(-1) * V  # [src]  # Shape: [num_edges, num_heads, head_dim]
@@ -468,8 +637,9 @@ class SE3MixAttention(nn.Module):
         H_out = H + self.phi_h(A * AH)
         return X_out, H_out
 
-    if __name__ == "__main__":
-        ligand_pos = torch.rand((75, 3))
+
+if __name__ == "__main__":
+    ligand_pos = torch.rand((75, 3))
     batch_ligand = torch.Tensor(
         [
             0,
