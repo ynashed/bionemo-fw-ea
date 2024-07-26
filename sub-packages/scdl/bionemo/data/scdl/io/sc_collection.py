@@ -176,14 +176,14 @@ class SingleCellCollection(SingleCellRowDatasetCore):
     ) -> bool:
         if cols_to_compare is None:
             cols_to_compare = ["feature_name"]
-        for p in self.mmap_paths:
-            logger.info(f"{p}: {self.fname_to_mmap[p].compare_features(other_dataset)}")
+        for path in self.mmap_paths:
+            logger.info(f"{path}: {self.fname_to_mmap[path].compare_features(other_dataset)}")
         return all(
-            self.fname_to_mmap[i].compare_features(other_dataset, cols_to_compare, check_order)
-            for i in self.mmap_paths
+            self.fname_to_mmap[path].compare_features(other_dataset, cols_to_compare, check_order)
+            for path in self.mmap_paths
         )
 
-    def _column_validate_component_datasets(
+    def is_column_validate_component_datasets(
         self, cols_to_compare: Optional[List[str]] = None, check_order: bool = True
     ) -> bool:
         if cols_to_compare is None:

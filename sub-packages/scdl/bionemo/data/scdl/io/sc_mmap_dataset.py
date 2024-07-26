@@ -112,7 +112,7 @@ def _pad_sparse_array(row_values, row_col_ptr, n_cols: int) -> np.ndarray:
 def _create_arrs(
     n_elements: int,
     n_rows: int,
-    path: str,
+    path: Path,
     mode: Mode,
     dtypes: Dict[str, str],
     create_path_if_nonexistent: bool = False,
@@ -286,8 +286,9 @@ class SC_MMAP_Dataset(SingleCellRowDataset):
     def get(
         self, row: int, column: Optional[int] = None, impute_missing_zeros: bool = True, pad: bool = True
     ) -> Optional[float | np.ndarray | tuple[np.ndarray, np.ndarray]]:
-        """ """
-
+        """
+        Obtain the entry at the specified row and optionally column.
+        """
         row_values, row_col_ptr = self._get_row(row, return_features=False, pad=False)
 
         if column is not None:
