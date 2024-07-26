@@ -224,7 +224,7 @@ class BionemoModelBase(Protocol):
 BionemoModel = TypeVar("BionemoModel", bound=BionemoModelBase)
 
 
-class BionemoModelConfig(Generic[BionemoModel, Loss], Protocol):
+class BionemoModelConfig(Protocol[BionemoModel, Loss]):
     def configure_model(self, **kwargs) -> BionemoModel: ...
 
     # NOTE: all must have **kwargs o/w passing in extras will cause it to break!
