@@ -67,8 +67,8 @@ class MoleculeDiT(nn.Module):
         # import ipdb; ipdb.set_trace()
         edge_attr = self.bond_refine(batch, X, H, E_idx, edge_attr)
         x = X - scatter_mean(X, index=batch, dim=0, dim_size=X.shape[0])
-        h_logits = self.atom_type_head(batch, H)
-        e_logits = self.edge_type_head.predict_edges(batch, edge_attr, E_idx)
+        h_logits, _ = self.atom_type_head(batch, H)
+        e_logits, _ = self.edge_type_head.predict_edges(batch, edge_attr, E_idx)
         out = {
             "x_hat": x,
             "h_logits": h_logits,
