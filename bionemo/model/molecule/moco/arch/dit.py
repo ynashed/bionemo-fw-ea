@@ -17,7 +17,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.nn import MessagePassing
 from torch_geometric.nn.norm import LayerNorm as BatchLayerNorm
-from torch_scatter import scatter, scatter_mean
+from torch_scatter import scatter, scatter_mean, scatter_softmax
 
 from bionemo.model.molecule.moco.arch.rotary import RotaryEmbedding
 
@@ -225,6 +225,14 @@ def swiglu_ln_ffn(d_model: int, expansion_ratio: float, bias: bool):
     )
 
 
+def swiglu_ffn(d_model: int, expansion_ratio: float, bias: bool):
+    return nn.Sequential(
+        nn.Linear(d_model, swiglu_correction_fn(expansion_ratio, d_model) * 2, bias=bias),
+        SwiGLU(),
+        nn.Linear(swiglu_correction_fn(expansion_ratio, d_model), d_model, bias=bias),
+    )
+
+
 class DiTBlock(nn.Module):
     """
     Mimics DiT block
@@ -243,19 +251,23 @@ class DiTBlock(nn.Module):
         super().__init__()
         self.hidden_size = hidden_size
         self.num_heads = num_heads
-        self.norm1 = nn.LayerNorm(hidden_size, elementwise_affine=False, eps=1e-6)
+        self.norm1 = BatchLayerNorm(
+            hidden_size, affine=False, eps=1e-6
+        )  # LayerNorm(hidden_size, elementwise_affine=False, eps=1e-6)
         # self.attn = nn.MultiheadAttention(
         # embed_dim=hidden_size, num_heads=num_heads, bias=True, **block_kwargs
         # )
-        self.norm2 = nn.LayerNorm(hidden_size, elementwise_affine=False, eps=1e-6)
+        self.norm2 = BatchLayerNorm(hidden_size, affine=False, eps=1e-6)
         # mlp_hidden_dim = int(hidden_size * mlp_expansion_ratio)
-        self.ffn = swiglu_ln_ffn(hidden_size, mlp_expansion_ratio, bias=False)
+        # self.ffn = swiglu_ln_ffn(hidden_size, mlp_expansion_ratio, bias=False)
+        self.ffn_norm = BatchLayerNorm(hidden_size)
+        self.ffn = swiglu_ffn(hidden_size, mlp_expansion_ratio, bias=False)
         self.adaLN_modulation = nn.Sequential(nn.SiLU(), nn.Linear(hidden_size, 6 * hidden_size, bias=True))
 
         # Single linear layer for QKV projection
         self.qkv_proj = nn.Linear(hidden_size, 3 * hidden_size, bias=False)
-        self.norm_q = nn.LayerNorm(hidden_size, elementwise_affine=False, eps=1e-6)
-        self.norm_k = nn.LayerNorm(hidden_size, elementwise_affine=False, eps=1e-6)
+        self.norm_q = BatchLayerNorm(hidden_size, affine=False, eps=1e-6)
+        self.norm_k = BatchLayerNorm(hidden_size, affine=False, eps=1e-6)
         self.out_projection = nn.Linear(hidden_size, hidden_size, bias=False)
 
         self.use_rotary = use_rotary
@@ -286,12 +298,13 @@ class DiTBlock(nn.Module):
         shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = self.adaLN_modulation(t_emb).chunk(6, dim=1)
 
         # Normalize x
-        x_norm = modulate(self.norm1(x), shift_msa, scale_msa)
+        x_norm = modulate(self.norm1(x, batch), shift_msa, scale_msa)
 
         # QKV projection
         qkv = self.qkv_proj(x_norm)
         Q, K, V = qkv.chunk(3, dim=-1)
-        Q, K = self.norm_q(Q), self.norm_k(K)
+        # Q, K = self.norm_q(Q), self.norm_k(K)
+        Q, K = self.norm_q(Q, batch), self.norm_k(K, batch)
         # Reshape Q, K, V to (1, seq_len, num_heads*head_dim)
         if x.dim() == 2:
             Q = Q.unsqueeze(0)
@@ -337,7 +350,9 @@ class DiTBlock(nn.Module):
         # Gated Residual
         x = x + gate_msa * y
         # Feed Forward
-        x = x + gate_mlp * self.ffn(modulate(self.norm2(x), shift_mlp, scale_mlp))
+        x = x + gate_mlp * self.ffn(
+            self.ffn_norm(modulate(self.norm2(x, batch), shift_mlp, scale_mlp), batch)
+        )  #! Using batch layer norm for PyG
         if Z is not None:
             Z = Z + x.unsqueeze(1) * x.unsqueeze(0)  # Z outer product
             if self.mask_z:
@@ -526,7 +541,7 @@ class EdgeMixOutLayer(MessagePassing):
         rel_dist = (rel_coors**2).sum(dim=-1, keepdim=True)
         edge_attr_feat = rel_dist  # torch.cat([edge_attr, rel_dist], dim=-1)
         m_ij = self.phi_message(torch.cat([H[target], H[source], edge_attr_feat], dim=-1))
-        coor_wij = self.phi_x(m_ij)  # E x 3
+        coor_wij = self.phi_x(m_ij)  # E x 1
         if self.coor_update_clamp_value:
             coor_wij.clamp_(min=-self.coor_update_clamp_value, max=self.coor_update_clamp_value)
         X_rel_norm = rel_coors / (1 + torch.sqrt(rel_dist + 1e-8))
@@ -564,7 +579,7 @@ class BondRefine(MessagePassing):
         # self.x_norm = E3Norm()
         self.h_norm = BatchLayerNorm(invariant_node_feat_dim)
         self.edge_norm = BatchLayerNorm(invariant_edge_feat_dim)
-        self.bond_norm = torch.nn.LayerNorm(invariant_edge_feat_dim)
+        self.bond_norm = BatchLayerNorm(invariant_edge_feat_dim)
         in_feats = 2 * invariant_node_feat_dim + 1 + invariant_edge_feat_dim
         self.refine_layer = torch.nn.Sequential(
             torch.nn.Linear(in_feats, invariant_edge_feat_dim),
@@ -576,14 +591,14 @@ class BondRefine(MessagePassing):
         X = X - scatter_mean(X, index=batch, dim=0, dim_size=X.shape[0])
         # X = self.x_norm(X, batch)
         H = self.h_norm(H, batch)
-
         source, target = edge_index
         rel_coors = X[source] - X[target]
         rel_dist = (rel_coors**2).sum(dim=-1, keepdim=True)
-
-        edge_attr = self.edge_norm(edge_attr, batch)
+        edge_batch, counts = torch.unique(batch, return_counts=True)
+        edge_batch = torch.repeat_interleave(edge_batch, counts * (counts - 1))  # E
+        edge_attr = self.edge_norm(edge_attr, edge_batch)
         infeats = torch.cat([H[target], H[source], rel_dist, edge_attr], dim=-1)
-        return self.bond_norm(self.refine_layer(infeats), batch)
+        return self.bond_norm(self.refine_layer(infeats), edge_batch)
 
 
 class SE3MixAttention(nn.Module):
@@ -593,7 +608,7 @@ class SE3MixAttention(nn.Module):
         invariant_node_feat_dim=64,
         invariant_edge_feat_dim=0,
     ):
-        super.__init__()
+        super(SE3MixAttention, self).__init__()
         self.equivariant_node_feature_dim = equivariant_node_feature_dim
         self.invariant_node_feat_dim = invariant_node_feat_dim
         self.invariant_edge_feat_dim = invariant_edge_feat_dim
@@ -601,16 +616,17 @@ class SE3MixAttention(nn.Module):
             invariant_node_feat_dim + 1, 2 * invariant_node_feat_dim, 2 * invariant_node_feat_dim, bias=False
         )
         self.Q = MLP(invariant_node_feat_dim, invariant_node_feat_dim, invariant_node_feat_dim, bias=False)
-        self.pair_bias = MLP(invariant_node_feat_dim, 4 * invariant_node_feat_dim, 1)
-        self.gate = MLP(invariant_node_feat_dim, invariant_node_feat_dim, 1, last_act='sigmoid')
+        # self.pair_bias = MLP(invariant_node_feat_dim, 4 * invariant_node_feat_dim, 1)
+        # self.gate = MLP(invariant_node_feat_dim, invariant_node_feat_dim, 1, last_act='sigmoid')
         self.phi_h = MLP(invariant_node_feat_dim, invariant_node_feat_dim, invariant_node_feat_dim)
         self.phi_x = MLP(invariant_node_feat_dim, invariant_node_feat_dim, 1, bias=False)
-        self.coor_update_clamp_value = 10.0
+        # self.coor_update_clamp_value = 10.0
         self.x_norm = E3Norm()
-        self.Q_norm = nn.LayerNorm(invariant_node_feat_dim)
-        self.K_norm = nn.LayerNorm(invariant_node_feat_dim)
+        self.Q_norm = BatchLayerNorm(invariant_node_feat_dim)
+        self.K_norm = BatchLayerNorm(invariant_node_feat_dim)
 
-    def forward(self, batch, X, H, E_idx, ZE):
+    def forward(self, batch, X, H, E_idx, ZE=None):
+        # TODO is this the right direction for src and dst? we will remove this away from PyG but still should check this
         X = self.x_norm(X, batch)
         src, dst = E_idx
         Q = self.Q(H[dst])
@@ -619,21 +635,24 @@ class SE3MixAttention(nn.Module):
         X_rel_norm = rel_coors / (1 + torch.sqrt(rel_dist + 1e-8))
         kv_input = torch.cat([rel_dist, H[src]], dim=-1)
         K, V = self.KV(kv_input).split(self.invariant_node_feat_dim, dim=-1)
-
-        Q = self.Q_norm(Q)
-        K = self.K_norm(K)
-
+        edge_batch, counts = torch.unique(batch, return_counts=True)
+        edge_batch = torch.repeat_interleave(edge_batch, counts * (counts - 1))
+        Q = self.Q_norm(Q, edge_batch)
+        K = self.K_norm(K, edge_batch)
+        # import ipdb; ipdb.set_trace()
         # B = self.pair_bias(ZE)
         attention_scores = (Q * K).sum(dim=-1) / (self.invariant_node_feat_dim**0.5)  # + B
-        alpha_ij = self.gate(H)[src, dst] * attention_scores
+        alpha_ij = scatter_softmax(attention_scores, dst, dim=0)  #! DO we want to gate maybe start simpler
 
-        attention_output = alpha_ij.unsqueeze(-1) * V  # [src]  # Shape: [num_edges, num_heads, head_dim]
+        attention_output = alpha_ij.unsqueeze(-1) * V
 
         A = scatter(attention_output, dst, dim=0, dim_size=H.size(0), reduce='sum')
-        AX = scatter(attention_output * X_rel_norm, dst, dim=0, dim_size=H.size(0), reduce='sum')
+        # AX = scatter(attention_output * rel_dist, dst, dim=0, dim_size=H.size(0), reduce='sum')
         AH = scatter(attention_output * H[dst], dst, dim=0, dim_size=H.size(0), reduce='sum')
 
-        X_out = X + self.phi_x(A * AX)
+        X_out = X + scatter(
+            X_rel_norm * self.phi_x(attention_output), index=dst, dim=0, reduce='sum', dim_size=X.shape[0]
+        )
         H_out = H + self.phi_h(A * AH)
         return X_out, H_out
 
