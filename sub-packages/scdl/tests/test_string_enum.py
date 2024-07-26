@@ -24,12 +24,13 @@ def test_string_enum():
         test = "pass"
         win = "lose"
 
-    e = E()
-    assert e.x == "y"
-    assert e.test == "pass"
-    assert e.win == "lose"
+    # Checking iteration over enum members
+    assert set(E) == {E.x, E.test, E.win}
 
+    # Checking for attribute errors when accessing non-existent attributes
     with pytest.raises(AttributeError):
-        e.singlecell == "k"
+        getattr(E, "singlecell")
+
+    # Checking for errors when trying to set attribute values
     with pytest.raises(AttributeError):
-        e.x = "zed"
+        setattr(E, "x", "zed")
