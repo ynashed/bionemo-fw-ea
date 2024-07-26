@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "scdl"
+version = "0.0.1"
+authors = [
+  {name="NVIDIA Corporation"},
+]
+description = "SCDL, a Dataset class for Single Cell data."
+readme = "README.md"
+requires-python = ">=3.10"
+keywords = ["single cell", "deep learning", "machine learning", "gpu", "nvidia", "pytorch", "torch"]
+license = {file = "LICENSE/license.txt"}
+dynamic = ["dependencies"]
+classifiers = [
+    "Programming Language :: Python :: 3.10",
+    "Development Status :: 3 - Alpha",
+    "Environment :: GPU :: NVIDIA CUDA :: 12 :: 12.1",
+    "Private :: Do Not Upload", # TODO [mgreaves] REMOVE ONCE BioNeMo IS OPEN-SOURCED !!
+]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[tool.setuptools.packages.find]
+where = ["."]
+namespaces = true
+include = ["bionemo"]
