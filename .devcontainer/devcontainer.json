@@ -39,7 +39,8 @@
 				"python.testing.pytestArgs": [
 					"sub-packages/",
 					"scripts/"
-				]
+				],
+				"python.analysis.typeCheckingMode": "standard"
 			}
 		}
 	}
