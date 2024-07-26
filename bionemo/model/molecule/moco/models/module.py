@@ -410,6 +410,8 @@ class Graph3DInterpolantModel(pl.LightningModule):
         Generates num_samples. Can supply a batch for inital starting points for conditional sampling for any interpolants set to None.
         """
         time_type = self.interpolants[self.global_variable].time_type
+        if "sample_time_discretization" in self.interpolant_params:
+            time_discretization = self.interpolant_params["sample_time_discretization"]
         if time_type == "continuous":
             if time_discretization == "linear":
                 timeline = torch.linspace(

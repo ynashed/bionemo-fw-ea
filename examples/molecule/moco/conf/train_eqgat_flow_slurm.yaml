@@ -42,7 +42,8 @@ interpolant:
   timesteps: &timesteps 100
   time_type: &time_type "continuous" #["discrete, "continuous]
   scheduler_type: &scheduler_type "linear" #["cosine_adaptive, "linear"]
-  sample_time_method: "uniform" # ["symmetric", "uniform", "stab_mode", "logit_normal", "beta"]
+  sample_time_method: "beta" # ["symmetric", "uniform", "stab_mode", "logit_normal", "beta"]
+  sample_time_discretization: "log"
   sample_time_mean: 0 # Used in stab_mode and logit_normal
   sample_time_scale: 0.81 # Used in stab_mode and logit_normal
   global_variable_name: 'h' # variable that is specficed below to be used for sampling time and loss sampling

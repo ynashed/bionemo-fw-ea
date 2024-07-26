@@ -23,7 +23,7 @@ CONFIG_NAME="train_eqgat_flow_slurm"
 # Logging
 # =========================
 EXP_GROUP="danny-iad-testing"
-EXP_NAME="eqgat_flow_slurm"
+EXP_NAME="eqgat_flow_slurm_betalog"
 WANDB_ENTITY="clara-discovery"
 WANDB_GROUP=${EXP_GROUP}
 WANDB_PROJECT="MoCo"
