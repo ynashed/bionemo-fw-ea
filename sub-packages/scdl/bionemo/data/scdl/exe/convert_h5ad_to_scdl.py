@@ -27,7 +27,7 @@
 import argparse
 import tempfile
 
-from bionemo.contrib.data.scdl.io.sc_collection import SingleCellCollection
+from bionemo.data.scdl.io.sc_collection import SingleCellCollection
 
 
 def parse_args():

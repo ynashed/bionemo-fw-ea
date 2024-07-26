@@ -15,7 +15,8 @@
 
 
 import pytest
-from scdl.util.StringEnum import StringEnum
+
+from bionemo.data.scdl.util.string_enum import StringEnum
 
 
 def test_string_enum():
@@ -24,13 +25,16 @@ def test_string_enum():
         test = "pass"
         win = "lose"
 
+    e = E()
     # Checking iteration over enum members
-    assert set(E) == {E.x, E.test, E.win}
+    assert e.x == "y"
+    assert e.test == "pass"
+    assert e.win == "lose"
 
     # Checking for attribute errors when accessing non-existent attributes
     with pytest.raises(AttributeError):
-        getattr(E, "singlecell")
+        getattr(e, "singlecell")
 
     # Checking for errors when trying to set attribute values
     with pytest.raises(AttributeError):
-        setattr(E, "x", "zed")
+        setattr(e, "x", "zed")

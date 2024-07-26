@@ -35,9 +35,9 @@ import numpy as np
 import pandas as pd
 import scipy
 
-from bionemo.contrib.data.scdl.api.single_cell_row_dataset import SingleCellRowDataset
-from bionemo.contrib.data.scdl.index.feature_index import RowFeatureIndex
-from bionemo.contrib.data.scdl.util.string_enum import StringEnum
+from bionemo.data.scdl.api.single_cell_row_dataset import SingleCellRowDataset
+from bionemo.data.scdl.index.feature_index import RowFeatureIndex
+from bionemo.data.scdl.util.string_enum import StringEnum
 
 
 class IntWidth(StringEnum):

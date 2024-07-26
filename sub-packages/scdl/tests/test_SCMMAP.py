@@ -15,7 +15,8 @@
 
 
 import numpy as np
-from scdl.io.SCMMAPDataset import INT_WIDTH, MODE, SC_MMAP_Dataset, _swap_mmap_array
+
+from bionemo.data.scdl.io.sc_mmap_dataset import INT_WIDTH, MODE, SC_MMAP_Dataset, _swap_mmap_array
 
 
 CURRENT_VERSION = "0.0.1"
