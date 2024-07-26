@@ -195,7 +195,10 @@ def test_nemo1_nemo2_weight_shapes_match(geneformer_config, seed: int = 42):
             )
         extra_keys = new_keys - old_keys
         extra_non_null_keys = {
-            k for k in extra_keys if new_state_dict[k] is not None and not k.endswith("_extra_state")
+            # TE adds non-null ._extra_state objects to layers so skip those.
+            k
+            for k in extra_keys
+            if new_state_dict[k] is not None and not k.endswith("_extra_state")
         }
         assert not extra_non_null_keys, "There are new keys that have state that is missing from the old checkpoint."
         missing_old_keys = old_keys - new_keys
@@ -455,7 +458,9 @@ def test_geneformer_inference_nemo1_v_nemo2_golden_values_by_layer(
                 assert False
         geneformer_config
         new_model = geneformer_config.configure_model(tokenizer).eval().cuda()
-        new_model.load_state_dict(new_state_dict_from_old, strict=False)
+        # TE adds non-null ._extra_state objects to layers, which store some kind of buffer bits
+        #  so we need to allow those to pass through.
+        new_model.load_state_dict(new_state_dict_from_old, strict=not USE_TE)
         for k, v in new_model.state_dict().items():
             # Make sure the weights were properly loaded
             if v is not None and not k.endswith("_extra_state"):
@@ -681,7 +686,7 @@ def _get_loss_from_model(model_config: BioBertConfig, seed: int) -> float:
             if limit_batches is not None and i + 1 >= limit_batches:
                 break
 
-        mean_loss: float = (loss / n).float().cpu().numpy().item()
+        mean_loss: float = (loss / n).cpu().numpy().item()
     return mean_loss
 
 

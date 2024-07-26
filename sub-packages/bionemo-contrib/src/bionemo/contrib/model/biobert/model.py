@@ -413,6 +413,9 @@ class BioBertConfig(TransformerConfig):
                 for k, v in old_weights.items():
                     new_key = nemo1_to_nemo2_biobert_key_mapping(k, new_model_prefix="", te_mapping=te_mapping)
                     new_state_dict_from_old[new_key] = v
+                # TE adds non-null ._extra_state objects to layers, which store some kind of buffer bits
+                #  so we need to allow those to pass through if we're loading from bionemo1 which did not
+                #  use TE.
                 model.load_state_dict(new_state_dict_from_old, strict=not te_mapping)
 
         # TODO (@jstjohn) come up with a cleaner way in the biobert module to return hidden states.

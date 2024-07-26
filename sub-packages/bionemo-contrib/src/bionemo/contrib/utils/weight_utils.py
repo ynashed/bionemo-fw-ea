@@ -69,6 +69,9 @@ def nemo1_to_nemo2_biobert_key_mapping(
     if "post_attention_layernorm" in base_rename:
         base_rename = base_rename.replace("post_attention_layernorm", "pre_mlp_layernorm")
 
+    # Handle the transformer engine spec's differences in layer naming and where things like layernorm are stored.
+    #  TE moves layernorm from  an object that's part of the main attention layer to being an internal component of
+    #  the linear layers, probably for efficiency/fusion of some sort.
     if te_mapping:
         if ".input_layernorm.weight" in base_rename:
             return base_rename.replace(".input_layernorm.weight", ".self_attention.linear_qkv.layer_norm_weight")
