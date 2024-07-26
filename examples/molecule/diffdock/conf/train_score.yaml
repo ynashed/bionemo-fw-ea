@@ -69,13 +69,13 @@ model:
   #                     sif getting info like "Only 99 out of 100 samples are used", increase max_total_size or num_batches slightly
   #                     if having OOM, reduce max_total_size
   #                     if OOM is from a batch with only one sample, set max_element_size to a finite number to skip these samples
-  micro_batch_size: 16 # number of samples per batch, 
+  micro_batch_size: 16 # number of samples per batch,
                       # if apply_size_control is True, only used to estimate and set default value for num_batches
                       # if apply_size_control is False, this will be the exact micro batch size
   global_batch_size: null # this will be set automatically by the `setup_trainer(cfg)`
   apply_size_control: True
   max_total_size: null    # only used for apply_size_control is True. this is the upper bound of memory usage, unit MiB
-                          # as memory usage changes as diffusion step changes 
+                          # as memory usage changes as diffusion step changes
                           # we use a upper bound for maximal memory usage when generating each batch of samples
                           # this can be slightly larger than model.estimate_memory_usage.maximal, 1.1 ~ 1.15 * model.estimate_memory_usage.maximal
                           # if null, default to use 0.85 * total memory of cuda:0
@@ -92,14 +92,14 @@ model:
     coeff_receptor_num_edges: 0.11
     coeff_num_cross_edges: 0.25
     bias: 435.0
-    maximal: null    # skip the batch if estimated memory is lager than this number, unit MiB 
+    maximal: null    # skip the batch if estimated memory is lager than this number, unit MiB
                      # in the forward call of the score model, forward diffusion is done, we can get an accurate estimation of memory usage
                      # so here we have a much tighter memory threshold, if memory is over maximal, most likely it will lead to crash due to OOM
                      # if null, use 0.75 * total memory of cuda:0
-    estimate_num_cross_edges: 
+    estimate_num_cross_edges:
       # estimate the upper bound of the number of cross edges
-      # the function is defined as 
-      # scale * (  4.92 * graph['ligand', 'ligand'].num_edges 
+      # the function is defined as
+      # scale * (  4.92 * graph['ligand', 'ligand'].num_edges
       #          + 0.0118 * graph['receptor', 'receptor'].num_edges
       #          + 0.0401 * graph['ligand'].num_nodes * graph['receptor', 'receptor'].num_edges )
       scale: 1.03

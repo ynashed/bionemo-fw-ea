@@ -28,7 +28,7 @@ from bionemo.utils.tests import Deterministic, distributed_model_parallel_state,
 
 @pytest.fixture(scope="function")
 def cfg(config_path_for_tests):
-    cfg = load_model_config(config_name='esm2nv_lora_finetune_test', config_path=config_path_for_tests)
+    cfg = load_model_config(config_name="esm2nv_lora_finetune_test", config_path=config_path_for_tests)
     return cfg
 
 
@@ -45,14 +45,14 @@ def model(cfg) -> FineTuneProteinModel:
 
 @pytest.mark.needs_80gb_memory_gpu
 def test_lora_layers_added(cfg, model):
-    contains_lora = any('lora_kqv_adapter' in name for name, _ in model.named_modules())
+    contains_lora = any("lora_kqv_adapter" in name for name, _ in model.named_modules())
     assert contains_lora is True
 
 
 @pytest.mark.needs_80gb_memory_gpu
 def test_lora_layers_trainable(cfg, model):
     for param, _ in model.named_parameters():
-        if 'lora_kqv_adapter' in param:
+        if "lora_kqv_adapter" in param:
             assert _.requires_grad is True
 
 
@@ -70,10 +70,10 @@ def test_finetuneproteinmodel_last_lora_adapter_layer_linear_in_trained(cfg):
         lora_after = copy.deepcopy(model.encoder_model.model.get_peft_state_dict())
 
         lora_before_weights = lora_before[
-            'model.language_model.encoder.layers.32.self_attention.adapter_layer.lora_kqv_adapter.linear_in.weight'
+            "model.language_model.encoder.layers.32.self_attention.adapter_layer.lora_kqv_adapter.linear_in.weight"
         ]
         lora_after_weights = lora_after[
-            'model.language_model.encoder.layers.32.self_attention.adapter_layer.lora_kqv_adapter.linear_in.weight'
+            "model.language_model.encoder.layers.32.self_attention.adapter_layer.lora_kqv_adapter.linear_in.weight"
         ]
 
         diff = torch.max(torch.abs(lora_before_weights.cuda() - lora_after_weights.cuda())).detach().cpu().numpy()
@@ -94,10 +94,10 @@ def test_finetuneproteinmodel_last_lora_adapter_layer_linear_out_trained(cfg):
         lora_after = copy.deepcopy(model.encoder_model.model.get_peft_state_dict())
 
         lora_before_weights = lora_before[
-            'model.language_model.encoder.layers.32.self_attention.adapter_layer.lora_kqv_adapter.linear_out.weight'
+            "model.language_model.encoder.layers.32.self_attention.adapter_layer.lora_kqv_adapter.linear_out.weight"
         ]
         lora_after_weights = lora_after[
-            'model.language_model.encoder.layers.32.self_attention.adapter_layer.lora_kqv_adapter.linear_out.weight'
+            "model.language_model.encoder.layers.32.self_attention.adapter_layer.lora_kqv_adapter.linear_out.weight"
         ]
 
         diff = torch.max(torch.abs(lora_before_weights.cuda() - lora_after_weights.cuda())).detach().cpu().numpy()
@@ -118,10 +118,10 @@ def test_finetuneproteinmodel_first_lora_adapter_layer_linear_out_trained(cfg):
         lora_after = copy.deepcopy(model.encoder_model.model.get_peft_state_dict())
 
         lora_before_weights = lora_before[
-            'model.language_model.encoder.layers.0.self_attention.adapter_layer.lora_kqv_adapter.linear_out.weight'
+            "model.language_model.encoder.layers.0.self_attention.adapter_layer.lora_kqv_adapter.linear_out.weight"
         ]
         lora_after_weights = lora_after[
-            'model.language_model.encoder.layers.0.self_attention.adapter_layer.lora_kqv_adapter.linear_out.weight'
+            "model.language_model.encoder.layers.0.self_attention.adapter_layer.lora_kqv_adapter.linear_out.weight"
         ]
 
         diff = torch.max(torch.abs(lora_before_weights.cuda() - lora_after_weights.cuda())).detach().cpu().numpy()
@@ -142,10 +142,10 @@ def test_finetuneproteinmodel_first_lora_adapter_layer_linear_in_trained(cfg):
         lora_after = copy.deepcopy(model.encoder_model.model.get_peft_state_dict())
 
         lora_before_weights = lora_before[
-            'model.language_model.encoder.layers.0.self_attention.adapter_layer.lora_kqv_adapter.linear_in.weight'
+            "model.language_model.encoder.layers.0.self_attention.adapter_layer.lora_kqv_adapter.linear_in.weight"
         ]
         lora_after_weights = lora_after[
-            'model.language_model.encoder.layers.0.self_attention.adapter_layer.lora_kqv_adapter.linear_in.weight'
+            "model.language_model.encoder.layers.0.self_attention.adapter_layer.lora_kqv_adapter.linear_in.weight"
         ]
 
         diff = torch.max(torch.abs(lora_before_weights.cuda() - lora_after_weights.cuda())).detach().cpu().numpy()
@@ -171,7 +171,7 @@ def test_nlpadaptermodelmixin_add_adapters(cfg):
 
         peft_cfg = LoraPEFTConfig(cfg.model)
         model_lora.add_adapter(peft_cfg)
-        contains_lora = any('lora_kqv_adapter' in name for name, _ in model_lora.named_modules())
+        contains_lora = any("lora_kqv_adapter" in name for name, _ in model_lora.named_modules())
         assert contains_lora is True
 
 

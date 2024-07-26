@@ -57,7 +57,7 @@ class TemplatePointwiseAttention(nn.Module):
         chunk_size: Optional[int],
     ) -> None:
         super(TemplatePointwiseAttention, self).__init__()
-        if OptimHub.config('mha_fused_gemm'):  # [optim-hub]
+        if OptimHub.config("mha_fused_gemm"):  # [optim-hub]
             self.mha = CrossAttentionNoGate(
                 c_q=c_z,
                 c_kv=c_t,
@@ -105,7 +105,7 @@ class TemplatePointwiseAttention(nn.Module):
         template_mask = template_mask.unsqueeze(-2).unsqueeze(-3).unsqueeze(-4).unsqueeze(-5)
         # template_mask: [batch, 1, 1, 1, 1, N_templ]
 
-        if OptimHub.config('mha_fused_gemm'):
+        if OptimHub.config("mha_fused_gemm"):
             z = self.mha(
                 input_q=z,
                 input_kv=t,

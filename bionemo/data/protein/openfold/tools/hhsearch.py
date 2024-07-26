@@ -39,7 +39,7 @@ class HHSearch:
     def __init__(
         self,
         databases: List[str],
-        binary_path: str = 'hhsearch',
+        binary_path: str = "hhsearch",
         n_cpu: int = 2,
         maxseq: int = 1_000_000,
     ):
@@ -98,9 +98,9 @@ class HHSearch:
             retcode = process.wait()
         except FileNotFoundError as e:
             raise FileNotFoundError(
-                'hh-search is required for finding templates. Please install HH-suite v3.3.0 available in '
-                'https://github.com/soedinglab/hh-suite/archive/refs/tags/v3.3.0.tar.gz. If you have already '
-                'installed it, please make sure it is discoverable by shell (usually through PATH variable).'
+                "hh-search is required for finding templates. Please install HH-suite v3.3.0 available in "
+                "https://github.com/soedinglab/hh-suite/archive/refs/tags/v3.3.0.tar.gz. If you have already "
+                "installed it, please make sure it is discoverable by shell (usually through PATH variable)."
             ) from e
 
         if retcode:

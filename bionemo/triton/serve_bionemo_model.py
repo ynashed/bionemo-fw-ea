@@ -56,40 +56,40 @@ __all_: Sequence[str] = (
 
 
 @click.command()
-@click.option('--config-path', required=True, help="Path to Hydra config directory where configuration date lives.")
+@click.option("--config-path", required=True, help="Path to Hydra config directory where configuration date lives.")
 @click.option(
-    '--config-name',
-    default='infer.yaml',
+    "--config-name",
+    default="infer.yaml",
     show_default=True,
     required=True,
     help="Name of YAML config file in --config-path to load from.",
 )
 @click.option(
-    '--nav', is_flag=True, help="If present, load runtime optimized with model navigator. Requires export beforehand."
+    "--nav", is_flag=True, help="If present, load runtime optimized with model navigator. Requires export beforehand."
 )
 @click.option(
-    '--embedding',
+    "--embedding",
     type=str,
     help="Starts Triton model name for sequence -> embedding inference. Only active is present.",
 )
 @click.option(
-    '--sampling', type=str, help="Triton model name for sampling inference encoding. Only active is present."
+    "--sampling", type=str, help="Triton model name for sampling inference encoding. Only active is present."
 )
 @click.option(
-    '--decode',
+    "--decode",
     type=str,
     help="Triton model name for hidden state -> original sequence decoding. Only active is present.",
 )
 @click.option(
-    '--hidden', type=str, help="Triton model name for sequence -> hidden state inference. Only active is present."
+    "--hidden", type=str, help="Triton model name for sequence -> hidden state inference. Only active is present."
 )
 @click.option(
-    '--controlled-generation',
+    "--controlled-generation",
     type=str,
     help="Triton model name for controlled generation inference. Only active is present.",
 )
 @click.option(
-    '--override-name',
+    "--override-name",
     is_flag=True,
     help="If present, must also only have one Triton model specified: will override the name to 'bionemo_moddel'.",
 )
@@ -157,7 +157,7 @@ def main(
     print(f"Starting hidden inference?:                 {hidden}")
     print(f"Starting controlled generation inference?:  {controlled_generation}")
     print(f"Override name?:                             {allow_override_name}")
-    print('-' * 80)
+    print("-" * 80)
 
     models_to_enable: List[bool] = [
         x is not None and len(x) > 0 for x in [embedding, sampling, decode, hidden, controlled_generation]

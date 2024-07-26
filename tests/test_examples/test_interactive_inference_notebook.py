@@ -16,7 +16,7 @@ from testbook import testbook
 @pytest.mark.needs_checkpoint
 @pytest.mark.needs_gpu
 @pytest.mark.parametrize(
-    'notebook',
+    "notebook",
     [
         "examples/protein/prott5nv/nbs/Inference_interactive.ipynb",
         "examples/protein/esm1nv/nbs/Inference_interactive.ipynb",

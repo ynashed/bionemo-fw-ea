@@ -26,6 +26,7 @@ Entry point to EquiDock.
 modify parameters from conf/*.yaml
 
 """
+
 import os
 
 import torch
@@ -42,10 +43,10 @@ from bionemo.model.protein.equidock.equidock_model import EquiDock
 from bionemo.model.utils import setup_trainer
 
 
-os.environ['DGLBACKEND'] = 'pytorch'
+os.environ["DGLBACKEND"] = "pytorch"
 
 torch.set_float32_matmul_precision("high")
-torch.multiprocessing.set_sharing_strategy('file_system')
+torch.multiprocessing.set_sharing_strategy("file_system")
 
 
 @hydra_runner(config_path="conf", config_name="pretrain")  # config_name options [finetune, pretrain]
@@ -77,7 +78,7 @@ def main(cfg) -> None:
     else:
         if cfg.data.num_workers != 0:
             try:
-                set_start_method('spawn', force=True)
+                set_start_method("spawn", force=True)
             except RuntimeError:
                 logging.info("Torch multiprocessing failed with spawn, set num_workers=0!")
                 raise RuntimeError(
@@ -85,7 +86,7 @@ def main(cfg) -> None:
                 )
 
         data_manager = DataManager(cfg)
-        cfg.model.input_edge_feats_dim = data_manager.train_ds[0][0].edata['he'].shape[1]
+        cfg.model.input_edge_feats_dim = data_manager.train_ds[0][0].edata["he"].shape[1]
         logging.info(f"\n Dataset name {cfg.data.data_name} loaded!")
 
         trainer = setup_trainer(cfg)

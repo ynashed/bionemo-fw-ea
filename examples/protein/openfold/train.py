@@ -34,9 +34,9 @@ from bionemo.model.protein.openfold.checkpoint_utils import load_pt_checkpoint
 from bionemo.model.protein.openfold.lr_scheduler import AlphaFoldLRScheduler
 from bionemo.model.protein.openfold.openfold_model import AlphaFold
 from bionemo.model.protein.openfold.optim_hub import enable_mlperf_optim
-from bionemo.model.protein.openfold.utils.logging_utils import log_with_nemo_at_level
 from bionemo.model.protein.openfold.utils.nemo_exp_manager_utils import isolate_last_checkpoint
 from bionemo.model.utils import setup_trainer
+from bionemo.utils.logging_utils import log_with_nemo_at_level
 
 
 torch._dynamo.config.verbose = True
@@ -47,17 +47,17 @@ torch._dynamo.config.suppress_errors = False
 def main(cfg) -> None:
     cfg = instantiate(cfg)
     logging.info("\n\n************** Experiment configuration ***********")
-    logging.info(f'\n{OmegaConf.to_yaml(cfg)}')
+    logging.info(f"\n{OmegaConf.to_yaml(cfg)}")
     missing_keys: set[str] = OmegaConf.missing_keys(cfg)
     if missing_keys:
         raise RuntimeError(f"Got missing required keys in config:\n{missing_keys}")
 
-    register_scheduler(name='AlphaFoldLRScheduler', scheduler=AlphaFoldLRScheduler, scheduler_params=None)
+    register_scheduler(name="AlphaFoldLRScheduler", scheduler=AlphaFoldLRScheduler, scheduler_params=None)
 
     np.random.seed(cfg.model.seed)
     pl.seed_everything(cfg.model.seed)
 
-    if cfg.get('do_preprocess', False):
+    if cfg.get("do_preprocess", False):
         ops_preprocessor = OpenProteinSetPreprocess(
             dataset_root_path=cfg.model.data.dataset_path, **cfg.model.data.prepare.open_protein_set
         )
@@ -77,7 +77,7 @@ def main(cfg) -> None:
             sample_uniclust30_ids=cfg.model.data.prepare.sample_uniclust30_ids,
         )
 
-    if cfg.get('do_training', False) or cfg.get('do_validation', False):
+    if cfg.get("do_training", False) or cfg.get("do_validation", False):
         filenames_to_keep, filenames_to_rename = isolate_last_checkpoint(cfg)
         log_with_nemo_at_level(
             f"""
@@ -88,7 +88,7 @@ def main(cfg) -> None:
         )
         trainer = setup_trainer(cfg, callbacks=[])
         enable_mlperf_optim(cfg.model)
-        if cfg.get('restore_from_path', None):
+        if cfg.get("restore_from_path", None):
             # TODO: consider blocking restore if stage is not 'fine-tune'
             alphafold = AlphaFold.restore_from(
                 restore_path=cfg.restore_from_path, override_config_path=cfg, trainer=trainer
@@ -97,14 +97,14 @@ def main(cfg) -> None:
             alphafold.setup_validation_data(cfg.model.validation_ds)
         else:
             alphafold = AlphaFold(cfg=cfg.model, trainer=trainer)
-            if cfg.get('torch_restore', None):
+            if cfg.get("torch_restore", None):
                 load_pt_checkpoint(model=alphafold, checkpoint_path=cfg.torch_restore)
 
-        if cfg.get('do_validation', False):
+        if cfg.get("do_validation", False):
             trainer.validate(alphafold)
-        if cfg.get('do_training', False):
+        if cfg.get("do_training", False):
             trainer.fit(alphafold)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

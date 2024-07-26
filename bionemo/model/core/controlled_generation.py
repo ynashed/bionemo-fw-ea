@@ -134,7 +134,7 @@ class ControlledGenerationPerceiverEncoderInferenceWrapper:
             if self.additional_decode_kwargs is not None:
                 additional_kwargs.update(**self.additional_decode_kwargs)
             if self.sampling_kwarg_overrides is not None:
-                additional_kwargs['sampling_kwargs'] = self.sampling_kwarg_overrides
+                additional_kwargs["sampling_kwargs"] = self.sampling_kwarg_overrides
             return self.inference_model.hiddens_to_seq(
                 hiddens, enc_mask=dummy_mask, sampling_method=self.sampling_method, **additional_kwargs
             )

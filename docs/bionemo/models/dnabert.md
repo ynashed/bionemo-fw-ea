@@ -20,7 +20,7 @@ DNABERT-2: [2306.15006] DNABERT-2: Efficient Foundation Model and Benchmark For 
 
 
 
-## Model Architecture: 
+## Model Architecture:
 **Architecture Type:** BERT  <br>
 **Network Architecture:** DNABERT <br>
 
@@ -34,11 +34,11 @@ DNABERT-2: [2306.15006] DNABERT-2: Efficient Foundation Model and Benchmark For 
 **Output Type(s):** Text predictions in the form of dense numerical embeddings. <br>
 
 **Output Parameters:** 1D <br>
-**Other Properties Related to Output:** Numeric vector with one float-point value corresponding to each amino acid in the input protein sequence <br> 
+**Other Properties Related to Output:** Numeric vector with one float-point value corresponding to each amino acid in the input protein sequence <br>
 
 
 ## Software Integration:
-**Runtime Engine(s):** 
+**Runtime Engine(s):**
 * BioNeMo, NeMo <br>
 
 **Supported Hardware Microarchitecture Compatibility:** <br>
@@ -49,11 +49,11 @@ DNABERT-2: [2306.15006] DNABERT-2: Efficient Foundation Model and Benchmark For 
 **[Preferred/Supported] Operating System(s):** <br>
 * [Linux] <br>
 
-## Model Version(s): 
+## Model Version(s):
 dnabert-86M.nemo, version 1.0  <br>
 
 
-# Training & Evaluation: 
+# Training & Evaluation:
 
 ## Training Dataset:
 **Link:** Homo sapiens genome assembly GRCh38.p13 - NCBI - NLM (nih.gov) <br>

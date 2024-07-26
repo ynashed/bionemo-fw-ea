@@ -14,7 +14,7 @@ trainer:
   val_check_interval: 50
   limit_val_batches: 1
   accumulate_grad_batches: 1
-    
+
 model:
   seq_length: 512 # maximum sequence length allowed. Set to 512 for backwards compatibililty with the checkpoint
   max_position_embeddings: ${.seq_length}

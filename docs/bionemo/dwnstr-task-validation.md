@@ -2,13 +2,13 @@
 
 ## Overview
 
-Validation with a downstream task allows the performance of model embeddings to be assessed on a downstream task of choice during the validation step of model training. To enable this functionality, labeled train and test datasets for a downstream task must be provided. A lightweight predictive ML model is trained and tested on provided datasets at the end of every validation epoch. Loss and metrics for the task are added to the Weights and Biases dashboard. 
+Validation with a downstream task allows the performance of model embeddings to be assessed on a downstream task of choice during the validation step of model training. To enable this functionality, labeled train and test datasets for a downstream task must be provided. A lightweight predictive ML model is trained and tested on provided datasets at the end of every validation epoch. Loss and metrics for the task are added to the Weights and Biases dashboard.
 
 Validation with a downstream task is useful for monitoring model training progress with metrics that are meaningful for the intended model purpose, such as secondary structure prediction accuracy for ProtT5nv and ESM-1nv or physchem property prediction error for MegaMolBART.
 
 ## Input Data Format
 
-Downstream task validation requires labeled training and test dataset for the downstream task of choice. Files are expected to be in the `.csv` format. The content of the files depends on the type of a downstream task. 
+Downstream task validation requires labeled training and test dataset for the downstream task of choice. Files are expected to be in the `.csv` format. The content of the files depends on the type of a downstream task.
 
 ## Supported Downstream Tasks
 
@@ -40,7 +40,7 @@ Sequence13,MLFLKLVASVLALMTIVPAQAGLIGKRKPKVMIINMFSLEANAWLSQMDDLYANNITVVGLNRLYPQVH
 
 ### Token-Level Classification
 
-Prediction of a class label for each token in the input sequence from sequence hidden states. Supports multiple classification heads, each can be binary or multi-class classification task. Additionally supports masking some token positions. Masked positions are excluded from loss and accuracy calculation both for training and testing. The downstream task dataset should contain a class label for each token in the input sequence. Optional masks of 0s and 1s can be provided. Example task is secondary structure prediction. Below is the sample dataset for secondary structure prediction. `sequence` column supplies protein amino acid sequence, `3state` column supplies secondary structure class labels for each amino acid in the protein sequence (`C` -- coil, `H` -- helix, `E` -- sheet), and the `resolved` column provides info if the residue at this position is resolved, that will be used as mask. 
+Prediction of a class label for each token in the input sequence from sequence hidden states. Supports multiple classification heads, each can be binary or multi-class classification task. Additionally supports masking some token positions. Masked positions are excluded from loss and accuracy calculation both for training and testing. The downstream task dataset should contain a class label for each token in the input sequence. Optional masks of 0s and 1s can be provided. Example task is secondary structure prediction. Below is the sample dataset for secondary structure prediction. `sequence` column supplies protein amino acid sequence, `3state` column supplies secondary structure class labels for each amino acid in the protein sequence (`C` -- coil, `H` -- helix, `E` -- sheet), and the `resolved` column provides info if the residue at this position is resolved, that will be used as mask.
 
 ```bash
 id,sequence,3state,resolved
@@ -51,7 +51,7 @@ id,sequence,3state,resolved
 
 ## Downstream Task Model Architectures
 
-BioNeMo framework offers two lightweight predictive model architectures for downstream task validation -- multi-layer perceptron model (MLP model) and a convolutional network (ConvNet). The MLP model is always used for sequence-level tasks, and ConvNet is always used for token-level tasks. 
+BioNeMo framework offers two lightweight predictive model architectures for downstream task validation -- multi-layer perceptron model (MLP model) and a convolutional network (ConvNet). The MLP model is always used for sequence-level tasks, and ConvNet is always used for token-level tasks.
 
 ### MLP Model
 
@@ -59,11 +59,11 @@ The MLP model is a fully connected neural network architecture with three hidden
 
 Additionally, `ReLU` activation function and a dropout with `p=0.1` are applied after each hidden layer transformation.
 
-MLP model architecture is not part of the YAML configuration file but can be manually adjusted in `bionemo/model/core/mlp_model.py` if desired. 
+MLP model architecture is not part of the YAML configuration file but can be manually adjusted in `bionemo/model/core/mlp_model.py` if desired.
 
 ### ConvNet model
- 
-The ConvNet model architecture consists of 2D convolutional layer with `in_channels` equal to the embeddings vector size, `out_channels=32`, `kernel_size=(7, 1)` and `padding=(3, 0)`. The convolutional layer is followed by the `ReLU` activation function and a dropout with `p=0.25`. The last layers are configurable classification prediction heads. The YAML configuration file specifies the number of heads and classes for each head. Other architectural parameters of the ConvNet are not part of the configuration file but can be manually adjusted in `bionemo/model/core/cnn.py` if desired. 
+
+The ConvNet model architecture consists of 2D convolutional layer with `in_channels` equal to the embeddings vector size, `out_channels=32`, `kernel_size=(7, 1)` and `padding=(3, 0)`. The convolutional layer is followed by the `ReLU` activation function and a dropout with `p=0.25`. The last layers are configurable classification prediction heads. The YAML configuration file specifies the number of heads and classes for each head. Other architectural parameters of the ConvNet are not part of the configuration file but can be manually adjusted in `bionemo/model/core/cnn.py` if desired.
 
 ## Intended Use
 
@@ -87,11 +87,11 @@ Downstream task validation is defined in the `model.dwnstr_task_validation` sect
 model:
   dwnstr_task_validation:
     enabled: True
-```    
+```
 
-### Model Configuration 
+### Model Configuration
 
-If downstream task validation is enabled, a set of parameters must be specified in `model.dwnstr_task_validation.dataset`. These parameters can be split into three categories -- universal, task-specific, and optimization. 
+If downstream task validation is enabled, a set of parameters must be specified in `model.dwnstr_task_validation.dataset`. These parameters can be split into three categories -- universal, task-specific, and optimization.
 
 ### Universal Parameters
 
@@ -134,13 +134,13 @@ An example of `SingleValuePredictionCallback` can be found in `/workspace/bionem
 
 * `sequence_col` defines the name of a column in train and test files containing input sequences.
 
-* `target_column` defines the list with names of columns in train and test files containing class labels for each classification task. 
+* `target_column` defines the list with names of columns in train and test files containing class labels for each classification task.
 
-* `target_sizes` defines the list with the number of classes for each classification task. 
+* `target_sizes` defines the list with the number of classes for each classification task.
 
 * `mask_col` defines the list with names of columns in train and test files used as masks for each classification task. Should be set to `null`` for any classification task where masking is not needed.
 
-Example usage of `PerTokenPredictionCallback` can be found in `/workspace/bionemo/examples/protein/esm1nv/conf/pretrain_small.yaml`. 
+Example usage of `PerTokenPredictionCallback` can be found in `/workspace/bionemo/examples/protein/esm1nv/conf/pretrain_small.yaml`.
 
 ### Optimization Parameters
 
@@ -156,12 +156,12 @@ Test metrics from the downstream task validation step are automatically added to
   * MSE loss for sequence-level regression
   * per-token masked cross-entropy loss for token-level classification. `PerTokenMaskedCrossEntropyLoss` is implemented in BioNeMo and can be found at `bionemo/model/core/cnn.py`.
 
-* Overall classification accuracy is only logged for classification tasks. In the case of sequence-level classification, a single chart is created. A chart for each classification task is created for token-level classification. 
+* Overall classification accuracy is only logged for classification tasks. In the case of sequence-level classification, a single chart is created. A chart for each classification task is created for token-level classification.
 
 * Regression MSE is only logged for regression tasks. A single chart is created in this case.
 
 ## Limitations
 
-Validation with a downstream task can be enabled during pre-training with data parallelism and/or tensor parallelism enabled. However, the downstream task model is trained on a single GPU on the rank 0 node, even when the main model is trained using multi-GPUs or multi-nodes. While the downstream task model is being trained, other processes are waiting for this training to complete. For efficient usage of computational resources, it is recommended to minimize the duration and frequency of validation epochs of downstream task model training. The frequency of the validation epoch can be controlled `trainer.val_check_interval` parameter. 
+Validation with a downstream task can be enabled during pre-training with data parallelism and/or tensor parallelism enabled. However, the downstream task model is trained on a single GPU on the rank 0 node, even when the main model is trained using multi-GPUs or multi-nodes. While the downstream task model is being trained, other processes are waiting for this training to complete. For efficient usage of computational resources, it is recommended to minimize the duration and frequency of validation epochs of downstream task model training. The frequency of the validation epoch can be controlled `trainer.val_check_interval` parameter.
 
-Finally, *token-level regression* is not currently implemented, although the existing token-level classification example could be modified to support regression. 
+Finally, *token-level regression* is not currently implemented, although the existing token-level classification example could be modified to support regression.

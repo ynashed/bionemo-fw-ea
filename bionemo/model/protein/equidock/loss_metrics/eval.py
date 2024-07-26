@@ -29,10 +29,10 @@ from torchmetrics import Metric
 from bionemo.data.equidock.protein_utils import rigid_transform_Kabsch_3D, rigid_transform_Kabsch_3D_torch
 
 
-__all__ = ['Meter_Unbound_Bound', 'Torchmetrics_Unbound_Bound']
+__all__ = ["Meter_Unbound_Bound", "Torchmetrics_Unbound_Bound"]
 
 
-def metrics_statistics(metrics_lst: List[Metric], dataset_type: str = 'val'):
+def metrics_statistics(metrics_lst: List[Metric], dataset_type: str = "val"):
     if len(metrics_lst) != 3:
         raise ValueError(f"len of metrics should be 3, but it is {len(metrics_lst)}!")
 
@@ -60,16 +60,16 @@ def metrics_statistics(metrics_lst: List[Metric], dataset_type: str = 'val'):
     )
 
     rmsd_log = {
-        dataset_type + '_ligand_rmsd_mean': ligand_rmsd_mean.cpu().detach(),
-        dataset_type + '_receptor_rmsd_mean': receptor_rmsd_mean.cpu().detach(),
-        dataset_type + '_complex_rmsd_mean': complex_rmsd_mean.cpu().detach(),
-        dataset_type + '_complex_rmsd_median': complex_rmsd_median.cpu().detach(),
-        dataset_type + '_ligand_rmsd_median': ligand_rmsd_median.cpu().detach(),
-        dataset_type + '_receptor_rmsd_median': receptor_rmsd_median.cpu().detach(),
-        dataset_type + '_complex_rmsd_std': complex_rmsd_std.cpu().detach(),
-        dataset_type + '_ligand_rmsd_std': ligand_rmsd_std.cpu().detach(),
-        dataset_type + '_receptor_rmsd_std': receptor_rmsd_std.cpu().detach(),
-        dataset_type + '_shape': complex_rmsd_tensors.shape[0],
+        dataset_type + "_ligand_rmsd_mean": ligand_rmsd_mean.cpu().detach(),
+        dataset_type + "_receptor_rmsd_mean": receptor_rmsd_mean.cpu().detach(),
+        dataset_type + "_complex_rmsd_mean": complex_rmsd_mean.cpu().detach(),
+        dataset_type + "_complex_rmsd_median": complex_rmsd_median.cpu().detach(),
+        dataset_type + "_ligand_rmsd_median": ligand_rmsd_median.cpu().detach(),
+        dataset_type + "_receptor_rmsd_median": receptor_rmsd_median.cpu().detach(),
+        dataset_type + "_complex_rmsd_std": complex_rmsd_std.cpu().detach(),
+        dataset_type + "_ligand_rmsd_std": ligand_rmsd_std.cpu().detach(),
+        dataset_type + "_receptor_rmsd_std": receptor_rmsd_std.cpu().detach(),
+        dataset_type + "_shape": complex_rmsd_tensors.shape[0],
     }
 
     for i in range(3):
@@ -180,8 +180,8 @@ class Meter_Unbound_Bound:
 
         return complex_rmsd
 
-    def summarize(self, reduction_rmsd='median'):
-        if reduction_rmsd == 'mean':
+    def summarize(self, reduction_rmsd="median"):
+        if reduction_rmsd == "mean":
             complex_rmsd_array = np.array(self.complex_rmsd_list)
             complex_rmsd_summarized = np.mean(complex_rmsd_array)
 
@@ -190,7 +190,7 @@ class Meter_Unbound_Bound:
 
             receptor_rmsd_array = np.array(self.receptor_rmsd_list)
             receptor_rmsd_summarized = np.mean(receptor_rmsd_array)
-        elif reduction_rmsd == 'median':
+        elif reduction_rmsd == "median":
             complex_rmsd_array = np.array(self.complex_rmsd_list)
             complex_rmsd_summarized = np.median(complex_rmsd_array)
 
@@ -203,11 +203,11 @@ class Meter_Unbound_Bound:
             raise ValueError("Meter_Unbound_Bound: reduction_rmsd mis specified!")
         return ligand_rmsd_summarized, receptor_rmsd_summarized, complex_rmsd_summarized
 
-    def summarize_with_std(self, reduction_rmsd='median'):
+    def summarize_with_std(self, reduction_rmsd="median"):
         complex_rmsd_array = np.array(self.complex_rmsd_list)
-        if reduction_rmsd == 'mean':
+        if reduction_rmsd == "mean":
             complex_rmsd_summarized = np.mean(complex_rmsd_array)
-        elif reduction_rmsd == 'median':
+        elif reduction_rmsd == "median":
             complex_rmsd_summarized = np.median(complex_rmsd_array)
         else:
             raise ValueError("Meter_Unbound_Bound: reduction_rmsd mis specified!")

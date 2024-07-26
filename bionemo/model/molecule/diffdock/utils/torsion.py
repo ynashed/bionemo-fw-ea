@@ -26,7 +26,7 @@ from torch_geometric.utils import to_networkx
 def get_transformation_mask(pyg_data):
     G = to_networkx(pyg_data.to_homogeneous(), to_undirected=False)
     to_rotate = []
-    edges = pyg_data['ligand', 'ligand'].edge_index.T.numpy()
+    edges = pyg_data["ligand", "ligand"].edge_index.T.numpy()
     for i in range(0, edges.shape[0], 2):
         assert edges[i, 0] == edges[i + 1, 1]
 

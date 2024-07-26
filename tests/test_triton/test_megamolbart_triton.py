@@ -44,7 +44,7 @@ from bionemo.utils.hydra import load_model_config
 from bionemo.utils.tests import teardown_apex_megatron_cuda
 
 
-SMILES = ['c1ccc2ccccc2c1', 'COc1cc2nc(N3CCN(C(=O)c4ccco4)CC3)nc(N)c2cc1OC']
+SMILES = ["c1ccc2ccccc2c1", "COc1cc2nc(N3CCN(C(=O)c4ccco4)CC3)nc(N)c2cc1OC"]
 
 MODEL_NAME = "megamolbart"
 
@@ -54,7 +54,7 @@ NAME_SAMPLINGS = complete_model_name(MODEL_NAME, SAMPLINGS)
 NAME_DECODES = complete_model_name(MODEL_NAME, DECODES)
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope="module")
 def cfg(bionemo_home: Path) -> DictConfig:
     return load_model_config(
         config_path=str(bionemo_home / "examples" / "molecule" / MODEL_NAME / "conf"),
@@ -63,7 +63,7 @@ def cfg(bionemo_home: Path) -> DictConfig:
     )
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope="module")
 def model(cfg: DictConfig) -> MegaMolBARTInference:
     # TODO [mgreaves] replace with this in !553
     # model = load_model_for_inference(cfg, interactive=False)
@@ -71,7 +71,7 @@ def model(cfg: DictConfig) -> MegaMolBARTInference:
     teardown_apex_megatron_cuda()
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope="module")
 def server(cfg: DictConfig, model: MegaMolBARTInference) -> Triton:
     triton = Triton()
     bind_embedding(triton, cfg, model, nav=False, triton_model_name=NAME_EMBEDDINGS)
@@ -117,7 +117,7 @@ def _validate_generated(generated: np.ndarray, expected_shape: Tuple[int]) -> No
         assert len(gen) >= 1, f"Expecting batch #{i+1} of generated samples to be non-empty"
         for j in range(len(gen)):
             try:
-                sample = gen[j].decode('utf8')
+                sample = gen[j].decode("utf8")
             except Exception as e:
                 raise ValueError(f"Error decoding generated sample ({i},{j}): {gen[j]}") from e
             assert len(sample) >= 1, f"Expecting sample ({i},{j}) to be non-empty"

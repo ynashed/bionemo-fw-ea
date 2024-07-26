@@ -1,4 +1,4 @@
-# MegaMolBART 
+# MegaMolBART
 # Model Overview
 
 ## Description:
@@ -9,13 +9,13 @@ Mike Lewis, Yinhan Liu, Naman Goyal, Marjan Ghazvininejad, Abdelrahman Mohamed, 
 
 Ross Irwin, Spyridon Dimitriadis, Jiazhen He, and Esben Jannik Bjerrum. Chemformer: a pre-trained transformer for computational chemistry. *Mach. Learn.: Sci. Technol.*, 3(1):015022, January 2022. doi:10.1088/2632-2153/ac3ffb.
 
-Teague Sterling and John J Irwin. ZINC 15–ligand discovery for everyone. *J. Chem. Inf. Model.*, 55(11):2324–2337, November 2015. doi:10.1021/acs.jcim.5b00559. <br> 
+Teague Sterling and John J Irwin. ZINC 15–ligand discovery for everyone. *J. Chem. Inf. Model.*, 55(11):2324–2337, November 2015. doi:10.1021/acs.jcim.5b00559. <br>
 
-## Model Architecture: 
+## Model Architecture:
 **Architecture Type:** Transformer, Sequence-to-sequence <br>
 **Network Architecture:** BART <br>
 
-Pre-norm layer normalization and GELU activation are used throughout. 
+Pre-norm layer normalization and GELU activation are used throughout.
 
 ## Input:
 **Input Type(s):** SMILES Text (Molecular Sequence) <br>
@@ -27,11 +27,11 @@ Pre-norm layer normalization and GELU activation are used throughout.
 **Output Type(s):** [Text, Numerical.] <br>
 **Output Format:** [SMILES] <br>
 **Output Parameters:** [2D] <br>
-**Other Properties Related to Output:** [Maximum output length is 512 tokens] <br> 
+**Other Properties Related to Output:** [Maximum output length is 512 tokens] <br>
 
 ## Software Integration:
-**Runtime Engine(s):** 
-* BioNeMo, NeMo 1.2 <br> 
+**Runtime Engine(s):**
+* BioNeMo, NeMo 1.2 <br>
 
 **Supported Hardware Microarchitecture Compatibility:** <br>
 * [Ampere] <br>
@@ -40,10 +40,10 @@ Pre-norm layer normalization and GELU activation are used throughout.
 **[Preferred/Supported] Operating System(s):** <br>
 * [Linux] <br>
 
-## Model Version(s): 
+## Model Version(s):
 Megamolbart.nemo, version 23.06  <br>
 
-# Training & Evaluation: 
+# Training & Evaluation:
 
 ## Training Dataset:
 

@@ -111,8 +111,8 @@ model:
       train: x[000..001] # Range is for full dataset
       test: x[000..001]
       val: x[000..001]
-    # The following should probably always be True, unless you want to explore the unchanged input data. 
-    #  Changing will impact val/test metrics since canonicalization is done to model outputs but not 
+    # The following should probably always be True, unless you want to explore the unchanged input data.
+    #  Changing will impact val/test metrics since canonicalization is done to model outputs but not
     #  targets (assuming it is done here).
     canonicalize_target_smile: True
     # The following four settings will result in randomized augmentation of SMILES for input, and matched output.
@@ -124,7 +124,7 @@ model:
     encoder_mask: False # task = mask(span)_aug
     decoder_mask: False # always False
     mask_prob: 0.0 # mask probability
-    span_lambda: 3.0 # max size of poisson distribution for 
+    span_lambda: 3.0 # max size of poisson distribution for
     micro_batch_size: ${model.micro_batch_size}
     num_workers: 10
     dataloader_type: single

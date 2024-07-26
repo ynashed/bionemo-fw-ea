@@ -23,7 +23,7 @@ class FASTAFieldsMemmapDataset(TextMemMapDataset):
         workers=None,
         tokenizer=None,
         sort_dataset_paths=True,
-        data_sep='\n',
+        data_sep="\n",
         data_fields={"data": 0},
         strip_first_element=True,
         collpase_sequence_elements=True,

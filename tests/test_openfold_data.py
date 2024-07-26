@@ -38,16 +38,16 @@ from bionemo.model.utils import setup_trainer
 from bionemo.utils.hydra import load_model_config
 
 
-BIONEMO_HOME = os.getenv('BIONEMO_HOME')
-EXAMPLE_CONFIG_PATH = os.path.join(BIONEMO_HOME, 'examples/protein/openfold/conf')
-TEST_DATA_PATH = os.path.join(BIONEMO_HOME, 'examples/tests/test_data')
-SAMPLE_DATA_PATH = os.path.join(TEST_DATA_PATH, 'openfold_data')
-SAMPLE_INFER_DATA_PATH = os.path.join(SAMPLE_DATA_PATH, 'inference')
+BIONEMO_HOME = os.getenv("BIONEMO_HOME")
+EXAMPLE_CONFIG_PATH = os.path.join(BIONEMO_HOME, "examples/protein/openfold/conf")
+TEST_DATA_PATH = os.path.join(BIONEMO_HOME, "examples/tests/test_data")
+SAMPLE_DATA_PATH = os.path.join(TEST_DATA_PATH, "openfold_data")
+SAMPLE_INFER_DATA_PATH = os.path.join(SAMPLE_DATA_PATH, "inference")
 
-S3_DATA_PATH = 's3://bionemo-ci/test-data/openfold/openfold_vprocessed_sample/openfold_sample_data.tar.gz'
+S3_DATA_PATH = "s3://bionemo-ci/test-data/openfold/openfold_vprocessed_sample/openfold_sample_data.tar.gz"
 
-TRAINING_DATA_VARIANT = 'processed'
-TEST_SAMPLE_VARIANT = 'processed_test'
+TRAINING_DATA_VARIANT = "processed"
+TEST_SAMPLE_VARIANT = "processed_test"
 SAMPLE_PDB_CHAIN_IDS = [
     # 2 chains from date range: ("2018-01-01", "2020-12-31")
     "5vf6_A",
@@ -59,75 +59,75 @@ SAMPLE_CAMEO_CHAIN_IDS = [
 ]
 SAMPLE_UNICLUST30_IDS = [
     # the first 2 uniclust30 ids
-    'A0A009JVE4',
-    'A0A010PP53',
+    "A0A009JVE4",
+    "A0A010PP53",
 ]
 
 SEQUENCE_FEATURE_NAMES = {
-    'aatype',
-    'residue_index',
-    'seq_length',
-    'bert_mask',
-    'atom14_atom_exists',
-    'residx_atom14_to_atom37',
-    'residx_atom37_to_atom14',
-    'atom37_atom_exists',
+    "aatype",
+    "residue_index",
+    "seq_length",
+    "bert_mask",
+    "atom14_atom_exists",
+    "residx_atom14_to_atom37",
+    "residx_atom37_to_atom14",
+    "atom37_atom_exists",
 }
 MSA_FEATURE_NAMES = {
-    'msa_mask',
-    'msa_row_mask',
-    'msa_feat',
-    'true_msa',
-    'seq_mask',
-    'target_feat',
+    "msa_mask",
+    "msa_row_mask",
+    "msa_feat",
+    "true_msa",
+    "seq_mask",
+    "target_feat",
 }
 EXTRA_MSA_FEATURE_NAMES = {
-    'extra_msa',
-    'extra_msa_mask',
-    'extra_msa_row_mask',
-    'extra_has_deletion',
-    'extra_deletion_value',
+    "extra_msa",
+    "extra_msa_mask",
+    "extra_msa_row_mask",
+    "extra_has_deletion",
+    "extra_deletion_value",
 }
 TEMPLATE_FEATURE_NAMES = {
-    'template_aatype',
-    'template_all_atom_positions',
-    'template_all_atom_mask',
-    'template_sum_probs',
-    'template_mask',
-    'template_pseudo_beta',
-    'template_pseudo_beta_mask',
-    'template_torsion_angles_sin_cos',
-    'template_alt_torsion_angles_sin_cos',
-    'template_torsion_angles_mask',
+    "template_aatype",
+    "template_all_atom_positions",
+    "template_all_atom_mask",
+    "template_sum_probs",
+    "template_mask",
+    "template_pseudo_beta",
+    "template_pseudo_beta_mask",
+    "template_torsion_angles_sin_cos",
+    "template_alt_torsion_angles_sin_cos",
+    "template_torsion_angles_mask",
 }
 TARGET_FEATURE_NAMES = {
-    'all_atom_positions',
-    'all_atom_mask',
-    'resolution',
-    'is_distillation',
-    'atom14_gt_exists',
-    'atom14_gt_positions',
-    'atom14_alt_gt_positions',
-    'atom14_alt_gt_exists',
-    'atom14_atom_is_ambiguous',
-    'rigidgroups_gt_frames',
-    'rigidgroups_gt_exists',
-    'rigidgroups_group_exists',
-    'rigidgroups_group_is_ambiguous',
-    'rigidgroups_alt_gt_frames',
-    'pseudo_beta',
-    'pseudo_beta_mask',
-    'backbone_rigid_tensor',
-    'backbone_rigid_mask',
-    'chi_angles_sin_cos',
-    'chi_mask',
-    'use_clamped_fape',
-    'id',
+    "all_atom_positions",
+    "all_atom_mask",
+    "resolution",
+    "is_distillation",
+    "atom14_gt_exists",
+    "atom14_gt_positions",
+    "atom14_alt_gt_positions",
+    "atom14_alt_gt_exists",
+    "atom14_atom_is_ambiguous",
+    "rigidgroups_gt_frames",
+    "rigidgroups_gt_exists",
+    "rigidgroups_group_exists",
+    "rigidgroups_group_is_ambiguous",
+    "rigidgroups_alt_gt_frames",
+    "pseudo_beta",
+    "pseudo_beta_mask",
+    "backbone_rigid_tensor",
+    "backbone_rigid_mask",
+    "chi_angles_sin_cos",
+    "chi_mask",
+    "use_clamped_fape",
+    "id",
 }
 
 PREDICT_FEATURE_NAMES = {
-    'seq_index',
-    'seq_name',
+    "seq_index",
+    "seq_name",
     *SEQUENCE_FEATURE_NAMES,
     *MSA_FEATURE_NAMES,
     *EXTRA_MSA_FEATURE_NAMES,
@@ -143,24 +143,24 @@ INITIAL_TRAINING_FEATURE_NAMES = {
 }
 
 
-@pytest.fixture(scope='function')
+@pytest.fixture(scope="function")
 def infer_cfg() -> DictConfig:
     """Setting up the general inference config object.
 
     Returns:
         DictConfig: Inference Config object containing path and name
     """
-    return load_model_config(config_name='infer', config_path=EXAMPLE_CONFIG_PATH)
+    return load_model_config(config_name="infer", config_path=EXAMPLE_CONFIG_PATH)
 
 
-@pytest.fixture(scope='function')
+@pytest.fixture(scope="function")
 def initial_training_cfg() -> DictConfig:
     """Setting up the general initial training config object.
 
     Returns:
         DictConfig: Initial training Config object containing path and name
     """
-    cfg = load_model_config(config_name='openfold_initial_training', config_path=EXAMPLE_CONFIG_PATH)
+    cfg = load_model_config(config_name="openfold_initial_training", config_path=EXAMPLE_CONFIG_PATH)
 
     # switch to sample training data
     cfg.model.data.dataset_path = SAMPLE_DATA_PATH
@@ -171,14 +171,14 @@ def initial_training_cfg() -> DictConfig:
     return cfg
 
 
-@pytest.fixture(scope='function')
+@pytest.fixture(scope="function")
 def finetuning_cfg() -> DictConfig:
     """Setting up the general finetuning config object.
 
     Yields:
         DictConfig: Initial training Config object containing path and name
     """
-    cfg = load_model_config(config_name='openfold_finetuning', config_path=EXAMPLE_CONFIG_PATH)
+    cfg = load_model_config(config_name="openfold_finetuning", config_path=EXAMPLE_CONFIG_PATH)
 
     # switch to sample training data
     cfg.model.data.dataset_path = SAMPLE_DATA_PATH
@@ -189,7 +189,7 @@ def finetuning_cfg() -> DictConfig:
     return cfg
 
 
-@pytest.fixture(scope='function')
+@pytest.fixture(scope="function")
 def predict_dataloader(infer_cfg: DictConfig) -> DataLoader:
     """Setup of prediction dataloader for test purposes; it contains all input features for the
     AlphaFold model, but not the ground truth coordinates.
@@ -222,7 +222,7 @@ def predict_dataloader(infer_cfg: DictConfig) -> DataLoader:
     return dataloader
 
 
-@pytest.fixture(scope='function')
+@pytest.fixture(scope="function")
 def initial_training_dataloader(initial_training_cfg: DictConfig) -> DataLoader:
     """Set up initial training dataloader from AlphaFold model class.
 
@@ -237,7 +237,7 @@ def initial_training_dataloader(initial_training_cfg: DictConfig) -> DataLoader:
     return alphafold.train_dataloader()
 
 
-@pytest.fixture(scope='function')
+@pytest.fixture(scope="function")
 def finetuning_dataloader(finetuning_cfg: DictConfig) -> DataLoader:
     """Set up fine-tuning dataloader from AlphaFold model class.
 
@@ -261,7 +261,7 @@ def get_sequence_features(sequence: str) -> Dict[str, np.array]:
     Returns:
         Dict: Sequence features.
     """
-    domain_name = 'description'  # ref: bionemo/data/protein/openfold/dataset.py (line 654)
+    domain_name = "description"  # ref: bionemo/data/protein/openfold/dataset.py (line 654)
     sequence_features = create_sequence_features(sequence, domain_name)
     return sequence_features
 
@@ -379,10 +379,10 @@ def raise_exception_if_feature_shape_mismatch(features: dict, cfg: DictConfig, N
         None
     """
     mapping = {
-        'N_res': N_res,
-        'N_clust': cfg.model.max_msa_clusters,
-        'N_extra_seq': cfg.model.max_extra_msa,
-        'N_templ': cfg.model.max_templates,
+        "N_res": N_res,
+        "N_clust": cfg.model.max_msa_clusters,
+        "N_extra_seq": cfg.model.max_extra_msa,
+        "N_templ": cfg.model.max_templates,
     }
     N_recycling = cfg.model.num_recycling_iters + 1
 
@@ -398,18 +398,18 @@ def raise_exception_if_feature_shape_mismatch(features: dict, cfg: DictConfig, N
             feature_shape.append(size)
         feature_shape.append(N_recycling)
 
-        assert tuple(feature.shape) == tuple(feature_shape), f'Shape mismatch in feature {k}'
+        assert tuple(feature.shape) == tuple(feature_shape), f"Shape mismatch in feature {k}"
 
 
 def test_sample_data_exists():
     """Test whether sample data for OpenFold unittest exists"""
     if not os.path.exists(SAMPLE_DATA_PATH):
         raise FileNotFoundError(
-            'Before testing, users must download openfold sample data through download_artifacts.py.'
+            "Before testing, users must download openfold sample data through download_artifacts.py."
         )
 
 
-@pytest.mark.skipif(not os.path.exists(SAMPLE_DATA_PATH), reason='Test sample data not found')
+@pytest.mark.skipif(not os.path.exists(SAMPLE_DATA_PATH), reason="Test sample data not found")
 def test_initial_training_dataset_shape(initial_training_cfg: DictConfig):
     """Test feature shape in initial training dataset
 
@@ -419,11 +419,11 @@ def test_initial_training_dataset_shape(initial_training_cfg: DictConfig):
     initial_training_dataset = get_initial_training_dataset(initial_training_cfg)
 
     sample = initial_training_dataset[(0, initial_training_cfg.model.seed)]
-    N_res = sample['aatype'].size(0)
+    N_res = sample["aatype"].size(0)
     raise_exception_if_feature_shape_mismatch(sample, initial_training_cfg, N_res)
 
 
-@pytest.mark.skipif(not os.path.exists(SAMPLE_DATA_PATH), reason='Test sample data not found')
+@pytest.mark.skipif(not os.path.exists(SAMPLE_DATA_PATH), reason="Test sample data not found")
 def test_self_distillation_dataset_shape(finetuning_cfg: DictConfig):
     """Test feature shape in self-distillation dataset
 
@@ -433,11 +433,11 @@ def test_self_distillation_dataset_shape(finetuning_cfg: DictConfig):
     self_distillation_dataset = get_self_distillation_dataset(finetuning_cfg)
 
     sample = self_distillation_dataset[(0, finetuning_cfg.model.seed)]
-    N_res = sample['aatype'].size(0)
+    N_res = sample["aatype"].size(0)
     raise_exception_if_feature_shape_mismatch(sample, finetuning_cfg, N_res)
 
 
-@pytest.mark.skipif(not os.path.exists(SAMPLE_DATA_PATH), reason='Test sample data not found')
+@pytest.mark.skipif(not os.path.exists(SAMPLE_DATA_PATH), reason="Test sample data not found")
 def test_create_sequence_features_aatype(infer_cfg: DictConfig):
     """Test aatype in sequence features.
 
@@ -446,7 +446,7 @@ def test_create_sequence_features_aatype(infer_cfg: DictConfig):
     """
     sequence = infer_cfg.sequences[0]
     sequence_features = get_sequence_features(sequence)
-    onehot = sequence_features['aatype']
+    onehot = sequence_features["aatype"]
 
     assert onehot.shape[0] == len(sequence)
     assert onehot.shape[1] == len(rc.RESTYPES_WITH_X)
@@ -456,7 +456,7 @@ def test_create_sequence_features_aatype(infer_cfg: DictConfig):
     assert rc.aatype_to_str_sequence(aa_idx) == sequence
 
 
-@pytest.mark.skipif(not os.path.exists(SAMPLE_DATA_PATH), reason='Test sample data not found')
+@pytest.mark.skipif(not os.path.exists(SAMPLE_DATA_PATH), reason="Test sample data not found")
 def test_predict_dataloader_feature_names(predict_dataloader: DataLoader):
     """Test whether batch from dataloader of PredictDataset has all the features.
 
@@ -467,7 +467,7 @@ def test_predict_dataloader_feature_names(predict_dataloader: DataLoader):
     assert set(batch) == PREDICT_FEATURE_NAMES
 
 
-@pytest.mark.skipif(not os.path.exists(SAMPLE_DATA_PATH), reason='Test sample data not found')
+@pytest.mark.skipif(not os.path.exists(SAMPLE_DATA_PATH), reason="Test sample data not found")
 def test_initial_training_dataloader_feature_names(initial_training_dataloader: DataLoader):
     """Test whether batch from dataloader of InitialTrainingDataset has all the features.
 
@@ -478,7 +478,7 @@ def test_initial_training_dataloader_feature_names(initial_training_dataloader: 
     assert set(batch) == INITIAL_TRAINING_FEATURE_NAMES
 
 
-@pytest.mark.skipif(not os.path.exists(SAMPLE_DATA_PATH), reason='Test sample data not found')
+@pytest.mark.skipif(not os.path.exists(SAMPLE_DATA_PATH), reason="Test sample data not found")
 def test_finetuning_dataloader_feature_names(finetuning_dataloader: DataLoader):
     """Test whether batch from dataloader of FinetuningDataset has all the features.
 
@@ -489,7 +489,7 @@ def test_finetuning_dataloader_feature_names(finetuning_dataloader: DataLoader):
     assert set(batch) == INITIAL_TRAINING_FEATURE_NAMES
 
 
-@pytest.mark.skipif(not os.path.exists(SAMPLE_DATA_PATH), reason='Test sample data not found')
+@pytest.mark.skipif(not os.path.exists(SAMPLE_DATA_PATH), reason="Test sample data not found")
 @pytest.mark.slow
 def test_openfold_sample_creator_initial_training_dataset(initial_training_cfg: DictConfig):
     """Test OpenFoldSampleCreator for initial training dataset.
@@ -529,11 +529,11 @@ def test_openfold_sample_creator_initial_training_dataset(initial_training_cfg: 
         seed = initial_training_cfg.model.seed
         for sample_idx in range(len(initial_training_dataset)):
             sample = initial_training_dataset[(sample_idx, seed)]
-            dataset_name, index, seed, pdb_chain_id, seqlen = sample['id']
+            dataset_name, index, seed, pdb_chain_id, seqlen = sample["id"]
             assert pdb_chain_id in SAMPLE_PDB_CHAIN_IDS
 
 
-@pytest.mark.skipif(not os.path.exists(SAMPLE_DATA_PATH), reason='Test sample data not found')
+@pytest.mark.skipif(not os.path.exists(SAMPLE_DATA_PATH), reason="Test sample data not found")
 @pytest.mark.slow
 def test_openfold_sample_creator_self_distillation_dataset(finetuning_cfg: DictConfig):
     """Test OpenFoldSampleCreator for self-distillation dataset.
@@ -570,11 +570,11 @@ def test_openfold_sample_creator_self_distillation_dataset(finetuning_cfg: DictC
         seed = finetuning_cfg.model.seed
         for sample_idx in range(len(self_distillation_dataset)):
             sample = self_distillation_dataset[(sample_idx, seed)]
-            dataset_name, index, seed, pdb_chain_id, seqlen = sample['id']
+            dataset_name, index, seed, pdb_chain_id, seqlen = sample["id"]
             assert pdb_chain_id in SAMPLE_UNICLUST30_IDS
 
 
-@pytest.mark.skipif(not os.path.exists(SAMPLE_DATA_PATH), reason='Test sample data not found')
+@pytest.mark.skipif(not os.path.exists(SAMPLE_DATA_PATH), reason="Test sample data not found")
 @pytest.mark.slow
 def test_openfold_sample_creator_validation_dataset(initial_training_cfg: DictConfig):
     """Test OpenFoldSampleCreator for fine-tuning dataset.
@@ -614,5 +614,5 @@ def test_openfold_sample_creator_validation_dataset(initial_training_cfg: DictCo
         seed = initial_training_cfg.model.seed
         for sample_idx in range(len(validation_dataset)):
             sample = validation_dataset[(sample_idx, seed)]
-            dataset_name, index, seed, pdb_chain_id, seqlen = sample['id']
+            dataset_name, index, seed, pdb_chain_id, seqlen = sample["id"]
             assert pdb_chain_id in SAMPLE_CAMEO_CHAIN_IDS

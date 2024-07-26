@@ -26,13 +26,13 @@ import torch
 
 
 def compute_sq_dist_mat(X_1, X_2):
-    '''Computes the l2 squared cost matrix between two point cloud inputs.
+    """Computes the l2 squared cost matrix between two point cloud inputs.
     Args:
         X_1: [n, #features] point cloud, tensor
         X_2: [m, #features] point cloud, tensor
     Output:
         [n, m] matrix of the l2 distance between point pairs
-    '''
+    """
     n_1, _ = X_1.size()
     n_2, _ = X_2.size()
     X_1 = X_1.view(n_1, 1, -1)

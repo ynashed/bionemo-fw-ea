@@ -15,7 +15,7 @@ import pytest
 from download_artifacts import download_artifacts, get_available_models, load_config, streamed_subprocess_call
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope="module")
 def download_models_for_test(tmpdir_factory):
     """Downloads common models between NGC and PBSS for testing."""
     config = load_config()

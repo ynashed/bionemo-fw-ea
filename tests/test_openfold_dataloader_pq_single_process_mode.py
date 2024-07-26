@@ -109,7 +109,7 @@ class SimpleSampler(Sampler[int]):
 
 
 # function scope for the iteration
-@pytest.fixture(scope='function')
+@pytest.fixture(scope="function")
 def get_simple_dataset_and_sampler_for_builtins():
     dataset = SimpleDatasetWithRecordsAsDicts()
     sampler = SimpleSampler(
@@ -120,7 +120,7 @@ def get_simple_dataset_and_sampler_for_builtins():
 
 
 # function scope for the iteration
-@pytest.fixture(scope='function')
+@pytest.fixture(scope="function")
 def get_simple_dataset_and_sampler_for_fruit_class_instances():
     dataset = SimpleDatasetWithRecordsAsDicts(record_type="Fruit")
     sampler = SimpleSampler(

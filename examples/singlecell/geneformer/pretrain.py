@@ -31,7 +31,7 @@ def main(cfg) -> None:
         None
     """
     logging.info("\n\n************** Experiment configuration ***********")
-    logging.info(f'\n{OmegaConf.to_yaml(cfg)}')
+    logging.info(f"\n{OmegaConf.to_yaml(cfg)}")
     if cfg.get("seed_everything", True):
         pl.seed_everything(cfg.model.seed)
     if cfg.do_training:
@@ -56,11 +56,11 @@ def main(cfg) -> None:
             tokenizer_vocab_path=cfg.model.tokenizer.vocab_file,
         )
         match preprocessor.preprocess():
-            case {'tokenizer': _, 'median_dict': _}:
+            case {"tokenizer": _, "median_dict": _}:
                 logging.info("*************** Preprocessing Finished ************")
             case _:
                 logging.error("Preprocessing failed.")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

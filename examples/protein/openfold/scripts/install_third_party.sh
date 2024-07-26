@@ -18,8 +18,8 @@
 #
 # description: install two cpp binaries via wget and cmake
 #
-#   This is updated to address in multi-gpu training jobs on the ORD slurm 
-#       cluster, where problems arose from multiple downloads and 
+#   This is updated to address in multi-gpu training jobs on the ORD slurm
+#       cluster, where problems arose from multiple downloads and
 #       installs to common location.
 #
 #
@@ -49,8 +49,8 @@ timer_end() {
 # (1) early exit if BIONEMO_HOME not set in environment
 if [[ -z "$BIONEMO_HOME" ]]; then
 
-    msg="\$BIONEMO_HOME is unset. Please set the variable and run the 
-    script again. This variable should be set to the base of the repo path.  
+    msg="\$BIONEMO_HOME is unset. Please set the variable and run the
+    script again. This variable should be set to the base of the repo path.
     Exiting with exit code 1"
     printf "${MESSAGE_TEMPLATE}" ${msg}
     exit 1
@@ -80,13 +80,13 @@ LABEL_2="ns${nanoseconds_since_epoch}"
 if [[ -n "${LOCAL_RANK}" ]]; then
 
     LABEL_1="lrank${LOCAL_RANK}_${LABEL_1}"
-    LABEL_2="lrank${LOCAL_RANK}_${LABEL_2}"    
+    LABEL_2="lrank${LOCAL_RANK}_${LABEL_2}"
 fi
 
 # if GLOBAL_RANK is not empty string
 if [[ -n "${GLOBAL_RANK}" ]]; then
     LABEL_1="grank${GLOBAL_RANK}_${LABEL_1}"
-    LABEL_2="grank${GLOBAL_RANK}_${LABEL_2}"    
+    LABEL_2="grank${GLOBAL_RANK}_${LABEL_2}"
 fi
 
 INSTALL_DIR_1="${INSTALL_DIR_1}_${LABEL_1}"

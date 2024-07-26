@@ -28,7 +28,7 @@ start_end_length = [
 ]
 
 
-@pytest.mark.parametrize('start,end,length', start_end_length)
+@pytest.mark.parametrize("start,end,length", start_end_length)
 def test_slice_dataset(start, end, length):
     dataset = SliceDataset(test_dataset, start, end)
     assert len(dataset) == length

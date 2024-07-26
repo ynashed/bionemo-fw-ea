@@ -25,10 +25,10 @@ from nemo.utils import logging
 from bionemo.data.utils import download_registry_from_ngc, get_ngc_registry_file_list, verify_checksum_matches
 
 
-__all__ = ['FastaPreprocess', 'UniRef50Preprocess', 'ESM2Preprocess']
+__all__ = ["FastaPreprocess", "UniRef50Preprocess", "ESM2Preprocess"]
 
-UNIREF50_ROOT_DIR = '/tmp/uniref50'
-UNIREF50_MD5_CHECKSUM = 'e619d3689749562d743f8ecf29a7a7c2'
+UNIREF50_ROOT_DIR = "/tmp/uniref50"
+UNIREF50_MD5_CHECKSUM = "e619d3689749562d743f8ecf29a7a7c2"
 
 
 class PreprocessMixin:
@@ -51,28 +51,28 @@ class PreprocessMixin:
         Returns:
             str: Path to unzipped FASTA file
         """
-        assert url.endswith('.fasta.gz'), AssertionError(f'Expected URL to end with `.fasta.gz`, got {url}..')
+        assert url.endswith(".fasta.gz"), AssertionError(f"Expected URL to end with `.fasta.gz`, got {url}..")
 
         filename, gz_ext = os.path.splitext(os.path.split(url)[-1])  # gz extension
         filename, fasta_ext = os.path.splitext(filename)  # fasta extension
 
         file_path = os.path.join(download_dir, filename + fasta_ext)
-        tmp_file_path = os.path.join(download_dir, filename + '_tmp' + fasta_ext)
+        tmp_file_path = os.path.join(download_dir, filename + "_tmp" + fasta_ext)
 
         gz_file_path = file_path + gz_ext
         tmp_gz_file_path = tmp_file_path + gz_ext
 
         if os.path.exists(file_path):
-            logging.info(f'{url} already exists at {file_path}...')
+            logging.info(f"{url} already exists at {file_path}...")
             return file_path
 
-        logging.info(f'Downloading file to {gz_file_path}...')
+        logging.info(f"Downloading file to {gz_file_path}...")
         try:
             if not os.path.exists(gz_file_path):
                 # Download gzipped file from url
                 with requests.get(url, stream=True) as r:
                     r.raise_for_status()
-                    with open(tmp_gz_file_path, 'wb') as f:
+                    with open(tmp_gz_file_path, "wb") as f:
                         for chunk in r.raw.stream(1024, decode_content=False):
                             if chunk:
                                 f.write(chunk)
@@ -80,9 +80,9 @@ class PreprocessMixin:
                 os.rename(tmp_gz_file_path, gz_file_path)
 
             # Extract gzipped file and clean up
-            logging.info(f'Extracting file to {file_path}...')
-            with gzip.open(gz_file_path, 'rb') as f_in:
-                with open(tmp_file_path, 'wb') as f_out:
+            logging.info(f"Extracting file to {file_path}...")
+            with gzip.open(gz_file_path, "rb") as f_in:
+                with open(tmp_file_path, "wb") as f_out:
                     shutil.copyfileobj(f_in, f_out)
 
             os.rename(tmp_file_path, file_path)
@@ -92,10 +92,10 @@ class PreprocessMixin:
 
         except requests.exceptions.HTTPError as e:
             if e.response.status_code == 404:
-                logging.error(f'{url} Not found')
+                logging.error(f"{url} Not found")
                 return
             else:
-                logging.error(f'Could not download file {url}: {e.response.status_code}')
+                logging.error(f"Could not download file {url}: {e.response.status_code}")
                 raise e
 
     @staticmethod
@@ -120,28 +120,28 @@ class PreprocessMixin:
         val_samples = sample_list[:val_size]
         test_samples = sample_list[val_size : val_size + test_size]
         train_samples = sample_list[val_size + test_size :]
-        assert len(val_samples) == val_size, AssertionError('Validation dataset is not the correct size.')
-        assert len(test_samples) == test_size, AssertionError('Test dataset is not the correct size.')
+        assert len(val_samples) == val_size, AssertionError("Validation dataset is not the correct size.")
+        assert len(test_samples) == test_size, AssertionError("Test dataset is not the correct size.")
         assert len(fasta_indexer) - len(val_samples) - len(test_samples) == len(train_samples), AssertionError(
-            'Train dataset is not the correct size.'
+            "Train dataset is not the correct size."
         )
         return train_samples, val_samples, test_samples
 
     @staticmethod
     def _protein_sequence_filewriter_map(args):
-        '''enables p.map'''
+        """enables p.map"""
         ordered_args = (
-            args['fasta_indexer'],
-            args['record_id_list'],
-            args['file_index'],
-            args['split_name'],
-            args['output_dir'],
-            args['delimiter'],
+            args["fasta_indexer"],
+            args["record_id_list"],
+            args["file_index"],
+            args["split_name"],
+            args["output_dir"],
+            args["delimiter"],
         )
         return PreprocessMixin._protein_sequence_filewriter(*ordered_args)
 
     @staticmethod
-    def _protein_sequence_filewriter(fasta_indexer, record_id_list, file_index, split_name, output_dir, delimiter=','):
+    def _protein_sequence_filewriter(fasta_indexer, record_id_list, file_index, split_name, output_dir, delimiter=","):
         """CSV file writer for FASTA data
 
         Args:
@@ -156,7 +156,7 @@ class PreprocessMixin:
 
         split_path = os.path.join(output_dir, split_name)
         pathlib.Path(split_path).mkdir(parents=True, exist_ok=True)
-        file_name = os.path.join(split_path, f'x{str(file_index).zfill(3)}.csv')
+        file_name = os.path.join(split_path, f"x{str(file_index).zfill(3)}.csv")
 
         if isinstance(fasta_indexer, str):
             # NOTE pass a string if you want to use with Pool.map
@@ -168,13 +168,13 @@ class PreprocessMixin:
             )
             fasta_indexer = _idx
 
-        with open(file_name, 'w') as fh:
-            header_str = delimiter.join(['record_id', 'record_name', 'sequence_length', 'sequence'])
-            fh.write(header_str + '\n')
+        with open(file_name, "w") as fh:
+            header_str = delimiter.join(["record_id", "record_name", "sequence_length", "sequence"])
+            fh.write(header_str + "\n")
             for record_id in record_id_list:
                 record = fasta_indexer[record_id]
                 output = delimiter.join([str(record.id), record.name, str(len(record.seq)), record.seq])
-                fh.write(output + '\n')
+                fh.write(output + "\n")
         return
 
     def train_val_test_split(self, train_samples, val_samples, test_samples, num_csv_files, fasta_indexer, output_dir):
@@ -189,11 +189,11 @@ class PreprocessMixin:
             output_dir (str): Output directory for CSV data.
         """
 
-        for split_name, record_id_list in zip(['train', 'val', 'test'], [train_samples, val_samples, test_samples]):
-            logging.info(f'Creating {split_name} split...')
+        for split_name, record_id_list in zip(["train", "val", "test"], [train_samples, val_samples, test_samples]):
+            logging.info(f"Creating {split_name} split...")
 
             for file_index, record_id_split in enumerate(np.array_split(record_id_list, num_csv_files)):
-                logging.debug(f'Writing file number {file_index}...')
+                logging.debug(f"Writing file number {file_index}...")
                 self._protein_sequence_filewriter(
                     record_id_list=record_id_split,
                     file_index=file_index,
@@ -241,14 +241,14 @@ class FastaPreprocess(PreprocessMixin):
             output_dir = self.root_directory
         os.makedirs(output_dir, exist_ok=True)
 
-        logging.info(f'Indexing custom dataset from {fasta_path}.')
+        logging.info(f"Indexing custom dataset from {fasta_path}.")
 
         fasta_path = str(fasta_path)
         fasta_indexer = pyfastx.Fasta(fasta_path, build_index=True, uppercase=True)
         record_id_list = np.arange(len(fasta_indexer))
 
         for file_index, record_id_split in enumerate(np.array_split(record_id_list, num_csv_files)):
-            logging.debug(f'Writing file number {file_index}...')
+            logging.debug(f"Writing file number {file_index}...")
             self._protein_sequence_filewriter(
                 record_id_list=record_id_split,
                 file_index=file_index,
@@ -283,9 +283,9 @@ class UniRef50Preprocess(PreprocessMixin):
             download_dir (str): Download directory for UniRef50 file.
         """
 
-        logging.info('Data processing can take an hour or more depending on system resources.')
+        logging.info("Data processing can take an hour or more depending on system resources.")
 
-        logging.info(f'Downloading file from {url}...')
+        logging.info(f"Downloading file from {url}...")
 
         os.makedirs(download_dir, exist_ok=True)
         file_path = self._download_and_extract_fasta_gz(url=url, download_dir=download_dir)
@@ -293,19 +293,19 @@ class UniRef50Preprocess(PreprocessMixin):
 
     @staticmethod
     def process_files_ngc(ngc_registry_target, ngc_registry_version, download_dir, output_dir, checksum):
-        assert os.environ.get('NGC_CLI_API_KEY', False), AssertionError(
+        assert os.environ.get("NGC_CLI_API_KEY", False), AssertionError(
             """NGC API key not defined as environment variable "NGC_CLI_API_KEY".
                                                                            Aborting resource download."""
         )
-        ngc_org = os.environ.get('NGC_CLI_ORG', None)
-        assert ngc_org, AssertionError('NGC org must be defined by the environment variable NGC_CLI_ORG')
-        ngc_team = os.environ.get('NGC_CLI_TEAM', None)
+        ngc_org = os.environ.get("NGC_CLI_ORG", None)
+        assert ngc_org, AssertionError("NGC org must be defined by the environment variable NGC_CLI_ORG")
+        ngc_team = os.environ.get("NGC_CLI_TEAM", None)
 
         # Check if resource already exists at final destination
         file_list = get_ngc_registry_file_list(ngc_registry_target, ngc_registry_version, ngc_org, ngc_team)
         file_exists = False
         if len(file_list) > 1:
-            logging.info('Checksum verification not supported if resource contains more than one file.')
+            logging.info("Checksum verification not supported if resource contains more than one file.")
         else:
             file_name = file_list[0]
             output_path = os.path.join(output_dir, file_name)
@@ -328,9 +328,9 @@ class UniRef50Preprocess(PreprocessMixin):
             file_name = os.path.basename(tmp_download_path)
             output_path = os.path.join(output_dir, file_name)  # Ensures output_path is defined when file is downloaded
             shutil.copyfile(tmp_download_path, output_path)
-            logging.info(f'Download complete at {output_path}.')
+            logging.info(f"Download complete at {output_path}.")
         else:
-            logging.info(f'File download skipped because file exists at {output_path} and has expected checksum.')
+            logging.info(f"File download skipped because file exists at {output_path} and has expected checksum.")
 
         return output_path
 
@@ -339,8 +339,8 @@ class UniRef50Preprocess(PreprocessMixin):
         output_dir: Optional[pathlib.Path] = None,
         ngc_registry_target=None,
         ngc_registry_version=None,
-        url: str = 'https://ftp.uniprot.org/pub/databases/uniprot/uniref/uniref50/uniref50.fasta.gz',
-        source: str = 'ngc',
+        url: str = "https://ftp.uniprot.org/pub/databases/uniprot/uniref/uniref50/uniref50.fasta.gz",
+        source: str = "ngc",
         num_csv_files: int = 50,
         val_size: int = 5000,
         test_size: int = 1000000,
@@ -357,14 +357,14 @@ class UniRef50Preprocess(PreprocessMixin):
         """
 
         logging.info(
-            'Download and preprocess of UniRef50 data does not currently use GPU. Workstation or CPU-only instance recommended.'
+            "Download and preprocess of UniRef50 data does not currently use GPU. Workstation or CPU-only instance recommended."
         )
 
-        download_dir = self.root_directory.joinpath('raw')
+        download_dir = self.root_directory.joinpath("raw")
         if output_dir is None:
-            output_dir = self.root_directory.joinpath('processed')
+            output_dir = self.root_directory.joinpath("processed")
         os.makedirs(output_dir, exist_ok=True)
-        if source == 'ngc':
+        if source == "ngc":
             assert ngc_registry_target is not None
             assert ngc_registry_version is not None
             file_path = self.process_files_ngc(
@@ -375,18 +375,18 @@ class UniRef50Preprocess(PreprocessMixin):
                 checksum=self.checksum,
             )
 
-        elif source == 'uniprot':
+        elif source == "uniprot":
             file_path = self.process_files_uniprot(url=url, download_dir=download_dir)
 
-        logging.info('UniRef50 data processing complete.')
+        logging.info("UniRef50 data processing complete.")
 
-        logging.info('Indexing UniRef50 dataset.')
+        logging.info("Indexing UniRef50 dataset.")
         fasta_indexer = pyfastx.Fasta(file_path, build_index=True, uppercase=True)
         train_samples, val_samples, test_samples = self._index_fasta_data(
             fasta_indexer=fasta_indexer, val_size=val_size, test_size=test_size, random_seed=random_seed
         )
 
-        logging.info(f'Writing processed dataset files to {output_dir}...')
+        logging.info(f"Writing processed dataset files to {output_dir}...")
         self.train_val_test_split(
             train_samples=train_samples,
             val_samples=val_samples,
@@ -451,16 +451,16 @@ class ESM2Preprocess(UniRef50Preprocess):
         if mode != "train" and uf90_datapath is not None:
             raise ValueError("Currently, only training mode utilizes the uf90 datapaths.")
 
-        if mode in ['train', 'val', 'test'] and not os.path.exists(uf50_datapath):
+        if mode in ["train", "val", "test"] and not os.path.exists(uf50_datapath):
             raise FileNotFoundError(f"input argument uf50_datapath: {uf50_datapath} is not found in mode {mode}.")
-        if mode in ['train'] and not os.path.exists(uf90_datapath):
+        if mode in ["train"] and not os.path.exists(uf90_datapath):
             raise FileNotFoundError(f"input argument uf90_datapath: {uf90_datapath} is not found in mode {mode}.")
-        if mode in ['train'] and not os.path.exists(cluster_mapping_tsv):
+        if mode in ["train"] and not os.path.exists(cluster_mapping_tsv):
             raise FileNotFoundError(
                 f"input argument cluster_mapping_tsv: {cluster_mapping_tsv} is not found in mode {mode}."
             )
 
-        logging.info('Indexing UniRef50 dataset.')
+        logging.info("Indexing UniRef50 dataset.")
         uf50_fasta_indexer = pyfastx.Fasta(uf50_datapath, build_index=True, uppercase=True)
 
         os.makedirs(uf50_output_dir, exist_ok=True)
@@ -468,10 +468,10 @@ class ESM2Preprocess(UniRef50Preprocess):
             os.makedirs(uf90_output_dir, exist_ok=True)
 
         if uf90_datapath is not None:
-            logging.info('Indexing UniRef90 dataset.')
+            logging.info("Indexing UniRef90 dataset.")
             uf90_fasta_indexer = pyfastx.Fasta(uf90_datapath, build_index=True, uppercase=True)
 
-        logging.info('Creating cluster mapping')
+        logging.info("Creating cluster mapping")
         if cluster_mapping_tsv is not None:
             global_starts, global_counts, all_cids, all_cmembers = self._load_cluster_mapping(cluster_mapping_tsv)
 
@@ -484,7 +484,7 @@ class ESM2Preprocess(UniRef50Preprocess):
             )
             new_uf90_fasta_indexer = pyfastx.Fasta(uf90_datapath, build_index=True)
 
-        logging.info('Loading sorted fasta files')
+        logging.info("Loading sorted fasta files")
         new_uf50_fasta_indexer = pyfastx.Fasta(uf50_datapath, build_index=True)
 
         record_id_list = np.sort(np.arange(len(new_uf50_fasta_indexer)))
@@ -492,13 +492,13 @@ class ESM2Preprocess(UniRef50Preprocess):
         split_path = os.path.join(uf50_output_dir, mode)
         pathlib.Path(split_path).mkdir(parents=True, exist_ok=True)
         # Create the memmap files.
-        counts_fn = os.path.join(split_path, 'counts.mmap')
-        starts_fn = os.path.join(split_path, 'starts.mmap')
+        counts_fn = os.path.join(split_path, "counts.mmap")
+        starts_fn = os.path.join(split_path, "starts.mmap")
 
         # Create the CSV files
-        logging.info(f'Writing processed uf50 {mode} dataset files to {uf50_output_dir}...')
+        logging.info(f"Writing processed uf50 {mode} dataset files to {uf50_output_dir}...")
         for file_index, record_id_split in enumerate(np.array_split(record_id_list, num_csv_files)):
-            logging.debug(f'Writing file number {file_index}...')
+            logging.debug(f"Writing file number {file_index}...")
             self._protein_sequence_filewriter(
                 record_id_list=record_id_split,
                 file_index=file_index,
@@ -514,18 +514,18 @@ class ESM2Preprocess(UniRef50Preprocess):
             )
 
             record_id_list = np.arange(len(new_uf90_fasta_indexer))
-            split_name = 'uf90_csvs'
+            split_name = "uf90_csvs"
             with Pool(num_preprocess_workers) as p:
                 p.map(
                     UniRef50Preprocess._protein_sequence_filewriter_map,
                     [
                         {
-                            'record_id_list': record_id_split,
-                            'file_index': file_index,
-                            'split_name': split_name,
-                            'fasta_indexer': uf90_datapath,
-                            'output_dir': uf90_output_dir,
-                            'delimiter': ',',
+                            "record_id_list": record_id_split,
+                            "file_index": file_index,
+                            "split_name": split_name,
+                            "fasta_indexer": uf90_datapath,
+                            "output_dir": uf90_output_dir,
+                            "delimiter": ",",
                         }
                         for file_index, record_id_split in enumerate(np.array_split(record_id_list, num_csv_files))
                     ],
@@ -540,13 +540,13 @@ class ESM2Preprocess(UniRef50Preprocess):
     def _make_local_memmaps(
         samples_arr, starts_global, counts_global, counts_mmap_fn, starts_mmap_fn, memmap_dtype=np.uint64
     ):
-        '''Constructs memmaps using only the locally available samples. starts and counts remain the same, but we use the
+        """Constructs memmaps using only the locally available samples. starts and counts remain the same, but we use the
         sample_arr to find them in the global counts and global starts maps.
 
         Returns - counts memmap and starts memmap
-        '''
-        counts_local_mm = np.memmap(counts_mmap_fn, dtype=memmap_dtype, mode='w+', shape=(len(samples_arr),))
-        starts_local_mm = np.memmap(starts_mmap_fn, dtype=memmap_dtype, mode='w+', shape=(len(samples_arr),))
+        """
+        counts_local_mm = np.memmap(counts_mmap_fn, dtype=memmap_dtype, mode="w+", shape=(len(samples_arr),))
+        starts_local_mm = np.memmap(starts_mmap_fn, dtype=memmap_dtype, mode="w+", shape=(len(samples_arr),))
         for i, global_sample_idx in enumerate(samples_arr):
             start = starts_global[global_sample_idx]
             counts = counts_global[global_sample_idx]
@@ -581,7 +581,7 @@ class ESM2Preprocess(UniRef50Preprocess):
         new_uf50_fn = tempfile.NamedTemporaryFile().name
         new_uf90_fn = tempfile.NamedTemporaryFile().name
         logging.info(f"Sorting fasta files in temporary file: {new_uf50_fn=} {new_uf90_fn=}")
-        with open(new_uf50_fn, 'w') as uf50_fa_out, open(new_uf90_fn, 'w') as uf90_fa_out:
+        with open(new_uf50_fn, "w") as uf50_fa_out, open(new_uf90_fn, "w") as uf90_fa_out:
             for cid, members in tqdm.tqdm(zip(all_cids, all_cmembers)):
                 uf50_entry = uf50_fasta_indexer[cid]
                 uf50_fa_out.write(f">{uf50_entry.name}\n")
@@ -595,11 +595,11 @@ class ESM2Preprocess(UniRef50Preprocess):
 
     @staticmethod
     def _load_cluster_mapping(cluster_mapping_tsv):
-        '''Loads the cluster map into two arrays, counts and sizes. As a side effect, creates new
+        """Loads the cluster map into two arrays, counts and sizes. As a side effect, creates new
         temp fasta files that are in the same sort order as cluster_mapping_tsv. This is required for
         csv creation to match the indexing structure in the cluster map.
-        '''
-        with open(cluster_mapping_tsv, 'r') as fd:
+        """
+        with open(cluster_mapping_tsv, "r") as fd:
             pos = 0
             all_cids, all_cmembers = [], []
             # Parse fasta
@@ -608,7 +608,7 @@ class ESM2Preprocess(UniRef50Preprocess):
                 if i == 0:
                     continue  # skip header
                 cid, cmembers, *_ = line.strip().split("\t")
-                members = cmembers.split(',')
+                members = cmembers.split(",")
                 all_cids.append(cid)
                 all_cmembers.append(members)
 

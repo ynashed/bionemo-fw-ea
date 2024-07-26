@@ -34,7 +34,7 @@ def main(cfg) -> None:
     """
 
     logging.info("\n\n************* Finetune config ****************")
-    logging.info(f'\n{OmegaConf.to_yaml(cfg)}')
+    logging.info(f"\n{OmegaConf.to_yaml(cfg)}")
 
     # Required for a lot of our inference functionality!
     with open_dict(cfg):
@@ -51,7 +51,7 @@ def main(cfg) -> None:
             tokenizer_vocab_path=cfg.model.tokenizer.vocab_file,
         )
         match preprocessor.preprocess():
-            case {'tokenizer': _, 'median_dict': _}:
+            case {"tokenizer": _, "median_dict": _}:
                 logging.info("*************** Preprocessing Finished ************")
             case _:
                 logging.error("Preprocessing failed.")
@@ -62,9 +62,9 @@ def main(cfg) -> None:
         artifacts = resource_fetcher.prepare_annotated()
         logging.info("*************** Adamson Download Finished ************")
         _ = preprocess_adamson(
-            adamson_perturbed_processed_fn=artifacts['perturbed_h5ad'],
-            gene2go_pkl_fn=artifacts['gene2go_pkl'],
-            all_pert_genes_pkl_fn=artifacts['pert_genes_pkl'],
+            adamson_perturbed_processed_fn=artifacts["perturbed_h5ad"],
+            gene2go_pkl_fn=artifacts["gene2go_pkl"],
+            all_pert_genes_pkl_fn=artifacts["pert_genes_pkl"],
             dest_preprocessed_anndata_fn=cfg.model.data.preprocessed_anndata_fn,
             dest_target_gep_fn=cfg.model.data.target_gep_fn,
         )
@@ -94,5 +94,5 @@ def main(cfg) -> None:
             logging.info("************** Finished Testing ***********")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

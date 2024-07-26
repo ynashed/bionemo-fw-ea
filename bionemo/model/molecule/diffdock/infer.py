@@ -84,13 +84,13 @@ def do_inference_sampling(
         confidence_model.eval()
 
     for name in complex_name_list:
-        write_dir = f'{cfg.out_dir}/{name}'
+        write_dir = f"{cfg.out_dir}/{name}"
         os.makedirs(write_dir, exist_ok=True)
 
     tr_schedule = get_t_schedule(denoising_inference_steps=cfg.denoising_inference_steps)
     rot_schedule = tr_schedule
     tor_schedule = tr_schedule
-    logging.info(f'common t schedule {tr_schedule}')
+    logging.info(f"common t schedule {tr_schedule}")
     score_model_cfg = cfg.score_infer
     if cfg.confidence_infer is not None:
         confidence_model_cfg = cfg.confidence_infer
@@ -99,7 +99,7 @@ def do_inference_sampling(
 
     failures, skipped, confidences_list, names_list, run_times, min_self_distances_list = 0, 0, [], [], [], []
     N = cfg.samples_per_complex
-    logging.info(f'Size of test dataset: {len(test_dataset)}')
+    logging.info(f"Size of test dataset: {len(test_dataset)}")
 
     with tqdm(total=len(test_loader), desc="sampling") as pbar:
         for idx, orig_complex_graph in tqdm(enumerate(test_loader)):
@@ -142,11 +142,11 @@ def do_inference_sampling(
                         pdb = PDBFile(lig)
                         pdb.add(lig, 0, 0)
                         pdb.add(
-                            (orig_complex_graph['ligand'].pos + orig_complex_graph.original_center).detach().cpu(),
+                            (orig_complex_graph["ligand"].pos + orig_complex_graph.original_center).detach().cpu(),
                             1,
                             0,
                         )
-                        pdb.add((graph['ligand'].pos + graph.original_center).detach().cpu(), part=1, order=1)
+                        pdb.add((graph["ligand"].pos + graph.original_center).detach().cpu(), part=1, order=1)
                         visualization_list.append(pdb)
                 else:
                     visualization_list = None
@@ -180,7 +180,7 @@ def do_inference_sampling(
                     )
                 ligand_pos = np.asarray(
                     [
-                        complex_graph['ligand'].pos.cpu().numpy() + orig_complex_graph.original_center.cpu().numpy()
+                        complex_graph["ligand"].pos.cpu().numpy() + orig_complex_graph.original_center.cpu().numpy()
                         for complex_graph in data_list
                     ]
                 )
@@ -197,7 +197,7 @@ def do_inference_sampling(
                     ligand_pos = ligand_pos[re_order]
 
                 # save predictions
-                write_dir = f'{cfg.out_dir}/{complex_name_list[idx]}'
+                write_dir = f"{cfg.out_dir}/{complex_name_list[idx]}"
                 for rank, pos in enumerate(ligand_pos):
                     if np.abs(pos.mean(axis=0)).max() > 1000.0:
                         pos = pos - pos.mean(axis=0) + 800.0 * np.sign(pos.mean(axis=0))
@@ -205,11 +205,11 @@ def do_inference_sampling(
                     if score_model_cfg.data.remove_hs:
                         mol_pred = RemoveHs(mol_pred)
                     if rank == 0:
-                        write_mol_with_coords(mol_pred, pos, os.path.join(write_dir, f'rank{rank+1}.sdf'))
+                        write_mol_with_coords(mol_pred, pos, os.path.join(write_dir, f"rank{rank+1}.sdf"))
                     if confidence is not None:
-                        path = os.path.join(write_dir, f'rank{rank+1}_confidence{confidence[rank]:.2f}.sdf')
+                        path = os.path.join(write_dir, f"rank{rank+1}_confidence{confidence[rank]:.2f}.sdf")
                     else:
-                        path = os.path.join(write_dir, f'rank{rank+1}.sdf')
+                        path = os.path.join(write_dir, f"rank{rank+1}.sdf")
                     write_mol_with_coords(mol_pred, pos, path)
 
                 self_distances = np.linalg.norm(ligand_pos[:, :, None, :] - ligand_pos[:, None, :, :], axis=-1)
@@ -221,11 +221,11 @@ def do_inference_sampling(
                     if confidence is not None:
                         for rank, batch_idx in enumerate(re_order):
                             visualization_list[batch_idx].write(
-                                os.path.join(write_dir, f'rank{rank+1}_reverseprocess.pdb')
+                                os.path.join(write_dir, f"rank{rank+1}_reverseprocess.pdb")
                             )
                     else:
                         for rank in range(len(ligand_pos)):
-                            visualization_list[rank].write(os.path.join(write_dir, f'rank{rank+1}_reverseprocess.pdb'))
+                            visualization_list[rank].write(os.path.join(write_dir, f"rank{rank+1}_reverseprocess.pdb"))
 
                 names_list.append(orig_complex_graph.name[0])
             except Exception as e:
@@ -237,9 +237,9 @@ def do_inference_sampling(
     confidences = np.array(confidences_list)
     names = np.array(names_list)
     run_times = np.array(run_times)
-    np.save(f'{cfg.out_dir}/min_self_distances.npy', min_self_distances)
-    np.save(f'{cfg.out_dir}/confidences.npy', confidences)
-    np.save(f'{cfg.out_dir}/run_times.npy', run_times)
-    np.save(f'{cfg.out_dir}/complex_names.npy', names)
+    np.save(f"{cfg.out_dir}/min_self_distances.npy", min_self_distances)
+    np.save(f"{cfg.out_dir}/confidences.npy", confidences)
+    np.save(f"{cfg.out_dir}/run_times.npy", run_times)
+    np.save(f"{cfg.out_dir}/complex_names.npy", names)
 
     return failures, skipped

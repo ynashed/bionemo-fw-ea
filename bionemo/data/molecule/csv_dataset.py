@@ -25,7 +25,7 @@ try:
 except (ImportError, ModuleNotFoundError):
     HAVE_APEX = False
 
-__all__ = ['MoleculeCsvDataset']
+__all__ = ["MoleculeCsvDataset"]
 
 
 # TODO: use NeMoUpsampling instead of directly calling get_samples_mapping
@@ -45,22 +45,22 @@ class MoleculeCsvDataset(Dataset):
         super().__init__()
 
         self.num_samples = num_samples
-        self.seed = cfg.get('seed')
+        self.seed = cfg.get("seed")
         # prefix for sample mapping cached indeices
-        self.data_prefix = cfg.get('data_prefix')
+        self.data_prefix = cfg.get("data_prefix")
         if not self.data_prefix:
             self.data_prefix = os.path.commonprefix(dataset_paths)
-        self.max_seq_length = cfg.get('max_seq_length')
+        self.max_seq_length = cfg.get("max_seq_length")
 
         self.ds = CSVMemMapDataset(
             dataset_paths=dataset_paths,
-            newline_int=cfg.get('newline_int'),
-            header_lines=cfg.get('header_lines'),  # skip first N lines
+            newline_int=cfg.get("newline_int"),
+            header_lines=cfg.get("header_lines"),  # skip first N lines
             workers=workers,
             tokenizer=None,
-            sort_dataset_paths=cfg.get('sort_dataset_paths'),
-            data_col=cfg.get('data_col'),
-            data_sep=cfg.get('data_sep'),
+            sort_dataset_paths=cfg.get("sort_dataset_paths"),
+            data_col=cfg.get("data_col"),
+            data_sep=cfg.get("data_sep"),
             index_mapping_dir=index_mapping_dir,
         )
         # create mapping to a single epoch with num_samples
@@ -81,7 +81,7 @@ class MoleculeCsvDataset(Dataset):
             max_seq_length=self.max_seq_length - 2,
             short_seq_prob=0,
             seed=self.seed,
-            name=self.data_prefix.split('/')[-1],
+            name=self.data_prefix.split("/")[-1],
             binary_head=False,
         )
 

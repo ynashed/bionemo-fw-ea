@@ -46,15 +46,15 @@ def send_seqs_for_inference(client: ModelClient, input_name: str, seqs: Sequence
 
 @click.command("")
 @click.option(
-    '--triton-url',
+    "--triton-url",
     type=str,
     default="http://localhost:8000",
     help="Url to Triton server (e.g. grpc://localhost:8001). "
     "HTTP protocol with default port is used if parameter is not provided",
     show_default=True,
 )
-@click.option('--model', type=str, default="bionemo_model", help="Name of model in Triton.", show_default=True)
-@click.option("--sequences", '-s', type=str, multiple=True, help="Protein sequence(s) to send for inference.")
+@click.option("--model", type=str, default="bionemo_model", help="Name of model in Triton.", show_default=True)
+@click.option("--sequences", "-s", type=str, multiple=True, help="Protein sequence(s) to send for inference.")
 @click.option(
     "--output",
     type=str,
@@ -80,7 +80,7 @@ def entrypoint(
     print(f"Protein sequences:  {sequences}")
     print(f"Output to file?:    {output}")
     print(f"Input tensor name:  {in_name}")
-    print('-' * 90)
+    print("-" * 90)
 
     with ExitStack() as stack:
         handle_output = _output_handler(stack, output)
@@ -109,7 +109,7 @@ def _output_handler(
                 print(_sep)
 
     else:
-        wt = stack.enter_context(open(output, 'wt'))
+        wt = stack.enter_context(open(output, "wt"))
         # csv.writer(wt, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
         print(f"Writing results to {output}")
 

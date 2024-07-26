@@ -1,7 +1,7 @@
 defaults:
   - pretrain_small_span_aug
   - _self_
-  
+
 hydra:
   searchpath:
      - ${oc.env:BIONEMO_HOME}/examples/molecule/megamolbart/conf/

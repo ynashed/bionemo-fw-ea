@@ -43,7 +43,7 @@ def base_config(bionemo_home):
 
 @pytest.fixture(scope="function")
 def alphafold_model(base_config, request):
-    if hasattr(request, 'param'):
+    if hasattr(request, "param"):
         OptimHub.enable_multiple(request.param)
     return AlphaFold(base_config.model, None)
 
@@ -67,9 +67,9 @@ def test_load_openfold_fail_direct(alphafold_model):
 @pytest.mark.needs_checkpoint
 @pytest.mark.skip_if_no_file(CHECKPOINT_PATH)
 @pytest.mark.parametrize(
-    'alphafold_model',
-    [[], ['mha_fused_gemm'], ['mha_fused_gemm', 'mha_triton'], ['mha_fused_gemm', 'mha_triton', 'layernorm_inductor']],
-    indirect=['alphafold_model'],
+    "alphafold_model",
+    [[], ["mha_fused_gemm"], ["mha_fused_gemm", "mha_triton"], ["mha_fused_gemm", "mha_triton", "layernorm_inductor"]],
+    indirect=["alphafold_model"],
 )
 def test_load_openfold_mapping(alphafold_model):
     """

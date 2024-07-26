@@ -29,7 +29,7 @@ __all__: Sequence[str] = ("setup_inference",)
 
 def setup_inference(cfg: DictConfig, *, interactive: bool = False) -> Tuple[M, pl.Trainer, DataLoader]:
     logging.info("\n\n************** Experiment configuration ***********")
-    logging.info(f'\n{OmegaConf.to_yaml(cfg)}')
+    logging.info(f"\n{OmegaConf.to_yaml(cfg)}")
 
     infer_class = import_class_by_path(cfg.infer_target)
     if isinstance(infer_class, BaseEncoderInference):
@@ -41,19 +41,19 @@ def setup_inference(cfg: DictConfig, *, interactive: bool = False) -> Tuple[M, p
     trainer = infer_model.trainer
 
     logging.info("\n\n************** Restored model configuration ***********")
-    logging.info(f'\n{OmegaConf.to_yaml(infer_model.model.cfg)}')
+    logging.info(f"\n{OmegaConf.to_yaml(infer_model.model.cfg)}")
 
     # TODO [???]: move this code into a dataset builder in data utils
     if not cfg.model.data.data_impl:
         # try to infer data_impl from the dataset_path file extension
-        if cfg.model.data.dataset_path.endswith('.fasta'):
-            cfg.model.data.data_impl = 'fasta_fields_mmap'
+        if cfg.model.data.dataset_path.endswith(".fasta"):
+            cfg.model.data.data_impl = "fasta_fields_mmap"
         else:
             # Data are assumed to be CSV format if no extension provided
-            logging.info('File extension not supplied for data, inferring csv.')
-            cfg.model.data.data_impl = 'csv_fields_mmap'
+            logging.info("File extension not supplied for data, inferring csv.")
+            cfg.model.data.data_impl = "csv_fields_mmap"
 
-        logging.info(f'Inferred data_impl: {cfg.model.data.data_impl}')
+        logging.info(f"Inferred data_impl: {cfg.model.data.data_impl}")
 
     if cfg.model.data.data_impl == "csv_fields_mmap":
         dataset_paths = expand_dataset_paths(cfg.model.data.dataset_path, ext=".csv")
@@ -89,7 +89,7 @@ def setup_inference(cfg: DictConfig, *, interactive: bool = False) -> Tuple[M, p
         )
         remove_too_long = False  # there is no "too long", the dataset will take the top N genes from each cell.
     else:
-        raise ValueError(f'Unknown data_impl: {cfg.model.data.data_impl}')
+        raise ValueError(f"Unknown data_impl: {cfg.model.data.data_impl}")
         remove_too_long = True
 
     # remove too long sequences

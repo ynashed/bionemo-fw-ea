@@ -20,12 +20,12 @@ from bionemo.data.sbdd.utils_data import PDBProtein, parse_sdf_file
 
 
 class PocketLigandPairDataset(Dataset):
-    def __init__(self, raw_path, transform=None, version='final'):
+    def __init__(self, raw_path, transform=None, version="final"):
         super().__init__()
-        self.raw_path = raw_path.rstrip('/')
-        self.index_path = os.path.join(self.raw_path, 'index.pkl')
+        self.raw_path = raw_path.rstrip("/")
+        self.index_path = os.path.join(self.raw_path, "index.pkl")
         self.processed_path = os.path.join(
-            os.path.dirname(self.raw_path), os.path.basename(self.raw_path) + f'_processed_{version}.lmdb'
+            os.path.dirname(self.raw_path), os.path.basename(self.raw_path) + f"_processed_{version}.lmdb"
         )
         self.transform = transform
         self.db = None
@@ -33,14 +33,14 @@ class PocketLigandPairDataset(Dataset):
         self.keys = None
 
         if not os.path.exists(self.processed_path):
-            print(f'{self.processed_path} does not exist, begin processing data')
+            print(f"{self.processed_path} does not exist, begin processing data")
             self._process()
 
     def _connect_db(self):
         """
         Establish read-only database connection
         """
-        assert self.db is None, 'A connection has already been opened.'
+        assert self.db is None, "A connection has already been opened."
         self.db = lmdb.open(
             self.processed_path,
             map_size=10 * (1024 * 1024 * 1024),  # 10GB
@@ -67,7 +67,7 @@ class PocketLigandPairDataset(Dataset):
             subdir=False,
             readonly=False,  # Writable
         )
-        with open(self.index_path, 'rb') as f:
+        with open(self.index_path, "rb") as f:
             index = pickle.load(f)
 
         num_skipped = 0
@@ -90,7 +90,7 @@ class PocketLigandPairDataset(Dataset):
                 except Exception:
                     num_skipped += 1
                     print(
-                        'Skipping (%d) %s'
+                        "Skipping (%d) %s"
                         % (
                             num_skipped,
                             ligand_fn,

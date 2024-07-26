@@ -1,15 +1,19 @@
-# Introduction
+# What is BioNeMo?
 
-AI models are changing how we think about and access information on an unprecedented scale. These methods, ranging from regression, classification, and even generation, allow the exploration of data-driven domains in unique ways. BioNeMo seeks to serve as a platform for accessibility to multiple bio-related AI tools to serve researchers in their challenges. The BioNeMo framework facilitates centralized model training, optimization, fine-tuning, and inferencing for protein and molecular design.
+Generative AI and large language models (LLMs) are achieving incredible breakthroughs in chemistry and biology, such as enabling 3D protein structure prediction, property prediction, and even the generation of novel protein sequences and molecules. This progress has facilitated developments in the pharmaceutical industry, such as antibody design, small-molecule drug design, and newer approaches like RNA aptamer and peptide-based therapeutics. As each of these pieces comes into play, their respective models may need additional fine-tuning or optimization to thoroughly explore or understand the biomolecular space, leading to the need for centralized infrastructure for model development and deployment.
+
+**BioNeMo Framework** is a free to use collection of programming tools and packages offering access to optimized, pre-trained biomolecular models and workflows, along with versatile functionalities for building and customizing models, including training and fine-tuning. Capabilities span various workloads and therapeutic modalities, such as molecular generation and representation learning, protein structure prediction and representation learning, protein-ligand and protein-protein docking, and DNA/RNA/single-cell embedding.
+
+**BioNeMo NIMs** are easy-to-use enterprise-ready inference microservices with built-in API endpoints. NIMs are engineered for scalable, self-hosted or cloud-hosted deployment of optimized, production-grade biomolecular foundation models on any cloud or data center. Check out the growing list of BioNeMo NIMs [here](https://build.nvidia.com/explore/biology).
 
 ![](./images/bionemo_overview_2.png)
 
-## BioNeMo Framework
-BioNeMo Framework provides versatile functionalities for developing, training and deploying large scale bio-based models. BioNeMo allows users to build biomolecular models by providing access to pre-trained models, creating workflows to fit downstream task models from embeddings, and generating biomolecules that meet user-specified criteria based on the fit model. Built for supercomputing scale, the framework allows developers to easily configure and deploy distributed multi-node jobs with minimal code. 
+## BioNeMo Framework: Fundamentals
+BioNeMo Framework provides versatile functionalities for developing and training large-scale biology-based models. BioNeMo allows users to build and train biomolecular models by providing access to pre-trained models and common model components for accelerating drug discovery workflows. Built for supercomputing scale, the framework allows developers to easily configure and train distributed multi-node jobs with minimal code.
 
 ![](./images/bionemo_overview_1.png)
 
-The underpinnings of the biological research framework rely on [NeMo](https://docs.nvidia.com/deeplearning/nemo/user-guide/docs/en/stable/starthere/intro.html), a framework initially established for conversational AI methods. NeMo provides a robust environment for working with large learning models, including [Megatron](https://docs.nvidia.com/deeplearning/nemo/user-guide/docs/en/stable/nlp/megatron.html) models. The BioNeMo Framework provides enhancements to PyTorch Lighting, such as hyperparameter configuarbility with YAML files and checkpoint management. Users can conveniently and quickly train models using these features, test them for desired tasks, and integrate them alongside existing applications. 
+BioNeMo is built on [NeMo](https://docs.nvidia.com/deeplearning/nemo/user-guide/docs/en/stable/starthere/intro.html), a scalable and cloud-native generative AI framework for researchers to create, customize, and deploy large language models (LLMs). NeMo provides a robust environment for working with large learning models, including [NVIDIA Megatron](https://docs.nvidia.com/deeplearning/nemo/user-guide/docs/en/stable/nlp/megatron.html) models. The BioNeMo Framework provides enhancements to PyTorch Lighting, such as hyperparameter configurability with YAML files and checkpoint management. Users can conveniently and quickly train models using these features, test them for desired tasks, and integrate them alongside existing applications.
 
 Some of the key features of BioNeMo Framework are:
 
@@ -19,24 +23,23 @@ Some of the key features of BioNeMo Framework are:
 * Logging with Tensorboard and Weights and Biases to monitor the model training process.
 
 
-## BioNeMo Models: Overview
+## BioNeMo Framework: Available Models
+State-of-the-art models are being continually integrated into the BioNeMo Framework. The available catalog consists of: 1) Models developed by NVIDIA, 2) Models contributed by NVIDIA’s ecosystem partners, and 3) Community models further enhanced by NVIDIA to take advantage of GPU acceleration. The BioNeMo Framework currently offers the following pre-trained models:
 
+| **Model**                                               | **Modality**             | **Uses**                                      |
+|---------------------------------------------------------|--------------------------|-----------------------------------------------|
+| [MegaMolBART](./models/megamolbart.md)                  | Small Molecule           | Representation Learning + Molecule Generation |
+| [MolMIM](./models/molmim.md)                            | Small Molecule           | Representation Learning + Molecule Generation |
+| [ESM-1nv](./models/esm1-nv.md)                          | Protein                  | Representation Learning                       |
+| [ESM-2nv 650M](./models/esm2-nv.md)                     | Protein                  | Representation Learning                       |
+| [ESM-2nv 3B](./models/esm2-nv.md)                       | Protein                  | Representation Learning                       |
+| [EquiDock DIPS Model](./models/equidock.md)             | Protein                  | Protein-Protein Complex Formation             |
+| [EquiDock DB5 Model](./models/equidock.md)              | Protein                  | Protein-Protein Complex Formation             |
+| [OpenFold](./models/openfold.md)                        | Protein                  | Protein Structure Prediction                  |
+| [ProtT5nv](./models/prott5nv.md)                        | Protein                  | Representation Learning                       |
+| [DiffDock Confidence Model](./models/diffdock.md)       | Protein + Molecule       | Generation of Ligand Poses                    |
+| [DiffDock Score Model](./models/diffdock.md)            | Protein + Molecule       | Generation of Ligand Poses                    |
+| [DNABERT](./models/dnabert.md)                          | DNA                      | Representation Learning                       |
+| [Geneformer](./models/geneformer.md)                    | Single Cell              | Representation Learning                       |
 
-| **Model**                                               | **Modality**             | **Uses**                                      |**Trained/Converted Checkpoints on NGC**           |
-|---------------------------------------------------------|--------------------------|-----------------------------------------------|---------------------------------------------------|
-| [OpenFold](./models/openfold.md)                        | Protein                  | Protein Structure Prediction                  | [Public checkpoint fine-tuned by BioNeMo](https://registry.ngc.nvidia.com/orgs/nvidia/teams/clara/models/openfold)     |
-| [DiffDock Score Model](./models/diffdock.md)            | Protein + Molecule       | Generation of Ligand Poses                    | [Public checkpoint converted to BioNeMo format](https://registry.ngc.nvidia.com/orgs/nvidia/teams/clara/models/dnabert)     |
-| [DiffDock Confidence Model](./models/diffdock.md)       | Protein + Molecule       | Generation of Ligand Poses                    | [Public checkpoint converted to BioNeMo format](https://registry.ngc.nvidia.com/orgs/nvidia/teams/clara/models/diffdock_confidence)        |
-| [EquiDock DIPS Model](./models/equidock.md)             | Protein                  | Protein-Protein Complex Formation             | [BioNeMo checkpoints pre-trained from scratch](https://registry.ngc.nvidia.com/orgs/nvidia/teams/clara/models/equidock_dips)               |
-| [EquiDock DB5 Model](./models/equidock.md)              | Protein                  | Protein-Protein Complex Formation             | [BioNeMo checkpoints pre-trained from scratch](https://registry.ngc.nvidia.com/orgs/nvidia/teams/clara/models/equidock_db5)                |
-| [ESM-2nv 650M](./models/esm2-nv.md)                     | Protein                  | Representation Learning                       | [Public checkpoint converted to BioNeMo Format](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/clara/models/esm2nv650m)                  |
-| [ESM-2nv 3B](./models/esm2-nv.md)                       | Protein                  | Representation Learning                       | [Public checkpoint converted to BioNeMo Format](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/clara/models/esm2nv3b)                    |
-| [ESM-1nv](./models/esm1-nv.md)                          | Protein                  | Representation Learning                       | [BioNeMo checkpoints pre-trained from scratch](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/clara/models/esm1nv)                       |
-| [ProtT5nv](./models/prott5nv.md)                        | Protein                  | Representation Learning                       | [BioNeMo checkpoints pre-trained from scratch](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/clara/models/prott5nv)                     |
-| [MegaMolBART](./models/megamolbart.md)                  | Small Molecule           | Representation Learning + Molecule Generation | [BioNeMo checkpoints pre-trained from scratch](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/clara/models/megamolbart)                  |
-| [MolMIM](./models/molmim.md)                  | Small Molecule           | Representation Learning + Molecule Generation | [BioNeMo checkpoints pre-trained from scratch](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/clara/models/molmim)                  |
-| [Geneformer](./models/geneformer.md)                  | Single Cell           | Representation Learning | [BioNeMo checkpoints pre-trained from scratch](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/clara/models/geneformer)                  |
-
-For more information about the models included in BioNeMo Framework, refer to the Model Cards linked in the table above or the original publications referenced in the respective model descriptions. One can also go to the linked NGC Model Catalog Pages to download the model checkpoints, integrate it into your own BioNeMo FW workflows. You can use the tutorials provided in the documentation to learn how to plug in a bionemo model and run training/inference or downstream tasks.
-
-Refer to the [Quickstart Guide](./quickstart-fw.md) for details on how to get started with BioNeMo Framework.
+For more information about the models included in BioNeMo Framework, you may refer to the Model Cards linked in the table above or the original publications referenced in the respective model descriptions.

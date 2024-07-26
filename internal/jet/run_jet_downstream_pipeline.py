@@ -17,7 +17,7 @@ from internal.jet.utils.modify_jet_workloads_config import modify_jet_workloads_
 
 
 # using logging not from NeMo to run this script outside a container
-logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
+logging.basicConfig(format="%(asctime)s - %(message)s", level=logging.INFO)
 
 
 def run_jet_downstream_pipeline(
@@ -212,118 +212,118 @@ def run_jet_downstream_pipeline(
     print(f"The pipeline was run for Jet Workloads Registry reference: {jet_workload_ref}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = ArgumentParser()
 
     # Arguments defining workload in JET Workloads Registry
     parser.add_argument(
-        '--jet_ref',
+        "--jet_ref",
         type=str,
-        default='bionemo/new-model-dev',
-        help='Reference to branch in JET Workloads Registry with default tests',
+        default="bionemo/new-model-dev",
+        help="Reference to branch in JET Workloads Registry with default tests",
     )
     parser.add_argument(
-        '--jet_ref_eph', type=str, default=None, help='Name of ephemeral reference (branch) to run the JET test on'
+        "--jet_ref_eph", type=str, default=None, help="Name of ephemeral reference (branch) to run the JET test on"
     )
     parser.add_argument(
-        '--jet_repo_path',
+        "--jet_repo_path",
         type=str,
         default=None,
-        help='Path to the JET Workloads Registry to use or downloads the repo to',
+        help="Path to the JET Workloads Registry to use or downloads the repo to",
     )
     # Arguments specifying how to obtain or build docker for a test
     parser.add_argument(
-        '--git_repo',
+        "--git_repo",
         type=str,
         default=None,
         help='Repository name to copy the "bionemo/ci" folder from to the docker image',
     )
     parser.add_argument(
-        '--git_branch',
+        "--git_branch",
         type=str,
         default=None,
         help='Branch name of the repository to copy the "bionemo/ci" folder from to the docker image',
     )
     parser.add_argument(
-        '--dockerfile',
+        "--dockerfile",
         type=str,
         default="internal/Dockerfile-devel",
         help='Branch name of the repository to copy the "bionemo/ci" folder from to the docker image',
     )
-    parser.add_argument('--image', type=str, default=None, help='Docker image to use to run JET tests')
+    parser.add_argument("--image", type=str, default=None, help="Docker image to use to run JET tests")
 
     # Arguments specifying command script to to use in the tests
     parser.add_argument(
-        '--config_path',
+        "--config_path",
         type=str,
         default=None,
-        help='Path to the folder with primary configs that is relative to bionemo '
+        help="Path to the folder with primary configs that is relative to bionemo "
         'ie "examples/molecule/megamolbart/conf"',
     )
     parser.add_argument(
-        '--config_name', type=str, default=None, help='Filename on the config to use under config_path'
+        "--config_name", type=str, default=None, help="Filename on the config to use under config_path"
     )
     parser.add_argument(
-        '--script_path',
+        "--script_path",
         type=str,
         default=None,
-        help='Path to the folder with the model-specific training scripts that ' 'should be relative to bionemo.',
+        help="Path to the folder with the model-specific training scripts that " "should be relative to bionemo.",
     )
     parser.add_argument(
-        '--variant',
+        "--variant",
         type=str,
         default="pretrain",
-        help='Type of the training case defined as '
-        'the name of a one training script that can be found '
+        help="Type of the training case defined as "
+        "the name of a one training script that can be found "
         'in script_path, ie "pretrain".'
         'The training command is defined as "{script_path}/{variant}.py"',
     )
 
-    parser.add_argument('--model', type=str, default=None, help='Name of the model to run tests for ie "megamolbart"')
+    parser.add_argument("--model", type=str, default=None, help='Name of the model to run tests for ie "megamolbart"')
     parser.add_argument(
-        '--extra_overwrites', type=str, default=None, help='Configs that overwrite the training/test configuration'
+        "--extra_overwrites", type=str, default=None, help="Configs that overwrite the training/test configuration"
     )
     # Arguments specifying tested cases for models
     parser.add_argument(
-        '--nodes',
-        nargs='+',
+        "--nodes",
+        nargs="+",
         type=int,
         default=None,
-        help='List of ints that specify different numbers of nodes to test',
+        help="List of ints that specify different numbers of nodes to test",
     )
     parser.add_argument(
-        '--gpus',
-        nargs='+',
+        "--gpus",
+        nargs="+",
         type=int,
         default=None,
-        help='List of ints that specify different numbers of devices per node  to test',
+        help="List of ints that specify different numbers of devices per node  to test",
     )
     parser.add_argument(
-        '--precision', nargs='+', type=int, default=None, help='List of ints that specify different precisions to test'
+        "--precision", nargs="+", type=int, default=None, help="List of ints that specify different precisions to test"
     )
     parser.add_argument(
-        '--batch_size',
-        nargs='+',
+        "--batch_size",
+        nargs="+",
         type=int,
         default=None,
-        help='List of ints that specify different batch sizes to test',
+        help="List of ints that specify different batch sizes to test",
     )
 
     # Other arguments
     parser.add_argument(
-        '--filter',
+        "--filter",
         type=str,
         default=None,
-        help='Query in the pandas format used to filter workloads in the JET config and run only subset of them',
+        help="Query in the pandas format used to filter workloads in the JET config and run only subset of them",
     )
     parser.add_argument(
-        '--setup_jet_api',
-        action='store_true',
+        "--setup_jet_api",
+        action="store_true",
         default=False,
-        help='A flag that determines whether to install JET API and set it up for the first time users',
+        help="A flag that determines whether to install JET API and set it up for the first time users",
     )
     parser.add_argument(
-        '--dry_run', action='store_true', default=False, help='A flag that determines whether to execute a test run'
+        "--dry_run", action="store_true", default=False, help="A flag that determines whether to execute a test run"
     )
 
     args = parser.parse_args()

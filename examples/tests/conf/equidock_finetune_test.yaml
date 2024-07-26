@@ -30,7 +30,7 @@ trainer:
   max_epochs: 1 # PTL default. In practice we don't usually train for more than 1 epoch.
   max_steps: 500 # consumed_samples = global_step * micro_batch_size * data_parallel_size * accumulate_grad_batches
 
-exp_manager:    
+exp_manager:
   # logging
   exp_dir: ${oc.env:BIONEMO_HOME}/test_results/nemo_experiments/equidock_finetune_db5
   create_tensorboard_logger: False

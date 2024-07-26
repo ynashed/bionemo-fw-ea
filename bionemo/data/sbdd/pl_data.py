@@ -16,9 +16,9 @@ from torch_geometric.data import Data
 
 
 FOLLOW_BATCH: Sequence[str] = (
-    'protein_element',
-    'ligand_element',
-    'ligand_bond_type',
+    "protein_element",
+    "ligand_element",
+    "ligand_bond_type",
 )
 
 
@@ -61,13 +61,13 @@ class ProteinLigandData(Data):
 
         if protein_dict is not None:
             for key, item in protein_dict.items():
-                instance[f'protein_{key}'] = item
+                instance[f"protein_{key}"] = item
 
         if ligand_dict is not None:
             for key, item in ligand_dict.items():
-                instance[f'ligand_{key}'] = item
+                instance[f"ligand_{key}"] = item
 
-        instance['ligand_nbh_list'] = {
+        instance["ligand_nbh_list"] = {
             i.item(): [
                 j.item()
                 for k, j in enumerate(instance.ligand_bond_index[1])
@@ -78,8 +78,8 @@ class ProteinLigandData(Data):
         return instance
 
     def __inc__(self, key, value, *args, **kwargs):
-        if key == 'ligand_bond_index':
-            return self['ligand_element'].size(0)
+        if key == "ligand_bond_index":
+            return self["ligand_element"].size(0)
         else:
             return super().__inc__(key, value)
 

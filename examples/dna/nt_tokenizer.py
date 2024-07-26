@@ -75,7 +75,7 @@ class NtTokenizer(TokenizerAdapterSpec):
         return list(text)
 
     def tokens_to_text(self, tokens):
-        return ''.join(tokens)
+        return "".join(tokens)
 
     def tokens_to_ids(self, tokens):
         return [self.vocab[token] for token in tokens]
@@ -184,7 +184,7 @@ class NtTokenizer(TokenizerAdapterSpec):
         return list(self.vocab.keys())
 
 
-test_sequences = ["ATGAATAGATAGATAGAGATATAGA", 'naTGATGGggaCccCACACGAN']
+test_sequences = ["ATGAATAGATAGATAGAGATATAGA", "naTGATGGggaCccCACACGAN"]
 tokenizer = NtTokenizer()
 for text in test_sequences:
     print(tokenizer.text_to_tokens(text))

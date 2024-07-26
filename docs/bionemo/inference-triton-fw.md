@@ -1,7 +1,7 @@
 # Inference with Nvidia Triton Server
 
 This section will use the pre-trained BioNeMo checkpoints to demonstrate [NVIDIA Triton Inference Server](https://github.com/triton-inference-server/server).
-BioNeMo uses [PyTriton](https://github.com/triton-inference-server/pytriton), which provides utilities that simplify Triton configuration and local deployment in Python environments. 
+BioNeMo uses [PyTriton](https://github.com/triton-inference-server/pytriton), which provides utilities that simplify Triton configuration and local deployment in Python environments.
 
 Sections:
 - [Start Inference Server](#start-inference-server)
@@ -38,5 +38,5 @@ See [the inference client documentation](../../bionemo/triton/README.md) for mor
 
 
 ## Detailed Example of PyTriton Inference
- 
+
 For a detailed example of performing BioNeMo model inference with PyTriton, refer to [this detailed tutorial](deep-dive-esm1-pytriton-inference.md).

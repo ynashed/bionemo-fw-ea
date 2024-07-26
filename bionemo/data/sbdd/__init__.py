@@ -17,14 +17,14 @@ from bionemo.data.sbdd.pl_pair_dataset import PocketLigandPairDataset
 
 
 def get_dataset(
-    name: Literal['pl'], root: str, split: Optional[str], *args, **kwargs
+    name: Literal["pl"], root: str, split: Optional[str], *args, **kwargs
 ) -> Tuple[PocketLigandPairDataset, Optional[Dict[str, Subset]]]:
-    if name == 'pl':
+    if name == "pl":
         dataset = PocketLigandPairDataset(root, *args, **kwargs)
     else:
-        raise NotImplementedError('Unknown dataset: %s' % name)
+        raise NotImplementedError("Unknown dataset: %s" % name)
 
-    if 'split' != None:
+    if "split" != None:
         split = torch.load(split)
         subsets = {k: Subset(dataset, indices=v) for k, v in split.items()}
         return dataset, subsets

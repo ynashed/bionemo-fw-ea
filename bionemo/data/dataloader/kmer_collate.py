@@ -22,11 +22,11 @@ from bionemo.data.dataloader.collate import (
 
 
 __all__ = [
-    'KmerTokenizerAdapter',
-    'KmerBertCollate',
-    'SpanMasking',
-    'LengthTruncator',
-    'DeterministicLengthTruncator',
+    "KmerTokenizerAdapter",
+    "KmerBertCollate",
+    "SpanMasking",
+    "LengthTruncator",
+    "DeterministicLengthTruncator",
 ]
 
 

@@ -1,3 +1,12 @@
+# :rotating_light: GitLab to GitHub Migration :construction:
+
+BioNeMo is currently in the process of going full open source with the intent of ingesting external contributions while also refactoring a large chunk of the codebase. Prior BioNeMo development was done internally at NVIDIA on GitLab, and this GitHub repository is currently mid-migration. There are two main branches of development:
+
+* `main` - This is currently a mirror of released versions of BioNeMo with "flat commits" for each release version. The code here corresponds to the `dev` branch on NVIDIA's internal GitLab, sometimes referred to as "bionemo1".
+* `v2-main` - This is in *active development* here on GitHub with a live git tree. This is "bionemo2" code which is a significant refactor around NeMo 2.0.
+
+If you are an Early Access customer and looking to contribute to either `main` or `v2-main`, we can't wait! Please coordinate with Harry Clifford (hclifford@nvidia.com) to get engineering support while we continue to build the developer operations and processes around our new GitHub home.
+
 # NVIDIA BioNeMo (Early Access)
 
 ## Introduction
@@ -21,9 +30,9 @@ The `./launch.sh` script can be run in a backwards compatible mode using the `-s
 With `-s`, the program will use the tag that's specified in the `.env` file at the repository's root. This flag makes the script mirror its prior behavior.
 
 #### `launch.sh` Using Commit Hash as Image Tag
-Now, `launch.sh` will default to using the current `git` commit hash as the image tag. 
+Now, `launch.sh` will default to using the current `git` commit hash as the image tag.
 
-This change makes it clear to the user what exact version of code is present in the image, eliminating a reoccurring 
+This change makes it clear to the user what exact version of code is present in the image, eliminating a reoccurring
 source of confusion for folks developing and using the BioNeMo FW image. Moreover, the `build` and `push` commands will
 fail fast if there are uncommitted changes to tracked files.
 
@@ -63,7 +72,7 @@ NGC_CLI_ORG= # Your organization name
 ./launch.sh -s dev
 ```
 
-Once the container is running, you can run the training and inference examples, see [BioNeMo Framework Tutorials](https://docs.nvidia.com/bionemo-framework/latest/tutorials-fw.html), or develop and test your own code.
+Once the container is running, you can run the training and inference examples, see [BioNeMo Framework Tutorials](https://docs.nvidia.com/bionemo-framework/latest/next-steps.html), or develop and test your own code.
 
 As an example, For ESM1-nv, ESM2-nv, and ProtT5-nv, we provide the `bionemo.model.infer` module to run inference in offline mode (without running a remote inference client).
 Users must specify an input CSV file with sequence data, and a CONFIG file with model specifics and data paths. Example config files are provided at  `examples/protein/<MODEL_NAME>/conf`. Example input data file is provided at `examples/tests/test_data/protein/test/x000.csv`.
@@ -266,4 +275,4 @@ Once a container has been built, it can be started in interactive mode with `./l
 ### Quick Links
 For a detailed guide on setting up the repo and launching example jobs, checkout the [Quickstart Guide](https://docs.nvidia.com/bionemo-framework/latest/quickstart-fw.html) in the documentation.
 
-For example data-processing, pretraining and inference setup, checkout the [Tutorials](https://docs.nvidia.com/bionemo-framework/latest/tutorials-fw.html).
+For example data-processing, pretraining and inference setup, checkout the [Tutorials](https://docs.nvidia.com/bionemo-framework/latest/next-steps.html).

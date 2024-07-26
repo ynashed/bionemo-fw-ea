@@ -46,7 +46,7 @@ class DummyBaseline(GeneformerModel):
         if lm_labels is not None:
             # lm_labels[lm_labels==-1] = 0
             lm_loss = torch.nn.functional.cross_entropy(
-                lm_logits.view(-1, lm_logits.shape[-1]), lm_labels.view(-1), reduction='none'
+                lm_logits.view(-1, lm_logits.shape[-1]), lm_labels.view(-1), reduction="none"
             ).view(lm_labels.shape)
             output_tensor = (lm_loss, None)
         else:
@@ -83,8 +83,8 @@ class ConfigBackedModel(torch.nn.Module):
         cfg = OmegaConf.to_container(self.cfg, resolve=True)
 
         # map precision related configs
-        cfg.get('precision', 32)  # PTL trainer precision
-        megatron_amp_O2 = cfg.get('megatron_amp_O2', False)
+        cfg.get("precision", 32)  # PTL trainer precision
+        megatron_amp_O2 = cfg.get("megatron_amp_O2", False)
 
         # dtype used in p2p communication
         pipeline_dtype = self.torch_dtype
@@ -97,8 +97,8 @@ class ConfigBackedModel(torch.nn.Module):
             "bf16": self.torch_dtype == torch.bfloat16 and megatron_amp_O2,
             "params_dtype": self.params_dtype,
             "timers": None,  # NeMo does not currently support megatron core timers
-            "async_tensor_model_parallel_allreduce": self.cfg.get('tensor_model_parallel_world_size', 1) > 1
-            and not self.cfg.get('sequence_parallel', False),
+            "async_tensor_model_parallel_allreduce": self.cfg.get("tensor_model_parallel_world_size", 1) > 1
+            and not self.cfg.get("sequence_parallel", False),
             "pipeline_dtype": pipeline_dtype,
             "grad_scale_func": self.trainer.precision_plugin.scaler.scale
             if self.torch_dtype == torch.float16
@@ -107,7 +107,7 @@ class ConfigBackedModel(torch.nn.Module):
             "autocast_dtype": self.autocast_dtype,
             "variable_seq_lengths": False,  # set dynamically during training
             "num_microbatches_with_partial_activation_checkpoints": self.cfg.get(
-                'num_micro_batches_with_partial_activation_checkpoints', None
+                "num_micro_batches_with_partial_activation_checkpoints", None
             ),
             "batch_p2p_sync": True,  # call torch.cuda.synchronize() after batch isend/rcv
             "use_ring_exchange_p2p": False,  # not supported in NeMo
@@ -137,10 +137,10 @@ class ConfigBackedModel(torch.nn.Module):
 
         try:
             # hidden size is needed for pipeline schedules but is not currently in ModelParallelConfig
-            setattr(model_parallel_config, 'hidden_size', self.cfg.hidden_size)
+            setattr(model_parallel_config, "hidden_size", self.cfg.hidden_size)
         except AttributeError:
             logging.warning(
-                f'hidden_size not found in {self.cfg}. Set this in model_parallel_config if using pipeline parallelism.'
+                f"hidden_size not found in {self.cfg}. Set this in model_parallel_config if using pipeline parallelism."
             )
 
         return model_parallel_config
@@ -194,7 +194,7 @@ def main(cfg) -> None:
         None
     """
     logging.info("\n\n************** Experiment configuration ***********")
-    logging.info(f'\n{OmegaConf.to_yaml(cfg)}')
+    logging.info(f"\n{OmegaConf.to_yaml(cfg)}")
     if cfg.get("seed_everything", True):
         np.random.seed(cfg.model.seed)
         pl.seed_everything(cfg.model.seed)
@@ -224,5 +224,5 @@ def main(cfg) -> None:
     logging.info("*************** Finish Training ************")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

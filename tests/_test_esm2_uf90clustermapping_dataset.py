@@ -18,7 +18,7 @@ from bionemo.model.utils import setup_trainer
 # TODO setup test data
 @pytest.mark.skip
 def test_uf90_resampling_dataset_integration():
-    '''
+    """
     This test requires:
 
     cluster_mapping_tsv: $BIONEMO_HOME/data/uniref2022_05/fake-uniref/mapping.tsv
@@ -31,12 +31,12 @@ def test_uf90_resampling_dataset_integration():
 
 
     files are deposited into the current working directory, move them to $BIONEMO_HOME/data/uniref2022_05 before preprocessing.
-    '''
+    """
 
     # TODO (SKH): automate data generation
     from omegaconf import OmegaConf
 
-    cfg = OmegaConf.load('conf/uf90-resampling.yaml')
+    cfg = OmegaConf.load("conf/uf90-resampling.yaml")
     trainer = setup_trainer(cfg, callbacks=[])
 
     # Required for the dataloaders
@@ -69,13 +69,13 @@ def test_uf90_resampling_dataset_integration():
     for ds in [train_ds, val_ds, test_ds]:
         for uf50, uf90 in zip(ds.uniref50_dataset, ds):
             # Compares the IDs, where we manually constructed them to be nearly-equal.
-            assert uf50.split("UniRef50_")[1] in uf90['sequence_id'].split("UniRef90_")[1]
+            assert uf50.split("UniRef50_")[1] in uf90["sequence_id"].split("UniRef90_")[1]
 
 
 def make_data():
-    alphabet = 'ARNDCQEGHILKMFPSTWYV'
+    alphabet = "ARNDCQEGHILKMFPSTWYV"
     cluster_mapping = {}
-    with open('Fake50.fasta', 'w') as fd:
+    with open("Fake50.fasta", "w") as fd:
         for length in range(50, 1000, 50):
             for base in alphabet:
                 fd.write(f">UniRef50_{base}_{length}\n")
@@ -83,7 +83,7 @@ def make_data():
                 fd.write("\n")
                 cluster_mapping[f"UniRef50_{base}_{length}"] = []
 
-    with open('Fake90.fasta', 'w') as fd:
+    with open("Fake90.fasta", "w") as fd:
         num_clusters = 10
         for length in range(50, 1000, 50):
             for base in alphabet:
@@ -94,12 +94,12 @@ def make_data():
                     cluster_mapping[f"UniRef50_{base}_{length}"].append(f"UniRef90_{base}_{length}-{i}")
                 num_clusters += 1
 
-    with open("mapping.tsv", 'w') as fd:
+    with open("mapping.tsv", "w") as fd:
         fd.write("dumbheader\n")
         for key, values in cluster_mapping.items():
             str_ = key + "\t" + ",".join(values)
             fd.write(f"{str_}\n")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     make_data()

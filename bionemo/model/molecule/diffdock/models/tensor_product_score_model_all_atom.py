@@ -170,9 +170,9 @@ class TensorProductScoreModelAllAtom(torch.nn.Module):
                 "sh_irreps": self.sh_irreps,
                 "out_irreps": o3.Irreps(out_irreps),
                 "batch_norm": False,
-                'mlp_channels': [3 * ns, 3 * ns],
-                'mlp_activation': nn.Sequential(nn.ReLU(), nn.Dropout(dropout)),
-                'e3nn_compat_mode': True,
+                "mlp_channels": [3 * ns, 3 * ns],
+                "mlp_activation": nn.Sequential(nn.ReLU(), nn.Dropout(dropout)),
+                "e3nn_compat_mode": True,
             }
 
             for _ in range(9):  # 3 intra & 6 inter per each layer
@@ -217,7 +217,7 @@ class TensorProductScoreModelAllAtom(torch.nn.Module):
             self.final_conv = FullyConnectedTensorProductConv(
                 in_irreps=self.conv_layers[-1].out_irreps,
                 sh_irreps=self.sh_irreps,
-                out_irreps=o3.Irreps('2x1o + 2x1e'),
+                out_irreps=o3.Irreps("2x1o + 2x1e"),
                 batch_norm=False,
                 mlp_channels=[2 * ns, 2 * ns],
                 mlp_activation=nn.Sequential(nn.ReLU(), nn.Dropout(dropout)),
@@ -255,7 +255,7 @@ class TensorProductScoreModelAllAtom(torch.nn.Module):
                 self.tor_bond_conv = FullyConnectedTensorProductConv(
                     in_irreps=self.conv_layers[-1].out_irreps,
                     sh_irreps=self.final_tp_tor.irreps_out,
-                    out_irreps=o3.Irreps(f'{ns}x0o + {ns}x0e'),
+                    out_irreps=o3.Irreps(f"{ns}x0o + {ns}x0e"),
                     batch_norm=False,
                     mlp_channels=[3 * ns, 3 * ns],
                     mlp_activation=nn.Sequential(nn.ReLU(), nn.Dropout(dropout)),

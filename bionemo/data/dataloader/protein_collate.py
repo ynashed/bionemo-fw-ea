@@ -18,7 +18,7 @@ from bionemo.data.dataloader.collate import (
 )
 
 
-__all__ = ['ProteinBertCollate']
+__all__ = ["ProteinBertCollate"]
 
 
 class ProteinBertCollate(BertCollate):
@@ -117,5 +117,5 @@ class ESM2BertCollate(ProteinBertCollate):
         )
 
     def collate_fn(self, batch: List[BatchItem], label_pad: int = -1):
-        '''Modifies the underlying collate_fn to handle a dictionary as input instead of a list of sequences.'''
-        return super().collate_fn([x['sequence'] for x in batch], label_pad=label_pad)
+        """Modifies the underlying collate_fn to handle a dictionary as input instead of a list of sequences."""
+        return super().collate_fn([x["sequence"] for x in batch], label_pad=label_pad)

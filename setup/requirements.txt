@@ -6,7 +6,7 @@
 --extra-index-url https://pypi.nvidia.com
 --extra-index-url https://pypi.python.org/simple
 # https://gitlab-master.nvidia.com/clara-discovery/fw2nim
-fw2nim==0.1.0
+fw2nim==0.2.0
 pyfastx==1.1.0
 # matplotlib>=3.4.3
 matplotlib==3.8.0
@@ -45,7 +45,7 @@ git+https://github.com/facebookresearch/esm.git@v2.0.0
 click==8.1.7
 # note: these must either be built from source
 # OR use the pre-built binaries on gitlab, which are compatible w/ bionemo's cuda version
-torch_cluster==1.6.3 
+torch_cluster==1.6.3
 torch_sparse==0.6.18
 torch-geometric==2.5.0
 torch-scatter==2.1.2
@@ -73,5 +73,5 @@ meeko==0.1.dev3
 # vina==1.2.5 # base container issues with libbost. Note that this is installed in the image manually.
 git+https://github.com/Valdes-Tresanco-MS/AutoDockTools_py3@1.5.7.post1
 lightning==2.2.1
-# DSMBind and DSMBind-anchor
+# DSMBind
 chemprop==1.6.1

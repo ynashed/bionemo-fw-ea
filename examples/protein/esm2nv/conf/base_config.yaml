@@ -8,7 +8,7 @@ restore_from_path: null # used when starting from a .nemo file
 
 trainer:
   devices: 1 # number of GPUs or CPUs
-  num_nodes: 1 
+  num_nodes: 1
   accelerator: gpu #gpu or cpu
   precision: 32 # 16-mixed, bf16-mixed or 32
   logger: False # logger is provided by NeMo exp_manager
@@ -28,7 +28,7 @@ exp_manager:
   name: ${name}
   exp_dir: ${oc.env:BIONEMO_HOME}/results/nemo_experiments/${.name}/${.wandb_logger_kwargs.name}
   explicit_log_dir: ${.exp_dir}
-  create_wandb_logger: True 
+  create_wandb_logger: True
   create_tensorboard_logger: True
   wandb_logger_kwargs:
     project: ${name}_pretraining
@@ -60,7 +60,7 @@ model:
   hidden_size: 320
   ffn_hidden_size: ${multiply:${model.hidden_size}, 4} # Transformer FFN hidden size. Usually 4 * hidden_size.
   num_attention_heads: 20
-  megatron_legacy: false 
+  megatron_legacy: false
   position_embedding_type: rope # ESM2 uses relative positional encoding 'ROPE' to extrapolate to longer sequences unseen during training
   hidden_dropout: 0 # ESM2 removes dropout from hidden layers and attention
   embedding_use_attention_mask: True # ESM2 uses attention masking on the embeddings
@@ -109,7 +109,7 @@ model:
 
   # NOTE: is this one of the new fields?
   masked_softmax_fusion: True # Use a kernel that fuses the attention softmax with it's mask.
-  tokenizer: 
+  tokenizer:
     # Use ESM2 tokenizers from HF
     library: 'huggingface'
     type: 'BertWordPieceLowerCase'
@@ -133,7 +133,7 @@ model:
 
   # not implemented in NeMo yet
   activations_checkpoint_method: null # 'uniform', 'block'
-  activations_checkpoint_num_layers: 1 
+  activations_checkpoint_num_layers: 1
 
   data:
     ngc_registry_target: uniref50_2022_05
@@ -147,7 +147,7 @@ model:
     skip_lines: 0
     drop_last: False
     pin_memory: False
-    dynamic_padding: False # If True, each batch is padded to the maximum sequence length within that batch. 
+    dynamic_padding: False # If True, each batch is padded to the maximum sequence length within that batch.
               #    Set it to False when model.pipeline_model_parallel_size > 1, as pipeline parallelism requires fixed-length padding.
     # Below is the configuration for UF90 resampling.
     # TODO(@jomitchell) Can remove this??
@@ -164,7 +164,7 @@ model:
           header_lines: 1
       use_upsampling: True # if the data should be upsampled to max number of steps in the training
       range: x[000..049]
-      sample_from_map: True # TODO: Use uf90_datapath and cluster_mapping_tsv to create resampled dataset for training with uf50_datapath. If False, only uf50_datapath is used for training. 
+      sample_from_map: True # TODO: Use uf90_datapath and cluster_mapping_tsv to create resampled dataset for training with uf50_datapath. If False, only uf50_datapath is used for training.
       uf50_datapath: ${model.data.dataset_path}/uniref50_train_filt.fasta
       uf90_datapath: ${model.data.dataset_path}/uniref90membersandreps_ur50trainfiltreps.fasta
       cluster_mapping_tsv: ${model.data.dataset_path}/uniref50_mapper_to_uniref90clustermembers_andselfuniref50.tsv
@@ -174,7 +174,7 @@ model:
       num_workers: ${model.data.num_workers}
       uf90:
         uniref90_path: ${model.data.dataset_path}/uf90 # created and populated my preprocessing
-        dataset: 
+        dataset:
           uf90_csvs: x[000..049] # created and populated by preprocessing, this key is a directory inside uniref90_path
         data_impl: 'csv_fields_mmap'
         data_impl_kwargs:
@@ -216,7 +216,7 @@ model:
           workers: ${model.data.test.num_workers} # number of workers when creating missing index files (null defaults to cpu_num // 2)
           data_fields: ${model.data.train.uf90.data_impl_kwargs.csv_fields_mmap.data_fields}
       custom_pretraining_fasta_path: null  # specific if want to have separate custom testing fasta
-    
+
     # These control the MLM token probabilities. The following settings are commonly used in literature.
     modify_percent: 0.15 # Fraction of characters in a protein sequence to modify. (Modification means replacing with another amino acid or with a mask token)
     # NOTE: if you want to replicate runs prior to 5/2024, set modify_percent (above) to 0.1 perturb_percent to 0.5, mask_percent to 0.5, and identity_percent to 0.0
@@ -228,7 +228,7 @@ model:
     identity_percent: 0.1 # Of the modify_percent, what fraction of characters are to be unchanged as the original amino acid.
 
   dwnstr_task_validation:
-    enabled: False 
+    enabled: False
     dataset:
       class: bionemo.model.core.dwnstr_task_callbacks.PerTokenPredictionCallback
       task_type: token-level-classification

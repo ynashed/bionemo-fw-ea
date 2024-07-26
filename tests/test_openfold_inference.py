@@ -33,48 +33,48 @@ from bionemo.utils.hydra import load_model_config
 
 GRADIENT_CHECKPOINTING = False
 
-BIONEMO_HOME = os.getenv('BIONEMO_HOME')
-EXAMPLE_CONFIG_PATH = os.path.join(BIONEMO_HOME, 'examples/protein/openfold/conf')
-TEST_DATA_PATH = os.path.join(BIONEMO_HOME, 'examples/tests/test_data')
-SAMPLE_DATA_PATH = os.path.join(TEST_DATA_PATH, 'openfold_data')
+BIONEMO_HOME = os.getenv("BIONEMO_HOME")
+EXAMPLE_CONFIG_PATH = os.path.join(BIONEMO_HOME, "examples/protein/openfold/conf")
+TEST_DATA_PATH = os.path.join(BIONEMO_HOME, "examples/tests/test_data")
+SAMPLE_DATA_PATH = os.path.join(TEST_DATA_PATH, "openfold_data")
 
-S3_DATA_PATH = 's3://bionemo-ci/test-data/openfold/openfold_vprocessed_sample/openfold_sample_data.tar.gz'
+S3_DATA_PATH = "s3://bionemo-ci/test-data/openfold/openfold_vprocessed_sample/openfold_sample_data.tar.gz"
 
 SAMPLE_INFER_DATA_PATH = os.path.join(
-    os.path.dirname(os.path.realpath(__file__)), '../examples/tests/test_data/openfold_data/inference'
+    os.path.dirname(os.path.realpath(__file__)), "../examples/tests/test_data/openfold_data/inference"
 )
 
-PDB_DIR = os.path.join(SAMPLE_INFER_DATA_PATH, 'pdb')
-CIF_NAMES = ['7b4q.cif', '7dnu.cif']
+PDB_DIR = os.path.join(SAMPLE_INFER_DATA_PATH, "pdb")
+CIF_NAMES = ["7b4q.cif", "7dnu.cif"]
 CIF_PATHS = [Path(os.path.join(PDB_DIR, cif)) for cif in CIF_NAMES]
 CIF_CHAIN_IDS = ["A", "A"]
 
-MSA_DIR = os.path.join(SAMPLE_INFER_DATA_PATH, 'msas')
+MSA_DIR = os.path.join(SAMPLE_INFER_DATA_PATH, "msas")
 MSA_PATHS = [
     [
-        os.path.join(MSA_DIR, '7b4q_A', 'bfd_uniclust_hits.a3m'),
-        os.path.join(MSA_DIR, '7b4q_A', 'mgnify_hits.a3m'),
-        os.path.join(MSA_DIR, '7b4q_A', 'uniref90_hits.a3m'),
+        os.path.join(MSA_DIR, "7b4q_A", "bfd_uniclust_hits.a3m"),
+        os.path.join(MSA_DIR, "7b4q_A", "mgnify_hits.a3m"),
+        os.path.join(MSA_DIR, "7b4q_A", "uniref90_hits.a3m"),
     ],
     [
-        os.path.join(MSA_DIR, '7dnu_A', 'bfd_uniclust_hits.a3m'),
-        os.path.join(MSA_DIR, '7dnu_A', 'mgnify_hits.a3m'),
-        os.path.join(MSA_DIR, '7dnu_A', 'uniref90_hits.a3m'),
+        os.path.join(MSA_DIR, "7dnu_A", "bfd_uniclust_hits.a3m"),
+        os.path.join(MSA_DIR, "7dnu_A", "mgnify_hits.a3m"),
+        os.path.join(MSA_DIR, "7dnu_A", "uniref90_hits.a3m"),
     ],
 ]
 
-DRYRUN_SEQUENCES = ['AAAAA', 'CCCCC']
-DRYRUN_SEQ_NAMES = ['first', 'second']
+DRYRUN_SEQUENCES = ["AAAAA", "CCCCC"]
+DRYRUN_SEQ_NAMES = ["first", "second"]
 
 
-@pytest.fixture(scope='function')
+@pytest.fixture(scope="function")
 def infer_cfg() -> DictConfig:
     """Setting up the general inference config object.
 
     Returns:
         DictConfig: Inference Config object containing path and name
     """
-    return load_model_config(config_name='infer', config_path=EXAMPLE_CONFIG_PATH)
+    return load_model_config(config_name="infer", config_path=EXAMPLE_CONFIG_PATH)
 
 
 def get_alphafold_model_trainer(cfg: DictConfig) -> Tuple[AlphaFold, plt.Trainer]:
@@ -120,7 +120,7 @@ def get_predict_dataset(cfg: DictConfig) -> PredictDataset:
 @pytest.mark.parametrize(
     "outputs",
     [
-        ['single', 'msa', 'pair', 'sm_single'],
+        ["single", "msa", "pair", "sm_single"],
     ],
 )
 def test_openfold_prediction_pdb_writer(infer_cfg: DictConfig, outputs: str):
@@ -138,12 +138,12 @@ def test_openfold_prediction_pdb_writer(infer_cfg: DictConfig, outputs: str):
     batch_size = infer_cfg.model.micro_batch_size
     N_seq = infer_cfg.model.max_msa_clusters
 
-    input_dict = {'seq_name': [seq_name]}
+    input_dict = {"seq_name": [seq_name]}
     output_dict = {
-        'single': torch.empty(batch_size, N_res, infer_cfg.model.evoformer_stack_config.c_s),
-        'msa': torch.empty(batch_size, N_seq, N_res, infer_cfg.model.evoformer_stack_config.c_m),
-        'pair': torch.empty(batch_size, N_res, N_res, infer_cfg.model.evoformer_stack_config.c_z),
-        'sm_single': torch.empty(batch_size, N_res, infer_cfg.model.structure_module_config.c_s),
+        "single": torch.empty(batch_size, N_res, infer_cfg.model.evoformer_stack_config.c_s),
+        "msa": torch.empty(batch_size, N_seq, N_res, infer_cfg.model.evoformer_stack_config.c_m),
+        "pair": torch.empty(batch_size, N_res, N_res, infer_cfg.model.evoformer_stack_config.c_z),
+        "sm_single": torch.empty(batch_size, N_res, infer_cfg.model.structure_module_config.c_s),
     }
 
     # call writer
@@ -224,11 +224,11 @@ def test_sample_data_exists():
     """Test whether sample data for OpenFold unittest exists"""
     if not os.path.exists(SAMPLE_DATA_PATH):
         raise FileNotFoundError(
-            'Before testing, users must download openfold sample data through download_artifacts.py.'
+            "Before testing, users must download openfold sample data through download_artifacts.py."
         )
 
 
-@pytest.mark.skipif(not os.path.exists(SAMPLE_DATA_PATH), reason='Test sample data not found')
+@pytest.mark.skipif(not os.path.exists(SAMPLE_DATA_PATH), reason="Test sample data not found")
 @pytest.mark.needs_gpu
 def test_openfold_inference_lddt_validation_metric_check(infer_cfg: DictConfig):
     """Test that checks whether the structure predicted by OpenFold is similar to the ground truth structure.

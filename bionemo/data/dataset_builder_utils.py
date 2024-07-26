@@ -21,9 +21,9 @@ from bionemo.data.memmap_fasta_fields_dataset import FASTAFieldsMemmapDataset
 from bionemo.data.utils import check_paths_exist, expand_dataset_paths
 
 
-_CSV_FIELDS_MMAP_TYPE = 'csv_fields_mmap'
-_CSV_MMAP_TYPE = 'csv_mmap'
-_FASTA_FIELDS_MMAP_TYPE = 'fasta_fields_mmap'
+_CSV_FIELDS_MMAP_TYPE = "csv_fields_mmap"
+_CSV_MMAP_TYPE = "csv_mmap"
+_FASTA_FIELDS_MMAP_TYPE = "fasta_fields_mmap"
 
 _DATA_IMPL_TYPE_CLS = {
     _CSV_FIELDS_MMAP_TYPE: CSVFieldsMemmapDataset,
@@ -59,14 +59,14 @@ def build_typed_dataset(
     ), f'Argument data_impl must be set to: {", ".join(_DATA_IMPL_TYPE_CLS.keys())}'
     dataset_cls = _DATA_IMPL_TYPE_CLS[data_impl]
 
-    assert 'data_impl_kwargs' in cfg, (
+    assert "data_impl_kwargs" in cfg, (
         f"Config 'cfg' should contain 'data_impl_kwargs.{data_impl}' key being "
         f"a dictionary with arguments to the constructor of {dataset_cls.__name__}"
     )
 
     data_impl_kwargs = cfg.data_impl_kwargs.get(data_impl, {})
     if data_impl_kwargs == {}:
-        logging.info(f'Default values of the arguments are used to initialize dataset {dataset_cls.__name__}')
+        logging.info(f"Default values of the arguments are used to initialize dataset {dataset_cls.__name__}")
 
     if data_impl == _FASTA_FIELDS_MMAP_TYPE:
         ext = ".fasta"
@@ -81,10 +81,10 @@ def build_typed_dataset(
     elif isinstance(dataset_paths, str):
         dataset_paths: List[str] = expand_dataset_paths(dataset_paths, ext=ext)
     else:
-        raise ValueError('Argument dataset_paths should be a str or list of str corresponding to paths to data')
+        raise ValueError("Argument dataset_paths should be a str or list of str corresponding to paths to data")
 
     errors = check_paths_exist(dataset_paths)
-    assert len(errors) == 0, "Following files do not exist %s" % ' '.join(errors)
+    assert len(errors) == 0, "Following files do not exist %s" % " ".join(errors)
     logging.info(f'Loading data from {", ".join(dataset_paths)}')
 
     index_mapping_dir = cfg.get("index_mapping_dir", os.path.dirname(dataset_paths[0]))
@@ -95,12 +95,12 @@ def build_typed_dataset(
     if use_upsampling:
         assert num_samples is not None, (
             'To enable upsampling, "num_samples" need to be specified as '
-            'the number of samples in the upsampled dataset'
+            "the number of samples in the upsampled dataset"
         )
         # We save the scaling down for here.
         if limit_batches_scale_factor is not None:
             num_samples = int(num_samples * (limit_batches_scale_factor * len(dataset)))
-        data_prefix = cfg.get('data_prefix', None)
+        data_prefix = cfg.get("data_prefix", None)
         if data_prefix is None:
             data_prefix = os.path.commonprefix(dataset_paths)
         dataset = ResamplingMappedDataset(

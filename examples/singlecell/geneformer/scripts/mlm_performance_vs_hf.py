@@ -41,8 +41,8 @@ class GeneformerHFAdapter(torch.nn.Module):
 
         # nvidia tokenizer has [cls] and [pad] first along with some others that do not overlap. This mapper
         hf_ordered_nv_tokenizer = {
-            self.nv_tokenizer.pad_token: my_token_dict['<pad>'],
-            self.nv_tokenizer.mask_token: my_token_dict['<mask>'],
+            self.nv_tokenizer.pad_token: my_token_dict["<pad>"],
+            self.nv_tokenizer.mask_token: my_token_dict["<mask>"],
         }
 
         missing_nv_tokens = []
@@ -95,7 +95,7 @@ class OneBatchDataLoader(DataLoader):
 
 
 def nested_getattr(obj, attr):
-    for a in attr.split('.'):
+    for a in attr.split("."):
         obj = getattr(obj, a)
     return obj
 
@@ -103,7 +103,7 @@ def nested_getattr(obj, attr):
 def main(
     model_path: Path, hf_model_path: str, dataset_path: Path, token_dictionary_path: Path, mask_prob: float = 0.15
 ):
-    with open(token_dictionary_path, 'rb') as geneformer_hf_token_file:
+    with open(token_dictionary_path, "rb") as geneformer_hf_token_file:
         geneformer_hf_token_dict = pickle.load(geneformer_hf_token_file)
     cfg = load_model_config("infer.yaml", config_path="/workspace/bionemo/examples/singlecell/geneformer/conf")
     with open_dict(cfg):
@@ -162,12 +162,12 @@ def main(
             batch_hf = {k: v.to(hf_model.device) for k, v in next(dl_hf_iter).items()}
             np.random.seed(b_idx)
             batch_nv = {k: v.to(geneformer_nv_inferer.device) for k, v in next(dl_nv_iter).items()}
-            logits_hf = hf_model(batch_hf['text'], batch_hf['padding_mask'])
+            logits_hf = hf_model(batch_hf["text"], batch_hf["padding_mask"])
             loss_hf = torch.nn.functional.cross_entropy(
-                logits_hf[batch_hf['loss_mask']], batch_hf['labels'][batch_hf['loss_mask']]
+                logits_hf[batch_hf["loss_mask"]], batch_hf["labels"][batch_hf["loss_mask"]]
             ).cpu()
 
-            loss_nv = geneformer_nv_inferer(batch_nv)['loss'].cpu()
+            loss_nv = geneformer_nv_inferer(batch_nv)["loss"].cpu()
             losses_hf.append(loss_hf)
             losses_nv.append(loss_nv)
     print(f"HF mean loss: {np.sum(losses_hf) / len(losses_hf)}, NV mean loss: {np.sum(losses_nv) / len(losses_nv)}")

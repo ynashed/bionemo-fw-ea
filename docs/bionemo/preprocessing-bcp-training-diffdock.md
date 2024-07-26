@@ -1,13 +1,17 @@
 
 # DiffDock: Preparing Workspace and Data for Pre-training
 
-This section outlines the steps to prepare your workspace with pre-processed files for training DiffDock using the NVIDIA NGC platform. 
+This section outlines the steps to prepare your workspace with pre-processed files for training DiffDock using the NVIDIA NGC platform.
 
 This workspace can then be used to launch DiffDock training job using the template script `<BioNeMO_Workspace>/examples/molecule/diffdock/scripts/train_bcp.sh`.
 
 For more information about how to launch DiffDock training using BCP script, you can check [Running BioNeMo on DGX-Cloud using BCP](./bcp-specific-commands-fw.md) tutorial.
 
 The commands below expect that you have NGC CLI installed on your machine. All of the commands below can then be run outside of BioNeMo Docker container.
+
+### Setup
+
+Before diving in, please ensure that you have completed all steps in the [Getting Started](./index.md) section.
 
 ### Step 1: Create a Workspace
 Create a new NGC workspace by running the following command. Make sure to replace `diffdock_bcp_train` with your desired workspace name and `nv-us-east-2` with your preferred ACE
@@ -38,7 +42,7 @@ The protein and ligand structure data files, e.g., PDB files for proteins and
 SDF files for ligands, should be placed in a dedicated data directory, which is
 to be passed to the data preprocessing script (see details below) via the
 config option `protein_data.protein_data_dir=/path/to/data`. The user needs to
-provide a CSV file that specifies the protein-ligand complexes' name and the corresponding 
+provide a CSV file that specifies the protein-ligand complexes' name and the corresponding
 structure data files in the following format:
 
 ```csv
@@ -104,7 +108,7 @@ $ head -n 2 ~/diffdock_data/data/splits/split_train
 
 This script performs pre-processing of train data for diffdock score model.
 
-If you followed the [Quickstart Guide](./quickstart-fw.md), you may already have a .env file in your root path. If so, run `source .env` to export all the necessary variables.
+If you followed the [Next Steps](./next-steps.md) section, you may already have a .env file in your root path. If so, run `source .env` to export all the necessary variables.
 If you don't have a .env file in your path, update and run the following commands to export necessary variables before running the commands below.
 
 ```

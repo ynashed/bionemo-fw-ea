@@ -1,2 +1,0 @@
--e ./src/bionemo-fw
--e ./src/bionemo-contrib

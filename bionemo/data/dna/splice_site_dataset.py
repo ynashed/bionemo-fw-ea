@@ -42,7 +42,7 @@ class InstanceDataset(Dataset):
         self.kind = kind
 
     def __getitem__(self, idx):
-        return {'coord': self.list_[idx], 'kind': int(self.kind)}
+        return {"coord": self.list_[idx], "kind": int(self.kind)}
 
     def __len__(self):
         return len(self.list_)
@@ -66,7 +66,7 @@ class TranscriptDataset(Dataset):
 
     def __getitem__(self, idx):
         item = self._dataset[idx]
-        item.update({'transcript': self.transcript})
+        item.update({"transcript": self.transcript})
         return item
 
     def __len__(self):
@@ -89,7 +89,7 @@ class ChrSpliceSitesDataset(Dataset):
 
     def __getitem__(self, idx):
         item = self._dataset[idx]
-        item.update({'id': self.id_})
+        item.update({"id": self.id_})
         return item
 
     def __len__(self):
@@ -158,7 +158,7 @@ def get_target(row: pd.Series):
     Returns:
         Dict: Dict containing 'target' as the key and the value gotten as the value
     """
-    return {'target': row.kind}
+    return {"target": row.kind}
 
 
 def get_autosomes(root_directory, pattern):
@@ -172,12 +172,12 @@ def get_autosomes(root_directory, pattern):
     Returns:
         List[str]: List of filepaths to autosomes
     """
-    paths = expand_dataset_paths('(' + pattern.format('[1..9]') + ',' + pattern.format('[10..22]') + ')', None)
+    paths = expand_dataset_paths("(" + pattern.format("[1..9]") + "," + pattern.format("[10..22]") + ")", None)
     return [os.path.join(root_directory, path) for path in paths]
 
 
 class SpliceSiteDataModule(BioNeMoDataModule):
-    def __init__(self, cfg, trainer, model, fasta_backend='memory'):
+    def __init__(self, cfg, trainer, model, fasta_backend="memory"):
         """Data Module for Splice Site prediction. Fetches sequences based on a GFF containing midpoints.
         These midpoints represent acceptor and donor sites.
 
@@ -194,11 +194,11 @@ class SpliceSiteDataModule(BioNeMoDataModule):
         self.cfg = cfg
         self.model = model
         self.train_file = cfg.data.train_file
-        self.val_file = cfg.data.get('val_file')
-        self.test_file = cfg.data.get('test_file')
+        self.val_file = cfg.data.get("val_file")
+        self.test_file = cfg.data.get("test_file")
         for f in [self.train_file, self.val_file, self.test_file]:
             if f is not None and not os.path.exists(f):
-                raise ValueError(f'File: {f} does not exist.')
+                raise ValueError(f"File: {f} does not exist.")
         fasta_files = self.get_fasta_files()
         self.length = cfg.seq_length
         self.fasta_dataset = ConcatFastaDataset(
@@ -272,7 +272,7 @@ class SpliceSiteDataModule(BioNeMoDataModule):
                 ),
                 get_target,
             ],
-            read_csv_args={'dtype': {'id': str}},
+            read_csv_args={"dtype": {"id": str}},
         )
 
         return gff_dataset
@@ -287,7 +287,7 @@ class SpliceSiteDataModule(BioNeMoDataModule):
             cfg=self.cfg,
             data_prefix=self.cfg.train_file,
             index_mapping_dir=dataset_dir,
-            name='train',
+            name="train",
         )
 
         return dataset
@@ -303,6 +303,6 @@ class SpliceSiteDataModule(BioNeMoDataModule):
             cfg=self.cfg,
             data_prefix=self.cfg.val_file,
             index_mapping_dir=dataset_dir,
-            name='val',
+            name="val",
         )
         return dataset

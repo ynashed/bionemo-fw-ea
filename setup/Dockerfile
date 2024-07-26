@@ -19,6 +19,8 @@
 # kept all dependencies necessary for nemo.collections.nlp, nemo.core, nemo.utils, nemo.collections.common
 
 ARG BASE_IMAGE=nvcr.io/nvidia/pytorch:23.10-py3
+ARG DGL_IMAGE=gitlab-master.nvidia.com:5005/clara-discovery/bionemo:dgl_builder_v1.1.4
+FROM ${DGL_IMAGE} AS dgl
 # build an image that includes only the nemo dependencies, ensures that dependencies
 # are included first for optimal caching, and useful for building a development
 # image (by specifying build target as `nemo-deps`)
@@ -93,10 +95,6 @@ RUN git clone -b v$NEMO_VERSION https://github.com/NVIDIA/NeMo.git && \
     pip install -r requirements/requirements_nlp.txt && \
     pip install ".[nlp]"
 
-# Remove lightning-app. Nemo and BioNeMo doesn't use it, and it introduces security vulnerabilities:
-# https://github.com/advisories/GHSA-cgwc-qvrx-rf7f
-# https://github.com/advisories/GHSA-mr7h-w2qc-ffc2
-RUN rm -rf /usr/local/lib/python3.10/dist-packages/lightning/app
 
 # need this for backward compatibility: pytests rely on configs in /workspace/nemo/examples
 RUN mkdir -p /workspace/nemo/
@@ -116,7 +114,7 @@ WORKDIR /workspace/
 ENV HOME=/root
 # copy built DGL and install it
 # dgl_builder is created with setup/Dockerfile.dgl_builder
-COPY --from=gitlab-master.nvidia.com:5005/clara-discovery/bionemo:dgl_builder_v1.1.3 /dgl ./dgl
+COPY --from=dgl /dgl ./dgl
 RUN cd dgl/python && python setup.py install && cd ../.. && rm -rf dgl
 
 # Please populate the labels below if using a custom base container (ie not NeMo GA)
@@ -254,6 +252,11 @@ RUN pip uninstall -y opencv-python opencv fonttools \
        /usr/local/lib/cmake/opencv4 \
        /usr/local/bin/opencv*
 
+# Remove CVEs:
+RUN rm -rf /opt/pytorch/pytorch/third_party/onnx \
+  && DEBIAN_FRONTEND=noninteractive apt remove -y libslurm37 libpmi2-0 openssh-client \
+  && DEBIAN_FRONTEND=noninteractive apt autoremove -y
+
 ####
 #### NOTE: THIS MUST BE THE ABSOLUTE **LAST** STEP BEFORE ENTRYPOINT !!!!!
 ####       SPECIFICALLY, THE SECTION LABELED "BioNeMo Build"
@@ -297,6 +300,12 @@ COPY bionemo ${BIONEMO_HOME}/bionemo
 WORKDIR ${BIONEMO_HOME}
 # we already install dependencies earlier, directly from the requirements*.txt files
 RUN pip install --no-deps -e .
+
+# Remove lightning-app. Nemo and BioNeMo doesn't use it, and it introduces security vulnerabilities:
+# https://github.com/advisories/GHSA-cgwc-qvrx-rf7f
+# https://github.com/advisories/GHSA-mr7h-w2qc-ffc2
+RUN rm -rf /usr/local/lib/python3.10/dist-packages/lightning/app
+
 
 # FIXME: If BIONEMO_HOME _is not_ /workspace/bionemo, then this ENTRYPOINT is invalid!
 ENTRYPOINT ["/workspace/bionemo/setup/startup.sh"]

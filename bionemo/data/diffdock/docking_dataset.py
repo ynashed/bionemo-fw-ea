@@ -71,9 +71,9 @@ class HeteroGraphDataConfig:
     no_torsion: bool = False  # whether not considering torsion
     matching: Optional[bool] = None  # if use RDKit to generate matching conformers
 
-    generate_conformer_max_iterations: Optional[
-        int
-    ] = 10  # maximal number of iterations for RDkit to generate conformers.
+    generate_conformer_max_iterations: Optional[int] = (
+        10  # maximal number of iterations for RDkit to generate conformers.
+    )
     # if failed, start with random coordinates. default to 10
     generate_conformer_enforce_chirality: Optional[bool] = False
     # whether keep enforcing chirality if failed with `generate_conformer_max_iterations`` iterations for RDkit to generate conformers.
@@ -84,9 +84,9 @@ class HeteroGraphDataConfig:
     num_chunks: Optional[int] = 1  # number of chunks to group the whole data in the split
     seed: Optional[int] = None  # random seed
 
-    min_num_shards: Optional[
-        int
-    ] = 0  # minimal number of shard tar files to create when using webdataset. set to None to ignore
+    min_num_shards: Optional[int] = (
+        0  # minimal number of shard tar files to create when using webdataset. set to None to ignore
+    )
 
     @classmethod
     def init_from_hydra_config(cls, data_config: DictConfig):
@@ -102,8 +102,8 @@ class HeteroGraphDataConfig:
         for field in fields(HeteroGraphDataConfig):
             if hasattr(data_config, field.name):
                 inputs[field.name] = data_config.get(field.name)
-        if 'no_torsion' in inputs and ('matching' not in inputs or inputs['matching'] is None):
-            inputs['matching'] = not inputs['no_torsion']
+        if "no_torsion" in inputs and ("matching" not in inputs or inputs["matching"] is None):
+            inputs["matching"] = not inputs["no_torsion"]
         return HeteroGraphDataConfig(**inputs)
 
 
@@ -204,14 +204,14 @@ class NoiseTransform(BaseTransform):
     def apply_noise_iter(self, source, keep_pos=False):
         for (data,) in source:
             if keep_pos:
-                data['ligand'].aligned_pos = deepcopy(data['ligand'].pos)
+                data["ligand"].aligned_pos = deepcopy(data["ligand"].pos)
             yield self.__call__(data)
 
 
 @contextmanager
 def ForkingBehavior(
     *,
-    start_method: Literal['spawn', 'fork', 'forkserver'],
+    start_method: Literal["spawn", "fork", "forkserver"],
     force: bool,
 ):
     """Contextmanager to set the method for starting child processes in multiprocessing.
@@ -284,7 +284,7 @@ class ProteinLigandDockingDataset(Dataset):
                     self.split_cache_path,
                     "heterographs",
                     lambda complex_graph: {
-                        "__key__": complex_graph.name.replace('.', '-'),
+                        "__key__": complex_graph.name.replace(".", "-"),
                         self.webdataset_fname_suffix_in_tar: pickle.dumps(complex_graph),
                     },
                     self.data_config.min_num_shards,
@@ -296,9 +296,9 @@ class ProteinLigandDockingDataset(Dataset):
                     f"Use build_complex_graphs() to build."
                 )
 
-        self.webdataset_urls = glob.glob(os.path.join(self.split_cache_path, 'heterographs-*.tar'))
+        self.webdataset_urls = glob.glob(os.path.join(self.split_cache_path, "heterographs-*.tar"))
         if len(self.webdataset_urls) == 0:
-            raise RuntimeError(f'{self.split_cache_path} is empty')
+            raise RuntimeError(f"{self.split_cache_path} is empty")
 
     @lru_cache(maxsize=None)
     def len(self):
@@ -318,7 +318,7 @@ class ProteinLigandDockingDataset(Dataset):
             processed_names = {
                 filename[: -len(".HeteroData.pyd")]
                 for filename in os.listdir(self.full_cache_path)
-                if filename.endswith('.HeteroData.pyd')
+                if filename.endswith(".HeteroData.pyd")
                 and os.path.getsize(os.path.join(self.full_cache_path, filename)) > 0
             }
             num_processed_names = len(processed_names)
@@ -337,17 +337,17 @@ class ProteinLigandDockingDataset(Dataset):
                 df = pd.read_csv(self.data_config.protein_ligand_csv)
             else:
                 logging.warning(
-                    f'The protein-ligand complex csv file does not exist : {self.data_config.protein_ligand_csv}. skipping'
+                    f"The protein-ligand complex csv file does not exist : {self.data_config.protein_ligand_csv}. skipping"
                 )
                 return
             if len(df) == 0:
                 logging.warning(
-                    f'The protein-ligand complex csv file in empty : {self.data_config.protein_ligand_csv}. skipping'
+                    f"The protein-ligand complex csv file in empty : {self.data_config.protein_ligand_csv}. skipping"
                 )
                 return
 
-            complexes_all = df[df['complex_name'].str.slice().isin(complex_names)][
-                ['complex_name', 'protein_path', 'ligand_paths']
+            complexes_all = df[df["complex_name"].str.slice().isin(complex_names)][
+                ["complex_name", "protein_path", "ligand_paths"]
             ].values.tolist()
 
             if self.data_config.limit_complexes is not None and self.data_config.limit_complexes != 0:
@@ -391,7 +391,7 @@ class ProteinLigandDockingDataset(Dataset):
             ]
             if len(lm_embedding_chain) == 0:
                 logging.warning(
-                    f'ESM embedding is missing for {name} in folder {self.data_config.esm_embeddings_path}, skipping'
+                    f"ESM embedding is missing for {name} in folder {self.data_config.esm_embeddings_path}, skipping"
                 )
                 continue
 
@@ -403,7 +403,7 @@ class ProteinLigandDockingDataset(Dataset):
                 continue
 
             lig = None
-            for ligand_path in ligand_paths.split(','):
+            for ligand_path in ligand_paths.split(","):
                 try:
                     lig = read_molecule(
                         os.path.join(self.data_config.data_dir, ligand_path), remove_hs=False, sanitize=True
@@ -480,7 +480,7 @@ class ProteinLigandDockingDataset(Dataset):
 
             complex_graph.original_center = protein_center
             complex_graph.mol = lig
-            with open(os.path.join(self.full_cache_path, f"{name}.HeteroData.pyd"), 'wb') as f:
+            with open(os.path.join(self.full_cache_path, f"{name}.HeteroData.pyd"), "wb") as f:
                 pickle.dump(complex_graph, f)
 
             total_complexes += 1
@@ -489,7 +489,7 @@ class ProteinLigandDockingDataset(Dataset):
         return total_ligands, total_complexes
 
 
-def read_mol(protein_dir, name, remove_hs=False, ligand_file_name_suffix='_ligand.sdf'):
+def read_mol(protein_dir, name, remove_hs=False, ligand_file_name_suffix="_ligand.sdf"):
     filename = name + ligand_file_name_suffix
     lig = read_molecule(os.path.join(protein_dir, name, filename), remove_hs=remove_hs, sanitize=True)
     if lig is None:  # read mol2 file if sdf file cannot be sanitized
@@ -518,9 +518,9 @@ def read_mols(protein_dir, name, remove_hs=False):
 
 
 class DataSplit(Enum):
-    train = 'train'
-    validation = 'validation'
-    test = 'test'
+    train = "train"
+    validation = "validation"
+    test = "test"
 
 
 def diffdock_build_dataset(
@@ -551,9 +551,9 @@ def diffdock_build_dataset(
         transform = None
 
     config = HeteroGraphDataConfig.init_from_hydra_config(data_config)
-    config.split_path = split_config.split_val if 'val' in mode.name else split_config.get(f"split_{mode.name}")
+    config.split_path = split_config.split_val if "val" in mode.name else split_config.get(f"split_{mode.name}")
     config.num_conformers = split_config.num_conformers if _num_conformers else 1
-    config.min_num_shards = split_config.get('min_num_shards')
+    config.min_num_shards = split_config.get("min_num_shards")
 
     return ProteinLigandDockingDataset(
         data_config=config,

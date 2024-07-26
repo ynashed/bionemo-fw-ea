@@ -15,7 +15,7 @@ from typing import List, Optional, Union
 import ruamel.yaml as yaml
 
 
-ALLOWED_BUILD_CONFIG_KWARGS_KEYS = ['docker_image', 'git_repo', 'git_branch', "dockerfile"]
+ALLOWED_BUILD_CONFIG_KWARGS_KEYS = ["docker_image", "git_repo", "git_branch", "dockerfile"]
 ALLOWED_RECIPE_CONFIG_KWARGS_KEYS = [
     "config_path",
     "config_name",
@@ -29,9 +29,9 @@ ALLOWED_RECIPE_CONFIG_KWARGS_KEYS = [
     "gpus",
     "precision",
 ]
-CONFIG_TYPES = ['build', 'recipe']
+CONFIG_TYPES = ["build", "recipe"]
 
-CONFIG_BUILD_NAME_DOCKER_IMAGE = 'bionemo.yaml'
+CONFIG_BUILD_NAME_DOCKER_IMAGE = "bionemo.yaml"
 CONFIG_NAME_RECIPE_PERF = "config.yaml"
 CONFIG_NAME_RECIPE_CONV = "config_conv.yaml"
 
@@ -84,14 +84,14 @@ def modify_jet_workloads_config(
 
     if docker_image:
         _modify_jet_workloads_config(
-            config_type='build',
+            config_type="build",
             config_name=CONFIG_BUILD_NAME_DOCKER_IMAGE,
             jet_workloads_repo_path=jet_workloads_repo_path,
             config_kwargs={"docker_image": docker_image},
         )
     if git_repo and git_branch and dockerfile:
         _modify_jet_workloads_config(
-            config_type='build',
+            config_type="build",
             config_name=CONFIG_BUILD_NAME_DOCKER_IMAGE,
             jet_workloads_repo_path=jet_workloads_repo_path,
             config_kwargs={"git_repo": git_repo, "git_branch": git_branch, "dockerfile": dockerfile},
@@ -113,7 +113,7 @@ def modify_jet_workloads_config(
 
     if any(v is not None for _, v in config_kwargs.items()):
         _modify_jet_workloads_config(
-            config_type='recipe',
+            config_type="recipe",
             config_name=CONFIG_NAME_RECIPE_PERF,
             jet_workloads_repo_path=jet_workloads_repo_path,
             config_kwargs=config_kwargs,
@@ -131,14 +131,14 @@ def _modify_jet_workloads_config(
         jet_workloads_repo_path: path to the local copy of JET Workloads Registry, default to parent dir of cwd
         config_kwargs: arguments to be updated as key=value
     """
-    assert config_type in CONFIG_TYPES, f'config_type must be either of {CONFIG_TYPES}'
-    if config_type == 'build':
-        workloads_config_path = os.path.join(jet_workloads_repo_path, 'builds', config_name)
+    assert config_type in CONFIG_TYPES, f"config_type must be either of {CONFIG_TYPES}"
+    if config_type == "build":
+        workloads_config_path = os.path.join(jet_workloads_repo_path, "builds", config_name)
         assert all(key in ALLOWED_BUILD_CONFIG_KWARGS_KEYS for key in config_kwargs.keys())
         _modify_jet_workloads_build_config(workloads_config_path=workloads_config_path, **config_kwargs)
     else:
         assert all(key in ALLOWED_RECIPE_CONFIG_KWARGS_KEYS for key in config_kwargs.keys())
-        workloads_config_path = os.path.join(jet_workloads_repo_path, 'recipes', config_name)
+        workloads_config_path = os.path.join(jet_workloads_repo_path, "recipes", config_name)
         _modify_jet_workloads_recipe_config(workloads_config_path=workloads_config_path, **config_kwargs)
 
 
@@ -179,7 +179,7 @@ def _modify_jet_workloads_recipe_config(
     """
 
     assert os.path.exists(workloads_config_path), f"JET workload config:{workloads_config_path} does not exist"
-    logging.info(f'Overwriting model specification in the jet config:{workloads_config_path}')
+    logging.info(f"Overwriting model specification in the jet config:{workloads_config_path}")
 
     with open(workloads_config_path, "r") as stream:
         config = yaml.load(stream)
@@ -206,16 +206,16 @@ def _modify_jet_workloads_recipe_config(
         config["spec"]["extra_overwrites"] = extra_overwrites
 
     if batch_size is not None:
-        config['products'][0]["batch_size"] = batch_size if isinstance(batch_size, list) else [batch_size]
+        config["products"][0]["batch_size"] = batch_size if isinstance(batch_size, list) else [batch_size]
 
     if nodes is not None:
-        config['products'][0]["nodes"] = nodes if isinstance(nodes, list) else [nodes]
+        config["products"][0]["nodes"] = nodes if isinstance(nodes, list) else [nodes]
 
     if gpus is not None:
-        config['products'][0]["gpus"] = gpus if isinstance(gpus, list) else [gpus]
+        config["products"][0]["gpus"] = gpus if isinstance(gpus, list) else [gpus]
 
     if precision is not None:
-        config['products'][0]["precision"] = precision if isinstance(precision, list) else [precision]
+        config["products"][0]["precision"] = precision if isinstance(precision, list) else [precision]
 
     with open(workloads_config_path, "w") as stream:
         yaml.dump(config, stream)
@@ -243,19 +243,19 @@ def _modify_jet_workloads_build_config(
         dockerfile: path to the Dockerfile to use ot buil the docker image
     """
     assert os.path.exists(workloads_config_path), f"JET workload config:{workloads_config_path} does not exist"
-    logging.info(f'Modifying build specification in the jet config:{workloads_config_path}')
+    logging.info(f"Modifying build specification in the jet config:{workloads_config_path}")
 
     with open(workloads_config_path, "r") as stream:
         config = yaml.load(stream)
 
     if docker_image:
-        config['spec']['source']['image'] = docker_image
+        config["spec"]["source"]["image"] = docker_image
 
     if git_repo and git_branch and dockerfile:
-        config['spec']['source'].pop('image')
-        config['spec']['source']['repo'] = git_repo
-        config['spec']['source']['ref'] = git_branch
-        config['spec']['source']['dockerfile'] = dockerfile
+        config["spec"]["source"].pop("image")
+        config["spec"]["source"]["repo"] = git_repo
+        config["spec"]["source"]["ref"] = git_branch
+        config["spec"]["source"]["dockerfile"] = dockerfile
 
     with open(workloads_config_path, "w") as stream:
         yaml.dump(config, stream)

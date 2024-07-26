@@ -59,7 +59,7 @@ class JetGitRepoHandler:
         self.jet_workloads_ref_default = jet_workloads_ref_default
         self.jet_workloads_ref_ephemeral = jet_workloads_ref_ephemeral
         self.prefix_ref_ephemeral = "ephemeral/bionemo"
-        self.jet_workloads_repo_dir = 'workloads-registry'
+        self.jet_workloads_repo_dir = "workloads-registry"
         self.jet_workloads_repo_url = "https://gitlab-master.nvidia.com/dl/jet/workloads-registry"
         self._set_jet_workloads_repo_path(jet_workloads_repo_path)
 

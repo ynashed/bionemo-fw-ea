@@ -148,12 +148,12 @@ def set_virtual_parallel_rank_safely(rank: int):
 def force_cpu_model(cfg):
     with open_dict(cfg):
         # temporarily set to cpu
-        original_cpu_init = cfg.get('use_cpu_initialization', False)
-        if 'megatron_amp_O2' in cfg:
-            key = 'megatron_amp_O2'
+        original_cpu_init = cfg.get("use_cpu_initialization", False)
+        if "megatron_amp_O2" in cfg:
+            key = "megatron_amp_O2"
             original_amp_o2 = cfg.megatron_amp_O2
-        elif 'megatron_amp_02' in cfg:
-            key = 'megatron_amp_02'
+        elif "megatron_amp_02" in cfg:
+            key = "megatron_amp_02"
             original_amp_o2 = cfg.megatron_amp_02
         else:
             key, original_amp_o2 = None, None
@@ -164,7 +164,7 @@ def force_cpu_model(cfg):
             cfg[key] = False
 
     # Setup restore dict
-    restore_dict = {'use_cpu_initialization': original_cpu_init}  # 'megatron_amp_O2': original_amp_o2
+    restore_dict = {"use_cpu_initialization": original_cpu_init}  # 'megatron_amp_O2': original_amp_o2
     if key is not None:
         restore_dict[key] = original_amp_o2
 
@@ -208,7 +208,7 @@ def compute_tp_splits(
     # alias the global index to idx
     idx = global_idx
 
-    fast_glu_activation = str(model_cfg.get('activation', '')).lower() in ['fast-geglu', 'fast-swiglu', 'fast-reglu']
+    fast_glu_activation = str(model_cfg.get("activation", "")).lower() in ["fast-geglu", "fast-swiglu", "fast-reglu"]
 
     if param.shape == partitions[0][idx].shape:
         split = [partitions[0][idx].data] * tp_size
@@ -217,7 +217,7 @@ def compute_tp_splits(
         split = torch.split(partitions[0][idx].data, param.shape[-1], dim=-1)
     else:
         # For T5-converted weights, the splitting needs to be strided such that q,k,v weights are bunched together on each tensor-parallel rank.
-        if 'query_key_value.weight' in param_name and megatron_legacy:
+        if "query_key_value.weight" in param_name and megatron_legacy:
             split_dim = partitions[0][idx].data.shape[0]
             if split_dim % (tp_size * 3) != 0:
                 raise ValueError(
@@ -228,7 +228,7 @@ def compute_tp_splits(
             for i in range(tp_size):
                 tp_qkv = torch.cat([tp_qkv_splits[item] for item in range(i, tp_size * 3, tp_size)])
                 split.append(tp_qkv)
-        elif 'key_value.weight' in param_name and megatron_legacy:
+        elif "key_value.weight" in param_name and megatron_legacy:
             split_dim = partitions[0][idx].data.shape[0]
             if split_dim % (tp_size * 2) != 0:
                 raise ValueError(
@@ -239,7 +239,7 @@ def compute_tp_splits(
             for i in range(tp_size):
                 tp_qkv = torch.cat([tp_qkv_splits[item] for item in range(i, tp_size * 2, tp_size)])
                 split.append(tp_qkv)
-        elif 'dense_h_to_4h.weight' in param_name and fast_glu_activation:
+        elif "dense_h_to_4h.weight" in param_name and fast_glu_activation:
             # For Megatron GPT model with Fast Glu activation
             # Handle gated linear units
             # concat all the first halves ('W's) and all the second halves ('V's)
@@ -270,7 +270,7 @@ def compute_tp_merge(idx, name, param, partitions_pp, model_cfg):
     Returns:
         The concatenated parameter for TP 1 PP 1.
     """
-    fast_glu_activation = str(model_cfg.get('activation', '')).lower() in ['fast-geglu', 'fast-swiglu', 'fast-reglu']
+    fast_glu_activation = str(model_cfg.get("activation", "")).lower() in ["fast-geglu", "fast-swiglu", "fast-reglu"]
 
     # Logic from original TP rank change
     if param.shape == partitions_pp[0][idx].shape:
@@ -281,7 +281,7 @@ def compute_tp_merge(idx, name, param, partitions_pp, model_cfg):
         concated = torch.cat([partitions_pp[i][idx].data for i in range(len(partitions_pp))], dim=0)
 
     # Logic for Fast Glu activation
-    if 'dense_h_to_4h.weight' in name and fast_glu_activation:
+    if "dense_h_to_4h.weight" in name and fast_glu_activation:
         # concat all the first halves ('W's) and all the second halves ('V's)
         wk_splits = []
         for tpr in range(len(partitions_pp)):
@@ -340,10 +340,10 @@ def write_tp_pp_split(model, splits, app_state, tp_size, pp_rank, write_path):
                 if split_val.shape[1:] == param.shape[1:]:
                     pad = [0, 0] * len(split_val.shape)
                     pad[-1] = param.shape[0] - split_val.shape[0]
-                    split_val = torch.nn.functional.pad(split_val, pad, 'constant')
+                    split_val = torch.nn.functional.pad(split_val, pad, "constant")
                 elif split_val.shape[:-1] == param.shape[:-1]:
                     pad = [0, param.shape[-1] - split_val.shape[-1]]
-                    split_val = torch.nn.functional.pad(split_val, pad, 'constant')
+                    split_val = torch.nn.functional.pad(split_val, pad, "constant")
                 else:
                     raise RuntimeError(
                         f"Can not handle parameter {name}, required shape: {param.shape}, split shape: {split_val.shape}."
@@ -377,11 +377,11 @@ class GPTHandler:
         self.megatron_legacy = megatron_legacy
 
     def compute_split_index(self, model, idx, tp_rank, pp_rank, pp_split_rank, tp_size, pp_size):
-        if pp_rank == (pp_size - 1) and hasattr(model, 'model') and hasattr(model.model, 'word_embeddings'):
+        if pp_rank == (pp_size - 1) and hasattr(model, "model") and hasattr(model.model, "word_embeddings"):
             # duplicate embedding copy (tied weights)
             self.duplicate_gpt_word_embedding_offset = 1
 
-        if model.cfg.get('share_embeddings_and_output_weights', True) is False:
+        if model.cfg.get("share_embeddings_and_output_weights", True) is False:
             self.untied_gpt_embedding = True
 
         if self.duplicate_gpt_word_embedding_offset > 0:
@@ -448,7 +448,7 @@ class T5Handler:
         # and the rank of decoder split is arbitrary.
         # Megatron T5 check for pipeline_model_parallel_split_rank in order to inject encoder embeddings
         self.shared_enc_dec_embeddings = (
-            pp_split_rank > 0 and pp_split_rank == pp_rank and model.cfg.get('share_token_embeddings', True)
+            pp_split_rank > 0 and pp_split_rank == pp_rank and model.cfg.get("share_token_embeddings", True)
         )
         # If embedding sharing is active, both vocab and position embeddings are shared
         if self.shared_enc_dec_embeddings:
@@ -467,15 +467,15 @@ class T5Handler:
         self.shared_enc_dec_embeddings_intermediate = (
             pp_split_rank > 0
             and pp_split_rank < pp_size
-            and hasattr(model, 'enc_dec_model')
-            and hasattr(model.enc_dec_model, 'word_embeddings')
+            and hasattr(model, "enc_dec_model")
+            and hasattr(model.enc_dec_model, "word_embeddings")
         )
 
         if self.shared_enc_dec_embeddings_intermediate:
             # Loop until we get the location of this tensor
             self.intermediate_shared_embedding_location = -1
             for param_name, param in model.named_parameters():  # special case for T5
-                if param_name == 'enc_dec_model.word_embeddings.weight':
+                if param_name == "enc_dec_model.word_embeddings.weight":
                     self.intermediate_shared_embedding_location += 1
                     break
                 self.intermediate_shared_embedding_location += 1
@@ -524,7 +524,7 @@ class T5Handler:
             # when pp rank > pp_split_rank.
             # Therefore we check for this, and skip the parameter of the current TP X PP Y module
             # and fill this parameter later.
-            if self.shared_enc_dec_embeddings_intermediate and param_name == 'enc_dec_model.word_embeddings.weight':
+            if self.shared_enc_dec_embeddings_intermediate and param_name == "enc_dec_model.word_embeddings.weight":
                 logging.info(
                     "EncDec models decoder shares embedding with encoder in intermediate pos, skipping module for later update"
                 )
@@ -563,7 +563,7 @@ class T5Handler:
         # again.
         if self.shared_enc_dec_embeddings_intermediate:
             for param_name, param in model.named_parameters():
-                if param_name == 'enc_dec_model.word_embeddings.weight':
+                if param_name == "enc_dec_model.word_embeddings.weight":
                     logging.info("Found intermediate shared embedding, injecting")
                     split = compute_tp_splits(
                         param_name,
@@ -614,7 +614,7 @@ def merge_partition(model, partitions: Dict[int, List[List[torch.Tensor]]], writ
 
     og_pp_split_rank = 0
     if pp_total_len > total_params_merged:
-        og_pp_split_rank = model.cfg.get('pipeline_model_parallel_split_rank', 0)
+        og_pp_split_rank = model.cfg.get("pipeline_model_parallel_split_rank", 0)
 
     idx = 0
     pp_rank = 0
@@ -714,11 +714,11 @@ def split_partition(
 
     # Special case for GPT models - whose last PP TP rank has a duplicate embedding tensor
 
-    if 'gpt' in model.cfg.target.lower():
+    if "gpt" in model.cfg.target.lower():
         logging.info("Splitting GPT model")
         handler = GPTHandler(megatron_legacy=megatron_legacy)
 
-    elif 't5' in model.cfg.target.lower():
+    elif "t5" in model.cfg.target.lower():
         logging.info("Splitting T5 model")
         handler = T5Handler(megatron_legacy=megatron_legacy)
 
@@ -801,19 +801,19 @@ def main():
     )
     parser.add_argument("--target_tensor_model_parallel_size", type=int, required=True, help="TP size of target model")
     parser.add_argument(
-        '--pipeline_model_parallel_size', type=int, default=-1, required=False, help='PP size of source model'
+        "--pipeline_model_parallel_size", type=int, default=-1, required=False, help="PP size of source model"
     )
     parser.add_argument(
-        '--target_pipeline_model_parallel_size', type=int, required=True, help='PP size of target model'
+        "--target_pipeline_model_parallel_size", type=int, required=True, help="PP size of target model"
     )
     parser.add_argument(
-        '--target_pipeline_model_parallel_split_rank', type=int, default=0, help='PP rank to split for Enc-Dec models'
+        "--target_pipeline_model_parallel_split_rank", type=int, default=0, help="PP rank to split for Enc-Dec models"
     )
     parser.add_argument(
-        '--virtual_pipeline_model_parallel_size', type=int, default=None, help='Virtual Pipeline parallelism size'
+        "--virtual_pipeline_model_parallel_size", type=int, default=None, help="Virtual Pipeline parallelism size"
     )
     parser.add_argument(
-        '--ckpt_name', type=str, default=None, help='Checkpoint name to load from for Virtual Parallel'
+        "--ckpt_name", type=str, default=None, help="Checkpoint name to load from for Virtual Parallel"
     )
     parser.add_argument(
         "--model_class",
@@ -822,7 +822,7 @@ def main():
         help="NeMo model class. This script should support all NeMo megatron models that use Tensor Parallel",
     )
     parser.add_argument("--precision", default=16, help="PyTorch Lightning Trainer precision flag")
-    parser.add_argument('--num_gpu_per_node', default=8, type=int, help='Number of GPUs per node')
+    parser.add_argument("--num_gpu_per_node", default=8, type=int, help="Number of GPUs per node")
     parser.add_argument(
         "--megatron_legacy",
         action="store_true",
@@ -849,9 +849,9 @@ def main():
         default=None,
         help="the tokenizer model name if your model uses a tokenizer model as an artifact. This is needed if your model uses a sentencepiece tokenizer.",
     )
-    parser.add_argument('--hparams_file', type=str, default=None, help='Path to hparams file from PTL training')
-    parser.add_argument('--tp_conversion_only', action='store_true', help='Only convert TP model to TP model')
-    parser.add_argument('--model_extracted_dir', type=str, default=None, help='Path to pre-extracted model directory')
+    parser.add_argument("--hparams_file", type=str, default=None, help="Path to hparams file from PTL training")
+    parser.add_argument("--tp_conversion_only", action="store_true", help="Only convert TP model to TP model")
+    parser.add_argument("--model_extracted_dir", type=str, default=None, help="Path to pre-extracted model directory")
 
     args = parser.parse_args()
 
@@ -899,11 +899,11 @@ def main():
         hparams_filepath = args.hparams_file
         if hparams_filepath is None:
             logging.warning(
-                '\n\n\n!!!!!!!!!\n'
-                'You are converting a model with virtual pipeline parallelism enabled, \n'
-                'but have not passed `hparams_file` argument. \n'
-                'This will cause each ckpt file to be temporarily laoded onto GPU memory!\n\n'
-                'It is highly recommended to pass `hparams_file` argument to avoid this.\n'
+                "\n\n\n!!!!!!!!!\n"
+                "You are converting a model with virtual pipeline parallelism enabled, \n"
+                "but have not passed `hparams_file` argument. \n"
+                "This will cause each ckpt file to be temporarily laoded onto GPU memory!\n\n"
+                "It is highly recommended to pass `hparams_file` argument to avoid this.\n"
             )
     else:
         hparams_filepath = None
@@ -925,8 +925,8 @@ def main():
             return_config=True,
         )
 
-        tp_size = model_config_internal.get('tensor_model_parallel_size', 1)
-        pp_size = model_config_internal.get('pipeline_model_parallel_size', 1)
+        tp_size = model_config_internal.get("tensor_model_parallel_size", 1)
+        pp_size = model_config_internal.get("pipeline_model_parallel_size", 1)
 
     # Check if TP conversion only
     tp_conversion_only = args.tp_conversion_only
@@ -1074,7 +1074,7 @@ def main():
                                 tmp_cfg = OmegaConf.load(hparams_filepath)
                                 tmp_cfg, restore_dict = force_cpu_model(tmp_cfg)
 
-                                with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', suffix='.yml') as tmp:
+                                with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", suffix=".yml") as tmp:
                                     OmegaConf.save(tmp_cfg, tmp, resolve=True)
                                     tmp.seek(0)
 
@@ -1115,9 +1115,9 @@ def main():
                             vp_params_tmp = []
                             for vp_idx in range(vp_size):
                                 set_virtual_parallel_rank_safely(vp_idx)
-                                vp_params = vp_state_dict[f'model{vp_idx}']
+                                vp_params = vp_state_dict[f"model{vp_idx}"]
                                 model.model[vp_idx].module.load_state_dict(vp_params, strict=True)
-                                model.model[vp_idx].module.to('cpu')
+                                model.model[vp_idx].module.to("cpu")
                                 params = list(model.model[vp_idx].module.parameters())
                                 vp_params_tmp.append(params)
                                 # partitions[pp_rank][vp_idx].append(params)
@@ -1178,7 +1178,7 @@ def main():
         logging.info("<<<<<<<< Building TP 1 PP 1 base model >>>>>>>>>")
         model = cls(model.cfg, trainer)  # type: nn.Module
         model.freeze()
-        model = model.to('cpu')
+        model = model.to("cpu")
         model._save_restore_connector = NLPSaveRestoreConnector()
 
         restore_model_config(model.cfg, restore_dict)
@@ -1319,7 +1319,7 @@ def main():
             tgt_pp_size * tgt_tp_size
         )  # pseudo world size for simulating load of a specific rank on a single gpu
         new_global_batch_size = model.cfg.micro_batch_size * world_size
-        old_global_batch_size = model.cfg.get('global_batch_size', model.cfg.micro_batch_size)
+        old_global_batch_size = model.cfg.get("global_batch_size", model.cfg.micro_batch_size)
 
         global_offset = len(global_params[0]) - 1  # -1 cause this indexes the array, range [0, L-1]
         logging.info(f"Final layer offset for parameters: {global_offset}")
@@ -1329,7 +1329,7 @@ def main():
                 model.cfg.pipeline_model_parallel_size = tgt_pp_size
                 model.cfg.tensor_model_parallel_size = tgt_tp_size
 
-                if 'pipeline_model_parallel_split_rank' in model.cfg:
+                if "pipeline_model_parallel_split_rank" in model.cfg:
                     if pipeline_model_parallel_split_rank > 0:
                         model.cfg.pipeline_model_parallel_split_rank = pipeline_model_parallel_split_rank
                     elif pp_size > 1:
@@ -1377,7 +1377,7 @@ def main():
             model.cfg, restore_dict = force_cpu_model(model.cfg)
 
             model = cls(model.cfg, trainer)
-            model = model.to('cpu')
+            model = model.to("cpu")
             model._save_restore_connector = NLPSaveRestoreConnector()
             model.freeze()
             model.to(dtype=dtype)
@@ -1449,5 +1449,5 @@ def main():
     logging.info("Successfully finished changing partitions!")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

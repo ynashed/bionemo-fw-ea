@@ -255,7 +255,7 @@ def load_navigated_model_for_inference(cfg: DictConfig, strategy: RuntimeSearchS
 
 def model_navigator_filepath(cfg: DictConfig) -> str:
     """Convention for obtaining the Model Navigator artifact path from a large config object."""
-    if hasattr(cfg, 'nav_path'):
+    if hasattr(cfg, "nav_path"):
         return cfg.nav_path
     else:
         return f"{cfg.model.downstream_task.restore_from_path[: -len('.nemo')]}.nav"
@@ -309,7 +309,7 @@ def encode_str_batch(sequences: SeqsOrBatch) -> np.ndarray:
     else:
         # assume List[List[str]] case
         seqs = sequences
-    return np.char.encode(np.array(seqs), encoding='utf-8')
+    return np.char.encode(np.array(seqs), encoding="utf-8")
 
 
 def decode_str_batch_rows(sequences: np.ndarray) -> List[str]:
@@ -326,13 +326,13 @@ def encode_str_batch_rows(sequences: SeqsOrBatch) -> np.ndarray:
 
 
 def decode_str_single(single_string: np.ndarray) -> str:
-    x = np.char.decode(single_string.astype("bytes"), encoding='utf-8')
+    x = np.char.decode(single_string.astype("bytes"), encoding="utf-8")
     assert len(x) == 1
     return x.reshape(-1)[0]
 
 
 def encode_str_single(single_string: str) -> np.ndarray:
-    return np.char.encode(np.array([single_string]), encoding='utf-8').reshape(1, 1)
+    return np.char.encode(np.array([single_string]), encoding="utf-8").reshape(1, 1)
 
 
 def encode_single(val: float | int | bool) -> np.ndarray:
@@ -347,7 +347,7 @@ def encode_single(val: float | int | bool) -> np.ndarray:
     return np.array([[val]], dtype=dtype)
 
 
-N = TypeVar('N', float, int, bool)
+N = TypeVar("N", float, int, bool)
 
 
 def decode_single(val: np.ndarray, t: type[N]) -> N:
@@ -368,7 +368,7 @@ def decode_single(val: np.ndarray, t: type[N]) -> N:
 
 def read_bytes_from_filepath(filepath: Union[str, Path]) -> bytes:
     """Reads file content in bytes"""
-    with open(str(filepath), 'rb') as rb:
+    with open(str(filepath), "rb") as rb:
         return rb.read()
 
 
@@ -397,7 +397,7 @@ def write_tempfiles_from_str_list(
         else:
             temp_file = NamedTemporaryFile(**tempfile_kwargs)
 
-        with open(temp_file.name, 'w') as fopen:
+        with open(temp_file.name, "w") as fopen:
             fopen.write(string)
 
         temp_files.append(temp_file)

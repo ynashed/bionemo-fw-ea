@@ -11,6 +11,7 @@
 """
 This file tests the forward pass of ESM2.
 """
+
 import json
 import os
 import pathlib
@@ -35,7 +36,7 @@ from bionemo.utils.tests import (
 )
 
 
-os.environ["BIONEMO_HOME"] = os.environ.get("BIONEMO_HOME", '/workspace/bionemo')
+os.environ["BIONEMO_HOME"] = os.environ.get("BIONEMO_HOME", "/workspace/bionemo")
 BIONEMO_HOME = os.environ["BIONEMO_HOME"]
 
 THIS_FILE_DIR = pathlib.Path(os.path.abspath(__file__))
@@ -54,11 +55,11 @@ GOLDEN_VALUES_FP32JSON = GOLDEN_VALUE_PREPEND_DIR / "revert_esm2nv_infer_golden_
 HEATMAPS_REPO_DIR = GOLDEN_VALUE_PREPEND_DIR / "heatmaps"
 
 # Diffs
-DIFF_FILEPATH_FP32 = f'{BIONEMO_HOME}/tests/data/esm2_golden_values/differences-fp32.yaml'
-DIFF_FILEPATH_FP16 = f'{BIONEMO_HOME}/tests/data/esm2_golden_values/differences-fp16.yaml'
+DIFF_FILEPATH_FP32 = f"{BIONEMO_HOME}/tests/data/esm2_golden_values/differences-fp32.yaml"
+DIFF_FILEPATH_FP16 = f"{BIONEMO_HOME}/tests/data/esm2_golden_values/differences-fp16.yaml"
 
 
-def get_cfg(prepend_config_path, config_name, config_path='conf'):
+def get_cfg(prepend_config_path, config_name, config_path="conf"):
     prepend_config_path = pathlib.Path(prepend_config_path)
 
     class TestSearchPathConfig(BioNemoSearchPathConfig):
@@ -75,7 +76,7 @@ def get_cfg(prepend_config_path, config_name, config_path='conf'):
 
 @pytest.fixture
 def model_and_configs():
-    cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='esm2nv_data_test', config_path=CONFIG_PATH)
+    cfg = get_cfg(PREPEND_CONFIG_DIR, config_name="esm2nv_data_test", config_path=CONFIG_PATH)
     reset_microbatch_calculator()
     initialize_distributed_parallel_state()
 
@@ -88,19 +89,19 @@ def model_and_configs():
 
 @pytest.fixture()
 def cfg():
-    cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='esm2nv_data_test', config_path=CONFIG_PATH)
+    cfg = get_cfg(PREPEND_CONFIG_DIR, config_name="esm2nv_data_test", config_path=CONFIG_PATH)
     return cfg
 
 
 @pytest.fixture()
 def cfg_infer():
-    cfg = get_cfg(PREPEND_CONFIG_DIR, config_name='esm2nv_infer', config_path=CONFIG_PATH)
+    cfg = get_cfg(PREPEND_CONFIG_DIR, config_name="esm2nv_infer", config_path=CONFIG_PATH)
     return cfg
 
 
 def plot_heatmap(diff_array, title, filepath):
     plt.figure(figsize=(8, 6))
-    plt.imshow(diff_array, cmap='coolwarm', interpolation='nearest')
+    plt.imshow(diff_array, cmap="coolwarm", interpolation="nearest")
     plt.colorbar()
     plt.title(title)
     plt.xlabel("Predictions Index")
@@ -134,14 +135,14 @@ def compare_predictions(predictions, golden_predictions, tol=1e-9):
 
     for i, (pred, gold) in enumerate(zip(predictions, golden_predictions)):
         diff = {}
-        if not all(np.allclose(pred[key], gold[key], atol=tol) for key in ['embeddings', 'hiddens']):
+        if not all(np.allclose(pred[key], gold[key], atol=tol) for key in ["embeddings", "hiddens"]):
             # Calculate differences for embeddings and hiddens
-            diff['embeddings'] = np.abs(pred['embeddings'] - gold['embeddings']).mean()
-            diff['hiddens'] = np.abs(pred['hiddens'] - gold['hiddens']).mean()
-        if pred['sequence'] != gold['sequence']:
-            diff['sequence'] = (pred['sequence'], gold['sequence'])
-        if pred['id'] != gold['id']:
-            diff['id'] = (pred['id'], gold['id'])
+            diff["embeddings"] = np.abs(pred["embeddings"] - gold["embeddings"]).mean()
+            diff["hiddens"] = np.abs(pred["hiddens"] - gold["hiddens"]).mean()
+        if pred["sequence"] != gold["sequence"]:
+            diff["sequence"] = (pred["sequence"], gold["sequence"])
+        if pred["id"] != gold["id"]:
+            diff["id"] = (pred["id"], gold["id"])
         if diff:
             differences.append(diff)
 
@@ -215,8 +216,8 @@ def test_esm2_inference_input_output_shapes_sizes_from_nemo_ckpt(cfg_infer):
     assert isinstance(predictions[0], dict)
 
     # Confirm that embeddings are type numpy array
-    assert isinstance(predictions[0]['embeddings'], np.ndarray)
-    assert isinstance(predictions[0]['hiddens'], np.ndarray)
+    assert isinstance(predictions[0]["embeddings"], np.ndarray)
+    assert isinstance(predictions[0]["hiddens"], np.ndarray)
 
     # Confirm that the output dictionary has the expected keys.
     assert set(cfg_infer.model.downstream_task.outputs).issubset(set(predictions[0].keys()))
@@ -224,20 +225,20 @@ def test_esm2_inference_input_output_shapes_sizes_from_nemo_ckpt(cfg_infer):
     # Confirm that the output dictionary has the expected values.
     sample = next(iter(dataloader))
     # Confirm that the input sample's sequence length matches the hidden layer output sequence length.
-    assert len(sample['sequence'][0]) == len(predictions[0]['hiddens'])
+    assert len(sample["sequence"][0]) == len(predictions[0]["hiddens"])
 
     # Confirm that the shape of the embemddings are expected
-    assert predictions[0]['embeddings'].shape == (cfg_infer.model.hidden_size,)
-    assert predictions[0]['hiddens'].shape == (len(sample['sequence'][0]), cfg_infer.model.hidden_size)
-    assert predictions[0]['embeddings'].shape == predictions[0]['hiddens'][-1].shape
+    assert predictions[0]["embeddings"].shape == (cfg_infer.model.hidden_size,)
+    assert predictions[0]["hiddens"].shape == (len(sample["sequence"][0]), cfg_infer.model.hidden_size)
+    assert predictions[0]["embeddings"].shape == predictions[0]["hiddens"][-1].shape
 
     # Maybe remove this test. It is not necessary.
-    assert sample['sequence'][0] == predictions[0]['sequence']
+    assert sample["sequence"][0] == predictions[0]["sequence"]
 
 
 parameter_sets_json = [
-    ('32', 1e-9, GOLDEN_VALUES_FP32JSON, HEATMAPS_REPO_DIR),
-    ('16-mixed', 1e-1, GOLDEN_VALUES_FP16JSON, HEATMAPS_REPO_DIR),
+    ("32", 1e-9, GOLDEN_VALUES_FP32JSON, HEATMAPS_REPO_DIR),
+    ("16-mixed", 1e-1, GOLDEN_VALUES_FP16JSON, HEATMAPS_REPO_DIR),
 ]
 
 
@@ -255,11 +256,11 @@ def test_esm2nv_golden_value_json_and_overwrite(cfg_infer, precision, tol, golde
     current_embeddings = current_predictions["embeddings"]
 
     # Load golden values
-    with open(golden_json_filepath, 'r') as f:
+    with open(golden_json_filepath, "r") as f:
         golden_values = json.load(f)
 
     # Convert predictions from json to array
-    golden_predictions = golden_values['predictions']
+    golden_predictions = golden_values["predictions"]
     golden_embeddings = np.array(golden_predictions["embeddings"])
     golden_hiddens = np.array(golden_predictions["hiddens"])
 

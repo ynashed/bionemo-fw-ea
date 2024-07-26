@@ -27,7 +27,7 @@ from bionemo.model.utils import setup_trainer
 def main(cfg) -> None:
     cfg = instantiate(cfg)
     logging.info("\n\n************** Experiment configuration ***********")
-    logging.info(f'\n{OmegaConf.to_yaml(cfg)}')
+    logging.info(f"\n{OmegaConf.to_yaml(cfg)}")
     missing_keys: set[str] = OmegaConf.missing_keys(cfg)
     if missing_keys:
         raise RuntimeError(f"Got missing required keys in config:\n{missing_keys}")
@@ -40,22 +40,22 @@ def main(cfg) -> None:
         writers.append(PredictionFeatureWriter(cfg.results_path, cfg.model.downstream_task.outputs, cfg.force))
     trainer = setup_trainer(cfg, callbacks=writers)
 
-    if cfg.get('restore_from_path', None):
+    if cfg.get("restore_from_path", None):
         alphafold = AlphaFold.restore_from(
             restore_path=cfg.restore_from_path, override_config_path=cfg, trainer=trainer
         )
-    elif cfg.get('torch_restore', None):
+    elif cfg.get("torch_restore", None):
         alphafold = AlphaFold(cfg=cfg.model, trainer=trainer)
         load_pt_checkpoint(model=alphafold, checkpoint_path=cfg.torch_restore)
     else:
         raise ValueError(
-            'No checkpoint has been provided neither via restore_from_path nor torch_restore. \
-                           Inference was not ran.'
+            "No checkpoint has been provided neither via restore_from_path nor torch_restore. \
+                           Inference was not ran."
         )
 
     predict_dataloader = get_predict_dataloader(model_cfg=cfg.model, predict_session_cfg=cfg)
     trainer.predict(alphafold, predict_dataloader, return_predictions=False)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

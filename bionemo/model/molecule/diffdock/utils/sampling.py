@@ -22,24 +22,24 @@ def randomize_position(data_list, no_torsion, no_random, tr_sigma_max):
     if not no_torsion:
         # randomize torsion angles
         for complex_graph in data_list:
-            torsion_updates = np.random.uniform(low=-np.pi, high=np.pi, size=complex_graph['ligand'].edge_mask.sum())
-            complex_graph['ligand'].pos = modify_conformer_torsion_angles(
-                complex_graph['ligand'].pos,
-                complex_graph['ligand', 'ligand'].edge_index.T[complex_graph['ligand'].edge_mask],
-                complex_graph['ligand'].mask_rotate[0],
+            torsion_updates = np.random.uniform(low=-np.pi, high=np.pi, size=complex_graph["ligand"].edge_mask.sum())
+            complex_graph["ligand"].pos = modify_conformer_torsion_angles(
+                complex_graph["ligand"].pos,
+                complex_graph["ligand", "ligand"].edge_index.T[complex_graph["ligand"].edge_mask],
+                complex_graph["ligand"].mask_rotate[0],
                 torsion_updates,
             )
 
     for complex_graph in data_list:
         # randomize position
-        molecule_center = torch.mean(complex_graph['ligand'].pos, dim=0, keepdim=True)
+        molecule_center = torch.mean(complex_graph["ligand"].pos, dim=0, keepdim=True)
         random_rotation = torch.from_numpy(R.random().as_matrix()).float()
-        complex_graph['ligand'].pos = (complex_graph['ligand'].pos - molecule_center) @ random_rotation.T
+        complex_graph["ligand"].pos = (complex_graph["ligand"].pos - molecule_center) @ random_rotation.T
         # base_rmsd = np.sqrt(np.sum((complex_graph['ligand'].pos.cpu().numpy() - orig_complex_graph['ligand'].pos.numpy()) ** 2, axis=1).mean())
 
         if not no_random:  # note for now the torsion angles are still randomised
             tr_update = torch.normal(mean=0, std=tr_sigma_max, size=(1, 3))
-            complex_graph['ligand'].pos += tr_update
+            complex_graph["ligand"].pos += tr_update
 
 
 def sampling(
@@ -153,7 +153,7 @@ def sampling(
                             else None
                         ),
                     )
-                    for i, complex_graph in enumerate(complex_graph_batch.to('cpu').to_data_list())
+                    for i, complex_graph in enumerate(complex_graph_batch.to("cpu").to_data_list())
                 ]
             )
         data_list = new_data_list
@@ -161,7 +161,7 @@ def sampling(
         if visualization_list is not None:
             for idx, visualization in enumerate(visualization_list):
                 visualization.add(
-                    (data_list[idx]['ligand'].pos + data_list[idx].original_center).detach().cpu(),
+                    (data_list[idx]["ligand"].pos + data_list[idx].original_center).detach().cpu(),
                     part=1,
                     order=t_idx + 2,
                 )
@@ -175,7 +175,7 @@ def sampling(
                 complex_graph_batch = complex_graph_batch.to(device)
                 if confidence_data_list is not None:
                     confidence_complex_graph_batch = next(confidence_loader).to(device)
-                    confidence_complex_graph_batch['ligand'].pos = complex_graph_batch['ligand'].pos
+                    confidence_complex_graph_batch["ligand"].pos = complex_graph_batch["ligand"].pos
                     set_time(confidence_complex_graph_batch, 0, 0, 0, N, confidence_model_cfg.all_atoms, device)
                     confidence.append(confidence_model(confidence_complex_graph_batch))
                 else:

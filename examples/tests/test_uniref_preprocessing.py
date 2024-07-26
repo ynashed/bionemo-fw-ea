@@ -23,14 +23,14 @@ from bionemo.utils.tests import get_directory_hash
 # THe UniRef file takes ~20 minutes to download so the default test uses a smaller (local) file.
 NGC_REGISTRY_TARGET = "uniref50_2022_05"
 NGC_REGISTRY_VERSION = "v23.06"
-MD5_CHECKSUM = '415cd74fda2c95c46b2496feb5d55d17'
-CONFIG = {'url': None, 'num_csv_files': 5, 'val_size': 10, 'test_size': 5, 'random_seed': 0}
-HEADER = 'record_id,record_name,sequence_length,sequence'
+MD5_CHECKSUM = "415cd74fda2c95c46b2496feb5d55d17"
+CONFIG = {"url": None, "num_csv_files": 5, "val_size": 10, "test_size": 5, "random_seed": 0}
+HEADER = "record_id,record_name,sequence_length,sequence"
 NUM_ENTRIES = 100
 TRAIN_VAL_TEST_HASHES = {
-    'train': 'eaa0161c6870605f51cbafff21bcf7e1',
-    'val': 'fc8864b075ebd7553ab345cf8d82cf6a',
-    'test': '243a2b10c32ef82bbd8c457fcd1728d8',
+    "train": "eaa0161c6870605f51cbafff21bcf7e1",
+    "val": "fc8864b075ebd7553ab345cf8d82cf6a",
+    "test": "243a2b10c32ef82bbd8c457fcd1728d8",
 }
 
 
@@ -38,10 +38,10 @@ TRAIN_VAL_TEST_HASHES = {
 os.environ["NGC_CLI_TEAM"] = "clara-lifesciences"
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope="session")
 def bionemo_home() -> Path:
     try:
-        x = os.environ['BIONEMO_HOME']
+        x = os.environ["BIONEMO_HOME"]
     except KeyError:
         raise ValueError("Need to set BIONEMO_HOME in order to run unit tests! See docs for instructions.")
     else:
@@ -55,13 +55,13 @@ def config_path_for_tests(bionemo_home) -> str:
 
 @pytest.fixture(scope="module")
 def sample_data(bionemo_home) -> str:
-    path = bionemo_home / 'examples' / 'tests' / 'test_data' / 'preprocessing' / 'test' / 'uniref2022_small.fasta'
+    path = bionemo_home / "examples" / "tests" / "test_data" / "preprocessing" / "test" / "uniref2022_small.fasta"
     return str(path.absolute())
 
 
 @pytest.fixture(scope="module")
 def sample_ngc_file(bionemo_home) -> str:
-    path = bionemo_home / 'examples' / 'tests' / 'test_data' / 'preprocessing' / 'uniref2022_UR50.fasta'
+    path = bionemo_home / "examples" / "tests" / "test_data" / "preprocessing" / "uniref2022_UR50.fasta"
     return str(path.absolute())
 
 
@@ -69,7 +69,7 @@ def sample_ngc_file(bionemo_home) -> str:
 def download_directory(tmp_path):
     """Create the temporary directory for testing and the download directory"""
     # TODO mock a download when preprocessing code is refactored
-    download_directory = tmp_path / 'raw'
+    download_directory = tmp_path / "raw"
     download_directory.mkdir(parents=True, exist_ok=True)
     return download_directory
 
@@ -79,7 +79,7 @@ def mock_url(download_directory, sample_data: str):
     """Preprocessing expects a url with 'fasta.gz' extension, must mimic that for local file"""
     dest_path = os.path.join(download_directory, os.path.basename(sample_data))
     shutil.copyfile(sample_data, dest_path)
-    mock_url = f'http://{dest_path}.gz'
+    mock_url = f"http://{dest_path}.gz"
     return mock_url
 
 
@@ -110,7 +110,7 @@ def test_process_files_ngc(tmp_path, sample_ngc_file: str):
 
 
 @pytest.mark.parametrize(
-    'config, header, num_entries, hash_dict', [(CONFIG, HEADER, NUM_ENTRIES, TRAIN_VAL_TEST_HASHES)]
+    "config, header, num_entries, hash_dict", [(CONFIG, HEADER, NUM_ENTRIES, TRAIN_VAL_TEST_HASHES)]
 )
 def test_prepare_dataset(tmp_path, mock_url, config, header, num_entries, hash_dict):
     cfg = OmegaConf.create(config)
@@ -121,21 +121,21 @@ def test_prepare_dataset(tmp_path, mock_url, config, header, num_entries, hash_d
         val_size=cfg.val_size,
         test_size=cfg.test_size,
         random_seed=cfg.random_seed,
-        source='uniprot',
+        source="uniprot",
     )
 
-    processed_directory = os.path.join(tmp_path, 'processed')
+    processed_directory = os.path.join(tmp_path, "processed")
 
     total_lines = 0
-    for split in ['train', 'val', 'test']:
+    for split in ["train", "val", "test"]:
         split_directory = os.path.join(processed_directory, split)
         assert get_directory_hash(split_directory) == hash_dict[split]
 
-        csv_file_list = glob.glob(os.path.join(split_directory, '*.csv'))
+        csv_file_list = glob.glob(os.path.join(split_directory, "*.csv"))
         assert len(csv_file_list) == cfg.num_csv_files
 
         for file in csv_file_list:
-            with open(file, 'r') as fh:
+            with open(file, "r") as fh:
                 lines = fh.readlines()
                 total_lines += len(lines) - 1
                 assert lines[0].strip() == header

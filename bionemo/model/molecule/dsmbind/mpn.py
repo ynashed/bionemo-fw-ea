@@ -10,7 +10,6 @@
 
 """A message passing neural network, which serves as the molecular graph embedding layer in DSMBind. This MPNEncoder is adapted from https://chemprop.readthedocs.io/en/v1.7.1/_modules/chemprop/models/mpn.html#MPNEncoder."""
 
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

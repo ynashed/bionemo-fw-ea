@@ -27,7 +27,7 @@ def config_path(bionemo_home) -> str:
 def inference_model_3_frozen(config_path) -> ESM1nvInference:
     cfg = load_model_config(config_name="infer", config_path=config_path)
     with open_dict(cfg):
-        cfg.model['freeze_layers'] = 3
+        cfg.model["freeze_layers"] = 3
     # load score model
     initialize_distributed_parallel_state()
     model = ESM1nvInference(cfg)

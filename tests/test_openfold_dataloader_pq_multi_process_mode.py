@@ -14,7 +14,7 @@ for the openfold model.
 Check correct behavior of priority queue dataloader for
     - real dataset and sampler
     - multiprocess mode
-See also test_openfold_dataloader_pq_single_process_mode.py
+See also test_openfold_dataloader_pq_single_process_mode.py.
 """
 
 import multiprocessing
@@ -22,7 +22,7 @@ import multiprocessing
 import pytest
 from omegaconf import DictConfig
 
-from bionemo.model.protein.openfold.utils.logging_utils import log_with_nemo_at_level
+from bionemo.utils.logging_utils import log_with_nemo_at_level
 from tests.test_openfold_data import initial_training_cfg  # noqa
 from tests.test_openfold_dataloader_pq_single_process_mode import create_and_step_through_dataloader_with_openfold_data
 

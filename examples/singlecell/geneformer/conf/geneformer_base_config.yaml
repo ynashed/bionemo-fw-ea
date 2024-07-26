@@ -31,7 +31,7 @@ exp_manager:
     name: geneformer-base
     offline: False
   resume_if_exists: True
-  resume_ignore_no_checkpoint: True 
+  resume_ignore_no_checkpoint: True
   create_checkpoint_callback: True
   checkpoint_callback_params:
     monitor: val_loss
@@ -92,8 +92,8 @@ model:
     index_mapping_dir: ${exp_manager.exp_dir}/index_mapping
     skip_warmup: True
     # NOTE: we encountered bugs with 'online' mapping when called how we call it in geneformer.
-    #   Please confirm that you do not see a block structure after the first 100k 
-    #   steps or so at the current batch size in the losses if you switch back to 
+    #   Please confirm that you do not see a block structure after the first 100k
+    #   steps or so at the current batch size in the losses if you switch back to
     #   an 'online' strategy.
     index_mapping_type: 'memmap'
     # IF we do switch back to an "online" mapping strategy, the following parameters were what we used:

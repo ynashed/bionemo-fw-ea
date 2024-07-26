@@ -30,7 +30,7 @@ def _build_dataset(
     skip_warmup,
     max_seq_length_dec,
     name,
-    dataset_type='t5',
+    dataset_type="t5",
     tokenizer=None,
     max_ngram_size=1,
     mean_ngram_size=None,
@@ -47,7 +47,7 @@ def _build_dataset(
 
     if min_seq_length_dec > max_seq_length_dec:
         raise ValueError(
-            f'Cannot have seq_length_dec ({max_seq_length_dec}) less than seq_length * masked_lm_prob * 2 + 1 ({min_seq_length_dec}). Increase seq_length_dec or decrease masked_lm_prob'
+            f"Cannot have seq_length_dec ({max_seq_length_dec}) less than seq_length * masked_lm_prob * 2 + 1 ({min_seq_length_dec}). Increase seq_length_dec or decrease masked_lm_prob"
         )
 
     # Indexed dataset.
@@ -62,12 +62,12 @@ def _build_dataset(
 
         dataset = None
         kwargs = {
-            'name': name,
-            'data_prefix': data_prefix,
-            'num_epochs': None,
-            'max_num_samples': int(num_samples),
-            'max_seq_length': max_seq_length,
-            'seed': seed,
+            "name": name,
+            "data_prefix": data_prefix,
+            "num_epochs": None,
+            "max_num_samples": int(num_samples),
+            "max_seq_length": max_seq_length,
+            "seed": seed,
         }
         if dataset_type == "t5":
             assert tokenizer is not None, "Tokenizer is required for T5 dataset"

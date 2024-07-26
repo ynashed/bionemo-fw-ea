@@ -57,8 +57,8 @@ def main(metadata_file: Path, data_base_path: Path, test_val_fraction: float, se
                 "tissues": tissues,
             }
         )
-    dset_summary = pd.DataFrame(md).sort_values(by='n_cells').reset_index(drop=True)
-    dset_summary['n_cells_cumulative'] = dset_summary.n_cells.cumsum()
+    dset_summary = pd.DataFrame(md).sort_values(by="n_cells").reset_index(drop=True)
+    dset_summary["n_cells_cumulative"] = dset_summary.n_cells.cumsum()
 
     # Determine tissues and assays for validation and training sets
     n_test_val = int(math.ceil(test_val_fraction * dset_summary.n_cells.sum()))
@@ -100,7 +100,7 @@ def main(metadata_file: Path, data_base_path: Path, test_val_fraction: float, se
 
     # Identify datasets that are redundant in terms of tissues and assays
     assays_tissues_to_datasets = defaultdict(set)
-    for at, ddf in dset_summary.loc[val_test_indices].reset_index().groupby(['assays', 'tissues']):
+    for at, ddf in dset_summary.loc[val_test_indices].reset_index().groupby(["assays", "tissues"]):
         if len(ddf) > 0:
             assays_tissues_to_datasets[at].update(set(ddf.dataset_id.unique()))
     most_redundant_ds_grp = sorted(max(assays_tissues_to_datasets.items(), key=lambda x: len(x[1]))[1])

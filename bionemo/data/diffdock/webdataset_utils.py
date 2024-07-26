@@ -70,7 +70,7 @@ def pickles_to_tars(
     with wds.ShardWriter(wd_subset_pattern, encoder=False, maxsize=maxsize, compress=False, mode=0o777) as sink:
         for name in input_prefix_subset:
             try:
-                data = pickle.load(open(os.path.join(dir_input, f"{name}.{input_suffix}"), 'rb'))
+                data = pickle.load(open(os.path.join(dir_input, f"{name}.{input_suffix}"), "rb"))
                 sample = func_output_data(data)
             except Exception as e:
                 logging.error(f"Failed to write {name} into tar files due to error {e}")
@@ -80,7 +80,6 @@ def pickles_to_tars(
 
 
 class SizeAwareBatching:
-
     """A WebDataset composable to do batching based on sample size"""
 
     def __init__(
@@ -103,7 +102,7 @@ class SizeAwareBatching:
                 self.cached_sizes[sample.name] = self.size_fn(sample)
             sample_size = self.cached_sizes[sample.name]
             if sample_size > self.max_total_size:
-                warn_once(f'sample {sample.name} has size larger than max size {self.max_total_size}, skipping')
+                warn_once(f"sample {sample.name} has size larger than max size {self.max_total_size}, skipping")
                 continue
             if (batch_size + sample_size) <= self.max_total_size:
                 batch.append(sample)

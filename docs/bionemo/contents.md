@@ -6,9 +6,8 @@
 
 index
 pre-reqs
-quickstart-fw
-quickstart-bcp
-tutorials-fw
+access-startup
+next-steps
 ```
 
 ```{toctree}
@@ -94,4 +93,3 @@ faq-fw
 bibliography-fw
 releasenotes-fw
 ```
-

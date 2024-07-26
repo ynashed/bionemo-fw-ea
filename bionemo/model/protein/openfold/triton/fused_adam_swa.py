@@ -25,7 +25,7 @@ import triton.language as tl
 from torch import Tensor  # noqa
 from torch.optim import Adam, Optimizer
 
-from bionemo.model.protein.openfold.utils.logging_utils import (
+from bionemo.utils.logging_utils import (
     log_with_nemo_at_level,
 )
 

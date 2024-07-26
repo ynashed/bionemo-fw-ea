@@ -41,7 +41,7 @@ torch.backends.cudnn.enabled = False
 
 
 def extract_to_dir(zipfile, dir):
-    with ZipFile(zipfile, 'r') as zipper:
+    with ZipFile(zipfile, "r") as zipper:
         # extracting all the files
         zipper.extractall(dir)
 
@@ -85,32 +85,36 @@ def test_model_exists(equidock_infer_cfg):
 
 @pytest.mark.needs_gpu
 def test_rmsds(equidock_infer_model, equidock_infer_cfg, equidock_data_path):
-    method_name = 'equidock'
+    method_name = "equidock"
     cfg, data_name = equidock_infer_cfg
     # test data
     data_dir = os.path.join(
-        equidock_data_path, "test_sets_pdb", f'{data_name}_test_random_transformed/random_transformed'
+        equidock_data_path, "test_sets_pdb", f"{data_name}_test_random_transformed/random_transformed"
     )
     ground_truth_data_dir = os.path.join(
-        equidock_data_path, "test_sets_pdb", f'{data_name}_test_random_transformed/complexes'
+        equidock_data_path, "test_sets_pdb", f"{data_name}_test_random_transformed/complexes"
     )
 
-    with tempfile.TemporaryDirectory() as temp_dir, tempfile.TemporaryDirectory() as ground_truth_temp_dir, tempfile.TemporaryDirectory() as random_transformed_temp_dir:
+    with (
+        tempfile.TemporaryDirectory() as temp_dir,
+        tempfile.TemporaryDirectory() as ground_truth_temp_dir,
+        tempfile.TemporaryDirectory() as random_transformed_temp_dir,
+    ):
         # result directory
         output_dir = temp_dir
 
         # ground truth directory
-        extract_to_dir(os.path.join(ground_truth_data_dir, 'ligands.zip'), ground_truth_temp_dir)
-        extract_to_dir(os.path.join(ground_truth_data_dir, 'receptors.zip'), ground_truth_temp_dir)
+        extract_to_dir(os.path.join(ground_truth_data_dir, "ligands.zip"), ground_truth_temp_dir)
+        extract_to_dir(os.path.join(ground_truth_data_dir, "receptors.zip"), ground_truth_temp_dir)
 
         # random transformed directory
-        extract_to_dir(os.path.join(data_dir, 'ligands.zip'), random_transformed_temp_dir)
-        extract_to_dir(os.path.join(data_dir, 'receptors.zip'), random_transformed_temp_dir)
+        extract_to_dir(os.path.join(data_dir, "ligands.zip"), random_transformed_temp_dir)
+        extract_to_dir(os.path.join(data_dir, "receptors.zip"), random_transformed_temp_dir)
 
         pdb_files = [
             f
             for f in os.listdir(random_transformed_temp_dir)
-            if os.path.isfile(os.path.join(random_transformed_temp_dir, f)) and f.endswith('.pdb')
+            if os.path.isfile(os.path.join(random_transformed_temp_dir, f)) and f.endswith(".pdb")
         ]
         pdb_files.sort()
         cnt = 0
@@ -119,13 +123,13 @@ def test_rmsds(equidock_infer_model, equidock_infer_cfg, equidock_data_path):
             if cnt > 5:
                 break
 
-            if not file.endswith('_l_b.pdb'):
+            if not file.endswith("_l_b.pdb"):
                 continue
 
-            ll = len('_l_b.pdb')
-            ligand_filename = os.path.join(random_transformed_temp_dir, f'{file[:-ll]}_l_b.pdb')
-            receptor_filename = os.path.join(ground_truth_temp_dir, f'{file[:-ll]}_r_b_COMPLEX.pdb')  # complexes
-            out_filename = f'{file[:-ll]}_l_b_{method_name.upper()}.pdb'
+            ll = len("_l_b.pdb")
+            ligand_filename = os.path.join(random_transformed_temp_dir, f"{file[:-ll]}_l_b.pdb")
+            receptor_filename = os.path.join(ground_truth_temp_dir, f"{file[:-ll]}_r_b_COMPLEX.pdb")  # complexes
+            out_filename = f"{file[:-ll]}_l_b_{method_name.upper()}.pdb"
 
             # Create ligand and receptor graphs and arrays
             (
@@ -159,21 +163,21 @@ def test_rmsds(equidock_infer_model, equidock_infer_cfg, equidock_data_path):
 
             ppdb_ligand = PandasPdb().read_pdb(ligand_filename)
             unbound_ligand_all_atoms_pre_pos = (
-                ppdb_ligand.df['ATOM'][['x_coord', 'y_coord', 'z_coord']].to_numpy().squeeze().astype(np.float32)
+                ppdb_ligand.df["ATOM"][["x_coord", "y_coord", "z_coord"]].to_numpy().squeeze().astype(np.float32)
             )
             unbound_ligand_new_pos = (rotation @ unbound_ligand_all_atoms_pre_pos.T).T + translation
 
-            ppdb_ligand.df['ATOM'][
-                ['x_coord', 'y_coord', 'z_coord']
-            ] = unbound_ligand_new_pos  # unbound_ligand_new_pos
+            ppdb_ligand.df["ATOM"][["x_coord", "y_coord", "z_coord"]] = (
+                unbound_ligand_new_pos  # unbound_ligand_new_pos
+            )
             unbound_ligand_save_filename = os.path.join(output_dir, out_filename)
-            ppdb_ligand.to_pdb(path=unbound_ligand_save_filename, records=['ATOM'], gz=False)
+            ppdb_ligand.to_pdb(path=unbound_ligand_save_filename, records=["ATOM"], gz=False)
 
             cnt += 1
 
         data_dir = output_dir
         pdb_files = [
-            f for f in os.listdir(data_dir) if os.path.isfile(os.path.join(data_dir, f)) and f.endswith('.pdb')
+            f for f in os.listdir(data_dir) if os.path.isfile(os.path.join(data_dir, f)) and f.endswith(".pdb")
         ]
         pdb_files.sort()
 
@@ -187,14 +191,14 @@ def test_rmsds(equidock_infer_model, equidock_infer_cfg, equidock_data_path):
             if cnt < 0:
                 break
 
-            if not file.endswith(f'_l_b_{method_name.upper()}.pdb'):
+            if not file.endswith(f"_l_b_{method_name.upper()}.pdb"):
                 continue
             cnt -= 1
-            ll = len(f'_l_b_{method_name.upper()}.pdb')
-            ligand_model_file = os.path.join(data_dir, f'{file[:-ll]}_l_b_{method_name.upper()}.pdb')
-            ligand_gt_file = os.path.join(ground_truth_temp_dir, f'{file[:-ll]}_l_b_COMPLEX.pdb')
-            receptor_model_file = os.path.join(ground_truth_temp_dir, f'{file[:-ll]}_r_b_COMPLEX.pdb')
-            receptor_gt_file = os.path.join(ground_truth_temp_dir, f'{file[:-ll]}_r_b_COMPLEX.pdb')
+            ll = len(f"_l_b_{method_name.upper()}.pdb")
+            ligand_model_file = os.path.join(data_dir, f"{file[:-ll]}_l_b_{method_name.upper()}.pdb")
+            ligand_gt_file = os.path.join(ground_truth_temp_dir, f"{file[:-ll]}_l_b_COMPLEX.pdb")
+            receptor_model_file = os.path.join(ground_truth_temp_dir, f"{file[:-ll]}_r_b_COMPLEX.pdb")
+            receptor_gt_file = os.path.join(ground_truth_temp_dir, f"{file[:-ll]}_r_b_COMPLEX.pdb")
 
             ligand_model_coords = get_coords(ligand_model_file, all_atoms=False)
             receptor_model_coords = get_coords(receptor_model_file, all_atoms=False)
@@ -231,13 +235,15 @@ def test_rmsds(equidock_infer_model, equidock_infer_cfg, equidock_data_path):
             all_crmsd.append(crmsd)
             all_irmsd.append(irmsd)
 
-        expected_rmsd = np.load(os.path.join(equidock_data_path, f'expected_{data_name}_equidock.npz'))
+        expected_rmsd = np.load(os.path.join(equidock_data_path, f"expected_{data_name}_equidock.npz"))
         all_crmsd = np.array(all_crmsd)
         all_irmsd = np.array(all_irmsd)
 
-        np.testing.assert_allclose(
-            all_crmsd, expected_rmsd['crmsd'][:6], rtol=1e-3, atol=1e-2
-        ), "Complex RMSD mismatch"
-        np.testing.assert_allclose(
-            all_irmsd, expected_rmsd['irmsd'][:6], rtol=1e-3, atol=1e-2
-        ), "Interface RMSD mismatch"
+        (
+            np.testing.assert_allclose(all_crmsd, expected_rmsd["crmsd"][:6], rtol=1e-3, atol=1e-2),
+            "Complex RMSD mismatch",
+        )
+        (
+            np.testing.assert_allclose(all_irmsd, expected_rmsd["irmsd"][:6], rtol=1e-3, atol=1e-2),
+            "Interface RMSD mismatch",
+        )

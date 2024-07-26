@@ -102,8 +102,8 @@ model:
     seed: ${model.seed}
     max_seq_length: ${model.seq_length}
     cluster_mapping_tsv: ${oc.env:BIONEMO_HOME}/data/uniref2022_05/fake-uniref/mapping.tsv
-    uf50_datapath: ${oc.env:BIONEMO_HOME}/data/uniref2022_05/fake-uniref/Fake50.fasta 
-    uf90_datapath: ${oc.env:BIONEMO_HOME}/data/uniref2022_05/fake-uniref/Fake90.fasta 
+    uf50_datapath: ${oc.env:BIONEMO_HOME}/data/uniref2022_05/fake-uniref/Fake50.fasta
+    uf90_datapath: ${oc.env:BIONEMO_HOME}/data/uniref2022_05/fake-uniref/Fake90.fasta
     dataset_path: ${oc.env:BIONEMO_HOME}/data/uniref2022_05/fake_uf_map
     dataset:
       train: x[000..049]

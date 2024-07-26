@@ -14,11 +14,11 @@ set -x
 # Usage
 # =========================
 # This is an example script for running a predictive task on a SLURM cluster.
-# Below is a sample set of parameters for launching ESM-{1,2}nv or ProtT5nv 
+# Below is a sample set of parameters for launching ESM-{1,2}nv or ProtT5nv
 # finetuning for a FLIP downstream task with BioNeMo on BCP clusters.
 # Replace all ?? with appropriate values prior to launching a job.
-# Any parameters not specified in this script, such as the ESM-2 checkpoint size, 
-# can be changed in the yaml config file located in examples/protein/MODEL/conf/ 
+# Any parameters not specified in this script, such as the ESM-2 checkpoint size,
+# can be changed in the yaml config file located in examples/protein/MODEL/conf/
 # directory where MODEL is {esm1nv, esm2nv, prott5nv}.
 
 BIONEMO_IMAGE=?? # BioNeMo container image
@@ -44,7 +44,7 @@ VAL_CHECK_INTERVAL=20 # how often validation step is performed, including downst
 TASK_NAME=secondary_structure # FLIP task name: secondary_structure, scl, meltome, etc.
 EXP_TAG="" # any additional experiment info, can be empty
 EXP_NAME="${PROTEIN_MODEL}_${CONFIG_NAME}_batch${MICRO_BATCH_SIZE}_gradacc${ACCUMULATE_GRAD_BATCHES}_nodes${SLURM_JOB_NUM_NODES}_encoder-frozen-${ENCODER_FROZEN}${EXP_TAG}"
-CREATE_WANDB_LOGGER=True # set to False if you don't want to log results with WandB 
+CREATE_WANDB_LOGGER=True # set to False if you don't want to log results with WandB
 WANDB_LOGGER_OFFLINE=False # set to True if there are issues uploading to WandB during training
 
 PROJECT_NAME="${PROTEIN_MODEL}_${CONFIG_NAME}"  # project name, will be used for logging

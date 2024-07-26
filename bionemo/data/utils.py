@@ -29,11 +29,11 @@ from bionemo.data.molecule import MoleculeCsvDataset
 
 
 __all__ = [
-    'DatasetTypes',
-    'expand_dataset_paths',
-    'create_dataset',
-    'build_train_valid_test_datasets',
-    'handle_index',
+    "DatasetTypes",
+    "expand_dataset_paths",
+    "create_dataset",
+    "build_train_valid_test_datasets",
+    "handle_index",
 ]
 
 
@@ -47,8 +47,8 @@ def expand_dataset_paths(filepath: str, ext: str) -> List[str]:
         filepath = filepath + ext
 
     # TODO this should eventually be moved to a Nemo fileutils module or similar
-    filepath = re.sub(r"""\(|\[|\<|_OP_""", '{', filepath)  # replaces '(', '[', '<' and '_OP_' with '{'
-    filepath = re.sub(r"""\)|\]|\>|_CL_""", '}', filepath)  # replaces ')', ']', '>' and '_CL_' with '}'
+    filepath = re.sub(r"""\(|\[|\<|_OP_""", "{", filepath)  # replaces '(', '[', '<' and '_OP_' with '{'
+    filepath = re.sub(r"""\)|\]|\>|_CL_""", "}", filepath)  # replaces ')', ']', '>' and '_CL_' with '}'
     dataset_paths = list(braceexpand.braceexpand(filepath))
     return dataset_paths
 
@@ -79,8 +79,8 @@ def gunzip(i: str, o: str, exist_ok: bool = False):
     if not exist_ok and os.path.exists(o):
         raise FileExistsError(f"Unzipping {i} to already existing path: {o}")
     if os.path.exists(i):
-        with gzip.open(i, 'rb') as f_in:
-            with open(o, 'wb') as f_out:
+        with gzip.open(i, "rb") as f_in:
+            with open(o, "wb") as f_out:
                 shutil.copyfileobj(f_in, f_out)
     else:
         raise FileNotFoundError(i)
@@ -197,8 +197,8 @@ class DatasetBuilderSpec:
 
 
 def get_filepath(options):
-    filepath = cfg_get_key(options['cfg'], 'dataset_path', default='')
-    filepath = os.path.join(filepath, options['name'], options['dataset'])
+    filepath = cfg_get_key(options["cfg"], "dataset_path", default="")
+    filepath = os.path.join(filepath, options["name"], options["dataset"])
 
     return filepath
 
@@ -239,7 +239,7 @@ class CSVDatasetBuilder(DatasetBuilderSpec):
         """
         filepath = get_filepath(self.options)
         # Get datasets and load data
-        logging.info(f'Loading data from {filepath}')
+        logging.info(f"Loading data from {filepath}")
         self.dataset_paths = expand_dataset_paths(filepath, ".csv")
 
     def check_path(self, filepath):
@@ -264,7 +264,7 @@ class CSVDatasetBuilder(DatasetBuilderSpec):
         Returns:
             Dataset: Dataset instantiated from paths.
         """
-        cfg = self.options['cfg']
+        cfg = self.options["cfg"]
         self.dataset = MoleculeCsvDataset(dataset_paths=self.dataset_paths, cfg=cfg)
         return self.dataset
 
@@ -308,7 +308,7 @@ class FormattedDatasetFactory(DatasetFactorySpec):
 
         """
 
-        dataset_format = cfg_get_key(options['cfg'], 'dataset_format')
+        dataset_format = cfg_get_key(options["cfg"], "dataset_format")
 
         if dataset_format in self.formats:
             builder_cls = self.formats[dataset_format]
@@ -339,7 +339,7 @@ class DefaultDatasetFactory(FormattedDatasetFactory):
         Initializes a dataset factory for handling csv and bin formats.
         """
         self.formats = {
-            'csv': CSVDatasetBuilder,
+            "csv": CSVDatasetBuilder,
         }
 
 
@@ -362,10 +362,10 @@ def create_dataset(
         dataset_factory = get_default_builder_factory()
 
     options = {
-        'cfg': cfg,
-        'num_samples': num_samples,
-        'name': name,
-        'dataset': dataset,
+        "cfg": cfg,
+        "num_samples": num_samples,
+        "name": name,
+        "dataset": dataset,
     }
 
     dataset = dataset_factory.create_dataset(options)
@@ -387,7 +387,7 @@ def build_train_valid_test_datasets(
     train_dataset = create_dataset(
         cfg,
         train_valid_test_num_samples[0],
-        'train',
+        "train",
         ds_train,
         dataset_factory,
     )
@@ -395,7 +395,7 @@ def build_train_valid_test_datasets(
     validation_dataset = create_dataset(
         cfg,
         train_valid_test_num_samples[1],
-        'val',
+        "val",
         ds_val,
         dataset_factory,
     )
@@ -403,7 +403,7 @@ def build_train_valid_test_datasets(
     test_dataset = create_dataset(
         cfg,
         train_valid_test_num_samples[2],
-        'test',
+        "test",
         ds_test,
         dataset_factory,
     )
@@ -494,7 +494,7 @@ def handle_index(dataset, idx):
     if idx < 0 and idx > -len(dataset) - 1:
         idx = len(dataset) + idx
     elif idx < 0:
-        raise IndexError(f'Index out of range: {idx}')
+        raise IndexError(f"Index out of range: {idx}")
     return idx
 
 
@@ -509,12 +509,12 @@ def verify_checksum_matches(file_path: str, expected_checksum: str) -> bool:
         bool: True if checksum matches else false
     """
 
-    file_hash = hashlib.md5(open(file_path, 'rb').read()).hexdigest()
+    file_hash = hashlib.md5(open(file_path, "rb").read()).hexdigest()
     if file_hash == expected_checksum:
         matches = True
     else:
         matches = False
-        logging.info(f'Checksum verification failed. Expected {expected_checksum} but got {file_hash}.')
+        logging.info(f"Checksum verification failed. Expected {expected_checksum} but got {file_hash}.")
     return matches
 
 
@@ -533,29 +533,29 @@ def get_ngc_registry_file_list(
     Returns:
         list of file names
     """
-    filelist_cmd = 'ngc registry resource info --format_type json --files '
-    filelist_cmd += f'--org {ngc_org} '
+    filelist_cmd = "ngc registry resource info --format_type json --files "
+    filelist_cmd += f"--org {ngc_org} "
 
     target = ngc_org
     if ngc_team:
-        filelist_cmd += f'--team {ngc_team} '
-        target += '/' + ngc_team
+        filelist_cmd += f"--team {ngc_team} "
+        target += "/" + ngc_team
 
-    target += '/' + ngc_registry_target
-    filelist_cmd += f' {target}:{ngc_registry_version}'
+    target += "/" + ngc_registry_target
+    filelist_cmd += f" {target}:{ngc_registry_version}"
 
     try:
         result = subprocess.run(filelist_cmd, capture_output=True, shell=True, check=True)
         if result.stderr:
             logging.warning(result.stderr.decode())
         json_output = result.stdout.strip()
-        file_list = json.loads(json_output)['file_list']
-        file_list = [x['path'] for x in file_list]
+        file_list = json.loads(json_output)["file_list"]
+        file_list = [x["path"] for x in file_list]
     except subprocess.CalledProcessError as e:
-        logging.error(f'File list retrival failed: {e}')
+        logging.error(f"File list retrival failed: {e}")
         file_list = []
     except Exception:
-        logging.error(f'File list retrival failed for command \'{filelist_cmd}\' and output \'{json_output}\'')
+        logging.error(f"File list retrival failed for command '{filelist_cmd}' and output '{json_output}'")
         file_list = []
 
     return file_list
@@ -566,7 +566,7 @@ def download_registry_from_ngc(
     ngc_registry_version: str,
     ngc_org: str,
     ngc_team: Optional[str] = None,
-    dest: Optional[str] = '.',
+    dest: Optional[str] = ".",
     exclude: Optional[str] = None,
     expected_checksum: Optional[str] = None,
     file: Optional[str] = None,
@@ -592,28 +592,28 @@ def download_registry_from_ngc(
         path to the folder where dataset is downloaded
     """
 
-    download_cmd = 'ngc registry resource download-version '
+    download_cmd = "ngc registry resource download-version "
 
     if dest:
-        download_cmd += f'--dest {dest} '
+        download_cmd += f"--dest {dest} "
     if exclude:
-        download_cmd += f'--exclude {exclude} '
+        download_cmd += f"--exclude {exclude} "
     if file:
-        download_cmd += f'--file {file} '
+        download_cmd += f"--file {file} "
     if format_type:
-        download_cmd += f'--format_type {format_type} '
+        download_cmd += f"--format_type {format_type} "
     if debug:
-        download_cmd += '--debug '
+        download_cmd += "--debug "
 
-    download_cmd += f'--org {ngc_org} '
+    download_cmd += f"--org {ngc_org} "
 
     target = ngc_org
     if ngc_team:
-        download_cmd += f'--team {ngc_team} '
-        target += '/' + ngc_team
+        download_cmd += f"--team {ngc_team} "
+        target += "/" + ngc_team
 
-    target += '/' + ngc_registry_target
-    download_cmd += f' {target}:{ngc_registry_version}'
+    target += "/" + ngc_registry_target
+    download_cmd += f" {target}:{ngc_registry_version}"
 
     # Determine if file is already downloaded
     file_list = get_ngc_registry_file_list(ngc_registry_target, ngc_registry_version, ngc_org, ngc_team)
@@ -621,10 +621,10 @@ def download_registry_from_ngc(
     download_file = True
     if expected_checksum and file_list:
         if len(file_list) > 1:
-            logging.info('Checksum verification not supported if resource contains more than one file.')
+            logging.info("Checksum verification not supported if resource contains more than one file.")
         else:
             file_name = file_list[0]
-            download_dir = os.path.join(dest, f'{ngc_registry_target}_v{ngc_registry_version}')
+            download_dir = os.path.join(dest, f"{ngc_registry_target}_v{ngc_registry_version}")
             if os.path.exists(os.path.join(download_dir, file_name)):
                 hash_path = os.path.join(download_dir, file_name)
                 download_file = False if verify_checksum_matches(hash_path, expected_checksum) else True
@@ -632,13 +632,13 @@ def download_registry_from_ngc(
     if download_file:
         os.system(download_cmd)
     else:
-        logging.info(f'Download of {target} to {hash_path} skipped because file exists and MD5 checksums match.')
+        logging.info(f"Download of {target} to {hash_path} skipped because file exists and MD5 checksums match.")
 
     downloaded_file_list = os.listdir(download_dir)
 
     # TODO update logic if there is more than one downloaded file present
     assert len(downloaded_file_list) == 1, AssertionError(
-        f'Expected only one downloaded file got {len(downloaded_file_list)}.'
+        f"Expected only one downloaded file got {len(downloaded_file_list)}."
     )
     file_path = os.path.join(download_dir, downloaded_file_list[0])
     return file_path
@@ -676,23 +676,23 @@ def download_dataset_from_ngc(
     """
     cmd = "ngc dataset download "
     if dest:
-        cmd += f'--dest {dest} '
+        cmd += f"--dest {dest} "
     if dir:
-        cmd += f'--dir {dir} '
+        cmd += f"--dir {dir} "
     if exclude:
-        cmd += f'--exclude {exclude} '
+        cmd += f"--exclude {exclude} "
     if file:
-        cmd += f'--file {file} '
+        cmd += f"--file {file} "
     if format_type:
-        cmd += f'--format_type {format_type} '
+        cmd += f"--format_type {format_type} "
     if resume:
-        cmd += f'--resume {resume} '
+        cmd += f"--resume {resume} "
     if debug:
-        cmd += '--debug '
+        cmd += "--debug "
     if dry_run:
-        cmd += '--dry-run '
+        cmd += "--dry-run "
     if compress_file:
-        cmd += '--zip '
+        cmd += "--zip "
 
     os.system(f"{cmd} {ngc_dataset_id}")
     return os.path.join(dest, str(ngc_dataset_id))

@@ -66,7 +66,7 @@ class LayerNorm(nn.Module):
         )
         ln_triton_dim = 4
         return (
-            OptimHub.config('layernorm_triton')
+            OptimHub.config("layernorm_triton")
             and self.training
             and x.dim() == ln_triton_dim
             and x.shape[-2:] in ln_triton_shapes
@@ -77,7 +77,7 @@ class LayerNorm(nn.Module):
         # and inductor are turn on, inductor gets ignored. This might be resolved more graciously
         if self._should_use_triton_kernels(x):
             return self._ln_triton_func(x, self.normalized_shape, self.weight, self.bias, self.eps)
-        elif self.training and OptimHub.config('layernorm_inductor'):
+        elif self.training and OptimHub.config("layernorm_inductor"):
             return self._ln_inductor_func(x, self.normalized_shape, self.weight, self.bias, self.eps)
         else:
             return self._ln_eager_func(x, self.normalized_shape, self.weight, self.bias, self.eps)

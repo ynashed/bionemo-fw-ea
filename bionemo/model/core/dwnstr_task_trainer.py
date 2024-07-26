@@ -50,11 +50,11 @@ class ValidationTrainer:
     def fit(self, train_dataset, train_dataloader):
         for epoch in range(self.cfg.num_epochs):
             self.model.train(True)
-            logging.info('EPOCH {}'.format(epoch + 1))
+            logging.info("EPOCH {}".format(epoch + 1))
             avg_loss = self.train_one_epoch(
                 self.model, train_dataset, train_dataloader, self.loss_fn, self.optimizer, self.scheduler
             )
-            logging.info('Training Avg Loss: {}'.format(avg_loss))
+            logging.info("Training Avg Loss: {}".format(avg_loss))
 
     def test(self, test_dataset, test_dataloader):
         running_vloss = 0.0

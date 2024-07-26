@@ -68,7 +68,7 @@ class DataManager(metaclass=Singleton):
             try:
                 self.load_datasets()
             except Exception as e:
-                logging.error(f'Dataset is not loaded because of the error: {e}')
+                logging.error(f"Dataset is not loaded because of the error: {e}")
                 raise e
 
     def preprocess(self):

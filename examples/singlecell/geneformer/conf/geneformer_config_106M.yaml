@@ -1,6 +1,6 @@
 defaults:
   - geneformer_base_config
-  
+
 seed_everything: false  # Set to False with real runs in parallel to avoid duplicated seeds across nodes.
 
 trainer:

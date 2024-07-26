@@ -73,26 +73,26 @@ def esm1nv_build_train_valid_test_datasets(
     cfg = copy.deepcopy(cfg)
 
     # setting
-    use_upsampling: bool = cfg.get('use_upsampling', True)
-    data_impl: str = cfg.get('data_impl', None)
+    use_upsampling: bool = cfg.get("use_upsampling", True)
+    data_impl: str = cfg.get("data_impl", None)
     # assert data_impl is not None, 'Config "cfg" should contain field "cfg.data_impl"'
-    dataset_path: str = cfg.get('dataset_path', None)
+    dataset_path: str = cfg.get("dataset_path", None)
     assert dataset_path is not None, 'Config "cfg" should contain field "cfg.dataset_path"'
 
     assert all(
-        split in ['train', 'val', 'test'] for split in train_valid_test_num_samples.keys()
-    ), 'Incorrect key in train_valid_test_num_samples!'
+        split in ["train", "val", "test"] for split in train_valid_test_num_samples.keys()
+    ), "Incorrect key in train_valid_test_num_samples!"
 
     datasets = []
     # Build individual datasets.
     for split in train_valid_test_num_samples.keys():
         num_samples = train_valid_test_num_samples[split]
-        print(f'{split}:{num_samples}')
+        print(f"{split}:{num_samples}")
         if num_samples is None or num_samples > 0:
             ds_name: Optional[Union[str, List[Union[int, str]]]] = cfg.dataset.get(split, None)
             assert ds_name is not None, (
                 f'Config "cfg" should contain field "cfg.dataset.{split}" with name or list of '
-                f'names corresponding to the data files used to construct the dataset'
+                f"names corresponding to the data files used to construct the dataset"
             )
             filepath: str = os.path.join(dataset_path, split, ds_name)
             dataset = build_typed_dataset(
@@ -123,7 +123,7 @@ class ESM1nvModel(ESMnvMegatronBertModel):
         Override this method to use an external tokenizer.
         All tokenizers are expected to provide compatible interface.
         """
-        model_name = self._cfg.tokenizer.get('model_name')
+        model_name = self._cfg.tokenizer.get("model_name")
         self.tokenizer = get_nmt_tokenizer(
             library=self._cfg.tokenizer.library,
             model_name=model_name,
@@ -132,13 +132,13 @@ class ESM1nvModel(ESMnvMegatronBertModel):
             legacy=False,
         )
         # patch tokenizer for use with HF esm tokenizer
-        if self._cfg.tokenizer.library == 'huggingface' and str(model_name).startswith('facebook/esm2'):
+        if self._cfg.tokenizer.library == "huggingface" and str(model_name).startswith("facebook/esm2"):
             self.tokenizer.tokenizer.vocab = self.tokenizer.tokenizer.get_vocab()
 
     def build_pretraining_data_loader(self, dataset, consumed_samples, num_workers=None):
         """Buld dataloader given an input dataset."""
 
-        assert self._cfg.data.dataloader_type == 'single', AssertionError(
+        assert self._cfg.data.dataloader_type == "single", AssertionError(
             f'Only the Megatron sequential ("single") sampler is currently supported. {self._cfg.data.dataloader_type} was chosen.'
         )
 
@@ -150,7 +150,7 @@ class ESM1nvModel(ESMnvMegatronBertModel):
             global_batch_size=self.cfg.global_batch_size,
             data_parallel_rank=parallel_state.get_data_parallel_rank(),
             data_parallel_size=parallel_state.get_data_parallel_world_size(),
-            drop_last=self.cfg.get('drop_last', True),
+            drop_last=self.cfg.get("drop_last", True),
         )
 
         if num_workers is None:
@@ -189,7 +189,7 @@ class ESM1nvModel(ESMnvMegatronBertModel):
         super().setup_training_data(cfg)
 
     def setup_validation_data(self, cfg):
-        if hasattr(self, '_validation_ds'):
+        if hasattr(self, "_validation_ds"):
             if self._validation_ds is not None:
                 consumed_samples = 0
                 self._validation_dl = self.build_pretraining_data_loader(
@@ -197,14 +197,14 @@ class ESM1nvModel(ESMnvMegatronBertModel):
                 )
 
     def setup_test_data(self, cfg):
-        if hasattr(self, '_test_ds'):
+        if hasattr(self, "_test_ds"):
             if self._test_ds is not None:
                 consumed_samples = 0
                 self._test_dl = self.build_pretraining_data_loader(self._test_ds, consumed_samples, num_workers=0)
 
     @staticmethod
     def _build_train_valid_test_datasets(trainer, model_cfg):
-        logging.info('Building Bert datasets.')
+        logging.info("Building Bert datasets.")
         global_batch_size = trainer.world_size * model_cfg.micro_batch_size / model_cfg.tensor_model_parallel_size
         # Compute training micro-batch steps: total_global_batch_steps x grad_acumms_per_global_batch
         # limit_val_batches specifies the number of batches.
@@ -214,9 +214,9 @@ class ESM1nvModel(ESMnvMegatronBertModel):
         test_iters = trainer.limit_test_batches
 
         train_valid_test_num_samples = {
-            'train': int(max_train_steps * global_batch_size),
-            'val': int(eval_iters * global_batch_size),
-            'test': int(test_iters * global_batch_size),
+            "train": int(max_train_steps * global_batch_size),
+            "val": int(eval_iters * global_batch_size),
+            "test": int(test_iters * global_batch_size),
         }
 
         # Note(@jomitchell) ESM should not be calling megamolbart's dataset builder.
@@ -224,10 +224,10 @@ class ESM1nvModel(ESMnvMegatronBertModel):
             cfg=model_cfg.data, train_valid_test_num_samples=train_valid_test_num_samples
         )
 
-        logging.info(f'Length of train dataset: {len(_train_ds)}')
-        logging.info(f'Length of val dataset: {len(_validation_ds)}')
-        logging.info(f'Length of test dataset: {len(_test_ds) if _test_ds is not None else None}')
-        logging.info('Finished building Bert datasets.')
+        logging.info(f"Length of train dataset: {len(_train_ds)}")
+        logging.info(f"Length of val dataset: {len(_validation_ds)}")
+        logging.info(f"Length of test dataset: {len(_test_ds) if _test_ds is not None else None}")
+        logging.info("Finished building Bert datasets.")
         return _train_ds, _validation_ds, _test_ds
 
     def build_train_valid_test_datasets(self):
@@ -254,13 +254,13 @@ class ESM1nvModel(ESMnvMegatronBertModel):
             return
         averaged_loss = torch.stack(outputs).mean()
         average_perplexity = averaged_loss.exp()
-        self.log('val_loss', averaged_loss, prog_bar=True, batch_size=1)
-        self.log('val_perplexity', average_perplexity, batch_size=1)
+        self.log("val_loss", averaged_loss, prog_bar=True, batch_size=1)
+        self.log("val_perplexity", average_perplexity, batch_size=1)
         self.log(
-            'val_loss_ECE', pow(2, averaged_loss), batch_size=1
+            "val_loss_ECE", pow(2, averaged_loss), batch_size=1
         )  # calculate exponential cross entropy loss for logs
         self.log(
-            'consumed_samples',
+            "consumed_samples",
             self.compute_consumed_samples(self.trainer.global_step - self.init_global_step),
             batch_size=1,
         )
@@ -328,7 +328,7 @@ class ESM1nvModel(ESMnvMegatronBertModel):
 
         # build input arguments description as expected by the encoder's forward method
         batch_for_pipeline = [tokens_enc, enc_mask]
-        arg_names = ['bert_model_input', 'attention_mask']
+        arg_names = ["bert_model_input", "attention_mask"]
 
         forward_step_func = self._get_forward_output_only_func(
             arg_names=arg_names,
@@ -354,12 +354,12 @@ class ESM1nvModel(ESMnvMegatronBertModel):
         )
 
         if output_tensor:
-            output_tensor = output_tensor[0]['hiddens']
+            output_tensor = output_tensor[0]["hiddens"]
         else:
             # Only the last pipeline stage has the actual output_tensor, for all other model-parallel ranks the output_tensor is None.
             output_tensor = torch.zeros(tensor_shape, dtype=self.autocast_dtype).cuda()
 
-        if self.cfg.get('pipeline_model_parallel_size', 1) > 1:
+        if self.cfg.get("pipeline_model_parallel_size", 1) > 1:
             # Broadcast the output_tensor from the last pipeline stage to all other model-parallel ranks.
             torch.distributed.broadcast(
                 output_tensor,
@@ -488,29 +488,29 @@ class ESM1nvModel(ESMnvMegatronBertModel):
             The computed values are logged using the NeMo logger.
         """
         averaged_loss = average_losses_across_data_parallel_group(self.test_step_outputs)
-        logging.info(f'test_loss: {averaged_loss[0]}')
-        logging.info(f'test_loss_ECE: {pow(2, averaged_loss[0])}')
-        logging.info(f'test_perplexity: {averaged_loss[0].exp()}')
+        logging.info(f"test_loss: {averaged_loss[0]}")
+        logging.info(f"test_loss_ECE: {pow(2, averaged_loss[0])}")
+        logging.info(f"test_perplexity: {averaged_loss[0].exp()}")
         self.test_step_outputs.clear()
 
     @property
     def input_names(self):
         return [
-            'input_ids',
-            'attention_mask',
+            "input_ids",
+            "attention_mask",
         ]
 
     @property
     def output_names(self):
-        return ['output']
+        return ["output"]
 
     @property
     def input_types(self) -> Optional[Dict[str, NeuralType]]:
-        return {'input_ids': {0: 'batch', 1: 'time'}, 'attention_mask': {0: 'batch', 1: 'time'}}
+        return {"input_ids": {0: "batch", 1: "time"}, "attention_mask": {0: "batch", 1: "time"}}
 
     @property
     def output_types(self) -> Optional[Dict[str, NeuralType]]:
-        return {'output': {0: 'batch', 1: 'time', 2: 'size'}}
+        return {"output": {0: "batch", 1: "time", 2: "size"}}
 
 
 class ESM2nvModel(ESM1nvModel):
@@ -574,7 +574,7 @@ class ESM2nvModel(ESM1nvModel):
 
             # TODO raise exception if cannot read the dataset properly
             train_ds = build_typed_dataset(
-                dataset_paths=os.path.join(model_cfg.data.train.dataset_path, 'train', model_cfg.data.train.range),
+                dataset_paths=os.path.join(model_cfg.data.train.dataset_path, "train", model_cfg.data.train.range),
                 data_impl=model_cfg.data.train.uf90.data_impl,
                 cfg=model_cfg.data.train,
                 use_upsampling=model_cfg.data.train.use_upsampling,
@@ -601,7 +601,7 @@ class ESM2nvModel(ESM1nvModel):
             train_dataset (Uniref90ClusterMappingDataset): A UF90 cluster mapping train dataset.
         """
         train_ds = build_typed_dataset(
-            dataset_paths=os.path.join(model_cfg.data.train.dataset_path, 'train', model_cfg.data.train.range),
+            dataset_paths=os.path.join(model_cfg.data.train.dataset_path, "train", model_cfg.data.train.range),
             data_impl=model_cfg.data.train.data_impl,
             cfg=model_cfg.data.train,
             use_upsampling=model_cfg.data.train.use_upsampling,
@@ -609,7 +609,7 @@ class ESM2nvModel(ESM1nvModel):
         )
         uniref90_dataset = build_typed_dataset(
             dataset_paths=os.path.join(
-                model_cfg.data.train.uf90.uniref90_path, 'uf90_csvs', model_cfg.data.train.range
+                model_cfg.data.train.uf90.uniref90_path, "uf90_csvs", model_cfg.data.train.range
             ),
             data_impl=model_cfg.data.train.uf90.data_impl,
             cfg=model_cfg.data.train.uf90,
@@ -627,8 +627,8 @@ class ESM2nvModel(ESM1nvModel):
             data_prefix="train",  # used for index creation
             seed=model_cfg.seed,  # used for rng, although awkward because global statehood
             index_mapping_dir=index_mapping_dir,  # stores index
-            cluster_map_starts_fn=f'{mmap_dataset_path}/starts.mmap',
-            cluster_map_counts_fn=f'{mmap_dataset_path}/counts.mmap',
+            cluster_map_starts_fn=f"{mmap_dataset_path}/starts.mmap",
+            cluster_map_counts_fn=f"{mmap_dataset_path}/counts.mmap",
             name=train_ds.name,
         )
         return train_dataset
@@ -642,7 +642,7 @@ class ESM2nvModel(ESM1nvModel):
         # TODO: If `num_samples is None` do we load the full dataset?
         # IF not default none -> raise warning.
         val_ds = build_typed_dataset(
-            dataset_paths=os.path.join(model_cfg.data.val.dataset_path, 'val', model_cfg.data.val.range),
+            dataset_paths=os.path.join(model_cfg.data.val.dataset_path, "val", model_cfg.data.val.range),
             data_impl=model_cfg.data.val.data_impl,
             cfg=model_cfg.data.val,
             use_upsampling=model_cfg.data.val.use_upsampling,
@@ -659,7 +659,7 @@ class ESM2nvModel(ESM1nvModel):
     ):
         """Constructs the test dataset."""
         test_ds = build_typed_dataset(
-            dataset_paths=os.path.join(model_cfg.data.test.dataset_path, 'test', model_cfg.data.test.range),
+            dataset_paths=os.path.join(model_cfg.data.test.dataset_path, "test", model_cfg.data.test.range),
             data_impl=model_cfg.data.test.data_impl,
             cfg=model_cfg.data.test,
             use_upsampling=model_cfg.data.test.use_upsampling,
@@ -736,28 +736,28 @@ class ESM2nvModel(ESM1nvModel):
             )
 
         self._train_ds = self.build_train_dataset(model_cfg=self._cfg, num_samples=num_train_samples)
-        logging.info(f'Length of train dataset: {len(self._train_ds)}')
+        logging.info(f"Length of train dataset: {len(self._train_ds)}")
 
         self._validation_ds = self.build_val_dataset(
             model_cfg=self._cfg,
             num_samples=num_val_samples,
             limit_batches_scale_factor=limit_val_batches_scale_factor,
         )
-        logging.info(f'Length of val dataset: {len(self._validation_ds)}')
+        logging.info(f"Length of val dataset: {len(self._validation_ds)}")
 
         self._test_ds = self.build_test_dataset(
             model_cfg=self._cfg,
             num_samples=num_test_samples,
             limit_batches_scale_factor=limit_test_batches_scale_factor,
         )
-        logging.info(f'Length of test dataset: {len(self._test_ds)}')
+        logging.info(f"Length of test dataset: {len(self._test_ds)}")
 
         return self._train_ds, self._validation_ds, self._test_ds
 
     def build_pretraining_data_loader(self, dataset, consumed_samples, num_workers=None):
         """Buld dataloader given an input dataset."""
 
-        assert self._cfg.data.dataloader_type == 'single', AssertionError(
+        assert self._cfg.data.dataloader_type == "single", AssertionError(
             f'Only the Megatron sequential ("single") sampler is currently supported. {self._cfg.data.dataloader_type} was chosen.'
         )
         dataloader = super().build_pretraining_data_loader(
@@ -790,14 +790,14 @@ class ESM2nvModel(ESM1nvModel):
         return dataloader
 
     def setup_validation_data(self, cfg):
-        if hasattr(self, '_validation_ds'):
+        if hasattr(self, "_validation_ds"):
             consumed_samples = 0
             self._validation_dl = self.build_pretraining_data_loader(
                 self._validation_ds, consumed_samples, num_workers=0
             )
 
     def setup_test_data(self, cfg):
-        if hasattr(self, '_test_ds'):
+        if hasattr(self, "_test_ds"):
             consumed_samples = 0
             self._test_dl = self.build_pretraining_data_loader(self._test_ds, consumed_samples, num_workers=0)
 

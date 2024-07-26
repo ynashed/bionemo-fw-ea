@@ -190,7 +190,7 @@ class SaveTrainerFinalMetricCallback(Callback):
 
     def on_train_end(self, trainer, pl_module):
         trainer_results = trainer.logged_metrics
-        logging.info(f'Saving expected training results to {self.log_path}/{self.trainer_log_file}')
+        logging.info(f"Saving expected training results to {self.log_path}/{self.trainer_log_file}")
         save_expected_training_results(
             self.log_path, self.trainer_log_file, {k: trainer_results[k].item() for k in trainer_results.keys()}
         )

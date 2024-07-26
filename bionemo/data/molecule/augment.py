@@ -20,7 +20,7 @@ from rdkit import Chem
 
 MAX_HEXADECIMAL = 2_147_483_647
 
-__all__ = ['MoleculeEnumeration', 'MoleculeInputTargetEnumeration']
+__all__ = ["MoleculeEnumeration", "MoleculeInputTargetEnumeration"]
 
 
 # FIXME: apply masking on ids instead of tokens
@@ -91,7 +91,7 @@ class MoleculeEnumeration:
                     encoder_augment: True
                     decoder_independent_augment: True
         """
-        assert 0 <= augmentation_prob <= 1, 'Augmentation probability should belong to [0, 1] '
+        assert 0 <= augmentation_prob <= 1, "Augmentation probability should belong to [0, 1] "
         self.augmentation_prob = augmentation_prob
         self.tokenizer = tokenizer
         self.seq_length = seq_length
@@ -103,9 +103,7 @@ class MoleculeEnumeration:
                 not encoder_augment
             ), "Augmentation of encoder input and canonicalization of encoder input are mutually exclusive"
         if canonicalize_decoder_output:
-            assert (
-                not decoder_independent_augment
-            ), "Independent augmentation of decoder output and canonicalization of decoder output are mutually exclusive"
+            assert not decoder_independent_augment, "Independent augmentation of decoder output and canonicalization of decoder output are mutually exclusive"
         self.canonicalize_decoder_input = canonicalize_decoder_output
         self.canonicalize_encoder_input = canonicalize_encoder_input
         self.canonicalize_target_smile = canonicalize_target_smile
@@ -120,7 +118,7 @@ class MoleculeEnumeration:
         ), "If masking is enabled, parameters mask_prob and span_lambda must be specified!"
 
         if self.encoder_mask or self.decoder_mask:
-            assert 0 <= self.mask_prob <= 1, 'Masking probability should belong to [0, 1] '
+            assert 0 <= self.mask_prob <= 1, "Masking probability should belong to [0, 1] "
 
     def _smiles_augmeter_func(self, smiles: str, augment_data: bool, canonicalize_input: bool) -> Tuple[str, str]:
         """
@@ -146,13 +144,13 @@ class MoleculeEnumeration:
                 rand_int = torch.randint(low=0, high=MAX_HEXADECIMAL, size=(1,)).item()
                 aug_smiles = Chem.MolToRandomSmilesVect(mol, 1, randomSeed=rand_int)[0]
             except RuntimeError:
-                logging.info(f'Could not generate smiles for {smiles} after augmenting. Forcing canonicalization')
+                logging.info(f"Could not generate smiles for {smiles} after augmenting. Forcing canonicalization")
                 aug_smiles = canon_smiles if canonicalize_input else Chem.MolToSmiles(mol, canonical=True)
         else:
             aug_smiles = Chem.MolToSmiles(mol, doRandom=False, canonical=False)
 
-        assert len(aug_smiles) > 0, AssertionError('Augmented SMILES string is empty')
-        assert len(canon_smiles) > 0, AssertionError('Canonical SMILES string is empty')
+        assert len(aug_smiles) > 0, AssertionError("Augmented SMILES string is empty")
+        assert len(canon_smiles) > 0, AssertionError("Canonical SMILES string is empty")
         return aug_smiles, canon_smiles
 
     def _check_seq_len(
@@ -190,10 +188,10 @@ class MoleculeEnumeration:
         token_output = self.tokenize(batch, mask_data=mask_data)
 
         if mask_data:
-            tokens = token_output['masked_tokens']
-            mask = token_output['token_masks']
+            tokens = token_output["masked_tokens"]
+            mask = token_output["token_masks"]
         else:
-            tokens = token_output['original_tokens']
+            tokens = token_output["original_tokens"]
             mask = [[True] * len(ts) for ts in tokens]  # 1/True = Active, 0/False = Inactive
 
         # Verify sequence length
@@ -305,7 +303,7 @@ class MoleculeEnumeration:
 
         # TODO masks from masked tokens are never used
         tokens_dict = self._prepare_tokens(smiles, mask_data=mask_data)
-        token_ids = [self.tokenizer.token_to_ids(t) for t in tokens_dict['tokens']]
+        token_ids = [self.tokenizer.token_to_ids(t) for t in tokens_dict["tokens"]]
 
         if get_labels:
             label_ids = [sample + [self.tokenizer.eos_id] for sample in token_ids]
@@ -313,15 +311,15 @@ class MoleculeEnumeration:
             label_token_ids = torch.tensor(label_token_ids, dtype=torch.int64)
             loss_mask = torch.tensor(loss_mask, dtype=torch.int64)
             label_token_ids[~loss_mask.to(torch.bool)] = label_pad
-            input_dict['label_ids'] = label_token_ids
-            input_dict['loss_mask'] = loss_mask
+            input_dict["label_ids"] = label_token_ids
+            input_dict["loss_mask"] = loss_mask
 
         if append_bos_token:
             token_ids = [[self.tokenizer.bos_id] + sample for sample in token_ids]
         token_ids, mask = self._pad_seqs(token_ids, self.tokenizer.pad_id)
 
-        input_dict['token_ids'] = torch.tensor(token_ids, dtype=torch.int64)
-        input_dict['mask'] = torch.tensor(mask, dtype=torch.int64)
+        input_dict["token_ids"] = torch.tensor(token_ids, dtype=torch.int64)
+        input_dict["mask"] = torch.tensor(mask, dtype=torch.int64)
         return input_dict
 
     def _get_encoder_decoder_input_smiles(self, batch: List[str]) -> Tuple[List[str], List[str], List[str]]:
@@ -393,13 +391,13 @@ class MoleculeEnumeration:
         )
 
         collate_output = {
-            'text_enc': encoder_input['token_ids'],
-            'enc_mask': encoder_input['mask'],
-            'text_dec': decoder_input['token_ids'],
-            'dec_mask': decoder_input['mask'],
-            'labels': decoder_input['label_ids'],
-            'loss_mask': decoder_input['loss_mask'],
-            'target_smiles': target_smiles,
+            "text_enc": encoder_input["token_ids"],
+            "enc_mask": encoder_input["mask"],
+            "text_dec": decoder_input["token_ids"],
+            "dec_mask": decoder_input["mask"],
+            "labels": decoder_input["label_ids"],
+            "loss_mask": decoder_input["loss_mask"],
+            "target_smiles": target_smiles,
         }  # target smiles strings
 
         return collate_output

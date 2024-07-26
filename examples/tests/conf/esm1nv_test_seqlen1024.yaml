@@ -14,7 +14,7 @@ trainer:
   val_check_interval: 1.0
   limit_val_batches: 1
   accumulate_grad_batches: 1
-    
+
 model:
   seq_length: 1024
   micro_batch_size: 4

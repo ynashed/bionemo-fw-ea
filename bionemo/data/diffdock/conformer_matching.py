@@ -67,7 +67,7 @@ def optimize_rotatable_bonds(
         disp=False,
         seed=seed,
     )
-    opt_mol = apply_changes(opt.mol, result['x'], opt.rotable_bonds, conf_id=probe_id)
+    opt_mol = apply_changes(opt.mol, result["x"], opt.rotable_bonds, conf_id=probe_id)
 
     return opt_mol
 
@@ -113,11 +113,11 @@ def get_torsion_angles(mol):
 
 # GeoMol
 def get_torsions(mol_list):
-    logging.info('USING GEOMOL GET TORSIONS FUNCTION')
+    logging.info("USING GEOMOL GET TORSIONS FUNCTION")
     atom_counter = 0
     torsionList = []
     for m in mol_list:
-        torsionSmarts = '[!$(*#*)&!D1]-&!@[!$(*#*)&!D1]'
+        torsionSmarts = "[!$(*#*)&!D1]-&!@[!$(*#*)&!D1]"
         torsionQuery = Chem.MolFromSmarts(torsionSmarts)
         matches = m.GetSubstructMatches(torsionQuery)
         for match in matches:
@@ -167,7 +167,7 @@ def GetDihedralFromPointCloud(Z, atom_idx):
     b[0] *= -1
     v = np.array([v - (v.dot(b[1]) / b[1].dot(b[1])) * b[1] for v in [b[0], b[2]]])
     # Normalize vectors
-    v /= np.sqrt(np.einsum('...i,...i', v, v)).reshape(-1, 1)
+    v /= np.sqrt(np.einsum("...i,...i", v, v)).reshape(-1, 1)
     b1 = b[1] / np.linalg.norm(b[1])
     x = np.dot(v[0], v[1])
     m = np.cross(v[0], b1)
@@ -213,7 +213,7 @@ def get_von_mises_rms(mol, mol_rdkit, rotable_bonds, conf_id):
 
 def mmff_func(mol):
     mol_mmff = copy.deepcopy(mol)
-    AllChem.MMFFOptimizeMoleculeConfs(mol_mmff, mmffVariant='MMFF94s')
+    AllChem.MMFFOptimizeMoleculeConfs(mol_mmff, mmffVariant="MMFF94s")
     for i in range(mol.GetNumConformers()):
         coords = mol_mmff.GetConformers()[i].GetPositions()
         for j in range(coords.shape[0]):

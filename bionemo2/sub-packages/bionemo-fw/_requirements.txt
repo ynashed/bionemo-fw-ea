@@ -1,2 +1,0 @@
--e ../bionemo-core
-# independent feature package(s)

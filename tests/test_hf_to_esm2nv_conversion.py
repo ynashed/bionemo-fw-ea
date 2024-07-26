@@ -79,7 +79,7 @@ def test_esm2_650m_model_hf_to_nemo_conversion_impulse_response_fp16_on_gpu(esm2
     # less stringent atol since on FP16 and on GPU
     sample_data = load_sample_protein_sequence_data()
     max_absolute_diff, mean_relative_diff = run_impulse_sanity_check(
-        nemo_model, hf_model, sample_data, compare_outputs, model_hf_dtype=args.hf_precision, device='cuda'
+        nemo_model, hf_model, sample_data, compare_outputs, model_hf_dtype=args.hf_precision, device="cuda"
     )
     assert max_absolute_diff <= atol
 
@@ -99,7 +99,7 @@ def test_esm2_3b_model_hf_to_nemo_conversion_impulse_response_fp16_on_gpu(esm2_3
     # less stringent atol since on FP16 and on GPU
     sample_data = load_sample_protein_sequence_data()
     max_absolute_diff, mean_relative_diff = run_impulse_sanity_check(
-        nemo_model, hf_model, sample_data, compare_outputs, model_hf_dtype=args.hf_precision, device='cuda'
+        nemo_model, hf_model, sample_data, compare_outputs, model_hf_dtype=args.hf_precision, device="cuda"
     )
     assert max_absolute_diff <= atol
 
@@ -116,7 +116,7 @@ def test_esm2_650m_model_hf_to_nemo_conversion_impulse_response_wo_apex_on_cpu(e
     # more stringent atol since on CPU we can get better match due to ECC RAM etc
     sample_data = load_sample_protein_sequence_data()
     max_absolute_diff, mean_relative_diff = run_impulse_sanity_check(
-        nemo_model, hf_model, sample_data, compare_outputs, model_hf_dtype=args.hf_precision, device='cpu'
+        nemo_model, hf_model, sample_data, compare_outputs, model_hf_dtype=args.hf_precision, device="cpu"
     )
     assert max_absolute_diff <= atol
 
@@ -134,7 +134,7 @@ def test_esm2_3b_model_hf_to_nemo_conversion_impulse_response_wo_apex_on_cpu(esm
     # more stringent atol since on CPU we can get better match due to ECC RAM etc
     sample_data = load_sample_protein_sequence_data()
     max_absolute_diff, mean_relative_diff = run_impulse_sanity_check(
-        nemo_model, hf_model, sample_data, compare_outputs, model_hf_dtype=args.hf_precision, device='cpu'
+        nemo_model, hf_model, sample_data, compare_outputs, model_hf_dtype=args.hf_precision, device="cpu"
     )
     assert max_absolute_diff <= atol
 
@@ -153,7 +153,7 @@ def test_esm2_650m_model_hf_to_nemo_conversion_parameter_gradient_response_fp16_
 
     sample_data = load_sample_protein_sequence_data()
     max_absolute_diff, mean_relative_diff = run_parameter_gradient_sanity_check(
-        nemo_model, hf_model, sample_data, compare_outputs, model_hf_dtype=args.hf_precision, device='cuda'
+        nemo_model, hf_model, sample_data, compare_outputs, model_hf_dtype=args.hf_precision, device="cuda"
     )
     assert max_absolute_diff <= atol
 
@@ -172,7 +172,7 @@ def test_esm2_3b_model_hf_to_nemo_conversion_parameter_gradient_response_fp16_on
 
     sample_data = load_sample_protein_sequence_data()
     max_absolute_diff, mean_relative_diff = run_parameter_gradient_sanity_check(
-        nemo_model, hf_model, sample_data, compare_outputs, model_hf_dtype=args.hf_precision, device='cuda'
+        nemo_model, hf_model, sample_data, compare_outputs, model_hf_dtype=args.hf_precision, device="cuda"
     )
     assert max_absolute_diff <= atol
 
@@ -207,15 +207,15 @@ def test_esm2_650m_model_hf_to_nemo_conversion_trainable_parameter_count(esm2_65
     padding_weight_params = num_padding_rows * num_padding_weight_cols
     padding_bias_params = num_padding_rows
 
-    num_padding_weight_lm_head_decoder_cols = hf_weights['lm_head.decoder.weight'].size(1)
+    num_padding_weight_lm_head_decoder_cols = hf_weights["lm_head.decoder.weight"].size(1)
     padding_weight_lm_head_decoder_params = num_padding_rows * num_padding_weight_lm_head_decoder_cols
 
     # correct for parameters not included in NeMo ESM model (positional embeddings, contact head)
     contact_head_params = (
-        hf_weights['esm.contact_head.regression.weight'].numel()
-        + hf_weights['esm.contact_head.regression.bias'].numel()
+        hf_weights["esm.contact_head.regression.weight"].numel()
+        + hf_weights["esm.contact_head.regression.bias"].numel()
     )
-    positional_embedding_params = hf_weights['esm.embeddings.position_embeddings.weight'].numel()
+    positional_embedding_params = hf_weights["esm.embeddings.position_embeddings.weight"].numel()
 
     additional_params = (
         additional_rope_params
@@ -258,15 +258,15 @@ def test_esm2_3b_model_hf_to_nemo_conversion_trainable_parameter_count(esm2_3b_h
     padding_weight_params = num_padding_rows * num_padding_weight_cols
     padding_bias_params = num_padding_rows
 
-    num_padding_weight_lm_head_decoder_cols = hf_weights['lm_head.decoder.weight'].size(1)
+    num_padding_weight_lm_head_decoder_cols = hf_weights["lm_head.decoder.weight"].size(1)
     padding_weight_lm_head_decoder_params = num_padding_rows * num_padding_weight_lm_head_decoder_cols
 
     # correct for parameters not included in NeMo ESM model (positional embeddings, contact head)
     contact_head_params = (
-        hf_weights['esm.contact_head.regression.weight'].numel()
-        + hf_weights['esm.contact_head.regression.bias'].numel()
+        hf_weights["esm.contact_head.regression.weight"].numel()
+        + hf_weights["esm.contact_head.regression.bias"].numel()
     )
-    positional_embedding_params = hf_weights['esm.embeddings.position_embeddings.weight'].numel()
+    positional_embedding_params = hf_weights["esm.embeddings.position_embeddings.weight"].numel()
 
     additional_params = (
         additional_rope_params

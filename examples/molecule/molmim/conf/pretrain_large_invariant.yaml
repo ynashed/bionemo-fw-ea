@@ -7,9 +7,9 @@ trainer:
   devices: 8
   num_nodes: 8
 
-model: 
+model:
   name: MolMIM-large
-  
+
   # model architecture
   encoder:
     num_layers: 8

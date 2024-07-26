@@ -13,11 +13,11 @@
 # Usage
 # =========================
 # This is an example script for running a predictive task on BCP.
-# Below is a sample set of parameters for launching ESM-{1,2}nv or ProtT5nv 
+# Below is a sample set of parameters for launching ESM-{1,2}nv or ProtT5nv
 # finetuning for a FLIP downstream task with BioNeMo on BCP clusters.
 # Replace all ?? with appropriate values prior to launching a job.
-# Any parameters not specified in this script, such as the ESM-2 checkpoint size, 
-# can be changed in the yaml config file located in examples/protein/MODEL/conf/ 
+# Any parameters not specified in this script, such as the ESM-2 checkpoint size,
+# can be changed in the yaml config file located in examples/protein/MODEL/conf/
 # directory where MODEL is {esm1nv, esm2nv, prott5nv}.
 
 BIONEMO_IMAGE=?? # BioNeMo container image

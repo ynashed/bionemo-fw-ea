@@ -6,7 +6,7 @@
 ESM-2nv is a protein language model that provides numerical embeddings for each amino acid in a protein sequence. It is developed using the BioNeMo Framework. The embeddings from its encoder can be used as features for predictive models. The ESM-2nv 3B model has 36 layers, 40 attention heads, a hidden space dimension of 2560, and contains 3B parameters. The 650M model has 33 layers, 20 attention heads, a hidden space dimension of 1280, and contains 650M parameters. These models are ready for commercial use. <br>
 
 ## Third-Party Community Consideration
-This model is not owned or developed by NVIDIA. This model has been developed and built to a third-party’s requirements for this application and use case [1]; see link to [Non-NVIDIA Model Card for ESM-2 3B model](https://huggingface.co/facebook/esm2_t36_3B_UR50D) and [non-NVIDIA Model Card for ESM-2 650M model](https://huggingface.co/facebook/esm2_t36_650M_UR50D) 
+This model is not owned or developed by NVIDIA. This model has been developed and built to a third-party’s requirements for this application and use case [1]; see link to [Non-NVIDIA Model Card for ESM-2 3B model](https://huggingface.co/facebook/esm2_t36_3B_UR50D) and [non-NVIDIA Model Card for ESM-2 650M model](https://huggingface.co/facebook/esm2_t36_650M_UR50D)
 
 ## References:
 [1] Lin, Z., Akin, H., Rao, R., Hie, B., Zhu, Z., Lu, W., Smetanin, N., Verkuil, R., Kabeli, O., Shmueli, Y. and dos Santos Costa, A., 2023. Evolutionary-scale prediction of atomic-level protein structure with a language model. Science, 379(6637), pp.1123-1130.
@@ -14,9 +14,9 @@ This model is not owned or developed by NVIDIA. This model has been developed an
 [2] "UniProt: the universal protein knowledgebase in 2021." Nucleic acids research 49, no. D1 (2021): D480-D489.
 
 [3] Devlin, J., Chang, M.W., Lee, K. and Toutanova, K., 2018. Bert: Pre-training of deep bidirectional transformers for language understanding. arXiv preprint arXiv:1810.04805.
-<br> 
+<br>
 
-## Model Architecture: 
+## Model Architecture:
 **Architecture Type:** BERT <br>
 **Network Architecture:** ESM-2 <br>
 
@@ -28,10 +28,10 @@ This model is not owned or developed by NVIDIA. This model has been developed an
 ## Output:
 **Output Type(s):** Text (Protein Sequences) <br>
 **Output Parameters:** 1D <br>
-**Other Properties Related to Output:** Numeric vector with one float-point value corresponding to an embedding for each amino acid in the input protein sequence. Maximum output length is 1022 embeddings - one embedding vector per amino acid. <br> 
+**Other Properties Related to Output:** Numeric vector with one float-point value corresponding to an embedding for each amino acid in the input protein sequence. Maximum output length is 1022 embeddings - one embedding vector per amino acid. <br>
 
 ## Software Integration:
-**Runtime Engine(s):** 
+**Runtime Engine(s):**
 * BioNeMo, NeMo 1.2 <br>
 
 **Supported Hardware Microarchitecture Compatibility:** <br>
@@ -42,10 +42,10 @@ This model is not owned or developed by NVIDIA. This model has been developed an
 **[Preferred/Supported] Operating System(s):** <br>
 * [Linux] <br>
 
-## Model Version(s): 
+## Model Version(s):
 esm2nv_3B_converted.nemo, esm2nv_650M_converted.nemo, version 1.0  <br>
 
-# Training & Evaluation: 
+# Training & Evaluation:
 
 ## Training Dataset:
 
@@ -68,16 +68,16 @@ Unlike ESM-2 pre-training data, the curated pre-training dataset provided with E
 * [Experimentally Measured] <br>
 * [Hybrid: Human & Automated] <br>
 
-**Properties:** 
-The FLIP datasets evaluate the performance of the model on five specific downstream tasks for proteins. It provides pre-defined splits for fine-tuning a pretrained model using task-specific train and validation examples, and subsequently evaluating it on a task-specific test split. 
+**Properties:**
+The FLIP datasets evaluate the performance of the model on five specific downstream tasks for proteins. It provides pre-defined splits for fine-tuning a pretrained model using task-specific train and validation examples, and subsequently evaluating it on a task-specific test split.
 
-The secondary structure FLIP dataset contains experimental secondary structures, with 9712 proteins for model finetuning, 1080 proteins for validation, and 648 proteins for testing. 
+The secondary structure FLIP dataset contains experimental secondary structures, with 9712 proteins for model finetuning, 1080 proteins for validation, and 648 proteins for testing.
 
-Conservation dataset contains conservation scores of the residues of protein sequences with 9392 proteins for training, 555 proteins for validation, and 519 proteins for testing. 
+Conservation dataset contains conservation scores of the residues of protein sequences with 9392 proteins for training, 555 proteins for validation, and 519 proteins for testing.
 
-Subcellular localization dataset contains protein subcellular locations with 9503 proteins for training, 1678 proteins for validation, and 2768 proteins for testing. 
+Subcellular localization dataset contains protein subcellular locations with 9503 proteins for training, 1678 proteins for validation, and 2768 proteins for testing.
 
-Meltome dataset contains experimental melting temperatures for proteins, with 22335 proteins for training, 2482 proteins for validation, and 3134 proteins for testing. 
+Meltome dataset contains experimental melting temperatures for proteins, with 22335 proteins for training, 2482 proteins for validation, and 3134 proteins for testing.
 
 The GB1 activity dataset contains experimental binding affinities of GB1 protein variants with variation at four sites (V39, D40, G41 and V54) measured in a binding assay, with 6289 proteins for training, 699 proteins for validation, and 1745 proteins for testing. <br>
 
@@ -110,9 +110,9 @@ Training speed was tested on DGX-A100 and DGX-H100 systems, on GPUs with 80GB of
 ![ESM2 benchmarks](../../readme-images/esm2_days_to_train.png)
 
 
-Model TFLOPS were collected for trainings of different model sizes of ESM-2nv on DGX-A100 and DGX-H100.  
+Model TFLOPS were collected for trainings of different model sizes of ESM-2nv on DGX-A100 and DGX-H100.
 Two comparisions were made: 1) single-node training using 1 node (8 GPUs), and 2) multi-node training using 8 nodes (64 GPUs).
-While the implementation of EMS2 in BioNeMo FW makes use of dynamic padding, we keep fixed sequence length of 1024. 
+While the implementation of EMS2 in BioNeMo FW makes use of dynamic padding, we keep fixed sequence length of 1024.
 All models were trained using tensor model parallel of 1 and accumulated gradient of 32, but batch sizes and pipeline model parallel depend on model size:
 * ESM-2nv 650M: 650M parameter model, batch size of 16, pipeline parallel 1
 * ESM-2nv 3B: 3B parameters model, batch size of 4, pipeline parallel 4

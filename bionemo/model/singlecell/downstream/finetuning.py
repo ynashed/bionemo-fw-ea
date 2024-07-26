@@ -39,7 +39,7 @@ class FineTuneGeneformerModel(EncoderFineTuning):
     def __init__(self, cfg, trainer, **kwargs):
         # This changed too.
         self.encoder_frozen = cfg.encoder_frozen
-        self.use_peft = cfg.get('peft.enabled', False)
+        self.use_peft = cfg.get("peft.enabled", False)
         self.task_type = cfg.data.task_type
         super().__init__(cfg, trainer=trainer)
         self.tokenizer = self.encoder_model.model.tokenizer
@@ -59,7 +59,7 @@ class FineTuneGeneformerModel(EncoderFineTuning):
         return loss
 
     def build_task_head(self) -> MLPModel:
-        if self.task_type in ['regression', 'classification']:
+        if self.task_type in ["regression", "classification"]:
             task_head = MLPModel(
                 layer_sizes=[
                     self.encoder_model.cfg.model.input_size,
@@ -113,7 +113,7 @@ class FineTuneGeneformerModel(EncoderFineTuning):
             Sequence: The embeddings extracted from the model.
 
         """
-        input_ids = batch.get('input_ids')
+        input_ids = batch.get("input_ids")
         token_types = batch.get("types", None)
         padding_mask = batch.get("padding_mask")
         embeddings = model.extract_embeddings(input_ids, padding_mask, token_type_ids=token_types)
@@ -137,7 +137,7 @@ class FineTuneGeneformerModel(EncoderFineTuning):
 
     def _calc_step(self, batch: dict, batch_idx: int) -> tuple:
         output_tensor = self.forward(batch)
-        target = batch['target']
+        target = batch["target"]
         loss = self.loss_fn(output_tensor, target)
         return loss, output_tensor, target
 

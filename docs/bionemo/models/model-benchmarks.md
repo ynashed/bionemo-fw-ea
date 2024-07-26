@@ -29,7 +29,7 @@ ESM models listed below are tested as deployed in BioNeMo.
 | ESM2 T36 3B UR50D   | 0.861        | ProtT5                         | 0.820        | ESM2 T48 15B UR50D  | 0.340        |
 | ESM2 T48 15B UR50D  | 0.867        | ESM2 T48 15B UR50D             | 0.839        | ProtT5              | 0.343        |
 
-**Regression Metric Values** 
+**Regression Metric Values**
 
 | Meltome             |        | GB1 Binding Activity |        |
 |---------------------|--------|----------------------|--------|

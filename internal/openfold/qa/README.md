@@ -1,5 +1,5 @@
 ## General Instructions
-For all of these test cases, the correct docker image should be specified. They are launched as sbatch path-to-script/launch_qa_testcase_{test number}.sh. 
+For all of these test cases, the correct docker image should be specified. They are launched as sbatch path-to-script/launch_qa_testcase_{test number}.sh.
 
 ## Test Case 1
 Tests openfold training on a single node. Dataset at ${INPUT_DIR} is needed. AWS and NGC credentials are not needed.
@@ -27,4 +27,3 @@ Runs intitial training with MLPerf optimization on multiple nodes. AWS credentia
 
 ## Test	Case 9
 Runs initial training on a single node with the priority queue dataloader. AWS and NGC credentials are not needed.
-

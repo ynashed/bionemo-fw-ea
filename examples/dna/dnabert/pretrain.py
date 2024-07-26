@@ -23,7 +23,7 @@ from bionemo.utils.connectors import BioNeMoSaveRestoreConnector
 @hydra_runner(config_path="conf", config_name="dnabert_config")
 def main(cfg) -> None:
     logging.info("\n\n************** Experiment configuration ***********")
-    logging.info(f'\n{OmegaConf.to_yaml(cfg)}')
+    logging.info(f"\n{OmegaConf.to_yaml(cfg)}")
 
     np.random.seed(cfg.model.seed)
     pl.seed_everything(cfg.model.seed)
@@ -58,5 +58,5 @@ def main(cfg) -> None:
         logging.info("*************** Finish Preprocessing ************")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

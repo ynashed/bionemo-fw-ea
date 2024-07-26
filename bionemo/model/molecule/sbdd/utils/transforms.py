@@ -16,33 +16,33 @@ from bionemo.data.sbdd import utils_data
 from bionemo.data.sbdd.pl_data import ProteinLigandData
 
 
-AROMATIC_FEAT_MAP_IDX = utils_data.ATOM_FAMILIES_ID['Aromatic']
+AROMATIC_FEAT_MAP_IDX = utils_data.ATOM_FAMILIES_ID["Aromatic"]
 
 # For CrossDocked2020 only atomic number 1, 6, 7, 8, 9, 15, 16, 17 exist
 MAP_ATOM_TYPE_FULL_TO_INDEX = {
-    (1, 'S', False): 0,
-    (6, 'SP', False): 1,
-    (6, 'SP2', False): 2,
-    (6, 'SP2', True): 3,
-    (6, 'SP3', False): 4,
-    (7, 'SP', False): 5,
-    (7, 'SP2', False): 6,
-    (7, 'SP2', True): 7,
-    (7, 'SP3', False): 8,
-    (8, 'SP2', False): 9,
-    (8, 'SP2', True): 10,
-    (8, 'SP3', False): 11,
-    (9, 'SP3', False): 12,
-    (15, 'SP2', False): 13,
-    (15, 'SP2', True): 14,
-    (15, 'SP3', False): 15,
-    (15, 'SP3D', False): 16,
-    (16, 'SP2', False): 17,
-    (16, 'SP2', True): 18,
-    (16, 'SP3', False): 19,
-    (16, 'SP3D', False): 20,
-    (16, 'SP3D2', False): 21,
-    (17, 'SP3', False): 22,
+    (1, "S", False): 0,
+    (6, "SP", False): 1,
+    (6, "SP2", False): 2,
+    (6, "SP2", True): 3,
+    (6, "SP3", False): 4,
+    (7, "SP", False): 5,
+    (7, "SP2", False): 6,
+    (7, "SP2", True): 7,
+    (7, "SP3", False): 8,
+    (8, "SP2", False): 9,
+    (8, "SP2", True): 10,
+    (8, "SP3", False): 11,
+    (9, "SP3", False): 12,
+    (15, "SP2", False): 13,
+    (15, "SP2", True): 14,
+    (15, "SP3", False): 15,
+    (15, "SP3D", False): 16,
+    (16, "SP2", False): 17,
+    (16, "SP2", True): 18,
+    (16, "SP3", False): 19,
+    (16, "SP3D", False): 20,
+    (16, "SP3D2", False): 21,
+    (17, "SP3", False): 22,
 }
 
 MAP_ATOM_TYPE_ONLY_TO_INDEX = {
@@ -78,11 +78,11 @@ MAP_INDEX_TO_ATOM_TYPE_FULL = {v: k for k, v in MAP_ATOM_TYPE_FULL_TO_INDEX.item
 
 
 def get_atomic_number_from_index(index: torch.Tensor, mode: str):
-    if mode == 'basic':
+    if mode == "basic":
         atomic_number = [MAP_INDEX_TO_ATOM_TYPE_ONLY[i] for i in index.tolist()]
-    elif mode == 'add_aromatic':
+    elif mode == "add_aromatic":
         atomic_number = [MAP_INDEX_TO_ATOM_TYPE_AROMATIC[i][0] for i in index.tolist()]
-    elif mode == 'full':
+    elif mode == "full":
         atomic_number = [MAP_INDEX_TO_ATOM_TYPE_FULL[i][0] for i in index.tolist()]
     else:
         raise ValueError
@@ -90,11 +90,11 @@ def get_atomic_number_from_index(index: torch.Tensor, mode: str):
 
 
 def is_aromatic_from_index(index: torch.Tensor, mode: str):
-    if mode == 'add_aromatic':
+    if mode == "add_aromatic":
         is_aromatic = [MAP_INDEX_TO_ATOM_TYPE_AROMATIC[i][1] for i in index.tolist()]
-    elif mode == 'full':
+    elif mode == "full":
         is_aromatic = [MAP_INDEX_TO_ATOM_TYPE_FULL[i][2] for i in index.tolist()]
-    elif mode == 'basic':
+    elif mode == "basic":
         is_aromatic = None
     else:
         raise ValueError
@@ -102,7 +102,7 @@ def is_aromatic_from_index(index: torch.Tensor, mode: str):
 
 
 def get_hybridization_from_index(index: torch.Tensor, mode: str):
-    if mode == 'full':
+    if mode == "full":
         hybridization = [MAP_INDEX_TO_ATOM_TYPE_AROMATIC[i][1] for i in index.tolist()]
     else:
         raise ValueError
@@ -110,9 +110,9 @@ def get_hybridization_from_index(index: torch.Tensor, mode: str):
 
 
 def get_index(atom_num: int, hybridization: int, is_aromatic: int, mode: str):
-    if mode == 'basic':
+    if mode == "basic":
         return MAP_ATOM_TYPE_ONLY_TO_INDEX[int(atom_num)]
-    elif mode == 'add_aromatic':
+    elif mode == "add_aromatic":
         if (int(atom_num), bool(is_aromatic)) in MAP_ATOM_TYPE_AROMATIC_TO_INDEX:
             return MAP_ATOM_TYPE_AROMATIC_TO_INDEX[int(atom_num), bool(is_aromatic)]
         else:
@@ -142,16 +142,16 @@ class FeaturizeProteinAtom(object):
 
 
 class FeaturizeLigandAtom(object):
-    def __init__(self, mode='basic'):
+    def __init__(self, mode="basic"):
         super().__init__()
-        assert mode in ['basic', 'add_aromatic', 'full']
+        assert mode in ["basic", "add_aromatic", "full"]
         self.mode = mode
 
     @property
     def feature_dim(self):
-        if self.mode == 'basic':
+        if self.mode == "basic":
             return len(MAP_ATOM_TYPE_ONLY_TO_INDEX)
-        elif self.mode == 'add_aromatic':
+        elif self.mode == "add_aromatic":
             return len(MAP_ATOM_TYPE_AROMATIC_TO_INDEX)
         else:
             return len(MAP_ATOM_TYPE_FULL_TO_INDEX)

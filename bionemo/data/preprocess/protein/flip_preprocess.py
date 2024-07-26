@@ -19,9 +19,9 @@ import pyfastx
 from nemo.utils import logging
 
 
-__all__ = ['FLIPPreprocess']
+__all__ = ["FLIPPreprocess"]
 
-ROOT_DIR = '/tmp/FLIP'
+ROOT_DIR = "/tmp/FLIP"
 
 SEQUENCE_FNAME = {
     "aav": "seven_vs_many.fasta",
@@ -155,11 +155,11 @@ class FLIPPreprocess:
         else:
             seq_attr = get_attributes_from_seq(sequence_indexer)
             name_to_labels = {key: seq_attr[key]["TARGET"] for key in seq_attr.keys()}
-        for split_name, record_id_list in zip(['train', 'val', 'test'], [train_samples, val_samples, test_samples]):
-            logging.info(f'Saving {split_name} split...')
+        for split_name, record_id_list in zip(["train", "val", "test"], [train_samples, val_samples, test_samples]):
+            logging.info(f"Saving {split_name} split...")
 
             for file_index, record_id_split in enumerate(np.array_split(record_id_list, num_csv_files)):
-                logging.debug(f'Writing file number {file_index}...')
+                logging.debug(f"Writing file number {file_index}...")
                 self._csv_files_writer(
                     record_id_list=record_id_split,
                     file_index=file_index,
@@ -186,11 +186,11 @@ class FLIPPreprocess:
     ):
         split_path = os.path.join(output_dir, split_name)
         pathlib.Path(split_path).mkdir(parents=True, exist_ok=True)
-        file_name = os.path.join(split_path, f'x{str(file_index).zfill(3)}.csv')
+        file_name = os.path.join(split_path, f"x{str(file_index).zfill(3)}.csv")
 
-        with open(file_name, 'w') as fh:
+        with open(file_name, "w") as fh:
             header_str = ",".join(HEADER[task_name])
-            fh.write(header_str + '\n')
+            fh.write(header_str + "\n")
             for record_id in record_id_list:
                 sequence = seq_dict[record_id]
                 labels = labels_dict[record_id]
@@ -199,7 +199,7 @@ class FLIPPreprocess:
                     output = delimiter.join([record_id, sequence, labels, str(mask)])
                 else:
                     output = delimiter.join([record_id, sequence, labels])
-                fh.write(output + '\n')
+                fh.write(output + "\n")
         return
 
     def prepare_all_datasets(self, output_dir="/data/FLIP", num_csv_files=1):
@@ -220,7 +220,7 @@ class FLIPPreprocess:
             url (str): URL for FLIP SS dataset location.
             num_csv_files (int): Number of CSV files to create for each train/val/test split.
         """
-        download_dir = os.path.join(self.root_directory, task_name, 'raw')
+        download_dir = os.path.join(self.root_directory, task_name, "raw")
         exists = os.path.exists(output_dir)
         if not exists:
             os.makedirs(output_dir)
@@ -234,15 +234,15 @@ class FLIPPreprocess:
             resolved_indexer = pyfastx.Fasta(resolved_path, build_index=True, uppercase=True)
         else:
             resolved_indexer = None
-        logging.info('FLIP data download complete.')
+        logging.info("FLIP data download complete.")
 
-        logging.info('Processing FLIP dataset.')
+        logging.info("Processing FLIP dataset.")
         if labels_indexer is not None:
             train_samples, val_samples, test_samples = self.get_train_val_test_splits(labels_indexer)
         else:
             train_samples, val_samples, test_samples = self.get_train_val_test_splits(sequence_indexer)
 
-        logging.info(f'Writing processed dataset files to {output_dir}...')
+        logging.info(f"Writing processed dataset files to {output_dir}...")
         self.write_csv_files(
             train_samples=train_samples,
             val_samples=val_samples,
@@ -254,4 +254,4 @@ class FLIPPreprocess:
             output_dir=output_dir,
             task_name=task_name,
         )
-        logging.info('FLIP dataset preprocessing completed')
+        logging.info("FLIP dataset preprocessing completed")

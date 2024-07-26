@@ -154,7 +154,7 @@ class BertLoRAModel(MegatronBertPEFTModel):
         if cfg.get("kv_channels", None) is None:
             assert (
                 cfg.hidden_size % cfg.num_attention_heads == 0
-            ), 'hidden_size must be divisible by num_attention_heads if kv_channels is None'
+            ), "hidden_size must be divisible by num_attention_heads if kv_channels is None"
             kv_channels = cfg.hidden_size // cfg.num_attention_heads
         else:
             kv_channels = cfg.kv_channels

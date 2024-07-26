@@ -149,7 +149,7 @@ class ESMnvCoreAttention(CoreAttention):
             # otherwise, only relative positional embedding takes effect
             # value_layer = apply_rotary_pos_emb(value_layer, k_pos_emb)
 
-        if self.position_embedding_type.lower() == 'xpos':
+        if self.position_embedding_type.lower() == "xpos":
             query_layer = self.xpos(query_layer, offset=key_layer.shape[-2] - query_layer.shape[-2], downscale=False)
             key_layer = self.xpos(key_layer, offset=0, downscale=True)
 
@@ -237,13 +237,13 @@ class ESMnvCoreAttention(CoreAttention):
         sk = key_layer.shape[0]
 
         if self.multi_query_attention:
-            query_layer = rearrange(query_layer, 'sq b np hn -> b (np sq) hn')
-            key_layer = rearrange(key_layer, 'sk b 1 hn -> b hn sk')
-            value_layer = rearrange(value_layer, 'sv b np hn -> (b np) sv hn')
+            query_layer = rearrange(query_layer, "sq b np hn -> b (np sq) hn")
+            key_layer = rearrange(key_layer, "sk b 1 hn -> b hn sk")
+            value_layer = rearrange(value_layer, "sv b np hn -> (b np) sv hn")
         else:
-            query_layer = rearrange(query_layer, 'sq b np hn -> (b np) sq hn')
-            key_layer = rearrange(key_layer, 'sk b np hn -> (b np) hn sk')
-            value_layer = rearrange(value_layer, 'sv b np hn -> (b np) sv hn')
+            query_layer = rearrange(query_layer, "sq b np hn -> (b np) sq hn")
+            key_layer = rearrange(key_layer, "sk b np hn -> (b np) hn sk")
+            value_layer = rearrange(value_layer, "sv b np hn -> (b np) sv hn")
 
         matmul_input_buffer = torch.zeros(
             query_layer.shape[0],
@@ -287,13 +287,13 @@ class ESMnvCoreAttention(CoreAttention):
             attention_probs = self.attention_dropout(attention_probs)
 
         # change view [b * np, sq, sk]
-        attention_probs = rearrange(attention_probs, 'b np sq sk -> (b np) sq sk')
+        attention_probs = rearrange(attention_probs, "b np sq sk -> (b np) sq sk")
 
         # matmul: [b * np, sq, hn]
         context_layer = torch.bmm(attention_probs, value_layer)
 
         # change view [b, np, sq, hn]
-        context_layer = rearrange(context_layer, '(b np) sq hn -> b np sq hn', np=np)
+        context_layer = rearrange(context_layer, "(b np) sq hn -> b np sq hn", np=np)
 
         if self.return_intermediate:
             return context_layer, attention_probs, attention_scores
@@ -322,7 +322,7 @@ class ESMnvParallelAttention(ParallelAttention):
         megatron_legacy=False,
         bias=True,
         headscale=False,
-        position_embedding_type='learned_absolute',
+        position_embedding_type="learned_absolute",
         multi_query_attention=False,
         normalize_attention_scores=True,
         use_flash_attention=False,
@@ -355,7 +355,7 @@ class ESMnvParallelAttention(ParallelAttention):
         if kv_channels is None:
             assert (
                 hidden_size % num_attention_heads == 0
-            ), 'hidden_size must be divisible by num_attention_heads if kv_channels is None'
+            ), "hidden_size must be divisible by num_attention_heads if kv_channels is None"
             kv_channels = hidden_size // num_attention_heads
         projection_size = kv_channels * num_attention_heads
 

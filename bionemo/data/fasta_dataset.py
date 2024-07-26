@@ -62,18 +62,18 @@ class _FetchFastxBackend:
 
 
 BACKENDS = {
-    'file': _FetchFastxBackend,
-    'memory': _InMemoryFastxBackend,
+    "file": _FetchFastxBackend,
+    "memory": _InMemoryFastxBackend,
 }
 
 
 class SafePyfastxFasta:
-    '''SafePyfastxFasta provides safety pytorch distributed by ensuring the pyfastx indexes are created only once.
+    """SafePyfastxFasta provides safety pytorch distributed by ensuring the pyfastx indexes are created only once.
     Previously, when more than one device was configured, a race condition would occur where all workers would try to build an index.
     If an index file already existed, the worker would attempt to use it, leading to a crash. This extension guards against this scenario.
 
     Since the original pyfastx is marked as final, we must override getattribute to mimic inheritence.
-    '''
+    """
 
     def __init__(self, *args, **kwargs):
         if distributed.is_available():
@@ -86,8 +86,8 @@ class SafePyfastxFasta:
             return pyfastx.Fasta(*args, **kwargs)
 
     def __getattribute__(self, __name: str):
-        fa = object.__getattribute__(self, 'fasta')
-        if __name == 'fasta':
+        fa = object.__getattribute__(self, "fasta")
+        if __name == "fasta":
             return fa
         else:
             return getattr(fa, __name)
@@ -125,7 +125,7 @@ class PyfastxFastaDataset(Dataset):
 
     """
 
-    def __init__(self, fastx_file, max_length, backend='file'):
+    def __init__(self, fastx_file, max_length, backend="file"):
         """
 
         Arguments:
@@ -172,9 +172,9 @@ class PyfastxFastaDataset(Dataset):
         position_end = int(position_start + self.max_length)
         text = self.backend.fetch(contig_name, position_start, position_end)
         return {
-            'seq': text,
-            'contig': contig_name,
-            'start': position_start,
+            "seq": text,
+            "contig": contig_name,
+            "start": position_start,
         }
 
 
@@ -224,7 +224,7 @@ class InternallyIndexedFastaMemMapDataset(Dataset):
         self.dataset_paths = dataset_paths
         self._dataset = TextMemMapDataset(
             dataset_paths,
-            newline_int=ord('>'),
+            newline_int=ord(">"),
             header_lines=1,
             workers=workers,
             sort_dataset_paths=sort_dataset_paths,
@@ -247,7 +247,7 @@ class InternallyIndexedFastaMemMapDataset(Dataset):
             _, mdata, start, end = self.get_fileid_mdata_start_end(self._dataset, idx)
             segment = mdata[start:end]
             # newlines tracks the locations of newline characters
-            newlines = np.where(segment == ord('\n'))[0]
+            newlines = np.where(segment == ord("\n"))[0]
             # make correction to the index if there are no newlines at end of file
             if newlines[-1] != len(segment) - 1:
                 newlines = np.concatenate([newlines, [len(segment)]])
@@ -299,9 +299,9 @@ class InternallyIndexedFastaMemMapDataset(Dataset):
         seq_end = start + newlines[end_line] + consume_trailing_chars + 1
 
         return {
-            'seq': mdata[seq_start:seq_end].tobytes().decode().replace('\n', ''),
-            'contig': mdata[start : start + newlines[0]].tobytes().decode(),
-            'start': position_within_entry,
+            "seq": mdata[seq_start:seq_end].tobytes().decode().replace("\n", ""),
+            "contig": mdata[start : start + newlines[0]].tobytes().decode(),
+            "start": position_within_entry,
         }
 
     @staticmethod
@@ -385,7 +385,7 @@ class DiscretizeFastaDataset(MappedDataset):
 
 
 class ConcatFastaDataset(Dataset):
-    def __init__(self, files, max_length, backend='file', uppercase=False, transforms=None):
+    def __init__(self, files, max_length, backend="file", uppercase=False, transforms=None):
         """
         Constructs a dataset consisting of multiple FASTA files.
 
@@ -427,7 +427,7 @@ class ConcatFastaDataset(Dataset):
 
     def build_id_index(self):
         for ds in self.datasets:
-            if hasattr(ds, 'ids'):
+            if hasattr(ds, "ids"):
                 for key in ds.ids():
                     # TODO warn for overriding key?
                     self.ids[key] = ds
@@ -460,7 +460,7 @@ def pyfastx_constructor(builder, discretize, max_length):
     return ConcatFastaDataset(
         builder.dataset_paths,
         max_length,
-        backend=builder.options['dataset_backend'],
+        backend=builder.options["dataset_backend"],
         transforms=transforms,
     )
 
@@ -477,14 +477,14 @@ def fasta_memmap_constructor(builder, discretize, max_length):
 
 
 tokenizers = {
-    'kmer': KmerTokenizer,
+    "kmer": KmerTokenizer,
 }
 
 adapters = {
-    'kmer': KmerTokenizerAdapter,
+    "kmer": KmerTokenizerAdapter,
 }
 
-dataset_constructors = {'pyfastx': pyfastx_constructor, 'memmap': fasta_memmap_constructor}
+dataset_constructors = {"pyfastx": pyfastx_constructor, "memmap": fasta_memmap_constructor}
 
 
 class FastaDatasetBuilder(DatasetBuilderSpec):
@@ -493,7 +493,7 @@ class FastaDatasetBuilder(DatasetBuilderSpec):
         Parses FASTA paths.
 
         """
-        self.dataset_paths = expand_dataset_paths(self.options['filepath'], None)
+        self.dataset_paths = expand_dataset_paths(self.options["filepath"], None)
 
     def check_path(self, filepath):
         """
@@ -517,9 +517,9 @@ class FastaDatasetBuilder(DatasetBuilderSpec):
         Returns:
             Dataset: Dataset instantiated from paths.
         """
-        cfg = self.options['cfg']
-        discretize = self.options['discretize']
-        dataset_class = self.options['dataset_class']
+        cfg = self.options["cfg"]
+        discretize = self.options["discretize"]
+        dataset_class = self.options["dataset_class"]
         max_length = cfg.seq_length - 1 + cfg.k
         constructor = dataset_constructors[dataset_class]
         self.dataset = constructor(self, discretize=discretize, max_length=max_length)
@@ -551,16 +551,16 @@ class DNABERTDatasetFactory(FormattedDatasetFactory):
         Initializes a dataset factory for handling fasta formats.
         """
         self.formats = {
-            'fasta': FastaDatasetBuilder,
+            "fasta": FastaDatasetBuilder,
         }
 
 
 tokenizers = {
-    'kmer': KmerTokenizer,
+    "kmer": KmerTokenizer,
 }
 
 adapters = {
-    'kmer': KmerTokenizerAdapter,
+    "kmer": KmerTokenizerAdapter,
 }
 
 
@@ -588,35 +588,35 @@ class DNABERTDataModule(BioNeMoDataModule):
     def _configure_options(self, name, ds):
         cfg = deepcopy(self.cfg)
         with open_dict(cfg):
-            dataset_path = cfg.get('dataset_path', '')
-            dataset_format = cfg.get('dataset_format')
-            dataset_class = cfg.get('dataset_class', 'memmap')
-            dataset_backend = cfg.get('dataset_backend')
-            if dataset_class == 'pyfastx':
+            dataset_path = cfg.get("dataset_path", "")
+            dataset_format = cfg.get("dataset_format")
+            dataset_class = cfg.get("dataset_class", "memmap")
+            dataset_backend = cfg.get("dataset_backend")
+            if dataset_class == "pyfastx":
                 if dataset_backend not in BACKENDS.keys():
                     raise ValueError(
-                        f'dataset_backend={dataset_backend} for dataset_class='
-                        f'{dataset_class} must be configured to one of: '
-                        f'{BACKENDS.keys()}'
+                        f"dataset_backend={dataset_backend} for dataset_class="
+                        f"{dataset_class} must be configured to one of: "
+                        f"{BACKENDS.keys()}"
                     )
 
         # Build individual datasets.
         filepath = os.path.join(dataset_path, name, ds)
 
         options = {
-            'cfg': cfg,
-            'filepath': filepath,
-            'dataset_format': dataset_format,
-            'batch_size': self.get_global_batch_size(),
-            'dataset_class': dataset_class,
-            'dataset_backend': dataset_backend,
+            "cfg": cfg,
+            "filepath": filepath,
+            "dataset_format": dataset_format,
+            "batch_size": self.get_global_batch_size(),
+            "dataset_class": dataset_class,
+            "dataset_backend": dataset_backend,
         }
         return options
 
     @staticmethod
     def _custom_get_sentence(x):
-        '''Replaces lambda usage below so this can be properly pickled.'''
-        return x['seq']
+        """Replaces lambda usage below so this can be properly pickled."""
+        return x["seq"]
 
     @staticmethod
     def _get_random_length_truncator():
@@ -656,9 +656,9 @@ class DNABERTDataModule(BioNeMoDataModule):
 
         """
         ds = self.cfg.dataset.train
-        name = 'train'
+        name = "train"
         options = self._configure_options(name, ds)
-        options['discretize'] = self.cfg.discretize_train
+        options["discretize"] = self.cfg.discretize_train
 
         dataset = DNABERTDatasetFactory().create_dataset(options)
         return dataset
@@ -669,7 +669,7 @@ class DNABERTDataModule(BioNeMoDataModule):
         num_samples = self.train_num_samples
         dataset_dir = os.path.join(
             self.cfg.dataset_path,
-            'train',
+            "train",
         )
         dataset = ResamplingMappedDataset(
             dataset,
@@ -677,7 +677,7 @@ class DNABERTDataModule(BioNeMoDataModule):
             cfg=self.cfg,
             data_prefix=self.cfg.dataset.train,
             index_mapping_dir=dataset_dir,
-            name='train',
+            name="train",
         )
         return dataset
 
@@ -686,10 +686,10 @@ class DNABERTDataModule(BioNeMoDataModule):
         Produces a discretized FASTA dataset to use for validation.
         """
         ds = self.cfg.dataset.val
-        name = 'val'
+        name = "val"
         options = self._configure_options(name, ds)
-        options['discretize'] = True
-        options['name'] = 'val'
+        options["discretize"] = True
+        options["name"] = "val"
         dataset = DNABERTDatasetFactory().create_dataset(options)
         return dataset
 
@@ -698,7 +698,7 @@ class DNABERTDataModule(BioNeMoDataModule):
         num_samples = self.val_num_samples
         dataset_dir = os.path.join(
             self.cfg.dataset_path,
-            'val',
+            "val",
         )
         dataset = ResamplingMappedDataset(
             dataset,
@@ -706,7 +706,7 @@ class DNABERTDataModule(BioNeMoDataModule):
             cfg=self.cfg,
             data_prefix=self.cfg.dataset.val,
             index_mapping_dir=dataset_dir,
-            name='val',
+            name="val",
         )
         return dataset
 
@@ -715,9 +715,9 @@ class DNABERTDataModule(BioNeMoDataModule):
         Produces a discretized FASTA dataset to use for testing.
         """
         ds = self.cfg.dataset.test
-        name = 'test'
+        name = "test"
         options = self._configure_options(name, ds)
-        options['discretize'] = True
+        options["discretize"] = True
         return DNABERTDatasetFactory().create_dataset(options)
 
     def adjust_train_dataloader(self, model, dataloader):

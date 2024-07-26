@@ -87,14 +87,14 @@ def format_predictions(
     # but always remove 'mask'
     for p in predictions:
         if extract_hiddens:
-            if 'hiddens' in p and 'mask' in p:
-                p["hiddens"] = p['hiddens'][p['mask']]
-                del p['mask']
+            if "hiddens" in p and "mask" in p:
+                p["hiddens"] = p["hiddens"][p["mask"]]
+                del p["mask"]
         else:
-            if 'mask' in p:
-                del p['mask']
-            if 'hiddens' in p:
-                del p['hiddens']
+            if "mask" in p:
+                del p["mask"]
+            if "hiddens" in p:
+                del p["hiddens"]
 
     return predictions
 
@@ -183,7 +183,7 @@ def main(config_path: str, config_name: str, output_override: Optional[str], ove
     print(f"Loading config from:                   {str(Path(config_path) / config_name)}")
     print(f"Override output location from config?: {output_override}")
     print("Overwrite output file if it exists?", {overwrite})
-    print('-' * 80)
+    print("-" * 80)
 
     cfg = load_model_config(config_name=config_name, config_path=config_path, logger=logging)
 
@@ -204,16 +204,16 @@ def main(config_path: str, config_name: str, output_override: Optional[str], ove
 
 
 @click.command()
-@click.option('--config-path', required=True, help="Path to Hydra config directory where configuration date lives.")
+@click.option("--config-path", required=True, help="Path to Hydra config directory where configuration date lives.")
 @click.option(
-    '--config-name',
-    default='infer.yaml',
+    "--config-name",
+    default="infer.yaml",
     show_default=True,
     required=True,
     help="Name of YAML config file in --config-path to load from.",
 )
 @click.option(
-    '--output',
+    "--output",
     required=False,
     help="An override to where to write the pickled predictions. "
     "If unset, then the model.data.output_fname value from the configuration is used. "
@@ -221,7 +221,7 @@ def main(config_path: str, config_name: str, output_override: Optional[str], ove
     "Note that this filepath must not exist: exsiting content will *not* be overwritten.",
 )
 @click.option(
-    '--overwrite',
+    "--overwrite",
     is_flag=True,
     help="If present, will overwrite the output file. Defaults to not overwrite and return a non-zero exit code.",
 )
@@ -229,5 +229,5 @@ def entrypoint(config_path: str, config_name: str, output: Optional[str], overwr
     main(config_path, config_name, output, overwrite)
 
 
-if __name__ == '__main__':  # pragma: no cover
+if __name__ == "__main__":  # pragma: no cover
     entrypoint()

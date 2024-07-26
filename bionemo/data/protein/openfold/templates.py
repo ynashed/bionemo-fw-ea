@@ -466,27 +466,19 @@ def _featurize_template_hit(
     ) as e:
         # These 3 errors indicate missing mmCIF experimental data rather than
         # a problem with the template search.
-        error = (
-            "{type_e}: {str_e} ;"
-            " sum_probs={sum_probs:.2f},"
-            " rank_index={rank_index}".format(
-                type_e=type(e),
-                str_e=str(e),
-                sum_probs=template_hit.sum_probs,
-                rank_index=template_hit.index,
-            )
+        error = "{type_e}: {str_e} ;" " sum_probs={sum_probs:.2f}," " rank_index={rank_index}".format(
+            type_e=type(e),
+            str_e=str(e),
+            sum_probs=template_hit.sum_probs,
+            rank_index=template_hit.index,
         )
         return TemplateFeaturesResult(features=None, error=error, warning=None)
     except QueryToTemplateAlignError as e:
-        error = (
-            "{type_e}: {str_e} ;"
-            " sum_probs={sum_probs:.2f},"
-            " rank_index={rank_index}".format(
-                type_e=type(e),
-                str_e=str(e),
-                sum_probs=template_hit.sum_probs,
-                rank_index=template_hit.index,
-            )
+        error = "{type_e}: {str_e} ;" " sum_probs={sum_probs:.2f}," " rank_index={rank_index}".format(
+            type_e=type(e),
+            str_e=str(e),
+            sum_probs=template_hit.sum_probs,
+            rank_index=template_hit.index,
         )
         return TemplateFeaturesResult(features=None, error=error, warning=None)
 
@@ -877,8 +869,7 @@ def _realign_pdb_template_to_query(
         )
     except (RuntimeError, ValueError) as e:
         raise QueryToTemplateAlignError(
-            "Could not align old template {ots} to template {nts} ({tid})."
-            " {type_e}: {str_e}".format(
+            "Could not align old template {ots} to template {nts} ({tid})." " {type_e}: {str_e}".format(
                 ots=repr(old_template_sequence),
                 nts=repr(new_template_sequence),
                 tid=repr(mmcif_dict["pdb_id"] + "_" + template_chain_id),

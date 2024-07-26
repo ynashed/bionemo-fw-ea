@@ -38,13 +38,13 @@ DECODES: Literal["decodes"] = "decodes"
 
 HIDDENS: Literal["hiddens"] = "hiddens"
 
-SAMPLINGS: Literal['samplings'] = "samplings"
+SAMPLINGS: Literal["samplings"] = "samplings"
 
-BIONEMO_MODEL: Literal['bionemo_model'] = "bionemo_model"
+BIONEMO_MODEL: Literal["bionemo_model"] = "bionemo_model"
 
-GENERATED: Literal['generated'] = "generated"
+GENERATED: Literal["generated"] = "generated"
 
-MASK: Literal['mask'] = "mask"
+MASK: Literal["mask"] = "mask"
 
 StrArray = np.ndarray[Tuple[Literal[1]], bytes]
 """A string of characters, as a UTF-8 encoded bytestring, implemented as a single-dimension NumPy array.
@@ -52,7 +52,7 @@ StrArray = np.ndarray[Tuple[Literal[1]], bytes]
 NOTE: Only useful for Triton inference functions use the `@batch` decorator.
 """
 
-NamedArrays = TypeVar('NamedArrays', bound=Dict[str, np.ndarray])
+NamedArrays = TypeVar("NamedArrays", bound=Dict[str, np.ndarray])
 """Format of I/O for Triton inference functions: a collection of possibly batched arrays, identified by names.
 
 Note that for a Triton model service, all of the underlying model's output tensors must be named and provided

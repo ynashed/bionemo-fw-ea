@@ -45,7 +45,6 @@ from bionemo.model.molecule.diffdock.utils.sampling import randomize_position, s
 
 
 class SelectPose:
-
     """A WebDataset composable to select one ligand poses from multiple ones and label confidence model training data by RMSD
     threshold"""
 
@@ -226,14 +225,14 @@ class ConfidenceDataset(Dataset):
     def _merge_complex_graph_with_ligand_data(complex_graph: HeteroData, positions_rmsds_dict: Dict) -> HeteroData:
         name = complex_graph.name
         if name not in positions_rmsds_dict:
-            raise KeyError(f'ligand poses for complex: {name} missing')
+            raise KeyError(f"ligand poses for complex: {name} missing")
         complex_graph.ligand_data = positions_rmsds_dict[name]
         return complex_graph
 
     def load_confidence_dataset(self):
         # split tar files not prepared or the folder is empty
         if not (os.path.exists(self.split_cache_path) and os.listdir(self.split_cache_path)):
-            logging.info(f'Preparing complex graphs split webdataset tar files to: {self.split_cache_path}')
+            logging.info(f"Preparing complex graphs split webdataset tar files to: {self.split_cache_path}")
 
             local_rank = get_rank()
             if local_rank == 0:
@@ -246,7 +245,7 @@ class ConfidenceDataset(Dataset):
             if os.path.exists(self.ligand_poses_cache) and os.listdir(self.ligand_poses_cache):
                 for file in os.listdir(self.ligand_poses_cache):
                     try:
-                        name, lig_poses, rmsds = pickle.load(open(os.path.join(self.ligand_poses_cache, file), 'rb'))
+                        name, lig_poses, rmsds = pickle.load(open(os.path.join(self.ligand_poses_cache, file), "rb"))
                         positions_rmsds_dict[name] = (lig_poses, rmsds)
                     except Exception as e:
                         logging.error(
@@ -291,7 +290,7 @@ class ConfidenceDataset(Dataset):
                     self.split_cache_path,
                     "heterographs",
                     lambda complex_graph: {
-                        "__key__": complex_graph.name.replace('.', '-'),
+                        "__key__": complex_graph.name.replace(".", "-"),
                         self.webdataset_fname_suffix_in_tar: pickle.dumps(
                             self._merge_complex_graph_with_ligand_data(complex_graph, positions_rmsds_dict)
                         ),
@@ -307,7 +306,7 @@ class ConfidenceDataset(Dataset):
                 )
 
         # glob the resulting tar files
-        self.webdataset_urls = glob.glob(os.path.join(self.split_cache_path, 'heterographs-*.tar'))
+        self.webdataset_urls = glob.glob(os.path.join(self.split_cache_path, "heterographs-*.tar"))
         if len(self.webdataset_urls) == 0:
             raise RuntimeError(f"No WebDataset tar file is found in {self.split_cache_path}")
 
@@ -326,7 +325,7 @@ class ConfidenceDataset(Dataset):
         score_data_config = HeteroGraphDataConfig.init_from_hydra_config(score_data_config)
         score_data_config.split_path = (
             score_model.cfg.model.get(f"{self.mode.name}_ds").split_val
-            if 'val' in self.mode.name
+            if "val" in self.mode.name
             else score_model.cfg.model.get(f"{self.mode.name}_ds").get(f"split_{self.mode.name}")
         )
         score_data_config.num_conformers = score_data_config.num_conformers
@@ -340,17 +339,17 @@ class ConfidenceDataset(Dataset):
             and os.listdir(score_model_complex_graphs_split_cache_path)
         ):
             raise RuntimeError(
-                f'Complex graphs for score model to run reverse diffusion does not exist here: {score_model_complex_graphs_split_cache_path}. '
-                'Try using ProteinLigandDockingDataset.build_complex_graphs() to do score model complex graphs preprocessing first.'
+                f"Complex graphs for score model to run reverse diffusion does not exist here: {score_model_complex_graphs_split_cache_path}. "
+                "Try using ProteinLigandDockingDataset.build_complex_graphs() to do score model complex graphs preprocessing first."
             )
-        webdataset_urls = glob.glob(os.path.join(score_model_complex_graphs_split_cache_path, 'heterographs-*.tar'))
+        webdataset_urls = glob.glob(os.path.join(score_model_complex_graphs_split_cache_path, "heterographs-*.tar"))
 
         t_to_sigma = partial(t_to_sigma_compl, cfg=score_model.cfg.model)
 
         dataset = (
             wds.WebDataset(webdataset_urls, shardshuffle=False, nodesplitter=wds.split_by_node)
             .decode()
-            .extract_keys('.heterodata.pyd')
+            .extract_keys(".heterodata.pyd")
             .batched(1, collation_fn=Collater(dataset=None, follow_batch=None, exclude_keys=None))
         )
 
@@ -364,7 +363,7 @@ class ConfidenceDataset(Dataset):
         processed_names = {
             filename[: -len(".LigandData.pyd")]
             for filename in os.listdir(self.ligand_poses_cache)
-            if filename.endswith('.LigandData.pyd')
+            if filename.endswith(".LigandData.pyd")
             and os.path.getsize(os.path.join(self.ligand_poses_cache, filename)) > 0
         }
 
@@ -436,7 +435,7 @@ class ConfidenceDataset(Dataset):
 
             name = orig_complex_graph.name[0]
             lig_poses = np.asarray([complex_graph["ligand"].pos.cpu().numpy() for complex_graph in predictions_list])
-            with open(os.path.join(self.ligand_poses_cache, f"{name}.LigandData.pyd"), 'wb') as f:
+            with open(os.path.join(self.ligand_poses_cache, f"{name}.LigandData.pyd"), "wb") as f:
                 pickle.dump([name, lig_poses, rmsds], f)
 
 
@@ -457,8 +456,8 @@ def diffdock_build_confidence_dataset(
     """
 
     config = HeteroGraphDataConfig.init_from_hydra_config(data_config)
-    config.split_path = split_config.split_val if 'val' in mode.name else split_config.get(f"split_{mode.name}")
-    config.min_num_shards = split_config.get('min_num_shards')
+    config.split_path = split_config.split_val if "val" in mode.name else split_config.get(f"split_{mode.name}")
+    config.min_num_shards = split_config.get("min_num_shards")
 
     return ConfidenceDataset(
         data_config=config,
