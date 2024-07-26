@@ -30,7 +30,7 @@ from typing import List, Optional, Sequence, TypeVar, Union
 import numpy as np
 from pandas import DataFrame
 
-from bionemo.contrib.data.scdl.api.single_cell_row_dataset import SingleCellRowDataset
+from bionemo.data.scdl.api.single_cell_row_dataset import SingleCellRowDataset
 
 
 __all__: Sequence[str] = ("RowFeatureIndex",)

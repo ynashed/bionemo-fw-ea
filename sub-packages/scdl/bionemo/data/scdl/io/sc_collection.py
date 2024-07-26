@@ -31,11 +31,11 @@ import shutil
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
-from bionemo.contrib.data.scdl.api.single_cell_row_dataset import SingleCellRowDatasetCore
-from bionemo.contrib.data.scdl.index.feature_index import RowFeatureIndex
-from bionemo.contrib.data.scdl.io.sc_mmap_dataset import Mode, SC_MMAP_Dataset
-from bionemo.contrib.data.scdl.util.string_enum import StringEnum
-from bionemo.contrib.data.scdl.util.task_queue import AsyncWorkQueue
+from bionemo.data.scdl.api.single_cell_row_dataset import SingleCellRowDatasetCore
+from bionemo.data.scdl.index.feature_index import RowFeatureIndex
+from bionemo.data.scdl.io.sc_mmap_dataset import Mode, SC_MMAP_Dataset
+from bionemo.data.scdl.util.string_enum import StringEnum
+from bionemo.data.scdl.util.task_queue import AsyncWorkQueue
 
 
 __all__: Sequence[str] = (
