@@ -17,8 +17,8 @@
 import os
 
 import pandas as pd
-from scdl.index.FeatureIndex import RowFeatureIndex
-from scdl.io.SCMMAPDataset import SC_MMAP_Dataset
+from scdl.index.feature_index import RowFeatureIndex
+from scdl.io.sc_mmap_dataset import SC_MMAP_Dataset
 
 
 def test_feature_index_internals():
@@ -47,7 +47,6 @@ def test_feature_index_internals():
     vals = index.n_values()
     assert vals == [12543 * 3]
     assert len(vals) == 1
-    assert index.n_values(return_sum=True) == 12543 * 3
 
     index._update_index(455987, two_feats, "MY DATAFRAME")
     assert len(index) == 2
@@ -55,7 +54,7 @@ def test_feature_index_internals():
     assert index.n_vars_at_row(12544, "feature_name") == 5
     assert index.n_vars_at_row(455986) == 5
     assert index.n_vars_at_row(17, "feature_int") == 3
-    assert index.n_values(return_sum=True) == (12543 * 3) + (455987 * 5)
+    assert sum(index.n_values()) == (12543 * 3) + (455987 * 5)
     assert index.n_values()[1] == (455987 * 5)
     assert index.n_rows() == 455987 + 12543
 

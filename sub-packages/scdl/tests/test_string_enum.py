@@ -26,7 +26,7 @@ def test_string_enum():
         win = "lose"
 
     e = E()
-    # Checking iteration over enum members
+
     assert e.x == "y"
     assert e.test == "pass"
     assert e.win == "lose"

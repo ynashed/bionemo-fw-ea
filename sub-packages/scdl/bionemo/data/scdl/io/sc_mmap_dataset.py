@@ -473,7 +473,7 @@ class SC_MMAP_Dataset(SingleCellRowDataset):
         return True
 
     def n_values(self):
-        return self._feature_index.n_values(return_sum=True)
+        return sum(self._feature_index.n_values())
 
     def n_obs(self):
         return self._feature_index.n_rows()

@@ -135,7 +135,7 @@ class RowFeatureIndex:
         else:
             return [len(feats[vars_id]) for feats in self._feature_arr]
 
-    def n_values(self, return_sum: bool = False) -> Union[List[int], int]:
+    def n_values(self) -> Union[List[int], int]:
         if len(self._feature_arr) == 0:
             return 0
         rows = [
@@ -145,8 +145,6 @@ class RowFeatureIndex:
         assert len(rows) == len(self._feature_arr)
 
         vals = [n_rows * len(self._feature_arr[i].iloc[:, 0]) for i, n_rows in enumerate(rows)]
-        if return_sum:
-            return sum(vals)
         return vals
 
     def n_rows(self) -> int:
