@@ -405,6 +405,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
             n_nodes = None
         return n_nodes
 
+    @torch.no_grad()
     def sample(self, num_samples, timesteps=500, time_discretization="linear", batch=None):
         """
         Generates num_samples. Can supply a batch for inital starting points for conditional sampling for any interpolants set to None.

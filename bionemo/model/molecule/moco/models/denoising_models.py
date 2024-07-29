@@ -162,7 +162,6 @@ class EQGATWrapper(DenoisingEdgeNetwork):
             "x_hat": out["coords_pred"],
             "h_logits": out["atoms_pred"],
             "edge_attr_logits": out["bonds_pred"],
-            # "Z_hat": out["Z_hat"] if "Z_hat" in out,
         }
         if "Z_hat" in out:
             result["Z_hat"] = out["Z_hat"]

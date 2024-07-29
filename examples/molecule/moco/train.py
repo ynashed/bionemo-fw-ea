@@ -88,6 +88,8 @@ def main(cfg: DictConfig) -> None:
     )
     logger.log_hyperparams(cfg)
 
+    datamodule = MoleculeDataModule(**cfg.data)
+
     lr_monitor = LearningRateMonitor(logging_interval="step")
 
     last_checkpoint_callback = ModelCheckpoint(
@@ -105,9 +107,18 @@ def main(cfg: DictConfig) -> None:
         mode=cfg.train.checkpoint_monitor_mode,
         filename="best-{epoch}-{step}--{" + metric_name + ":.3f}",
     )
+
     evaluation_callback = MoleculeEvaluationCallback(
-        n_graphs=cfg.evaluation.n_molecules, batch_size=cfg.evaluation.batch_size, timesteps=cfg.evaluation.timesteps
-    )  #! This is where the validation epoch end but control is still done as we would in the config
+        n_graphs=cfg.evaluation.n_molecules,
+        batch_size=cfg.evaluation.batch_size,
+        timesteps=cfg.evaluation.timesteps,
+        train_smiles=datamodule.train_dataset.smiles,
+        statistics=datamodule.statistics,
+        compute_2D_metrics=cfg.evaluation.compute_2D_metrics,
+        compute_3D_metrics=cfg.evaluation.compute_3D_metrics,
+        compute_dihedrals=cfg.evaluation.compute_dihedrals,
+        compute_train_data_metrics=cfg.evaluation.compute_train_data_metrics,
+    )
 
     trainer = pl.Trainer(
         max_epochs=cfg.train.n_epochs,
@@ -123,7 +134,6 @@ def main(cfg: DictConfig) -> None:
         num_sanity_val_steps=0,  # skip sanity since sampling from random weights causes explosion in discrete elements
     )
 
-    datamodule = MoleculeDataModule(**cfg.data)
     train_loader = datamodule.train_dataloader()
     val_loader = datamodule.val_dataloader()
     # pl_module.eval()
