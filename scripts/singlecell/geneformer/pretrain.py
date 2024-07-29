@@ -66,6 +66,7 @@ def main(
     precision: PrecisionTypes,
     wandb_entity: str = "clara-discovery",
     create_tensorboard_logger: bool = False,
+    nemo1_init_path: Optional[Path] = None,
 ):
     """Train a Geneformer model on single cell data.
 
@@ -193,6 +194,7 @@ def main(
         share_embeddings_and_output_weights=True,
         enable_autocast=False,  # This has to be set to True if we use the mixed precision plugin
         biobert_spec_option=biobert_spec_option,
+        nemo1_ckpt_path=nemo1_init_path,
     )
 
     # The lightning class owns a copy of the actual model, and a loss function, both of which are configured
@@ -361,6 +363,12 @@ if __name__ == "__main__":
         default=BiobertSpecOption.bert_layer_local_spec.value,
         help="Biobert spec option to use for the model. Default is 'bert_layer_local_spec'.",
     )
+    parser.add_argument(
+        "--nemo1-init-path",
+        type=Path,
+        required=False,
+        help="Path to nemo1 file, if desired to load at init time.",
+    )
 
     # Parse the arguments and pull them out into local variables for ease of future refactor to a
     #   config management system.
@@ -385,4 +393,5 @@ if __name__ == "__main__":
         precision=args.precision,
         experiment_name=args.experiment_name,
         resume_if_exists=args.resume_if_exists,
+        nemo1_init_path=args.nemo1_init_path,
     )
