@@ -25,7 +25,7 @@
 # its affiliates is strictly prohibited.
 
 import pickle
-from typing import List, Optional, Sequence, TypeVar, Union
+from typing import List, Optional, Sequence, Tuple, TypeVar, Union
 
 import numpy as np
 from pandas import DataFrame
@@ -89,19 +89,20 @@ class RowFeatureIndex:
 
     def index(self, dataset: Union[SingleCellRowDataset, List[SingleCellRowDataset]]) -> None:
         if isinstance(dataset, list):
-            for _, d in enumerate(dataset):
-                self.concat_dataset(dataset)
+            for d in dataset:
+                self.concat_dataset(d)
         elif isinstance(dataset, SingleCellRowDataset):
             self.concat_dataset(dataset)
         else:
             raise ValueError(f"Dataset is of unsupported type: {type(dataset)}")
 
-    def lookup(
-        self, row: int, select_features: Optional[List[str]] = None, return_label: bool = False
-    ) -> Union[List[DataFrame, int], DataFrame]:
-        # TODO: return flattened list in all cases like this
-        assert row >= 0
-        assert self._index_ready
+    def lookup(self, row: int, select_features: Optional[List[str]] = None) -> Tuple[List[DataFrame], List[int]]:
+        # TODO: check this
+        if row >= 0:
+            raise ValueError(f"Row index {row} is not valid. It must be non-negative)")
+        if not self._index_ready:
+            raise IndexError("There are no dataframes to lookup.")
+
         if row > self._cumulative_sum_index[-1]:
             raise IndexError(
                 f"Row index ({row}) was larger than number of rows in FeatureIndex ({self._cumulative_sum_index[-1]})"
@@ -120,19 +121,17 @@ class RowFeatureIndex:
         if select_features is not None:
             features = features[select_features]
 
-        # If the label is also to be returned, return both features and the label for the identified range.
-        if return_label:
-            return features, self._labels[d_id]
-
         # Return the features for the identified range.
-        return features
+        return features, self._labels[d_id]
 
     def n_vars_at_row(self, row: int, vars_id: str = "feature_name") -> int:
+        """Return number of variabls in a given row."""
         feats = self.lookup(row=row)
         assert vars_id in feats.columns
         return len(feats[vars_id])
 
     def column_dims(self, vars_id: Optional[str] = None) -> List[int]:
+        """Return the number of columns in all rows or for given features."""
         if vars_id is None:
             # Just take the total dim of the DataFrame(s)
             return [len(feats.iloc[:, 0]) for feats in self._feature_arr]
