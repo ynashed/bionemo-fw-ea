@@ -445,7 +445,6 @@ class Graph3DInterpolantModel(pl.LightningModule):
         data, prior = {}, {}
         total_num_atoms = num_atoms.sum().item()
         # Sample from all Priors
-        # import ipdb; ipdb.set_trace()
         for key, interpolant in self.interpolants.items():
             if interpolant is None:
                 if batch is not None:
@@ -473,36 +472,16 @@ class Graph3DInterpolantModel(pl.LightningModule):
             t = timeline[idx]
             dt = DT[idx]
             time = torch.tensor([t] * num_samples).to(self.device)
-            for k, v in data.items():
-                print(k, v)
             data = self.one_hot(data)
             # Apply Self Conditioning
             pre_conditioning_variables = {}
             #! Try turning off self conditioning --> fixed some but still had edge blow ups can try adding norms here TODO
             if self.self_conditioning_module is not None:
                 data, pre_conditioning_variables = self.self_conditioning(data, time, conditional_batch=out)
-            for k, v in data.items():
-                print("sc", k, v)
             data = self.aggregate_discrete_variables(data)
             data["batch"] = batch_index
             data["edge_index"] = edge_index
-            _out = self.dynamics(data, time, conditional_batch=out, timesteps=timesteps)
-            h_hat = _out['h_logits']
-            if torch.isnan(h_hat).any().item():
-                print(torch.isnan(h_hat).nonzero(as_tuple=False))
-                import ipdb
-
-                ipdb.set_trace()
-                out = self.dynamics(data, time, conditional_batch=out, timesteps=timesteps)
-
-            h_hat = _out['edge_attr_logits']
-            if torch.isnan(h_hat).any().item():
-                print(torch.isnan(h_hat).nonzero(as_tuple=False))
-                import ipdb
-
-                ipdb.set_trace()
-                out = self.dynamics(data, time, conditional_batch=out, timesteps=timesteps)
-            out = _out
+            out = self.dynamics(data, time, conditional_batch=out, timesteps=timesteps)
             #! Error is for FM sampling EQGAT is producing NANs in discrete logits
             out, data = self.separate_discrete_variables(out, data)
 
@@ -521,29 +500,16 @@ class Graph3DInterpolantModel(pl.LightningModule):
                         dt=dt,
                     )
                 else:
-                    try:
-                        test = interpolant.step(
-                            xt=data[f"{key}_t"],
-                            x_hat=out[f"{key}_hat"],
-                            x0=prior[key],
-                            batch=batch_index,
-                            time=time,
-                            dt=dt,
-                        )
-                        data[f"{key}_t"] = test
-                    except Exception as e:
-                        print(key, e)
-                        import ipdb
+                    test = interpolant.step(
+                        xt=data[f"{key}_t"],
+                        x_hat=out[f"{key}_hat"],
+                        x0=prior[key],
+                        batch=batch_index,
+                        time=time,
+                        dt=dt,
+                    )
+                    data[f"{key}_t"] = test
 
-                        ipdb.set_trace()
-                        test = interpolant.step(
-                            xt=data[f"{key}_t"],
-                            x_hat=out[f"{key}_hat"],
-                            x0=prior[key],
-                            batch=batch_index,
-                            time=time,
-                            dt=dt,
-                        )
         samples = {key: data[f"{key}_t"] for key in self.interpolants.keys()}
         samples["batch"] = batch_index
         samples["edge_index"] = edge_index

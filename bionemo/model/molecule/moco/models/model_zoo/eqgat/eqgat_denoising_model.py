@@ -27,7 +27,6 @@ from bionemo.model.molecule.moco.models.model_zoo.eqgat.eqgat_modules import (
     LayerNorm,
     SE3Norm,
 )
-from bionemo.model.molecule.moco.models.mpnn import E3Norm
 
 
 def cross_product(a: Tensor, b: Tensor, dim: int) -> Tensor:
@@ -458,18 +457,18 @@ class EQGATEdgeGNN(nn.Module):
             norm_module = LayerNorm
 
         self.norms = nn.ModuleList([norm_module(dims=hn_dim, latent_dim=latent_dim) for _ in range(num_layers)])
-        self.use_e_norm = False
-        if self.use_e_norm:
-            self.e_norms = nn.ModuleList([nn.LayerNorm(edge_dim) for _ in range(num_layers)])
+        # self.use_e_norm = False
+        # if self.use_e_norm:
+        #     self.e_norms = nn.ModuleList([nn.LayerNorm(edge_dim) for _ in range(num_layers)])
         self.reset_parameters()
 
     def reset_parameters(self):
         for conv, norm in zip(self.convs, self.norms):
             conv.reset_parameters()
             norm.reset_parameters()
-        if self.use_e_norm:
-            for norm in self.e_norms:
-                norm.reset_parameters()
+        # if self.use_e_norm:
+        #     for norm in self.e_norms:
+        #         norm.reset_parameters()
 
     def calculate_edge_attrs(
         self,
@@ -543,8 +542,8 @@ class EQGATEdgeGNN(nn.Module):
 
             s, v, p, e = out["s"], out["v"], out["p"], out["e"]
             # p = p - scatter_mean(p, batch, dim=0)[batch]
-            if self.use_e_norm:
-                e = self.e_norms[i](e)
+            # if self.use_e_norm:
+            #     e = self.e_norms[i](e)
             if self.recompute_edge_attributes:
                 edge_attr_global = self.calculate_edge_attrs(
                     edge_index=edge_index_global,
@@ -584,7 +583,7 @@ class PredictionHeadEdge(nn.Module):
         self.atoms_lin = DenseLayer(in_features=self.sdim, out_features=num_atom_features, bias=True)
 
         self.coords_param = coords_param
-        self.coord_norm = E3Norm()
+        # self.coord_norm = E3Norm()
 
         self.reset_parameters()
 
@@ -594,7 +593,7 @@ class PredictionHeadEdge(nn.Module):
         self.atoms_lin.reset_parameters()
         self.bonds_lin_0.reset_parameters()
         self.bonds_lin_1.reset_parameters()
-        self.coord_norm.reset_parameters()
+        # self.coord_norm.reset_parameters()
 
     def forward(
         self,
@@ -609,7 +608,8 @@ class PredictionHeadEdge(nn.Module):
         s, v, p, e = x["s"], x["v"], x["p"], x["e"]
         s = self.shared_mapping(s)
         #! Trying to add norm here can also bump to in the GNN layer
-        coords_pred = self.coords_lin(self.coord_norm(v, batch)).squeeze()
+        coords_pred = self.coords_lin(v).squeeze()
+        # coords_pred = self.coords_lin(self.coord_norm(v, batch)).squeeze()
         atoms_pred = self.atoms_lin(s)
 
         if batch_lig is not None and pocket_mask is not None:
