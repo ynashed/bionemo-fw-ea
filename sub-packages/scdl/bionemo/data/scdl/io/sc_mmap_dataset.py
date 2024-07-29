@@ -121,6 +121,11 @@ def _create_arrs(
     Takes the parameters required to create
     a set of CSR-format numpy arrays and
     creates them at path.
+    Nice way of indexing into a sparse matrix.
+    Data stores the non-zero values within the matrix.
+    col - stores column index for a given non-zero value (1d array length of the dataset?)
+    row - stores a pointer to slice into the rows of the dataset. value at row_id - 1 is index of first element of
+    the row in data and column array
     """
     assert ArrNames.DATA in dtypes
     assert ArrNames.COLPTR in dtypes

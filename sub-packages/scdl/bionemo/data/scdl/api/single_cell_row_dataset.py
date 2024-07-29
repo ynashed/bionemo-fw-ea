@@ -38,6 +38,8 @@ __all__: Sequence[str] = (
 
 
 class DurableData(ABC):
+    """Ensures that you can call load and save"""
+
     @abstractmethod
     def load(self, data_path: str) -> None:
         """
@@ -55,6 +57,8 @@ class DurableData(ABC):
 
 
 class SingleCellRowDatasetCore(ABC):
+    """Implements the actual ann data-like interface."""
+
     @abstractmethod
     def version(self) -> str:
         """
@@ -115,4 +119,6 @@ class SingleCellRowDatasetCore(ABC):
 
 
 class SingleCellRowDataset(SingleCellRowDatasetCore, DurableData, Dataset, ABC):
+    """One row in an ann dataframe (hdf5 file with a  spare array format)"""
+
     pass

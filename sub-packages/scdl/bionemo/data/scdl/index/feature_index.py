@@ -40,6 +40,9 @@ Self = TypeVar("Self", bound="RowFeatureIndex")
 
 
 class RowFeatureIndex:
+    """Maintains a mapping between a given an row in an scmmemap or sccolection and the features
+    associated with that row. (ragged array problem). Preserves the columns for a given row."""
+
     def __init__(self) -> None:
         self._cumulative_sum_index: np.array = np.array([-1])
         self._feature_arr: List[DataFrame] = []
@@ -68,34 +71,35 @@ class RowFeatureIndex:
         Updates the index by inserting the dataframe into the feature array
         and adding a new span to the row lookup index.
         """
-        arr_list = list(self._cumulative_sum_index)
         csum = max(self._cumulative_sum_index[-1], 0)
-        arr_list.append(csum + n_obs)
-        self._cumulative_sum_index = np.array(arr_list)
+        self._cumulative_sum_index = np.append(self._cumulative_sum_index, csum + n_obs)
         self._feature_arr.append(features)
         self._labels.append(label)
-
         self._index_ready = True
 
     def append_features(self, n_obs: int, features: DataFrame, label: Optional[str] = None) -> None:
+        """Append a new feature into the dataframe."""
         return self._update_index(n_obs=n_obs, features=features, label=label)
+
+    def concat_dataset(self, dataset: SingleCellRowDataset) -> None:
+        """Check that the dataset is correctly formatted and add its features."""
+        assert hasattr(dataset, "features")
+        assert hasattr(dataset, "n_obs")
+        self.concat(dataset.features())
 
     def index(self, dataset: Union[SingleCellRowDataset, List[SingleCellRowDataset]]) -> None:
         if isinstance(dataset, list):
-            for i, d in enumerate(dataset):
-                assert hasattr(d, "features")
-                assert hasattr(d, "n_obs")
-                self.concat(dataset.features())
+            for _, d in enumerate(dataset):
+                self.concat_dataset(dataset)
         elif isinstance(dataset, SingleCellRowDataset):
-            assert hasattr(dataset, "features")
-            assert hasattr(dataset, "n_obs")
-            self.concat(dataset.features())
+            self.concat_dataset(dataset)
         else:
             raise ValueError(f"Dataset is of unsupported type: {type(dataset)}")
 
     def lookup(
         self, row: int, select_features: Optional[List[str]] = None, return_label: bool = False
     ) -> Union[List[DataFrame, int], DataFrame]:
+        # TODO: return flattened list in all cases like this
         assert row >= 0
         assert self._index_ready
         if row > self._cumulative_sum_index[-1]:
