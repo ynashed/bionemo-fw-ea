@@ -1,5 +1,5 @@
 {
-	"name": "Standalone Container (NeMo2 + Megatron provided)",
+	"name": "BioNeMo2 Development Container",
 	"runArgs": [
 		"--gpus=all"
 	],
@@ -29,7 +29,9 @@
 				"python.analysis.extraPaths": [
 					"./sub-packages/bionemo-fw/src",
 					"./sub-packages/bionemo-core/src",
-					"./sub-packages/bionemo-contrib/src"
+					"./sub-packages/bionemo-contrib/src",
+					"./3rdparty/NeMo",
+					"./3rdparty/Megatron-LM"
 				],
 				"python.pythonPath": "/bin/python3",
 				"python.testing.pytestEnabled": true,
