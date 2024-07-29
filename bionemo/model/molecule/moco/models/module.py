@@ -337,7 +337,6 @@ class Graph3DInterpolantModel(pl.LightningModule):
                         else:
                             true_data = true_data.argmax(dim=-1)
                     sub_loss, sub_pred = loss_fn(batch_geo, out[f'{key}_logits'], true_data, batch_weight=ws_t)
-            # print(key, sub_loss)
             self.log(f"{stage}/{key}_loss", sub_loss, batch_size=batch_size, prog_bar=True)
             loss = loss + sub_loss
             predictions[f'{key}'] = sub_pred
@@ -501,7 +500,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
                         dt=dt,
                     )
                 else:
-                    test = interpolant.step(
+                    data[f"{key}_t"] = interpolant.step(
                         xt=data[f"{key}_t"],
                         x_hat=out[f"{key}_hat"],
                         x0=prior[key],
@@ -509,7 +508,6 @@ class Graph3DInterpolantModel(pl.LightningModule):
                         time=time,
                         dt=dt,
                     )
-                    data[f"{key}_t"] = test
 
         samples = {key: data[f"{key}_t"] for key in self.interpolants.keys()}
         samples["batch"] = batch_index
