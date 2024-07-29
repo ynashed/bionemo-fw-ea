@@ -106,7 +106,7 @@ def download_anndata(
                 adata[start:stop].copy().write_h5ad(file_path)
             return 0
         except Exception as e:
-            print(f"Could not download: {folder_name} - {file_name}. Caught exception {e}")
+            print(f"Could not download: {folder_name} - {file_name0}. Caught exception {e}")
             return -1
 
 
