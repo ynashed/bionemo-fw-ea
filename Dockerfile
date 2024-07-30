@@ -85,7 +85,7 @@ WORKDIR /build/Megatron-LM
 RUN pip install --disable-pip-version-check --no-cache-dir .
 
 WORKDIR /build/NeMo
-RUN pip install --disable-pip-version-check --no-cache-dir .
+RUN pip install --disable-pip-version-check --no-cache-dir .[all]
 WORKDIR /workspace
 RUN rm -rf /build
 
