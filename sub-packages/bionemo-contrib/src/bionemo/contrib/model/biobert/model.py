@@ -335,27 +335,100 @@ from megatron.core.models.bert.bert_lm_head import BertLMHead
 
 class MLPHeadModel(MegatronModule):
     def __init__(self, language_model, config):
+        super().__init__(config)
         self.language_model = language_model
         self.head = BertLMHead(1024, config=config)
+        # megatron core pipelining currently depends on model type
+        # self.model_type = ModelType.encoder_or_decoder
 
-    def forward(self, )
+    def forward(self,
+        input_ids: Tensor,
+        attention_mask: Tensor,
+        tokentype_ids: Tensor = None,
+        lm_labels: Tensor = None,
+        inference_params=None,
+        ):
+        X = self.language_model(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            tokentype_ids=tokentype_ids,
+            lm_labels=lm_labels,
+            inference_params=inference_params,
+        )
+        y = self.head(X)
+        return y
 
+    def set_input_tensor(self, input_tensor: Tensor) -> None:
+        """Sets input tensor to the model.
+
+        See megatron.model.transformer.set_input_tensor()
+
+        Args:
+            input_tensor (Tensor): Sets the input tensor for the model.
+        """
+        # This is usually handled in schedules.py but some inference code still
+        # gives us non-lists or None
+        if not isinstance(input_tensor, list):
+            input_tensor = [input_tensor]
+
+        assert len(input_tensor) == 1, "input_tensor should only be length 1 for gpt/bert"
+        self.encoder.set_input_tensor(input_tensor[0])
+
+
+from bionemo.contrib.utils.dtypes import PrecisionTypes, get_autocast_dtype
+import torch.nn.functional as F
 
 class BioBertFinetuneHeadConfig(ModelParallelConfig):
 
-    def __init__(self):
-        super().__init__()
-        self.lm_config = BioBertConfig(seq_length=2048)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # TODO(@georgea) this doesn't allow the nemo ckpt load yet
+        seq_length = 2048
+        precision = "bf16-mixed"
+        biobert_spec_option = BiobertSpecOption.bert_layer_local_spec.value
+        self.lm_config = BioBertConfig(
+            num_layers=6,
+            hidden_size=256,
+            ffn_hidden_size=512,
+            num_attention_heads=4,
+            seq_length=seq_length,
+            fp32_residual_connection=False,  # TODO(@jstjohn) check this
+            hidden_dropout=0.02,
+            init_method_std=0.02,
+            kv_channels=None,
+            apply_query_key_layer_scaling=False,
+            make_vocab_size_divisible_by=128,
+            masked_softmax_fusion=True,  # TODO(@jstjohn) check this
+            fp16_lm_cross_entropy=False,
+            params_dtype=get_autocast_dtype(precision),
+            pipeline_dtype=get_autocast_dtype(precision),
+            autocast_dtype=get_autocast_dtype(precision),  # setting this speeds things up a lot
+            gradient_accumulation_fusion=False,  # THIS BREAKS STUFF, leave False
+            layernorm_zero_centered_gamma=False,  # TODO(@jstjohn) check this
+            layernorm_epsilon=1.0e-12,
+            activation_func=F.gelu,  # TODO(@jstjohn) check this
+            qk_layernorm=False,  # TODO(@jstjohn) check this
+            apply_residual_connection_post_layernorm=False,  # False is new default, True was BERT pub.
+            bias_activation_fusion=True,  # TODO(@jstjohn) check this
+            bias_dropout_fusion=True,  # TODO(@jstjohn) check this
+            get_attention_mask_from_fusion=False,
+            attention_dropout=0.1,
+            share_embeddings_and_output_weights=True,
+            enable_autocast=False,  # This has to be set to True if we use the mixed precision plugin
+            biobert_spec_option=biobert_spec_option,
+            # nemo1_ckpt_path=nemo1_init_path,
+            )
 
     def configure_model(self, tokenizer) -> "MegatronBioBertModel":
         lm =  self.lm_config.configure_model(tokenizer)
         # model_with_head = self.head.configure_model(lm)
-        return lm
+        model_with_head = MLPHeadModel(lm, self.lm_config)
+        return model_with_head
 
     def get_loss_reduction_class(self) -> Type[MegatronLossReduction]:
         # You could optionally return a different loss reduction class here based on the config settings.
-        # return BERTMLMLossWithReduction
-        pass
+        return BERTMLMLossWithReduction
+        # pass
 
 
 @dataclass
