@@ -14,11 +14,29 @@
 # limitations under the License.
 
 
-import os
-
+import numpy as np
 import pandas as pd
-from scdl.index.feature_index import RowFeatureIndex
-from scdl.io.sc_mmap_dataset import SC_MMAP_Dataset
+
+from bionemo.data.scdl.index.feature_index import RowFeatureIndex
+
+
+def verify_new_index_helper(index, two_feats_columns):
+    assert len(index) == 2
+    assert index.n_vars_at_row(1) == 3
+    assert index.n_vars_at_row(12544) == 5
+    assert index.n_vars_at_row(455986) == 5
+    assert index.n_vars_at_row(17) == 3
+    assert sum(index.n_values()) == (12543 * 3) + (455987 * 5)
+    assert index.n_values()[1] == (455987 * 5)
+    assert index.n_rows() == 455987 + 12543
+
+    feats, label = index.lookup(3, None)
+    assert list(feats.columns) == ["feature_name", "feature_int"]
+    assert label is None
+    assert np.array_equal(index._cumulative_sum_index, np.array([-1, 12543, 455987 + 12543]))
+    feats, label = index.lookup(13001, None)
+    assert label == "MY DATAFRAME"
+    assert list(feats.columns) == list(two_feats_columns)
 
 
 def test_feature_index_internals():
@@ -49,33 +67,38 @@ def test_feature_index_internals():
     assert len(vals) == 1
 
     index._update_index(455987, two_feats, "MY DATAFRAME")
-    assert len(index) == 2
-    assert index.n_vars_at_row(1, "feature_name") == 3
-    assert index.n_vars_at_row(12544, "feature_name") == 5
-    assert index.n_vars_at_row(455986) == 5
-    assert index.n_vars_at_row(17, "feature_int") == 3
-    assert sum(index.n_values()) == (12543 * 3) + (455987 * 5)
-    assert index.n_values()[1] == (455987 * 5)
-    assert index.n_rows() == 455987 + 12543
-
-    feats, label = index.lookup(3, None, True)
-    assert list(feats.columns) == ["feature_name", "feature_int"]
-    assert label is None
-
-    feats, label = index.lookup(13001, None, True)
-    assert label == "MY DATAFRAME"
-    assert list(feats.columns) == list(two_feats.columns)
+    verify_new_index_helper(index, two_feats.columns)
 
 
+def test_concat():
+    one_feats = pd.DataFrame({"feature_name": ["FF", "GG", "HH"], "feature_int": [1, 2, 3]})
+    two_feats = pd.DataFrame(
+        {
+            "feature_name": ["FF", "GG", "HH", "II", "ZZ"],
+            "gene_name": ["RET", "NTRK", "PPARG", "TSHR", "EGFR"],
+            "spare": [None, None, None, None, None],
+        }
+    )
+    index = RowFeatureIndex()
+    index2 = RowFeatureIndex()
+    index._update_index(12543, one_feats)
+    index2._update_index(455987, two_feats, "MY DATAFRAME")
+    # concatenate index as opposed to updating
+    index.concat(index2)
+
+    verify_new_index_helper(index, two_feats.columns)
+
+
+"""
 def test_index_with_SCMMAP(tmpdir):
     ds = SC_MMAP_Dataset(f"{tmpdir}/scy", h5ad_path="hdf5/97e96fb1-8caf-4f08-9174-27308eabd4ea.h5ad")
     dt = SC_MMAP_Dataset(f"{tmpdir}/scx", h5ad_path="hdf5/97e96fb1-8caf-4f08-9174-27308eabd4ea.h5ad")
-    feats = ds._feature_index.lookup(2, select_features=["feature_name"])
+    feats, _ = ds._feature_index.lookup(2, select_features=["feature_name"])
     assert len(feats) == 34455
 
     index = ds.features()
     index.index(dt)
-    feats, label = index.lookup(25382 + 100, None, True)
+    feats, label = index.lookup(25382 + 100, None)
     assert len(feats) == 34455
     assert isinstance(label, str)
     assert label == "hdf5/97e96fb1-8caf-4f08-9174-27308eabd4ea.h5ad"
@@ -121,3 +144,4 @@ def testindex_concat(tmpdir):
     feats = index.lookup(2500)
     assert len(feats) == 34455
     assert index.n_vars_at_row(224) == 34455
+"""

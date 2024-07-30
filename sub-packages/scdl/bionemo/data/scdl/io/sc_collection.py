@@ -33,7 +33,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 
 from bionemo.data.scdl.api.single_cell_row_dataset import SingleCellRowDatasetCore
 from bionemo.data.scdl.index.feature_index import RowFeatureIndex
-from bionemo.data.scdl.io.sc_mmap_dataset import Mode, SC_MMAP_Dataset
+from bionemo.data.scdl.io.sc_mmap_dataset import Mode, SingleCellMemMapDataset
 from bionemo.data.scdl.util.string_enum import StringEnum
 from bionemo.data.scdl.util.task_queue import AsyncWorkQueue
 
@@ -50,9 +50,9 @@ logging.basicConfig(format="%(asctime)s %(levelname)s [%(filename)s:%(lineno)d] 
 
 def _create_scmmap_from_h5ad(
     datapath: str, fname: Optional[str] = None, base_dir: Optional[str] = None
-) -> SC_MMAP_Dataset:
+) -> SingleCellMemMapDataset:
     """
-    Creates and SC_MAP_Dataset. Loads the h5ad file from datapath. The SC_MMAP_Dataset is loaded from datapath,
+    Creates and SC_MAP_Dataset. Loads the h5ad file from datapath. The SingleCellMemMapDataset is loaded from datapath,
     base_dir + datapath, or fname Raises an error if both the fnmae and base_dir are sepcified."""
     if base_dir is not None and fname is not None:
         raise ValueError("Only one of 'base_dir' or 'fname' should be set to a value. The other must be None.")
@@ -61,7 +61,7 @@ def _create_scmmap_from_h5ad(
         scmm_path = base_dir + "/" + scmm_path
     if fname is not None:
         scmm_path = fname
-    obj = SC_MMAP_Dataset(scmm_path)
+    obj = SingleCellMemMapDataset(scmm_path)
     obj.load_h5ad(datapath)
     return obj
 
@@ -172,7 +172,10 @@ class SingleCellCollection(SingleCellRowDatasetCore):
         return (float(self.n_values()) - float(self.num_nonzeros())) / float(self.n_values())
 
     def identical_vars(
-        self, other_dataset: SC_MMAP_Dataset, cols_to_compare: Optional[List[str]] = None, check_order: bool = True
+        self,
+        other_dataset: SingleCellMemMapDataset,
+        cols_to_compare: Optional[List[str]] = None,
+        check_order: bool = True,
     ) -> bool:
         if cols_to_compare is None:
             cols_to_compare = ["feature_name"]
@@ -204,7 +207,7 @@ class SingleCellCollection(SingleCellRowDatasetCore):
         """
         Flattens the collection into a single SCMMAP.
         """
-        output = SC_MMAP_Dataset(
+        output = SingleCellMemMapDataset(
             output_path, n_obs=self.n_obs(), n_values=self.num_nonzeros(), mode=Mode.CREATE_APPEND
         )
 

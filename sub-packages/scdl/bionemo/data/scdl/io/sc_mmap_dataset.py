@@ -40,13 +40,6 @@ from bionemo.data.scdl.index.feature_index import RowFeatureIndex
 from bionemo.data.scdl.util.string_enum import StringEnum
 
 
-class IntWidth(StringEnum):
-    EIGHT = "8"
-    SIXTEEN = "16"
-    THIRTYTWO = "32"
-    SIXTYFOUR = "64"
-
-
 class ArrNames(StringEnum):
     DATA = "data.npy"
     COLPTR = "col_ptr.npy"
@@ -69,9 +62,6 @@ class Mode(StringEnum):
 
 class METADATA(StringEnum):
     NUM_ROWS = "num_rows"
-    # TODO: remove all references to NUM_COLUMNS,
-    # as we'll use the featureindex from here on out.
-    NUM_COLUMNS = "num_columns"
 
 
 def _swap_mmap_array(
@@ -81,15 +71,17 @@ def _swap_mmap_array(
     dest_path: str,
     destroy_src: bool = False,
 ) -> None:
-    # TODO: should maybe reopen the array ptrs here, as the swap is really confusing.
+    # TODO: docstring
     assert os.path.isfile(src_path)
     assert os.path.isfile(dest_path)
 
     # Flush and close arrays
     src_array.flush()
-    # del src_array
     dest_array.flush()
-    # del dest_array
+
+    del src_array
+    del dest_array
+
     # Swap the file locations on disk using a tmp file.
     with tempfile.TemporaryDirectory() as tempdir:
         temp_file_name = f"{tempdir}/arr_temp"
@@ -137,7 +129,7 @@ def _create_arrs(
     if not create_path_if_nonexistent and not os.path.exists(path):
         raise FileNotFoundError(f"Path does not exist: {path}")
     if not os.path.exists(path):
-        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        path.parent.mkdir(parents=True, exist_ok=True)
     # mmap new arrays
     # Records the value at index[i]
     data_arr = np.memmap(f"{path}/{ArrNames.DATA}", dtype=dtypes[ArrNames.DATA], shape=(n_elements,), mode=mode)
@@ -151,23 +143,19 @@ def _create_arrs(
     return data_arr, col_arr, row_arr
 
 
-class SC_MMAP_Dataset(SingleCellRowDataset):
+class SingleCellMemMapDataset(SingleCellRowDataset):
     def __init__(
         self,
         data_path: str,
         h5ad_path: Optional[str] = None,
-        keep_columns: Optional[List[str]] = None,
-        strict_columns: bool = False,
         n_values: Optional[int] = None,
         n_obs: Optional[int] = None,
         mode: Mode = Mode.READ_APPEND,
     ) -> None:
         """
-        Loads an existing SCMMAP Dataset or Creates a new SC_MMAP_Dataset from an H5AD file.
+        Loads an existing SCMMAP Dataset or Creates a new SingleCellMemMapDataset from an H5AD file.
         data_path
         h5ad_path
-        keep_columns
-        strict_columns
         """
 
         self._version: str = "0.0.1"
@@ -197,19 +185,19 @@ class SC_MMAP_Dataset(SingleCellRowDataset):
         if mode == Mode.CREATE_APPEND and os.path.exists(data_path):
             raise FileExistsError(f"Output directory already exists: {data_path}")
 
-        if h5ad_path is not None and (data_path is not None and os.path.exists(data_path)):
+        if h5ad_path is not None and data_path is not None:
             raise FileExistsError(
                 "Invalid input; both an SCMMAP and an h5ad file were passed. "
                 "Please pass either an existing SCMMAP or an h5ad file."
             )
 
         # If there is only a data path, and it exists already, load SCMMAP data.
-        elif data_path is not None and os.path.exists(data_path):
+        elif data_path is not None:
             self.load(data_path)
 
         # If there is only an h5ad path, load the HDF5 data
         elif h5ad_path is not None:
-            self.load_h5ad(h5ad_path, "float32", keep_columns, strict_columns)
+            self.load_h5ad(h5ad_path, "float32")
 
         elif isinstance(n_obs, int) and isinstance(n_values, int):
             self.create(n_values=n_values, n_obs=n_obs)
@@ -235,31 +223,6 @@ class SC_MMAP_Dataset(SingleCellRowDataset):
         self.data = data_arr
         self.col_index = col_arr
         self.row_index = row_arr
-        # mmap new arrays
-        # Records the value at index[i]
-        # self.data = np.memmap(
-        #     f"{self.data_path}/{ArrNames.DATA}",
-        #     dtype=self.dtypes[ArrNames.DATA],
-        #     shape=(n_elements,),
-        #     mode=self.mode
-        # )
-        # Records a pointer into the data and column arrays
-        # to get the data for a specific row, slice row_idx[idx, idx+1]
-        # and then get the elements in data[row_idx[idx]:row_idx[idx+1]]
-        # which are in the corresponding columns col_index[row_idx[idx], row_idx[row_idx+1]]
-        # self.row_index  = np.memmap(
-        #     f"{self.data_path}/{ArrNames.ROWPTR}",
-        #     dtype=self.dtypes[ArrNames.ROWPTR],
-        #     shape=(n_rows + 1,),
-        #     mode=self.mode
-        # )
-        # Records the column the data resides in at index [i]
-        # self.col_index  = np.memmap(
-        #     f"{self.data_path}/{ArrNames.COLPTR}",
-        #     dtype=self.dtypes[ArrNames.COLPTR],
-        #     shape=(n_elements,),
-        #     mode=self.mode
-        # )
 
     def _get_row(
         self,
@@ -285,7 +248,7 @@ class SC_MMAP_Dataset(SingleCellRowDataset):
             ret = _pad_sparse_array(values, columns, self._feature_index.n_vars_at_row(idx))
 
         if return_features:
-            return ret, self._feature_index.lookup(idx, select_features=feature_vars, return_label=return_labels)
+            return ret, self._feature_index.lookup(idx, select_features=feature_vars)[0]
         return ret
 
     def get(
@@ -322,6 +285,12 @@ class SC_MMAP_Dataset(SingleCellRowDataset):
         self.mode = Mode.CREATE_APPEND
         self._init_arrs(n_elements=n_values, n_rows=n_obs)
 
+    def load_mmap_file_if_exists(self, file_path, dtype):
+        if os.file.exists(file_path):
+            return np.memmap(file_path, dtype=dtype, mode=self.mode)
+        else:
+            raise FileNotFoundError(f"The mmap file at {file_path} is missing")
+
     def load(self, stored_path: str) -> None:
         if not os.path.exists(stored_path):
             raise FileNotFoundError(f"Error: could not find data path [{stored_path}]")
@@ -336,8 +305,6 @@ class SC_MMAP_Dataset(SingleCellRowDataset):
         assert os.path.exists(f"{self.data_path}/{ArrNames.METADATA}")
         with open(f"{self.data_path}/{ArrNames.METADATA}", "r") as mfi:
             self.metadata = json.load(mfi)
-            # self.num_columns = self.metadata[METADATA.NUM_COLUMNS]
-            # self.num_rows = self.metadata[METADATA.NUM_ROWS]
 
         self._feature_index = RowFeatureIndex.load(f"{self.data_path}/{ArrNames.FEATURES}")
 
@@ -356,7 +323,6 @@ class SC_MMAP_Dataset(SingleCellRowDataset):
         #     self._features = read_feather(f"{self.data_path}/{ArrNames.FEATURES}")
 
         # mmap the existing arrays
-        # TODO: check for existence of arrays
         self.data = np.memmap(
             f"{self.data_path}/{ArrNames.DATA}",
             dtype=self.dtypes[ArrNames.DATA],  # TODO: make flexible
@@ -373,8 +339,6 @@ class SC_MMAP_Dataset(SingleCellRowDataset):
         # checking that they match the metadata if it's present.
 
     def _write_metadata(self) -> None:
-        # assert METADATA.NUM_ROWS in self.metadata
-        # assert METADATA.NUM_COLUMNS in self.metadata
         with open(f"{self.data_path}/{ArrNames.METADATA}", "w") as mfi:
             json.dump(self.metadata, mfi)
 
@@ -382,8 +346,6 @@ class SC_MMAP_Dataset(SingleCellRowDataset):
         self,
         anndata_path: str,
         dtype: str = "int32",
-        keep_columns: Optional[List[str]] = None,
-        strict_columns: bool = False,
     ) -> None:
         """
         Takes a path to an existing AnnData archive,
@@ -391,7 +353,7 @@ class SC_MMAP_Dataset(SingleCellRowDataset):
         Note: the storage utilized will roughly double.
         """
         if not os.path.exists(anndata_path):
-            raise FileNotFoundError(f"Error: could not find data path [{anndata_path}]")
+            raise FileNotFoundError(f"Error: could not find h5ad path [{anndata_path}]")
         # FIXME: this is wrong -- the object **MUST** be instantiated correctly before using it!
         # If the backing data structure does not exist, create it.
         if not os.path.exists(self.data_path):
@@ -421,10 +383,7 @@ class SC_MMAP_Dataset(SingleCellRowDataset):
 
         shape = count_data.shape
         num_rows = shape[0]
-        # self.num_columns = shape[1]
-        # self.num_rows = shape[0]
-        # self.metadata[METADATA.NUM_ROWS] = self.num_rows
-        # self.metadata[METADATA.NUM_COLUMNS] = self.num_columns
+
         self._write_metadata()
         n_stored = count_data.nnz
         self.dtypes[ArrNames.DATA] = count_data.dtype
@@ -453,9 +412,7 @@ class SC_MMAP_Dataset(SingleCellRowDataset):
         assert isinstance(self.n_obs(), int)
         if METADATA.NUM_ROWS not in self.metadata:
             self.metadata[METADATA.NUM_ROWS] = self.n_obs()
-        # assert isinstance(self.num_columns, int)
-        # if METADATA.NUM_COLUMNS not in self.metadata:
-        # self.metadata[METADATA.NUM_COLUMNS] = self.num_columns
+
         self._write_metadata()
         # Write the feature index.
         self._feature_index.save(f"{self.data_path}/{ArrNames.FEATURES}")
@@ -492,7 +449,7 @@ class SC_MMAP_Dataset(SingleCellRowDataset):
     def __getitem__(self, idx: int) -> Tuple[np.ndarray, np.ndarray]:
         return self._get_row(idx, return_features=False, pad=False, feature_vars=None, return_labels=False)
 
-    def n_vars(self) -> Union[int, List[int]]:
+    def n_vars(self) -> int:
         feats = self._feature_index
         if len(feats) == 0:
             return 0
@@ -524,7 +481,7 @@ class SC_MMAP_Dataset(SingleCellRowDataset):
 
     def concat(
         self,
-        other: Union[list["SC_MMAP_Dataset"], "SC_MMAP_Dataset"],
+        other: Union[list["SingleCellMemMapDataset"], "SingleCellMemMapDataset"],
     ) -> None:
         """
         Takes another SCMMAP class and concatenates it to the existing one.
@@ -536,11 +493,13 @@ class SC_MMAP_Dataset(SingleCellRowDataset):
             for o in other:
                 assert self.version() == o.version()
         else:
-            raise ValueError(f"Expecting either a {SC_MMAP_Dataset} or a list thereof. Actually got: {type(other)}")
+            raise ValueError(
+                f"Expecting either a {SingleCellMemMapDataset} or a list thereof. Actually got: {type(other)}"
+            )
 
         # Set our mode:
         # FIXME: this is wrong -- the object **MUST** be instantiated correctly before using it!
-        self.mode: Mode = "r+"
+        self.mode: Mode = Mode.READ_APPEND
 
         # TODO: Add to our metadata
         mmaps = []
@@ -615,13 +574,13 @@ class SC_MMAP_Dataset(SingleCellRowDataset):
                 f"{self.data_path}/{ArrNames.ROWPTR}",
                 dtype=self.dtypes[ArrNames.ROWPTR],
                 shape=(cumulative_rows + 1,),
-                mode="r+",
+                mode=Mode.READ_APPEND,
             )
             self.col_index = np.memmap(
                 f"{self.data_path}/{ArrNames.COLPTR}",
                 dtype=self.dtypes[ArrNames.COLPTR],
                 shape=(cumulative_elements,),
-                mode="r+",
+                mode=Mode.READ_APPEND,
             )
             # TODO: Verify mmap integrity upon file move.
 

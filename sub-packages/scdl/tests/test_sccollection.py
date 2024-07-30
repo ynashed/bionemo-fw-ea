@@ -15,9 +15,9 @@
 
 
 from bionemo.data.scdl.io.sc_collection import SingleCellCollection
+from bionemo.data.scdl.io.sc_mmap_dataset import SingleCellMemMapDataset
 
 
-"""
 def test_sccollection_internals(tmpdir):
     coll = SingleCellCollection(f"{tmpdir}/sccz")
     assert isinstance(coll.version(), str)
@@ -28,7 +28,6 @@ def test_sccollection_internals(tmpdir):
     assert coll.n_values() == 0
     assert coll.num_nonzeros() == 0
     assert coll.data_path == f"{tmpdir}/sccz"
-"""
 
 
 def test_sccollection_basics(tmpdir):
@@ -41,8 +40,6 @@ def test_sccollection_basics(tmpdir):
     assert coll.sparsity() == 0.9691868030117566
     assert coll.shape() == (25382, 34455)
 
-
-"""
 
 def test_sccollection_multi(tmpdir):
     coll = SingleCellCollection(f"{tmpdir}/sccy")
@@ -65,8 +62,7 @@ def test_sccollection_serialization(tmpdir):
     coll = SingleCellCollection(f"{tmpdir}/sccy")
     coll.load_h5ad_multi("hdf5/", max_workers=4, use_processes=False)
     coll.flatten(f"{tmpdir}/flattened")
-
-    dat = SC_MMAP_Dataset(f"{tmpdir}/flattened")
+    dat = SingleCellMemMapDataset(f"{tmpdir}/flattened")
     assert dat.n_obs() == 96308
     assert dat.n_values() == 3423735545
     assert dat.num_nonzeros() == 115136865
@@ -74,4 +70,3 @@ def test_sccollection_serialization(tmpdir):
 
 def test_sccollection_concat(tmpdir):
     pass
-"""
