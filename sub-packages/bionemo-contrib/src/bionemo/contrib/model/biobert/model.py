@@ -29,7 +29,7 @@ from megatron.core.models.common.language_module.language_module import Language
 from megatron.core.transformer import spec_utils
 from megatron.core.transformer.enums import ModelType
 from megatron.core.transformer.transformer_block import TransformerBlock
-from megatron.core.transformer.transformer_config import TransformerConfig
+from megatron.core.transformer.transformer_config import TransformerConfig, ModelParallelConfig
 from megatron.core.transformer.utils import get_linear_layer
 from nemo.collections.common.tokenizers.huggingface.auto_tokenizer import AutoTokenizer
 from nemo.lightning import get_vocab_size
@@ -328,6 +328,34 @@ class MegatronBioBertModel(LanguageModule):
         # [s b h] => [b s h]  # move batch to the first dimension after forward
         logits = logits.transpose(0, 1).contiguous()
         return {"token_logits": logits, "binary_logits": binary_logits}
+
+
+from megatron.core.transformer.module import MegatronModule
+from megatron.core.models.bert.bert_lm_head import BertLMHead
+
+class MLPHeadModel(MegatronModule):
+    def __init__(self, language_model, config):
+        self.language_model = language_model
+        self.head = BertLMHead(1024, config=config)
+
+    def forward(self, )
+
+
+class BioBertFinetuneHeadConfig(ModelParallelConfig):
+
+    def __init__(self):
+        super().__init__()
+        self.lm_config = BioBertConfig(seq_length=2048)
+
+    def configure_model(self, tokenizer) -> "MegatronBioBertModel":
+        lm =  self.lm_config.configure_model(tokenizer)
+        # model_with_head = self.head.configure_model(lm)
+        return lm
+
+    def get_loss_reduction_class(self) -> Type[MegatronLossReduction]:
+        # You could optionally return a different loss reduction class here based on the config settings.
+        # return BERTMLMLossWithReduction
+        pass
 
 
 @dataclass
