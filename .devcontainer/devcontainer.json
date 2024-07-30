@@ -6,8 +6,7 @@
 	"build": {
 		"context": "${localWorkspaceFolder}",
 		"dockerfile": "${localWorkspaceFolder}/Dockerfile",
-		"target": "bionemo2-base",
-		"cache-from": "nvcr.io/nvidian/cvai_bnmo_trng/bionemo:bionemo2-latest"
+		"cacheFrom": "nvcr.io/nvidian/cvai_bnmo_trng/bionemo:bionemo2-latest"
 	},
 	"mounts": [
 		// Mount the local ~/.aws config to pass along AWS credentials for PBSS.
