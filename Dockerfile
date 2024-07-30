@@ -93,12 +93,12 @@ RUN rm -rf /build
 WORKDIR /workspace/bionemo2/
 COPY ./sub-packages/bionemo-fw/ ./sub-packages/bionemo-fw/
 WORKDIR /workspace/bionemo2/sub-packages/bionemo-fw/
-RUN pip install --disable-pip-version-check --no-cache-dir -e .
+RUN pip install --disable-pip-version-check --no-cache-dir --no-deps -e .
 
 WORKDIR /workspace/bionemo2/
 COPY ./sub-packages/bionemo-contrib/ ./sub-packages/bionemo-contrib/
 WORKDIR /workspace/bionemo2/sub-packages/bionemo-contrib/
-RUN pip install --disable-pip-version-check --no-cache-dir -e .
+RUN pip install --disable-pip-version-check --no-cache-dir --no-deps -e .
 
 WORKDIR /workspace/bionemo2/
 COPY ./scripts ./scripts
