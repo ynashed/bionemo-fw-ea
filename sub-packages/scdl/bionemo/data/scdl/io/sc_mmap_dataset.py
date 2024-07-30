@@ -28,11 +28,10 @@ import json
 import os
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import anndata as ad
 import numpy as np
-import pandas as pd
 import scipy
 
 from bionemo.data.scdl.api.single_cell_row_dataset import SingleCellRowDataset
@@ -58,6 +57,7 @@ class Mode(StringEnum):
 
     CREATE_APPEND = "w+"
     READ_APPEND = "r+"
+    READ = "r"
 
 
 class METADATA(StringEnum):
@@ -129,7 +129,7 @@ def _create_arrs(
     if not create_path_if_nonexistent and not os.path.exists(path):
         raise FileNotFoundError(f"Path does not exist: {path}")
     if not os.path.exists(path):
-        path.parent.mkdir(parents=True, exist_ok=True)
+        path.mkdir(parents=True, exist_ok=True)
     # mmap new arrays
     # Records the value at index[i]
     data_arr = np.memmap(f"{path}/{ArrNames.DATA}", dtype=dtypes[ArrNames.DATA], shape=(n_elements,), mode=mode)
@@ -185,32 +185,30 @@ class SingleCellMemMapDataset(SingleCellRowDataset):
         if mode == Mode.CREATE_APPEND and os.path.exists(data_path):
             raise FileExistsError(f"Output directory already exists: {data_path}")
 
-        if h5ad_path is not None and data_path is not None:
+        if h5ad_path is not None and (data_path is not None and os.path.exists(data_path)):
             raise FileExistsError(
-                "Invalid input; both an SCMMAP and an h5ad file were passed. "
+                "Invalid input; both an existing SCMMAP and an h5ad file were passed. "
                 "Please pass either an existing SCMMAP or an h5ad file."
             )
 
         # If there is only a data path, and it exists already, load SCMMAP data.
-        elif data_path is not None:
+        elif data_path is not None and os.path.exists(data_path):
+            self.__init__obj()
             self.load(data_path)
 
         # If there is only an h5ad path, load the HDF5 data
         elif h5ad_path is not None:
+            self.__init__obj()
             self.load_h5ad(h5ad_path, "float32")
 
         elif isinstance(n_obs, int) and isinstance(n_values, int):
-            self.create(n_values=n_values, n_obs=n_obs)
+            self.__init__obj()
+            self._init_arrs(n_elements=n_values, n_rows=n_obs)
 
-        # a data_path was passed but doesn't exist yet.
-        # Initialize a new empty SCMMAP object.
-        # FIXME: this is wrong -- the object **MUST** be instantiated correctly before using it!
-        #        the code in _init_object() method should **ONLY** live in this __init__ method!
-        self._init_object()
-
-    def _init_object(self):
+    def __init__obj(self):
         if not os.path.exists(self.data_path):
             os.mkdir(self.data_path)
+
         # Write the version
         if not os.path.exists(f"{self.data_path}/{ArrNames.VERSION}"):
             with open(f"{self.data_path}/{ArrNames.VERSION}", "w") as vfi:
@@ -218,8 +216,9 @@ class SingleCellMemMapDataset(SingleCellRowDataset):
 
     def _init_arrs(self, n_elements: int, n_rows: int) -> None:
         self.mode = Mode.CREATE_APPEND
-
-        data_arr, col_arr, row_arr = _create_arrs(n_elements, n_rows, self.data_path, self.mode, self.dtypes, True)
+        data_arr, col_arr, row_arr = _create_arrs(
+            n_elements, n_rows, Path(self.data_path), self.mode, self.dtypes, True
+        )
         self.data = data_arr
         self.col_index = col_arr
         self.row_index = row_arr
@@ -230,34 +229,34 @@ class SingleCellMemMapDataset(SingleCellRowDataset):
         return_features: bool = False,
         pad: bool = False,
         feature_vars: Optional[List[str]] = None,
-        return_labels: bool = False,
-    ) -> Union[
-        Tuple[np.ndarray, np.ndarray],
-        np.ndarray,
-        Tuple[Tuple[np.ndarray, np.ndarray], pd.DataFrame],
-        Tuple[np.ndarray, pd.DataFrame],
-    ]:
+    ):  # TODO: sort this shit out
+        """
+        Union[
+            Tuple[np.ndarray, np.ndarray],
+            np.ndarray,
+            Tuple[Tuple[np.ndarray, np.ndarray], pd.DataFrame],
+            Tuple[np.ndarray, pd.DataFrame],
+        ]:"""
         start = self.row_index[idx]
         end = self.row_index[idx + 1]
         values = self.data[start:end]
         columns = self.col_index[start:end]
-
         ret = (values, columns)
 
         if pad:
             ret = _pad_sparse_array(values, columns, self._feature_index.n_vars_at_row(idx))
-
         if return_features:
             return ret, self._feature_index.lookup(idx, select_features=feature_vars)[0]
-        return ret
+        return ret, None
 
     def get(
         self, row: int, column: Optional[int] = None, impute_missing_zeros: bool = True, pad: bool = True
     ) -> Optional[float | np.ndarray | tuple[np.ndarray, np.ndarray]]:
         """
         Obtain the entry at the specified row and optionally column.
+        TODO: REALLY SORT THIS
         """
-        row_values, row_col_ptr = self._get_row(row, return_features=False, pad=False)
+        (row_values, row_col_ptr), _ = self._get_row(row, pad=False)
 
         if column is not None:
             for i, col in enumerate(row_col_ptr):
@@ -265,7 +264,10 @@ class SingleCellMemMapDataset(SingleCellRowDataset):
                     # return the value at this position
                     return row_values[i]
                 elif col > column:
-                    break
+                    try:
+                        raise ValueError(f"Column pointer {col} exceeds the number of columns {column} for the row.")
+                    except ValueError:
+                        break
             return 0.0 if impute_missing_zeros else None
 
         if pad:
@@ -279,31 +281,26 @@ class SingleCellMemMapDataset(SingleCellRowDataset):
     def features(self) -> Optional[RowFeatureIndex]:
         return self._feature_index
 
-    def create(self, n_values: int, n_obs: int) -> None:
-        # FIXME: this is wrong -- the object **MUST** be instantiated correctly before using it!
-        self._init_object()
-        self.mode = Mode.CREATE_APPEND
-        self._init_arrs(n_elements=n_values, n_rows=n_obs)
-
-    def load_mmap_file_if_exists(self, file_path, dtype):
-        if os.file.exists(file_path):
+    def _load_mmap_file_if_exists(self, file_path, dtype):
+        if os.path.exists(file_path):
             return np.memmap(file_path, dtype=dtype, mode=self.mode)
         else:
             raise FileNotFoundError(f"The mmap file at {file_path} is missing")
 
     def load(self, stored_path: str) -> None:
         if not os.path.exists(stored_path):
+            # TODO, what do for instructions here
             raise FileNotFoundError(f"Error: could not find data path [{stored_path}]")
         self.data_path = stored_path
         self.mode = Mode.READ_APPEND
 
         # Read the version
-        with open(f"{self.data_path}/{ArrNames.VERSION}", "r") as vfi:
+        with open(f"{self.data_path}/{ArrNames.VERSION}", Mode.READ) as vfi:
             self.version = json.load(vfi)
 
         # Metadata is required, so we must check if it exists and fail if not.
         assert os.path.exists(f"{self.data_path}/{ArrNames.METADATA}")
-        with open(f"{self.data_path}/{ArrNames.METADATA}", "r") as mfi:
+        with open(f"{self.data_path}/{ArrNames.METADATA}", Mode.READ) as mfi:
             self.metadata = json.load(mfi)
 
         self._feature_index = RowFeatureIndex.load(f"{self.data_path}/{ArrNames.FEATURES}")
@@ -323,16 +320,12 @@ class SingleCellMemMapDataset(SingleCellRowDataset):
         #     self._features = read_feather(f"{self.data_path}/{ArrNames.FEATURES}")
 
         # mmap the existing arrays
-        self.data = np.memmap(
-            f"{self.data_path}/{ArrNames.DATA}",
-            dtype=self.dtypes[ArrNames.DATA],  # TODO: make flexible
-            mode=self.mode,
+        self.data = self._load_mmap_file_if_exists(f"{self.data_path}/{ArrNames.DATA}", self.dtypes[ArrNames.DATA])
+        self.row_index = self._load_mmap_file_if_exists(
+            f"{self.data_path}/{ArrNames.ROWPTR}", dtype=self.dtypes[ArrNames.ROWPTR]
         )
-        self.row_index = np.memmap(
-            f"{self.data_path}/{ArrNames.ROWPTR}", dtype=self.dtypes[ArrNames.ROWPTR], mode=self.mode
-        )
-        self.col_index = np.memmap(
-            f"{self.data_path}/{ArrNames.COLPTR}", dtype=self.dtypes[ArrNames.COLPTR], mode=self.mode
+        self.col_index = self._load_mmap_file_if_exists(
+            f"{self.data_path}/{ArrNames.COLPTR}", dtype=self.dtypes[ArrNames.COLPTR]
         )
 
         # Set variables based on arrays,
@@ -354,11 +347,6 @@ class SingleCellMemMapDataset(SingleCellRowDataset):
         """
         if not os.path.exists(anndata_path):
             raise FileNotFoundError(f"Error: could not find h5ad path [{anndata_path}]")
-        # FIXME: this is wrong -- the object **MUST** be instantiated correctly before using it!
-        # If the backing data structure does not exist, create it.
-        if not os.path.exists(self.data_path):
-            self._init_object()
-
         adata = ad.read_h5ad(anndata_path)  # slow
         # Get / set the number of rows and columns for sanity
         # Fill the data array
@@ -370,27 +358,28 @@ class SingleCellMemMapDataset(SingleCellRowDataset):
             raise NotImplementedError("Error: dense matrix loading not yet implemented.")
 
         # TODO: impl getattr(data, "raw", None)
-        count_data: Optional[Any] = None
+
         # Check if raw data is present
         raw = getattr(adata, "raw", None)
         if raw is not None:
             # If it is, attempt to get the counts in the raw data.
             count_data = getattr(raw, "X", None)
+
         if count_data is None:
             # No raw counts were present, resort to normalized
             count_data = getattr(adata, "X")
-        assert count_data is not None
+        if count_data is None:
+            raise ValueError("This file does not have count data")
 
         shape = count_data.shape
         num_rows = shape[0]
 
-        self._write_metadata()
         n_stored = count_data.nnz
         self.dtypes[ArrNames.DATA] = count_data.dtype
 
         # Collect features and store in FeatureIndex
         features = adata.var
-        self._feature_index.append_features(num_rows, features, anndata_path)
+        self._feature_index.append_features(n_obs=num_rows, features=features, label=anndata_path)
 
         # Create the arrays.
         self._init_arrs(n_stored, num_rows)
@@ -406,9 +395,6 @@ class SingleCellMemMapDataset(SingleCellRowDataset):
         self.save()
 
     def save(self, output_path: Optional[str] = None) -> None:
-        # Create the data_path and write the version
-        # FIXME: this is wrong -- the object **MUST** be instantiated correctly before using it!
-        self._init_object()
         assert isinstance(self.n_obs(), int)
         if METADATA.NUM_ROWS not in self.metadata:
             self.metadata[METADATA.NUM_ROWS] = self.n_obs()
@@ -417,12 +403,9 @@ class SingleCellMemMapDataset(SingleCellRowDataset):
         # Write the feature index.
         self._feature_index.save(f"{self.data_path}/{ArrNames.FEATURES}")
         # Ensure the object is in a valid state.
-
-        assert os.path.exists(f"{self.data_path}/{ArrNames.VERSION}")
-        assert os.path.exists(f"{self.data_path}/{ArrNames.DATA}")
-        assert os.path.exists(f"{self.data_path}/{ArrNames.COLPTR}")
-        assert os.path.exists(f"{self.data_path}/{ArrNames.ROWPTR}")
-        assert os.path.exists(f"{self.data_path}/{ArrNames.FEATURES}")
+        for postfix in [ArrNames.VERSION, ArrNames.DATA, ArrNames.COLPTR, ArrNames.ROWPTR, ArrNames.FEATURES]:
+            if not os.path.exists(f"{self.data_path}/{postfix}"):
+                raise FileNotFoundError(f"Path does not exist: {self.data_path}/{postfix}")
 
         self.data.flush()
         self.row_index.flush()
@@ -446,22 +429,20 @@ class SingleCellMemMapDataset(SingleCellRowDataset):
         """
         return self.n_obs()
 
-    def __getitem__(self, idx: int) -> Tuple[np.ndarray, np.ndarray]:
-        return self._get_row(idx, return_features=False, pad=False, feature_vars=None, return_labels=False)
+    def __getitem__(self, idx: int) -> Tuple[np.ndarray, np.ndarray]:  # TODO: check this
+        return self._get_row(idx, pad=False, feature_vars=None)[0]
 
-    def n_vars(self) -> int:
+    def n_vars(self) -> List[int]:
         feats = self._feature_index
         if len(feats) == 0:
-            return 0
+            return [0]
         num_vars = feats.column_dims()
-        if len(num_vars) == 1:
-            return num_vars[0]
         return num_vars
 
     def num_nonzeros(self) -> int:
         return self.data.size
 
-    def shape(self) -> Union[Tuple[int, int], Tuple[int, List[int]]]:
+    def shape(self) -> Tuple[int, List[int]]:
         return self.n_obs(), self.n_vars()
 
     def compare_features(self, other, cols_to_compare: Tuple[str] = ("feature_name")) -> int:
@@ -481,32 +462,31 @@ class SingleCellMemMapDataset(SingleCellRowDataset):
 
     def concat(
         self,
-        other: Union[list["SingleCellMemMapDataset"], "SingleCellMemMapDataset"],
+        other_dataset: Union[list["SingleCellMemMapDataset"], "SingleCellMemMapDataset"],
     ) -> None:
         """
         Takes another SCMMAP class and concatenates it to the existing one.
         """
         # Verify the versions are compatible.
-        if isinstance(other, type(self)):
-            assert self.version() == other.version()
-        elif isinstance(other, list):
-            for o in other:
+        if isinstance(other_dataset, type(self)):
+            assert self.version() == other_dataset.version()
+        elif isinstance(other_dataset, list):
+            for o in other_dataset:
                 assert self.version() == o.version()
         else:
             raise ValueError(
-                f"Expecting either a {SingleCellMemMapDataset} or a list thereof. Actually got: {type(other)}"
+                f"Expecting either a {SingleCellMemMapDataset} or a list thereof. Actually got: {type(other_dataset)}"
             )
 
         # Set our mode:
-        # FIXME: this is wrong -- the object **MUST** be instantiated correctly before using it!
         self.mode: Mode = Mode.READ_APPEND
 
         # TODO: Add to our metadata
         mmaps = []
-        if isinstance(other, list):
-            mmaps.extend(other)
+        if isinstance(other_dataset, list):
+            mmaps.extend(other_dataset)
         else:
-            mmaps.append(other)
+            mmaps.append(other_dataset)
         # Calculate the size of our new dataset arrays
         total_n_elements = (self.num_nonzeros() if self.n_obs() > 0 else 0) + sum([m.num_nonzeros() for m in mmaps])
         total_n_rows = self.n_obs() + sum([m.n_obs() for m in mmaps])
@@ -517,7 +497,7 @@ class SingleCellMemMapDataset(SingleCellRowDataset):
             data_arr, col_arr, row_arr = _create_arrs(
                 n_elements=total_n_elements,
                 n_rows=total_n_rows,
-                path=tmp,
+                path=Path(tmp),
                 mode=Mode.CREATE_APPEND,
                 dtypes=self.dtypes,  # TODO: make safe for overflow.
                 create_path_if_nonexistent=True,

@@ -26,24 +26,28 @@ CURRENT_VERSION = "0.0.1"
 
 
 @pytest.fixture
-def fn_download(tmpdir, request):  # tmpdir
-    remote_path = f"https://datasets.cellxgene.cziscience.com/{request.param}"
-    local_path = f"{tmpdir}/{request.param}"
-    if not os.path.exists(local_path):
-        response = requests.get(remote_path)
-        with open(local_path, "wb") as ofi:
-            ofi.write(response.content)
-    yield local_path
+def fn_download(tmpdir):  # request):  # tmpdir
+    def create_fixture(param):
+        remote_path = f"https://datasets.cellxgene.cziscience.com/{param}"
+        local_path = f"{tmpdir}/{param}"
+        if not os.path.exists(local_path):
+            response = requests.get(remote_path)
+            with open(local_path, "wb") as ofi:
+                ofi.write(response.content)
+        yield local_path
 
-    if os.path.exists(local_path):
-        os.remove(local_path)
+        if os.path.exists(local_path):
+            os.remove(local_path)
+
+    return create_fixture
 
 
-@pytest.mark.parametrize("fn_download", ["97e96fb1-8caf-4f08-9174-27308eabd4ea.h5ad"], indirect=True)
 def test_load_hdf5(tmpdir, fn_download):
-    ds = SingleCellMemMapDataset(f"{tmpdir}/scy", h5ad_path=fn_download)
+    fixture_gen_1 = fn_download("97e96fb1-8caf-4f08-9174-27308eabd4ea.h5ad")
+    ds = SingleCellMemMapDataset(f"{tmpdir}/scy", h5ad_path=next(fixture_gen_1))
+    next(fixture_gen_1, None)
     assert ds.n_obs() == 25382
-    assert ds.n_vars() == 34455
+    assert ds.n_vars() == [34455]
     assert len(ds) == 25382
     assert ds.n_values() == 874536810
     assert ds.num_nonzeros() == 26947275
@@ -97,15 +101,17 @@ def test_swap_mmap_delete(tmpdir):
     assert np.array_equal(x_now_y, np.array(x))
 
 
-@pytest.mark.parametrize("fn_download", ["97e96fb1-8caf-4f08-9174-27308eabd4ea.h5ad"], indirect=True)
 def test_load_scmmap(tmpdir, fn_download):
-    ds = SingleCellMemMapDataset(f"{tmpdir}/scy", h5ad_path=fn_download)
+    fixture_gen_1 = fn_download("97e96fb1-8caf-4f08-9174-27308eabd4ea.h5ad")
+    ds = SingleCellMemMapDataset(f"{tmpdir}/scy", h5ad_path=next(fixture_gen_1))
+    next(fixture_gen_1, None)
     ds.save()
     del ds
+
     reloaded = SingleCellMemMapDataset(f"{tmpdir}/scy")
 
     assert reloaded.n_obs() == 25382
-    assert reloaded.n_vars() == 34455
+    assert reloaded.n_vars() == [34455]
     assert reloaded.n_values() == 874536810
     assert reloaded.num_nonzeros() == 26947275
     assert reloaded.sparsity() == 0.9691868030117566
@@ -116,13 +122,12 @@ def test_load_scmmap(tmpdir, fn_download):
     assert vals[1] == 1.0
     assert vals[10] == 25.0
     assert cols[10] == 488
-    assert len(reloaded._get_row(10, return_features=False, pad=True)) == 34455
+    assert len(reloaded._get_row(10, pad=True)[0]) == 34455
 
-    padded_row, feats = reloaded._get_row(10, True, True, "feature_name", False)
+    padded_row, feats = reloaded._get_row(10, True, True, "feature_name")
     assert len(padded_row) == 34455
     assert padded_row[488] == 25.0
     assert len(feats) == 34455
-
     # ## TODO: copy construct not implemented
     # ds = SingleCellMemMapDataset("scz")
     # ds.load(f"{tmpdir}/scy")
@@ -137,7 +142,7 @@ def test_load_scmmap(tmpdir, fn_download):
     # adata = ad.read_h5ad('hdf5/97e96fb1-8caf-4f08-9174-27308eabd4ea.h5ad')
     # adata.X[300,450] = 1.4055748
     # adata.raw.X[300,450] = 1.0
-    assert reloaded._get_row(300, return_features=False, pad=True)[450] == 1.0
+    assert reloaded._get_row(300, return_features=False, pad=True)[0][450] == 1.0
     assert reloaded.get(300, 450) == 1.0
     assert reloaded.data[50000] == 1.0
     assert reloaded.data[55001] == 33.0
@@ -146,17 +151,19 @@ def test_load_scmmap(tmpdir, fn_download):
     assert reloaded.get(1985, 1090, False) is None
     assert reloaded.get(0, 488) == 15.0
     assert reloaded.get(25381, 32431) == 7.0
-    assert reloaded.shape() == (25382, 34455)
+    assert reloaded.shape() == (25382, [34455])
 
     ##TODO: test getidx function
     # assert reloaded[25381][32431] == 7.0
 
 
-"""
-
-def test_concat_mmaps_same(tmpdir):
-    ds = SingleCellMemMapDataset(f"{tmpdir}/scy", h5ad_path="hdf5/97e96fb1-8caf-4f08-9174-27308eabd4ea.h5ad")
-    dt = SingleCellMemMapDataset(f"{tmpdir}/sct", h5ad_path="hdf5/97e96fb1-8caf-4f08-9174-27308eabd4ea.h5ad")
+def test_concat_mmaps_same(tmpdir, fn_download):
+    fixture_gen_1 = fn_download("97e96fb1-8caf-4f08-9174-27308eabd4ea.h5ad")
+    ds = SingleCellMemMapDataset(f"{tmpdir}/scy", h5ad_path=next(fixture_gen_1))
+    next(fixture_gen_1, None)
+    fixture_gen_2 = fn_download("97e96fb1-8caf-4f08-9174-27308eabd4ea.h5ad")
+    dt = SingleCellMemMapDataset(f"{tmpdir}/sct", h5ad_path=next(fixture_gen_2))
+    next(fixture_gen_2, None)
 
     dt.concat(ds)
     assert dt.n_obs() == 2 * ds.n_obs()
@@ -164,9 +171,13 @@ def test_concat_mmaps_same(tmpdir):
     assert dt.num_nonzeros() == 2 * ds.num_nonzeros()
 
 
-def test_concat_mmaps_diff(tmpdir):
-    ds = SingleCellMemMapDataset(f"{tmpdir}/scy", h5ad_path="hdf5/97e96fb1-8caf-4f08-9174-27308eabd4ea.h5ad")
-    dt = SingleCellMemMapDataset(f"{tmpdir}/sct", h5ad_path="hdf5/5315d127-d698-44c5-955d-5e5c87e39ac3.h5ad")
+def test_concat_mmaps_diff(tmpdir, fn_download):
+    fixture_gen_1 = fn_download("97e96fb1-8caf-4f08-9174-27308eabd4ea.h5ad")
+    ds = SingleCellMemMapDataset(f"{tmpdir}/scy", h5ad_path=next(fixture_gen_1))
+    next(fixture_gen_1, None)
+    fixture_gen_2 = fn_download("5315d127-d698-44c5-955d-5e5c87e39ac3.h5ad")
+    dt = SingleCellMemMapDataset(f"{tmpdir}/sct", h5ad_path=next(fixture_gen_2))
+    next(fixture_gen_2, None)
 
     exp_n_obs = ds.n_obs() + dt.n_obs()
     exp_n_val = ds.n_values() + dt.n_values()
@@ -177,17 +188,23 @@ def test_concat_mmaps_diff(tmpdir):
     assert dt.num_nonzeros() == exp_nnz
 
 
-def test_concat_mmaps_multi(tmpdir):
-    ds = SingleCellMemMapDataset(f"{tmpdir}/scy", h5ad_path="hdf5/97e96fb1-8caf-4f08-9174-27308eabd4ea.h5ad")
-    dt = SingleCellMemMapDataset(f"{tmpdir}/sct", h5ad_path="hdf5/5315d127-d698-44c5-955d-5e5c87e39ac3.h5ad")
-    dx = SingleCellMemMapDataset(f"{tmpdir}/sccx", h5ad_path="hdf5/sub/f8f41e86-e9ed-4de7-a155-836b2f243fd0.h5ad")
+def test_concat_mmaps_multi(tmpdir, fn_download):
+    fixture_gen_1 = fn_download("97e96fb1-8caf-4f08-9174-27308eabd4ea.h5ad")
+    ds = SingleCellMemMapDataset(f"{tmpdir}/scy", h5ad_path=next(fixture_gen_1))
+    next(fixture_gen_1, None)
+    fixture_gen_2 = fn_download("5315d127-d698-44c5-955d-5e5c87e39ac3.h5ad")
+    fix_gen_2 = next(fixture_gen_2)
+    dt = SingleCellMemMapDataset(f"{tmpdir}/sct", h5ad_path=fix_gen_2)
+    fixture_gen_3 = fn_download("f8f41e86-e9ed-4de7-a155-836b2f243fd0.h5ad")
+    dx = SingleCellMemMapDataset(f"{tmpdir}/sccx", h5ad_path=next(fixture_gen_3))
+    next(fixture_gen_3, None)
     exp_n_obs = ds.n_obs() + dt.n_obs() + dx.n_obs()
     dt.concat(ds)
     dt.concat(dx)
 
     assert dt.n_obs() == exp_n_obs
-
-    dns = SingleCellMemMapDataset(f"{tmpdir}/scdns", h5ad_path="hdf5/5315d127-d698-44c5-955d-5e5c87e39ac3.h5ad")
+    dns = SingleCellMemMapDataset(f"{tmpdir}/scdns", h5ad_path=fix_gen_2)
+    next(fixture_gen_2, None)
     dns.concat([ds, dx])
     assert dns.n_obs() == dt.n_obs()
     assert dns.n_values() == dt.n_values()
@@ -195,4 +212,3 @@ def test_concat_mmaps_multi(tmpdir):
     assert dns.n_vars() == dt.n_vars()
 
     ## TODO: check specific values of the file.
-"""
