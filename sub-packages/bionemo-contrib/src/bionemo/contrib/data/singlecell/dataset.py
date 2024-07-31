@@ -36,20 +36,10 @@ class Item(TypedDict):
 
 
 class SingleCellDataset(Dataset):
-    """A dataset class for single-cell pre-training. These can be generated using the sc_memmap.py script. Future
-    updates will contain more comprehensive workflows for generating a Sparse Memmap from scRNA-seq.
+    """A dataset class for single-cell pre-training.
 
-    Args:
-        data_path (str): Path where the single cell files are stored. It should contain the following files:
-            - `metadata.json`: Path containing feature subset associated with each dataset.
-            - `features.csv`: Feature subset associated with each sample.
-            - Gene expression matrix stored in CSR format as `numpy.memmap`:
-                - `gene_expression_data.npy`: Gene expression values.
-                - `gene_expression_ind.npy`: Gene indices associated with gene values.
-                - `gene_expression_ptr.npy`: Column indices for each sample.
-        tokenizer: The tokenizer to use for tokenizing the input data.
-        median_dict (dict, optional): A dictionary containing median values for each gene. Defaults to None.
-        max_len (int, optional): The maximum length of the input sequence. Defaults to 1024.
+    These can be generated using the sc_memmap.py script. Future updates will contain more comprehensive workflows for
+    generating a Sparse Memmap from scRNA-seq.
 
     Attributes:
         data_path (str): Path where the single cell files are stored.
@@ -74,9 +64,9 @@ class SingleCellDataset(Dataset):
 
     See Also:
         bionemo/data/singlecell/sc_memmap.py - creates the artifacts required for instantiating a singlecell dataset from hdf5 files.
-    """  # noqa: D205
+    """
 
-    def __init__(  # noqa: D107
+    def __init__(
         self,
         data_path: str,
         tokenizer: Any,
@@ -88,6 +78,22 @@ class SingleCellDataset(Dataset):
         prepend_cls_token: bool = True,
         assert_increasing_columns: bool = True,
     ):
+        """Initialize the SingleCellDataset object.
+
+        Args:
+            data_path (str): The path to the data.
+            tokenizer (Any): The tokenizer object.
+            median_dict (Optional[dict], optional): A dictionary containing median values for genes. Defaults to None.
+            max_len (int, optional): The maximum length of the input sequence. Defaults to 1024.
+            mask_prob (float, optional): The probability of masking a token. Defaults to 0.15.
+            mask_token_prob (float, optional): The probability of replacing a masked token with a mask token. Defaults
+                to 0.8.
+            random_token_prob (float, optional): The probability of replacing a masked token with a random token.
+                Defaults to 0.1.
+            prepend_cls_token (bool, optional): Whether to prepend a CLS token to the input sequence. Defaults to True.
+            assert_increasing_columns (bool, optional): Whether to check if column indices are increasing for looking up
+                genes. Defaults to True.
+        """
         super().__init__()
         self.data_path = data_path
         self.max_len = max_len
@@ -95,8 +101,6 @@ class SingleCellDataset(Dataset):
         self.mask_token_prob = mask_token_prob
         self.mask_prob = mask_prob
         self.prepend_cls_token = prepend_cls_token
-        # check if column indices are increasing for looking up genes. This is a way of spotting if the sc_memmap.py
-        #  script produced properly strctured sparse files.
         self.assert_increasing_columns = assert_increasing_columns
         path = Path(data_path)
 
@@ -165,7 +169,8 @@ class SingleCellDataset(Dataset):
             self.feature_ids = feature_ids
             self.metadata = None
 
-    def __len__(self):  # noqa: D105
+    def __len__(self):
+        """Return the length of the dataset."""
         return self.num_samples
 
     def metadata_lookup(self, idx) -> Dict[str, np.ndarray]:
@@ -174,25 +179,30 @@ class SingleCellDataset(Dataset):
         metadata = self.metadata[self.dataset_map[did]]
         return metadata
 
-    def lookup_cell_by_idx(self, idx) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:  # noqa: D102
+    def lookup_cell_by_idx(self, idx: int) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Look up a cell by its index.
+
+        Args:
+            idx (int): The index of the cell.
+
+        Returns:
+            Tuple[np.ndarray, np.ndarray, np.ndarray]: A tuple containing the gene data, column indices, and feature IDs
+            for the specified cell.
+        """
         ptr = slice(int(self.gene_data_ptr[idx]), int(self.gene_data_ptr[idx + 1]))
-        # col idxs poin to offsets in the original sparse metadata, this is for looking up metadata eg gene names
-        col_idxs = np.asarray(self.gene_data_indices[ptr]).astype(int)  # keyed by ptr
+        col_idxs = np.asarray(self.gene_data_indices[ptr]).astype(int)
         if self.assert_increasing_columns and len(col_idxs) > 1:
             is_increasing = np.diff(col_idxs) > 0
             if not np.all(is_increasing):
                 raise ValueError(f"Column indices are not increasing for {np.sum(~is_increasing)} pairs of genes")
-        gene_data = np.asarray(self.gene_data[ptr]).astype(int)  # keyed by ptr
-        # Get feature_ids for this particular cell. Eitehr lookup by index if we need to, or if we already verified that
-        #  metadata is not needed because feature_ids are the same for every file, then we can just use the single feature_ids
-        #  vector instead.
+        gene_data = np.asarray(self.gene_data[ptr]).astype(int)
         feature_ids: np.ndarray = (
             self.feature_ids if self.metadata is None else self.metadata_lookup(idx)["feature_ids"]
         )
         return gene_data, col_idxs, feature_ids
 
     def __getitem__(self, idx: int) -> Item:
-        """Performs a lookup and the required transformation for the model"""  # noqa: D415
+        """Performs a lookup and the required transformation for the model."""
         gene_data, col_idxs, feature_ids = self.lookup_cell_by_idx(idx)
         return process_item(
             gene_data,
@@ -208,7 +218,7 @@ class SingleCellDataset(Dataset):
         )
 
 
-def process_item(  # noqa: D417
+def process_item(
     gene_data: np.ndarray,
     gene_idxs: np.ndarray,
     feature_ids: np.ndarray,
@@ -224,24 +234,26 @@ def process_item(  # noqa: D417
 ) -> Item:
     """Process a single item in the dataset.
 
-    Optionally performs median normalization and rank ordering. The tokenizers CLS token is added to the beginning
-    of every sample. Converts gene names to ensemble ids before tokenizing. Expects gene_medians to contain ensembl ids as keys.
+    Optionally performs median normalization and rank ordering. The tokenizers CLS token is added to the beginning of
+    every sample. Converts gene names to ensemble ids before tokenizing. Expects gene_medians to contain ensembl ids as
+    keys.
 
     Args:
         gene_data (list): List of gene data, these are expression counts.
-        gene_idxs (list): List of gene indices, these are keys in 'metadata['feature_ids']' and correspdong the CSR entry. These are computed by sc_memmap.
+        gene_idxs (list): List of gene indices, these are keys in 'metadata['feature_ids']' and corresponding the CSR
+            entry. These are computed by sc_memmap.
         feature_ids (list): Feature ids for the full dataset.
         tokenizer (Tokenizer): Tokenizer object.
         gene_median (optional(dict)): Dictionary of gene medians. Defaults to None. Expects ensembl IDs to be keys.
-        max_len (int): Maximum length of the item. Defaults to 1024. Applies padding to any sequence shorter than max_len and truncates any sequence longer than max_len.
+        max_len (int): Maximum length of the item. Defaults to 1024. Applies padding to any sequence shorter than
+            max_len and truncates any sequence longer than max_len.
         mask_prob (float): Probability of masking a token. Defaults to 0.15.
+        mask_token_prob (float): Probability of replacing a masked token with a mask token. Defaults to 0.8.
+        random_token_prob (float): Probability of replacing a masked token with a random token. Defaults to 0.1.
         target_sum (int): Target sum for normalization. Defaults to 10000.
         normalize (bool): Flag to normalize the gene data. Defaults to True.
             When set, this re-orders the gene tokens by their median expression value.
-        probabilistic_dirichlet_sampling (bool): Flag to enable probabilistic dirichlet sampling. Defaults to False.
-        dirichlet_alpha (float): Alpha value for dirichlet sampling if set by `probabilistic_dirichlet_sampling`. Defaults to 0.5.
-        same_length (bool): when true, sample the same length of genes as you originally had before the dirichlet sampler.
-        recompute_globals (bool): when true, global arrays are always recomputed. this is only useful for testing.
+        prepend_cls_token (bool): Flag to prepend a CLS token to the input sequence. Defaults to True.
 
     Returns:
         dict: Processed item dictionary.

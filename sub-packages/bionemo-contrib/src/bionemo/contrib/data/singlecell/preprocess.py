@@ -65,15 +65,18 @@ class GeneformerResourcePreprocessor(ResourcePreprocessor):
         return [self.prepare_resource(resource) for resource in self.get_remote_resources()]
 
 
-class GeneformerPreprocess:  # noqa: D101
-    def __init__(self, download_directory: Path, medians_file_path: Path, tokenizer_vocab_path: Path):
-        """Downloads HGNC symbols
+class GeneformerPreprocess:
+    """Geneformer preprocessing class."""
 
-        preproc_dir (str): Directory to store the reference preproc in
-        tokenizer_vocab_path (str): Filepath to store the tokenizer vocab
-        dataset_conf (OmegaConf): has 'train', 'val', 'test' keys containing
-            the names of preprocessed train/val/test files to use for training.
-        """  # noqa: D415
+    def __init__(self, download_directory: Path, medians_file_path: Path, tokenizer_vocab_path: Path):
+        """Downloads HGNC symbols.
+
+        Args:
+            download_directory (Path): Directory to store the downloaded files.
+            medians_file_path (Path): Filepath to store the median dictionary.
+            tokenizer_vocab_path (Path): Filepath to store the tokenizer vocabulary.
+
+        """
         self.download_directory = download_directory
         self.medians_file_path = medians_file_path
         self.tokenizer_vocab_path = tokenizer_vocab_path

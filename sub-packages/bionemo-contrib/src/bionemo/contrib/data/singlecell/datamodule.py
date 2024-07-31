@@ -29,17 +29,7 @@ from bionemo.contrib.data.singlecell.dataset import SingleCellDataset
 
 
 class SingleCellDataModule(pl.LightningDataModule):
-    """LightningDataModule wrapper of `SingleCellDataset`
-
-    Args:
-        data_path (Union[str, PosixPath]): Path to preprocessed single-cell data files
-        tokenizer (Tokenizer): Maps gene names to ids and vice-versa
-        collator: Used to batch samples
-        process_item: Function defining how each item should be processed
-        num_workers (int): Number of workers to use
-        num_mask_per_sample (int): Number of masked versions of a single sample to be returned by each worker
-        train_batch_size (int): Batch size for training
-        val_batch_size (int): Batch size for validation
+    """LightningDataModule wrapper of `SingleCellDataset`.
 
     Attributes:
         cfg (Config): Configuration object
@@ -48,11 +38,10 @@ class SingleCellDataModule(pl.LightningDataModule):
         tokenizer (Tokenizer): Tokenizer object
         setup_called (bool): Flag indicating if the setup method has been called
         dataset (SingleCellDataset): Single-cell dataset object
-
-    """  # noqa: D415
+    """
 
     # Nothing says we cant pass in the dataset...
-    def __init__(  # noqa: D107
+    def __init__(
         self,
         tokenizer: Tokenizer,
         train_dataset_path: str,
@@ -72,6 +61,30 @@ class SingleCellDataModule(pl.LightningDataModule):
         persistent_workers: bool = True,
         pin_memory: bool = True,
     ):
+        """Initialize the DataModule.
+
+        Args:
+            tokenizer (Tokenizer): The tokenizer used for tokenizing the input data.
+            train_dataset_path (str): The file path to the training dataset.
+            val_dataset_path (str): The file path to the validation dataset.
+            test_dataset_path (str): The file path to the test dataset.
+            median_dict (dict[str, float]): A dictionary containing median values for normalization.
+            mask_prob (float, optional): The probability of masking a token during data augmentation. Defaults to 0.15.
+            mask_token_prob (float, optional): The probability of replacing a masked token with a mask token. Defaults
+                to 0.8.
+            random_token_prob (float, optional): The probability of replacing a masked token with a random token.
+                Defaults to 0.5.
+            seq_length (int, optional): The maximum sequence length. Defaults to 2048.
+            micro_batch_size (int, optional): The size of each micro batch. Defaults to 4.
+            global_batch_size (int, optional): The size of the global batch. Defaults to 8.
+            index_mapping_dir (str, optional): The directory to store the index mapping. Defaults to None.
+            rampup_batch_size (List[int], optional): The ramp-up batch sizes. Defaults to None.
+            seed (int, optional): The random seed. Defaults to 42.
+            num_workers (int, optional): The number of workers for data loading. Defaults to 10.
+            persistent_workers (bool, optional): Whether to keep workers alive between data loading iterations. Defaults
+                to True.
+            pin_memory (bool, optional): Whether to pin memory for faster data transfer. Defaults to True.
+        """
         super().__init__()
         self.data_path_train = train_dataset_path
         self.data_path_val = val_dataset_path
@@ -124,7 +137,8 @@ class SingleCellDataModule(pl.LightningDataModule):
             rampup_batch_size=rampup_batch_size,
         )
 
-    def setup(self, stage: str = "") -> None:  # noqa: D102
+    def setup(self, stage: str = "") -> None:
+        """Setup the data module."""
         assert (
             hasattr(self, "trainer") and self.trainer is not None
         ), "Setup should be completed when trainer and config are attached."
@@ -151,13 +165,16 @@ class SingleCellDataModule(pl.LightningDataModule):
         self._validation_ds = self._sample_and_shuffle_dataset(self._val_dataset_ori, num_val_samples, "val")
         self._test_ds = self._sample_and_shuffle_dataset(self._test_dataset_ori, num_test_samples, "test")
 
-    def train_dataloader(self) -> TRAIN_DATALOADERS:  # noqa: D102
+    def train_dataloader(self) -> TRAIN_DATALOADERS:
+        """Create the training dataloader."""
         return self._create_dataloader(self._train_ds)
 
-    def val_dataloader(self) -> EVAL_DATALOADERS:  # noqa: D102
+    def val_dataloader(self) -> EVAL_DATALOADERS:
+        """Create the validation dataloader."""
         return self._create_dataloader(self._validation_ds)
 
-    def test_dataloader(self) -> EVAL_DATALOADERS:  # noqa: D102
+    def test_dataloader(self) -> EVAL_DATALOADERS:
+        """Create the test dataloader."""
         return self._create_dataloader(self._test_ds)
 
     def _create_dataloader(self, dataset, **kwargs) -> DataLoader:
@@ -170,11 +187,13 @@ class SingleCellDataModule(pl.LightningDataModule):
             **kwargs,
         )
 
-    def _sample_and_shuffle_dataset(self, dataset: SingleCellDataset, num_samples: int, stage: str):  # noqa: D417
+    def _sample_and_shuffle_dataset(self, dataset: SingleCellDataset, num_samples: int, stage: str):
         """Sample the training dataset.
 
         Args:
             dataset (torch.utils.data.Dataset): The dataset to sample from
+            num_samples: The number of samples to draw
+            stage: The stage of the training process
 
         Returns:
             ResamplingMappedDataset: Resampled dataset
