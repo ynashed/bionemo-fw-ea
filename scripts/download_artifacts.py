@@ -222,12 +222,10 @@ def download_artifacts(
             ngc_dirname = complete_download_dir / ngc_dirname
 
             # TODO: this assumes that it's a model for now.
-            command = f"mkdir -p {complete_download_dir!s} && {ngc_call_command} registry model download-version {artifact_source_path} --dest {complete_download_dir!s} && mv {ngc_dirname!s}/* {complete_download_dir!s}/ && rm -d {ngc_dirname!s}"
+            command = f"mkdir -p {complete_download_dir} && {ngc_call_command} registry model download-version {artifact_source_path} --dest {complete_download_dir} && mv {ngc_dirname}/* {complete_download_dir}/ && rm -d {ngc_dirname}"
             file_name = artifact_source_path.split("/")[-1]
         elif source == "pbss":
-            command = (
-                f"aws s3 cp {artifact_source_path!s} {complete_download_dir!s}/ --endpoint-url https://pbss.s8k.io"
-            )
+            command = f"aws s3 cp {artifact_source_path} {complete_download_dir}/ --endpoint-url https://pbss.s8k.io"
             file_name = artifact_source_path.split("/")[-1]
         if conf[download_artifact].extra_args:
             extra_args = conf[download_artifact].extra_args
@@ -239,10 +237,10 @@ def download_artifacts(
             unpack: bool = getattr(conf[download_artifact], "unpack", True)
             if unpack:
                 # Assume it is a tarfile
-                tar_file = f"{complete_download_dir!s}/{file_name}"
+                tar_file = f"{complete_download_dir}/{file_name}"
                 if Path(tar_file).is_file():
                     with tarfile.open(tar_file) as tar:
-                        extract_path = f"{complete_download_dir!s}"
+                        extract_path = f"{complete_download_dir}"
                         if conf[download_artifact].untar_dir:
                             extract_path = f"{extract_path}/{conf[download_artifact].untar_dir}"
                         tar.extractall(path=extract_path)
@@ -253,7 +251,7 @@ def download_artifacts(
             source_file = conf[download_artifact].symlink.source
             target_file = complete_download_dir / conf[download_artifact].symlink.target
             target_dir = target_file.parent
-            command = f"mkdir -p {target_dir} && ln -sf {source_file!s} {target_file!s}"
+            command = f"mkdir -p {target_dir} && ln -sf {source_file} {target_file}"
             logging.info(f"Creating symlink: {source_file} -> {target_file} by running:\n\t{command}")
             _, stderr, retcode = streamed_subprocess_call(command, stream_stdout=True)
             if retcode != 0:
@@ -306,14 +304,14 @@ def main():
     parser.add_argument(
         "--models",
         nargs="*",
-        choices=all_models_list + [ALL_KEYWORD],  # noqa: RUF005
+        choices=all_models_list + [ALL_KEYWORD],
         help="Name of the model (optional if downloading all models)",
     )
 
     parser.add_argument(
         "--data",
         nargs="*",
-        choices=all_data_list + [ALL_KEYWORD],  # noqa: RUF005
+        choices=all_data_list + [ALL_KEYWORD],
         help="Name of the data (optional if downloading all data)",
     )
 
