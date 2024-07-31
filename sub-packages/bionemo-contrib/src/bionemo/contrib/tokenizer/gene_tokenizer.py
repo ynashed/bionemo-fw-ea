@@ -35,7 +35,7 @@ class GeneTokenizer(Label2IDTokenizer):
     ukw_token: str = "[UKW]"
     special_tokens: Tuple[str, str, str, str, str] = (cls_token, mask_token, pad_token, sep_token, ukw_token)
 
-    def __init__(self, vocab: Dict[str, int], gene_to_ens: Dict[str, str]):
+    def __init__(self, vocab: Dict[str, int], gene_to_ens: Dict[str, str]):  # noqa: D107
         # Sets up vocab/decode_vocab dictionaries, parent class is sateful.
         super().__init__()
         assert set(self.special_tokens).issubset(
@@ -48,7 +48,7 @@ class GeneTokenizer(Label2IDTokenizer):
 
     @classmethod
     def from_medians_and_genes_dicts(cls, median_dict: Dict[str, float], gene_to_ens: Dict[str, str]):
-        """Creates a tokenizer from a median dictionary"""
+        """Creates a tokenizer from a median dictionary"""  # noqa: D415
         tokens = list(cls.special_tokens) + list(median_dict.keys())
         vocab = cls._build_vocab(tokens)
         return cls(vocab, gene_to_ens)
@@ -77,14 +77,14 @@ class GeneTokenizer(Label2IDTokenizer):
         return self.vocab.get(token)
 
     @property
-    def pad_id(self) -> int:
+    def pad_id(self) -> int:  # noqa: D102
         return self.token_to_id(self.pad_token)
 
     @property
-    def class_id(self) -> int:
+    def class_id(self) -> int:  # noqa: D102
         return self.token_to_id(self.cls_token)
 
-    def tokens_to_ids(self, tokens: List[str]) -> List[int]:
+    def tokens_to_ids(self, tokens: List[str]) -> List[int]:  # noqa: D102
         return super().tokens_to_ids(tokens)
 
     def save_vocab(self, vocab_file):
@@ -102,7 +102,7 @@ class GeneTokenizer(Label2IDTokenizer):
 
     @classmethod
     def from_vocab_file(cls, vocab_file):
-        """This method adds a layer on the constructor in the case we are working from a filename instead of a dictionary"""
+        """This method adds a layer on the constructor in the case we are working from a filename instead of a dictionary"""  # noqa: D415
         if not os.path.exists(vocab_file):
             raise FileNotFoundError(f"Vocab file {vocab_file} not found, run preprocessing to create it.")
 

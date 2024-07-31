@@ -47,7 +47,7 @@ def my_test():
 def _reset_microbatch_calculator():
     """Resets _GLOBAL_NUM_MICROBATCHES_CALCULATOR in megatron which is used in NeMo to initilised model parallel in
     nemo.collections.nlp.modules.common.megatron.megatron_init.initialize_model_parallel_for_nemo
-    """
+    """  # noqa: D205, D415
     megatron.core.num_microbatches_calculator._GLOBAL_NUM_MICROBATCHES_CALCULATOR = None
 
 
@@ -59,7 +59,7 @@ def _teardown_apex_megatron_cuda():
     """Cleans GPU allocation and model and data parallel settings after usage of a model:
     - sets the global variables related to model and data parallelism to None in Apex and Megatron:.
     - releases all unoccupied cached GPU memory currently held by the caching CUDA allocator, see torch.cuda.empty_cache
-    """
+    """  # noqa: D205, D415
     torch.cuda.empty_cache()
     _reset_microbatch_calculator()
     parallel_state.destroy_model_parallel()
@@ -93,7 +93,7 @@ def _initialize_distributed_parallel_state(
 
 @contextmanager
 def clean_parallel_state_context():
-    """Puts you into a clean parallel state, and again tears it down at the end"""
+    """Puts you into a clean parallel state, and again tears it down at the end"""  # noqa: D415
     try:
         _teardown_apex_megatron_cuda()
         yield
@@ -108,7 +108,7 @@ def distributed_model_parallel_state(seed: Optional[int] = 42):
     with distributed_model_parallel_state():
         # your test code here
     # After the block your state is cleaned up.
-    """
+    """  # noqa: D205
     try:
         _teardown_apex_megatron_cuda()
         _initialize_distributed_parallel_state()

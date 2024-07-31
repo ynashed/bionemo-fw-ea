@@ -22,7 +22,7 @@ import torch
 PrecisionTypes = Literal["fp16", "bf16", "fp32", "bf16-mixed", "fp32-mixed", "16-mixed", "fp16-mixed", 16, 32]
 
 
-def get_autocast_dtype(precision: PrecisionTypes) -> torch.dtype:
+def get_autocast_dtype(precision: PrecisionTypes) -> torch.dtype:  # noqa: D103
     # TODO move this to a utilities folder, or find/import the function that does this in NeMo
     if precision == "fp16":
         return torch.float16

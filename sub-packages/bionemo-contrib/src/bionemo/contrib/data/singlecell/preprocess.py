@@ -65,7 +65,7 @@ class GeneformerResourcePreprocessor(ResourcePreprocessor):
         return [self.prepare_resource(resource) for resource in self.get_remote_resources()]
 
 
-class GeneformerPreprocess:
+class GeneformerPreprocess:  # noqa: D101
     def __init__(self, download_directory: Path, medians_file_path: Path, tokenizer_vocab_path: Path):
         """Downloads HGNC symbols
 
@@ -73,7 +73,7 @@ class GeneformerPreprocess:
         tokenizer_vocab_path (str): Filepath to store the tokenizer vocab
         dataset_conf (OmegaConf): has 'train', 'val', 'test' keys containing
             the names of preprocessed train/val/test files to use for training.
-        """
+        """  # noqa: D415
         self.download_directory = download_directory
         self.medians_file_path = medians_file_path
         self.tokenizer_vocab_path = tokenizer_vocab_path
@@ -84,7 +84,7 @@ class GeneformerPreprocess:
     def build_and_save_tokenizer(self, median_dict, gene_to_ens, vocab_output_name):
         """Builds the GeneTokenizer using the median dictionary
         then serializes and saves the dictionary to disk.
-        """
+        """  # noqa: D205
         tokenizer = GeneTokenizer.from_medians_and_genes_dicts(median_dict, gene_to_ens)
         tokenizer.save_vocab(vocab_output_name)
         return tokenizer
@@ -95,7 +95,7 @@ class GeneformerPreprocess:
             logging.warning(f"Tokenizer vocab file: {vocab_output_name} already exists. Overwriting...")
 
     def preprocess(self) -> dict[Literal["tokenizer", "median_dict"], Any]:
-        """Preprocesses for the Geneformer model"""
+        """Preprocesses for the Geneformer model"""  # noqa: D415
         gene_name_dict_fn, gene_median_dict_fn = GeneformerResourcePreprocessor(
             dest_directory=self.download_directory,
         ).prepare()

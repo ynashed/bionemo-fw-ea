@@ -74,7 +74,7 @@ class RemoteResource:
     url: Optional[str] = None
 
     @property
-    def fully_qualified_dest_folder(self):
+    def fully_qualified_dest_folder(self):  # noqa: D102
         return os.path.join(self.root_directory, self.dest_directory)
 
     @property
@@ -118,7 +118,7 @@ class RemoteResource:
         return self.fully_qualified_dest_filename
 
     def check_exists(self):
-        """Returns true if `fully_qualified_dest_filename` exists and the checksum matches `self.checksum`"""
+        """Returns true if `fully_qualified_dest_filename` exists and the checksum matches `self.checksum`"""  # noqa: D415
         if os.path.exists(self.fully_qualified_dest_filename):
             with open(self.fully_qualified_dest_filename, "rb") as fd:
                 data = fd.read()
@@ -133,7 +133,7 @@ class RemoteResource:
         return False
 
 
-class FTPRemoteResource(RemoteResource):
+class FTPRemoteResource(RemoteResource):  # noqa: D101
     def download_resource(self, overwrite=False) -> str:
         """Downloads the resource to its specified fully_qualified_dest name.
 

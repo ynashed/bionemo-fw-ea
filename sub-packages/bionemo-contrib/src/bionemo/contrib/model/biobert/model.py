@@ -67,9 +67,9 @@ class MegatronBioBertModel(LanguageModule):
             Defaults is 'learned_absolute'.
         rotary_percent (float): Percent of rotary dimension to use for rotary position embeddings.
             Defaults to 1.0 (100%). Ignored unless position_embedding_type is 'rope'.
-    """
+    """  # noqa: D205, D415
 
-    def __init__(
+    def __init__(  # noqa: D107
         self,
         config: TransformerConfig,
         num_tokentypes: int,
@@ -184,7 +184,7 @@ class MegatronBioBertModel(LanguageModule):
 
         Returns:
             Tensor: The extended binary attention mask
-        """
+        """  # noqa: D415
         # We create a 3D attention mask from a 2D tensor mask.
         # [b, 1, s]
         attention_mask_b1s = attention_mask.unsqueeze(1)
@@ -209,7 +209,7 @@ class MegatronBioBertModel(LanguageModule):
 
         return extended_attention_mask
 
-    def bert_position_ids(self, token_ids):
+    def bert_position_ids(self, token_ids):  # noqa: D102
         # Create position ids
         seq_length = token_ids.size(1)
         position_ids = torch.arange(seq_length, dtype=torch.long, device=token_ids.device)
@@ -217,7 +217,7 @@ class MegatronBioBertModel(LanguageModule):
 
         return position_ids
 
-    def embedding_forward(
+    def embedding_forward(  # noqa: D102
         self, input_ids: Tensor, position_ids: Tensor, tokentype_ids: Tensor = None, attention_mask: Tensor = None
     ):
         return self.embedding(input_ids=input_ids, position_ids=position_ids, tokentype_ids=tokentype_ids)
@@ -253,7 +253,7 @@ class MegatronBioBertModel(LanguageModule):
         processing layer (optional).
 
         It either returns the Loss values if labels are given  or the final hidden units
-        """
+        """  # noqa: D415
         # TODO! If we upgrade to TE 1.7 why does bit flipping back to 1 help the loss in TE 1.7? It claimed that they now follow standards, did
         #  nemo/megatron flip again internally to be compatible wtih TE somewhere?
         #  change the following line to ~self.bert... and see if it helps if we upgrade to TE 1.7 and NeMo/Megatron have not compensated.
@@ -331,7 +331,7 @@ class MegatronBioBertModel(LanguageModule):
 
 
 @dataclass
-class BioBertConfig(TransformerConfig):
+class BioBertConfig(TransformerConfig):  # noqa: D101
     # From megatron.core.models.gpt.bert_model.GPTModel
     fp16_lm_cross_entropy: bool = False
     parallel_output: bool = True
@@ -358,7 +358,7 @@ class BioBertConfig(TransformerConfig):
     #  things as part of the workflow for inference and fine-tuning.
     return_only_hidden_states: bool = False
 
-    def configure_model(self, tokenizer) -> "MegatronBioBertModel":
+    def configure_model(self, tokenizer) -> "MegatronBioBertModel":  # noqa: D102
         vp_size = self.virtual_pipeline_model_parallel_size
         if vp_size:
             p_size = self.pipeline_model_parallel_size
@@ -428,7 +428,7 @@ class BioBertConfig(TransformerConfig):
             model.encoder.post_layer_norm = True
         return model
 
-    def get_loss_reduction_class(self) -> Type[MegatronLossReduction]:
+    def get_loss_reduction_class(self) -> Type[MegatronLossReduction]:  # noqa: D102
         # You could optionally return a different loss reduction class here based on the config settings.
         return BERTMLMLossWithReduction
 

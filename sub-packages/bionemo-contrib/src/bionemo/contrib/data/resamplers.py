@@ -21,7 +21,7 @@ from typing import Optional, Union
 from torch.utils.data import Dataset
 
 
-class PRNGDatasetShuffler(Dataset):
+class PRNGDatasetShuffler(Dataset):  # noqa: D101
     def __init__(self, dataset: Dataset, seed: int = 42, num_samples: Optional[int] = None):
         """Initializes the PRNGDatasetShuffler. PRNGDatasetShuffler shuffles a given dataset using a pseudo-random number generator (PRNG).
             This allows for reproducible shuffling by controlling the random seed, while not ever storing the list of indices in memory.
@@ -37,7 +37,7 @@ class PRNGDatasetShuffler(Dataset):
             seed (int, optional): The seed value for the PRNG. Default is 42.
             num_samples (Optional[int], optional): The number of samples to draw from the dataset.
                 If None, the length of the dataset is used. Default is None.
-        """
+        """  # noqa: D205
         self.initial_seed = seed
         self.rng = random.Random(seed)
         self.dataset_len = len(dataset)
@@ -54,7 +54,7 @@ class PRNGDatasetShuffler(Dataset):
         """Generates a random index within the range of the dataset size."""
         return self.rng.randint(0, self.dataset_len - 1)
 
-    def advance_state(self, num_to_advance: int):
+    def advance_state(self, num_to_advance: int):  # noqa: D417
         """Advances the PRNG state by generating n_to_advance random indices.
 
         Args:

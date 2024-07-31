@@ -40,7 +40,7 @@ from bionemo.contrib.model.layers import TELayerNorm
 class BiobertSpecOption(str, Enum):
     """Options for the BiobertSpec. The spec defines the architecture of the transformer (BERT) block in the biobert model.
     This is a `str, Enum` type so that argparse can use the string names as choices.
-    """
+    """  # noqa: D205
 
     bert_layer_local_spec = "bert_layer_local_spec"
     bert_layer_local_spec_with_qk_ln = "bert_layer_local_spec_with_qk_ln"
@@ -50,7 +50,7 @@ class BiobertSpecOption(str, Enum):
     esm2_bert_layer_local_spec = "esm2_bert_layer_local_spec"
 
 
-def get_biobert_spec(biobert_spec_option: BiobertSpecOption, qk_layernorm: bool = False) -> spec_utils.ModuleSpec:
+def get_biobert_spec(biobert_spec_option: BiobertSpecOption, qk_layernorm: bool = False) -> spec_utils.ModuleSpec:  # noqa: D417
     """Get the spec for the Biobert model.
 
     Args:

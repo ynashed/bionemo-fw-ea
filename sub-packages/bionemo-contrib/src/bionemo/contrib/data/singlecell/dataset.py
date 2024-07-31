@@ -74,9 +74,9 @@ class SingleCellDataset(Dataset):
 
     See Also:
         bionemo/data/singlecell/sc_memmap.py - creates the artifacts required for instantiating a singlecell dataset from hdf5 files.
-    """
+    """  # noqa: D205
 
-    def __init__(
+    def __init__(  # noqa: D107
         self,
         data_path: str,
         tokenizer: Any,
@@ -165,7 +165,7 @@ class SingleCellDataset(Dataset):
             self.feature_ids = feature_ids
             self.metadata = None
 
-    def __len__(self):
+    def __len__(self):  # noqa: D105
         return self.num_samples
 
     def metadata_lookup(self, idx) -> Dict[str, np.ndarray]:
@@ -174,7 +174,7 @@ class SingleCellDataset(Dataset):
         metadata = self.metadata[self.dataset_map[did]]
         return metadata
 
-    def lookup_cell_by_idx(self, idx) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def lookup_cell_by_idx(self, idx) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:  # noqa: D102
         ptr = slice(int(self.gene_data_ptr[idx]), int(self.gene_data_ptr[idx + 1]))
         # col idxs poin to offsets in the original sparse metadata, this is for looking up metadata eg gene names
         col_idxs = np.asarray(self.gene_data_indices[ptr]).astype(int)  # keyed by ptr
@@ -192,7 +192,7 @@ class SingleCellDataset(Dataset):
         return gene_data, col_idxs, feature_ids
 
     def __getitem__(self, idx: int) -> Item:
-        """Performs a lookup and the required transformation for the model"""
+        """Performs a lookup and the required transformation for the model"""  # noqa: D415
         gene_data, col_idxs, feature_ids = self.lookup_cell_by_idx(idx)
         return process_item(
             gene_data,
@@ -208,7 +208,7 @@ class SingleCellDataset(Dataset):
         )
 
 
-def process_item(
+def process_item(  # noqa: D417
     gene_data: np.ndarray,
     gene_idxs: np.ndarray,
     feature_ids: np.ndarray,

@@ -268,7 +268,6 @@ def execute_download(
     file_name: str,
 ) -> None:
     """Execute the download command and check the MD5 checksum of the downloaded file."""
-
     _, stderr, retcode = streamed_subprocess_call(command, stream_stdout)
     if retcode != 0:
         raise ValueError(f"Failed to download {download_artifact=}! {stderr=}")
