@@ -8,7 +8,7 @@ line-length = 119
 
 [tool.ruff.lint]
 ignore = ["C901", "E741", "E501", "D100", "RUF005", "RUF010"]
-select = ["C", "E", "F", "I", "W",
+select = [
     "C",    # Pylint conventions
     "E",    # style stuff, whitespaces
     "F",    # important pyflakes lints
