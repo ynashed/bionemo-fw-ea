@@ -32,7 +32,7 @@ class ResourcePreprocessor(ABC):
         remote -> prepare -> prepared data.
     """  # noqa: D205
 
-    root_directory: Optional[str] = RemoteResource.get_env_tmpdir()
+    root_directory: Optional[str] = RemoteResource.get_env_tmpdir()  # noqa: RUF009
     dest_directory: str = "data"
 
     def get_checksums(self) -> List[str]:  # noqa: D102

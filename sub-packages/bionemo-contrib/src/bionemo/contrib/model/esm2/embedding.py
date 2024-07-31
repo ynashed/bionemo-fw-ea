@@ -81,7 +81,11 @@ class ESM2Embedding(LanguageModelEmbedding):
         return word_embeddings, embeddings_mask
 
     def forward(
-        self, input_ids: Tensor, position_ids: Tensor, tokentype_ids: int = None, attention_mask: Tensor = None
+        self,
+        input_ids: Tensor,
+        position_ids: Tensor,
+        tokentype_ids: int | None = None,
+        attention_mask: Tensor | None = None,
     ) -> Tensor:
         """Forward pass of the embedding module.
 
