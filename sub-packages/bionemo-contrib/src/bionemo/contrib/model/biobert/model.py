@@ -339,7 +339,7 @@ class MLPHeadModel(MegatronModule):
         self.language_model = language_model
         self.head = BertLMHead(1024, config=config)
         # megatron core pipelining currently depends on model type
-        # self.model_type = ModelType.encoder_or_decoder
+        self.model_type = ModelType.encoder_or_decoder
 
     def forward(self,
         input_ids: Tensor,
@@ -355,7 +355,8 @@ class MLPHeadModel(MegatronModule):
             lm_labels=lm_labels,
             inference_params=inference_params,
         )
-        y = self.head(X)
+        # raise ValueError(X['token_logits'].shape)
+        y = self.head(X['token_logits'][:, 0, :1024])
         return y
 
     def set_input_tensor(self, input_tensor: Tensor) -> None:
@@ -372,7 +373,7 @@ class MLPHeadModel(MegatronModule):
             input_tensor = [input_tensor]
 
         assert len(input_tensor) == 1, "input_tensor should only be length 1 for gpt/bert"
-        self.encoder.set_input_tensor(input_tensor[0])
+        self.language_model.encoder.set_input_tensor(input_tensor[0])
 
 
 from bionemo.contrib.utils.dtypes import PrecisionTypes, get_autocast_dtype
@@ -418,6 +419,8 @@ class BioBertFinetuneHeadConfig(ModelParallelConfig):
             biobert_spec_option=biobert_spec_option,
             # nemo1_ckpt_path=nemo1_init_path,
             )
+        # Needed for compatibility with megatron
+        self.calculate_per_token_loss = False
 
     def configure_model(self, tokenizer) -> "MegatronBioBertModel":
         lm =  self.lm_config.configure_model(tokenizer)
@@ -427,9 +430,48 @@ class BioBertFinetuneHeadConfig(ModelParallelConfig):
 
     def get_loss_reduction_class(self) -> Type[MegatronLossReduction]:
         # You could optionally return a different loss reduction class here based on the config settings.
-        return BERTMLMLossWithReduction
+        # return BERTMLMLossWithReduction
         # pass
+        from bionemo.contrib.lightning import DataT, ReductionT
+        from torch import nn
+        from typing import Tuple, Sequence
 
+        class PassthroughLoss(MegatronLossReduction):
+            def __init__(self, *args, **kwargs):
+                super().__init__()
+
+            def forward(self, batch: DataT, forward_out: torch.Tensor) -> Tuple[torch.Tensor, ReductionT]:
+                """
+                Calculates the loss within a micro-batch. A micro-batch is a batch of data on a single GPU.
+
+                Args:
+                    batch: A batch of data that gets passed to the original forward inside LitAutoEncoder.
+                    forward_out: the output of the forward method inside LitAutoEncoder.
+                Returns:
+                    A tuple containing [<loss_tensor>, ReductionT] where the loss tensor will be used for
+                    backpropagation and the ReductionT will be passed to the reduce method
+                    (which currently only works for logging.).
+                """
+                # x = batch["data"]
+                loss = (forward_out ** 2).mean()
+
+                return loss, {"avg": loss}
+
+            def reduce(self, losses_reduced_per_micro_batch: Sequence[ReductionT]) -> torch.Tensor:
+                """
+                Works across micro-batches. (data on single gpu).
+                Note: This currently only works for logging and this loss will not be used for backpropagation.
+
+                Args:
+                    losses_reduced_per_micro_batch: a list of the outputs of forward
+
+                Returns:
+                    A tensor that is the mean of the losses. (used for logging).
+                """
+                mse_losses = torch.stack([loss["avg"] for loss in losses_reduced_per_micro_batch])
+                return mse_losses.mean()
+
+        return PassthroughLoss
 
 @dataclass
 class BioBertConfig(TransformerConfig):
