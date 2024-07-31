@@ -60,7 +60,7 @@ class ESM2Model(MegatronBioBertModel):
             Defaults to 1.0 (100%). Ignored unless position_embedding_type is 'rope'.
     """
 
-    def __init__(  # noqa: D107
+    def __init__(
         self,
         config: TransformerConfig,
         num_tokentypes: int,
@@ -166,7 +166,7 @@ class ESM2Model(MegatronBioBertModel):
         if self.pre_process or self.post_process:
             self.setup_embeddings_and_output_layer()
 
-    def embedding_forward(  # noqa: D102
+    def embedding_forward(
         self, input_ids: Tensor, position_ids: Tensor, tokentype_ids: Tensor = None, attention_mask: Tensor = None
     ):
         # ESM2 Customization: ESM2Embedding forward takes attention_mask
@@ -177,17 +177,18 @@ class ESM2Model(MegatronBioBertModel):
 
 
 def esm_gelu_func(x):
-    """ESM2-specific gelu implementation from the original ESM repo.
+    """
+    ESM2-specific gelu implementation from the original ESM repo.
     Using F.gelu yields subtly wrong results.
 
     Args:
         x (Tensor): input tensor of any given dimension
-    """  # noqa: D205
+    """
     return x * 0.5 * (1.0 + torch.erf(x / math.sqrt(2.0)))
 
 
 @dataclass
-class ESM2Config(BioBertConfig):  # noqa: D101
+class ESM2Config(BioBertConfig):
     num_layers: int = 33  # 650M
     hidden_size: int = 1280  # 650M
     num_attention_heads: int = 20
@@ -224,7 +225,7 @@ class ESM2Config(BioBertConfig):  # noqa: D101
 
     optimizer_fn: Optional[Callable[[MegatronBioBertModel], Optimizer]] = None
 
-    def configure_model(self, tokenizer) -> ESM2Model:  # noqa: D102
+    def configure_model(self, tokenizer) -> ESM2Model:
         vp_size = self.virtual_pipeline_model_parallel_size
         if vp_size:
             p_size = self.pipeline_model_parallel_size

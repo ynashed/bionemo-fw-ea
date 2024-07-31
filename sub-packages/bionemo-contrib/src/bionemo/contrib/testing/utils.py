@@ -18,7 +18,7 @@ from typing import Optional
 import torch
 
 
-def assert_matrix_mape_below_value(  # noqa: D417
+def assert_matrix_mape_below_value(
     actual: torch.Tensor,
     expected: torch.Tensor,
     mask: Optional[torch.Tensor] = None,
@@ -26,7 +26,8 @@ def assert_matrix_mape_below_value(  # noqa: D417
     eps: float = 1e-3,
     msg: str = "",
 ) -> None:
-    """Assert that two tensors are close with a root mean squared error (RMSE)
+    """
+    Assert that two tensors are close with a root mean squared error (RMSE)
         relative to the scaled root mean square values for each matrix. This tells
         you if the RMSE implies that the two matrices are more similar to eachother
         as-is than would be the case if values were randomly permuted.
@@ -37,7 +38,7 @@ def assert_matrix_mape_below_value(  # noqa: D417
         mask: If there are only some values you want to compare,
             apply this mask and RMSE will be computed on the unmasked items only.
         min_relative_rmse: The relative tolerance parameter.
-    """  # noqa: D205
+    """
     if mask is None:
         mask = torch.ones_like(actual)
     else:
@@ -56,14 +57,15 @@ def assert_matrix_mape_below_value(  # noqa: D417
         raise AssertionError(f"MAPE below threshold: {mape} > {max_mape}. {msg}")
 
 
-def assert_matrix_correlation_above_value(  # noqa: D417
+def assert_matrix_correlation_above_value(
     actual: torch.Tensor,
     expected: torch.Tensor,
     mask: Optional[torch.Tensor] = None,
     min_correlation: float = 0.95,
     msg: str = "",
 ) -> None:
-    """Assert that two tensors are close with a root mean squared error (RMSE)
+    """
+    Assert that two tensors are close with a root mean squared error (RMSE)
         relative to the scaled root mean square values for each matrix. This tells
         you if the RMSE implies that the two matrices are more similar to eachother
         as-is than would be the case if values were randomly permuted.
@@ -74,7 +76,7 @@ def assert_matrix_correlation_above_value(  # noqa: D417
         mask: If there are only some values you want to compare,
             apply this mask and RMSE will be computed on the unmasked items only.
         min_relative_rmse: The relative tolerance parameter.
-    """  # noqa: D205
+    """
     if mask is None:
         mask = torch.ones_like(actual)
     else:

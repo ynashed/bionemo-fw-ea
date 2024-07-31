@@ -23,14 +23,14 @@ from torch.optim.lr_scheduler import _LRScheduler
 from bionemo.contrib.model.biobert.model import MegatronBioBertModel
 
 
-class SchedulerOutput(TypedDict):  # noqa: D101
+class SchedulerOutput(TypedDict):
     optimizer: MegatronOptimizerModule
     lr_scheduler: dict
     monitor: str
 
 
-class WarmupAnnealDecayHold(_LRScheduler):  # noqa: D101
-    def __init__(  # noqa: D417
+class WarmupAnnealDecayHold(_LRScheduler):
+    def __init__(
         self,
         optimizer: MegatronOptimizerModule,
         *,
@@ -41,7 +41,8 @@ class WarmupAnnealDecayHold(_LRScheduler):  # noqa: D101
         anneal_percentage: float = 0.10,
         last_epoch: int = -1,
     ) -> None:
-        """Initializes the WarmupAnnealDecayHold learning rate scheduler.
+        """
+        Initializes the WarmupAnnealDecayHold learning rate scheduler.
 
         Args:
             max_steps (int): Total number of training steps.
@@ -60,7 +61,7 @@ class WarmupAnnealDecayHold(_LRScheduler):  # noqa: D101
 
         super(WarmupAnnealDecayHold, self).__init__(optimizer, last_epoch)
 
-    def get_lr(self) -> List[float]:  # noqa: D102
+    def get_lr(self) -> List[float]:
         step_num = self.last_epoch
         if step_num < self.warmup_steps:
             lr = self.min_lr + (self.max_lr - self.min_lr) * step_num / self.warmup_steps
@@ -75,7 +76,7 @@ class WarmupAnnealDecayHold(_LRScheduler):  # noqa: D101
 class WarmupAnnealDecayHoldScheduler(LRSchedulerModule):
     """Warmup Policy Learning Rate Scheduler."""
 
-    def __init__(  # noqa: D107
+    def __init__(
         self,
         warmup_steps: int = 2000,
         max_steps: int = 500_000,
@@ -96,7 +97,7 @@ class WarmupAnnealDecayHoldScheduler(LRSchedulerModule):
         self.frequency = frequency
         self.monitor = monitor
 
-    def scheduler(self, model: MegatronBioBertModel, optimizer: MegatronOptimizerModule) -> SchedulerOutput:  # noqa: D102
+    def scheduler(self, model: MegatronBioBertModel, optimizer: MegatronOptimizerModule) -> SchedulerOutput:
         lr_scheduler = WarmupAnnealDecayHold(
             optimizer,
             warmup_steps=self.warmup_steps,
