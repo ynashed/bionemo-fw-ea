@@ -22,8 +22,105 @@ from bionemo.model.molecule.moco.arch.dit import (
     EdgeMixOutLayer,
     SE3MixAttention,
 )
+from bionemo.model.molecule.moco.arch.dit_eqf import (
+    MultidimEquiUpdate,
+    MultiEdgeMixInLayer,
+    MultiEdgeMixOutLayer,
+    MultiXEGNN,
+)
 from bionemo.model.molecule.moco.arch.scratch.mpnn import TimestepEmbedder
 from bionemo.model.molecule.moco.models.utils import PredictionHead
+
+
+def coord2dist(x, edge_index):
+    row, col = edge_index
+    coord_diff = x[row] - x[col]
+    radial = torch.sum(coord_diff**2, 1).unsqueeze(1)
+    return radial
+
+
+class MoleculeVecDiT(nn.Module):
+    def __init__(
+        self,
+        num_layers=8,
+        equivariant_node_feature_dim=3,
+        invariant_node_feat_dim=256,
+        invariant_edge_feat_dim=256,
+        atom_classes=16,
+        edge_classes=5,
+        num_heads=4,
+        n_vector_features=128,
+    ):
+        super(MoleculeVecDiT, self).__init__()
+        self.atom_embedder = MLP(atom_classes, invariant_node_feat_dim, invariant_node_feat_dim)
+        self.edge_embedder = MLP(edge_classes + n_vector_features, invariant_edge_feat_dim, invariant_edge_feat_dim)
+        self.num_atom_classes = atom_classes
+        self.num_edge_classes = edge_classes
+        self.n_vector_features = n_vector_features
+        self.coord_emb = nn.Linear(1, n_vector_features, bias=False)
+        self.coord_pred = nn.Linear(n_vector_features, 1, bias=False)
+
+        #! TODO do we need coord prediction head which is mlp then 0 CoM?
+        self.atom_type_head = PredictionHead(atom_classes, invariant_node_feat_dim)
+        self.edge_type_head = PredictionHead(edge_classes, invariant_edge_feat_dim, edge_prediction=True)
+        self.time_embedding = TimestepEmbedder(invariant_node_feat_dim)
+
+        self.mix_layer = MultidimEquiUpdate(
+            invariant_node_feat_dim,
+            invariant_edge_feat_dim,
+            n_vector_features,
+            invariant_node_feat_dim,
+            n_vector_features=n_vector_features,
+        )
+
+        self.in_layer = MultiEdgeMixInLayer(
+            equivariant_node_feature_dim, invariant_node_feat_dim, invariant_edge_feat_dim
+        )
+        self.out_layer = MultiEdgeMixOutLayer(
+            equivariant_node_feature_dim, invariant_node_feat_dim, invariant_edge_feat_dim
+        )
+        self.bond_refine = BondRefine(invariant_node_feat_dim, invariant_edge_feat_dim)
+        self.dit_layers = nn.ModuleList()
+        self.egnn_layers = nn.ModuleList()
+        self.attention_mix_layers = nn.ModuleList()
+        for i in range(num_layers):
+            self.dit_layers.append(DiTBlock(invariant_node_feat_dim, num_heads, use_z=False))
+            self.egnn_layers.append(MultiXEGNN(invariant_node_feat_dim))
+            # self.attention_mix_layers.append(
+            #     SE3MixAttention(equivariant_node_feature_dim, invariant_node_feat_dim, invariant_edge_feat_dim)
+            # )
+
+    def forward(self, batch, X, H, E_idx, E, t):
+        torch.max(batch) + 1
+        pos = self.coord_emb(X.unsqueeze(-1))  # N x 3 x K
+        distances = coord2dist(pos, E_idx)
+        # import ipdb; ipdb.set_trace()
+        distances = distances.squeeze(1)  # E x K
+        H = self.atom_embedder(H)
+        E = self.edge_embedder(torch.cat([E, distances], dim=-1))  # should be + n_vector_features not + 1
+        te = self.time_embedding(t, batch)
+        #! Model missing proper mixing, equivariant features and distance and H interaction || Z tensor could fix this along with proepr mixing
+        X, H = self.in_layer(batch, pos, H, E_idx, E)
+        for layer_index in range(len(self.dit_layers)):
+            H_dit = self.dit_layers[layer_index](batch, H, te)
+            X, H = self.egnn_layers[layer_index](batch, X, H_dit, E_idx)
+            # pos, H = self.attention_mix_layers[layer_index](batch, X_eg, H_eg, E_idx)
+
+        X, H, edge_attr = self.out_layer(batch, X, H, E_idx)
+        X = self.coord_pred(X).squeeze(-1)
+        x = X - scatter_mean(X, index=batch, dim=0)[batch]
+        # import ipdb; ipdb.set_trace()
+        edge_attr = self.bond_refine(batch, X, H, E_idx, edge_attr)
+
+        h_logits, _ = self.atom_type_head(batch, H)
+        e_logits, _ = self.edge_type_head.predict_edges(batch, edge_attr, E_idx)
+        out = {
+            "x_hat": x,
+            "h_logits": h_logits,
+            "edge_attr_logits": e_logits,
+            # "Z_hat": z_logits,
+        }
+        return out
 
 
 class MoleculeDiT(nn.Module):
@@ -65,13 +162,22 @@ class MoleculeDiT(nn.Module):
         H = self.atom_embedder(H)
         E = self.edge_embedder(E)
         te = self.time_embedding(t, batch)
-
+        #! Model missing proper mixing, equivariant features and distance and H interaction || Z tensor could fix this along with proepr mixing
         X, H = self.in_layer(batch, X, H, E_idx, E)
         for layer_index in range(len(self.dit_layers)):
+            rel_vec = X.unsqueeze(1) - X.unsqueeze(0)  # [b, a, a, 3]
+            rel_dist = (rel_vec**2).sum(dim=-1, keepdim=True)
+            square_batch = (batch.unsqueeze(1) == batch.unsqueeze(0)).int()
+            torch.ones_like(square_batch) - torch.eye(
+                square_batch.size(0), dtype=square_batch.dtype, device=square_batch.device
+            )
+            rel_dist = rel_dist * square_batch.unsqueeze(-1)
+
+            import ipdb
+
+            ipdb.set_trace()
             H_dit = self.dit_layers[layer_index](batch, H, te)
             X_eg, H_eg = self.egnn_layers[layer_index](batch, X, H_dit, E_idx)
-            # X = X_eg
-            # H = H_eg
             X, H = self.attention_mix_layers[layer_index](batch, X_eg, H_eg, E_idx)
         X, H, edge_attr = self.out_layer(batch, X, H, E_idx)
         # import ipdb; ipdb.set_trace()

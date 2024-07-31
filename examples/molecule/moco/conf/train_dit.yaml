@@ -1,9 +1,9 @@
-run_name: 'dit_test_bs350'
+run_name: 'dit_test_local_vec2'
 outdir: /workspace/bionemo/results/eqgatdiff
 resume: null
 ema_resume: null
 wandb_params:
-  mode: 'online'  # disabled, offline, online
+  mode: 'disabled'  # disabled, offline, online
   entity: 'clara-discovery'
   group: 'danny-testing'
   project: 'MoCo'
@@ -11,8 +11,8 @@ wandb_params:
 data:
   dataset_root: "/workspace/bionemo/data/pyg_geom_drug"
   processed_folder: "processed"
-  batch_size: &batch_size 350
-  inference_batch_size: 350
+  batch_size: &batch_size 200
+  inference_batch_size: 200
   removed_h: False
   data_loader_type: "midi"
 
@@ -162,16 +162,22 @@ evaluation:
 
 optimizer:
   type: adamw
-  lr: 2.e-4
+  lr: 1.e-4
   weight_decay: 1.e-12
   amsgrad: True
 
 lr_scheduler:
-  type: plateau
-  factor: 0.75
-  patience: 50
-  min_lr: 5.e-5
-  cooldown: 0
-  monitor: val/loss
-  interval: epoch
-  frequency: 5 #not in config but this is the default
+  # type: plateau
+  # factor: 0.75
+  # patience: 50
+  # min_lr: 5.e-5
+  # cooldown: 0
+  # monitor: val/loss
+  # interval: epoch
+  # frequency: 5 #not in config but this is the default
+  type: linear_warmup
+  initial_lr: 1.e-5
+  final_lr: 1.e-4
+  num_warmup_steps: 1000
+  interval: step
+  frequency: 1 #not in config but this is the default

@@ -132,6 +132,14 @@ class Graph3DInterpolantModel(pl.LightningModule):
                     min_lr=self.lr_scheduler_params.min_lr,
                     cooldown=self.lr_scheduler_params.cooldown,
                 )
+            elif self.lr_scheduler_params.type == "linear_warmup":
+                scheduler = torch.optim.lr_scheduler.LinearLR(
+                    optimizer,
+                    start_factor=self.lr_scheduler_params.initial_lr
+                    / self.lr_scheduler_params.final_lr,  # Start factor (initial learning rate / final learning rate)
+                    end_factor=1.0,  # End factor (final learning rate / final learning rate)
+                    total_iters=self.lr_scheduler_params.num_warmup_steps,  # Number of iterations to go from start_factor to end_factor
+                )
             else:
                 raise NotImplementedError('LR Scheduler not supported: %s' % self.lr_scheduler_params.type)
             return {
@@ -139,7 +147,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
                 "lr_scheduler": {
                     "scheduler": scheduler,
                     "interval": self.lr_scheduler_params.interval,
-                    "monitor": self.lr_scheduler_params.monitor,
+                    # "monitor": self.lr_scheduler_params.monitor,
                     "frequency": self.lr_scheduler_params.frequency,
                     "strict": False,
                 },

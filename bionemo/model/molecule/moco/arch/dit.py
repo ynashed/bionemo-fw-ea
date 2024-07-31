@@ -398,7 +398,7 @@ class XEGNN(MessagePassing):
     #         nn.init.zeros_(module.bias)
 
     def forward(self, batch, X, H, edge_index, edge_attr=None):
-        X = X - scatter_mean(X, index=batch, dim=0, dim_size=X.shape[0])
+        X = X - scatter_mean(X, index=batch, dim=0)[batch]
         X = self.x_norm(X, batch)
         H = self.h_norm(H, batch)
         source, target = edge_index
@@ -465,7 +465,7 @@ class EdgeMixInLayer(MessagePassing):
     #         nn.init.zeros_(module.bias)
 
     def forward(self, batch, X, H, edge_index, edge_attr):
-        X = X - scatter_mean(X, index=batch, dim=0, dim_size=X.shape[0])
+        X = X - scatter_mean(X, index=batch, dim=0)[batch]
         X = self.x_norm(X, batch)
         H = self.h_norm(H, batch)
         source, target = edge_index
@@ -533,7 +533,7 @@ class EdgeMixOutLayer(MessagePassing):
     #         nn.init.zeros_(module.bias)
 
     def forward(self, batch, X, H, edge_index):
-        X = X - scatter_mean(X, index=batch, dim=0, dim_size=X.shape[0])
+        X = X - scatter_mean(X, index=batch, dim=0)[batch]
         X = self.x_norm(X, batch)
         H = self.h_norm(H, batch)
         source, target = edge_index
@@ -588,7 +588,7 @@ class BondRefine(MessagePassing):
         )
 
     def forward(self, batch, X, H, edge_index, edge_attr):
-        X = X - scatter_mean(X, index=batch, dim=0, dim_size=X.shape[0])
+        X = X - scatter_mean(X, index=batch, dim=0)[batch]
         # X = self.x_norm(X, batch)
         H = self.h_norm(H, batch)
         source, target = edge_index
