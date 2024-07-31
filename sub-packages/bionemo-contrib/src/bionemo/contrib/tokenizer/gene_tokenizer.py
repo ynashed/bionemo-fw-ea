@@ -20,12 +20,13 @@ from copy import deepcopy
 from typing import Dict, List, Tuple, Union
 
 from .label2id_tokenizer import Label2IDTokenizer
+from nemo.lightning import io # TODO: Remove this import
 
 
 __all__ = ["GeneTokenizer"]
 
 
-class GeneTokenizer(Label2IDTokenizer):
+class GeneTokenizer(Label2IDTokenizer, io.IOMixin): # TODO: Remove io.IOMixin
     """Initializes the GeneTokenizer object."""
 
     cls_token: str = "[CLS]"

@@ -111,7 +111,8 @@ def main(
         pipeline_model_parallel_size=pipeline_model_parallel_size,
         ddp="megatron",
         find_unused_parameters=True,
-        enable_nemo_ckpt_io=False,
+        # enable_nemo_ckpt_io=False,
+        enable_nemo_ckpt_io=True,
     )
 
     wandb_options: Optional[WandbLoggerOptions] = (
@@ -124,6 +125,7 @@ def main(
             log_model=False,
         )
     )
+    from nemo.lightning.io import track_io
     trainer = nl.Trainer(
         devices=devices,
         max_steps=num_steps,
@@ -132,7 +134,7 @@ def main(
         limit_val_batches=limit_val_batches,  # This controls upsampling and downsampling
         val_check_interval=val_check_interval,  # TODO(@jstjohn) Checkpoint saving is currently broken, fix and change this.
         num_nodes=num_nodes,
-        callbacks=[LossLoggingCallback(), RichModelSummary(max_depth=4), LearningRateMonitor()],
+        callbacks=[LossLoggingCallback(), track_io(RichModelSummary)(max_depth=4), track_io(LearningRateMonitor)()],
         plugins=nl.MegatronMixedPrecision(precision=precision, amp_O2=False),
     )
 
@@ -221,12 +223,24 @@ def main(
         ),
     )
 
+    from nemo.lightning.pytorch.callbacks import ModelCheckpoint
+    checkpoint_callback = ModelCheckpoint(
+        save_best_model=False,
+        save_last=True,
+        monitor="reduced_train_loss",
+        save_top_k=2,
+        every_n_train_steps=10,
+        enable_nemo_ckpt_io=True,  # Enables the .nemo file-like checkpointing where all IOMixins are under SerDe
+        async_save=False,
+    )
+
     # Setup the logger and train the model
     nemo_logger = setup_nemo_lightning_logger(
         root_dir=result_dir,
         name=experiment_name,
         initialize_tensorboard_logger=create_tensorboard_logger,
         wandb_kwargs=wandb_options,
+        ckpt=checkpoint_callback,
     )
 
     llm.train(

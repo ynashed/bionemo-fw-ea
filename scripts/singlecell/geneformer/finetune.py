@@ -49,10 +49,10 @@ from bionemo.contrib.utils.logger_utils import WandbLoggerOptions, setup_nemo_li
 
 
 class MLPHeadModel(MegatronModule):
-    def __init__(self, language_model, config):
+    def __init__(self, language_model: MegatronBioBertModel, config: BioBertConfig):
         super().__init__(config)
         self.language_model = language_model
-        self.head = BertLMHead(1024, config=config)
+        self.head: MegatronModule = BertLMHead(1024, config=config)
         # megatron core pipelining currently depends on model type
         self.model_type = ModelType.encoder_or_decoder
 
@@ -127,8 +127,9 @@ class InheritanceMLPHeadModel(MegatronBioBertModel):
 
 
 class BioBertFinetuneHeadConfig(ModelParallelConfig):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, trainer: nl.Trainer | None = None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.trainer = trainer # TODO(@georgea) this bad. try to  not have to pass in a trainer
         # TODO(@georgea) this doesn't allow the nemo ckpt load yet
         seq_length = 2048
         precision = "bf16-mixed"
@@ -169,7 +170,7 @@ class BioBertFinetuneHeadConfig(ModelParallelConfig):
         self.calculate_per_token_loss = False
 
     def configure_model(self, tokenizer) -> "MegatronBioBertModel":
-        use_inheritance = True
+        use_inheritance = False
         if use_inheritance:
             # The local specs all require the standard full attention mask. For transformer engine only the NVTE_FLASH_ATTN=0
             #  option requires this full attention mask.
@@ -201,7 +202,16 @@ class BioBertFinetuneHeadConfig(ModelParallelConfig):
                 use_full_attention_mask=use_full_attention_mask,
             )
         else:
-            lm = self.lm_config.configure_model(tokenizer)
+            # TODO this if bad, fix with better condition pls, that actually  tests whether you want to load ckpt (@georgea)
+            # TODO(@georgea) also try dist_checkpoint
+            if self.trainer is None:
+                lm = self.lm_config.configure_model(tokenizer)
+            else:
+                fabric = self.trainer.to_fabric()
+                distributed_model = fabric.load_model(
+                    "/workspaces/bionemo-github/results/test_experiment/2024-07-31_23-01-09/checkpoints/test_experiment--reduced_train_loss=8.2760-epoch=0"
+                    )
+                lm: MegatronBioBertModel = distributed_model.module.module # distributed_model is megatron_parallel, .module is the lightning module, and .module.module is the megatronbiobertmodel
             for param in lm.parameters():
                 param.requires_grad = False
             # model_with_head = self.head.configure_model(lm)
@@ -334,6 +344,7 @@ def main(
             log_model=False,
         )
     )
+    from nemo.lightning.io import track_io
     trainer = nl.Trainer(
         devices=devices,
         max_steps=num_steps,
@@ -342,7 +353,7 @@ def main(
         limit_val_batches=limit_val_batches,  # This controls upsampling and downsampling
         val_check_interval=val_check_interval,  # TODO(@jstjohn) Checkpoint saving is currently broken, fix and change this.
         num_nodes=num_nodes,
-        callbacks=[LossLoggingCallback(), RichModelSummary(max_depth=4), LearningRateMonitor()],
+        callbacks=[LossLoggingCallback(), track_io(RichModelSummary)(max_depth=4), track_io(LearningRateMonitor)()],
         plugins=nl.MegatronMixedPrecision(precision=precision, amp_O2=False),
     )
 
@@ -375,7 +386,7 @@ def main(
         num_workers=num_dataset_workers,
     )
 
-    geneformer_config = BioBertFinetuneHeadConfig()
+    geneformer_config = BioBertFinetuneHeadConfig(trainer)
 
     # The lightning class owns a copy of the actual model, and a loss function, both of which are configured
     #  and lazily returned by the `geneformer_config` object defined above.
