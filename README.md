@@ -49,8 +49,8 @@ The following command runs a very small example of geneformer.
 
 ```bash
 python  \
-    scripts/singlecell/geneformer/pretrain.py     \
-    --data-dir data/cellxgene_2023-12-15_small/processed_data    \
+    scripts/singlecell/geneformer/finetune.py     \
+    --data-dir test_data/cellxgene_2023-12-15_small/processed_data    \
     --result-dir ./results     \
     --experiment-name test_experiment     \
     --num-gpus 1  \

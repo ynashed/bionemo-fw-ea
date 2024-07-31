@@ -39,7 +39,7 @@ from bionemo.contrib.data.singlecell.datamodule import SingleCellDataModule
 from bionemo.contrib.data.singlecell.preprocess import GeneformerPreprocess
 from bionemo.contrib.lightning import LossLoggingCallback
 from bionemo.contrib.model.biobert.lightning import BioBertLightningModule
-from bionemo.contrib.model.biobert.model import BioBertConfig, BiobertSpecOption, BioBertFinetuneHeadConfig
+from bionemo.contrib.model.biobert.model import BioBertConfig, BiobertSpecOption
 from bionemo.contrib.utils.dtypes import PrecisionTypes, get_autocast_dtype
 from bionemo.contrib.utils.logger_utils import WandbLoggerOptions, setup_nemo_lightning_logger
 
@@ -164,39 +164,38 @@ def main(
         pin_memory=False,
         num_workers=num_dataset_workers,
     )
-    # geneformer_config = BioBertConfig(
-    #     num_layers=6,
-    #     hidden_size=256,
-    #     ffn_hidden_size=512,
-    #     num_attention_heads=4,
-    #     seq_length=seq_length,
-    #     fp32_residual_connection=False,  # TODO(@jstjohn) check this
-    #     hidden_dropout=0.02,
-    #     init_method_std=0.02,
-    #     kv_channels=None,
-    #     apply_query_key_layer_scaling=False,
-    #     make_vocab_size_divisible_by=128,
-    #     masked_softmax_fusion=True,  # TODO(@jstjohn) check this
-    #     fp16_lm_cross_entropy=False,
-    #     params_dtype=get_autocast_dtype(precision),
-    #     pipeline_dtype=get_autocast_dtype(precision),
-    #     autocast_dtype=get_autocast_dtype(precision),  # setting this speeds things up a lot
-    #     gradient_accumulation_fusion=False,  # THIS BREAKS STUFF, leave False
-    #     layernorm_zero_centered_gamma=False,  # TODO(@jstjohn) check this
-    #     layernorm_epsilon=1.0e-12,
-    #     activation_func=F.gelu,  # TODO(@jstjohn) check this
-    #     qk_layernorm=False,  # TODO(@jstjohn) check this
-    #     apply_residual_connection_post_layernorm=False,  # False is new default, True was BERT pub.
-    #     bias_activation_fusion=True,  # TODO(@jstjohn) check this
-    #     bias_dropout_fusion=True,  # TODO(@jstjohn) check this
-    #     get_attention_mask_from_fusion=False,
-    #     attention_dropout=0.1,
-    #     share_embeddings_and_output_weights=True,
-    #     enable_autocast=False,  # This has to be set to True if we use the mixed precision plugin
-    #     biobert_spec_option=biobert_spec_option,
-    #     nemo1_ckpt_path=nemo1_init_path,
-    # )
-    geneformer_config = BioBertFinetuneHeadConfig()
+    geneformer_config = BioBertConfig(
+        num_layers=6,
+        hidden_size=256,
+        ffn_hidden_size=512,
+        num_attention_heads=4,
+        seq_length=seq_length,
+        fp32_residual_connection=False,  # TODO(@jstjohn) check this
+        hidden_dropout=0.02,
+        init_method_std=0.02,
+        kv_channels=None,
+        apply_query_key_layer_scaling=False,
+        make_vocab_size_divisible_by=128,
+        masked_softmax_fusion=True,  # TODO(@jstjohn) check this
+        fp16_lm_cross_entropy=False,
+        params_dtype=get_autocast_dtype(precision),
+        pipeline_dtype=get_autocast_dtype(precision),
+        autocast_dtype=get_autocast_dtype(precision),  # setting this speeds things up a lot
+        gradient_accumulation_fusion=False,  # THIS BREAKS STUFF, leave False
+        layernorm_zero_centered_gamma=False,  # TODO(@jstjohn) check this
+        layernorm_epsilon=1.0e-12,
+        activation_func=F.gelu,  # TODO(@jstjohn) check this
+        qk_layernorm=False,  # TODO(@jstjohn) check this
+        apply_residual_connection_post_layernorm=False,  # False is new default, True was BERT pub.
+        bias_activation_fusion=True,  # TODO(@jstjohn) check this
+        bias_dropout_fusion=True,  # TODO(@jstjohn) check this
+        get_attention_mask_from_fusion=False,
+        attention_dropout=0.1,
+        share_embeddings_and_output_weights=True,
+        enable_autocast=False,  # This has to be set to True if we use the mixed precision plugin
+        biobert_spec_option=biobert_spec_option,
+        nemo1_ckpt_path=nemo1_init_path,
+    )
 
     # The lightning class owns a copy of the actual model, and a loss function, both of which are configured
     #  and lazily returned by the `geneformer_config` object defined above.

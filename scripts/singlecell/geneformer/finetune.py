@@ -15,10 +15,12 @@
 
 import argparse
 import math
+import os
 from pathlib import Path
 from typing import Optional, Type, get_args
 
 import torch
+from megatron.core import parallel_state
 from megatron.core.models.bert.bert_lm_head import BertLMHead
 from megatron.core.optimizer import OptimizerConfig
 from megatron.core.transformer.enums import ModelType
@@ -26,6 +28,7 @@ from megatron.core.transformer.module import MegatronModule
 from megatron.core.transformer.transformer_config import ModelParallelConfig
 from nemo import lightning as nl
 from nemo.collections import llm
+from nemo.lightning import get_vocab_size
 from nemo.lightning.megatron_parallel import MegatronLossReduction
 from nemo.lightning.pytorch.optim import MegatronOptimizerModule
 from nemo.lightning.pytorch.optim.lr_scheduler import CosineAnnealingScheduler
@@ -40,6 +43,7 @@ from bionemo.contrib.data.singlecell.preprocess import GeneformerPreprocess
 from bionemo.contrib.lightning import LossLoggingCallback
 from bionemo.contrib.model.biobert.lightning import BioBertLightningModule
 from bionemo.contrib.model.biobert.model import BioBertConfig, BiobertSpecOption, MegatronBioBertModel
+from bionemo.contrib.model.biobert.transformer_specs import get_biobert_spec
 from bionemo.contrib.utils.dtypes import PrecisionTypes, get_autocast_dtype
 from bionemo.contrib.utils.logger_utils import WandbLoggerOptions, setup_nemo_lightning_logger
 
@@ -88,6 +92,40 @@ class MLPHeadModel(MegatronModule):
         self.language_model.encoder.set_input_tensor(input_tensor[0])
 
 
+class InheritanceMLPHeadModel(MegatronBioBertModel):
+    def __init__(self, config, *args, **kwargs):
+        super().__init__(
+            config,
+            *args,
+            **kwargs,
+            # config,
+            # num_tokentypes=config.num_tokentypes,
+            # transformer_layer_spec=config.transformer_layer_spec,
+            # vocab_size=config.vocab_size,
+            # max_sequence_length=config.seq_length,
+        )
+        self.head = BertLMHead(1024, config=config)
+
+    def forward(
+        self,
+        input_ids: Tensor,
+        attention_mask: Tensor,
+        tokentype_ids: Tensor = None,
+        lm_labels: Tensor = None,
+        inference_params=None,
+    ):
+        X = super().forward(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            tokentype_ids=tokentype_ids,
+            lm_labels=lm_labels,
+            inference_params=inference_params,
+        )
+        # raise ValueError(X['token_logits'].shape)
+        y = self.head(X["token_logits"][:, 0, :1024])
+        return y
+
+
 class BioBertFinetuneHeadConfig(ModelParallelConfig):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -131,11 +169,43 @@ class BioBertFinetuneHeadConfig(ModelParallelConfig):
         self.calculate_per_token_loss = False
 
     def configure_model(self, tokenizer) -> "MegatronBioBertModel":
-        lm = self.lm_config.configure_model(tokenizer)
-        for param in lm.parameters():
-            param.requires_grad = False
-        # model_with_head = self.head.configure_model(lm)
-        model_with_head = MLPHeadModel(lm, self.lm_config)
+        use_inheritance = True
+        if use_inheritance:
+            # The local specs all require the standard full attention mask. For transformer engine only the NVTE_FLASH_ATTN=0
+            #  option requires this full attention mask.
+            self = self.lm_config
+            use_full_attention_mask: bool = os.getenv("NVTE_FLASH_ATTN") == "0" or self.biobert_spec_option in {
+                BiobertSpecOption.bert_layer_local_spec,
+                BiobertSpecOption.bert_layer_local_spec_with_qk_ln,
+                BiobertSpecOption.esm2_bert_layer_local_spec,
+            }
+
+            do_next_sentence = False
+            model_with_head = InheritanceMLPHeadModel(
+                self,
+                transformer_layer_spec=get_biobert_spec(self.biobert_spec_option, qk_layernorm=self.qk_layernorm),
+                num_tokentypes=2 if do_next_sentence else 0,
+                vocab_size=get_vocab_size(self, tokenizer.vocab_size, self.make_vocab_size_divisible_by),
+                max_sequence_length=self.seq_length,
+                tokrnizer=tokenizer,
+                fp16_lm_cross_entropy=self.fp16_lm_cross_entropy,
+                parallel_output=self.parallel_output,
+                share_embeddings_and_output_weights=self.share_embeddings_and_output_weights,
+                position_embedding_type=self.position_embedding_type,
+                rotary_percent=self.rotary_percent,
+                seq_len_interpolation_factor=self.seq_len_interpolation_factor,
+                return_embeddings=False,
+                pre_process=parallel_state.is_pipeline_first_stage(),
+                post_process=parallel_state.is_pipeline_last_stage(),  # set to False for inference
+                add_binary_head=do_next_sentence,
+                use_full_attention_mask=use_full_attention_mask,
+            )
+        else:
+            lm = self.lm_config.configure_model(tokenizer)
+            for param in lm.parameters():
+                param.requires_grad = False
+            # model_with_head = self.head.configure_model(lm)
+            model_with_head = MLPHeadModel(lm, self.lm_config)
         return model_with_head
 
     def get_loss_reduction_class(self) -> Type[MegatronLossReduction]:
