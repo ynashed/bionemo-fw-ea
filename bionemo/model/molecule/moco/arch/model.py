@@ -52,7 +52,7 @@ class MoleculeDiTe2(nn.Module):
         num_heads=4,
         n_vector_features=128,
     ):
-        super(MoleculeDiTe, self).__init__()
+        super(MoleculeDiTe2, self).__init__()
         self.atom_embedder = MLP(atom_classes, invariant_node_feat_dim, invariant_node_feat_dim)
         self.edge_embedder = MLP(edge_classes, invariant_edge_feat_dim, invariant_edge_feat_dim)
         self.num_atom_classes = atom_classes
