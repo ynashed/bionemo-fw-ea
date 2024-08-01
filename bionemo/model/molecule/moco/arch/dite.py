@@ -466,3 +466,69 @@ class MultiXEGNNE(MessagePassing):
             X_out = X_out + x_update_cross
 
         return X_out
+
+
+class MultiXEGNNET(MessagePassing):
+    """
+    X only EGNN
+    """
+
+    def __init__(self, invariant_node_feat_dim=64, n_vector_features=128):
+        super().__init__(node_dim=0, aggr=None, flow="source_to_target")  #! This should be target to source
+        self.message_input_size = (
+            2 * invariant_node_feat_dim + n_vector_features + invariant_node_feat_dim + invariant_node_feat_dim
+        )  # + invariant_edge_feat_dim
+        self.phi_message = MLP(self.message_input_size, invariant_node_feat_dim, invariant_node_feat_dim)
+        self.phi_x = MLP(invariant_node_feat_dim, invariant_node_feat_dim, 1)
+        self.coor_update_clamp_value = 10.0
+        # self.reset_parameters()
+        self.h_norm = BatchLayerNorm(invariant_node_feat_dim)
+        self.use_cross_product = True
+        if self.use_cross_product:
+            self.phi_x_cross = MLP(invariant_node_feat_dim, invariant_node_feat_dim, 1)
+        self.x_norm = E3Norm(n_vector_features)
+        # TODO: @Ali what is good weight inititalization for EGNN?
+
+    #     self.apply(self.init_)
+
+    # # def reset_parameters(self):
+    # def init_(self, module): #! this made it worse
+    #     if type(module) in {nn.Linear}:
+    #         # seems to be needed to keep the network from exploding to NaN with greater depths
+    #         nn.init.xavier_normal_(module.weight)
+    #         nn.init.zeros_(module.bias)
+
+    def forward(self, batch, X, H, edge_index, edge_attr=None, te=None):
+        X = X - scatter_mean(X, index=batch, dim=0, dim_size=X.shape[0])[batch]
+        X = self.x_norm(X, batch)
+        H = self.h_norm(H, batch)
+        source, target = edge_index
+        rel_coors = X[source] - X[target]
+        rel_dist = (rel_coors.transpose(1, 2) ** 2).sum(dim=-1, keepdim=False)
+        if edge_attr is not None:
+            edge_attr_feat = torch.cat([edge_attr, rel_dist], dim=-1)
+        else:
+            edge_attr_feat = rel_dist
+        m_ij = self.phi_message(torch.cat([H[target], H[source], edge_attr_feat, te], dim=-1))
+        coor_wij = self.phi_x(m_ij)  # E x 3
+        if self.coor_update_clamp_value:
+            coor_wij.clamp_(min=-self.coor_update_clamp_value, max=self.coor_update_clamp_value)
+        # import ipdb; ipdb.set_trace()
+        X_rel_norm = rel_coors / (1 + torch.sqrt(rel_dist.unsqueeze(1) + 1e-8))
+        x_update = scatter(X_rel_norm * coor_wij.unsqueeze(-1), index=target, dim=0, reduce='sum', dim_size=X.shape[0])
+        X_out = X + x_update
+        if self.use_cross_product:
+            mean = scatter(X, index=batch, dim=0, reduce='mean', dim_size=X.shape[0])
+            x_src = X[source] - mean[source]
+            x_tgt = X[target] - mean[target]
+            cross = torch.cross(x_src, x_tgt, dim=1)
+            cross = cross / (1 + torch.linalg.norm(cross, dim=1, keepdim=True))
+            coor_wij_cross = self.phi_x_cross(m_ij)
+            if self.coor_update_clamp_value:
+                coor_wij_cross.clamp_(min=-self.coor_update_clamp_value, max=self.coor_update_clamp_value)
+            x_update_cross = scatter(
+                cross * coor_wij_cross.unsqueeze(-1), index=target, dim=0, reduce='sum', dim_size=X.shape[0]
+            )
+            X_out = X_out + x_update_cross
+
+        return X_out
