@@ -90,7 +90,7 @@ class MoleculeDiTe2(nn.Module):
         for layer_index in range(len(self.dit_layers)):
             distances = coord2dist(pos, E_idx).squeeze(1)  # E x K
             H, edge_attr = self.dit_layers[layer_index](batch, H, te_h, edge_attr, E_idx, te_e, distances, edge_batch)
-            pos = self.egnn_layers[layer_index](batch, pos, H, E_idx, edge_attr, te_h)  #! TODO at time here
+            pos = self.egnn_layers[layer_index](batch, pos, H, E_idx, edge_attr, te_e)  #! TODO at time here
 
         X = self.coord_pred(pos).squeeze(-1)
         x = X - scatter_mean(X, index=batch, dim=0)[batch]
