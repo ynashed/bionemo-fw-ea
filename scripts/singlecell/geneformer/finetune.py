@@ -127,6 +127,8 @@ class InheritanceMLPHeadModel(MegatronBioBertModel):
 
 
 from nemo.lightning.io.pl import MegatronCheckpointIO
+
+
 class CustomMegatronCheckpointIO(MegatronCheckpointIO):
     @override
     def load_checkpoint(
@@ -158,7 +160,7 @@ class CustomMegatronCheckpointIO(MegatronCheckpointIO):
         if not fs.isdir(path):
             raise ValueError(f"Distributed checkpoints should be a directory. Found: {path}.")
 
-        if self.save_ckpt_format == 'zarr' and self.load_directly_on_device:
+        if self.save_ckpt_format == "zarr" and self.load_directly_on_device:
             from megatron.core.dist_checkpointing.strategies.tensorstore import TensorStoreLoadShardedStrategy
 
             sharded_strategy = TensorStoreLoadShardedStrategy(load_directly_on_device=True)
@@ -173,7 +175,7 @@ class CustomMegatronCheckpointIO(MegatronCheckpointIO):
             )
 
         if sharded_strategy is not None:
-            logging.info(f'Using {sharded_strategy} dist-ckpt load strategy.')
+            logging.info(f"Using {sharded_strategy} dist-ckpt load strategy.")
 
         checkpoint = dist_checkpointing.load(
             sharded_state_dict=sharded_state_dict, checkpoint_dir=str(path), sharded_strategy=sharded_strategy
@@ -261,16 +263,17 @@ class BioBertFinetuneHeadConfig(ModelParallelConfig):
         else:
             # TODO this if bad, fix with better condition pls, that actually  tests whether you want to load ckpt (@georgea)
             # TODO(@georgea) also try dist_checkpoint
-            from megatron.core import dist_checkpointing
             if self.trainer is None:
                 lm = self.lm_config.configure_model(tokenizer)
                 parallel_load = False
                 sharded_strategy = None
                 ckpt_dir = "/workspaces/bionemo-github/results/test_experiment/2024-07-31_23-01-09/checkpoints/test_experiment--reduced_train_loss=8.2760-epoch=0"
                 # breakpoint()
-                ckpt_io = MegatronCheckpointIO('torch_dist')
+                ckpt_io = MegatronCheckpointIO("torch_dist")
                 # breakpoint()
-                state_dict = ckpt_io.load_checkpoint(ckpt_dir, sharded_state_dict={'sharded_state_dict': lm.sharded_state_dict()})
+                state_dict = ckpt_io.load_checkpoint(
+                    ckpt_dir, sharded_state_dict={"sharded_state_dict": lm.sharded_state_dict()}
+                )
                 # ckpt =  dist_checkpointing.load(lm.sharded_state_dict(), ckpt_dir, sharded_strategy=sharded_strategy, strict='log_unexpected')
                 breakpoint()
             else:
@@ -455,7 +458,7 @@ def main(
         num_workers=num_dataset_workers,
     )
 
-    geneformer_config = BioBertFinetuneHeadConfig() #trainer=trainer)
+    geneformer_config = BioBertFinetuneHeadConfig()  # trainer=trainer)
 
     # The lightning class owns a copy of the actual model, and a loss function, both of which are configured
     #  and lazily returned by the `geneformer_config` object defined above.
