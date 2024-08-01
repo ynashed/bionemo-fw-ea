@@ -50,7 +50,7 @@ __all__: Sequence[str] = (
 )
 
 
-class BioBertOutput(TypedDict):
+class BioBertOutput(TypedDict):  # noqa: D101
     token_logits: Tensor
     binary_logits: Optional[Tensor]
 
@@ -73,7 +73,7 @@ class MegatronBioBertModel(LanguageModule):
             Defaults is 'learned_absolute'.
         rotary_percent (float): Percent of rotary dimension to use for rotary position embeddings.
             Defaults to 1.0 (100%). Ignored unless position_embedding_type is 'rope'.
-    """  # noqa: D415
+    """  # noqa: D205, D415
 
     def __init__(  # noqa: D107
         self,
@@ -215,7 +215,7 @@ class MegatronBioBertModel(LanguageModule):
 
         return extended_attention_mask
 
-    def bert_position_ids(self, token_ids):
+    def bert_position_ids(self, token_ids):  # noqa: D102
         # Create position ids
         seq_length = token_ids.size(1)
         position_ids = torch.arange(seq_length, dtype=torch.long, device=token_ids.device)
@@ -223,7 +223,7 @@ class MegatronBioBertModel(LanguageModule):
 
         return position_ids
 
-    def embedding_forward(
+    def embedding_forward(  # noqa: D102
         self, input_ids: Tensor, position_ids: Tensor, tokentype_ids: Tensor = None, attention_mask: Tensor = None
     ):
         return self.embedding(input_ids=input_ids, position_ids=position_ids, tokentype_ids=tokentype_ids)
@@ -337,7 +337,7 @@ class MegatronBioBertModel(LanguageModule):
 
 
 @dataclass
-class BioBertConfig(BionemoTrainableModelConfig[MegatronBioBertModel, MegatronLossReduction], TransformerConfig):
+class BioBertConfig(BionemoTrainableModelConfig[MegatronBioBertModel, MegatronLossReduction], TransformerConfig):  # noqa: D101
     # From megatron.core.models.gpt.bert_model.GPTModel
     fp16_lm_cross_entropy: bool = False
     parallel_output: bool = True
@@ -364,7 +364,7 @@ class BioBertConfig(BionemoTrainableModelConfig[MegatronBioBertModel, MegatronLo
     #  things as part of the workflow for inference and fine-tuning.
     return_only_hidden_states: bool = False
 
-    def configure_model(self, tokenizer) -> "MegatronBioBertModel":
+    def configure_model(self, tokenizer) -> "MegatronBioBertModel":  # noqa: D102
         vp_size = self.virtual_pipeline_model_parallel_size
         if vp_size:
             p_size = self.pipeline_model_parallel_size
@@ -434,6 +434,6 @@ class BioBertConfig(BionemoTrainableModelConfig[MegatronBioBertModel, MegatronLo
             model.encoder.post_layer_norm = True
         return model
 
-    def get_loss_reduction_class(self) -> Type[MegatronLossReduction]:
+    def get_loss_reduction_class(self) -> Type[MegatronLossReduction]:  # noqa: D102
         # You could optionally return a different loss reduction class here based on the config settings.
         return BERTMLMLossWithReduction

@@ -53,10 +53,10 @@ class Label2IDTokenizer(TokenizerSpec):
         """Return the size of the vocab being used."""
         return len(self.vocab)
 
-    def text_to_tokens(self, text: str) -> List[str]:
+    def text_to_tokens(self, text: str) -> List[str]:  # noqa: D102
         return list(text)
 
-    def tokens_to_text(self, tokens: List[str]) -> str:
+    def tokens_to_text(self, tokens: List[str]) -> str:  # noqa: D102
         return "".join(tokens)
 
     def tokens_to_ids(self, tokens: List[str]) -> List[int]:
@@ -104,7 +104,7 @@ class Label2IDTokenizer(TokenizerSpec):
         tokens = self.text_to_tokens(text)
         return self.tokens_to_ids(tokens)
 
-    def ids_to_text(self, ids: List[int]) -> str:
+    def ids_to_text(self, ids: List[int]) -> str:  # noqa: D102
         tokens = self.ids_to_tokens(ids)
         return self.tokens_to_text(tokens)
 
@@ -116,7 +116,7 @@ class Label2IDTokenizer(TokenizerSpec):
                 then the vocabulary is built from the single string.
                 Otherwise, the vocabulary is progressively built
                 from all the strings in `strings`.
-        """
+        """  # noqa: D205
         if isinstance(strings, str):
             strings = [strings]
 

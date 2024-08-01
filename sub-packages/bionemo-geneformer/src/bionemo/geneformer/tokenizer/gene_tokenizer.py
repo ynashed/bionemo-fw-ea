@@ -79,14 +79,14 @@ class GeneTokenizer(Label2IDTokenizer):
         return self.vocab.get(token)
 
     @property
-    def pad_id(self) -> int:
+    def pad_id(self) -> int:  # noqa: D102
         return self.token_to_id(self.pad_token)
 
     @property
-    def class_id(self) -> int:
+    def class_id(self) -> int:  # noqa: D102
         return self.token_to_id(self.cls_token)
 
-    def tokens_to_ids(self, tokens: List[str]) -> List[int]:
+    def tokens_to_ids(self, tokens: List[str]) -> List[int]:  # noqa: D102
         return super().tokens_to_ids(tokens)
 
     def save_vocab(self, vocab_file: str) -> None:

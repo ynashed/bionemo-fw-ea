@@ -24,7 +24,7 @@ __all__: Sequence[str] = (
 )
 
 
-def assert_matrix_mape_below_value(
+def assert_matrix_mape_below_value(  # noqa: D417
     actual: torch.Tensor,
     expected: torch.Tensor,
     mask: Optional[torch.Tensor] = None,
@@ -43,7 +43,7 @@ def assert_matrix_mape_below_value(
         mask: If there are only some values you want to compare,
             apply this mask and RMSE will be computed on the unmasked items only.
         min_relative_rmse: The relative tolerance parameter.
-    """
+    """  # noqa: D205
     if mask is None:
         mask = torch.ones_like(actual)
     else:
@@ -62,7 +62,7 @@ def assert_matrix_mape_below_value(
         raise AssertionError(f"MAPE below threshold: {mape} > {max_mape}. {msg}")
 
 
-def assert_matrix_correlation_above_value(
+def assert_matrix_correlation_above_value(  # noqa: D417
     actual: torch.Tensor,
     expected: torch.Tensor,
     mask: Optional[torch.Tensor] = None,
@@ -80,7 +80,7 @@ def assert_matrix_correlation_above_value(
         mask: If there are only some values you want to compare,
             apply this mask and RMSE will be computed on the unmasked items only.
         min_relative_rmse: The relative tolerance parameter.
-    """
+    """  # noqa: D205
     if mask is None:
         mask = torch.ones_like(actual)
     else:

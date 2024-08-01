@@ -42,7 +42,7 @@ def pad_token_ids(
 
     Returns:
         Tuple[List[int], List[int]]: Padded token ids and mask
-    """
+    """  # noqa: D205
     lengths = torch.tensor([len(s) for s in token_ids])
     if padding_len is None:
         padding_len = lengths.max()

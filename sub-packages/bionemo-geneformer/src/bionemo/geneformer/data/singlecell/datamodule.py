@@ -127,7 +127,7 @@ class SingleCellDataModule(pl.LightningDataModule):
             rampup_batch_size=rampup_batch_size,
         )
 
-    def setup(self, stage: str = "") -> None:
+    def setup(self, stage: str = "") -> None:  # noqa: D102
         assert (
             hasattr(self, "trainer") and self.trainer is not None
         ), "Setup should be completed when trainer and config are attached."
@@ -154,13 +154,13 @@ class SingleCellDataModule(pl.LightningDataModule):
         self._validation_ds = self._sample_and_shuffle_dataset(self._val_dataset_ori, num_val_samples, "val")
         self._test_ds = self._sample_and_shuffle_dataset(self._test_dataset_ori, num_test_samples, "test")
 
-    def train_dataloader(self) -> TRAIN_DATALOADERS:
+    def train_dataloader(self) -> TRAIN_DATALOADERS:  # noqa: D102
         return self._create_dataloader(self._train_ds)
 
-    def val_dataloader(self) -> EVAL_DATALOADERS:
+    def val_dataloader(self) -> EVAL_DATALOADERS:  # noqa: D102
         return self._create_dataloader(self._validation_ds)
 
-    def test_dataloader(self) -> EVAL_DATALOADERS:
+    def test_dataloader(self) -> EVAL_DATALOADERS:  # noqa: D102
         return self._create_dataloader(self._test_ds)
 
     def _create_dataloader(self, dataset, **kwargs) -> DataLoader:
@@ -173,7 +173,7 @@ class SingleCellDataModule(pl.LightningDataModule):
             **kwargs,
         )
 
-    def _sample_and_shuffle_dataset(self, dataset: SingleCellDataset, num_samples: int, stage: str):
+    def _sample_and_shuffle_dataset(self, dataset: SingleCellDataset, num_samples: int, stage: str):  # noqa: D417
         """Sample the training dataset.
 
         Args:

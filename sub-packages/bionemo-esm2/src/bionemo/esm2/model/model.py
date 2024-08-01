@@ -174,7 +174,7 @@ class ESM2Model(MegatronBioBertModel):
         if self.pre_process or self.post_process:
             self.setup_embeddings_and_output_layer()
 
-    def embedding_forward(
+    def embedding_forward(  # noqa: D102
         self, input_ids: Tensor, position_ids: Tensor, tokentype_ids: Tensor = None, attention_mask: Tensor = None
     ):
         # ESM2 Customization: ESM2Embedding forward takes attention_mask
@@ -190,12 +190,12 @@ def esm_gelu_func(x: Tensor) -> Tensor:  # D205 # D205
 
     Args:
         x: input tensor of any given dimension
-    """
+    """  # noqa: D205
     return x * 0.5 * (1.0 + torch.erf(x / math.sqrt(2.0)))
 
 
 @dataclass
-class ESM2Config(BionemoModelConfig[ESM2Model], TransformerConfig):
+class ESM2Config(BionemoModelConfig[ESM2Model], TransformerConfig):  # noqa: D101
     num_layers: int = 33  # 650M
     hidden_size: int = 1280  # 650M
     num_attention_heads: int = 20
@@ -246,7 +246,7 @@ class ESM2Config(BionemoModelConfig[ESM2Model], TransformerConfig):
 
     return_only_hidden_states: bool = False
 
-    def configure_model(self, tokenizer) -> ESM2Model:
+    def configure_model(self, tokenizer) -> ESM2Model:  # noqa: D102
         vp_size = self.virtual_pipeline_model_parallel_size
         if vp_size:
             p_size = self.pipeline_model_parallel_size

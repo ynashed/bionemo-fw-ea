@@ -80,7 +80,7 @@ class RemoteResource:
     url: Optional[str] = None
 
     @property
-    def fully_qualified_dest_folder(self):
+    def fully_qualified_dest_folder(self):  # noqa: D102
         return os.path.join(self.root_directory, self.dest_directory)
 
     @property
@@ -139,7 +139,7 @@ class RemoteResource:
         return False
 
 
-class FTPRemoteResource(RemoteResource):
+class FTPRemoteResource(RemoteResource):  # noqa: D101
     def download_resource(self, overwrite=False) -> str:
         """Downloads the resource to its specified fully_qualified_dest name.
 

@@ -19,7 +19,7 @@ from typing import Sequence
 __all__: Sequence[str] = ("nemo1_to_nemo2_biobert_key_mapping",)
 
 
-def nemo1_to_nemo2_biobert_key_mapping(
+def nemo1_to_nemo2_biobert_key_mapping(  # noqa: D417
     old_key: str,
     new_model_prefix: str = "module",
     old_model_prefix: str = "model",

@@ -568,7 +568,7 @@ def test_geneformer_inference_nemo1_v_nemo2_golden_values_by_layer(
                     new_output = [o for o in new_output if o is not None]
                 else:
                     new_output = [new_output]
-                assert type(ori_output) == type(new_output)
+                assert type(ori_output) is type(new_output)
                 assert len(ori_output) == len(new_output)
                 for ori, new in zip(ori_output, new_output):
                     if ori is None and new is None:

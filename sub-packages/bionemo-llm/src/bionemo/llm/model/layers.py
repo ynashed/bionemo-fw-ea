@@ -21,15 +21,15 @@ from megatron.core.transformer.transformer_config import TransformerConfig
 __all__: Sequence[str] = ("TELayerNorm",)
 
 
-class TELayerNorm(te.pytorch.LayerNorm):
-    def __init__(self, config: TransformerConfig, *args, **kwargs) -> None:
+class TELayerNorm(te.pytorch.LayerNorm):  # noqa: D101
+    def __init__(self, config: TransformerConfig, *args, **kwargs) -> None:  # noqa: D417
         """A wrapper around transformer engine layernorm that allows it to be initialized with a TransformerConfig.
             This allows this method to be used in a megatron layerspec.
 
         Args:
             config (TransformerConfig): The megatron config. This is used for extracing sequence_parallel and zero_centered_gamma.
                 The rest of the config is not used.
-        """
+        """  # noqa: D205
         # Eps tends to get passed through properly, as does hidden_size, but not other params from the config.
         super().__init__(
             *args,
