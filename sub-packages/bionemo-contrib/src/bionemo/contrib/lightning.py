@@ -146,6 +146,8 @@ class LightningPassthroughPredictionMixin:
 
 
 from nemo.lightning import io
+
+
 class LossLoggingCallback(pl.Callback, io.IOMixin):
     def __init__(self):
         """Log the loss at the end of each batch. For training do not reduce across the epoch but do so for validation/test."""

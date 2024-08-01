@@ -126,10 +126,67 @@ class InheritanceMLPHeadModel(MegatronBioBertModel):
         return y
 
 
+from nemo.lightning.io.pl import MegatronCheckpointIO
+class CustomMegatronCheckpointIO(MegatronCheckpointIO):
+    @override
+    def load_checkpoint(
+        self, path: _PATH, sharded_state_dict=None, map_location: Optional[Callable] = None
+    ) -> Dict[str, Any]:
+        """Loads checkpoint using :func:`torch.load`, with additional handling for ``fsspec`` remote loading of files.
+
+        Args:
+            path: Path to checkpoint
+            map_location: a function, :class:`torch.device`, string or a dict specifying how to remap storage
+                locations.
+
+        Returns: The loaded checkpoint.
+
+        Raises
+        ------
+            FileNotFoundError: If ``path`` is not found by the ``fsspec`` filesystem
+
+        """
+        from megatron.core import dist_checkpointing
+
+        if map_location is not None:
+            raise ValueError("`map_location` argument is not supported for `MegatronCheckpointIO.load_checkpoint`.")
+
+        # Try to read the checkpoint at `path`. If not exist, do not restore checkpoint.
+        fs = get_filesystem(path)
+        if not fs.exists(path):
+            raise FileNotFoundError(f"Checkpoint file not found: {path}")
+        if not fs.isdir(path):
+            raise ValueError(f"Distributed checkpoints should be a directory. Found: {path}.")
+
+        if self.save_ckpt_format == 'zarr' and self.load_directly_on_device:
+            from megatron.core.dist_checkpointing.strategies.tensorstore import TensorStoreLoadShardedStrategy
+
+            sharded_strategy = TensorStoreLoadShardedStrategy(load_directly_on_device=True)
+        else:
+            sharded_strategy = None
+
+        if self.parallel_load:
+            if sharded_strategy is None:
+                sharded_strategy = get_default_load_sharded_strategy(path)
+            sharded_strategy = FullyParallelLoadStrategyWrapper(
+                sharded_strategy, get_data_parallel_group(with_context_parallel=True)
+            )
+
+        if sharded_strategy is not None:
+            logging.info(f'Using {sharded_strategy} dist-ckpt load strategy.')
+
+        checkpoint = dist_checkpointing.load(
+            sharded_state_dict=sharded_state_dict, checkpoint_dir=str(path), sharded_strategy=sharded_strategy
+        )
+        checkpoint = _fix_tensors_device(checkpoint)
+
+        return checkpoint
+
+
 class BioBertFinetuneHeadConfig(ModelParallelConfig):
     def __init__(self, *args, trainer: nl.Trainer | None = None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.trainer = trainer # TODO(@georgea) this bad. try to  not have to pass in a trainer
+        self.trainer = trainer  # TODO(@georgea) this bad. try to  not have to pass in a trainer
         # TODO(@georgea) this doesn't allow the nemo ckpt load yet
         seq_length = 2048
         precision = "bf16-mixed"
@@ -204,14 +261,25 @@ class BioBertFinetuneHeadConfig(ModelParallelConfig):
         else:
             # TODO this if bad, fix with better condition pls, that actually  tests whether you want to load ckpt (@georgea)
             # TODO(@georgea) also try dist_checkpoint
+            from megatron.core import dist_checkpointing
             if self.trainer is None:
                 lm = self.lm_config.configure_model(tokenizer)
+                parallel_load = False
+                sharded_strategy = None
+                ckpt_dir = "/workspaces/bionemo-github/results/test_experiment/2024-07-31_23-01-09/checkpoints/test_experiment--reduced_train_loss=8.2760-epoch=0"
+                # breakpoint()
+                ckpt_io = MegatronCheckpointIO('torch_dist')
+                # breakpoint()
+                state_dict = ckpt_io.load_checkpoint(ckpt_dir, sharded_state_dict={'sharded_state_dict': lm.sharded_state_dict()})
+                # ckpt =  dist_checkpointing.load(lm.sharded_state_dict(), ckpt_dir, sharded_strategy=sharded_strategy, strict='log_unexpected')
+                breakpoint()
             else:
                 fabric = self.trainer.to_fabric()
                 distributed_model = fabric.load_model(
                     "/workspaces/bionemo-github/results/test_experiment/2024-07-31_23-01-09/checkpoints/test_experiment--reduced_train_loss=8.2760-epoch=0"
-                    )
-                lm: MegatronBioBertModel = distributed_model.module.module # distributed_model is megatron_parallel, .module is the lightning module, and .module.module is the megatronbiobertmodel
+                )
+                lm: MegatronBioBertModel = distributed_model.module.module  # distributed_model is megatron_parallel, .module is the lightning module, and .module.module is the megatronbiobertmodel
+                breakpoint()
             for param in lm.parameters():
                 param.requires_grad = False
             # model_with_head = self.head.configure_model(lm)
@@ -345,6 +413,7 @@ def main(
         )
     )
     from nemo.lightning.io import track_io
+
     trainer = nl.Trainer(
         devices=devices,
         max_steps=num_steps,
@@ -386,7 +455,7 @@ def main(
         num_workers=num_dataset_workers,
     )
 
-    geneformer_config = BioBertFinetuneHeadConfig(trainer)
+    geneformer_config = BioBertFinetuneHeadConfig() #trainer=trainer)
 
     # The lightning class owns a copy of the actual model, and a loss function, both of which are configured
     #  and lazily returned by the `geneformer_config` object defined above.

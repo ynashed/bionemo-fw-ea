@@ -126,6 +126,7 @@ def main(
         )
     )
     from nemo.lightning.io import track_io
+
     trainer = nl.Trainer(
         devices=devices,
         max_steps=num_steps,
@@ -224,6 +225,7 @@ def main(
     )
 
     from nemo.lightning.pytorch.callbacks import ModelCheckpoint
+
     checkpoint_callback = ModelCheckpoint(
         save_best_model=False,
         save_last=True,
