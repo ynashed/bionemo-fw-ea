@@ -60,8 +60,8 @@ class MLPHeadModel(MegatronModule):
         self,
         input_ids: Tensor,
         attention_mask: Tensor,
-        tokentype_ids: Tensor = None,
-        lm_labels: Tensor = None,
+        tokentype_ids: Tensor | None = None,
+        lm_labels: Tensor | None = None,
         inference_params=None,
     ):
         X = self.language_model(
@@ -127,62 +127,6 @@ class InheritanceMLPHeadModel(MegatronBioBertModel):
 
 
 from nemo.lightning.io.pl import MegatronCheckpointIO
-
-
-class CustomMegatronCheckpointIO(MegatronCheckpointIO):
-    @override
-    def load_checkpoint(
-        self, path: _PATH, sharded_state_dict=None, map_location: Optional[Callable] = None
-    ) -> Dict[str, Any]:
-        """Loads checkpoint using :func:`torch.load`, with additional handling for ``fsspec`` remote loading of files.
-
-        Args:
-            path: Path to checkpoint
-            map_location: a function, :class:`torch.device`, string or a dict specifying how to remap storage
-                locations.
-
-        Returns: The loaded checkpoint.
-
-        Raises
-        ------
-            FileNotFoundError: If ``path`` is not found by the ``fsspec`` filesystem
-
-        """
-        from megatron.core import dist_checkpointing
-
-        if map_location is not None:
-            raise ValueError("`map_location` argument is not supported for `MegatronCheckpointIO.load_checkpoint`.")
-
-        # Try to read the checkpoint at `path`. If not exist, do not restore checkpoint.
-        fs = get_filesystem(path)
-        if not fs.exists(path):
-            raise FileNotFoundError(f"Checkpoint file not found: {path}")
-        if not fs.isdir(path):
-            raise ValueError(f"Distributed checkpoints should be a directory. Found: {path}.")
-
-        if self.save_ckpt_format == "zarr" and self.load_directly_on_device:
-            from megatron.core.dist_checkpointing.strategies.tensorstore import TensorStoreLoadShardedStrategy
-
-            sharded_strategy = TensorStoreLoadShardedStrategy(load_directly_on_device=True)
-        else:
-            sharded_strategy = None
-
-        if self.parallel_load:
-            if sharded_strategy is None:
-                sharded_strategy = get_default_load_sharded_strategy(path)
-            sharded_strategy = FullyParallelLoadStrategyWrapper(
-                sharded_strategy, get_data_parallel_group(with_context_parallel=True)
-            )
-
-        if sharded_strategy is not None:
-            logging.info(f"Using {sharded_strategy} dist-ckpt load strategy.")
-
-        checkpoint = dist_checkpointing.load(
-            sharded_state_dict=sharded_state_dict, checkpoint_dir=str(path), sharded_strategy=sharded_strategy
-        )
-        checkpoint = _fix_tensors_device(checkpoint)
-
-        return checkpoint
 
 
 class BioBertFinetuneHeadConfig(ModelParallelConfig):

@@ -334,7 +334,7 @@ class MegatronBioBertModel(LanguageModule):
 
 
 @dataclass
-class BioBertConfig(TransformerConfig, io.IOMixing):  # noqa: D101
+class BioBertConfig(TransformerConfig, io.IOMixin):  # noqa: D101
     # From megatron.core.models.gpt.bert_model.GPTModel
     fp16_lm_cross_entropy: bool = False
     parallel_output: bool = True

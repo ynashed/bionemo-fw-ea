@@ -2,7 +2,7 @@
 
 ```bash
 python \
-    scripts/singlecell/geneformer/pretrain.py \
+    scripts/singlecell/geneformer/finetune.py \
     --data-dir test_data/cellxgene_2023-12-15_small/processed_data \
     --result-dir ./results \
     --experiment-name test_experiment \
