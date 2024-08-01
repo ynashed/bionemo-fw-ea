@@ -47,6 +47,7 @@ RUN pip --disable-pip-version-check --no-cache-dir install \
 
 # Copy and install pypi depedencies.
 RUN mkdir /tmp/pip-tmp
+
 COPY requirements-dev.txt /tmp/pip-tmp/
 COPY requirements-test.txt /tmp/pip-tmp/
 COPY sub-packages/bionemo-fw/requirements.txt /tmp/pip-tmp/requirements-fw.txt
@@ -72,34 +73,32 @@ RUN groupadd --gid $USER_GID $USERNAME \
   && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME \
   && chmod 0440 /etc/sudoers.d/$USERNAME
 
-
-# Create a development image with NeMo and Megatron-LM pre-installed.
-FROM bionemo2-base AS standalone
-
-# This is the latest commit of megatron-lm on 2024/06/14
-# feel free to try updating.
-ARG MEGATRON_COMMIT=c7a1f82d761577e6ca0338d3521eac82f2aa0904
-RUN pip --disable-pip-version-check --no-cache-dir install \
-  git+https://github.com/NVIDIA/Megatron-LM.git@${MEGATRON_COMMIT}
-
-# Full install of NeMo from source.
-ARG NEMO_COMMIT=d28c1b2dd7c8539299a4c31f7c8d1678e2cbb9c8
-RUN pip --disable-pip-version-check --no-cache-dir install \
-  git+https://github.com/NVIDIA/NeMo.git@${NEMO_COMMIT}#egg=nemo_toolkit[all]
+ENV PATH="/home/bionemo/.local/bin:${PATH}"
 
 
 # Create a release image with bionemo2 installed.
-FROM standalone AS release
+FROM bionemo2-base AS release
 
+# Install 3rd-party deps
+COPY ./3rdparty /build
+WORKDIR /build/Megatron-LM
+RUN pip install --disable-pip-version-check --no-cache-dir .
+
+WORKDIR /build/NeMo
+RUN pip install --disable-pip-version-check --no-cache-dir .[all]
+WORKDIR /workspace
+RUN rm -rf /build
+
+# Install bionemo2 submodules
 WORKDIR /workspace/bionemo2/
 COPY ./sub-packages/bionemo-fw/ ./sub-packages/bionemo-fw/
 WORKDIR /workspace/bionemo2/sub-packages/bionemo-fw/
-RUN pip install --no-deps -e .
+RUN pip install --disable-pip-version-check --no-cache-dir --no-deps -e .
 
 WORKDIR /workspace/bionemo2/
 COPY ./sub-packages/bionemo-contrib/ ./sub-packages/bionemo-contrib/
 WORKDIR /workspace/bionemo2/sub-packages/bionemo-contrib/
-RUN pip install --no-deps -e .
+RUN pip install --disable-pip-version-check --no-cache-dir --no-deps -e .
 
 WORKDIR /workspace/bionemo2/
 COPY ./scripts ./scripts

@@ -14,7 +14,7 @@
 # limitations under the License.
 
 
-def nemo1_to_nemo2_biobert_key_mapping(
+def nemo1_to_nemo2_biobert_key_mapping(  # noqa: D417
     old_key: str,
     new_model_prefix: str = "module",
     old_model_prefix: str = "model",
@@ -32,7 +32,7 @@ def nemo1_to_nemo2_biobert_key_mapping(
 
     Returns:
         str: New key name
-    """
+    """  # noqa: D415
     # add the . to the end of the input prefixes if they are not the empty string,
     #  unless the user has already done so.
     if old_model_prefix != "":

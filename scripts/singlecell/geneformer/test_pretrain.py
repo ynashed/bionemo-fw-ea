@@ -95,8 +95,8 @@ def test_pretrain_cli(tmpdir):
     # NOTE: if you need to change the following command, please update the README.md example.
     cmd_str = f"""python  \
     scripts/singlecell/geneformer/pretrain.py     \
-    --data-dir {str(data_path)}     \
-    --result-dir {str(result_dir)}     \
+    --data-dir {data_path}     \
+    --result-dir {result_dir}     \
     --experiment-name test_experiment     \
     --num-gpus 1  \
     --num-nodes 1 \

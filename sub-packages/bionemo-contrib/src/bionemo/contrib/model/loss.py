@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""A collection of megatron compatable losses"""
+"""A collection of megatron compatable losses"""  # noqa: D415
 
 from typing import Dict, List, Tuple, TypedDict, Union
 
@@ -46,7 +46,7 @@ class _Nemo2CompatibleLossReduceMixin:
     If you do need it, then this assumption was incorrect so please refactor accordingly.
 
     Since this overrides an abstract parent class, this needs to be put first in the inheritance list to ensure that the correct method is called.
-    """
+    """  # noqa: D205
 
     def old_reduce(
         self, losses_reduced_per_micro_batch: List[Union[PerTokenLossDict, SameSizeLossDict]]
@@ -105,7 +105,7 @@ class _Nemo2CompatibleLossReduceMixin:
             raise ValueError(f"Got a key of {only_key=} but expected one of 'avg, losses_reduced_per_micro_batch'")
 
 
-class BERTMLMLossWithReduction(_Nemo2CompatibleLossReduceMixin, MegatronLossReduction):
+class BERTMLMLossWithReduction(_Nemo2CompatibleLossReduceMixin, MegatronLossReduction):  # noqa: D101
     def __init__(self, validation_step: bool = False, val_drop_last: bool = True) -> None:
         """Initializes the Model class.
 
@@ -138,7 +138,7 @@ class BERTMLMLossWithReduction(_Nemo2CompatibleLossReduceMixin, MegatronLossRedu
         loss = loss.transpose(0, 1).contiguous()
         return loss
 
-    def unreduced_sequence_loss_fn(self, logits: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
+    def unreduced_sequence_loss_fn(self, logits: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:  # noqa: D102
         # TODO (@jstjohn): implement this function to handle the next sequence prediction task
         # TODO (@jstjohn): determine expected shapes of logits/labels in this case and add that to the docstring
         raise NotImplementedError("Sequence loss not implemented yet.")
@@ -157,7 +157,7 @@ class BERTMLMLossWithReduction(_Nemo2CompatibleLossReduceMixin, MegatronLossRedu
 
         Taken from:
         https://github.com/NVIDIA/NeMo/blob/main/nemo/collections/nlp/models/language_modeling/megatron_gpt_model.py#L951-L976 .
-        """
+        """  # noqa: D205
         if "labels" not in batch:
             raise ValueError("Labels not provided in the batch. These are required for this loss computation.")
 

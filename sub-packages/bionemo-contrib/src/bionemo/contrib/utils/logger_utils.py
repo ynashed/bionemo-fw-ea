@@ -23,7 +23,7 @@ from pytorch_lightning.loggers import TensorBoardLogger, WandbLogger
 class WandbLoggerOptions(TypedDict):
     """Note: `name` controls the exp name is handled by the NeMoLogger so it is ommitted here.
     `directory` is also omitted since it is set by the NeMoLogger.
-    """
+    """  # noqa: D205
 
     offline: bool  # offline mode
     project: str  # project name

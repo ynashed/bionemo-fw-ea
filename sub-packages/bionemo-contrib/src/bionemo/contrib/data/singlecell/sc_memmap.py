@@ -104,7 +104,7 @@ def create_metadata(file_path: PosixPath, shared_dict: Dict[str, Dict[str, objec
     shared_dict[str(file_path)] = d
 
 
-def calculate_running_sums(metadata):
+def calculate_running_sums(metadata):  # noqa: D103
     num_el = 0
     cur_count = 0
     for k in metadata:

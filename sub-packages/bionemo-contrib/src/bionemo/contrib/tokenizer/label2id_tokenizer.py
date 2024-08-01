@@ -24,6 +24,7 @@ __all__ = ["Label2IDTokenizer"]
 
 class Label2IDTokenizer(TokenizerSpec):
     """Initializes simple Char Tokenizer.
+
     Intended to be used for extracting class labels
     for classification models such as secondary
     structure prediction model, where each class is
@@ -36,14 +37,14 @@ class Label2IDTokenizer(TokenizerSpec):
 
     """
 
-    def __init__(
+    def __init__(  # noqa: D107
         self,
     ):
         self.vocab = {}
         self._update_index()
 
     def _update_index(self):
-        """Updates the id_to_vocab index based on the current vocab"""
+        """Updates the id_to_vocab index based on the current vocab."""
         self.decode_vocab = {id_: token for token, id_ in self.vocab.items()}
 
     @property
@@ -51,14 +52,15 @@ class Label2IDTokenizer(TokenizerSpec):
         """Return the size of the vocab being used."""
         return len(self.vocab)
 
-    def text_to_tokens(self, text: str) -> List[str]:
+    def text_to_tokens(self, text: str) -> List[str]:  # noqa: D102
         return list(text)
 
-    def tokens_to_text(self, tokens):
+    def tokens_to_text(self, tokens):  # noqa: D102
         return "".join(tokens)
 
     def tokens_to_ids(self, tokens: List[str]) -> List[int]:
-        """Convert tokens to indexes/ids
+        """Convert tokens to indexes/ids.
+
         Args:
             tokens (List[str]):  Containing tokens
         Returns:
@@ -74,7 +76,8 @@ class Label2IDTokenizer(TokenizerSpec):
         return ids
 
     def ids_to_tokens(self, ids: List[int]) -> List[str]:
-        """Convert Ids to tokens
+        """Convert Ids to tokens.
+
         Args:
             ids (List[int]): Containg ids for each token
         Returns:
@@ -89,7 +92,8 @@ class Label2IDTokenizer(TokenizerSpec):
         return tokens
 
     def text_to_ids(self, text: str) -> List[int]:
-        """Converts text to ids
+        """Converts text to ids.
+
         Args:
             text (str): String containing text to convert
         Returns:
@@ -99,12 +103,13 @@ class Label2IDTokenizer(TokenizerSpec):
         tokens = self.text_to_tokens(text)
         return self.tokens_to_ids(tokens)
 
-    def ids_to_text(self, ids):
+    def ids_to_text(self, ids):  # noqa: D102
         tokens = self.ids_to_tokens(ids)
         return self.tokens_to_text(tokens)
 
     def build_vocab(self, strings: Union[str, Iterable[str]]):
-        """Builds the vocabulary of the tokenizer from strings
+        """Builds the vocabulary of the tokenizer from strings.
+
         Args:
             strings: (Union[str, Iterable[str]]): Strings to
                 build the vocabulary with. If a string is supplied,

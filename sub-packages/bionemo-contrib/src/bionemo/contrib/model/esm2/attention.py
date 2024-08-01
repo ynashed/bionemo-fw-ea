@@ -27,8 +27,7 @@ from torch import Tensor
 
 
 class ESM2DotProductAttention(DotProductAttention):
-    """
-    ESM2-Specific core attention
+    """ESM2-Specific core attention
 
     Region where selective activation recomputation is applied.
     This region is memory intensive but less compute intensive which
@@ -42,9 +41,9 @@ class ESM2DotProductAttention(DotProductAttention):
      p: number of tensor model parallel partitions
      b: batch size
      s: sequence length
-    """
+    """  # noqa: D415
 
-    def __init__(
+    def __init__(  # noqa: D107
         self,
         config: TransformerConfig,
         layer_number: int,
@@ -63,7 +62,7 @@ class ESM2DotProductAttention(DotProductAttention):
         self.use_esm_attention = config.use_esm_attention
         self.attention_softmax_in_fp32 = config.attention_softmax_in_fp32
 
-    def forward(
+    def forward(  # noqa: D102
         self,
         query: Tensor,
         key: Tensor,

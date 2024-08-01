@@ -421,7 +421,7 @@ def _error(noncompliant_files: Mapping[Path, LicenseCheckError], n_files_checked
         f"files that do not have the license header!{maybe_modify_msg}\n"
     )
     for pyfile, error in noncompliant_files.items():
-        error_message += f"  {str(pyfile)}: {error}\n"
+        error_message += f"  {pyfile}: {error}\n"
     return ValueError(error_message)
 
 
