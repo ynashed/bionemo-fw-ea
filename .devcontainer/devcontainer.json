@@ -29,7 +29,10 @@
 				"python.analysis.extraPaths": [
 					"./sub-packages/bionemo-fw/src",
 					"./sub-packages/bionemo-core/src",
-					"./sub-packages/bionemo-contrib/src",
+					"./sub-packages/bionemo-esm2/src",
+					"./sub-packages/bionemo-geneformer/src",
+					"./sub-packages/bionemo-llm/src",
+					"./sub-packages/bionemo-testing/src",
 					"./3rdparty/NeMo",
 					"./3rdparty/Megatron-LM"
 				],
