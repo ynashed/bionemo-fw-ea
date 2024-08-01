@@ -100,7 +100,7 @@ dynamics:
     invariant_edge_feat_dim: 256
     invariant_node_feat_dim: 256
     equivariant_node_feature_dim: 3
-    num_layers: 8
+    num_layers: 10
     num_heads: 4
   wrapper_args:
     timesteps: *timesteps

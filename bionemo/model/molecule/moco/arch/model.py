@@ -73,7 +73,7 @@ class MoleculeDiTe2(nn.Module):
             self.dit_layers.append(DiTeBlock(invariant_node_feat_dim, num_heads, use_z=False))
             self.egnn_layers.append(MultiXEGNNET(invariant_node_feat_dim))
         self.h_feat_refine = DiTBlock(invariant_node_feat_dim, num_heads, use_z=False)
-        self.edge_feat_refine = DiTBlock(invariant_node_feat_dim, num_heads, use_z=False)
+        # self.edge_feat_refine = DiTBlock(invariant_node_feat_dim, num_heads, use_z=False)
 
     def forward(self, batch, X, H, E_idx, E, t):
         torch.max(batch) + 1
@@ -96,7 +96,7 @@ class MoleculeDiTe2(nn.Module):
         x = X - scatter_mean(X, index=batch, dim=0)[batch]
         # import ipdb; ipdb.set_trace()
         H = self.h_feat_refine(batch, H, te_h)
-        edge_attr = self.edge_feat_refine(edge_batch, edge_attr, te_e)
+        # edge_attr = self.edge_feat_refine(edge_batch, edge_attr, te_e) #! cannot do attn with edges due to memory
 
         edge_attr = self.bond_refine(batch, X, H, E_idx, edge_attr)
 
