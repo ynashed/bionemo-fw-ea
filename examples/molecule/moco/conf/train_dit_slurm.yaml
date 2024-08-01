@@ -22,8 +22,8 @@ loss:
       loss_scale: 3.0
       aggregate: 'sum'
       continuous: True
-      use_distance: 'triple'
-      distance_scale: 1e-2
+      use_distance: null
+      distance_scale: null
     - variable_name: 'h'
       loss_scale: 1.0
       aggregate: 'sum'
