@@ -47,37 +47,7 @@ class MultidimE3Norm(nn.Module):
         batch_size = int(batch.max()) + 1
         mean_norm = scatter_mean(norm, batch, dim=0, dim_size=batch_size)
         new_pos = self.weight * pos / (mean_norm[batch] + self.eps)
-        # return new_pos
-        import ipdb
-
-        ipdb.set_trace()
-        # batch_size = int(batch.max()) + 1
-        # _, num_atoms = torch.unique(batch, return_counts = True)
-        # norm = torch.norm(pos, dim=1, keepdim=True) #torch.Size([1892, 1, 128])
-        # scaled_lengths = norm.sum(dim=2, keepdim=True) / num_atoms[batch].unsqueeze(-1).unsqueeze(-1) # torch.Size([1892, 1, 1])
-        # coord_div = scaled_lengths + self.eps
-        # new_pos = self.weight * pos / coord_div
         return new_pos
-
-
-def center_x(pos, batch):
-    N, C, K = pos.size()  # Adjust these dimensions according to your actual input
-
-    # Permute and reshape pos for scatter_mean
-    pos_reshaped = pos.permute(0, 2, 1).reshape(-1, C)  # Shape: (N * K, C)
-    extended_batch = batch.repeat_interleave(K)
-    # Compute the scatter mean
-    mean_pos = scatter_mean(pos_reshaped, index=extended_batch, dim=0)  # Shape: (num_batches, C)
-
-    # Expand mean_pos to the original shape
-    mean_pos_expanded = mean_pos[batch].unsqueeze(1).expand(-1, K, -1)  # Shape: (N, K, C)
-
-    # Permute mean_pos_expanded to match pos
-    mean_pos_permuted = mean_pos_expanded.permute(0, 2, 1)  # Shape: (N, C, K)
-
-    # Subtract mean_pos from pos
-    pos_centered = pos - mean_pos_permuted
-    return pos_centered
 
 
 class MultidimEquiUpdate(nn.Module):

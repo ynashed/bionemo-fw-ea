@@ -14,7 +14,7 @@ import torch.nn.functional as F
 from torch_geometric.utils import to_dense_adj
 from torch_scatter import scatter_add
 
-from bionemo.model.molecule.moco.arch.model import MoleculeVecDiT as MoleculeDiT
+from bionemo.model.molecule.moco.arch.model import MoleculeDiTe as MoleculeDiT
 
 # from bionemo.model.molecule.moco.arch.model import MoleculeDiT
 from bionemo.model.molecule.moco.arch.scratch.moco import MoCo
