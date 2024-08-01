@@ -30,3 +30,7 @@ known-first-party = ["bionemo"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
+
+[tool.pytest.ini_options]
+norecursedirs = ["3rdparty"]
+addopts = ["--ignore=3rdparty"]
