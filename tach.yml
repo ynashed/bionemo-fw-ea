@@ -19,6 +19,9 @@ modules:
   - path: bionemo.llm
     depends_on:
       - path: bionemo.core
+  - path: bionemo.example_model
+    depends_on:
+      - path: bionemo.llm
   - path: bionemo.testing
     depends_on: []
   - path: <root>
