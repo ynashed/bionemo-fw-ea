@@ -1,0 +1,50 @@
+{
+	"name": "BioNeMo2 Development Container",
+	"runArgs": [
+		"--gpus=all"
+	],
+	"build": {
+		"context": "${localWorkspaceFolder}",
+		"dockerfile": "${localWorkspaceFolder}/Dockerfile",
+		"cacheFrom": "nvcr.io/nvidian/cvai_bnmo_trng/bionemo:bionemo2-latest",
+		"target": "dev"
+	},
+	"mounts": [
+		// Mount the local ~/.aws config to pass along AWS credentials for PBSS.
+		"source=${localEnv:HOME}/.aws,target=/home/bionemo/.aws,type=bind,consistency=cached"
+	],
+	"postCreateCommand": "./.devcontainer/postCreateCommand.sh",
+	"remoteUser": "bionemo",
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"ms-python.python",
+				"ms-python.vscode-pylance",
+				"eamodio.gitlens",
+				"streetsidesoftware.code-spell-checker",
+				"ms-azuretools.vscode-docker",
+				"charliermarsh.ruff",
+				"njpwerner.autodocstring"
+			],
+			"settings": {
+				"python.analysis.extraPaths": [
+					"./sub-packages/bionemo-fw/src",
+					"./sub-packages/bionemo-core/src",
+					"./sub-packages/bionemo-esm2/src",
+					"./sub-packages/bionemo-geneformer/src",
+					"./sub-packages/bionemo-llm/src",
+					"./sub-packages/bionemo-testing/src",
+					"./3rdparty/NeMo",
+					"./3rdparty/Megatron-LM"
+				],
+				"python.pythonPath": "/bin/python3",
+				"python.testing.pytestEnabled": true,
+				"python.testing.pytestArgs": [
+					"sub-packages/",
+					"scripts/"
+				],
+				"python.analysis.typeCheckingMode": "standard"
+			}
+		}
+	}
+}
