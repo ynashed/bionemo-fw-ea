@@ -28,6 +28,7 @@ from bionemo.model.molecule.moco.arch.dit_eqf import (
     MultiEdgeMixOutLayer,
     MultiXEGNN,
 )
+from bionemo.model.molecule.moco.arch.dit_mpnn import DiTeMPNN
 from bionemo.model.molecule.moco.arch.dite import DiTeBlock, MultiXEGNNE, MultiXEGNNET
 from bionemo.model.molecule.moco.arch.scratch.mpnn import TimestepEmbedder
 from bionemo.model.molecule.moco.models.utils import PredictionHead
@@ -38,6 +39,78 @@ def coord2dist(x, edge_index):
     coord_diff = x[row] - x[col]
     radial = torch.sum(coord_diff**2, 1).unsqueeze(1)
     return radial
+
+
+class MoleculeDiTeMPNN(nn.Module):
+    def __init__(
+        self,
+        num_layers=8,
+        equivariant_node_feature_dim=3,
+        invariant_node_feat_dim=256,
+        invariant_edge_feat_dim=256,
+        atom_classes=16,
+        edge_classes=5,
+        num_heads=4,
+        n_vector_features=128,
+    ):
+        super(MoleculeDiTeMPNN, self).__init__()
+        self.atom_embedder = MLP(atom_classes, invariant_node_feat_dim, invariant_node_feat_dim)
+        self.edge_embedder = MLP(edge_classes, invariant_edge_feat_dim, invariant_edge_feat_dim)
+        self.num_atom_classes = atom_classes
+        self.num_edge_classes = edge_classes
+        self.n_vector_features = n_vector_features
+        self.coord_emb = nn.Linear(1, n_vector_features, bias=False)
+        self.coord_pred = nn.Linear(n_vector_features, 1, bias=False)
+
+        #! TODO do we need coord prediction head which is mlp then 0 CoM?
+        self.atom_type_head = PredictionHead(atom_classes, invariant_node_feat_dim)
+        self.edge_type_head = PredictionHead(edge_classes, invariant_edge_feat_dim, edge_prediction=True)
+        self.time_embedding = TimestepEmbedder(invariant_node_feat_dim)
+        self.bond_refine = BondRefine(invariant_node_feat_dim, invariant_edge_feat_dim)
+        self.dit_layers = nn.ModuleList()
+        self.egnn_layers = nn.ModuleList()
+        self.attention_mix_layers = nn.ModuleList()
+        for i in range(num_layers):
+            self.dit_layers.append(DiTeMPNN(invariant_node_feat_dim, num_heads, use_z=False))
+            self.egnn_layers.append(MultiXEGNNET(invariant_node_feat_dim))
+        # self.h_feat_refine = DiTBlock(invariant_node_feat_dim, num_heads, use_z=False)
+        # self.edge_feat_refine = DiTBlock(invariant_node_feat_dim, num_heads, use_z=False)
+
+    def forward(self, batch, X, H, E_idx, E, t):
+        torch.max(batch) + 1
+        pos = self.coord_emb(X.unsqueeze(-1))  # N x 3 x K
+
+        H = self.atom_embedder(H)
+        E = self.edge_embedder(E)  # should be + n_vector_features not + 1
+        te = self.time_embedding(t)
+        te_h = te[batch]
+        # edge_batch, counts = torch.unique(batch, return_counts=True)
+        # edge_batch = torch.repeat_interleave(edge_batch, counts * (counts - 1))  #
+        edge_batch = batch[E_idx[0]]
+        te_e = te[edge_batch]
+        edge_attr = E
+        for layer_index in range(len(self.dit_layers)):
+            distances = coord2dist(pos, E_idx).squeeze(1)  # E x K
+            H, edge_attr = self.dit_layers[layer_index](batch, H, te_h, edge_attr, E_idx, te_e, distances)
+            pos = self.egnn_layers[layer_index](batch, pos, H, E_idx, edge_attr, te_e)  #! TODO at time here
+
+        X = self.coord_pred(pos).squeeze(-1)
+        x = X - scatter_mean(X, index=batch, dim=0)[batch]
+        # import ipdb; ipdb.set_trace()
+        # H = self.h_feat_refine(batch, H, te_h)
+        # edge_attr = self.edge_feat_refine(edge_batch, edge_attr, te_e) #! cannot do attn with edges due to memory
+
+        edge_attr = self.bond_refine(batch, X, H, E_idx, edge_attr)
+
+        h_logits, _ = self.atom_type_head(batch, H)
+        e_logits, _ = self.edge_type_head.predict_edges(batch, edge_attr, E_idx)
+        out = {
+            "x_hat": x,
+            "h_logits": h_logits,
+            "edge_attr_logits": e_logits,
+            # "Z_hat": z_logits,
+        }
+        return out
 
 
 class MoleculeDiTe2(nn.Module):

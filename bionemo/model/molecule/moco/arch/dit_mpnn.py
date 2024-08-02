@@ -17,7 +17,7 @@ from torch_geometric.nn.norm import LayerNorm as BatchLayerNorm
 from torch_geometric.utils import softmax
 from torch_scatter import scatter, scatter_mean
 
-from bionemo.model.molecule.moco.arch.dite import MLP, modulate, swiglu_ffn
+from bionemo.model.molecule.moco.arch.dite import modulate, swiglu_ffn
 from bionemo.model.molecule.moco.arch.rotary import RotaryEmbedding
 
 
@@ -63,7 +63,7 @@ class DiTeMPNN(nn.Module):
         hidden_size,
         num_heads,
         mlp_expansion_ratio=4.0,
-        use_z=True,
+        use_z=False,
         mask_z=True,
         use_rotary=False,
         n_vector_features=128,
@@ -74,15 +74,14 @@ class DiTeMPNN(nn.Module):
         self.hidden_size = hidden_size
         self.dropout = dropout
         self.num_heads = num_heads
+        self.edge_emb = nn.Linear(hidden_size + n_vector_features, hidden_size)
         self.norm1 = BatchLayerNorm(hidden_size, affine=False, eps=1e-6)
         self.norm2 = BatchLayerNorm(hidden_size, affine=False, eps=1e-6)
-        self.feature_embedder = MLP(
-            hidden_size + hidden_size + hidden_size + n_vector_features, hidden_size, hidden_size
-        )
+
         self.norm1_edge = BatchLayerNorm(hidden_size, affine=False, eps=1e-6)
         self.norm2_edge = BatchLayerNorm(hidden_size, affine=False, eps=1e-6)
 
-        self.ffn_norm = BatchLayerNorm(hidden_size)
+        self.norm2_node = BatchLayerNorm(hidden_size)
         self.ffn = swiglu_ffn(hidden_size, mlp_expansion_ratio, bias=False)
         self.adaLN_modulation = nn.Sequential(nn.SiLU(), nn.Linear(hidden_size, 6 * hidden_size, bias=True))
         self.adaLN_edge_modulation = nn.Sequential(nn.SiLU(), nn.Linear(hidden_size, 6 * hidden_size, bias=True))
@@ -98,18 +97,19 @@ class DiTeMPNN(nn.Module):
         if use_rotary:
             # self.d_head = hidden_size // num_heads
             self.rotary = RotaryEmbedding(self.d_head)
-
+        self.use_z = use_z
         if use_z:
             self.use_z = use_z
             self.pair_bias = nn.Sequential(nn.SiLU(), nn.Linear(hidden_size, 1, bias=False))
             self.mask_z = mask_z
 
+        self.node2edge_lin = nn.Linear(hidden_size, hidden_size)
         self.lin_edge0 = nn.Linear(hidden_size, hidden_size, bias=False)
         # self.lin_edge1 = nn.Linear(hidden_size, hidden_size, bias=False)
-        self.lin_edge1 = nn.Linear(hidden_size + n_vector_features, hidden_size, bias=False)
-        self.ffn_norm_edge = BatchLayerNorm(hidden_size)
+        self.lin_edge1 = nn.Linear(hidden_size, hidden_size, bias=False)
+        # self.ffn_norm_edge = BatchLayerNorm(hidden_size)
         self.ffn_edge = swiglu_ffn(hidden_size, mlp_expansion_ratio, bias=False)
-        # self.tanh = nn.GELU(approximate='tanh')
+        self.tanh = nn.GELU(approximate='tanh')
 
     def _apply_rotary(self, q: torch.Tensor, k: torch.Tensor):
         q = q.unflatten(-1, (self.num_heads, self.d_head))
@@ -154,7 +154,7 @@ class DiTeMPNN(nn.Module):
             edge_scale_mlp,
             edge_gate_mlp,
         ) = self.adaLN_edge_modulation(t_emb_e).chunk(6, dim=1)
-
+        edge_attr = self.edge_emb(torch.cat([edge_attr, dist], dim=-1))
         # Normalize x
         x = modulate(self.norm1(x, batch), shift_msa, scale_msa)
         prev_edge_attr = edge_attr
@@ -173,7 +173,7 @@ class DiTeMPNN(nn.Module):
 
         # Message function computes attention coefficients and messages for edges
         # Edge attributes are transformed and reshaped to match the head and channel dimensions
-        edge_attn = self.lin_edge0(edge_attr).view(-1, self.heads, self.d_head)  # [E, heads, d_head]
+        edge_attn = self.lin_edge0(edge_attr).view(-1, self.num_heads, self.d_head)  # [E, heads, d_head]
         edge_attn = self.tanh(edge_attn)  # [E, heads, d_head]
 
         # Compute the attention scores using dot-product attention mechanism
@@ -184,14 +184,17 @@ class DiTeMPNN(nn.Module):
         alpha = F.dropout(alpha, p=self.dropout, training=self.training)  # Apply dropout to attention scores
 
         # Multiply normalized attention scores with the value tensor to compute the messages
-        msg = value_j * alpha.view(-1, self.heads, 1)  # [E, heads, d_head]
+        # import ipdb; ipdb.set_trace()
+        msg = value_j
+        msg = msg * self.lin_edge1(edge_attr).view(-1, self.num_heads, self.d_head)
+        msg = msg * alpha.view(-1, self.num_heads, 1)  # [E, heads, d_head]
 
         # Aggregate messages to the destination nodes
         out = scatter(msg, tgt, dim=0, reduce='sum', dim_size=x.size(0))  # [N, heads, d_head]
 
         # Merge the heads and the output channels
         out = out.view(
-            -1, self.heads * self.d_head
+            -1, self.num_heads * self.d_head
         )  # [N, heads * d_head] #? no linear layer for the first h_node? to aggregate the MHA?
 
         h_node = out
@@ -200,10 +203,10 @@ class DiTeMPNN(nn.Module):
 
         h_node = h_in_node + gate_msa * h_node
         h_node = modulate(self.norm2_node(h_node, batch), shift_mlp, scale_mlp)
-        h_out = h_node + gate_mlp * self._ff_block_node(h_node)
+        h_out = h_node + gate_mlp * self.ffn(h_node)
 
         h_edge = h_in_edge + edge_gate_msa * h_edge
         h_edge = modulate(self.norm2_edge(h_edge, edge_batch), edge_shift_mlp, edge_scale_mlp)
-        h_edge_out = prev_edge_attr + h_edge + edge_gate_mlp * self._ff_block_edge(h_edge)
+        h_edge_out = prev_edge_attr + h_edge + edge_gate_mlp * self.ffn_edge(h_edge)
 
         return h_out, h_edge_out
