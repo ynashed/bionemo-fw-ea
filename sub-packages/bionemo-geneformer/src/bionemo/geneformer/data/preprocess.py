@@ -15,7 +15,7 @@
 
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Optional, Sequence
 
 from bionemo.llm.utils.remote import RemoteResource
@@ -32,7 +32,7 @@ class ResourcePreprocessor(ABC):
         remote -> prepare -> prepared data.
     """  # noqa: D205
 
-    root_directory: Optional[str] = RemoteResource.get_env_tmpdir()  # noqa: RUF009
+    root_directory: Optional[str] = field(default_factory=RemoteResource.get_env_tmpdir)
     dest_directory: str = "data"
 
     def get_checksums(self) -> List[str]:  # noqa: D102
