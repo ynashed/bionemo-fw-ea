@@ -18,6 +18,7 @@ from typing import Any, Dict, Optional, Sequence, TypedDict
 from nemo.lightning.nemo_logger import NeMoLogger
 from nemo.utils import logging
 from pytorch_lightning.loggers import TensorBoardLogger, WandbLogger
+from nemo.lightning.pytorch import callbacks as nemo_callbacks
 
 
 __all__: Sequence[str] = (
@@ -38,12 +39,12 @@ class WandbLoggerOptions(TypedDict):
     # the directory is also set by NeMoLogger
     log_model: bool  # log model
 
-
 def setup_nemo_lightning_logger(
     name: str = "default-name",
-    root_dir: str = "./results",
+    root_dir: str | pathlib.Path  = "./results",
     initialize_tensorboard_logger: bool = False,
     wandb_kwargs: Optional[WandbLoggerOptions] = None,
+    ckpt_callback: Optional[nemo_callbacks.ModelCheckpoint] = None,
     **kwargs: Dict[str, Any],
 ) -> NeMoLogger:
     """Setup the logger for the experiment.
@@ -53,6 +54,8 @@ def setup_nemo_lightning_logger(
         root_dir: The root directory to create the `name` directory in for saving run results.
         initialize_tensorboard_logger: Whether to initialize the tensorboard logger.
         wandb_kwargs: The kwargs for the wandb logger.
+        ckpt_callback: The checkpoint callback to use, must be a child of the pytorch lightning ModelCheckpoint callback.
+            NOTE the type annotation in the underlying NeMoCheckpoint constructor is incorrect.
         **kwargs: The kwargs for the NeMoLogger.
 
     Returns:
@@ -71,10 +74,11 @@ def setup_nemo_lightning_logger(
         tb_logger = None
         logging.warning("User-set tensorboard is currently turned off. Internally one may still be set by NeMo2.")
     logger: NeMoLogger = NeMoLogger(
-        dir=root_dir,
+        dir=str(root_dir),
         name=name,
         tensorboard=tb_logger,
         wandb=wandb_logger,
+        ckpt=ckpt_callback,
         **kwargs,
     )
     # Needed so that the trainer can find an output directory for the profiler

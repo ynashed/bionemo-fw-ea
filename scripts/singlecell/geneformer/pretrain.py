@@ -27,10 +27,10 @@ from typing import Optional, Sequence, get_args
 
 from megatron.core.optimizer import OptimizerConfig
 from nemo import lightning as nl
+from nemo.lightning import io
 from nemo.collections import llm
 from nemo.lightning.pytorch.optim import MegatronOptimizerModule
 from nemo.lightning.pytorch.optim.lr_scheduler import CosineAnnealingScheduler
-from nemo.lightning.resume import AutoResume
 from nemo.utils import logging
 from pytorch_lightning.callbacks import LearningRateMonitor, RichModelSummary
 from torch.nn import functional as F
@@ -44,6 +44,8 @@ from bionemo.llm.model.biobert.lightning import BioBertLightningModule
 from bionemo.llm.model.biobert.model import BiobertSpecOption
 from bionemo.llm.utils.logger_utils import WandbLoggerOptions, setup_nemo_lightning_logger
 
+from nemo.lightning import resume
+from nemo.lightning.pytorch import callbacks as nl_callbacks
 
 __all__: Sequence[str] = ("main",)
 
@@ -71,6 +73,11 @@ def main(
     wandb_entity: str = "clara-discovery",
     create_tensorboard_logger: bool = False,
     nemo1_init_path: Optional[Path] = None,
+    save_best_checkpoint: bool = True,
+    save_last_checkpoint: bool = True,
+    metric_to_monitor_for_checkpoints: str = 'val_loss',
+    save_top_k: int = 2,
+    save_every_n_steps: int = 100,
 ) -> None:
     """Train a Geneformer model on single cell data.
 
@@ -84,9 +91,8 @@ def main(
         wandb_offline (bool): if wandb should happen in offline mode
         num_steps (int): number of steps to train the model for
         limit_val_batches (int): limit the number of validation global batches to this many
-        val_check_interval (int): number of steps to periodically check the validation loss and save
-            an updated checkpoint
-        num_dataset_workers (int): num dataset workers
+        val_check_interval (int): number of steps to periodically check the validation loss and save num_dataset_workers (
+       int): num dataset workers
         biobert_spec_option (BiobertSpecOption): the biobert spec option (architecture) to use for this run
         lr (float): learning rate
         micro_batch_size (int): micro batch size, from this and parallelism settings we infer the global batch size
@@ -136,7 +142,7 @@ def main(
         limit_val_batches=limit_val_batches,  # This controls upsampling and downsampling
         val_check_interval=val_check_interval,  # TODO(@jstjohn) Checkpoint saving is currently broken, fix and change this.
         num_nodes=num_nodes,
-        callbacks=[LossLoggingCallback(), RichModelSummary(max_depth=4), LearningRateMonitor()],
+        callbacks=[io.track_io(LossLoggingCallback)(), io.track_io(RichModelSummary)(max_depth=4), io.track_io(LearningRateMonitor)()],
         plugins=nl.MegatronMixedPrecision(precision=precision, amp_O2=False),
     )
 
@@ -224,6 +230,16 @@ def main(
             ),
         ),
     )
+    # Configure our custom Checkpointer
+    checkpoint_callback = nl_callbacks.ModelCheckpoint(
+        save_best_model=save_best_checkpoint,
+        save_last=save_last_checkpoint,
+        monitor=metric_to_monitor_for_checkpoints, # "val_loss",
+        save_top_k=save_top_k,
+        every_n_train_steps=save_every_n_steps,
+        enable_nemo_ckpt_io=True, # Enables the .nemo file-like checkpointing where all IOMixins are under SerDe
+        async_save=False, # Tries to save asynchronously, previously led to race conditions.
+    )
 
     # Setup the logger and train the model
     nemo_logger = setup_nemo_lightning_logger(
@@ -231,6 +247,7 @@ def main(
         name=experiment_name,
         initialize_tensorboard_logger=create_tensorboard_logger,
         wandb_kwargs=wandb_options,
+        ckpt_callback=checkpoint_callback,
     )
 
     llm.train(
@@ -238,8 +255,7 @@ def main(
         data=data,
         trainer=trainer,
         log=nemo_logger,
-        # FIXME @skothenhill this doesn't work yet, but this is probably close to what we are supposed to do
-        resume=AutoResume(resume_if_exists=resume_if_exists, resume_ignore_no_checkpoint=True),
+        resume=resume.AutoResume(resume_if_exists=resume_if_exists, resume_ignore_no_checkpoint=True),
     )
 
 
@@ -373,6 +389,39 @@ if __name__ == "__main__":
         required=False,
         help="Path to nemo1 file, if desired to load at init time.",
     )
+    parser.add_argument(
+        "--save-best-checkpoint",
+        action="store_true",
+        default=True,
+        help="Save the best checkpoint based on the metric to monitor.",
+    )
+    parser.add_argument(
+        "--save-last-checkpoint",
+        action="store_true",
+        default=True,
+        help="Save the last checkpoint.",
+    )
+    parser.add_argument(
+        "--metric-to-monitor-for-checkpoints",
+        type=str,
+        required=False,
+        default="val_loss",
+        help="The metric to monitor for checkpointing.",
+    )
+    parser.add_argument(
+        "--save-top-k",
+        type=int,
+        required=False,
+        default=2,
+        help="Save the top k checkpoints.",
+    )
+    parser.add_argument(
+        "--save-every-n-steps",
+        type=int,
+        required=False,
+        default=20,
+        help="Save a checkpoint every n steps.",
+    )
 
     # Parse the arguments and pull them out into local variables for ease of future refactor to a
     #   config management system.
@@ -398,4 +447,9 @@ if __name__ == "__main__":
         experiment_name=args.experiment_name,
         resume_if_exists=args.resume_if_exists,
         nemo1_init_path=args.nemo1_init_path,
+        save_best_checkpoint=args.save_best_checkpoint,
+        save_last_checkpoint=args.save_last_checkpoint,
+        metric_to_monitor_for_checkpoints=args.metric_to_monitor_for_checkpoints,
+        save_top_k=args.save_top_k,
+        save_every_n_steps=args.save_every_n_steps,
     )

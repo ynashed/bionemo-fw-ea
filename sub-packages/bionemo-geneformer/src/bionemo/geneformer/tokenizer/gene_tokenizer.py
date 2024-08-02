@@ -20,6 +20,7 @@ from copy import deepcopy
 from typing import Dict, List, Sequence, Tuple, TypeVar, Union
 
 from bionemo.geneformer.tokenizer.label2id_tokenizer import Label2IDTokenizer
+from nemo.lightning import io
 
 
 __all__: Sequence[str] = ("GeneTokenizer",)
@@ -27,7 +28,7 @@ __all__: Sequence[str] = ("GeneTokenizer",)
 T = TypeVar("T", bound="GeneTokenizer")
 
 
-class GeneTokenizer(Label2IDTokenizer):
+class GeneTokenizer(Label2IDTokenizer, io.IOMixin):
     """Initializes the GeneTokenizer object."""
 
     cls_token: str = "[CLS]"
