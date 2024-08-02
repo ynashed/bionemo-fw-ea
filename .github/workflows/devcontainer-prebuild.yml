@@ -10,23 +10,16 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     steps:
-    -
-      name: Checkout
-      id: checkout
     - uses: actions/checkout@v4
-    -
-        name: Login to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: nvcr.io
-          username: $oauthtoken
-          password: ${{ secrets.NGC_KEY }}
-    -
-        name: Pre-build dev container image
-        uses: devcontainers/ci@v0.3
-        with:
-          subFolder: .github
-          imageName: nvcr.io/nvidian/cvai_bnmo_trng/bionemo-devcontainer
-          cacheFrom: nvcr.io/nvidian/cvai_bnmo_trng/bionemo-devcontainer
-          push: filter
-          eventFilterForPush: push
+    - uses: docker/login-action@v3
+      with:
+        registry: nvcr.io
+        username: $oauthtoken
+        password: ${{ secrets.NGC_KEY }}
+    - uses: devcontainers/ci@v0.3
+      with:
+        subFolder: .github
+        imageName: nvcr.io/nvidian/cvai_bnmo_trng/bionemo-devcontainer
+        cacheFrom: nvcr.io/nvidian/cvai_bnmo_trng/bionemo-devcontainer
+        push: filter
+        eventFilterForPush: push
