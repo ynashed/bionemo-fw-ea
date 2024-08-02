@@ -180,7 +180,7 @@ class SingleCellDataModule(pl.LightningDataModule):
             pin_memory=self.pin_memory,
             persistent_workers=self.persistent_workers,
             collate_fn=functools.partial(
-                collate.collate_fn,
+                collate.bert_padding_collate_fn,
                 padding_value=self.tokenizer.token_to_id(GeneTokenizer.pad_token),
                 max_length=self.max_len,
             ),

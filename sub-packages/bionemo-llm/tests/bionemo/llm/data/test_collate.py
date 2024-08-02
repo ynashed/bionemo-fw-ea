@@ -16,10 +16,10 @@
 
 import torch
 
-from bionemo.llm.data.collate import collate_fn
+from bionemo.llm.data.collate import bert_padding_collate_fn
 
 
-def test_collate_fn():
+def test_bert_padding_collate_fn():
     # Create sample data
     sample1 = {
         "text": torch.tensor([1, 2, 3]),
@@ -40,7 +40,7 @@ def test_collate_fn():
     batch = [sample1, sample2]
 
     # Call the collate_fn
-    collated_batch = collate_fn(batch, padding_value=-1)
+    collated_batch = bert_padding_collate_fn(batch, padding_value=-1)
 
     # Assert the expected output
     assert torch.all(torch.eq(collated_batch["text"], torch.tensor([[1, 2, 3], [10, 11, 12]])))
@@ -53,7 +53,7 @@ def test_collate_fn():
     assert torch.all(torch.eq(collated_batch["is_random"], torch.tensor([[0, 0, 0], [0, 0, 0]])))
 
 
-def test_collate_fn_with_padding():
+def test_bert_padding_collate_fn_with_padding():
     # Create sample data
     sample1 = {
         "text": torch.tensor([1, 2, 3]),
@@ -74,7 +74,7 @@ def test_collate_fn_with_padding():
     batch = [sample1, sample2]
 
     # Call the collate_fn
-    collated_batch = collate_fn(batch, padding_value=10)
+    collated_batch = bert_padding_collate_fn(batch, padding_value=10)
 
     # Assert the expected output
     assert torch.all(torch.eq(collated_batch["text"], torch.tensor([[1, 2, 3, 10, 10], [4, 5, 6, 7, 8]])))
@@ -95,7 +95,7 @@ def test_collate_fn_with_padding():
     assert torch.all(torch.eq(collated_batch["is_random"], torch.tensor([[0, 0, 0, 0, 0], [0, 0, 0, 0, 0]])))
 
 
-def test_collate_fn_with_max_length_truncates():
+def test_bert_padding_collate_fn_with_max_length_truncates():
     # Create sample data
     sample1 = {
         "text": torch.tensor([1, 2, 3]),
@@ -116,7 +116,7 @@ def test_collate_fn_with_max_length_truncates():
     batch = [sample1, sample2]
 
     # Call the collate_fn
-    collated_batch = collate_fn(batch, padding_value=10, max_length=4)
+    collated_batch = bert_padding_collate_fn(batch, padding_value=10, max_length=4)
 
     # Assert the expected output
     assert torch.all(torch.eq(collated_batch["text"], torch.tensor([[1, 2, 3, 10], [4, 5, 6, 7]])))
@@ -133,7 +133,7 @@ def test_collate_fn_with_max_length_truncates():
     assert torch.all(torch.eq(collated_batch["is_random"], torch.tensor([[0, 0, 0, 0], [0, 0, 0, 0]])))
 
 
-def test_collate_fn_with_max_length_pads_extra():
+def test_bert_padding_collate_fn_with_min_length_pads_extra():
     # Create sample data
     sample1 = {
         "text": torch.tensor([1, 2, 3]),
@@ -154,7 +154,7 @@ def test_collate_fn_with_max_length_pads_extra():
     batch = [sample1, sample2]
 
     # Call the collate_fn
-    collated_batch = collate_fn(batch, padding_value=-1, max_length=5)
+    collated_batch = bert_padding_collate_fn(batch, padding_value=-1, min_length=5)
     assert torch.all(torch.eq(collated_batch["text"], torch.tensor([[1, 2, 3, -1, -1], [10, 11, 12, -1, -1]])))
     for val in collated_batch.values():
         assert val.size(1) == 5

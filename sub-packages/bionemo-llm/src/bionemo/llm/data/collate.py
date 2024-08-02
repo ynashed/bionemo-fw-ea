@@ -14,25 +14,31 @@
 # limitations under the License.
 
 
-from typing import Sequence
+from typing import Sequence, TypeVar
 
 import torch
 
 from bionemo.llm.data import types
 
 
-def collate_fn(
-    batch: Sequence[types.BertSample],
-    padding_value: int,
+_T = TypeVar("_T", bound=dict[str, torch.Tensor])
+
+
+def padding_collate_fn(
+    batch: Sequence[_T],
+    padding_values: dict[str, int],
+    min_length: int | None = None,
     max_length: int | None = None,
-) -> types.BertSample:
+) -> _T:
     """Collate function with padding.
 
     Args:
-        batch (list): List of samples.
-        padding_value (int, optional): Padding value. Defaults to 0.
-        max_length (int, optional): Maximum length of the sequence. If not provided, the maximum length of the batch
-            will be used. Tensors longer than this value will be truncated. Defaults to None.
+        batch: List of samples, each of which is a dictionary of tensors.
+        padding_values: A dictionary of padding values for each tensor key.
+        min_length: Minimum length of the output batch; tensors will be padded to this length. If not
+            provided, no extra padding beyond the max_length will be added.
+        max_length: Maximum length of the sequence. If not provided, tensors will be padded to the
+            longest sequence in the batch.
 
     Returns:
         A collated batch with the same dictionary input structure.
@@ -42,15 +48,40 @@ def collate_fn(
         if max_length is not None:
             tensors = [t[:max_length] for t in tensors]
         batched_tensors = torch.nn.utils.rnn.pad_sequence(tensors, batch_first=True, padding_value=padding_value)
-        if max_length is None:
+        if min_length is None:
             return batched_tensors
-        return torch.nn.functional.pad(batched_tensors, (0, max_length - batched_tensors.size(1)), value=padding_value)
+        return torch.nn.functional.pad(batched_tensors, (0, min_length - batched_tensors.size(1)), value=padding_value)
 
-    return {
-        "text": _pad([s["text"] for s in batch], padding_value),
-        "types": _pad([s["types"] for s in batch], 0),
-        "attention_mask": _pad([s["attention_mask"] for s in batch], False),
-        "labels": _pad([s["labels"] for s in batch], -1),
-        "loss_mask": _pad([s["loss_mask"] for s in batch], False),
-        "is_random": _pad([s["is_random"] for s in batch], 0),
+    return {k: _pad([s[k] for s in batch], padding_values[k]) for k in batch[0].keys()}  # type: ignore[return-value]
+
+
+def bert_padding_collate_fn(
+    batch: Sequence[types.BertSample],
+    padding_value: int,
+    min_length: int | None = None,
+    max_length: int | None = None,
+) -> types.BertSample:
+    """Padding collate function for BERT dataloaders.
+
+    Args:
+        batch (list): List of samples.
+        padding_value (int, optional): The tokenizer's pad token ID.
+        min_length: Minimum length of the output batch; tensors will be padded to this length. If not
+            provided, no extra padding beyond the max_length will be added.
+        max_length: Maximum length of the sequence. If not provided, tensors will be padded to the
+            longest sequence in the batch.
+    """
+    padding_values = {
+        "text": padding_value,
+        "types": 0,
+        "attention_mask": False,
+        "labels": -1,
+        "loss_mask": False,
+        "is_random": 0,
     }
+    return padding_collate_fn(
+        batch=batch,  # type: ignore[assignment]
+        padding_values=padding_values,
+        min_length=min_length,
+        max_length=max_length,
+    )

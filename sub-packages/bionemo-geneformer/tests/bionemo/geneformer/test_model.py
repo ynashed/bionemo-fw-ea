@@ -681,7 +681,9 @@ def _get_loss_from_model(model_config: GeneformerConfig, seed: int) -> float:
             shuffle=False,
             num_workers=0,
             collate_fn=functools.partial(
-                collate.collate_fn, padding_value=tokenizer.token_to_id(tokenizer.pad_token), max_length=2048
+                collate.bert_padding_collate_fn,
+                padding_value=tokenizer.token_to_id(tokenizer.pad_token),
+                max_length=2048,
             ),
             drop_last=False,
         )
