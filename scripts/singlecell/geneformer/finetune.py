@@ -46,15 +46,66 @@ from bionemo.contrib.model.biobert.model import BioBertConfig, BiobertSpecOption
 from bionemo.contrib.model.biobert.transformer_specs import get_biobert_spec
 from bionemo.contrib.utils.dtypes import PrecisionTypes, get_autocast_dtype
 from bionemo.contrib.utils.logger_utils import WandbLoggerOptions, setup_nemo_lightning_logger
+from megatron.core.transformer.utils import get_linear_layer
+import torch.nn.functional as F
+from torch import nn
 
+try:
+    import apex
+
+    from megatron.core.fusions.fused_layer_norm import FusedLayerNorm
+
+    HAVE_APEX = True
+    LNImpl = FusedLayerNorm
+except ImportError:
+    import warnings
+
+    from megatron.core.transformer.torch_layer_norm import WrappedTorchLayerNorm
+
+    warnings.warn(f'Apex is not installed. Falling back to Torch LayerNorm')
+    LNImpl = WrappedTorchLayerNorm
+
+class Linear(MegatronModule):
+
+    def __init__(self, input_size, config: "BioBertFinetuneHeadConfig"):
+        super().__init__(config)
+        self.dense_layers = nn.ModuleList([
+                get_linear_layer(input_size, input_size, config.init_method) for n in range(config.n_layers - 1)
+            ])
+        self.dense_layers.append(get_linear_layer(input_size, config.output_size, config.init_method))
+        self.activation = F.gelu
+        self.dropout = nn.Dropout(p=0.1)
+        self.layer_norm = LNImpl(
+            config=config,
+            hidden_size=input_size,
+            eps=config.layernorm_epsilon,
+        )
+
+    def forward(self, X):
+        return self.dense(X)
 
 class MLPHeadModel(MegatronModule):
-    def __init__(self, language_model: MegatronBioBertModel, config: BioBertConfig):
+    def __init__(self, language_model: MegatronBioBertModel, config: "BioBertFinetuneHeadConfig", input_size):
         super().__init__(config)
         self.language_model = language_model
-        self.head: MegatronModule = BertLMHead(1024, config=config)
-        # megatron core pipelining currently depends on model type
-        self.model_type = ModelType.encoder_or_decoder
+        # TODO(@georgea) how do I make sure this gets cast properly? when in BertLMHead, it was cast fine
+        # self.head = Linear(config, input_size)
+        # self.head = get_linear_layer(input_size, config.output_size, config.init_method) # : MegatronModule = BertLMHead(1024, config=config)
+        self.dense_layers = nn.ModuleList([
+                get_linear_layer(input_size, input_size, config.init_method) for n in range(config.n_layers - 1)
+            ])
+        self.dense_layers.append(get_linear_layer(input_size, config.output_size, config.init_method))
+        self.activation = F.gelu
+        self.dropout = nn.Dropout(p=0.1)
+        self.layer_norm = LNImpl(
+            config=config,
+            hidden_size=input_size,
+            eps=config.layernorm_epsilon,
+        )
+        self.language_model.return_embeddings = True
+        # @georgea megatron core pipelining currently depends on model type, so this has to be set
+        # it is unlear to me whether this can take any value other than the one inherited from langauge_model
+        self.model_type = self.language_model.model_type
 
     def forward(
         self,
@@ -64,16 +115,22 @@ class MLPHeadModel(MegatronModule):
         lm_labels: Tensor | None = None,
         inference_params=None,
     ):
-        X = self.language_model(
+        x = self.language_model(
             input_ids=input_ids,
             attention_mask=attention_mask,
             tokentype_ids=tokentype_ids,
             lm_labels=lm_labels,
             inference_params=inference_params,
         )
-        # raise ValueError(X['token_logits'].shape)
-        y = self.head(X["token_logits"][:, 0, :1024])
-        return y
+        for i in range(len(self.dense_layers)):
+            x = self.dropout(x)
+            layer = self.dense_layers[i]
+            x = self.layer_norm(x)
+            x = layer(x)
+            if i < len(self.dense_layers) - 1:
+                x = self.activation(x)
+
+        return x
 
     def set_input_tensor(self, input_tensor: Tensor) -> None:
         """Sets input tensor to the model.
@@ -92,191 +149,104 @@ class MLPHeadModel(MegatronModule):
         self.language_model.encoder.set_input_tensor(input_tensor[0])
 
 
-class InheritanceMLPHeadModel(MegatronBioBertModel):
-    def __init__(self, config, *args, **kwargs):
-        super().__init__(
-            config,
-            *args,
-            **kwargs,
-            # config,
-            # num_tokentypes=config.num_tokentypes,
-            # transformer_layer_spec=config.transformer_layer_spec,
-            # vocab_size=config.vocab_size,
-            # max_sequence_length=config.seq_length,
-        )
-        self.head = BertLMHead(1024, config=config)
+from megatron.core.transformer.transformer_config import TransformerConfig
 
-    def forward(
-        self,
-        input_ids: Tensor,
-        attention_mask: Tensor,
-        tokentype_ids: Tensor = None,
-        lm_labels: Tensor = None,
-        inference_params=None,
-    ):
-        X = super().forward(
-            input_ids=input_ids,
-            attention_mask=attention_mask,
-            tokentype_ids=tokentype_ids,
-            lm_labels=lm_labels,
-            inference_params=inference_params,
-        )
-        # raise ValueError(X['token_logits'].shape)
-        y = self.head(X["token_logits"][:, 0, :1024])
-        return y
+from dataclasses import dataclass
+from typing import Callable
+from megatron.core.utils import init_method_normal, scaled_init_method_normal
 
+from typing import Sequence, Tuple
 
-from nemo.lightning.io.pl import MegatronCheckpointIO
+from bionemo.contrib.lightning import DataT, ReductionT
 
+class ReductionLoss(MegatronLossReduction):
+    def __init__(self, *args, **kwargs):
+        super().__init__()
 
+    def forward(self, batch: DataT, forward_out: torch.Tensor) -> Tuple[torch.Tensor, ReductionT]:
+        """
+        Calculates the loss within a micro-batch. A micro-batch is a batch of data on a single GPU.
+
+        Args:
+            batch: A batch of data that gets passed to the original forward inside LitAutoEncoder.
+            forward_out: the output of the forward method inside LitAutoEncoder.
+        Returns:
+            A tuple containing [<loss_tensor>, ReductionT] where the loss tensor will be used for
+            backpropagation and the ReductionT will be passed to the reduce method
+            (which currently only works for logging.).
+        """
+        target = torch.zeros(size=(len(batch['text']), ), dtype=torch.long, device=forward_out.device)
+        first_entries = batch['text'][:, 0]
+        target[:len(first_entries)] = first_entries % forward_out.size(1)
+
+        loss = F.cross_entropy(forward_out, target)
+
+        return loss, {"avg": loss}
+
+    def reduce(self, losses_reduced_per_micro_batch: Sequence[ReductionT]) -> torch.Tensor:
+        """
+        Works across micro-batches. (data on single gpu).
+        Note: This currently only works for logging and this loss will not be used for backpropagation.
+
+        Args:
+            losses_reduced_per_micro_batch: a list of the outputs of forward
+
+        Returns:
+            A tensor that is the mean of the losses. (used for logging).
+        """
+        mse_losses = torch.stack([loss["avg"] for loss in losses_reduced_per_micro_batch])
+        return mse_losses.mean()
+
+@dataclass
 class BioBertFinetuneHeadConfig(ModelParallelConfig):
-    def __init__(self, *args, trainer: nl.Trainer | None = None, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.trainer = trainer  # TODO(@georgea) this bad. try to  not have to pass in a trainer
-        # TODO(@georgea) this doesn't allow the nemo ckpt load yet
-        seq_length = 2048
-        precision = "bf16-mixed"
-        biobert_spec_option = BiobertSpecOption.bert_layer_local_spec.value
-        self.lm_config = BioBertConfig(
-            num_layers=6,
-            hidden_size=256,
-            ffn_hidden_size=512,
-            num_attention_heads=4,
-            seq_length=seq_length,
-            fp32_residual_connection=False,  # TODO(@jstjohn) check this
-            hidden_dropout=0.02,
-            init_method_std=0.02,
-            kv_channels=None,
-            apply_query_key_layer_scaling=False,
-            make_vocab_size_divisible_by=128,
-            masked_softmax_fusion=True,  # TODO(@jstjohn) check this
-            fp16_lm_cross_entropy=False,
-            params_dtype=get_autocast_dtype(precision),
-            pipeline_dtype=get_autocast_dtype(precision),
-            autocast_dtype=get_autocast_dtype(precision),  # setting this speeds things up a lot
-            gradient_accumulation_fusion=False,  # THIS BREAKS STUFF, leave False
-            layernorm_zero_centered_gamma=False,  # TODO(@jstjohn) check this
-            layernorm_epsilon=1.0e-12,
-            activation_func=F.gelu,  # TODO(@jstjohn) check this
-            qk_layernorm=False,  # TODO(@jstjohn) check this
-            apply_residual_connection_post_layernorm=False,  # False is new default, True was BERT pub.
-            bias_activation_fusion=True,  # TODO(@jstjohn) check this
-            bias_dropout_fusion=True,  # TODO(@jstjohn) check this
-            get_attention_mask_from_fusion=False,
-            attention_dropout=0.1,
-            share_embeddings_and_output_weights=True,
-            enable_autocast=False,  # This has to be set to True if we use the mixed precision plugin
-            biobert_spec_option=biobert_spec_option,
-            # nemo1_ckpt_path=nemo1_init_path,
-        )
-        # Needed for compatibility with megatron
+    # don't want to inherit from `TransformerConfig`, becuase it makes you set the transformer specs (like head) and we
+    # are not doing anything different there from whatever is loaded by the fabric
+
+    # Expected for the BERTLMHead
+    output_size: int = 1
+    n_layers: int = 3
+    init_method: Callable | None = None
+    init_method_std: float = 0.02
+    trainer: nl.Trainer = None
+    # params for layernorm module
+    layernorm_epsilon: float = 1e-5
+    layernorm_zero_centered_gamma: bool = False
+    normalization: bool = "LayerNorm"
+    persist_layer_norm: bool = False
+    memory_efficient_layer_norm: bool = False
+
+    # def __init__(self, trainer: nl.Trainer, *args, **kwargs):
+        # super().__init__(*args, **kwargs)
+    def __post_init__(self):
+        """ Python dataclass method that is used to modify attributes after initialization.
+            See https://docs.python.org/3/library/dataclasses.html#post-init-processing for more details.
+        """
+        super().__post_init__()
+        # Expected for the BERTLMHead
+        if self.init_method is None:
+            self.init_method = init_method_normal(self.init_method_std)
+        # Needed for compatibility with megatron for some reason, I think it contributes to ddp configuration
+        # see: "3rdparty/Megatron-LM/megatron/core/distributed/distributed_data_parallel.py", line 146
         self.calculate_per_token_loss = False
 
     def configure_model(self, tokenizer) -> "MegatronBioBertModel":
-        use_inheritance = False
-        if use_inheritance:
-            # The local specs all require the standard full attention mask. For transformer engine only the NVTE_FLASH_ATTN=0
-            #  option requires this full attention mask.
-            self = self.lm_config
-            use_full_attention_mask: bool = os.getenv("NVTE_FLASH_ATTN") == "0" or self.biobert_spec_option in {
-                BiobertSpecOption.bert_layer_local_spec,
-                BiobertSpecOption.bert_layer_local_spec_with_qk_ln,
-                BiobertSpecOption.esm2_bert_layer_local_spec,
-            }
-
-            do_next_sentence = False
-            model_with_head = InheritanceMLPHeadModel(
-                self,
-                transformer_layer_spec=get_biobert_spec(self.biobert_spec_option, qk_layernorm=self.qk_layernorm),
-                num_tokentypes=2 if do_next_sentence else 0,
-                vocab_size=get_vocab_size(self, tokenizer.vocab_size, self.make_vocab_size_divisible_by),
-                max_sequence_length=self.seq_length,
-                tokrnizer=tokenizer,
-                fp16_lm_cross_entropy=self.fp16_lm_cross_entropy,
-                parallel_output=self.parallel_output,
-                share_embeddings_and_output_weights=self.share_embeddings_and_output_weights,
-                position_embedding_type=self.position_embedding_type,
-                rotary_percent=self.rotary_percent,
-                seq_len_interpolation_factor=self.seq_len_interpolation_factor,
-                return_embeddings=False,
-                pre_process=parallel_state.is_pipeline_first_stage(),
-                post_process=parallel_state.is_pipeline_last_stage(),  # set to False for inference
-                add_binary_head=do_next_sentence,
-                use_full_attention_mask=use_full_attention_mask,
-            )
-        else:
-            # TODO this if bad, fix with better condition pls, that actually  tests whether you want to load ckpt (@georgea)
-            # TODO(@georgea) also try dist_checkpoint
-            if self.trainer is None:
-                lm = self.lm_config.configure_model(tokenizer)
-                parallel_load = False
-                sharded_strategy = None
-                ckpt_dir = "/workspaces/bionemo-github/results/test_experiment/2024-07-31_23-01-09/checkpoints/test_experiment--reduced_train_loss=8.2760-epoch=0"
-                # breakpoint()
-                ckpt_io = MegatronCheckpointIO("torch_dist")
-                # breakpoint()
-                state_dict = ckpt_io.load_checkpoint(
-                    ckpt_dir, sharded_state_dict={"sharded_state_dict": lm.sharded_state_dict()}
-                )
-                # ckpt =  dist_checkpointing.load(lm.sharded_state_dict(), ckpt_dir, sharded_strategy=sharded_strategy, strict='log_unexpected')
-                breakpoint()
-            else:
-                fabric = self.trainer.to_fabric()
-                distributed_model = fabric.load_model(
-                    "/workspaces/bionemo-github/results/test_experiment/2024-07-31_23-01-09/checkpoints/test_experiment--reduced_train_loss=8.2760-epoch=0"
-                )
-                lm: MegatronBioBertModel = distributed_model.module.module  # distributed_model is megatron_parallel, .module is the lightning module, and .module.module is the megatronbiobertmodel
-                breakpoint()
-            for param in lm.parameters():
-                param.requires_grad = False
-            # model_with_head = self.head.configure_model(lm)
-            model_with_head = MLPHeadModel(lm, self.lm_config)
+        fabric = self.trainer.to_fabric()
+        distributed_model = fabric.load_model(
+            "/workspaces/bionemo-github/results/test_experiment/2024-07-31_23-01-09/checkpoints/test_experiment--reduced_train_loss=8.2760-epoch=0"
+        )
+        lm: MegatronBioBertModel = distributed_model.module.module  # distributed_model is megatron_parallel, .module is the lightning module, and .module.module is the megatronbiobertmodel
+        for param in lm.parameters():
+            param.requires_grad = False
+        # model_with_head = self.head.configure_model(lm)
+        model_with_head = MLPHeadModel(lm, self, lm.config.hidden_size)
         return model_with_head
 
     def get_loss_reduction_class(self) -> Type[MegatronLossReduction]:
         # You could optionally return a different loss reduction class here based on the config settings.
         # return BERTMLMLossWithReduction
         # pass
-        from typing import Sequence, Tuple
 
-        from bionemo.contrib.lightning import DataT, ReductionT
-
-        class PassthroughLoss(MegatronLossReduction):
-            def __init__(self, *args, **kwargs):
-                super().__init__()
-
-            def forward(self, batch: DataT, forward_out: torch.Tensor) -> Tuple[torch.Tensor, ReductionT]:
-                """
-                Calculates the loss within a micro-batch. A micro-batch is a batch of data on a single GPU.
-
-                Args:
-                    batch: A batch of data that gets passed to the original forward inside LitAutoEncoder.
-                    forward_out: the output of the forward method inside LitAutoEncoder.
-                Returns:
-                    A tuple containing [<loss_tensor>, ReductionT] where the loss tensor will be used for
-                    backpropagation and the ReductionT will be passed to the reduce method
-                    (which currently only works for logging.).
-                """
-                # x = batch["data"]
-                loss = (forward_out**2).mean()
-
-                return loss, {"avg": loss}
-
-            def reduce(self, losses_reduced_per_micro_batch: Sequence[ReductionT]) -> torch.Tensor:
-                """
-                Works across micro-batches. (data on single gpu).
-                Note: This currently only works for logging and this loss will not be used for backpropagation.
-
-                Args:
-                    losses_reduced_per_micro_batch: a list of the outputs of forward
-
-                Returns:
-                    A tensor that is the mean of the losses. (used for logging).
-                """
-                mse_losses = torch.stack([loss["avg"] for loss in losses_reduced_per_micro_batch])
-                return mse_losses.mean()
-
-        return PassthroughLoss
+        return ReductionLoss
 
 
 def main(
@@ -369,7 +339,7 @@ def main(
         limit_val_batches=limit_val_batches,  # This controls upsampling and downsampling
         val_check_interval=val_check_interval,  # TODO(@jstjohn) Checkpoint saving is currently broken, fix and change this.
         num_nodes=num_nodes,
-        callbacks=[LossLoggingCallback(), track_io(RichModelSummary)(max_depth=4), track_io(LearningRateMonitor)()],
+        callbacks=[track_io(LossLoggingCallback)(), track_io(RichModelSummary)(max_depth=4), track_io(LearningRateMonitor)()],
         plugins=nl.MegatronMixedPrecision(precision=precision, amp_O2=False),
     )
 
@@ -402,7 +372,15 @@ def main(
         num_workers=num_dataset_workers,
     )
 
-    geneformer_config = BioBertFinetuneHeadConfig()  # trainer=trainer)
+    geneformer_config = BioBertFinetuneHeadConfig(
+        trainer=trainer,
+        output_size=20,
+        params_dtype=get_autocast_dtype(precision),
+        pipeline_dtype=get_autocast_dtype(precision),
+        autocast_dtype=get_autocast_dtype(precision),  # setting this speeds things up a lot
+        gradient_accumulation_fusion=False,  # THIS BREAKS STUFF, leave False
+        enable_autocast=False,  # This has to be set to True if we use the mixed precision plugin
+    )
 
     # The lightning class owns a copy of the actual model, and a loss function, both of which are configured
     #  and lazily returned by the `geneformer_config` object defined above.
@@ -427,6 +405,17 @@ def main(
             ),
         ),
     )
+
+    # from nemo.lightning.pytorch.callbacks import ModelCheckpoint
+    # checkpoint_callback = ModelCheckpoint(
+    #     save_best_model=False,
+    #     save_last=True,
+    #     monitor="reduced_train_loss",
+    #     save_top_k=2,
+    #     every_n_train_steps=10,
+    #     enable_nemo_ckpt_io=True, # Enables the .nemo file-like checkpointing where all IOMixins are under SerDe
+    #     async_save=True,
+    # )
 
     # Setup the logger and train the model
     nemo_logger = setup_nemo_lightning_logger(

@@ -309,7 +309,7 @@ class MegatronBioBertModel(LanguageModule):
             # Collect masked embeddings.
             output = torch.zeros(
                 size=(embeddings.shape[0], embeddings.shape[2]),
-                dtype=torch.float32,
+                dtype=embeddings.dtype, #torch.float32,
                 device=torch.cuda.current_device(),
             )
             for i, (embedding, mask) in enumerate(zip(embeddings, masks)):
