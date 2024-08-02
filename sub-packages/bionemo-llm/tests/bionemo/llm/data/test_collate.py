@@ -14,9 +14,36 @@
 # limitations under the License.
 
 
+import pytest
 import torch
 
-from bionemo.llm.data.collate import bert_padding_collate_fn
+from bionemo.llm.data.collate import bert_padding_collate_fn, padding_collate_fn
+
+
+def test_padding_collate_fn():
+    sample1 = {
+        "my_key": torch.tensor([1, 2, 3]),
+    }
+    sample2 = {
+        "my_key": torch.tensor([4, 5, 6, 7, 8]),
+    }
+    batch = [sample1, sample2]
+    collated_batch = padding_collate_fn(batch, padding_values={"my_key": -1})
+
+    assert torch.all(torch.eq(collated_batch["my_key"], torch.tensor([[1, 2, 3, -1, -1], [4, 5, 6, 7, 8]])))
+
+
+def test_padding_collate_with_missing_key_raises():
+    sample1 = {
+        "my_key": torch.tensor([1, 2, 3]),
+    }
+    sample2 = {
+        "my_key": torch.tensor([4, 5, 6, 7, 8]),
+        "other_key": torch.tensor([1, 2, 3]),
+    }
+    batch = [sample1, sample2]
+    with pytest.raises(ValueError, match="All keys in inputs must match provided padding_values."):
+        padding_collate_fn(batch, padding_values={"my_key": -1, "other_key": -1})
 
 
 def test_bert_padding_collate_fn():

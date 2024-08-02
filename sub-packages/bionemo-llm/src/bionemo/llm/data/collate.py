@@ -43,6 +43,9 @@ def padding_collate_fn(
     Returns:
         A collated batch with the same dictionary input structure.
     """
+    for entry in batch:
+        if entry.keys() != padding_values.keys():
+            raise ValueError("All keys in inputs must match provided padding_values.")
 
     def _pad(tensors, padding_value):
         if max_length is not None:
