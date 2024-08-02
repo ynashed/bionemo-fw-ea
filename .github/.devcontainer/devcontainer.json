@@ -4,7 +4,7 @@
 		"--gpus=all"
 	],
 	"build": {
-		"dockerfile": "Dockerfile",
+		"dockerfile": "../../Dockerfile",
 		"cacheFrom": "nvcr.io/nvidian/cvai_bnmo_trng/bionemo:bionemo2-latest",
 		"target": "dev"
 	},
