@@ -1,8 +1,6 @@
-# bionemo-core
+# bionemo-example_model
 
-Minimalist package containing proven utilities that are used among many indenepdent feature packages of the bionemo framework.
-
-Additions to this package are made if and only if they are used between 3 or more independent feature packages, including the framework package itself.
+Minimalist package containing an example model that makes use of bionemo2/nemo conventions.
 
 ```bash
 pip install -e .
