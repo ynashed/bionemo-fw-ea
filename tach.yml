@@ -36,3 +36,4 @@ source_roots:
   - sub-packages/bionemo-geneformer/src
   - sub-packages/bionemo-fw/src
   - sub-packages/bionemo-testing/src
+  - sub-packages/bionemo-example_model/src
