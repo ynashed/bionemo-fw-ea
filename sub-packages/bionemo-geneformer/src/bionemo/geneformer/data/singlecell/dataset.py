@@ -300,6 +300,34 @@ def process_item(
         token_ids, max_len, tokenizer.token_to_id(tokenizer.pad_token), sample=False
     )
 
+    token_ids, mask, attention_mask, labels = apply_masking(
+        token_ids,
+        mask_prob,
+        mask_token_prob,
+        random_token_prob,
+        prepend_cls_token,
+        tokenizer.pad_id,
+        tokenizer.token_to_id(tokenizer.cls_token),
+        tokenizer.token_to_id(tokenizer.mask_token),
+        len(tokenizer.vocab) - 5,
+    )
+
+    # NeMo megatron assumes this return structure.
+    item = {
+        "text": token_ids.astype(np.int64),
+        "types": np.zeros_like(token_ids).astype(np.int64),
+        "attention_mask": attention_mask.astype(np.int64),
+        "labels": labels.astype(np.int64),
+        "loss_mask": mask,
+        "is_random": np.zeros_like(token_ids).astype(np.int64),
+    }
+
+    return item
+
+
+def apply_masking(
+    token_ids, mask_prob, mask_token_prob, random_token_prob, prepend_cls_token, pad_id, cls_id, mask_id, num_tokens
+):
     mask = None
     mask_tokens_positions = None
     random_tokens_positions = None
@@ -307,11 +335,11 @@ def process_item(
     # - masked tokens
     if mask_prob > 0.0:
         probs = np.full(token_ids.shape[0], mask_prob)
-        probs[token_ids == tokenizer.token_to_id(tokenizer.pad_token)] = 0.0
+        probs[token_ids == pad_id] = 0.0
         mask = np.random.binomial(1, probs).astype(bool)
         mask_tokens_positions = mask & np.random.binomial(1, mask_token_prob, mask.shape).astype(bool)
-        random_tokens_positions = (
-            mask & np.random.binomial(1, random_token_prob, mask.shape).astype(bool) & (~mask_tokens_positions)
+        random_tokens_positions = (mask & np.random.binomial(1, random_token_prob, mask.shape).astype(bool)) & (
+            ~mask_tokens_positions
         )
         # - ensure [CLS] token is masked from the loss. Note that we're dealing with 1d arrays so flattening isn't a problem here.
         if prepend_cls_token:
@@ -321,8 +349,8 @@ def process_item(
 
     # - add [CLS] token, note that token_ids is a 1d array so flattening isn't a problem here.
     if prepend_cls_token:
-        token_ids = np.insert(token_ids, 0, tokenizer.token_to_id(tokenizer.cls_token))
-    attention_mask = token_ids != tokenizer.token_to_id(tokenizer.pad_token)
+        token_ids = np.insert(token_ids, 0, cls_id)
+    attention_mask = token_ids != pad_id
 
     labels = np.ones(len(token_ids)) * -1
 
@@ -339,19 +367,8 @@ def process_item(
     if random_tokens_positions is None:
         random_tokens_positions = np.zeros_like(mask)
     # identity_tokens = mask & (~mask_tokens_positions) & (~random_tokens_positions), not needed because
-    token_ids[mask_tokens_positions] = tokenizer.token_to_id(tokenizer.mask_token)
+    token_ids[mask_tokens_positions] = mask_id
     # There are 5 special tokens in the tokenizer, so we start from 5. TODO make this a parameter of the tokenizer.
     if random_tokens_positions.sum() > 0:
-        token_ids[random_tokens_positions] = np.random.randint(5, len(tokenizer.vocab), random_tokens_positions.sum())
-
-    # NeMo megatron assumes this return structure.
-    item = {
-        "text": token_ids.astype(np.int64),
-        "types": np.zeros_like(token_ids).astype(np.int64),
-        "attention_mask": attention_mask.astype(np.int64),
-        "labels": labels.astype(np.int64),
-        "loss_mask": mask,
-        "is_random": np.zeros_like(token_ids).astype(np.int64),
-    }
-
-    return item
+        token_ids[random_tokens_positions] = np.random.randint(5, num_tokens + 5, random_tokens_positions.sum())
+    return token_ids, mask, attention_mask, labels
