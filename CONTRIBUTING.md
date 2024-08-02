@@ -55,41 +55,7 @@ This page contains the Python coding standards for the BioNeMo repository. They 
 
 
 
-# Pull Request (PR) Guidelines
-
-**Send your PRs to the `v2-main` branch**. Branch off from `v2-main` when making your changes.
-Prefix your branches with your name or initials (i.e. `yourname/branch_description`) if you have push access to our repository
-otherwise please create a fork with your branch and submit a PR with `v2-main` as the target.
-
-- Make sure your PR does one thing. Have a clear answer to "What does this PR do?"
-- Make sure you have the linters enabled via pre-commit hooks (`pre-commit install`)
-- Follow the default PR template
-- Make sure all unit tests finish successfully before running PR pipeline by invoking `pytest scripts sub-packages`.
-- Make sure you added necessary tests and documentation changes (could be just comments in the config files) for the feature in your PR
-- Rebase your feature branch with the latest `dev` to include any new changes that have been added. Resolve merge conflicts, if any
-- Send your PR and request a review
-- If your PR is still WIP, mark it as "Draft"
-- Your merge request must pass all pipelines and be peer-reviewed before it can be merged.
-- Make sure to merge your PR when it's ready and pipeline is successful
-
-## Unit tests
-Contributors to BioNeMo FW are expected to unit test their introduced changes.
-
-After testing your code locally, trigger tests in the PR's CI. Let a code-owner know that you are ready for the build to run and they will leave a `/build-ci` comment on your PR which will run the CI test suite.
-
-### Adding unit tests
-Add unit tests under `tests` to examine use cases of new classes or methods that are being added to the codebase. Each
-test file must be for a particular file or module. For example if you have a file that is under
-`src/path/to/module/my_file_name.py` then your test should match the path at `tests/path/to/module/test_my_file_name.py`.
-Check the tests folders in the sub-modules of this repository for examples. If you are testing a module, such as
-integrating multiple examples of different files, then you can use the following pattern to test the module, say in the
-above example, if you wanted to test functions from several files together that all exist in the same `src/path/to/module`
-then you could create a `tests/path/to/test_module.py` file. The same is true for parents of that module and so on.
-Generally unit tests should exist at the level of the individual file however.
-
-
-## Pull Request Guidelines
-
+## Pull Request (PR) Guidelines
 ### Signing Your Work
 
 * We require that all contributors "sign-off" on their commits. This certifies that the contribution is your original work, or you have rights to submit it under the same license, or a compatible license.
@@ -147,12 +113,12 @@ Developer workflow for _external_ code contributions is as follows:
 
 2. Git clone the forked repository and push changes to the personal fork.
 
-  ```bash
+```bash
 git clone https://github.com/YOUR_USERNAME/YOUR_FORK.git bionemo-fw-ea
 # Checkout the targeted branch and commit changes
 # Push the commits to a branch on the fork (remote).
 git push -u origin <local-branch>:<remote-branch>
-  ```
+```
 
 Developer workflow for _internal_ or those developers that have been granted push access to our repository is as follows:
 
@@ -171,3 +137,36 @@ For both internal and external developers, the next step is opening a PR:
   * While under review, mark your PRs as work-in-progress by prefixing the PR title with [WIP].
 
 5. Once ready, CI can be started by a developer with permissions when they add a `/build-ci` comment. This must pass prior to merging.
+
+
+### General guidelines
+**Send your PRs to the `v2-main` branch**. Branch off from `v2-main` when making your changes.
+Prefix your branches with your name or initials (i.e. `yourname/branch_description`) if you have push access to our repository
+otherwise please create a fork with your branch and submit a PR with `v2-main` as the target.
+
+- Make sure your PR does one thing. Have a clear answer to "What does this PR do?"
+- Make sure you have the linters enabled via pre-commit hooks (`pre-commit install`)
+- Follow the default PR template
+- Make sure all unit tests finish successfully before running PR pipeline by invoking `pytest scripts sub-packages`.
+- Make sure you added necessary tests and documentation changes (could be just comments in the config files) for the feature in your PR
+- Rebase your feature branch with the latest `dev` to include any new changes that have been added. Resolve merge conflicts, if any
+- Send your PR and request a review
+- If your PR is still WIP, mark it as "Draft"
+- Your merge request must pass all pipelines and be peer-reviewed before it can be merged.
+- Make sure to merge your PR when it's ready and pipeline is successful
+
+### Unit tests
+Contributors to BioNeMo FW are expected to unit test their introduced changes.
+
+After testing your code locally, trigger tests in the PR's CI. Let a code-owner know that you are ready for the build to
+ run and they will leave a `/build-ci` comment on your PR which will run the CI test suite.
+
+#### Adding unit tests
+Add unit tests under `tests` to examine use cases of new classes or methods that are being added to the codebase. Each
+test file must be for a particular file or module. For example if you have a file that is under
+`src/path/to/module/my_file_name.py` then your test should match the path at `tests/path/to/module/test_my_file_name.py`.
+Check the tests folders in the sub-modules of this repository for examples. If you are testing a module, such as
+integrating multiple examples of different files, then you can use the following pattern to test the module, say in the
+above example, if you wanted to test functions from several files together that all exist in the same `src/path/to/module`
+then you could create a `tests/path/to/test_module.py` file. The same is true for parents of that module and so on.
+Generally unit tests should exist at the level of the individual file however.
