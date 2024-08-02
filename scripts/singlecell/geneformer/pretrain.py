@@ -415,13 +415,6 @@ if __name__ == "__main__":
         default=2,
         help="Save the top k checkpoints.",
     )
-    parser.add_argument(
-        "--save-every-n-steps",
-        type=int,
-        required=False,
-        default=20,
-        help="Save a checkpoint every n steps.",
-    )
 
     # Parse the arguments and pull them out into local variables for ease of future refactor to a
     #   config management system.
@@ -451,5 +444,5 @@ if __name__ == "__main__":
         save_last_checkpoint=args.save_last_checkpoint,
         metric_to_monitor_for_checkpoints=args.metric_to_monitor_for_checkpoints,
         save_top_k=args.save_top_k,
-        save_every_n_steps=args.save_every_n_steps,
+        save_every_n_steps=args.val_check_interval,
     )
