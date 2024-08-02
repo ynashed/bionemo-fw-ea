@@ -65,7 +65,7 @@ class ESM2DotProductAttention(DotProductAttention):
         self.use_esm_attention = config.use_esm_attention
         self.attention_softmax_in_fp32 = config.attention_softmax_in_fp32
 
-    def forward(
+    def forward(  # noqa: D102
         self,
         query: Tensor,
         key: Tensor,

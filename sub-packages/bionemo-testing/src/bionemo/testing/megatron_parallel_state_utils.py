@@ -50,7 +50,7 @@ __all__: Sequence[str] = (
 def _reset_microbatch_calculator():
     """Resets _GLOBAL_NUM_MICROBATCHES_CALCULATOR in megatron which is used in NeMo to initilised model parallel in
     nemo.collections.nlp.modules.common.megatron.megatron_init.initialize_model_parallel_for_nemo
-    """  # noqa: D415
+    """  # noqa: D205, D415
     megatron.core.num_microbatches_calculator._GLOBAL_NUM_MICROBATCHES_CALCULATOR = None
 
 
@@ -62,7 +62,7 @@ def _teardown_apex_megatron_cuda():
     """Cleans GPU allocation and model and data parallel settings after usage of a model:
     - sets the global variables related to model and data parallelism to None in Apex and Megatron:.
     - releases all unoccupied cached GPU memory currently held by the caching CUDA allocator, see torch.cuda.empty_cache
-    """  # noqa: D415
+    """  # noqa: D205, D415
     torch.cuda.empty_cache()
     _reset_microbatch_calculator()
     parallel_state.destroy_model_parallel()
@@ -111,7 +111,7 @@ def distributed_model_parallel_state(seed: Optional[int] = 42) -> Iterator[None]
     with distributed_model_parallel_state():
         # your test code here
     # After the block your state is cleaned up.
-    """
+    """  # noqa: D205
     initial_states: Optional[Any] = None
 
     try:
