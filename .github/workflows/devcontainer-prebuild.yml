@@ -18,7 +18,7 @@ jobs:
         password: ${{ secrets.NGC_KEY }}
     - uses: devcontainers/ci@v0.3
       with:
-        subFolder: .github
+        configFile: .github/.devcontainer/devcontainer.json
         imageName: nvcr.io/nvidian/cvai_bnmo_trng/bionemo-devcontainer
         cacheFrom: nvcr.io/nvidian/cvai_bnmo_trng/bionemo-devcontainer
         push: filter
