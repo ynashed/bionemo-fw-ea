@@ -25,6 +25,8 @@ on:
           args:
             description: 'argument'
             required: false
+  merge_group:
+    types: [checks_requested]
 jobs:
   Authorization:
     name: Authorization
