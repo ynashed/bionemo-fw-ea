@@ -46,47 +46,6 @@ RUN pip --disable-pip-version-check --no-cache-dir install \
   git+https://github.com/state-spaces/mamba.git@v2.0.3
 
 
-FROM bionemo2-base as pip-requirements
-
-# Copy and install pypi depedencies.
-RUN mkdir /tmp/pip-tmp
-WORKDIR /tmp/pip-tmp
-
-COPY requirements-dev.txt requirements-test.txt /tmp/pip-tmp/
-
-# We want to only copy the requirements.txt, setup.py, and pyproject.toml files for *ALL* sub-packages
-# but we **can't** do COPY sub-packages/**/{requirements.txt,...} /<destination> because this will overwrite!
-# So....we copy everything into a temporary image and remove everything else!
-# Later, we can copy the result from the temporary image and get what we want
-# **WITHOUT** invalidating the cache for successive layers!
-COPY sub-packages/ /tmp/pip-tmp/sub-packages
-# remove all directories that aren't the top-level sub-packages/bionemo-{xyz}
-RUN find sub-packages/ -type d | grep "bionemo-[a-zA-Z0-9\-]*/" | xargs rm -rf && \
-    # only keep the requirements-related files
-    find sub-packages/ -type f | grep -v -E "requirements.txt|pyproject.toml|setup.py" | xargs rm
-
-FROM bionemo2-base as dev
-
-RUN mkdir -p /workspace/bionemo2/
-WORKDIR /workspace/bionemo2
-
-# We get the sub-packcages/ top-level structure + requirements.txt files
-COPY --from=pip-requirements /tmp/pip-tmp/ /workspace/bionemo2/
-
-RUN pip install -r requirements-dev.txt -r requirements-test.txt
-
-# We calculate paths to each requirements.txt file and dynamically construct the pip install command.
-# This command will expand to something like:
-#   pip install --disable-pip-version-check --no-cache-dir \
-#      -r bionemo-core/requirements.txt \
-#      -r bionemo-pytorch/requirements.txt \
-#      -r bionemo-lmm/requirements.txt \
-#      (etc.)
-RUN X=""; for sub in $(echo sub-packages/bionemo-*); do X="-r ${sub}/requirements.txt ${X}"; done; eval "pip install --disable-pip-version-check --no-cache-dir ${X}"
-
-# Delete the temporary /build directory.
-WORKDIR /workspace
-RUN rm -rf /build
 
 # Create a non-root user to use inside a devcontainer.
 ARG USERNAME=bionemo
@@ -99,9 +58,20 @@ RUN groupadd --gid $USER_GID $USERNAME \
 
 ENV PATH="/home/bionemo/.local/bin:${PATH}"
 
+FROM bionemo2-base AS dev
+
+COPY requirements-dev.lock ./
+RUN sed '/-e/d' requirements-dev.lock > requirements-install.lock \
+  && PYTHONDONTWRITEBYTECODE=1 pip install --no-cache-dir --disable-pip-version-check -r requirements-install.lock
+RUN rm requirements*.lock
 
 # Create a release image with bionemo2 installed.
-FROM dev AS release
+FROM bionemo2-base AS release
+
+COPY requirements.lock ./
+RUN sed '/-e/d' requirements.lock > requirements-install.lock \
+  && PYTHONDONTWRITEBYTECODE=1 pip install --no-cache-dir --disable-pip-version-check -r requirements-install.lock
+RUN rm requirements*.lock
 
 # Install 3rd-party deps
 COPY ./3rdparty /build
@@ -117,7 +87,7 @@ RUN rm -rf /build
 WORKDIR /workspace/bionemo2/
 COPY ./sub-packages /workspace/bionemo2/sub-packages
 # Dynamically install the code for each bionemo namespace package.
-RUN for sub in $(ls sub-packages/); do pushd sub-packages/${sub} && pip install --no-build-isolation --no-cache-dir --disable-pip-version-check --no-deps -e . && popd; done
+RUN for sub in $(ls sub-packages/); do pushd sub-packages/${sub} && pip install --no-build-isolation --no-cache-dir --disable-pip-version-check --no-deps . && popd; done
 
 WORKDIR /workspace/bionemo2/
 COPY ./scripts ./scripts
