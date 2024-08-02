@@ -36,6 +36,7 @@ def test_masking_gives_expected_ratios():
 
     assert len(masked_token_ids) == 100_001
     masked_token_ids = masked_token_ids[1:]
+    loss_mask = loss_mask[1:]
 
     # Check that overall masking probability is correct.
     assert pytest.approx(loss_mask.mean(), abs=0.01) == 0.5
@@ -48,3 +49,24 @@ def test_masking_gives_expected_ratios():
 
     # Check that the distribution of unmasked tokens is correct.
     assert pytest.approx((masked_token_ids[loss_mask] == 1).mean(), abs=0.01) == 1.0 - (0.25 + 0.12)
+
+
+def test_binomial_logic():
+    token_ids = np.ones(100_000, dtype=np.int64)
+    mask_prob = 1.0
+    mask_token_prob = 0.50
+    random_token_prob = 0.50
+    pad_id = 0
+
+    probs = np.full(token_ids.shape[0], mask_prob)
+    probs[token_ids == pad_id] = 0.0
+    mask = np.random.binomial(1, probs).astype(bool)
+    mask_tokens_positions = np.random.binomial(1, mask_token_prob, mask.shape).astype(bool)
+
+    random_tokens_positions = ~mask_tokens_positions & np.random.binomial(1, random_token_prob, mask.shape).astype(
+        bool
+    )
+
+    assert pytest.approx(mask.mean(), abs=0.01) == mask_prob
+    assert pytest.approx(mask_tokens_positions.mean(), abs=0.01) == mask_prob * mask_token_prob
+    assert pytest.approx(random_tokens_positions.mean(), abs=0.01) == mask_prob * random_token_prob
