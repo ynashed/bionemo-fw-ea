@@ -88,9 +88,9 @@ class DiTeMPNN(nn.Module):
 
         # Single linear layer for QKV projection
         self.qkv_proj = nn.Linear(hidden_size, 3 * hidden_size, bias=False)
-        self.norm_q = BatchLayerNorm(hidden_size, affine=False, eps=1e-6)
-        self.norm_k = BatchLayerNorm(hidden_size, affine=False, eps=1e-6)
-        self.out_projection = nn.Linear(hidden_size, hidden_size, bias=False)
+        # self.norm_q = BatchLayerNorm(hidden_size, affine=False, eps=1e-6)
+        # self.norm_k = BatchLayerNorm(hidden_size, affine=False, eps=1e-6)
+        # self.out_projection = nn.Linear(hidden_size, hidden_size, bias=False)
 
         self.use_rotary = use_rotary
         self.d_head = hidden_size // num_heads
@@ -210,3 +210,37 @@ class DiTeMPNN(nn.Module):
         h_edge_out = prev_edge_attr + h_edge + edge_gate_mlp * self.ffn_edge(h_edge)
 
         return h_out, h_edge_out
+
+
+class MultiCondEquiUpdate(nn.Module):
+    """Update atom coordinates equivariantly, use time emb condition."""
+
+    def __init__(self, hidden_dim, edge_dim, time_dim, n_vector_features=128):
+        super().__init__()
+        self.coord_norm = E3Norm(n_vector_features)
+        self.coord_posnorm = E3Norm(n_vector_features)
+        self.time_mlp = nn.Sequential(nn.SiLU(), nn.Linear(time_dim, hidden_dim * 2))
+        input_ch = hidden_dim * 2 + edge_dim + n_vector_features
+        self.input_lin = nn.Linear(input_ch, hidden_dim)
+        self.ln = BatchLayerNorm(hidden_dim, affine=False, eps=1e-6)
+        self.coord_mlp = nn.Sequential(
+            nn.Linear(hidden_dim, hidden_dim), nn.SiLU(), nn.Linear(hidden_dim, n_vector_features, bias=False)
+        )
+        self.tanh = nn.GELU(approximate='tanh')
+
+    def forward(self, h, pos, edge_index, edge_attr, dist, time_emb, batch_index):
+        row, col = edge_index
+        h_input = torch.cat([h[row], h[col], edge_attr, dist], dim=1)
+        coord_diff = pos[row] - pos[col]
+        coord_diff = self.coord_norm(coord_diff, batch_index[row])
+        edge_batch_index = batch_index[edge_index[0]]
+        shift, scale = self.time_mlp(time_emb).chunk(2, dim=1)
+        inv = modulate(self.ln(self.input_lin(h_input), batch=edge_batch_index), shift, scale)
+        inv = self.tanh(self.coord_mlp(inv))
+
+        # aggregate position
+        trans = coord_diff * inv.unsqueeze(1)
+        agg = scatter(trans, edge_index[0], 0, reduce='add', dim_size=pos.size(0))
+        pos = pos + self.coord_posnorm(agg, batch_index)
+
+        return pos
