@@ -20,21 +20,21 @@ loss:
   variables:
     - variable_name: 'x'
       loss_scale: 3.0
-      aggregate: 'sum'
+      aggregate: 'mean'
       continuous: True
       use_distance: null
       distance_scale: null
     - variable_name: 'h'
       loss_scale: 1.0
-      aggregate: 'sum'
+      aggregate: 'mean'
       continuous: False
     - variable_name: 'edge_attr'
       loss_scale: 2.0
-      aggregate: 'sum'
+      aggregate: 'mean'
       continuous: False
     - variable_name: 'charges'
       loss_scale: 1.0
-      aggregate: 'sum'
+      aggregate: 'mean'
       continuous: False
 
 interpolant:

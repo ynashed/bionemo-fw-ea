@@ -410,6 +410,20 @@ class Graph3DInterpolantModel(pl.LightningModule):
             n_nodes = None
         return n_nodes
 
+    # def on_after_backward(self):
+    #     # Compute and log the maximum gradient norm before clipping
+    #     max_grad_norm = 0
+    #     for p in self.dynamics.parameters():
+    #         if p.grad is not None:
+    #             param_norm = p.grad.data.norm(2)
+    #             if param_norm > max_grad_norm:
+    #                 max_grad_norm = param_norm
+
+    #     # Log the maximum gradient norm before clipping
+    #     print("TEST", max_grad_norm)
+    #     results = {'train/max_grad_norm_before_clipping': max_grad_norm}
+    #     self.log_dict(results, sync_dist=True)
+
     @torch.no_grad()
     def sample(self, num_samples, timesteps=500, time_discretization="linear", batch=None):
         """
