@@ -17,12 +17,13 @@
 # Example proteins taken from the https://github.com/facebookresearch/esm main README.
 import pytest
 import torch
-from transformers import AutoTokenizer
+
+from bionemo.esm2.data.tokenizer import get_tokenizer
 
 
 @pytest.fixture
 def tokenizer():
-    return AutoTokenizer.from_pretrained("facebook/esm2_t33_650M_UR50D")
+    return get_tokenizer()
 
 
 def test_tokenize_protein1(tokenizer):

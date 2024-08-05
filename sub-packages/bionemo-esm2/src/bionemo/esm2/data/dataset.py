@@ -17,18 +17,19 @@
 import os
 import random
 import sqlite3
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Sequence
 
 import numpy as np
 import pandas as pd
 import torch
+import transformers
 from torch.utils.data import Dataset
 
-from bionemo.contrib.data.esm2 import tokenizer
-from bionemo.contrib.data.masking import BertMaskConfig, apply_bert_pretraining_mask
-from bionemo.contrib.data.types import BertSample
+from bionemo.esm2.data.tokenizer import get_tokenizer
+from bionemo.llm.data.masking import BertMaskConfig, apply_bert_pretraining_mask
+from bionemo.llm.data.types import BertSample
 
 
 class ProteinSQLiteDataset(Dataset):
@@ -96,7 +97,12 @@ class ESMMaskedResidueDataset(Dataset):
     total_samples: int
     seed: int = np.random.SeedSequence().entropy  # type: ignore
     max_seq_length: int = 1024
-    mask_config: BertMaskConfig = BertMaskConfig()
+    mask_prob: float = 0.15
+    mask_token_prob: float = 0.8
+    mask_random_prob: float = 0.1
+    tokenizer: transformers.PreTrainedTokenizer | transformers.PreTrainedTokenizerFast = field(
+        default_factory=get_tokenizer
+    )
 
     def __len__(self) -> int:
         return self.total_samples

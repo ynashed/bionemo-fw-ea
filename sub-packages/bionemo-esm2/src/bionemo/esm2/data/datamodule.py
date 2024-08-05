@@ -19,8 +19,8 @@ import os
 import pytorch_lightning as pl
 from nemo.lightning.pytorch.plugins import MegatronDataSampler
 
-from bionemo.contrib.data.esm2.dataset import create_train_dataset, create_valid_dataset
-from bionemo.contrib.data.types import BertMaskConfig
+from bionemo.esm2.data.dataset import create_train_dataset, create_valid_dataset
+from bionemo.llm.data.masking import BertMaskConfig
 
 
 def create_dataloader(): ...
