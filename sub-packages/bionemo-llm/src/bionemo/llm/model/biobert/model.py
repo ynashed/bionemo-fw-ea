@@ -340,6 +340,11 @@ class MegatronBioBertModel(LanguageModule):
 class BioBertConfig(
     BionemoTrainableModelConfig[MegatronBioBertModel, MegatronLossReduction], TransformerConfig, io.IOMixin
 ):
+    """Config class for BioBert model, responsible for the partial configuration of Transformer models.
+
+    `configure_model()` is ultimately called by the LightningModule using PTL lightning module hooks.
+    """
+
     # From megatron.core.models.gpt.bert_model.GPTModel
     fp16_lm_cross_entropy: bool = False
     parallel_output: bool = True
