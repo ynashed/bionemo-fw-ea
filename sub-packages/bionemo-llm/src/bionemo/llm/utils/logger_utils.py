@@ -16,9 +16,9 @@ import pathlib
 from typing import Any, Dict, Optional, Sequence, TypedDict
 
 from nemo.lightning.nemo_logger import NeMoLogger
+from nemo.lightning.pytorch import callbacks as nemo_callbacks
 from nemo.utils import logging
 from pytorch_lightning.loggers import TensorBoardLogger, WandbLogger
-from nemo.lightning.pytorch import callbacks as nemo_callbacks
 
 
 __all__: Sequence[str] = (
@@ -39,9 +39,10 @@ class WandbLoggerOptions(TypedDict):
     # the directory is also set by NeMoLogger
     log_model: bool  # log model
 
+
 def setup_nemo_lightning_logger(
     name: str = "default-name",
-    root_dir: str | pathlib.Path  = "./results",
+    root_dir: str | pathlib.Path = "./results",
     initialize_tensorboard_logger: bool = False,
     wandb_kwargs: Optional[WandbLoggerOptions] = None,
     ckpt_callback: Optional[nemo_callbacks.ModelCheckpoint] = None,

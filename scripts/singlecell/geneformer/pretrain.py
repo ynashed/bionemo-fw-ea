@@ -27,8 +27,9 @@ from typing import Optional, Sequence, get_args
 
 from megatron.core.optimizer import OptimizerConfig
 from nemo import lightning as nl
-from nemo.lightning import io
 from nemo.collections import llm
+from nemo.lightning import io, resume
+from nemo.lightning.pytorch import callbacks as nl_callbacks
 from nemo.lightning.pytorch.optim import MegatronOptimizerModule
 from nemo.lightning.pytorch.optim.lr_scheduler import CosineAnnealingScheduler
 from nemo.utils import logging
@@ -44,8 +45,6 @@ from bionemo.llm.model.biobert.lightning import BioBertLightningModule
 from bionemo.llm.model.biobert.model import BiobertSpecOption
 from bionemo.llm.utils.logger_utils import WandbLoggerOptions, setup_nemo_lightning_logger
 
-from nemo.lightning import resume
-from nemo.lightning.pytorch import callbacks as nl_callbacks
 
 __all__: Sequence[str] = ("main",)
 
@@ -75,7 +74,7 @@ def main(
     nemo1_init_path: Optional[Path] = None,
     save_best_checkpoint: bool = True,
     save_last_checkpoint: bool = True,
-    metric_to_monitor_for_checkpoints: str = 'val_loss',
+    metric_to_monitor_for_checkpoints: str = "val_loss",
     save_top_k: int = 2,
     save_every_n_steps: int = 100,
 ) -> None:
@@ -142,7 +141,11 @@ def main(
         limit_val_batches=limit_val_batches,  # This controls upsampling and downsampling
         val_check_interval=val_check_interval,  # TODO(@jstjohn) Checkpoint saving is currently broken, fix and change this.
         num_nodes=num_nodes,
-        callbacks=[io.track_io(LossLoggingCallback)(), io.track_io(RichModelSummary)(max_depth=4), io.track_io(LearningRateMonitor)()],
+        callbacks=[
+            io.track_io(LossLoggingCallback)(),
+            io.track_io(RichModelSummary)(max_depth=4),
+            io.track_io(LearningRateMonitor)(),
+        ],
         plugins=nl.MegatronMixedPrecision(precision=precision, amp_O2=False),
     )
 
@@ -234,11 +237,11 @@ def main(
     checkpoint_callback = nl_callbacks.ModelCheckpoint(
         save_best_model=save_best_checkpoint,
         save_last=save_last_checkpoint,
-        monitor=metric_to_monitor_for_checkpoints, # "val_loss",
+        monitor=metric_to_monitor_for_checkpoints,  # "val_loss",
         save_top_k=save_top_k,
         every_n_train_steps=save_every_n_steps,
-        enable_nemo_ckpt_io=True, # Enables the .nemo file-like checkpointing where all IOMixins are under SerDe
-        async_save=False, # Tries to save asynchronously, previously led to race conditions.
+        enable_nemo_ckpt_io=True,  # Enables the .nemo file-like checkpointing where all IOMixins are under SerDe
+        async_save=False,  # Tries to save asynchronously, previously led to race conditions.
     )
 
     # Setup the logger and train the model
