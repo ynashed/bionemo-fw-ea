@@ -387,7 +387,6 @@ def test_geneformer_nemo1_v_nemo2_inference_golden_values(
         pipeline_model_parallel_size=1,
         ddp="megatron",
         find_unused_parameters=True,
-        enable_nemo_ckpt_io=False,
         data_sampler=nl.MegatronDataSampler(
             micro_batch_size=3,
             global_batch_size=3,
