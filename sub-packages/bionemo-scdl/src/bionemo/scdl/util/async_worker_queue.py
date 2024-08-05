@@ -22,9 +22,11 @@ __all__: Sequence[str] = ("AsyncWorkQueue",)
 
 
 class AsyncWorkQueue:
+    """Implements an asynchronous queue."""
+
     def __init__(self, max_workers: int = 5, use_processes: bool = False) -> None:
-        """
-        Initialize the AsyncWorkQueue.
+        """Initialize the AsyncWorkQueue.
+
         Args:
             max_workers: The maximum number of worker threads or processes.
             use_processes: If True, use ProcessPoolExecutor; otherwise, use ThreadPoolExecutor.
@@ -40,13 +42,14 @@ class AsyncWorkQueue:
         self.tasks: List[concurrent.futures.Future] = []
 
     def submit_task(self, func: Callable[..., Any], *args: Any, **kwargs: Any) -> concurrent.futures.Future:
-        """
-        Submit a task to the work queue.
+        """Submit a task to the work queue.
+
         Args:
             func: The function to be executed asynchronously.
             args: Positional arguments to pass to the function.
             kwargs: Keyword arguments to pass to the function.
             A Future object representing the execution of the function.
+
         Returns:
             Future: placeholder for the asynchronous operation.
         """
@@ -56,16 +59,16 @@ class AsyncWorkQueue:
             return future
 
     def shutdown(self, wait: bool = True) -> None:
-        """
-        Shutdown the executor and wait for the tasks to complete.
+        """Shutdown the executor and wait for the tasks to complete.
+
         Args:
             wait: If True, wait for all tasks to complete before shutting down.
         """
         self.executor.shutdown(wait=wait)
 
     def get_completed_tasks(self) -> List[concurrent.futures.Future]:
-        """
-        Get the list of completed tasks.
+        """Get the list of completed tasks.
+
         Returns:
             A list of Future objects that are completed.
         """
@@ -74,8 +77,8 @@ class AsyncWorkQueue:
             return completed_tasks
 
     def get_pending_tasks(self) -> List[concurrent.futures.Future]:
-        """
-        Get the list of pending tasks.
+        """Get the list of pending tasks.
+
         Returns:
             A list of Future objects that are not yet completed.
         """
@@ -84,10 +87,11 @@ class AsyncWorkQueue:
             return pending_tasks
 
     def get_task_results(self) -> List[Any]:
-        """
-        Get the results of all completed tasks.
+        """Get the results of all completed tasks.
+
         Returns:
             A list of results from the completed tasks.
+
         Raises:
             Exception: This would be expected if the task fails to complete or
             if is cancelled.
@@ -102,8 +106,8 @@ class AsyncWorkQueue:
         return results
 
     def wait(self) -> List[Any]:
-        """
-        Wait for all submitted tasks to complete and return their results.
+        """Wait for all submitted tasks to complete and return their results.
+
         Returns:
             A list of results from all completed tasks.
         """

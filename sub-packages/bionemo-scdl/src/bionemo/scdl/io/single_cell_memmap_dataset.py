@@ -33,6 +33,8 @@ from bionemo.scdl.VERSION import __version__
 
 
 class FileNames(str, Enum):
+    """Names of files that are generated in SingleCellCollection."""
+
     DATA = "data.npy"
     COLPTR = "col_ptr.npy"
     ROWPTR = "row_ptr.npy"
@@ -43,7 +45,8 @@ class FileNames(str, Enum):
 
 
 class Mode(str, Enum):
-    """Valid modes for the single cell memory mapped dataset:
+    """Valid modes for the single cell memory mapped dataset.
+
     The write append mode is 'w+' while the read append mode is 'r+'.
     """
 
@@ -54,6 +57,8 @@ class Mode(str, Enum):
 
 
 class METADATA(str, Enum):
+    """Stored metadata."""
+
     NUM_ROWS = "num_rows"
 
 
@@ -64,9 +69,10 @@ def _swap_mmap_array(
     dest_path: str,
     destroy_src: bool = False,
 ) -> None:
-    """Function that swaps the location of two mmap arrays. This is used when
-    concatonating SingleCellMemMapDataset. This emables the newly merged arrays
-    to be stored in the same place as the original dataset.
+    """Function that swaps the location of two mmap arrays.
+
+    This is used when concatanating SingleCellMemMapDataset. This emables the
+    newly merged arrays to be stored in the same place as the original dataset.
 
     Args:
         src_array: the first memmap array
@@ -102,7 +108,8 @@ def _swap_mmap_array(
 
 
 def _pad_sparse_array(row_values, row_col_ptr, n_cols: int) -> np.ndarray:
-    """
+    """Creates a conventional array from a sparse one.
+
     Convert a sparse matrix representation of a 1d matrix to a conventional
     numpy representation.
 
@@ -110,6 +117,7 @@ def _pad_sparse_array(row_values, row_col_ptr, n_cols: int) -> np.ndarray:
         row_values: The row indices of the entries
         row_col_ptr: The corresponding column pointers
         n_cols: The number of columns in the dataset.
+
     Returns:
         The full 1d numpy array representation.
     """
@@ -127,10 +135,10 @@ def _create_compressed_sparse_row_memmaps(
     mode: Mode,
     dtypes: Dict[str, str],
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """
-    Takes the parameters required to create a set of CSR-format numpy arrays and
-    creates them at path. This is an efficient way of indexing into a sparse matrix.
-    Only non-zero values of the data are stored.
+    """Create a set of CSR-format numpy arrays.
+
+    They are saved to memmap_dir_path. This is an efficient way of indexing
+    into a sparse matrix. Only non- zero values of the data are stored.
     """
     if num_elements <= 0:
         raise ValueError(f"n_elements is set to {num_elements}. It must be postive to create CSR matrices.")
@@ -159,11 +167,11 @@ def _create_compressed_sparse_row_memmaps(
 
 
 class SingleCellMemMapDataset(SingleCellRowDataset):
-    """
-    A SingleCellMemMapDataset represents one or more AnnData matrices. Data is
-    stored in a large, memory-mapped array that enables fast access of datasets
-    larger than the available amount of RAM on a system. SCMMAP implements a
-    consistent API defined in SingleCellRowDataset.
+    """Represents one or more AnnData matrices.
+
+    Data is stored in a large, memory-mapped array that enables fast access of
+    datasets larger than the available amount of RAM on a system. SCMMAP
+    implements a consistent API defined in SingleCellRowDataset.
 
     Attributes:
         data_path: Location of np.memmap files to be loaded from or that will be
@@ -179,7 +187,6 @@ class SingleCellMemMapDataset(SingleCellRowDataset):
         dtypes: A dictionary containing the datatypes of the data, row_index,
         and col_index arrays.
         _version: The version of the dataset
-
     """
 
     def __init__(
@@ -190,8 +197,8 @@ class SingleCellMemMapDataset(SingleCellRowDataset):
         num_rows: Optional[int] = None,
         mode: Mode = f"{Mode.READ_APPEND}",
     ) -> None:
-        """
-        Instantiate the class
+        """Instantiate the class.
+
         Args:
             data_path: The location where the data np.memmap files are read from
             or stored.
@@ -275,8 +282,9 @@ class SingleCellMemMapDataset(SingleCellRowDataset):
         self.row_index = row_arr
 
     def version(self) -> str:
-        """
-        Returns a version number (following <major>.<minor>.<point> convention).
+        """Returns a version number.
+
+        (following <major>.<minor>.<point> convention).
         """
         return self._version
 
@@ -312,9 +320,11 @@ class SingleCellMemMapDataset(SingleCellRowDataset):
         return_features: bool = False,
         feature_vars: Optional[List[str]] = None,
     ) -> Tuple[np.ndarray, pd.DataFrame]:
-        """Returns a padded version of a  given row in the dataset along with
-        optional features. A padded version is one where the a sparse array
-        representation is converted to a conventional represenentation
+        """Returns a padded version of a row in the dataset.
+
+        A padded version is one where the a sparse array representation is
+        converted to a conventional represenentation. Optionally, features are
+        returned.
 
         Args:
             index: The row to be returned
@@ -324,7 +334,6 @@ class SingleCellMemMapDataset(SingleCellRowDataset):
             np.ndarray: conventional row representation
             pd.DataFrame: optional, corresponding features.
         """
-
         (row_values, row_column_pointer), features = self.get_row(index, return_features, feature_vars)
         return (
             _pad_sparse_array(row_values, row_column_pointer, self._feature_index.number_vars_at_row(index)),
@@ -332,7 +341,7 @@ class SingleCellMemMapDataset(SingleCellRowDataset):
         )
 
     def get_row_column(self, index: int, column: int, impute_missing_zeros: bool = True) -> Optional[float]:
-        """Returns the value at a given index and the corresponding column
+        """Returns the value at a given index and the corresponding column.
 
         Args:
             index: The index to be returned
@@ -342,7 +351,6 @@ class SingleCellMemMapDataset(SingleCellRowDataset):
         Return:
             A float that is the value in the array or None.
         """
-
         (row_values, row_column_pointer), _ = self.get_row(index)
         if column is not None:
             for col_index, col in enumerate(row_column_pointer):
@@ -357,7 +365,7 @@ class SingleCellMemMapDataset(SingleCellRowDataset):
             return 0.0 if impute_missing_zeros else None
 
     def features(self) -> Optional[RowFeatureIndex]:
-        """Return the corresponding RowFeatureIndex"""
+        """Return the corresponding RowFeatureIndex."""
         return self._feature_index
 
     def _load_mmap_file_if_exists(self, file_path, dtype):
@@ -367,8 +375,8 @@ class SingleCellMemMapDataset(SingleCellRowDataset):
             raise FileNotFoundError(f"The mmap file at {file_path} is missing")
 
     def load(self, stored_path: str) -> None:
-        """
-        Loads the data at store_path that is an np.memmap format.
+        """Loads the data at store_path that is an np.memmap format.
+
         Args:
             stored_path: directory with np.memmap files
         Raises:
@@ -418,10 +426,9 @@ class SingleCellMemMapDataset(SingleCellRowDataset):
         self,
         anndata_path: str,
     ) -> None:
-        """
-        Takes a path to an existing AnnData archive, loads the data from disk
-        and then creates a new backing data structure. This is saved.
+        """Loads an existing AnnData archive from disk.
 
+        This creates a new backing data structure which is saved.
         Note: the storage utilized will roughly double. Currently, the data must
         be in a scipy.sparse.spmatrix format.
 
@@ -432,7 +439,6 @@ class SingleCellMemMapDataset(SingleCellRowDataset):
             NotImplementedError if the data is not in scipy.sparse.spmatrix
             format
             ValueError it there is not count data
-
         """
         if not os.path.exists(anndata_path):
             raise FileNotFoundError(f"Error: could not find h5ad path {anndata_path}")
@@ -479,8 +485,8 @@ class SingleCellMemMapDataset(SingleCellRowDataset):
         self.save()
 
     def save(self, output_path: Optional[str] = None) -> None:
-        """
-        Saves the class to a given output path
+        """Saves the class to a given output path.
+
         Args:
             output_path: The location to save - not yet implemented and should
             be self.data_path
@@ -516,13 +522,13 @@ class SingleCellMemMapDataset(SingleCellRowDataset):
         return True
 
     def number_of_values(self) -> int:
-        """Get the total number of values in the array. For each index, the length
-        of the corresponding dataframe is counted.
+        """Get the total number of values in the array.
+
+        For each index, the length of the corresponding dataframe is counted.
 
         Returns:
             The sum of lengths of the features in every row
         """
-
         return sum(self._feature_index.number_of_values())
 
     def number_of_rows(self) -> int:
@@ -546,17 +552,15 @@ class SingleCellMemMapDataset(SingleCellRowDataset):
         return self.data.size
 
     def __len__(self):
-        """
-        Return the number of rows.
-        """
+        """Return the number of rows."""
         return self.number_of_rows()
 
     def __getitem__(self, idx: int) -> Tuple[np.ndarray, np.ndarray]:
+        """Get the row values located and index idx."""
         return self.get_row(idx)[0]
 
     def number_of_variables(self) -> List[int]:
-        """
-        Get the number of features in every entry in the dataset.
+        """Get the number of features in every entry in the dataset.
 
         Returns:
             A list containing the lengths of the features in every row
@@ -568,9 +572,10 @@ class SingleCellMemMapDataset(SingleCellRowDataset):
         return num_vars
 
     def shape(self) -> Tuple[int, List[int]]:
-        """
-        Get the size of the dataset. This is the number of entries
-        by the the length of the feature index corresponding to that variable.
+        """Get the shape of the dataset.
+
+        This is the number of entries by the the length of the feature index
+        corresponding to that variable.
 
         Returns:
             The number of elements in the dataset
@@ -582,10 +587,10 @@ class SingleCellMemMapDataset(SingleCellRowDataset):
         self,
         other_dataset: Union[list["SingleCellMemMapDataset"], "SingleCellMemMapDataset"],
     ) -> None:
-        """
-        Concatenates another SingleCellMemMapDataset to the existing one. The data
-        is stored in the same place as for the original data set. This necessitates
-        using _swap_memmap_array
+        """Concatenates another SingleCellMemMapDataset to the existing one.
+
+        The data is stored in the same place as for the original data set. This
+        necessitates using _swap_memmap_array.
 
         Args:
             other_dataset: A SingleCellMemMapDataset or a list of

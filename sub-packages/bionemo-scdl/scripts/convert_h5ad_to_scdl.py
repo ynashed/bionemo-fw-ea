@@ -20,6 +20,7 @@ from bionemo.scdl.io.single_cell_collection import SingleCellCollection
 
 
 def parse_args():
+    """Parse the arguments to process the single cell collection."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--num-workers", type=int, default=4, help="The number of AnnData loaders to run in parallel [4]."

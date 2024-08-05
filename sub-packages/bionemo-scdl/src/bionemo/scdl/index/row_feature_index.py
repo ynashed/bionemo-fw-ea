@@ -28,16 +28,12 @@ __all__: Sequence[str] = ("RowFeatureIndex",)
 
 
 class RowFeatureIndex:
-    """
-    Maintains a mapping between a given an row and the features associated with
-    that row. This is a ragged dataset, where the number and dimension of
-    features can be different at every row.
+    """Maintains a mapping between a row and its features.
 
-    """
+    This is a ragged dataset, where the number and dimension of features
+    can be different at every row.
 
-    def __init__(self) -> None:
-        """Attributes:
-
+    Attributes:
         _cumulative_sum_index: Pointer that deliniates which entries
         correspondto a given row. For examples if the array is [-1, 200, 201],
         rows 0 to 199 correspond to _feature_arr[0] and 200 corresponds to
@@ -45,39 +41,47 @@ class RowFeatureIndex:
         _feature_arr: list of feature dataframes
         _labels: list of labels
         _version: The version of the dataset
-        """
+    """
+
+    def __init__(self) -> None:
+        """Instantiates the index."""
         self._cumulative_sum_index: np.array = np.array([-1])
         self._feature_arr: List[pd.DataFrame] = []
         self._version = __version__
         self._labels: List[str] = []
 
     def version(self) -> str:
-        """
-        Returns a version number (following <major>.<minor>.<point> convention).
+        """Returns a version number.
+
+        (following <major>.<minor>.<point> convention).
         """
         return self._version
 
     def __len__(self) -> int:
+        """The length is the number of rows or RowFeatureIndex length."""
         return len(self._feature_arr)
 
     def append_features(self, n_obs: int, features: pd.DataFrame, label: Optional[str] = None) -> None:
-        """
-        Updates the index by inserting the dataframe into the feature array
-        and adding a new span to the row lookup index.
+        """Updates the index with the given features.
+
+        The dataframe is inserted into the feature array by adding a
+        new span to the row lookup index.
+
         Args:
             n_obs (int): The number of times that these feature occur in the
             class.
             features (pd.DataFrame): Corresponding features.
             label (str): Label for the features.
         """
-
         csum = max(self._cumulative_sum_index[-1], 0)
         self._cumulative_sum_index = np.append(self._cumulative_sum_index, csum + n_obs)
         self._feature_arr.append(features)
         self._labels.append(label)
 
     def lookup(self, row: int, select_features: Optional[List[str]] = None) -> Tuple[pd.DataFrame, str]:
-        """Find the features at a given row. It is assumed that the row is
+        """Find the features at a given row.
+
+        It is assumed that the row is
         non-zero._cumulative_sum_index contains pointers to which rows correspond
         to given dataframes. To obtain a specific row, we determine where it is
         located in _cumulative_sum_index and then look up that dataframe in
@@ -133,23 +137,23 @@ class RowFeatureIndex:
 
     def column_dims(self) -> List[int]:
         """Return the number of columns in all rows.
+
         Args:
             length of features at every row is returned.
 
         Returns:
             A list containing the lengths of the features in every row
         """
-
         # Just take the total dim of the DataFrame(s)
         return [len(feats) for feats in self._feature_arr]
 
     def number_of_values(self) -> List[int]:
-        """Get the total number of values in the array. For each row, the length
-        of the corresponding dataframe is counted.
+        """Get the total number of values in the array.
+
+        For each row, the length of the corresponding dataframe is counted.
 
         Returns:
             A list containing the lengths of the features in every block of rows
-
         """
         if len(self._feature_arr) == 0:
             return [0]
@@ -170,16 +174,18 @@ class RowFeatureIndex:
         return int(max(self._cumulative_sum_index[-1], 0))
 
     def concat(self, other_row_index: RowFeatureIndex, fail_on_empty_index: bool = True) -> RowFeatureIndex:
-        """
-        Concatenates the other FeatureIndex to this one, returning
-        the new, updated index. Warning: modifies this index in-place.
+        """Concatenates the other FeatureIndex to this one.
+
+        Returns the new, updated index. Warning: modifies this index in-place.
 
         Args:
             other_row_index: another RowFeatureIndex
             fail_on_empty_index: A boolean flag that sets whether to raise an
             error if an empty row index is passed in.
+
         Returns:
             self, the RowIndexFeature after the concatenations.
+
         Raises:
             TypeError if other_row_index is not a RowFeatureIndex
             ValueError if an empty RowFeatureIndex is passed and the function is
@@ -202,6 +208,7 @@ class RowFeatureIndex:
 
     def save(self, datapath: str) -> None:
         """Saves the RowFeatureIndex to a given path.
+
         Args:
             datapath: path to save the index
         """
@@ -217,8 +224,8 @@ class RowFeatureIndex:
 
     @staticmethod
     def load(datapath: str) -> RowFeatureIndex:
-        """
-        Loads the data from datapath.
+        """Loads the data from datapath.
+
         Args:
             datapath: the path to load from
         Returns:

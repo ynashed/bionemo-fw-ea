@@ -39,9 +39,10 @@ logging.basicConfig(format="%(asctime)s %(levelname)s [%(filename)s:%(lineno)d] 
 
 
 def _create_single_cell_memmap_dataset_from_h5ad(h5ad_path: str, base_directory_path: str) -> SingleCellMemMapDataset:
-    """
-    The SingleCellMemMapDataset is loaded from h5ad_path and the data is stored in the base_data_path
-    directory.
+    """The SingleCellMemMapDataset is loaded from h5ad_path.
+
+    The data is stored in the base_data_path directory.
+
     Args:
         h5ad_path: the path to the dataset
         base_directory_path: the base directory path where the dataset will be stored
@@ -54,18 +55,21 @@ def _create_single_cell_memmap_dataset_from_h5ad(h5ad_path: str, base_directory_
 
 
 class FileNames(str, Enum):
+    """Names of files that are generated in SingleCellCollection."""
+
     VERSION = "version.json"
     METADATA = "metadata.json"
     FEATURES = "features"
 
 
 class SingleCellCollection(SingleCellRowDatasetCore):
-    """
-    An SingleCellCollection is a collection of one or more SingleCellMemMapDataset.
-    SingleCellCollection support most of the functionality of the SingleCellDataSet
-    API. An SingleCellCollection can be converted to a single SingleCellMemMapDataset.
-    A SingleCellCollection enables the use of heterogeneous datasets, such as
-    those composed of many AnnData files.
+    """A collection of one or more SingleCellMemMapDatasets.
+
+    SingleCellCollection support most of the functionality of the
+    SingleCellDataSet API. An SingleCellCollection can be converted
+    to a single SingleCellMemMapDataset. A SingleCellCollection
+    enables the use of heterogeneous datasets, such as those composed of many
+    AnnData files.
 
     Attributes:
         _version: The version of the dataset
@@ -78,11 +82,10 @@ class SingleCellCollection(SingleCellRowDatasetCore):
         lengths
         False: not ragged; all SingleCellMemMapDataset have same column dimemsion
         True: ragged; scmmap column dimemsions vary
-
     """
 
     def __init__(self, data_path: str) -> None:
-        """Instantiate the class
+        """Instantiate the class.
 
         Args:
             data_path: Where the class will be stored.
@@ -101,16 +104,17 @@ class SingleCellCollection(SingleCellRowDatasetCore):
                 json.dump(self.version(), vfi)
 
     def version(self) -> str:
-        """
-        Returns a version number (following <major>.<minor>.<point> convention).ƒ
+        """Returns a version number.
+
+        (following <major>.<minor>.<point> convention).
         """
         return self._version
 
     def load_h5ad(self, h5ad_path: str) -> None:
-        """
-        Takes a path to an existing AnnData archive, loads the data from disk
-        and then creates a new backing data structure. This is saved. Then, the
-        location and the data and the dataset are stored.
+        """Loads data from an existing AnnData archive.
+
+        This creates and saves a new backing data structure.
+        Then, the location and the data and the dataset are stored.
 
         Args:
             h5ad_path: the path to AnnData archive
@@ -122,16 +126,14 @@ class SingleCellCollection(SingleCellRowDatasetCore):
         self._feature_index.concat(self.fname_to_mmap[mmap_path]._feature_index)
 
     def load_h5ad_multi(self, directory_path: str, max_workers: int = 5, use_processes: bool = False) -> None:
-        """
-        Loads one or more AnnData files and add the corresponding datasets to the
-        collection
+        """Loads one or more AnnData files and adds them to the collection.
+
         Args:
             directory_path: The path to the directory with the AnnData files
             max_workers: the maximal number of workers to use
             use_processes: If True, use ProcessPoolExecutor; otherwise, use
             ThreadPoolExecutor
         """
-
         directory_path = Path(directory_path)
         ann_data_paths = sorted(directory_path.rglob("*.h5ad"))
 
@@ -175,10 +177,10 @@ class SingleCellCollection(SingleCellRowDatasetCore):
         return row_sum_from_datasets
 
     def number_of_variables(self) -> List[int]:
-        """
-        If ragged, returns a list of variable lengths. If not ragged, returns a
-        list with one entry. A ragged collection is one where the datasets have
-        different lengths.
+        """If ragged, returns a list of variable lengths.
+
+        If not ragged, returns a list with one entry. A ragged
+        collection is one where the datasets have different lengths.
         """
         if len(self._feature_index) == 0:
             return [0]
@@ -187,9 +189,10 @@ class SingleCellCollection(SingleCellRowDatasetCore):
             return num_vars
 
     def shape(self) -> Tuple[int, List[int]]:
-        """
-        Get the size of the dataset. This is the number of entries
-        by the the length of the feature index corresponding to that variable.
+        """Get the shape of the dataset.
+
+        This is the number of entries by the the length of the feature index
+        corresponding to that variable.
 
         Returns:
             The total number of elements across dataset
@@ -203,14 +206,12 @@ class SingleCellCollection(SingleCellRowDatasetCore):
         output_path: str,
         destroy_on_copy: bool = False,
     ) -> None:
-        """
-        Flattens the collection into a single SingleCellMemMapDataset.
+        """Flattens the collection into a single SingleCellMemMapDataset.
 
         Args:
             output_path: location to store new dataset
             destroy_on_copy: Whether to remove the current data_path
         """
-
         output = SingleCellMemMapDataset(
             output_path,
             num_elements=self.number_of_rows(),
