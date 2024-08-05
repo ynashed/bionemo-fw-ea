@@ -91,7 +91,7 @@ def batch_collator(batches: Optional[Union[Tuple[ReductionT], List[ReductionT]]]
 
     Returns:
         A single batch of the same type as the elements of your input sequence.
-    """
+    """  # noqa: D205
     match batches:
         case [torch.Tensor(), *_]:
             return torch.cat(batches, dim=0)
@@ -116,7 +116,7 @@ class PassthroughLossReduction(MegatronLossReduction):
     This class hijacks that mechanism to instead pass through the forward output unperturbed as the loss (to enable inference in the predict step), and then the
     reduce method is used to collate the batch of forward outputs into a single batch. This supports the model forward output being a tensor, dict, tuple,
     or list of tensors. The inner type _must always be a torch.Tensor_.
-    """
+    """  # noqa: D205
 
     def forward(self, batch: DataT, forward_out: DataT) -> Tuple[torch.Tensor, DataT]:
         """_summary_
@@ -140,27 +140,27 @@ class PassthroughLossReduction(MegatronLossReduction):
 
         Returns:
             ReductionT: _description_
-        """
+        """  # noqa: D205
         return batch_collator(forward_out)
 
 
 class LightningPassthroughPredictionMixin:
     """A mixin that allows your model to do inference on the predict step by hijacking the nemo loss
     reduction mechanism and passing the model output through.
-    """
+    """  # noqa: D205
 
     def predict_loss_reduction(self) -> PassthroughLossReduction:
         """For the predict step, pass through the forward pass output."""
         return PassthroughLossReduction()
 
 
-class LossLoggingCallback(pl.Callback):
+class LossLoggingCallback(pl.Callback):  # noqa: D101
     def __init__(self):
         """Log the loss at the end of each batch. For training do not reduce across the epoch but do so for validation/test."""
         self.val_losses = []
         self.test_losses = []
 
-    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
+    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):  # noqa: D102
         # Assuming the loss is computed internally and stored in pl_module
         if torch.distributed.get_rank() == 0 and parallel_state.is_pipeline_last_stage():
             # TODO(@jstjohn): verify when the outputs are a dictionary of "loss" and when they are just one tensor value.
@@ -170,7 +170,7 @@ class LossLoggingCallback(pl.Callback):
             loss = outputs
             pl_module.log("train_loss", loss, on_step=True, prog_bar=True, logger=True, rank_zero_only=True)
 
-    def on_test_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0):
+    def on_test_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0):  # noqa: D102
         # TODO(@jstjohn): Add a docstring with type hints for this lightning hook
         # Assuming the loss is computed internally and stored in pl_module
         if torch.distributed.get_rank() == 0 and parallel_state.is_pipeline_last_stage():
@@ -182,7 +182,7 @@ class LossLoggingCallback(pl.Callback):
             loss = outputs
             self.test_losses.append(loss)
 
-    def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0):
+    def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0):  # noqa: D102
         # TODO(@jstjohn): Add a docstring with type hints for this lightning hook
         # Assuming the loss is computed internally and stored in pl_module
         if torch.distributed.get_rank() == 0 and parallel_state.is_pipeline_last_stage():
@@ -196,7 +196,7 @@ class LossLoggingCallback(pl.Callback):
             loss = outputs
             self.val_losses.append(loss)
 
-    def on_validation_epoch_end(self, trainer, pl_module):
+    def on_validation_epoch_end(self, trainer, pl_module):  # noqa: D102
         # TODO(@jstjohn): Add a docstring with type hints for this lightning hook
         if torch.distributed.get_rank() == 0 and parallel_state.is_pipeline_last_stage():
             if len(self.val_losses) > 0:
@@ -204,7 +204,7 @@ class LossLoggingCallback(pl.Callback):
                 pl_module.log("val_loss", avg_val_loss, prog_bar=True, logger=True, rank_zero_only=True)
                 self.val_losses.clear()
 
-    def on_test_epoch_end(self, trainer, pl_module):
+    def on_test_epoch_end(self, trainer, pl_module):  # noqa: D102
         # TODO(@jstjohn): Add a docstring with type hints for this lightning hook
         if torch.distributed.get_rank() == 0 and parallel_state.is_pipeline_last_stage():
             if len(self.test_losses) > 0:

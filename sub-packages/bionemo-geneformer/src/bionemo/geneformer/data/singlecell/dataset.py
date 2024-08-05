@@ -33,7 +33,7 @@ __all__: Sequence[str] = (
 )
 
 
-class Item(TypedDict):
+class Item(TypedDict):  # noqa: D101
     text: np.ndarray
     types: np.ndarray
     padding_mask: np.ndarray
@@ -81,7 +81,7 @@ class SingleCellDataset(Dataset):
 
     See Also:
         bionemo/data/singlecell/sc_memmap.py - creates the artifacts required for instantiating a singlecell dataset from hdf5 files.
-    """
+    """  # noqa: D205
 
     def __init__(  # noqa: D107
         self,
@@ -181,7 +181,7 @@ class SingleCellDataset(Dataset):
         metadata = self.metadata[self.dataset_map[did]]
         return metadata
 
-    def lookup_cell_by_idx(self, idx) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    def lookup_cell_by_idx(self, idx) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:  # noqa: D102
         ptr = slice(int(self.gene_data_ptr[idx]), int(self.gene_data_ptr[idx + 1]))
         # col idxs poin to offsets in the original sparse metadata, this is for looking up metadata eg gene names
         col_idxs = np.asarray(self.gene_data_indices[ptr]).astype(int)  # keyed by ptr
@@ -215,7 +215,7 @@ class SingleCellDataset(Dataset):
         )
 
 
-def process_item(
+def process_item(  # noqa: D417
     gene_data: np.ndarray,
     gene_idxs: np.ndarray,
     feature_ids: np.ndarray,

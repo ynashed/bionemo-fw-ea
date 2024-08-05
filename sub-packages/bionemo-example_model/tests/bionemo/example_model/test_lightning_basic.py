@@ -13,27 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 import pytest
 from nemo import lightning as nl
 
-from bionemo.llm import lightning as bnptl
-from bionemo.testing import lightning_basic as lb
+from bionemo.example_model import lightning_basic as lb
 from bionemo.testing import megatron_parallel_state_utils
-
-
-def test_mixin_strategy_contract_get_loss_reduction():
-    with megatron_parallel_state_utils.clean_parallel_state_context():
-        strategy = nl.MegatronStrategy(
-            tensor_model_parallel_size=1,
-            pipeline_model_parallel_size=1,
-            ddp="megatron",
-            find_unused_parameters=True,
-            enable_nemo_ckpt_io=False,
-        )
-        strategy.connect(bnptl.LightningPassthroughPredictionMixin())
-        mixin = bnptl.LightningPassthroughPredictionMixin()
-        strategy_reduction_function = strategy._get_loss_reduction("predict")
-        assert isinstance(strategy_reduction_function(mixin), bnptl.PassthroughLossReduction)
 
 
 @pytest.mark.needs_gpu

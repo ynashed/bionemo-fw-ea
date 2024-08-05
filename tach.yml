@@ -19,6 +19,9 @@ modules:
   - path: bionemo.llm
     depends_on:
       - path: bionemo.core
+  - path: bionemo.example_model
+    depends_on:
+      - path: bionemo.llm
   - path: bionemo.testing
     depends_on: []
   - path: <root>
@@ -36,3 +39,4 @@ source_roots:
   - sub-packages/bionemo-geneformer/src
   - sub-packages/bionemo-fw/src
   - sub-packages/bionemo-testing/src
+  - sub-packages/bionemo-example_model/src

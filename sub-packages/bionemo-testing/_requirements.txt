@@ -1,1 +1,1 @@
--e ../bionemo-nemo-mega
+-e ../bionemo-llm

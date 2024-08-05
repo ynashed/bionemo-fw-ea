@@ -6,7 +6,8 @@
 	"build": {
 		"context": "${localWorkspaceFolder}",
 		"dockerfile": "${localWorkspaceFolder}/Dockerfile",
-		"cacheFrom": "nvcr.io/nvidian/cvai_bnmo_trng/bionemo:bionemo2-latest"
+		"cacheFrom": "nvcr.io/nvidian/cvai_bnmo_trng/bionemo:bionemo2-latest",
+		"target": "dev"
 	},
 	"mounts": [
 		// Mount the local ~/.aws config to pass along AWS credentials for PBSS.
@@ -33,6 +34,7 @@
 					"./sub-packages/bionemo-geneformer/src",
 					"./sub-packages/bionemo-llm/src",
 					"./sub-packages/bionemo-testing/src",
+					"./sub-packages/bionemo-example_model/src",
 					"./3rdparty/NeMo",
 					"./3rdparty/Megatron-LM"
 				],

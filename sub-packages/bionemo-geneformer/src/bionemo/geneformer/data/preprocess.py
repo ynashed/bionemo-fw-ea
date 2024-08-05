@@ -15,7 +15,7 @@
 
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Optional, Sequence
 
 from bionemo.llm.utils.remote import RemoteResource
@@ -30,15 +30,15 @@ class ResourcePreprocessor(ABC):
     preprocess method. This interface can be used to generically define a workflow from a config file.
 
         remote -> prepare -> prepared data.
-    """
+    """  # noqa: D205
 
-    root_directory: Optional[str] = RemoteResource.get_env_tmpdir()  # noqa: RUF009
+    root_directory: Optional[str] = field(default_factory=RemoteResource.get_env_tmpdir)
     dest_directory: str = "data"
 
-    def get_checksums(self) -> List[str]:
+    def get_checksums(self) -> List[str]:  # noqa: D102
         return [resource.checksum for resource in self.get_remote_resources()]
 
-    def get_urls(self) -> List[str]:
+    def get_urls(self) -> List[str]:  # noqa: D102
         return [resource.url for resource in self.get_remote_resources()]
 
     @abstractmethod

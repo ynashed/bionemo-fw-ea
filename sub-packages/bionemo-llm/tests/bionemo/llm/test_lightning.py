@@ -16,9 +16,12 @@
 
 import pytest
 import torch
+from nemo import lightning as nl
 from torch import nn
 
+from bionemo.llm import lightning as bnptl
 from bionemo.llm.lightning import batch_collator, get_dtype_device
+from bionemo.testing import megatron_parallel_state_utils
 
 
 def test_batch_collate_tuple():
@@ -159,3 +162,18 @@ class NestedModule(nn.Module):
 
     def forward(self, x):
         return self.other(x)
+
+
+def test_mixin_strategy_contract_get_loss_reduction():
+    with megatron_parallel_state_utils.clean_parallel_state_context():
+        strategy = nl.MegatronStrategy(
+            tensor_model_parallel_size=1,
+            pipeline_model_parallel_size=1,
+            ddp="megatron",
+            find_unused_parameters=True,
+            enable_nemo_ckpt_io=False,
+        )
+        strategy.connect(bnptl.LightningPassthroughPredictionMixin())
+        mixin = bnptl.LightningPassthroughPredictionMixin()
+        strategy_reduction_function = strategy._get_loss_reduction("predict")
+        assert isinstance(strategy_reduction_function(mixin), bnptl.PassthroughLossReduction)

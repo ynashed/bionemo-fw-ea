@@ -47,7 +47,7 @@ __all__: Sequence[str] = (
 class ExampleConfig(ModelParallelConfig):
     """Timers from ModelParallelConfig are required (apparently).
     For megatron forward compatibility.
-    """
+    """  # noqa: D205
 
     calculate_per_token_loss: bool = False
 
@@ -102,12 +102,12 @@ class MSELossReduction(MegatronLossReduction):
 class LitAutoEncoder(pl.LightningModule):
     """A very basic lightning module example that is used for testing the megatron strategy and the megatron-nemo2-bionemo
     contract.
-    """
+    """  # noqa: D205
 
     def __init__(self, config):
         """Args:
         config: a Config object necessary to construct the actual nn.Module (the thing that has the parameters).
-        """
+        """  # noqa: D205
         super().__init__()
         self.config = config
         self.optim = MegatronOptimizerModule(
@@ -126,11 +126,11 @@ class LitAutoEncoder(pl.LightningModule):
 
         Returns:
             The output of the model.
-        """
+        """  # noqa: D205
         x = batch["data"]
         return self.module(x)
 
-    def training_step(self, batch, batch_idx: Optional[int] = None):
+    def training_step(self, batch, batch_idx: Optional[int] = None):  # noqa: D417
         """Background:
         - NeMo's Strategy overrides this method.
         - The strategies' training step will call the forward method of the model.
@@ -144,24 +144,24 @@ class LitAutoEncoder(pl.LightningModule):
         Args:
             batch: A dictionary of data.
             requires `batch_idx` as default None.
-        """
+        """  # noqa: D205
         return self(batch, batch_idx)
 
-    def training_loss_reduction(self) -> MegatronLossReduction:
+    def training_loss_reduction(self) -> MegatronLossReduction:  # noqa: D102
         # This is the function that takes batch['loss_mask'] and the logits output by the model and reduces the loss
         return MSELossReduction()
 
-    def validation_loss_reduction(self) -> MegatronLossReduction:
+    def validation_loss_reduction(self) -> MegatronLossReduction:  # noqa: D102
         return MSELossReduction()
 
-    def test_loss_reduction(self) -> MegatronLossReduction:
+    def test_loss_reduction(self) -> MegatronLossReduction:  # noqa: D102
         return MSELossReduction()
 
-    def configure_model(self) -> None:
+    def configure_model(self) -> None:  # noqa: D102
         self.module = self.config.configure_model()
 
 
-class ExampleModel(MegatronModule):
+class ExampleModel(MegatronModule):  # noqa: D101
     def __init__(self, config: ModelParallelConfig) -> None:
         """Constructor of the model.
 
@@ -214,7 +214,7 @@ class MnistItem(TypedDict):
     idx: int
 
 
-class MNISTCustom(MNIST):
+class MNISTCustom(MNIST):  # noqa: D101
     def __getitem__(self, index: int) -> MnistItem:
         """Wraps the getitem method of the MNIST dataset such that we return a Dict
         instead of a Tuple or tensor.
@@ -224,7 +224,7 @@ class MNISTCustom(MNIST):
 
         Returns:
             A dict containing the data ("x"), label ("y"), and index ("idx").
-        """
+        """  # noqa: D205
         x, y = super().__getitem__(index)
 
         return {
@@ -234,7 +234,7 @@ class MNISTCustom(MNIST):
         }
 
 
-class MNISTDataModule(pl.LightningDataModule):
+class MNISTDataModule(pl.LightningDataModule):  # noqa: D101
     def __init__(self, data_dir: str = "./", batch_size: int = 32) -> None:  # noqa: D107
         super().__init__()
         self.data_dir = data_dir
@@ -268,14 +268,14 @@ class MNISTDataModule(pl.LightningDataModule):
             mnist_full, [55000, 5000], generator=torch.Generator().manual_seed(42)
         )
 
-    def train_dataloader(self) -> DataLoader:
+    def train_dataloader(self) -> DataLoader:  # noqa: D102
         return DataLoader(self.mnist_train, batch_size=self.batch_size, num_workers=0)
 
-    def val_dataloader(self) -> DataLoader:
+    def val_dataloader(self) -> DataLoader:  # noqa: D102
         return DataLoader(self.mnist_val, batch_size=self.batch_size, num_workers=0)
 
-    def test_dataloader(self) -> DataLoader:
+    def test_dataloader(self) -> DataLoader:  # noqa: D102
         return DataLoader(self.mnist_test, batch_size=self.batch_size, num_workers=0)
 
-    def predict_dataloader(self) -> DataLoader:
+    def predict_dataloader(self) -> DataLoader:  # noqa: D102
         return DataLoader(self.mnist_predict, batch_size=self.batch_size, num_workers=0)
