@@ -41,6 +41,88 @@ def coord2dist(x, edge_index):
     return radial
 
 
+class MoleculeDiTeResidual(nn.Module):
+    def __init__(
+        self,
+        num_layers=8,
+        equivariant_node_feature_dim=3,
+        invariant_node_feat_dim=256,
+        invariant_edge_feat_dim=256,
+        atom_classes=16,
+        edge_classes=5,
+        num_heads=16,
+        n_vector_features=128,
+    ):
+        super(MoleculeDiTeResidual, self).__init__()
+        self.atom_embedder = MLP(atom_classes, invariant_node_feat_dim, invariant_node_feat_dim)
+        self.edge_embedder = MLP(edge_classes, invariant_edge_feat_dim, invariant_edge_feat_dim)
+        self.num_atom_classes = atom_classes
+        self.num_edge_classes = edge_classes
+        self.n_vector_features = n_vector_features
+        self.coord_emb = nn.Linear(1, n_vector_features, bias=False)
+        self.coord_pred = nn.Linear(n_vector_features, 1, bias=False)
+
+        #! TODO do we need coord prediction head which is mlp then 0 CoM?
+        self.atom_type_head = PredictionHead(atom_classes, invariant_node_feat_dim)
+        self.edge_type_head = PredictionHead(edge_classes, invariant_edge_feat_dim, edge_prediction=True)
+        self.time_embedding = TimestepEmbedder(invariant_node_feat_dim)
+        self.bond_refine = BondRefine(invariant_node_feat_dim, invariant_edge_feat_dim)
+        self.dit_layers = nn.ModuleList()
+        self.egnn_layers = nn.ModuleList()
+        self.attention_mix_layers = nn.ModuleList()
+        for i in range(num_layers):
+            self.dit_layers.append(DiTeBlock(invariant_node_feat_dim, num_heads, use_z=False))
+            self.egnn_layers.append(MultiXEGNNETV(invariant_node_feat_dim))
+        # self.h_feat_refine = DiTBlock(invariant_node_feat_dim, num_heads, use_z=False)
+        self.node_blocks = nn.ModuleList(
+            [nn.Linear(invariant_node_feat_dim, invariant_node_feat_dim) for i in range(num_layers)]
+        )
+        self.edge_blocks = nn.ModuleList(
+            [nn.Linear(invariant_edge_feat_dim, invariant_edge_feat_dim) for i in range(num_layers)]
+        )
+        # self.edge_feat_refine = DiTBlock(invariant_node_feat_dim, num_heads, use_z=False)
+
+    def forward(self, batch, X, H, E_idx, E, t):
+        torch.max(batch) + 1
+        pos = self.coord_emb(X.unsqueeze(-1))  # N x 3 x K
+
+        H = self.atom_embedder(H)
+        E = self.edge_embedder(E)  # should be + n_vector_features not + 1
+        te = self.time_embedding(t)
+        te_h = te[batch]
+        edge_batch, counts = torch.unique(batch, return_counts=True)
+        edge_batch = torch.repeat_interleave(edge_batch, counts * (counts - 1))  #
+        te_e = te[edge_batch]
+        edge_attr = E
+
+        atom_hids = H
+        edge_hids = edge_attr
+        for layer_index in range(len(self.dit_layers)):
+            distances = coord2dist(pos, E_idx).squeeze(1)  # E x K
+            H, edge_attr = self.dit_layers[layer_index](batch, H, te_h, edge_attr, E_idx, te_e, distances, edge_batch)
+            pos = self.egnn_layers[layer_index](batch, pos, H, E_idx, edge_attr, te_e)  #! TODO at time here
+            atom_hids = atom_hids + self.node_blocks[layer_index](H)
+            edge_hids = edge_hids + self.edge_blocks[layer_index](edge_attr)
+
+        X = self.coord_pred(pos).squeeze(-1)
+        x = X - scatter_mean(X, index=batch, dim=0)[batch]
+        # import ipdb; ipdb.set_trace() #! if instability persists is the refine block the problem likely no as it massive help to valid??
+        # H = self.h_feat_refine(batch, atom_hids, te_h)
+        # edge_attr = self.edge_feat_refine(edge_batch, edge_attr, te_e) #! cannot do attn with edges due to memory
+        H = atom_hids
+        edge_attr = self.bond_refine(batch, X, H, E_idx, edge_hids)
+
+        h_logits, _ = self.atom_type_head(batch, H)
+        e_logits, _ = self.edge_type_head.predict_edges(batch, edge_attr, E_idx)
+        out = {
+            "x_hat": x,
+            "h_logits": h_logits,
+            "edge_attr_logits": e_logits,
+            # "Z_hat": z_logits,
+        }
+        return out
+
+
 class MoleculeDiTeMPNN(nn.Module):
     def __init__(
         self,

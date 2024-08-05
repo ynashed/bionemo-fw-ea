@@ -15,7 +15,7 @@ from torch_geometric.utils import to_dense_adj
 from torch_scatter import scatter_add
 
 from bionemo.model.molecule.moco.arch.model import MoleculeDiTe as MoleculeDiT
-from bionemo.model.molecule.moco.arch.model import MoleculeDiTe2, MoleculeDiTe3, MoleculeDiTeMPNN
+from bionemo.model.molecule.moco.arch.model import MoleculeDiTe2, MoleculeDiTe3, MoleculeDiTeMPNN, MoleculeDiTeResidual
 
 # from bionemo.model.molecule.moco.arch.model import MoleculeDiT
 from bionemo.model.molecule.moco.arch.scratch.moco import MoCo
@@ -38,6 +38,7 @@ class ModelBuilder:
             "dit2": DiT2Wrapper,
             "dit3": DiT3Wrapper,
             "ditmpnn": DiTMPNNWrapper,
+            "ditres": DiTResidualWrapper,
         }
 
     def create_model(self, model_name: str, args_dict: dict, wrapper_args: dict):
@@ -96,6 +97,46 @@ class MOCOWrapper(MoCo):
         Returns:
             dict: The output of the MoCo model.
         """
+        out = super().forward(
+            batch=batch["batch"],
+            X=batch["x_t"],
+            H=batch["h_t"],
+            E=batch["edge_attr_t"],
+            E_idx=batch["edge_index"],
+            t=time,
+        )
+        return out
+
+
+class DiTResidualWrapper(MoleculeDiTeResidual):
+    """A wrapper class for the MoCo model."""
+
+    def __init__(self, args_dict, time_type="continuous", timesteps=None):
+        """
+        Initializes the DiTWrapper.
+
+        Args:
+            args_dict (dict): A dictionary of arguments for initializing the MoCo model.
+        """
+        self.args = args_dict
+        self.time_type = time_type
+        self.timesteps = timesteps
+        super().__init__(**args_dict)
+
+    def forward(self, batch, time, conditional_batch=None, timesteps=None):
+        """
+        Forward pass of the MoCo model.
+
+        Args:
+            batch (torch_geometric.data.Batch): The input batch.
+            time (Tensor): The time tensor.
+
+        Returns:
+            dict: The output of the MoCo model.
+        """
+        timesteps = timesteps if timesteps is not None else self.timesteps
+        if self.time_type == "discrete" and timesteps is not None:
+            time = (timesteps - time.float()) / timesteps
         out = super().forward(
             batch=batch["batch"],
             X=batch["x_t"],
