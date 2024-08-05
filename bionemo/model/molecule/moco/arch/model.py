@@ -167,7 +167,7 @@ class MoleculeDiTe3(nn.Module):
 
         X = self.coord_pred(pos).squeeze(-1)
         x = X - scatter_mean(X, index=batch, dim=0)[batch]
-        # import ipdb; ipdb.set_trace()
+        # import ipdb; ipdb.set_trace() #! if instability persists is the refine block the problem likely no as it massive help to valid??
         H = self.h_feat_refine(batch, H, te_h)
         # edge_attr = self.edge_feat_refine(edge_batch, edge_attr, te_e) #! cannot do attn with edges due to memory
 
