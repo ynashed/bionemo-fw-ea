@@ -194,8 +194,8 @@ RUN --mount=type=secret,id=GITLAB_TOKEN GITLAB_TOKEN=$(cat /run/secrets/GITLAB_T
 RUN /tmp/install_lmdb.sh
 # requirements-cve.txt *must* be installed last to patch security vulns in pip packages
 RUN pip install -r /tmp/requirements-cve.txt
-#install scgym reqs
-RUN pip install -r /tmp/requirements-scgym.txt
+# #install scgym reqs
+# RUN pip install -r /tmp/requirements-scgym.txt
 
 
 # AWS CLI is inside requirements.txt. Add config file.
