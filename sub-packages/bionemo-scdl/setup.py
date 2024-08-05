@@ -16,22 +16,22 @@
 
 from setuptools import find_packages, setup
 
+from bionemo.scdl.VERSION import __version__
+
 
 setup(
     name="scdl",
-    version="0.0.1",
     packages=find_packages(),
     author="NVIDIA Corporation",
     author_email="edawson@nvidia.com",
     description="A library for fast dataloading of single cell data.",
     long_description="scdl is a library for reading and writing performant datasets from single cell foundation models.",
     url="",
+    version=__version__,
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
     ],
-    python_requires=">=3.10",
-    install_requires=[],
 )

@@ -4,7 +4,6 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bionemo-scdl"
-version = "0.0.1"
 license.file = "LICENSE"
 readme = "README.md"
 description = "SCDL, a Dataset class for Single Cell data."
@@ -14,11 +13,10 @@ authors = [
     { name = "Polina Binder", email = "pbinder@nvidia.com" },
     { name = "Eric Dawson", email = "edawson@nvidia.com" },
 ]
-dynamic = ["dependencies"]
+dynamic = ["dependencies", "version"]
 
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]}
-
 
 [tool.setuptools.packages.find]
 where = ["src"]
