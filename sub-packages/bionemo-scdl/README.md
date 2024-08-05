@@ -34,7 +34,7 @@ Download "https://datasets.cellxgene.cziscience.com/97e96fb1-8caf-4f08-9174-2730
 ### Loading a single cell dataset from an H5AD file
 
 ```python
-bionemo.scdl.io.single_cell_memmap_dataset import SingleCellMemMapDataset
+from bionemo.scdl.io.single_cell_memmap_dataset import SingleCellMemMapDataset
 
 data = SingleCellMemMapDataset("97e_scmm", "hdf5s/97e96fb1-8caf-4f08-9174-27308eabd4ea.h5ad")
 

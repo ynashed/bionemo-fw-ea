@@ -12,7 +12,7 @@ authors = [
     { name = "John St. John", email = "jstjohn@nvidia.com" },
     { name = "Malcolm Greaves", email = "mgreaves@nvidia.com" },
     { name = "Polina Binder", email = "pbinder@nvidia.com" },
-    { name = "Eric Dawson", email = "edawson@nvidia" }
+    { name = "Eric Dawson", email = "edawson@nvidia.com" },
 ]
 dynamic = ["dependencies"]
 
