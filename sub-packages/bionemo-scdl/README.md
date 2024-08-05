@@ -22,6 +22,10 @@ SCDL is available as an independent `pip` package from the local source tree:
 pip install -e .
 ```
 
+Alternatively, it can be installed with
+```bash
+pip install bionemo[scdl]
+```
 ## Usage
 
 ### Getting example data
