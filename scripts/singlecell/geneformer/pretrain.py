@@ -72,6 +72,7 @@ def main(
     wandb_entity: str = "clara-discovery",
     create_tensorboard_logger: bool = False,
     nemo1_init_path: Optional[Path] = None,
+    restore_from_checkpoint_path: Optional[str] = None,
     save_best_checkpoint: bool = True,
     save_last_checkpoint: bool = True,
     metric_to_monitor_for_checkpoints: str = "val_loss",
@@ -102,8 +103,8 @@ def main(
         resume_if_exists (bool): attempt to resume if the checkpoint exists [FIXME @skothenhill this doesn't work yet]
         wandb_entity (str): the group to use for the wandb run, sometimes called a team, could also be your username
         create_tensorboard_logger (bool): create the tensorboard logger
-
-
+        restore_from_checkpoint_path (path): If set, restores the model from the directory passed in. Expects the
+            checkpoint to be created by using the ModelCheckpoint class and enable_nemo_ckpt_io=True.
     """
     # Create the result directory if it does not exist.
     result_dir.mkdir(parents=True, exist_ok=True)
@@ -120,7 +121,7 @@ def main(
         pipeline_model_parallel_size=pipeline_model_parallel_size,
         ddp="megatron",
         find_unused_parameters=True,
-        enable_nemo_ckpt_io=False,
+        ckpt_include_optimizer=True,
     )
 
     wandb_options: Optional[WandbLoggerOptions] = (
@@ -149,7 +150,6 @@ def main(
         plugins=nl.MegatronMixedPrecision(precision=precision, amp_O2=False),
     )
 
-    # Preprocess the data to get the tokenizer and median dictionary
     preprocessor = GeneformerPreprocess(
         download_directory=train_data_path,
         medians_file_path=train_data_path / "medians.json",
@@ -252,13 +252,16 @@ def main(
         wandb_kwargs=wandb_options,
         ckpt_callback=checkpoint_callback,
     )
-
     llm.train(
         model=model,
         data=data,
         trainer=trainer,
         log=nemo_logger,
-        resume=resume.AutoResume(resume_if_exists=resume_if_exists, resume_ignore_no_checkpoint=True),
+        resume=resume.AutoResume(
+            path=restore_from_checkpoint_path,  # Overrides the path found by resume_if_exists when set.
+            resume_if_exists=resume_if_exists,  # Looks for the -last checkpoint to continue training.
+            resume_ignore_no_checkpoint=True,  # When false this will throw an error with no existing checkpoint.
+        ),
     )
 
 
@@ -418,6 +421,13 @@ if __name__ == "__main__":
         default=2,
         help="Save the top k checkpoints.",
     )
+    parser.add_argument(
+        "--restore-from-checkpoint-path",
+        type=Path,
+        required=False,
+        default=None,
+        help="Path to the checkpoint directory to restore from. Will override `--resume-if-exists` when set.",
+    )
 
     # Parse the arguments and pull them out into local variables for ease of future refactor to a
     #   config management system.
@@ -443,6 +453,7 @@ if __name__ == "__main__":
         experiment_name=args.experiment_name,
         resume_if_exists=args.resume_if_exists,
         nemo1_init_path=args.nemo1_init_path,
+        restore_from_checkpoint_path=args.restore_from_checkpoint_path,
         save_best_checkpoint=args.save_best_checkpoint,
         save_last_checkpoint=args.save_last_checkpoint,
         metric_to_monitor_for_checkpoints=args.metric_to_monitor_for_checkpoints,
