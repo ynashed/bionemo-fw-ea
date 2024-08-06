@@ -25,7 +25,7 @@ from bionemo.scdl.api.single_cell_row_dataset import SingleCellRowDatasetCore
 from bionemo.scdl.index.row_feature_index import RowFeatureIndex
 from bionemo.scdl.io.single_cell_memmap_dataset import Mode, SingleCellMemMapDataset
 from bionemo.scdl.util.async_worker_queue import AsyncWorkQueue
-from bionemo.scdl.VERSION import __version__
+from bionemo.scdl.util.pytoml_utils import get_version_from_pyproject
 
 
 __all__: Sequence[str] = (
@@ -91,7 +91,7 @@ class SingleCellCollection(SingleCellRowDatasetCore):
             data_path: Where the class will be stored.
         """
         self.data_path: str = data_path
-        self._version: str = __version__
+        self._version: str = get_version_from_pyproject()
         self.metadata: Dict[str, int] = {}
         self._feature_index: RowFeatureIndex = RowFeatureIndex()
         self.fname_to_mmap: Dict[str, SingleCellMemMapDataset] = {}

@@ -21,7 +21,7 @@ from typing import List, Optional, Sequence, Tuple
 import numpy as np
 import pandas as pd
 
-from bionemo.scdl.VERSION import __version__
+from bionemo.scdl.util.pytoml_utils import get_version_from_pyproject
 
 
 __all__: Sequence[str] = ("RowFeatureIndex",)
@@ -47,7 +47,7 @@ class RowFeatureIndex:
         """Instantiates the index."""
         self._cumulative_sum_index: np.array = np.array([-1])
         self._feature_arr: List[pd.DataFrame] = []
-        self._version = __version__
+        self._version = get_version_from_pyproject()
         self._labels: List[str] = []
 
     def version(self) -> str:

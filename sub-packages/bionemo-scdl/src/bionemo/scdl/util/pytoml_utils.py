@@ -13,6 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import tomli
 
-# The version of the package
-__version__ = "0.0.1"
+
+def get_version_from_pyproject():
+    """Get the code version from pyproject.toml file"""
+    with open("pyproject.toml", "rb") as f:
+        pyproject_data = tomli.load(f)
+    return pyproject_data["project"]["version"]
