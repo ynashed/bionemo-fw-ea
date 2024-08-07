@@ -58,9 +58,9 @@ This page contains the Python coding standards for the BioNeMo repository. They 
 ## Pull Request (PR) Guidelines
 ### Signing Your Work
 
-* We require that all contributors "sign-off" on their commits. This certifies that the contribution is your original work, or you have rights to submit it under the same license, or a compatible license.
+* We require that all contributors "sign-off" on their commits (not gpg signing, just adding the `-s | --signoff` argument, or follow the instructions below for auto-signing). This certifies that the contribution is your original work, or you have rights to submit it under the same license, or a compatible license.
 
-  * Any contribution which contains commits that are not Signed-Off will not be accepted.
+* Any contribution which contains commits that are not Signed-Off will not be accepted.
 
 * To sign off on a commit you simply use the `--signoff` (or `-s`) option when committing your changes:
   ```bash
@@ -69,6 +69,21 @@ This page contains the Python coding standards for the BioNeMo repository. They 
   This will append the following to your commit message:
   ```
   Signed-off-by: Your Name <your@email.com>
+  ```
+
+  If you would like this to happen automatically to all of your commits, you can modify
+  your local `~/.git-config-template.txt` file. You can do this with a command like the
+  following:
+  
+  ```
+  echo "Signed-off-by: Your Name <your@email.com>" > ~/.git-commit-template.txt
+  git config --local commit.template ~/.git-commit-template.txt
+  ```
+
+  If you have a commit that you want to retroactively sign, you can do that with:
+
+  ```
+  git commit --amend --no-edit --signoff
   ```
 
 * Full text of the DCO:
