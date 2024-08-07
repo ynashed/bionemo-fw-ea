@@ -16,6 +16,7 @@
 		"source=${localEnv:HOME}/.gitconfig,target=/home/bionemo/.gitconfig,type=bind,consistency=cached",
 		"source=${localEnv:HOME}/.ssh,target=/home/bionemo/.ssh,type=bind,consistency=cached"
 	],
+    "initializeCommand": "./.devcontainer/initializeCommand.sh",
 	"postCreateCommand": "./.devcontainer/postCreateCommand.sh",
 	"remoteUser": "bionemo",
 	"customizations": {
