@@ -40,7 +40,7 @@ class GeneformerResourcePreprocessor(ResourcePreprocessor):
 
     dest_directory: str = "geneformer"
 
-    def get_remote_resources(self) -> List[RemoteResource]:
+    def get_remote_resources(self) -> List[RemoteResource]:  # noqa: D102
         url_fn = {
             "https://huggingface.co/ctheodoris/Geneformer/resolve/main/geneformer/gene_name_id_dict.pkl?download=true": "gene_name_id_dict.pkl",
             "https://huggingface.co/ctheodoris/Geneformer/resolve/main/geneformer/gene_median_dictionary.pkl?download=true": "gene_median_dictionary.pkl",
@@ -67,11 +67,11 @@ class GeneformerResourcePreprocessor(ResourcePreprocessor):
         """
         return resource.download_resource()
 
-    def prepare(self):
+    def prepare(self):  # noqa: D102
         return [self.prepare_resource(resource) for resource in self.get_remote_resources()]
 
 
-class GeneformerPreprocess:
+class GeneformerPreprocess:  # noqa: D101
     def __init__(self, download_directory: Path, medians_file_path: Path, tokenizer_vocab_path: Path):
         """Downloads HGNC symbols
 
@@ -90,7 +90,7 @@ class GeneformerPreprocess:
     def build_and_save_tokenizer(self, median_dict, gene_to_ens, vocab_output_name):
         """Builds the GeneTokenizer using the median dictionary
         then serializes and saves the dictionary to disk.
-        """
+        """  # noqa: D205
         tokenizer = GeneTokenizer.from_medians_and_genes_dicts(median_dict, gene_to_ens)
         tokenizer.save_vocab(vocab_output_name)
         return tokenizer

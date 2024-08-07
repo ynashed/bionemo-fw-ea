@@ -37,7 +37,7 @@ def random_numpy_context(seed: int = 42) -> Iterator[None]:
             np.random.randint(5) # this will change the state
         >>> new_state = np.random.get_state()
         >>> assert ori_state == new_state
-    """
+    """  # noqa: D205
     state = np.random.get_state()  # just fail if this fails
     try:
         np.random.seed(seed)

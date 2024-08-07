@@ -40,7 +40,7 @@ __all__: Sequence[str] = (
 )
 
 
-class BioBertLightningModule(
+class BioBertLightningModule(  # noqa: D101
     pl.LightningModule, nlio.IOMixin, nlio.ConnectorMixin, LightningPassthroughPredictionMixin
 ):
     def __init__(
@@ -57,7 +57,7 @@ class BioBertLightningModule(
         pass in a different config object that returns a different model. Do not modify this function unless you need to change higher level logic. You may
         need to modify the various step and forward functions towards the bottom of this file to handle new/different keys in the batch. In the future some of
         those functions may need to be refactored out into the config object or a different place so that they live closer to the model definition.
-        """
+        """  # noqa: D205
         super().__init__()
         self.config = config
         self.tokenizer = tokenizer
@@ -68,7 +68,7 @@ class BioBertLightningModule(
         self.optim = optimizer
         self.optim.connect(self)  # This will bind the `configure_optimizers` method
 
-    def configure_model(self) -> None:
+    def configure_model(self) -> None:  # noqa: D102
         self.module = self.config.configure_model(self.tokenizer)
 
     # This is now replaced by the init hook on self.optimizer
@@ -84,37 +84,37 @@ class BioBertLightningModule(
         output_tensor = self.module(*args, **kwargs)  # for now just pass through to the underlying model
         return output_tensor
 
-    def data_step(self, dataloader_iter) -> Dict[str, torch.Tensor]:
+    def data_step(self, dataloader_iter) -> Dict[str, torch.Tensor]:  # noqa: D102
         return biobert_data_step(dataloader_iter)
 
-    def forward_step(self, batch) -> torch.Tensor:
+    def forward_step(self, batch) -> torch.Tensor:  # noqa: D102
         return bert_forward_step(self, batch)
 
-    def training_step(self, batch, batch_idx=None) -> torch.Tensor:
+    def training_step(self, batch, batch_idx=None) -> torch.Tensor:  # noqa: D102
         # In mcore the loss-function is part of the forward-pass (when labels are provided)
         return self.forward_step(batch)
 
-    def validation_step(self, batch, batch_idx=None) -> torch.Tensor:
+    def validation_step(self, batch, batch_idx=None) -> torch.Tensor:  # noqa: D102
         # In mcore the loss-function is part of the forward-pass (when labels are provided)
         return self.forward_step(batch)
 
-    def predict_step(self, batch, batch_idx=None) -> torch.Tensor:
+    def predict_step(self, batch, batch_idx=None) -> torch.Tensor:  # noqa: D102
         return self.forward_step(batch)
 
-    def training_loss_reduction(self) -> MegatronLossReduction:
+    def training_loss_reduction(self) -> MegatronLossReduction:  # noqa: D102
         # This is the function that takes batch['loss_mask'] and the logits output by the model and reduces the loss
         #  This function will
         return self.loss_reduction_class()
 
     # The predict step comes from the LightningPassthroughPredictionMixin
 
-    def validation_loss_reduction(self) -> MegatronLossReduction:
+    def validation_loss_reduction(self) -> MegatronLossReduction:  # noqa: D102
         return self.loss_reduction_class(validation_step=True)
 
-    def test_loss_reduction(self) -> MegatronLossReduction:
+    def test_loss_reduction(self) -> MegatronLossReduction:  # noqa: D102
         return self.loss_reduction_class(validation_step=True)
 
-    def copy(self) -> "BioBertLightningModule":
+    def copy(self) -> "BioBertLightningModule":  # noqa: D102
         return self.__class__(self.config, self.tokenizer)
 
 
@@ -133,7 +133,7 @@ def biobert_data_step(dataloader_iter) -> Dict[str, torch.Tensor]:
     Returns:
         output: A dictionary of this batch limiting to relevant keys.
 
-    """
+    """  # noqa: D205
     # Based on: https://github.com/NVIDIA/Megatron-LM/blob/main/pretrain_gpt.py#L87
     # https://github.com/NVIDIA/NeMo/blob/main/nemo/collections/nlp/models/language_modeling/megatron_gpt_model.py#L828-L842
 
@@ -164,7 +164,7 @@ def biobert_data_step(dataloader_iter) -> Dict[str, torch.Tensor]:
 def bert_forward_step(model: pl.LightningModule, batch: Dict[str, torch.Tensor]) -> DataT:
     """This subsets the batch keys to the ones actually used by forward pass of the model, and then calls the model's forward pass.
     if "cu_seqsens" are defined in the batch, then the packed sequence parameters are also passed to the model for forward pass efficiency.
-    """
+    """  # noqa: D205
     forward_args = {
         "input_ids": batch["text"],
         "attention_mask": batch["attention_mask"],

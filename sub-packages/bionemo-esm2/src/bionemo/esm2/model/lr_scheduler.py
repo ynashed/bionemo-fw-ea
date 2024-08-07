@@ -30,14 +30,14 @@ __all__: Sequence[str] = (
 )
 
 
-class SchedulerOutput(TypedDict):
+class SchedulerOutput(TypedDict):  # noqa: D101
     optimizer: MegatronOptimizerModule
     lr_scheduler: dict
     monitor: str
 
 
-class WarmupAnnealDecayHold(_LRScheduler):
-    def __init__(
+class WarmupAnnealDecayHold(_LRScheduler):  # noqa: D101
+    def __init__(  # noqa: D417
         self,
         optimizer: MegatronOptimizerModule,
         *,
@@ -67,7 +67,7 @@ class WarmupAnnealDecayHold(_LRScheduler):
 
         super(WarmupAnnealDecayHold, self).__init__(optimizer, last_epoch)
 
-    def get_lr(self) -> List[float]:
+    def get_lr(self) -> List[float]:  # noqa: D102
         step_num = self.last_epoch
         if step_num < self.warmup_steps:
             lr = self.min_lr + (self.max_lr - self.min_lr) * step_num / self.warmup_steps
@@ -103,7 +103,7 @@ class WarmupAnnealDecayHoldScheduler(LRSchedulerModule):
         self.frequency = frequency
         self.monitor = monitor
 
-    def scheduler(self, model: MegatronBioBertModel, optimizer: MegatronOptimizerModule) -> SchedulerOutput:
+    def scheduler(self, model: MegatronBioBertModel, optimizer: MegatronOptimizerModule) -> SchedulerOutput:  # noqa: D102
         lr_scheduler = WarmupAnnealDecayHold(
             optimizer,
             warmup_steps=self.warmup_steps,
