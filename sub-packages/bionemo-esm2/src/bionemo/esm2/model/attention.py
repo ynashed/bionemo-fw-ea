@@ -91,7 +91,8 @@ class ESM2DotProductAttention(DotProductAttention):
             value: The value tensor of shape [sk, b, ng, hn].
             attention_mask: The attention mask tensor of shape [b, np, sq, sk].
             attn_mask_type: The attention mask type, currently unused. Defaults to None.
-            packed_seq_params: The packed sequence parameters. Defaults to None.
+            packed_seq_params: The packed sequence parameters. These are used for context parallelism so will be needed
+                to be implemented if we want to support this. Defaults to None.
 
         Returns:
             Tensor: The context tensor of shape [sq, b, hp].

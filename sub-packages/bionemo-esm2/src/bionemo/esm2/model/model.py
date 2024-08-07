@@ -201,7 +201,7 @@ class ESM2Model(MegatronBioBertModel):
         )
 
 
-def esm_gelu_func(x: Tensor) -> Tensor:  # D205 # D205
+def esm_gelu_func(x: Tensor) -> Tensor:
     """ESM2-specific gelu implementation from the original ESM repo.
 
     !!! warning
