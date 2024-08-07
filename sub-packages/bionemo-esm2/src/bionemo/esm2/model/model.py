@@ -15,6 +15,7 @@
 
 
 import math
+import tarfile
 import os
 import tarfile
 from dataclasses import dataclass
