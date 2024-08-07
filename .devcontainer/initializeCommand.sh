@@ -1,2 +1,3 @@
+#!/bin/bash
 mkdir -p ~/.ssh ~/.gnupg
-touch ~/.gitconfig
+touch -a ~/.gitconfig
