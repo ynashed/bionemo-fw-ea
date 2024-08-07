@@ -83,7 +83,7 @@ class ESM2DotProductAttention(DotProductAttention):
         attn_mask_type: Optional[AttnMaskType] = None,
         packed_seq_params: Optional[PackedSeqParams] = None,
     ):
-        """Forward pass of the DotProductAttention module.
+        """Forward pass of the ESM2DotProductAttention module.
 
         Args:
             query: The query tensor of shape [sq, b, np, hn].

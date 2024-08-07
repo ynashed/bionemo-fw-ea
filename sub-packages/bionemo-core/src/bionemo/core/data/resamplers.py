@@ -22,7 +22,7 @@ from torch.utils.data import Dataset
 
 
 class PRNGDatasetShuffler(Dataset):
-    """A dataset shuffler that uses a pseudo-random number generator (PRNG) to shuffle the dataset.
+    """A thread-safe dataset shuffler that uses a pseudo-random number generator (PRNG) to shuffle the dataset.
 
     PRNGDatasetShuffler shuffles a given dataset using a pseudo-random number generator (PRNG). This allows for
     reproducible shuffling by controlling the random seed, while not ever storing the list of indices in memory. It

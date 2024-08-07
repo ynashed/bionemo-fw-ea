@@ -47,7 +47,7 @@ __all__: Sequence[str] = (
 class ExampleConfig(ModelParallelConfig):
     """ExampleConfig is a dataclass that is used to configure the model.
 
-    Timers from ModelParallelConfig are required (apparently) for megatron forward compatibility.
+    Timers from ModelParallelConfig are required for megatron forward compatibility.
     """
 
     calculate_per_token_loss: bool = False
