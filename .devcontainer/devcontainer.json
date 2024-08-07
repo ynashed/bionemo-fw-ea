@@ -10,9 +10,13 @@
 		"target": "dev"
 	},
 	"mounts": [
-		// Mount the local ~/.aws config to pass along AWS credentials for PBSS.
-		"source=${localEnv:HOME}/.aws,target=/home/bionemo/.aws,type=bind,consistency=cached"
+		// Mount the local ~/.aws config to pass along AWS credentials for PBSS, .gnupg for signing commits, .gitconfig for git.
+		"source=${localEnv:HOME}/.aws,target=/home/bionemo/.aws,type=bind,consistency=cached",
+		"source=${localEnv:HOME}/.gnupg,target=/home/bionemo/.gnupg,type=bind,consistency=cached",
+		"source=${localEnv:HOME}/.gitconfig,target=/home/bionemo/.gitconfig,type=bind,consistency=cached",
+		"source=${localEnv:HOME}/.ssh,target=/home/bionemo/.ssh,type=bind,consistency=cached"
 	],
+	"initializeCommand": "./.devcontainer/initializeCommand.sh",
 	"postCreateCommand": "./.devcontainer/postCreateCommand.sh",
 	"remoteUser": "bionemo",
 	"customizations": {
