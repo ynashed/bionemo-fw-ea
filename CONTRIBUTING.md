@@ -74,7 +74,7 @@ This page contains the Python coding standards for the BioNeMo repository. They 
   If you would like this to happen automatically to all of your commits, you can modify
   your local `~/.git-config-template.txt` file. You can do this with a command like the
   following:
-  
+
   ```
   echo "Signed-off-by: Your Name <your@email.com>" > ~/.git-commit-template.txt
   git config --local commit.template ~/.git-commit-template.txt
