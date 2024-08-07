@@ -17,7 +17,7 @@ import tomli
 
 
 def get_version_from_pyproject():
-    """Get the code version from pyproject.toml file"""
+    """Get the code version from pyproject.toml file."""
     with open("pyproject.toml", "rb") as f:
         pyproject_data = tomli.load(f)
     return pyproject_data["project"]["version"]
