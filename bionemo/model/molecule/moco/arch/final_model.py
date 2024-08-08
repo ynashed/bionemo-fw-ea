@@ -294,7 +294,7 @@ class XEGNNK(MessagePassing):
         return X_out
 
 
-class BondRefine(MessagePassing):
+class BondRefine(MessagePassing):  #! can make this nn.Module to ensure no weird propagate error
     def __init__(
         self,
         invariant_node_feat_dim=64,

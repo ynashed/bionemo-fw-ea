@@ -23,7 +23,7 @@ CONFIG_NAME="train_dit_slurm_mega_bigfeat"
 # Logging
 # =========================
 EXP_GROUP="danny-ord-testing"
-EXP_NAME="ord_megalodon"
+EXP_NAME="ord_megalodon_bigfeat"
 WANDB_ENTITY="clara-discovery"
 WANDB_GROUP=${EXP_GROUP}
 WANDB_PROJECT="MoCo"
