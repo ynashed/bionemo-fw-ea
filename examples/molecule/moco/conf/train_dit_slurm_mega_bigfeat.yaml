@@ -101,7 +101,7 @@ dynamics:
     invariant_node_feat_dim: 256
     equivariant_node_feature_dim: 3
     num_layers: 10
-    num_heads: 4
+    num_heads: 16
   wrapper_args:
     timesteps: *timesteps
     time_type: *time_type
@@ -110,27 +110,27 @@ self_conditioning:
   name: "base"
   variables:
     - variable_name: h
-      hidden_dims: 64
+      hidden_dims: 256
       fuse_softmax: True
       vector: False
       clamp_min: null
       clamp_max: null
     - variable_name: charges
-      hidden_dims: 64
+      hidden_dims: 256
       fuse_softmax: True
       vector: False
       clamp_min: null
       clamp_max: null
 
     - variable_name: edge_attr
-      hidden_dims: 64
+      hidden_dims: 256
       fuse_softmax: True
       vector: False
       clamp_min: null
       clamp_max: null
 
     - variable_name: x
-      hidden_dims: 32
+      hidden_dims: 128
       fuse_softmax: False
       vector: True
       clamp_min: -100
