@@ -13,12 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import math
-from typing import Sequence
+from typing import Sequence, Tuple
 
 import torch
 import transformer_engine as te
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.utils import divide
+from torch import Tensor
 
 
 __all__: Sequence[str] = ("TELayerNorm", "ESM2QueryScaling")
@@ -58,3 +59,30 @@ class ESM2QueryScaling(torch.nn.Module):  # noqa: D101
 
     def forward(self, query, *args, **kwargs):  # noqa: D102
         return query / math.sqrt(self.hidden_size_per_attention_head)
+
+
+class TorchLayerNorm(torch.nn.LayerNorm):
+    """A wrapper around PyTorch LayerNorm
+
+    This layer should replace FusedLayerNorm in TransformerLayerSubmodules to ensure equivalency
+    of ESM2 logits with HF implementation
+    """
+
+    def __init__(self, config: TransformerConfig, hidden_size: int, eps: float, *args, **kwargs) -> None:
+        super().__init__(normalized_shape=hidden_size, eps=eps, elementwise_affine=True)
+
+
+class TorchLinear(torch.nn.Linear):
+    """A wrapper around PyTorch Linear
+
+    This layer should replace RowParallelLinear in TransformerLayerSubmodules to ensure equivalency
+    of ESM2 logits with HF implementation
+    """
+
+    def __init__(self, input_size, output_size, config, init_method, bias, *args, **kwargs):
+        super().__init__(in_features=input_size, out_features=output_size, bias=bias)
+
+    def forward(self, input: Tensor) -> Tuple[Tensor, Tensor]:
+        output = super().forward(input)
+        output_bias = torch.zeros(size=(self.out_features,)).to(output.device)
+        return output, output_bias

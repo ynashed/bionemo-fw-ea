@@ -44,23 +44,6 @@ __all__: Sequence[str] = (
 )
 
 
-class ESM2QuaryScaling(torch.nn.Module):
-    """
-    A custom layer that scales quary values
-
-    This layer should replace the q_layernorm=IdentityOp in ESM2 ModuleSpec to reproduce ESM2
-    which apply 1/sqrt(hidden_size_per_attention_head) scaling prior to apply_rotary_pos_emb()
-    """
-
-    def __init__(self, config, *args, **kwargs):
-        super().__init__()
-        projection_size = config.kv_channels * config.num_attention_heads
-        self.hidden_size_per_attention_head = divide(projection_size, config.num_attention_heads)
-
-    def forward(self, query, *args, **kwargs):
-        return query / math.sqrt(self.hidden_size_per_attention_head)
-
-
 class BiobertSpecOption(str, Enum):
     """Options for the BiobertSpec. The spec defines the architecture of the transformer (BERT) block in the biobert model.
     This is a `str, Enum` type so that argparse can use the string names as choices.
