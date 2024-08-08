@@ -117,7 +117,7 @@ RUN rm -rf /build
 WORKDIR /workspace/bionemo2/
 COPY ./sub-packages /workspace/bionemo2/sub-packages
 # Dynamically install the code for each bionemo namespace package.
-RUN for sub in $(ls sub-packages/); do pushd sub-packages/${sub} && pip install --no-build-isolation --no-cache-dir --disable-pip-version-check --no-deps -e . && popd; done
+RUN for sub in sub-packages/bionemo-*; do pushd ${sub} && pip install --no-build-isolation --no-cache-dir --disable-pip-version-check --no-deps -e . && popd; done
 
 WORKDIR /workspace/bionemo2/
 COPY ./scripts ./scripts
