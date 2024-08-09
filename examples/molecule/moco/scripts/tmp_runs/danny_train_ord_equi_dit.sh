@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --account=healthcareeng_bionemo                  # account (user must belong to account)
-#SBATCH --nodes=2                    # number of nodes
+#SBATCH --nodes=1                    # number of nodes
 #SBATCH --partition=grizzly,polar2,polar3,polar4                  # partition (should be compatible with account)
 #SBATCH --ntasks-per-node=8          # n tasks per machine (one task per gpu) <required>
 #SBATCH --gpus-per-node=8
@@ -90,5 +90,5 @@ srun \
     ema_resume=${EMA_PATH} \
     outdir=${RESULTS_MOUNT} \
     train.gpus=8 \
-    train.num_nodes=2"
+    train.num_nodes=1"
 set +x
