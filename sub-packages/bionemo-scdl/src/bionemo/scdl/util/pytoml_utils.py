@@ -13,11 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from pathlib import Path
+
 import tomli
 
 
 def get_version_from_pyproject():
     """Get the code version from pyproject.toml file."""
-    with open("pyproject.toml", "rb") as f:
+    relative_path = Path(__file__).parents[4] / "pyproject.toml"
+    with open(relative_path, "rb") as f:
         pyproject_data = tomli.load(f)
     return pyproject_data["project"]["version"]
