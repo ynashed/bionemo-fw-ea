@@ -89,6 +89,6 @@ srun \
     resume=${RESUME_PATH} \
     ema_resume=${EMA_PATH} \
     outdir=${RESULTS_MOUNT} \
-    train.gpus=8,
+    train.gpus=8 \
     train.num_nodes=2"
 set +x
