@@ -30,6 +30,111 @@ from bionemo.model.molecule.moco.models.self_conditioning import SelfConditionin
 from bionemo.model.molecule.moco.models.utils import InterpolantLossFunction
 
 
+def compute_angles(pos, bond_matrix, edge_index):
+    """
+    Compute the angles between connected nodes in a graph based on their positions and the bond matrix.
+
+    Args:
+        positions (Tensor): Node positions [N, 3].
+        bond_matrix (Tensor): Adjacency matrix [N, N].
+        edge_index (Tensor): Edge index [2, E].
+
+    Returns:
+        Tensor: Vector of angles for existing bonds [E].
+    """
+    num_edges = edge_index.size(1)
+    angle_list = []
+
+    for edge_idx in range(num_edges):
+        src, dst = edge_index[:, edge_idx]
+        if bond_matrix[src, dst] > 0:
+            # Find all other neighbors to compute the angle
+            # src_neighbors = torch.nonzero(bond_matrix[src]).squeeze(1)
+            dst_neighbors = torch.nonzero(bond_matrix[dst]).squeeze(1)
+
+            # Remove self from neighbors
+            # src_neighbors = src_neighbors[src_neighbors != dst]
+            dst_neighbors = dst_neighbors[dst_neighbors != src]
+
+            for k in dst_neighbors:
+                if k != src:  # Avoid self-loop
+                    # Compute the angle (i, j, k)
+                    p_a = pos[src]
+                    p_b = pos[dst]
+                    p_c = pos[k]
+
+                    v1 = p_b - p_a
+                    v2 = p_c - p_a
+
+                    # Normalize the vectors
+                    v1_norm = v1 / (torch.norm(v1) + 1e-6)
+                    v2_norm = v2 / (torch.norm(v2) + 1e-6)
+
+                    # Compute cosine similarity
+                    cosine_similarity = torch.dot(v1_norm, v2_norm)
+
+                    # Clamp to avoid numerical errors
+                    cosine_similarity = cosine_similarity.clamp(-1, 1)
+
+                    # Compute angle
+                    angle = torch.acos(cosine_similarity)
+                    angle_list.append(angle)
+
+    return torch.stack(angle_list).to(pos.device)  # Convert list to tensor and move to device
+
+
+def cosine_distance_loss(true_angles, pred_angles):
+    """
+    Compute the cosine distance loss between true and predicted angles.
+
+    Args:
+        true_angles (Tensor): True angles [E].
+        pred_angles (Tensor): Predicted angles [E].
+
+    Returns:
+        Tensor: Loss value.
+    """
+    true_cos = torch.cos(true_angles)
+    pred_cos = torch.cos(pred_angles)
+    loss = 1 - torch.mean(true_cos * pred_cos)
+    return loss
+
+
+def angle_cosine_loss(X, X_true, edge_index, edge_attr, batch):
+    total_loss = 0.0
+
+    for graph_idx in torch.unique(batch):
+        # Mask to select the current graph
+        mask = batch == graph_idx
+        pos_pred = X[mask]  # Predicted positions for the current graph
+        pos_true = X_true[mask]  # True positions for the current graph
+
+        # Create bond matrix
+        edge_mask = (edge_index[0] >= mask.nonzero(as_tuple=True)[0].min()) & (
+            edge_index[0] <= mask.nonzero(as_tuple=True)[0].max()
+        )
+        bonds = edge_attr[edge_mask]
+        bond_indices = edge_index[:, edge_mask]
+
+        # Adjust bond indices to local molecule
+        local_bond_indices = bond_indices - bond_indices[0].min()
+        bond_matrix = torch.zeros((mask.sum().item(), mask.sum().item()), dtype=torch.long, device=X.device)
+        for src, dst, bond in zip(local_bond_indices[0], local_bond_indices[1], bonds):
+            bond_matrix[src, dst] = bond
+            bond_matrix[dst, src] = bond
+
+        # Compute angles
+        # import ipdb; ipdb.set_trace()
+        true_angles = compute_angles(pos_true, bond_matrix, local_bond_indices)
+        pred_angles = compute_angles(pos_pred, bond_matrix, local_bond_indices)
+
+        # Calculate loss
+        loss = cosine_distance_loss(true_angles, pred_angles)
+        total_loss += loss
+
+    return total_loss / len(torch.unique(batch))
+
+
 class Graph3DInterpolantModel(pl.LightningModule):
     def __init__(
         self,
@@ -361,7 +466,11 @@ class Graph3DInterpolantModel(pl.LightningModule):
                 self.log(f"{stage}/distance_loss_tz", distance_loss_tz, batch_size=batch_size)
                 self.log(f"{stage}/distance_loss_pz", distance_loss_pz, batch_size=batch_size)
                 loss = loss + loss_fn.distance_scale * distance_loss
-
+            # if loss_fn.use_distance in ["angle"]:
+            #     # import ipdb; ipdb.set_trace()
+            #     angle_loss = angle_cosine_loss(X= out[f'x_hat'], X_true = batch[f'x'], edge_index = batch[f'edge_index'], edge_attr = batch[f'edge_attr'], batch=batch["batch"])
+            #     self.log(f"{stage}/bond_angle_loss", angle_loss, batch_size=batch_size, prog_bar=True)
+            #     loss = loss + angle_loss
         self.log(f"{stage}/loss", loss, batch_size=batch_size)
         return loss, predictions
 

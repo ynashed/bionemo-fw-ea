@@ -119,6 +119,11 @@ def main(cfg: DictConfig) -> None:
         compute_train_data_metrics=cfg.evaluation.compute_train_data_metrics,
     )
 
+    if 'num_nodes' in cfg.train:
+        num_nodes = cfg.train.num_nodes
+    else:
+        num_nodes = 1
+
     trainer = pl.Trainer(
         max_epochs=cfg.train.n_epochs,
         logger=logger,
@@ -126,6 +131,7 @@ def main(cfg: DictConfig) -> None:
         enable_progress_bar=cfg.train.enable_progress_bar,
         accelerator='gpu',
         devices=cfg.train.gpus,
+        num_nodes=num_nodes,
         strategy=('ddp' if cfg.train.gpus > 1 else 'auto'),
         check_val_every_n_epoch=cfg.train.val_freq,
         gradient_clip_val=cfg.train.gradient_clip_value,

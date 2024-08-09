@@ -1,18 +1,18 @@
-run_name: 'mega_local_angle' #CUDA_VISIBLE_DEVICES=0 python train.py --config-name "train_dit"
-outdir: /workspace/bionemo/results/eqgatdiff
-resume: null
-ema_resume: null
+run_name: 'EQGAT_FW_TEST_7_9_distance_loss_bs_100'
+outdir: /results/eqgatdiff
+resume: null # /workspace/bionemo/bionemo/model/molecule/moco/models/results/eqgatdiff/EQGAT_FW_TEST_7_1_distance_loss_0.1/checkpoints/last.ckpt
+ema_resume: null #/workspace/bionemo/bionemo/model/molecule/moco/models/results/eqgatdiff/EQGAT_FW_TEST_7_1_distance_loss_0.1/checkpoints/ema_parameters_epoch_25.pt
 wandb_params:
-  mode: 'disabled'  # disabled, offline, online
+  mode: 'online'  # disabled, offline, online
   entity: 'clara-discovery'
   group: 'danny-testing'
   project: 'MoCo'
 
 data:
-  dataset_root: "/workspace/bionemo/data/pyg_geom_drug"
+  dataset_root: "/data/pyg_geom_drug"
   processed_folder: "processed"
-  batch_size: &batch_size 100 #200
-  inference_batch_size: 100 #200
+  batch_size: &batch_size 100
+  inference_batch_size: 100
   removed_h: False
   data_loader_type: "midi"
 
@@ -22,7 +22,7 @@ loss:
       loss_scale: 3.0
       aggregate: 'mean'
       continuous: True
-      use_distance: "angle"
+      use_distance: null
       distance_scale: null
     - variable_name: 'h'
       loss_scale: 1.0
@@ -60,7 +60,7 @@ interpolant:
     - variable_name: 'h'
       interpolant_type: 'discrete_diffusion' #["discrete_diffusion", "discrete_flow_matching"]
       prior_type: 'custom' #['uniform', 'mask', 'custom']
-      custom_prior: '/workspace/bionemo/data/pyg_geom_drug/processed/train_types_h.npy'
+      custom_prior: '/data/pyg_geom_drug/processed/train_types_h.npy'
       timesteps: *timesteps
       num_classes: &num_atoms 16
       scheduler_type: *scheduler_type
@@ -70,7 +70,7 @@ interpolant:
     - variable_name: 'edge_attr'
       interpolant_type: 'discrete_diffusion' #["discrete_diffusion", "discrete_flow_matching"]
       prior_type: 'custom'
-      custom_prior: '/workspace/bionemo/data/pyg_geom_drug/processed/train_bond_types_h.npy'
+      custom_prior: '/data/pyg_geom_drug/processed/train_bond_types_h.npy'
       timesteps: *timesteps
       num_classes: 5
       scheduler_type: *scheduler_type
@@ -80,12 +80,13 @@ interpolant:
     - variable_name: 'charges'
       interpolant_type: 'discrete_diffusion' #["discrete_diffusion", "discrete_flow_matching"]
       prior_type: 'custom'
-      custom_prior: '/workspace/bionemo/data/pyg_geom_drug/processed/train_charges_prior.npy' #! had to manually create the marginal (h_prior*charge_h_prior[:, None]).sum(0)
+      custom_prior: '/data/pyg_geom_drug/processed/train_charges_prior.npy' #! had to manually create the marginal (h_prior*charge_h_prior[:, None]).sum(0)
       timesteps: *timesteps
       scheduler_type: *scheduler_type
       scheduler_cut: False
       time_type: *time_type
       nu: 1.0
+      # interpolant_type: null
       concat: 'h'
       num_classes: 6
       offset: 2
@@ -104,47 +105,47 @@ dynamics:
   wrapper_args:
     timesteps: *timesteps
     time_type: *time_type
-    # random_learning: False
 
 self_conditioning:
   name: "base"
   variables:
     - variable_name: h
-      hidden_dims: 32
+      hidden_dims: 64
       fuse_softmax: True
       vector: False
       clamp_min: null
       clamp_max: null
     - variable_name: charges
-      hidden_dims: 16
+      hidden_dims: 64
       fuse_softmax: True
       vector: False
       clamp_min: null
       clamp_max: null
 
     - variable_name: edge_attr
-      hidden_dims: 16
+      hidden_dims: 64
       fuse_softmax: True
       vector: False
       clamp_min: null
       clamp_max: null
 
     - variable_name: x
-      hidden_dims: 1
+      hidden_dims: 32
       fuse_softmax: False
       vector: True
       clamp_min: -100
       clamp_max: 100
 
 sample:
-  node_distribution: "/workspace/bionemo/data/pyg_geom_drug/processed/train_n_h.pickle" # null
+  node_distribution: "/data/pyg_geom_drug/processed/train_n_h.pickle" # null
 
 train:
   seed: 42
   gpus: 1
+  num_nodes: 1
   n_epochs: 800
   enable_progress_bar: True
-  gradient_clip_value: 10.0
+  gradient_clip_value: 1.0
   log_freq: 50
   val_freq: 5
   checkpoint_monitor: mol_stable
@@ -181,3 +182,4 @@ lr_scheduler:
   num_warmup_steps: 1000
   interval: step
   frequency: 1 #not in config but this is the default
+

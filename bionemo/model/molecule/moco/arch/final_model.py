@@ -951,7 +951,7 @@ class MegalodonDotFN(nn.Module):
         # H = self.h_feat_refine(batch, atom_hids, te_h)
         # edge_attr = self.edge_feat_refine(edge_batch, edge_attr, te_e) #! cannot do attn with edges due to memory
         H = atom_hids
-        edge_attr = self.bond_refine(batch, X, H, E_idx, edge_hids)
+        edge_attr = self.bond_refine(batch, x, H, E_idx, edge_hids)
 
         h_logits, _ = self.atom_type_head(batch, H)
         e_logits, _ = self.edge_type_head.predict_edges(batch, edge_attr, E_idx)
