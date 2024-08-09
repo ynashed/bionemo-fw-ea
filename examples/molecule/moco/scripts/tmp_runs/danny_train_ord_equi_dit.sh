@@ -34,7 +34,7 @@ USERNAME="dreidenbach"
 # Mounts
 # =========================
 DATA_MOUNT=/data # where data will be mounted in the container
-DATA_PATH="/lustre/fsw/portfolios/healthcareeng/projects/healthcareeng_bionemo/fnikitin/data" # Directory with data for model training and downstream task validation
+DATA_PATH="/lustre/fsw/portfolios/healthcareeng/projects/healthcareeng_bionemo/dreidenbach/data" # Directory with data for model training and downstream task validation
 DATASET=pyg_geom_drug # The processed dataset folder
 RESULTS_MOUNT=/results # directory where results folder will be mounted in the container
 RESULTS_PATH="/lustre/fsw/portfolios/healthcareeng/projects/healthcareeng_bionemo/${USERNAME}/results/moco" # directory to store logs, checkpoints and results
