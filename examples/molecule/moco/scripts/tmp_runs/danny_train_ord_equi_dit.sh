@@ -17,7 +17,7 @@
 BIONEMO_IMAGE="nvcr.io/nvidian/cvai_bnmo_trng/bionemo:moco" # BioNeMo container image
 WANDB_API_KEY=40eca22e1f13673f579d3b59efb30d6425fae9e5 # Add your WANDB API KEY
 
-CONFIG_NAME="train_dit_slurm_mega" 
+CONFIG_NAME="train_dit_slurm_equiformer" 
 
 
 # Logging
