@@ -17,13 +17,13 @@
 BIONEMO_IMAGE="nvcr.io/nvidian/cvai_bnmo_trng/bionemo:moco" # BioNeMo container image
 WANDB_API_KEY=40eca22e1f13673f579d3b59efb30d6425fae9e5 # Add your WANDB API KEY
 
-CONFIG_NAME="train_dit_slurm_mega" #! TODO this should be mega_nogeom
+CONFIG_NAME="train_dit_slurm_mega_nores" 
 
 
 # Logging
 # =========================
 EXP_GROUP="danny-ord-testing"
-EXP_NAME="ord_megalodon_bs150_nogeom"
+EXP_NAME="ord_megalodon_bs150_nores"
 WANDB_ENTITY="clara-discovery"
 WANDB_GROUP=${EXP_GROUP}
 WANDB_PROJECT="MoCo"
