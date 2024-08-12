@@ -46,7 +46,7 @@ from bionemo.testing.utils import assert_matrix_correlation_above_value, assert_
 bionemo2_root: Path = (
     # geneformer module's path is the most dependable --> don't expect this to change!
     Path(geneformer.__file__)
-    # This gets us from 'sub-packages/bionemo-geneformer/src/bionemo/esm2/__init__.py' to 'sub-packages/bionemo-geneformer'
+    # This gets us from 'sub-packages/bionemo-geneformer/src/bionemo/geneformer/__init__.py' to 'sub-packages/bionemo-geneformer'
     .parent.parent.parent.parent
     # From here, we want to get to the root of the repository: _before_ sub-packages/
     .parent.parent
