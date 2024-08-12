@@ -24,7 +24,9 @@ if __name__ == "__main__":
     ema_weights = None  # f"{res_dir}/ema_parameters_epoch_214.pt"
     n_graphs = 5000
     batch_size = 100
+    import ipdb
 
+    ipdb.set_trace()
     model = Graph3DInterpolantModel.load_from_checkpoint(ckpt_path)
     datamodule = MoleculeDataModule(
         dataset_root="/data/pyg_geom_drug",
