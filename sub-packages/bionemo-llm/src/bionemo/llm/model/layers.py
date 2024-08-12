@@ -22,7 +22,7 @@ from megatron.core.utils import divide
 from torch import Tensor
 
 
-__all__: Sequence[str] = ("TELayerNorm", "ESM2QueryScaling")
+__all__: Sequence[str] = ("TELayerNorm", "ESM2QueryScaling", "TorchLayerNorm", "TorchLinear")
 
 
 class TELayerNorm(te.pytorch.LayerNorm):  # noqa: D101
