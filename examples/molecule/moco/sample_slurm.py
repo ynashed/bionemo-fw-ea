@@ -16,6 +16,7 @@ from bionemo.model.molecule.moco.models.module import Graph3DInterpolantModel
 from bionemo.model.molecule.moco.models.utils_train import ExponentialMovingAverage as EMA
 
 
+# scp dreidenbach@ord-dc:/lustre/fsw/portfolios/healthcareeng/projects/healthcareeng_bionemo/dreidenbach/results/moco/ord_megalodon_bs150_clip_dotfn/checkpoints/best* .
 if __name__ == "__main__":
     run_name = "ord_megalodon_bs150_clip_dotfn"
     res_dir = f"/results/{run_name}/checkpoints"

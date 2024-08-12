@@ -121,10 +121,14 @@ class Molecule2DStability:
         valid_molecules = []
         num_components = []
         error_message = Counter()
+        is_valid = []
         for i, mol in enumerate(generated):
             rdmol = mol.rdkit_mol
+            is_valid[i] = (0, 0)
             if rdmol is not None:
                 try:
+                    num_atoms = rdmol.GetNumAtoms()
+                    is_valid[i] = (0, num_atoms)
                     mol_frags = Chem.rdmolops.GetMolFrags(rdmol, asMols=True, sanitizeFrags=False)
                     num_components.append(len(mol_frags))
                     if len(mol_frags) > 1:
@@ -136,7 +140,8 @@ class Molecule2DStability:
                         valid_molecules.append(generated[i])
                         valid_smiles.append(smiles)
                         valid_ids.append(i)
-                        error_message[-1] += 1
+                        is_valid[i] = (1, num_atoms)
+                        error_message[5] += 1
                 except Chem.rdchem.AtomValenceException:
                     error_message[1] += 1
                 except Chem.rdchem.KekulizeException:
@@ -144,15 +149,15 @@ class Molecule2DStability:
                 except Chem.rdchem.AtomKekulizeException or ValueError:
                     error_message[3] += 1
         print(
-            f"Error messages: AtomValence {error_message[1]}, Kekulize {error_message[2]}, other {error_message[3]}, "
-            f" -- No error {error_message[-1]}"
+            f"Error messages: Chem.rdchem.AtomValenceException {error_message[1]}, Chem.rdchem.KekulizeException {error_message[2]}, Chem.rdchem.AtomKekulizeException {error_message[3]}, More than 1 fragment {error_message[4]},"
+            f" -- No error {error_message[5]}"
         )
         self.validity_metric.update(value=len(valid_smiles) / len(generated), weight=len(generated))
 
         valid_smiles, duplicate_ids = canonicalize_list(valid_smiles)
         valid_molecules = [mol for i, mol in enumerate(valid_molecules) if i not in duplicate_ids]
 
-        return valid_smiles, valid_molecules
+        return valid_smiles, valid_molecules, is_valid
 
     def evaluate(self, generated):
         """
@@ -164,9 +169,9 @@ class Molecule2DStability:
         Returns:
             Tuple containing valid SMILES, valid molecules, and validity score.
         """
-        valid_smiles, valid_molecules = self.compute_validity(generated)
+        valid_smiles, valid_molecules, is_valid = self.compute_validity(generated)
         validity = self.validity_metric.compute().item()
-        return valid_smiles, valid_molecules, validity
+        return valid_smiles, valid_molecules, validity, is_valid
 
     def __call__(self, molecules):
         """
@@ -185,14 +190,14 @@ class Molecule2DStability:
             self.atom_stable.update(value=at_stable / num_bonds, weight=num_bonds)
             if mol_stable:
                 stable_molecules.append(mol)
-        valid_smiles, valid_molecules, validity = self.evaluate(molecules)
+        valid_smiles, valid_molecules, validity, is_valid = self.evaluate(molecules)
 
         results = {
             "mol_stable": self.mol_stable.compute().item(),
             "atm_stable": self.atom_stable.compute().item(),
             "validity": validity,
         }
-        return results, valid_smiles, valid_molecules, stable_molecules
+        return results, valid_smiles, valid_molecules, stable_molecules, is_valid
 
     @staticmethod
     def default_values():
