@@ -62,24 +62,22 @@ class ESM2QueryScaling(torch.nn.Module):  # noqa: D101
 
 
 class TorchLayerNorm(torch.nn.LayerNorm):
-    """A wrapper around PyTorch LayerNorm
-
-    This layer should replace FusedLayerNorm in TransformerLayerSubmodules to ensure equivalency
-    of ESM2 logits with HF implementation
-    """
-
     def __init__(self, config: TransformerConfig, hidden_size: int, eps: float, *args, **kwargs) -> None:
+        """A wrapper around PyTorch LayerNorm
+
+        This layer should replace FusedLayerNorm in TransformerLayerSubmodules to ensure equivalency
+        of ESM2 logits with HF implementation
+        """
         super().__init__(normalized_shape=hidden_size, eps=eps, elementwise_affine=True)
 
 
 class TorchLinear(torch.nn.Linear):
-    """A wrapper around PyTorch Linear
-
-    This layer should replace RowParallelLinear in TransformerLayerSubmodules to ensure equivalency
-    of ESM2 logits with HF implementation
-    """
-
     def __init__(self, input_size, output_size, config, init_method, bias, *args, **kwargs):
+        """A wrapper around PyTorch Linear
+
+        This layer should replace RowParallelLinear in TransformerLayerSubmodules to ensure equivalency
+        of ESM2 logits with HF implementation
+        """
         super().__init__(in_features=input_size, out_features=output_size, bias=bias)
 
     def forward(self, input: Tensor) -> Tuple[Tensor, Tensor]:
