@@ -125,9 +125,9 @@ class MoleculeEvaluationCallback(pl.Callback):
             train_data_res = train_data_metrics(valid_smiles)
             results.update(train_data_res)
 
-        results['store_valid_molecules'] = valid_molecules
-        results['store_stable_molecules'] = stable_molecules
-        results['store_info_2d'] = info_2d
+        # results['store_valid_molecules'] = valid_molecules
+        # results['store_stable_molecules'] = stable_molecules
+        # results['store_info_2d'] = info_2d
         if trainer is None or trainer.global_rank == 0:
             for key, value in results.items():
                 if "store" not in key:
