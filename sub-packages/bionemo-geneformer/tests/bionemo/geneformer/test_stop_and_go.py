@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-'''
+"""
 How to adapt these tests:
 
 1) Need to hook up our own pretraining workflow. In the code below, we do this via subproc and CLI. Is this still best practice?
@@ -22,30 +22,34 @@ How to adapt these tests:
 3) How do we want this to work for other modules? Lots of code could be duplicated here which makes it a challenge.
 4) is this the right set of code to do this on?
 
-'''
+"""
+
 import math
-import pytest
 import pathlib
-from typing import Literal, List, Tuple
-from bionemo import geneformer
-from nemo.collections import llm
-# Do we want to re-export stuff in api?
-from bionemo.geneformer.api import GeneformerConfig
-from bionemo.llm.model.biobert.lightning import BioBertLightningModule
-from bionemo.core.utils.batching_utils import pad_token_ids
-from bionemo.geneformer.data.singlecell.preprocess import GeneformerPreprocess
-from bionemo.core.utils.dtypes import get_autocast_dtype
-from nemo.lightning.pytorch import callbacks as nl_callbacks
-from bionemo.llm.model.biobert.transformer_specs import BiobertSpecOption
+from typing import List, Literal, Tuple
+
+import pytest
+import torch
 from megatron.core.optimizer.optimizer_config import OptimizerConfig
 from nemo import lightning as nl
-from torch.nn import functional as F
-import torch
-
+from nemo.collections import llm
 from nemo.lightning import resume
 from nemo.lightning.nemo_logger import NeMoLogger
+from nemo.lightning.pytorch import callbacks as nl_callbacks
 from nemo.lightning.pytorch.optim.lr_scheduler import CosineAnnealingScheduler
 from nemo.lightning.pytorch.optim.megatron import MegatronOptimizerModule
+from torch.nn import functional as F
+
+from bionemo import geneformer
+from bionemo.core.utils.batching_utils import pad_token_ids
+from bionemo.core.utils.dtypes import get_autocast_dtype
+
+# Do we want to re-export stuff in api?
+from bionemo.geneformer.api import GeneformerConfig
+from bionemo.geneformer.data.singlecell.preprocess import GeneformerPreprocess
+from bionemo.llm.model.biobert.lightning import BioBertLightningModule
+from bionemo.llm.model.biobert.transformer_specs import BiobertSpecOption
+
 
 bionemo2_root: pathlib.Path = (
     # geneformer module's path is the most dependable --> don't expect this to change!
@@ -108,6 +112,7 @@ CELLS_FOR_TEST: List[List[str]] = [
     ],
 ]
 
+
 def _apply_tokenizer(tokenizer, sequences: List[List[str]], device) -> List[torch.Tensor]:
     # parent pulls the tokenizer from the loaded model.
     try:
@@ -127,6 +132,7 @@ def _apply_tokenizer(tokenizer, sequences: List[List[str]], device) -> List[torc
             f"Unknown token in gene symbols. Please filter genes for those present in self.tokenizer:\n{invalid_tokens}"
         ) from e
     return token_ids
+
 
 def _batched_tokenizer(
     tokenizer, sequences: List[List[str]], device, seq_length: int = 2048, dynamic_padding: bool = True
@@ -158,6 +164,7 @@ def _batched_tokenizer(
 
     return token_ids, mask
 
+
 class _DummyDataSet(torch.utils.data.Dataset):
     def __init__(self, cells: List[List[str]], tokenizer):
         input_ids, mask = _batched_tokenizer(tokenizer, cells, device=torch.device("cuda"))
@@ -171,10 +178,13 @@ class _DummyDataSet(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         return {"text": self.input_ids[idx], "attention_mask": self.mask[idx]}
 
-seq_length = 2048 # NOTE(@skothenhill) decrease this if there are memory issues in CI
+
+seq_length = 2048  # NOTE(@skothenhill) decrease this if there are memory issues in CI
+
+
 @pytest.fixture
 def geneformer_config():
-    """ Setups the default geneformer config taken from pretrain.py. Update as needed. """
+    """Setups the default geneformer config taken from pretrain.py. Update as needed."""
     autocast_dtype = get_autocast_dtype(MODEL_PRECISION)
     return GeneformerConfig(
         num_layers=6,
@@ -214,23 +224,26 @@ def geneformer_config():
         return_only_hidden_states=True,  # This is what we did in nemo1 for inference
     )
 
+
 # TODO (skothenhill) which dataloader makes more sense for this test?
 #   - dummy will have the loss descending faster, which is good. But we need it in a DataLoader, no bueno.
 #   - real will be more representative of the actual use case, but harder to maintain the test.
 def make_dummy_dataloader(tokenizer):
-    """ Dummy dataloader for testing without requiring the full memmap. """
+    """Dummy dataloader for testing without requiring the full memmap."""
     cells = CELLS_FOR_TEST
     dataloader = torch.utils.data.DataLoader(_DummyDataSet(cells, tokenizer), batch_size=3, num_workers=0)
     return dataloader
 
+
 def make_real_datamodule(tokenizer, seq_length, median_dict, devices, pipeline_model_parallel_size, data_path):
     from bionemo.geneformer.data.singlecell.datamodule import SingleCellDataModule
+
     data = SingleCellDataModule(
         seq_length=seq_length,
         tokenizer=tokenizer,
-        train_dataset_path=data_path / 'train',
-        val_dataset_path=data_path / 'val',
-        test_dataset_path=data_path / 'test',
+        train_dataset_path=data_path / "train",
+        val_dataset_path=data_path / "val",
+        test_dataset_path=data_path / "test",
         random_token_prob=0.1,  # this is the incorrect setting we originally used.
         median_dict=median_dict,
         micro_batch_size=3,
@@ -242,17 +255,16 @@ def make_real_datamodule(tokenizer, seq_length, median_dict, devices, pipeline_m
     )
     return data
 
+
 # TODO (@skothenhill) How can we adapt this into a test harness?
-def test_geneformer_stop_and_go(
-    geneformer_config: GeneformerConfig, seed: int = 42
-):
+def test_geneformer_stop_and_go(geneformer_config: GeneformerConfig, seed: int = 42):
     # Ensure the test data exists.
     data_error_str = "Please download test data with:\n`python scripts/download_artifacts.py --models all --model_dir ./models --data all --data_dir ./ --verbose --source pbss`"
     # Configuration stuff.
     data_dir = pathlib.Path(data_path)
     train_data_path = data_dir / "train"
     val_check_interval = 100
-    lr=1e-4
+    lr = 1e-4
     num_steps = 100000
     cosine_rampup_frac = 0.1
     cosine_hold_frac = 0.05
@@ -273,10 +285,11 @@ def test_geneformer_stop_and_go(
         case _:
             raise ValueError("Preprocessing must have failed.")
 
-    
     # Taken from default argparse.
-    module = BioBertLightningModule(config=geneformer_config, tokenizer=tokenizer,
-            optimizer=MegatronOptimizerModule(
+    module = BioBertLightningModule(
+        config=geneformer_config,
+        tokenizer=tokenizer,
+        optimizer=MegatronOptimizerModule(
             config=OptimizerConfig(
                 lr=lr,
                 optimizer="adam",
@@ -290,8 +303,11 @@ def test_geneformer_stop_and_go(
                 monitor="val_loss",
                 constant_steps=int(math.ceil(num_steps * cosine_hold_frac)),
             ),
-        ),)
-    data_module = make_real_datamodule(tokenizer, seq_length, median_dict, devices=1, pipeline_model_parallel_size=1, data_path=data_path)
+        ),
+    )
+    data_module = make_real_datamodule(
+        tokenizer, seq_length, median_dict, devices=1, pipeline_model_parallel_size=1, data_path=data_path
+    )
 
     checkpoint_callback = nl_callbacks.ModelCheckpoint(
         save_last=True,
@@ -302,17 +318,13 @@ def test_geneformer_stop_and_go(
     )
 
     nemo_logger: NeMoLogger = NeMoLogger(
-        dir=str(root_dir),
-        name='geneformer-stopngo',
-        tensorboard=None,
-        wandb=None,
-        ckpt=checkpoint_callback
+        dir=str(root_dir), name="geneformer-stopngo", tensorboard=None, wandb=None, ckpt=checkpoint_callback
     )
 
     # TODO (@skothenhill) Also impacts the DataModule? Should we be thinking about this?
     tp_size, pp_size, devices = 1, 1, 1
     micro_batch_size = 3
-    seq_len = 16 # Full size is 2048
+    seq_len = 16  # Full size is 2048
     strategy = nl.MegatronStrategy(
         tensor_model_parallel_size=tp_size,
         pipeline_model_parallel_size=pp_size,
@@ -331,16 +343,19 @@ def test_geneformer_stop_and_go(
         accelerator="gpu",
         strategy=strategy,
         num_nodes=1,
-        callbacks=None, # is this what I need for stop and go?
+        callbacks=None,  # is this what I need for stop and go?
         plugins=nl.MegatronMixedPrecision(precision=MODEL_PRECISION, amp_O2=False),
     )
-    llm.train(module, data_module, trainer, 
+    llm.train(
+        module,
+        data_module,
+        trainer,
         log=nemo_logger,
         resume=resume.AutoResume(
             path=None,  # Overrides the path found by resume_if_exists when set.
             resume_if_exists=False,  # Looks for the -last checkpoint to continue training.
             resume_ignore_no_checkpoint=True,  # When false this will throw an error with no existing checkpoint.
-        )
+        ),
     )
     # TODO (@skothenhill) setup a callback that throws an exception or something similar after saving a checkpoint.
     # TODO (@skothenhill) setup the Trainer again, but this time use resume_if_exists=True
@@ -348,19 +363,17 @@ def test_geneformer_stop_and_go(
     # NOTE (@skothenhill) There are some variants of this we will want to test, such as: restoring from a direct path, using use_nemo_ckpt_io, changing parallelisms.
     # NOTE (@skothenhill) Ensure that teardown is handled correctly.
 
-
-    llm.train(module, data_module, trainer, 
+    llm.train(
+        module,
+        data_module,
+        trainer,
         log=nemo_logger,
         resume=resume.AutoResume(
             path=None,  # Overrides the path found by resume_if_exists when set.
             resume_if_exists=True,  # Looks for the -last checkpoint to continue training.
             resume_ignore_no_checkpoint=True,  # When false this will throw an error with no existing checkpoint.
-        )
+        ),
     )
-
-
-
-
 
 
 '''
