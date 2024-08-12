@@ -28,6 +28,7 @@ from megatron.core.models.common.embeddings.rotary_pos_embedding import RotaryEm
 from megatron.core.models.common.language_module.language_module import LanguageModule
 from megatron.core.transformer import spec_utils
 from megatron.core.transformer.enums import ModelType
+from megatron.core.transformer.identity_op import IdentityOp
 from megatron.core.transformer.transformer_block import TransformerBlock
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.transformer.utils import get_linear_layer
@@ -123,6 +124,8 @@ class MegatronBioBertModel(LanguageModule):
 
         # megatron core pipelining currently depends on model type
         self.model_type = ModelType.encoder_or_decoder
+
+        self.finetuning_head = IdentityOp()
 
         # Embeddings.
         if self.pre_process:
@@ -303,20 +306,13 @@ class MegatronBioBertModel(LanguageModule):
         if not self.post_process:
             return hidden_states
 
+        output_dict = {"hiddens": hidden_states, "attention_mask": attention_mask}
+
         if self.add_binary_head:
             pooled_output = self.pooler(hidden_states, 0)
 
         if self.return_embeddings:
-            embeddings = torch.transpose(hidden_states, 0, 1)
-            masks = torch.sum(attention_mask, dim=1)
-            # Collect masked embeddings.
-            output = torch.zeros(
-                size=(embeddings.shape[0], embeddings.shape[2]),
-                dtype=torch.float32,
-                device=torch.cuda.current_device(),
-            )
-            for i, (embedding, mask) in enumerate(zip(embeddings, masks)):
-                output[i, :] = torch.mean(embedding[1 : mask - 1], dim=0)
+            output = self.compute_masked_embeddings(hidden_states, attention_mask)
             return output
 
         # logits and loss
@@ -333,7 +329,21 @@ class MegatronBioBertModel(LanguageModule):
 
         # [s b h] => [b s h]  # move batch to the first dimension after forward
         logits = logits.transpose(0, 1).contiguous()
-        return {"token_logits": logits, "binary_logits": binary_logits}
+        output_dict = {**output_dict, "token_logits": logits, "binary_logits": binary_logits}
+        return self.finetuning_head(output_dict)
+
+    def compute_masked_embeddings(self, hidden_states, attention_mask):
+        embeddings = torch.transpose(hidden_states, 0, 1)
+        masks = torch.sum(attention_mask, dim=1)
+        # Collect masked embeddings.
+        output = torch.zeros(
+            size=(embeddings.shape[0], embeddings.shape[2]),
+            dtype=torch.float32,
+            device=torch.cuda.current_device(),
+        )
+        for i, (embedding, mask) in enumerate(zip(embeddings, masks)):
+            output[i, :] = torch.mean(embedding[1 : mask - 1], dim=0)
+        return output
 
 
 @dataclass
