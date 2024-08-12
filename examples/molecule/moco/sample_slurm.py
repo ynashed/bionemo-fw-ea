@@ -40,6 +40,7 @@ if __name__ == "__main__":
         n_graphs=n_graphs,
         batch_size=batch_size,
         timesteps=500,
+        compute_dihedrals=True,
         compute_train_data_metrics=False,
         train_smiles=datamodule.train_dataset.smiles,
         statistics=datamodule.statistics,
