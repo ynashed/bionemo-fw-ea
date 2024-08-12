@@ -26,14 +26,14 @@ if __name__ == "__main__":
     ckpt_path = (
         "/workspace/bionemo/examples/molecule/moco/checkpoints/best-epoch=149-step=146708--mol_stable=0.978.ckpt"
     )
-    n_graphs = 400
-    batch_size = 400
+    n_graphs = 100
+    batch_size = 100
     # to load previous weights
     # from omegaconf import OmegaConf
     # cfg = OmegaConf.load('/workspace/bionemo/examples/molecule/moco/conf/train_eqgat.yaml')
     # model = Graph3DInterpolantModel.load_from_checkpoint(ckpt_path, loss_params=cfg.loss)
-    model = Graph3DInterpolantModel.load_from_checkpoint(ckpt_path)
-    print(f"loaded model successfully {ckpt_path}")
+    model = Graph3DInterpolantModel.load_from_checkpoint(ckpt_path).cuda()
+    print(f"loaded model successfully {ckpt_path} on {model.device}")
     # Calculate the total number of parameters
     total_params = sum(p.numel() for p in model.parameters())
 
@@ -69,7 +69,9 @@ if __name__ == "__main__":
 
     model.cuda()
     model.eval()
+    import ipdb
 
+    ipdb.set_trace()
     result = eval_callback.evaluate_molecules(model)
     import ipdb
 

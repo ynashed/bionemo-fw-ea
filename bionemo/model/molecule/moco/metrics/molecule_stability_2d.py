@@ -124,7 +124,7 @@ class Molecule2DStability:
         is_valid = []
         for i, mol in enumerate(generated):
             rdmol = mol.rdkit_mol
-            is_valid[i] = (0, 0)
+            is_valid.append((0, 0))
             if rdmol is not None:
                 try:
                     num_atoms = rdmol.GetNumAtoms()
