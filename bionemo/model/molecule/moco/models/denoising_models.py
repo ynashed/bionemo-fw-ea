@@ -19,6 +19,7 @@ from bionemo.model.molecule.moco.arch.final_model import (
     Megalodon,
     MegalodonDot,
     MegalodonDotFN,
+    MegalodonDotFNNoRes,
     MegalodonNoGeom,
     MegalodonNoRes,
 )
@@ -52,6 +53,7 @@ class ModelBuilder:
             "meganores": MegalodonNoResWrapper,
             "megadot": MegalodonDotWrapper,
             "megadotfn": MegalodonDotFnWrapper,
+            "megadotfnnores": MegalodonDotFnNoResWrapper,
             "equidit": EquiDitWrapper,
         }
 
@@ -123,6 +125,46 @@ class MOCOWrapper(MoCo):
 
 
 class EquiDitWrapper(MoleculeDiTEquiformer):
+    """A wrapper class for the MoCo model."""
+
+    def __init__(self, args_dict, time_type="continuous", timesteps=None):
+        """
+        Initializes the DiTWrapper.
+
+        Args:
+            args_dict (dict): A dictionary of arguments for initializing the MoCo model.
+        """
+        self.args = args_dict
+        self.time_type = time_type
+        self.timesteps = timesteps
+        super().__init__(**args_dict)
+
+    def forward(self, batch, time, conditional_batch=None, timesteps=None):
+        """
+        Forward pass of the MoCo model.
+
+        Args:
+            batch (torch_geometric.data.Batch): The input batch.
+            time (Tensor): The time tensor.
+
+        Returns:
+            dict: The output of the MoCo model.
+        """
+        timesteps = timesteps if timesteps is not None else self.timesteps
+        if self.time_type == "discrete" and timesteps is not None:
+            time = (timesteps - time.float()) / timesteps
+        out = super().forward(
+            batch=batch["batch"],
+            X=batch["x_t"],
+            H=batch["h_t"],
+            E=batch["edge_attr_t"],
+            E_idx=batch["edge_index"],
+            t=time,
+        )
+        return out
+
+
+class MegalodonDotFnNoResWrapper(MegalodonDotFNNoRes):
     """A wrapper class for the MoCo model."""
 
     def __init__(self, args_dict, time_type="continuous", timesteps=None):
