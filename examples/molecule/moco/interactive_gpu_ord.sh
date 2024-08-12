@@ -31,7 +31,7 @@ RESULTS_PATH="/lustre/fsw/portfolios/healthcareeng/projects/healthcareeng_bionem
 if [ -z "$CODE_PATH" ]; then
   MOUNTS="${DATA_PATH}:${DATA_MOUNT}"
 else
-  MOUNTS="${CODE_PATH}:${CODE_MOUNT},${DATA_PATH}:${DATA_MOUNT},${RESULTS_PATH}:${RESULTS_PATH}"
+  MOUNTS="${CODE_PATH}:${CODE_MOUNT},${DATA_PATH}:${DATA_MOUNT},${RESULTS_PATH}:${RESULTS_MOUNT}"
 fi
 # ========================
 
