@@ -61,9 +61,9 @@ class ESM2QueryScaling(torch.nn.Module):  # noqa: D101
         return query / math.sqrt(self.hidden_size_per_attention_head)
 
 
-class TorchLayerNorm(torch.nn.LayerNorm):
+class TorchLayerNorm(torch.nn.LayerNorm):  # noqa: D101
     def __init__(self, config: TransformerConfig, hidden_size: int, eps: float, *args, **kwargs) -> None:
-        """A wrapper around PyTorch LayerNorm
+        """A wrapper around PyTorch LayerNorm.
 
         This layer should replace FusedLayerNorm in TransformerLayerSubmodules to ensure equivalency
         of ESM2 logits with HF implementation
@@ -71,16 +71,16 @@ class TorchLayerNorm(torch.nn.LayerNorm):
         super().__init__(normalized_shape=hidden_size, eps=eps, elementwise_affine=True)
 
 
-class TorchLinear(torch.nn.Linear):
+class TorchLinear(torch.nn.Linear):  # noqa: D101
     def __init__(self, input_size, output_size, config, init_method, bias, *args, **kwargs):
-        """A wrapper around PyTorch Linear
+        """A wrapper around PyTorch Linear.
 
         This layer should replace RowParallelLinear in TransformerLayerSubmodules to ensure equivalency
         of ESM2 logits with HF implementation
         """
         super().__init__(in_features=input_size, out_features=output_size, bias=bias)
 
-    def forward(self, input: Tensor) -> Tuple[Tensor, Tensor]:
+    def forward(self, input: Tensor) -> Tuple[Tensor, Tensor]:  # noqa: D102
         output = super().forward(input)
         output_bias = torch.zeros(size=(self.out_features,)).to(output.device)
         return output, output_bias
