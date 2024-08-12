@@ -143,6 +143,7 @@ def main(
         val_check_interval=val_check_interval,  # TODO(@jstjohn) Checkpoint saving is currently broken, fix and change this.
         num_nodes=num_nodes,
         callbacks=[
+            # TODO(@skothenhill-nv) these need to be cleaned up when we have the automatic addition of track_io
             io.track_io(LossLoggingCallback)(),
             io.track_io(RichModelSummary)(max_depth=4),
             io.track_io(LearningRateMonitor)(),
@@ -168,7 +169,7 @@ def main(
         train_dataset_path=train_data_path,
         val_dataset_path=val_data_path,
         test_dataset_path=test_data_path,
-        random_token_prob=0.1,  # this is the incorrect setting we originally used.
+        random_token_prob=0.02,  # changed to represent the incorrect setting we originally used.
         median_dict=median_dict,
         micro_batch_size=micro_batch_size,
         global_batch_size=micro_batch_size * int(num_nodes * devices / pipeline_model_parallel_size),
