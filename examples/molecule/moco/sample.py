@@ -23,11 +23,10 @@ if __name__ == "__main__":
     # ckpt_path = f"{res_dir}/epoch=214-step=315199.ckpt"
     # ema_weights = f"{res_dir}/ema_parameters_epoch_214.pt"
     ema_weights = None
-    ckpt_path = (
-        "/workspace/bionemo/examples/molecule/moco/checkpoints/best-epoch=149-step=146708--mol_stable=0.978.ckpt"
-    )
-    n_graphs = 100
-    batch_size = 100
+    ckpt_path = '/workspace/bionemo/examples/molecule/moco/checkpoints/best-epoch=169-step=166269--mol_stable=0.984.ckpt'  # best-epoch=149-step=146708--mol_stable=0.978.ckpt"
+
+    n_graphs = 1000
+    batch_size = 200
     # to load previous weights
     # from omegaconf import OmegaConf
     # cfg = OmegaConf.load('/workspace/bionemo/examples/molecule/moco/conf/train_eqgat.yaml')

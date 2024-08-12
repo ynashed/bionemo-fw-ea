@@ -23,11 +23,9 @@ if __name__ == "__main__":
     weight_name = "best-epoch=219-step=215172--mol_stable=0.975.ckpt"
     ckpt_path = f"{res_dir}/{weight_name}"
     ema_weights = None  # f"{res_dir}/ema_parameters_epoch_214.pt"
-    n_graphs = 5000
-    batch_size = 100
-    import ipdb
+    n_graphs = 1000
+    batch_size = 200
 
-    ipdb.set_trace()
     model = Graph3DInterpolantModel.load_from_checkpoint(ckpt_path)
     datamodule = MoleculeDataModule(
         dataset_root="/data/pyg_geom_drug",
@@ -57,7 +55,3 @@ if __name__ == "__main__":
     model.eval()
 
     results = eval_callback.evaluate_molecules(model)
-    import ipdb
-
-    ipdb.set_trace()
-    print(results)
