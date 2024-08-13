@@ -13,14 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from pathlib import Path
-
-import tomli
+import importlib.metadata
 
 
 def get_version_from_pyproject():
     """Get the code version from pyproject.toml file."""
-    relative_path = Path(__file__).parents[4] / "pyproject.toml"
-    with open(relative_path, "rb") as f:
-        pyproject_data = tomli.load(f)
-    return pyproject_data["project"]["version"]
+    package_name = "bionemo.scdl"
+    return importlib.metadata.version(package_name)
