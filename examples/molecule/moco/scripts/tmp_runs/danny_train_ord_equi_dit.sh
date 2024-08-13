@@ -23,7 +23,7 @@ CONFIG_NAME="train_dit_slurm_equiformer"
 # Logging
 # =========================
 EXP_GROUP="danny-iad-testing"
-EXP_NAME="dit_equiformer"
+EXP_NAME="dit_equiformer_new"
 WANDB_ENTITY="clara-discovery"
 WANDB_GROUP=${EXP_GROUP}
 WANDB_PROJECT="MoCo"
