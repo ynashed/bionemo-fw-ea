@@ -447,7 +447,7 @@ class EGNNBlock(Module):
         x_updates_vals = self.clamp(self.phi_x(h_message) * mask)  # b, a, a, 3
 
         if self.use_cross_product:
-            x_updates_corss = self.clamp(self.phi_x_cross(h_message) * mask)
+            x_updates_cross = self.clamp(self.phi_x_cross(h_message) * mask)
 
         if self.aggregation_method == 'sum':
             x_update = torch.sum(
@@ -456,7 +456,7 @@ class EGNNBlock(Module):
             if self.use_cross_product:
                 rel_cross = torch.linalg.cross(x.unsqueeze(-2), x.unsqueeze(-3))
                 x_update = x_update + (
-                    (rel_cross) / (self.norm_constant + rel_cross.norm(dim=-1, keepdim=True)) * x_updates_corss
+                    (rel_cross) / (self.norm_constant + rel_cross.norm(dim=-1, keepdim=True)) * x_updates_cross
                 ).sum(dim=-2)
 
         x = x + x_update

@@ -92,7 +92,7 @@ interpolant:
 
   
 dynamics:
-  model_name: "megadotfn"
+  model_name: "skinny"
   model_args:
     atom_classes: 22
     edge_classes: 5

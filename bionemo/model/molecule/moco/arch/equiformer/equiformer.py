@@ -965,9 +965,9 @@ class EquivariantTransformer(torch.nn.Module):
             node_features = self.out_dropout(node_features)
         outputs = self.head(node_features)
         hidden_states, dT = outputs[:, :H], outputs[:, H:]
-
+        print(torch.norm(dT, dim=-1), torch.norm(pos, dim=-1))
         # TODO: Update pos with dT and remove mean!
-        return pos + dT, hidden_states
+        return pos + dT, hidden_states  #! check dT and try to remove the hidden state update.
 
 
 def create_batch_pairwise_matrix(
@@ -992,7 +992,7 @@ def equivariant_transformer_l2(
     radius: float = 16,
     basis_type: Literal['gaussian', 'edge_attr'] = 'edge_attr',
     num_basis: int = 128,
-    num_layers: int = 2,
+    num_layers: int = 2,  #! can try more layers?
     **kwargs,
 ):
     model = EquivariantTransformer(

@@ -336,7 +336,7 @@ class MoleculeDiTEquiformer(nn.Module):
             distances = coord2distfn(pos, E_idx, scale_dist_features=4)
             H, edge_attr = self.dit_layers[layer_index](batch, H, te_h, edge_attr, E_idx, te_e, distances, edge_batch)
 
-            X_eg, H = self.equiformer_layers[layer_index](pos, H, E_idx, edge_attr, te_e)  # ! TODO at time here
+            X_eg, _ = self.equiformer_layers[layer_index](pos, H, E_idx, edge_attr, te_e)  # ! TODO at time here
 
             pos = X_eg - scatter_mean(X_eg, index=batch, dim=0, dim_size=X.shape[0])[batch]
 
