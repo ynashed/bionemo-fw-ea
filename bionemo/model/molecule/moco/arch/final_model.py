@@ -1,7 +1,8 @@
 import math
 
 import torch
-import torch.cuda.nvtx as nvtx
+
+# import torch.cuda.nvtx as nvtx
 import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.nn.norm import LayerNorm as BatchLayerNorm
@@ -552,6 +553,7 @@ class MoleculeDiffusion(nn.Module):
         scale_dist_features=4,
         use_z=None,
         attn_dropout=0.0,
+        use_cross_product=False,
     ):
         super(MoleculeDiffusion, self).__init__()
         self.atom_embedder = MLP(atom_classes, invariant_node_feat_dim, invariant_node_feat_dim)
@@ -582,14 +584,17 @@ class MoleculeDiffusion(nn.Module):
                     num_heads,
                     mlp_expansion_ratio=4.0,
                     use_z=use_z,
-                    n_vector_features=128,
+                    n_vector_features=n_vector_features,
                     scale_dist_features=scale_dist_features,
                     dropout=attn_dropout,
                 )
             )
             self.egnn_layers.append(
                 EquivariantBlock(
-                    invariant_node_feat_dim, invariant_edge_feat_dim, n_vector_features, use_cross_product=False
+                    invariant_node_feat_dim,
+                    invariant_edge_feat_dim,
+                    n_vector_features,
+                    use_cross_product=use_cross_product,
                 )
             )
 
@@ -644,11 +649,11 @@ class MoleculeDiffusion(nn.Module):
         edge_hids = edge_attr
 
         for layer_index in range(len(self.dit_layers)):
-            with nvtx.range(f"DiTe Layer {layer_index}"):
-                distances = coord2distfn(pos, E_idx, self.scale_dist_features, batch)  # E x K
-                H, edge_attr, Z = self.dit_layers[layer_index](batch, H, te_h, edge_attr, E_idx, te_e, distances, Z)
-            with nvtx.range(f"EGNN Layer {layer_index}"):
-                pos = self.egnn_layers[layer_index](batch, pos, H, E_idx, edge_attr, te_e_cont)
+            # with nvtx.range(f"DiTe Layer {layer_index}"):
+            distances = coord2distfn(pos, E_idx, self.scale_dist_features, batch)  # E x K
+            H, edge_attr, Z = self.dit_layers[layer_index](batch, H, te_h, edge_attr, E_idx, te_e, distances, Z)
+            # with nvtx.range(f"EGNN Layer {layer_index}"):
+            pos = self.egnn_layers[layer_index](batch, pos, H, E_idx, edge_attr, te_e_cont)
             atom_hids = atom_hids + self.node_blocks[layer_index](H)
             edge_hids = edge_hids + self.edge_blocks[layer_index](edge_attr)
 

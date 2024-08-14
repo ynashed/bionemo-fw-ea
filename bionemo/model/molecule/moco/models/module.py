@@ -245,6 +245,29 @@ class Graph3DInterpolantModel(pl.LightningModule):
                     end_factor=1.0,  # End factor (final learning rate / final learning rate)
                     total_iters=self.lr_scheduler_params.num_warmup_steps,  # Number of iterations to go from start_factor to end_factor
                 )
+            elif self.lr_scheduler_params.type == "linear_warmup_decay":
+                # Warm-up phase using LinearLR
+                warmup_scheduler = torch.optim.lr_scheduler.LinearLR(
+                    optimizer,
+                    start_factor=self.lr_scheduler_params.initial_lr / self.lr_scheduler_params.final_lr,
+                    end_factor=1.0,
+                    total_iters=self.lr_scheduler_params.num_warmup_steps,  # Steps
+                )
+
+                # Decay phase using LinearLR (kicks in after milestone)
+                decay_scheduler = torch.optim.lr_scheduler.LinearLR(
+                    optimizer,
+                    start_factor=1.0,
+                    end_factor=self.lr_scheduler_params.min_lr_decay / self.lr_scheduler_params.final_lr,
+                    total_iters=self.lr_scheduler_params.num_decay_steps,  # Steps
+                )
+
+                # SequentialLR to combine both schedulers
+                scheduler = torch.optim.lr_scheduler.SequentialLR(
+                    optimizer,
+                    schedulers=[warmup_scheduler, decay_scheduler],
+                    milestones=[self.lr_scheduler_params.milestone_steps],  # Milestone in steps
+                )
             else:
                 raise NotImplementedError('LR Scheduler not supported: %s' % self.lr_scheduler_params.type)
             return {
