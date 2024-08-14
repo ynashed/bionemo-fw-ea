@@ -159,9 +159,9 @@ def test_train_mnist_litautoencoder_with_megatron_strategy_single_gpu(tmpdir: LE
         simple_ft_checkpoint, simple_ft_metrics = _train_model_get_ckpt(
             name="simple_finetune_experiment",
             root_dir=tmpdir / "simple_finetune",  # new checkpoint will land in a subdir of this
-            data_dir=data_dir, # same data dir for all steps to skip re-download
-            model_cfg_cls=lb.ExampleConfig, # same config as before since we are just continuing training
-            ckpt_path=ckpt_path, # specify the initial checkpoint path now
+            data_dir=data_dir,  # same data dir for all steps to skip re-download
+            model_cfg_cls=lb.ExampleConfig,  # same config as before since we are just continuing training
+            ckpt_path=ckpt_path,  # specify the initial checkpoint path now
             skip_weight_prefixes=set(),  # no new weights in this model need skipping
         )
         assert simple_ft_checkpoint.exists()
@@ -191,7 +191,7 @@ def test_train_mnist_litautoencoder_with_megatron_strategy_single_gpu(tmpdir: LE
             data_dir=data_dir,
             model_cfg_cls=lb.ExampleFineTuneDropParentConfig,  # config that drops the decoder and head -> only cls now
             ckpt_path=add_head_checkpoint,  # cumulatively build on the config that had this cls head (optional)
-            skip_weight_prefixes=set(), # no new parameters vs prior cfg, will continue training cls head by itself
+            skip_weight_prefixes=set(),  # no new parameters vs prior cfg, will continue training cls head by itself
         )
         assert drop_head_checkpoint.exists()
         assert drop_head_checkpoint.is_dir()
