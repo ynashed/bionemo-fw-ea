@@ -16,14 +16,17 @@
 """This is intended to be a minimal self-container NeMo2 example."""
 
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Sequence, Tuple, TypedDict
+from pathlib import Path
+from typing import Any, Dict, Optional, Sequence, Tuple, Type, TypedDict
 
 import pytorch_lightning as pl
 import torch
-from megatron.core import ModelParallelConfig
+from megatron.core import ModelParallelConfig, dist_checkpointing
+from megatron.core.dist_checkpointing.mapping import ShardedTensor
 from megatron.core.optimizer import OptimizerConfig
 from megatron.core.transformer.enums import ModelType
 from megatron.core.transformer.module import MegatronModule
+from nemo.lightning import io
 from nemo.lightning.megatron_parallel import DataT, MegatronLossReduction, ReductionT
 from nemo.lightning.pytorch.optim import MegatronOptimizerModule
 from nemo.lightning.pytorch.plugins import MegatronDataSampler
@@ -31,6 +34,9 @@ from torch import Tensor, nn
 from torch.utils.data import DataLoader
 from torchvision import transforms
 from torchvision.datasets import MNIST
+
+from bionemo.core.model.config import BionemoTrainableModelConfig
+from bionemo.llm.lightning import LightningPassthroughPredictionMixin
 
 
 __all__: Sequence[str] = (
@@ -43,30 +49,10 @@ __all__: Sequence[str] = (
 )
 
 
-@dataclass
-class ExampleConfig(ModelParallelConfig):
-    """ExampleConfig is a dataclass that is used to configure the model.
-
-    Timers from ModelParallelConfig are required for megatron forward compatibility.
-    """
-
-    calculate_per_token_loss: bool = False
-
-    def configure_model(self) -> nn.Module:
-        """This function is called by the strategy to construct the model.
-
-        Note: Must pass self into Model since model requires having a config object.
-
-        Returns:
-            The model object.
-        """
-        return ExampleModel(self)
-
-
 class MSELossReduction(MegatronLossReduction):
     """A class used for calculating the loss, and for logging the reduced loss across micro batches."""
 
-    def forward(self, batch: DataT, forward_out: Tensor) -> Tuple[Tensor, ReductionT]:
+    def forward(self, batch: DataT, forward_out: Dict[str, Tensor]) -> Tuple[Tensor, ReductionT]:
         """Calculates the loss within a micro-batch. A micro-batch is a batch of data on a single GPU.
 
         Args:
@@ -79,7 +65,7 @@ class MSELossReduction(MegatronLossReduction):
                 (which currently only works for logging.).
         """
         x = batch["data"]
-        x_hat = forward_out
+        x_hat = forward_out["x_hat"]
         xview = x.view(x.size(0), -1)
         loss = nn.functional.mse_loss(x_hat, xview)
 
@@ -100,10 +86,195 @@ class MSELossReduction(MegatronLossReduction):
         return mse_losses.mean()
 
 
-class LitAutoEncoder(pl.LightningModule):
+def munge_key_megatron_to_nemo2(k: str) -> str:
+    return f"0.module.{k}"
+
+
+def munge_sharded_tensor_key_megatron_to_nemo2(v: ShardedTensor) -> ShardedTensor:
+    # This works with PP=1, how do we handle PP>1?
+    key = v.key
+    v.key = munge_key_megatron_to_nemo2(key)
+    return v
+
+
+def load_weights_shareded_inplace_nemo2_to_mcore(model, ckpt):
+    # Loads checkpoint from state dict
+    sharded_state_dict = {
+        munge_key_megatron_to_nemo2(k): munge_sharded_tensor_key_megatron_to_nemo2(v)
+        for k, v in model.sharded_state_dict().items()
+    }
+    dist_checkpointing.load(
+        sharded_state_dict=sharded_state_dict,
+        # TODO pull settings out of checkpoint and into self, demonstrate how that's done.
+        checkpoint_dir=ckpt,
+        strict=dist_checkpointing.serialization.StrictHandling.ASSUME_OK_UNEXPECTED,
+    )
+
+
+@dataclass
+class ExampleConfig(BionemoTrainableModelConfig["ExampleModel", "MSELossReduction"]):
+    """ExampleConfig is a dataclass that is used to configure the model.
+
+    Timers from ModelParallelConfig are required for megatron forward compatibility.
+    """
+
+    initial_weights: str | None = None
+    calculate_per_token_loss: bool = False
+
+    def configure_model(self) -> "ExampleModel":
+        """This function is called by the strategy to construct the model.
+
+        Note: Must pass self into Model since model requires having a config object.
+
+        Returns:
+            The model object.
+        """
+        model = ExampleModel(self)
+        if self.initial_weights:
+            load_weights_shareded_inplace_nemo2_to_mcore(model, self.initial_weights)
+        return model
+
+    def get_loss_reduction_class(self) -> Type[MSELossReduction]:
+        return MSELossReduction
+
+
+@dataclass
+class ExampleFineTuneBothConfig(
+    BionemoTrainableModelConfig["ExampleFineTuneBothModel", "MSEPlusClassifierLossReduction"]
+):
+    """ExampleConfig is a dataclass that is used to configure the model.
+
+    Timers from ModelParallelConfig are required for megatron forward compatibility.
+    """
+
+    initial_weights: Path | None = None
+    calculate_per_token_loss: bool = False
+
+    def configure_model(self) -> "ExampleFineTuneBothModel":
+        """This function is called by the strategy to construct the model.
+
+        Note: Must pass self into Model since model requires having a config object.
+
+        Returns:
+            The model object.
+        """
+        model = ExampleFineTuneBothModel(self)
+        if self.initial_weights:
+            load_weights_shareded_inplace_nemo2_to_mcore(model, self.initial_weights)
+        return model
+
+    def get_loss_reduction_class(self) -> Type["MSEPlusClassifierLossReduction"]:
+        return MSEPlusClassifierLossReduction
+
+
+@dataclass
+class ExampleFineTuneDropParentConfig(
+    BionemoTrainableModelConfig["ExampleFineTuneDropParentModel", "ClassifierLossReduction"]
+):
+    """ExampleConfig is a dataclass that is used to configure the model.
+
+    Timers from ModelParallelConfig are required for megatron forward compatibility.
+    """
+
+    initial_weights: Path | None = None
+    calculate_per_token_loss: bool = False
+
+    def configure_model(self) -> "ExampleFineTuneDropParentModel":
+        """This function is called by the strategy to construct the model.
+
+        Note: Must pass self into Model since model requires having a config object.
+
+        Returns:
+            The model object.
+        """
+        model = ExampleFineTuneDropParentModel(self)
+        if self.initial_weights:
+            load_weights_shareded_inplace_nemo2_to_mcore(model, self.initial_weights)
+        return model
+
+    def get_loss_reduction_class(self) -> Type["ClassifierLossReduction"]:
+        return ClassifierLossReduction
+
+
+class MSEPlusClassifierLossReduction(MegatronLossReduction):
+    """A class used for calculating the loss, and for logging the reduced loss across micro batches."""
+
+    def forward(self, batch: DataT, forward_out: Dict[str, Tensor]) -> Tuple[Tensor, ReductionT]:
+        """Calculates the loss within a micro-batch. A micro-batch is a batch of data on a single GPU.
+
+        Args:
+            batch: A batch of data that gets passed to the original forward inside LitAutoEncoder.
+            forward_out: the output of the forward method inside LitAutoEncoder.
+
+        Returns:
+            A tuple containing [<loss_tensor>, ReductionT] where the loss tensor will be used for
+                backpropagation and the ReductionT will be passed to the reduce method
+                (which currently only works for logging.).
+        """
+        x = batch["data"]
+        digits = batch["labels"]
+        x_hat = forward_out["x_hat"]
+        digit_logits = forward_out["digit_logits"]
+        xview = x.view(x.size(0), -1)
+        mse_loss = nn.functional.mse_loss(x_hat, xview)
+        classifier_loss = nn.functional.cross_entropy(digit_logits, digits)
+        loss = classifier_loss + mse_loss
+        return loss, {"avg": loss}
+
+    def reduce(self, losses_reduced_per_micro_batch: Sequence[ReductionT]) -> Tensor:
+        """Works across micro-batches. (data on single gpu).
+
+        Note: This currently only works for logging and this loss will not be used for backpropagation.
+
+        Args:
+            losses_reduced_per_micro_batch: a list of the outputs of forward
+
+        Returns:
+            A tensor that is the mean of the losses. (used for logging).
+        """
+        mse_losses = torch.stack([loss["avg"] for loss in losses_reduced_per_micro_batch])
+        return mse_losses.mean()
+
+
+class ClassifierLossReduction(MegatronLossReduction):
+    """A class used for calculating the loss, and for logging the reduced loss across micro batches."""
+
+    def forward(self, batch: DataT, forward_out: Tensor) -> Tuple[Tensor, ReductionT]:
+        """Calculates the loss within a micro-batch. A micro-batch is a batch of data on a single GPU.
+
+        Args:
+            batch: A batch of data that gets passed to the original forward inside LitAutoEncoder.
+            forward_out: the output of the forward method inside LitAutoEncoder.
+
+        Returns:
+            A tuple containing [<loss_tensor>, ReductionT] where the loss tensor will be used for
+                backpropagation and the ReductionT will be passed to the reduce method
+                (which currently only works for logging.).
+        """
+        digits = batch["labels"]
+        digit_logits = forward_out
+        loss = nn.functional.cross_entropy(digit_logits, digits)
+        return loss, {"avg": loss}
+
+    def reduce(self, losses_reduced_per_micro_batch: Sequence[ReductionT]) -> Tensor:
+        """Works across micro-batches. (data on single gpu).
+
+        Note: This currently only works for logging and this loss will not be used for backpropagation.
+
+        Args:
+            losses_reduced_per_micro_batch: a list of the outputs of forward
+
+        Returns:
+            A tensor that is the mean of the losses. (used for logging).
+        """
+        mse_losses = torch.stack([loss["avg"] for loss in losses_reduced_per_micro_batch])
+        return mse_losses.mean()
+
+
+class LitAutoEncoder(pl.LightningModule, io.IOMixin, LightningPassthroughPredictionMixin):
     """A very basic lightning module for testing the megatron strategy and the megatron-nemo2-bionemo contract."""
 
-    def __init__(self, config):
+    def __init__(self, config: BionemoTrainableModelConfig):
         """Initializes the model.
 
         Args:
@@ -155,19 +326,22 @@ class LitAutoEncoder(pl.LightningModule):
 
     def training_loss_reduction(self) -> MegatronLossReduction:  # noqa: D102
         # This is the function that takes batch['loss_mask'] and the logits output by the model and reduces the loss
-        return MSELossReduction()
+        return self.loss_reduction_class()()
 
     def validation_loss_reduction(self) -> MegatronLossReduction:  # noqa: D102
-        return MSELossReduction()
+        return self.loss_reduction_class()()
 
     def test_loss_reduction(self) -> MegatronLossReduction:  # noqa: D102
-        return MSELossReduction()
+        return self.loss_reduction_class()()
 
     def configure_model(self) -> None:  # noqa: D102
         self.module = self.config.configure_model()
 
+    def loss_reduction_class(self) -> Type[MegatronLossReduction]:
+        return self.config.get_loss_reduction_class()
 
-class ExampleModel(MegatronModule):  # noqa: D101
+
+class ExampleModelTrunk(MegatronModule):
     def __init__(self, config: ModelParallelConfig) -> None:
         """Constructor of the model.
 
@@ -179,11 +353,33 @@ class ExampleModel(MegatronModule):  # noqa: D101
         self.linear1 = nn.Linear(28 * 28, 64)
         self.relu = nn.ReLU()
         self.linear2 = nn.Linear(64, 3)
+
+    def forward(self, x: torch.Tensor) -> Tensor:
+        # we could return a dictionary of strings to tensors here, but let's demonstrate this is not necessary
+        x = x.view(x.size(0), -1)
+        z = self.linear1(x)
+        z = self.relu(z)
+        z = self.linear2(z)
+        return z
+
+    def set_input_tensor(self, input_tensor: Optional[Tensor]) -> None:
+        """This _would_ be needed for model parallel and other kinds of more complicated forward passes in megatron"""
+        pass
+
+
+class ExampleModel(ExampleModelTrunk):  # noqa: D101
+    def __init__(self, config: ModelParallelConfig) -> None:
+        """Constructor of the model.
+
+        Args:
+            config: The config object is responsible for telling the strategy what model to create.
+        """
+        super().__init__(config)
         self.linear3 = nn.Linear(3, 64)
         self.relu2 = nn.ReLU()
         self.linear4 = nn.Linear(64, 28 * 28)
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, x: Tensor) -> Dict[str, Tensor]:
         """Forward pass of the model.
 
         Args:
@@ -192,26 +388,39 @@ class ExampleModel(MegatronModule):  # noqa: D101
         Returns:
             x_hat: The result of the last linear layer of the network.
         """
-        x = x.view(x.size(0), -1)
-        z = self.linear1(x)
-        z = self.relu(z)
-        z = self.linear2(z)
+        z: Tensor = super().forward(x)
         x_hat = self.linear3(z)
         x_hat = self.relu2(x_hat)
         x_hat = self.linear4(x_hat)
-        return x_hat
+        return {"x_hat": x_hat, "z": z}
 
-    def set_input_tensor(self, input_tensor: Optional[Tensor]) -> None:
-        """This is needed because it is a megatron convention. Even if it is a no-op for single GPU testing.
 
-        See megatron.model.transformer.set_input_tensor()
+class ExampleFineTuneBothModel(ExampleModel):
+    """Example of taking the example model and adding an output task"""
 
-        Note: Currently this is a no-op just to get by an mcore function.
+    def __init__(self, config: ModelParallelConfig):
+        super().__init__(config)
+        # 10 output digits, and use the latent output layer (z) for making predictions
+        self.digit_classifier = nn.Linear(self.linear2.out_features, 10)
 
-        Args:
-            input_tensor: Input tensor.
-        """
-        pass
+    def forward(self, x: Tensor) -> Dict[str, Tensor]:
+        parent_out: Dict[str, Tensor] = super().forward(x)
+        digit_logits = self.digit_classifier(parent_out["z"])
+        return {**parent_out, "digit_logits": digit_logits}
+
+
+class ExampleFineTuneDropParentModel(ExampleModelTrunk):
+    """Example of taking the example model and replacing output task"""
+
+    def __init__(self, config: ModelParallelConfig):
+        super().__init__(config)
+        # 10 output digits, and use the latent output layer (z) for making predictions
+        self.digit_classifier = nn.Linear(self.linear2.out_features, 10)
+
+    def forward(self, x: Tensor) -> Tensor:
+        z: Tensor = super().forward(x)
+        digit_logits = self.digit_classifier(z)  # to demonstrate flexibility, in this case we return a tensor
+        return digit_logits
 
 
 class MnistItem(TypedDict):
@@ -282,6 +491,3 @@ class MNISTDataModule(pl.LightningDataModule):  # noqa: D101
 
     def test_dataloader(self) -> DataLoader:  # noqa: D102
         return DataLoader(self.mnist_test, batch_size=self.batch_size, num_workers=0)
-
-    def predict_dataloader(self) -> DataLoader:  # noqa: D102
-        return DataLoader(self.mnist_predict, batch_size=self.batch_size, num_workers=0)

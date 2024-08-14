@@ -17,6 +17,9 @@
 from abc import ABC, abstractmethod
 from typing import Generic, Sequence, Type, TypeVar
 
+from megatron.core.model_parallel_config import ModelParallelConfig
+from nemo.lightning.io import IOMixin
+
 
 __all__: Sequence[str] = (
     "BionemoModelConfig",
@@ -29,7 +32,7 @@ Loss = TypeVar("Loss")
 Model = TypeVar("Model")
 
 
-class BionemoModelConfig(Generic[Model], ABC):
+class BionemoModelConfig(Generic[Model], ModelParallelConfig, IOMixin, ABC):
     """An abstract class for model configuration."""
 
     @abstractmethod
