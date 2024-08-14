@@ -27,6 +27,7 @@ jobs:
           pip install -r docs/requirements.txt
       - name: Build site
         run: mkdocs build
+        working-directory: docs
       - name: Configure Git Credentials
         if: github.event_name == 'push'
         run: |
@@ -35,3 +36,4 @@ jobs:
       - name: Deploy
         if: github.event_name == 'push'
         run: mkdocs gh-deploy --force
+        working-directory: docs
