@@ -16,8 +16,10 @@
 
 import math
 import os
+import tarfile
 from dataclasses import dataclass
-from typing import Callable, Literal, Optional, Sequence
+from pathlib import Path
+from typing import Callable, Literal, Optional, Sequence, Type
 
 import torch
 import torch.distributed
@@ -32,6 +34,7 @@ from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.transformer.utils import get_linear_layer
 from nemo.collections.common.tokenizers.huggingface.auto_tokenizer import AutoTokenizer
 from nemo.lightning import get_vocab_size
+from nemo.lightning.megatron_parallel import MegatronLossReduction
 from torch import Tensor
 from torch.optim import Optimizer
 
@@ -40,6 +43,8 @@ from bionemo.esm2.model.attention import ESM2DotProductAttention
 from bionemo.esm2.model.embedding import ESM2Embedding
 from bionemo.llm.model.biobert.model import MegatronBioBertModel
 from bionemo.llm.model.biobert.transformer_specs import BiobertSpecOption, get_biobert_spec
+from bionemo.llm.model.loss import BERTMLMLossWithReduction
+from bionemo.llm.utils.weight_utils import nemo1_to_nemo2_biobert_key_mapping
 
 
 __all__: Sequence[str] = (
@@ -261,47 +266,46 @@ class ESM2Config(BionemoModelConfig[ESM2Model], TransformerConfig):
     attention_dropout: float = 0.0  # ESM2 does not use attention dropout
     apply_residual_connection_post_layernorm: bool = False  # TODO: farhadr False is new default, True was BERT pub.
     layernorm_epsilon: float = 1.0e-5
-    layernorm_zero_centered_gamma: bool = False  # TODO(@jstjohn) check this
     activation_func: Callable = esm_gelu_func  # ESM2 MLP
-
     init_method_std: float = 0.02
-    apply_query_key_layer_scaling: bool = True  # TODO: farhadr check in esm2
-
-    masked_softmax_fusion: bool = True  # Use a kernel that fuses the attention softmax with it's mask.
-    fp16_lm_cross_entropy: bool = False  # Move the cross entropy unreduced loss calculation for lm head to fp16
-    share_embeddings_and_output_weights: bool = True
-    enable_autocast: bool = True  # This has to be set to True if we use the mixed precision plugin
-    biobert_spec_option: BiobertSpecOption = BiobertSpecOption.esm2_bert_layer_local_spec.value
-    position_embedding_type: Literal["learned_absolute", "rope"] = (
-        "rope"  # ESM2 uses relative positional encoding 'ROPE' to extrapolate to longer sequences unseen during training
-    )
-
-    seq_length: int = 1024
-    make_vocab_size_divisible_by: int = 128
 
     # embedding
     token_dropout: bool = True
     use_attention_mask: bool = True
 
     # core attention
-    use_esm_attention: bool = True  # farhadr MR813
+    use_esm_attention: bool = True
     attention_softmax_in_fp32: bool = True
-
-    optimizer_fn: Optional[Callable[[MegatronBioBertModel], Optimizer]] = None
+    normalize_attention_scores: bool = False
+    apply_query_key_layer_scaling: bool = True
 
     # From megatron.core.models.gpt.bert_model.GPTModel
+    fp16_lm_cross_entropy: bool = False  # Move the cross entropy unreduced loss calculation for lm head to fp16
     parallel_output: bool = True
+    share_embeddings_and_output_weights: bool = True
+    make_vocab_size_divisible_by: int = 128
+    position_embedding_type: Literal["learned_absolute", "rope"] = (
+        "rope"  # ESM2 uses relative positional encoding 'ROPE' to extrapolate to longer sequences unseen during training
+    )
     rotary_base: int = 10000
     rotary_percent: float = 1.0
     seq_len_interpolation_factor: Optional[float] = None
+    seq_length: int = 1024
+    biobert_spec_option: BiobertSpecOption = BiobertSpecOption.esm2_bert_layer_local_spec.value
 
+    # TODO: Move this to better places?
     get_attention_mask_from_fusion: bool = False
 
-    nemo1_ckpt_path: Optional[str] = None
+    optimizer_fn: Optional[Callable[[MegatronBioBertModel], Optimizer]] = None
+    # TODO (@skothenhill,@georgea) update to use the nemo2 checkpoint mixins
+    #  support HF (requires weight interleaving on qkv layer) and nemo1 checkpoints ideally.
+    # TODO (@skothenhill,@jstjohn) come up with a nice way of doing fine-tuning checkpoint loading,
+    #  where some acceptible layers (eg lm_head) may or may not be absent from the model, and others
+    #  (like a new head) may be new and missing from the initial checkpoint.
+    nemo1_ckpt_path: Optional[Path] = None
     # TODO (@jstjohn) come up with a cleaner way in the biobert module to return user requested
     #  things as part of the workflow for inference and fine-tuning.
-
-    return_only_hidden_states: bool = False
+    return_only_hidden_states: bool = False  # return logits
 
     def configure_model(self, tokenizer) -> ESM2Model:
         """Configures the ESM2Model with the given tokenizer.
@@ -329,7 +333,7 @@ class ESM2Config(BionemoModelConfig[ESM2Model], TransformerConfig):
 
         do_next_sentence = False
 
-        return ESM2Model(
+        model = ESM2Model(
             self,
             transformer_layer_spec=get_biobert_spec(
                 self.biobert_spec_option,
@@ -352,3 +356,41 @@ class ESM2Config(BionemoModelConfig[ESM2Model], TransformerConfig):
             add_binary_head=do_next_sentence,
             use_full_attention_mask=use_full_attention_mask,
         )
+        # TODO (@skothenhill) this is a hack to load the old checkpoint.
+        # This should be removed once we have a proper checkpoint conversion
+        # see NeMo/nemo/collections/llm/gpt/model/mixtral.py for how we should do it.
+        # We should eventually have an adapter for nemo1 checkpoints, HF checkpoints (at least for ESM2 @georgea)
+        # and an adapter may also be the right way to handle expected missing/extra keys when importing
+        # a checkpoint for fine-tuning (eg ignore misisng lm_head, if not there in model, etc).
+        if self.nemo1_ckpt_path is not None:
+            te_mapping = self.biobert_spec_option in {
+                BiobertSpecOption.bert_layer_with_transformer_engine_spec,
+                BiobertSpecOption.bert_layer_with_transformer_engine_and_qk_ln_spec,
+            }
+            with tarfile.open(self.nemo1_ckpt_path, "r") as old_ckpt:
+                ckpt_file = old_ckpt.extractfile("./model_weights.ckpt")
+                old_weights = torch.load(ckpt_file)
+                new_state_dict_from_old = {}
+                for k, v in old_weights.items():
+                    if "word_embeddings" in k:
+                        print(k)
+                    new_key = nemo1_to_nemo2_biobert_key_mapping(k, new_model_prefix="", te_mapping=te_mapping)
+                    new_state_dict_from_old[new_key] = v
+                # TE adds non-null ._extra_state objects to layers, which store some kind of buffer bits
+                #  so we need to allow those to pass through if we're loading from bionemo1 which did not
+                #  use TE.
+                model.load_state_dict(new_state_dict_from_old, strict=not te_mapping)
+
+        # TODO (@jstjohn) come up with a cleaner way in the biobert module to return hidden states.
+        #  maybe a suite of options like hugging face has so a user can ask for several or only one thing.
+        if self.return_only_hidden_states:
+            # this applies the final layernorm in the encoder to the hidden states which was
+            #  the default in nemo1.
+            model.post_process = False
+            model.encoder.post_process = True
+            model.encoder.post_layer_norm = True
+        return model
+
+    def get_loss_reduction_class(self) -> Type[MegatronLossReduction]:  # noqa: D102
+        # You could optionally return a different loss reduction class here based on the config settings.
+        return BERTMLMLossWithReduction
