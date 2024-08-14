@@ -143,61 +143,59 @@ def test_train_mnist_litautoencoder_with_megatron_strategy_single_gpu(tmpdir: LE
     data_dir: Path = tmpdir / "data"
     data_dir.mkdir()
     with megatron_parallel_state_utils.clean_parallel_state_context():
-
-        def train_model(tmpdir: Path) -> Tuple[Path, MetricTracker]:
-            # Configure our custom Checkpointer
-            name = "test_experiment"
-            return _train_model_get_ckpt(name, tmpdir, data_dir, lb.ExampleConfig, None, set())
-
-        ckpt_path, initial_metrics = train_model(tmpdir / "pretrain")
+        ckpt_path, initial_metrics = _train_model_get_ckpt(
+            "test_experiment",
+            tmpdir / "pretrain",
+            data_dir,
+            lb.ExampleConfig,
+            None,
+            set(),
+        )
         assert ckpt_path.exists()
         assert ckpt_path.is_dir()
         assert io.is_distributed_ckpt(ckpt_path)
         assert initial_metrics.collection_train["loss"][0] > initial_metrics.collection_train["loss"][-1]
     with megatron_parallel_state_utils.clean_parallel_state_context():
-
-        def simple_finetune(tmpdir: Path, ckpt_path: Path) -> Tuple[Path, MetricTracker]:
-            """Now take that checkpoint and show that you can train it further without making changes to model/loss"""
-
-            # Configure our custom Checkpointer
-            name = "simple_finetune_experiment"
-            return _train_model_get_ckpt(name, tmpdir, data_dir, lb.ExampleConfig, ckpt_path, set())
-
-        simple_ft_checkpoint, simple_ft_metrics = simple_finetune(tmpdir / "simple_finetune", ckpt_path)
+        simple_ft_checkpoint, simple_ft_metrics = _train_model_get_ckpt(
+            "simple_finetune_experiment",
+            tmpdir / "simple_finetune",
+            data_dir,
+            lb.ExampleConfig,
+            ckpt_path,
+            set(),
+        )
         assert simple_ft_checkpoint.exists()
         assert simple_ft_checkpoint.is_dir()
         assert io.is_distributed_ckpt(simple_ft_checkpoint)
         assert initial_metrics.collection_train["loss"][-1] > simple_ft_metrics.collection_train["loss"][0]
     with megatron_parallel_state_utils.clean_parallel_state_context():
-
-        def add_head_finetune(tmpdir: Path, ckpt_path: Path) -> Tuple[Path, MetricTracker]:
-            """Now take that checkpoint and show that you can add in a new head/task and update loss"""
-            # Configure our custom Checkpointer
-            name = "add_head_finetune_experiment"
-            return _train_model_get_ckpt(
-                name, tmpdir, data_dir, lb.ExampleFineTuneBothConfig, simple_ft_checkpoint, {"digit_classifier"}
-            )
-
-        add_head_checkpoint, add_head_ft_metrics = add_head_finetune(
-            tmpdir / "add_head_finetune", simple_ft_checkpoint
+        add_head_checkpoint, add_head_ft_metrics = _train_model_get_ckpt(
+            "add_head_finetune_experiment",
+            tmpdir / "add_head_finetune",
+            data_dir,
+            lb.ExampleFineTuneBothConfig,
+            simple_ft_checkpoint,
+            {"digit_classifier"},
         )
         assert add_head_checkpoint.exists()
         assert add_head_checkpoint.is_dir()
         assert io.is_distributed_ckpt(add_head_checkpoint)
         assert add_head_ft_metrics.collection_train["loss"][0] > add_head_ft_metrics.collection_train["loss"][-1]
+        # We're adding a new loss, so the loss should be worse initially at least.
+        assert add_head_ft_metrics.collection_train["loss"][0] > simple_ft_metrics.collection_train["loss"][-1]
 
     with megatron_parallel_state_utils.clean_parallel_state_context():
-
-        def drop_head_finetune(tmpdir: Path, ckpt_path: Path) -> Tuple[Path, MetricTracker]:
-            """Now take that checkpoint and show that you can drop a head and update loss"""
-            name = "drop_head_finetune_experiment"
-            return _train_model_get_ckpt(name, tmpdir, data_dir, lb.ExampleFineTuneDropParentConfig, ckpt_path, set())
-
-        drop_head_checkpoint, drop_head_ft_metrics = drop_head_finetune(
-            tmpdir / "drop_head_finetune", add_head_checkpoint
+        drop_head_checkpoint, drop_head_ft_metrics = _train_model_get_ckpt(
+            "drop_head_finetune_experiment",
+            tmpdir / "drop_head_finetune",
+            data_dir,
+            lb.ExampleFineTuneDropParentConfig,
+            add_head_checkpoint,
+            set(),
         )
         assert drop_head_checkpoint.exists()
         assert drop_head_checkpoint.is_dir()
         assert io.is_distributed_ckpt(drop_head_checkpoint)
+        # We're dropping a loss, so initially we should be better than before
         assert drop_head_ft_metrics.collection_train["loss"][0] > drop_head_ft_metrics.collection_train["loss"][-1]
         assert add_head_ft_metrics.collection_train["loss"][-1] > drop_head_ft_metrics.collection_train["loss"][0]
