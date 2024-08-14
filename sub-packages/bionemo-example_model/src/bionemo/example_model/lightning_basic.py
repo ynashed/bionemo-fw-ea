@@ -87,11 +87,7 @@ class MSELossReduction(MegatronLossReduction):
         return mse_losses.mean()
 
 
-def munge_key_megatron_to_nemo2(k: str, keep_initial: bool = False) -> str:
-    if keep_initial:
-        parts = k.split(".")
-        new = [parts[0], "module", *parts[1:]]
-        return ".".join(new)
+def munge_key_megatron_to_nemo2(k: str) -> str:
     return f"module.{k}"
 
 
@@ -109,16 +105,15 @@ def key_in_filter(k: str, filter: Set[str]) -> bool:
     return False
 
 
-def load_weights_shareded_inplace_nemo2_to_mcore(model, ckpt, skip_loading_keys: Set[str]):
+def load_weights_sharded_inplace_nemo2_to_mcore(model, ckpt, skip_loading_keys: Set[str]):
     # Loads checkpoint from state dict
     sharded_state_dict = {
-        munge_key_megatron_to_nemo2(k, keep_initial=False): munge_sharded_tensor_key_megatron_to_nemo2(v)
+        munge_key_megatron_to_nemo2(k): munge_sharded_tensor_key_megatron_to_nemo2(v)
         for k, v in model.sharded_state_dict().items()
         if not key_in_filter(k, skip_loading_keys)
     }
     dist_checkpointing.load(
         sharded_state_dict=sharded_state_dict,
-        # TODO pull settings out of checkpoint and into self, demonstrate how that's done.
         checkpoint_dir=ckpt,
         strict=dist_checkpointing.serialization.StrictHandling.ASSUME_OK_UNEXPECTED,
     )
@@ -145,10 +140,11 @@ class ExampleConfig(BionemoTrainableModelConfig["ExampleModel", "MSELossReductio
         """
         model = ExampleModel(self)
         if self.initial_weights:
-            load_weights_shareded_inplace_nemo2_to_mcore(model, self.initial_weights, self.skip_weight_prefixes)
+            load_weights_sharded_inplace_nemo2_to_mcore(model, self.initial_weights, self.skip_weight_prefixes)
         return model
 
     def get_loss_reduction_class(self) -> Type[MSELossReduction]:
+        """Return the expected loss reduction class."""
         return MSELossReduction
 
 
@@ -175,7 +171,7 @@ class ExampleFineTuneBothConfig(
         """
         model = ExampleFineTuneBothModel(self)
         if self.initial_weights:
-            load_weights_shareded_inplace_nemo2_to_mcore(model, self.initial_weights, self.skip_weight_prefixes)
+            load_weights_sharded_inplace_nemo2_to_mcore(model, self.initial_weights, self.skip_weight_prefixes)
         return model
 
     def get_loss_reduction_class(self) -> Type["MSEPlusClassifierLossReduction"]:
@@ -205,7 +201,7 @@ class ExampleFineTuneDropParentConfig(
         """
         model = ExampleFineTuneDropParentModel(self)
         if self.initial_weights:
-            load_weights_shareded_inplace_nemo2_to_mcore(model, self.initial_weights, self.skip_weight_prefixes)
+            load_weights_sharded_inplace_nemo2_to_mcore(model, self.initial_weights, self.skip_weight_prefixes)
         return model
 
     def get_loss_reduction_class(self) -> Type["ClassifierLossReduction"]:
@@ -354,6 +350,7 @@ class LitAutoEncoder(pl.LightningModule, io.IOMixin, LightningPassthroughPredict
         self.module = self.config.configure_model()
 
     def loss_reduction_class(self) -> Type[MegatronLossReduction]:
+        """Get the loss reduction class the user has specified in their config."""
         return self.config.get_loss_reduction_class()
 
 
@@ -379,7 +376,7 @@ class ExampleModelTrunk(MegatronModule):
         return z
 
     def set_input_tensor(self, input_tensor: Optional[Tensor]) -> None:
-        """This _would_ be needed for model parallel and other kinds of more complicated forward passes in megatron"""
+        """This _would_ be needed for model parallel and other kinds of more complicated forward passes in megatron."""
         pass
 
 
@@ -412,7 +409,7 @@ class ExampleModel(ExampleModelTrunk):  # noqa: D101
 
 
 class ExampleFineTuneBothModel(ExampleModel):
-    """Example of taking the example model and adding an output task"""
+    """Example of taking the example model and adding an output task."""
 
     def __init__(self, config: ModelParallelConfig):
         super().__init__(config)
@@ -426,7 +423,7 @@ class ExampleFineTuneBothModel(ExampleModel):
 
 
 class ExampleFineTuneDropParentModel(ExampleModelTrunk):
-    """Example of taking the example model and replacing output task"""
+    """Example of taking the example model and replacing output task."""
 
     def __init__(self, config: ModelParallelConfig):
         super().__init__(config)

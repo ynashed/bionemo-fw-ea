@@ -175,7 +175,7 @@ def test_train_mnist_litautoencoder_with_megatron_strategy_single_gpu(tmpdir: LE
             # Configure our custom Checkpointer
             name = "add_head_finetune_experiment"
             return _train_model_get_ckpt(
-                name, tmpdir, data_dir, lb.ExampleFineTuneBothConfig, ckpt_path, {"digit_classifier"}
+                name, tmpdir, data_dir, lb.ExampleFineTuneBothConfig, simple_ft_checkpoint, {"digit_classifier"}
             )
 
         add_head_checkpoint, add_head_ft_metrics = add_head_finetune(
