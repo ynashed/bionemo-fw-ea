@@ -1,25 +1,12 @@
-# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
-#
-# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
-# property and proprietary rights in and to this material, related
-# documentation and any modifications thereto. Any use, reproduction,
-# disclosure or distribution of this material and related documentation
-# without an express license agreement from NVIDIA CORPORATION or
-# its affiliates is strictly prohibited.
-
-import functools
 import math
 
-import einops
 import torch
+import torch.cuda.nvtx as nvtx
 import torch.nn as nn
 import torch.nn.functional as F
-from torch_geometric.nn import MessagePassing
 from torch_geometric.nn.norm import LayerNorm as BatchLayerNorm
+from torch_geometric.utils import softmax
 from torch_scatter import scatter, scatter_mean
-
-from bionemo.model.molecule.moco.models.utils import PredictionHead
 
 
 NONLINEARITIES = {
@@ -211,15 +198,6 @@ class SwiGLU(nn.Module):
         return F.silu(x1) * x2
 
 
-def swiglu_ln_ffn(d_model: int, expansion_ratio: float, bias: bool):
-    return nn.Sequential(
-        nn.LayerNorm(d_model),
-        nn.Linear(d_model, swiglu_correction_fn(expansion_ratio, d_model) * 2, bias=bias),
-        SwiGLU(),
-        nn.Linear(swiglu_correction_fn(expansion_ratio, d_model), d_model, bias=bias),
-    )
-
-
 def swiglu_ffn(d_model: int, expansion_ratio: float, bias: bool):
     return nn.Sequential(
         nn.Linear(d_model, swiglu_correction_fn(expansion_ratio, d_model) * 2, bias=bias),
@@ -228,22 +206,98 @@ def swiglu_ffn(d_model: int, expansion_ratio: float, bias: bool):
     )
 
 
-class XEGNNK(MessagePassing):
+class PredictionHead(nn.Module):
+    def __init__(self, num_classes, feat_dim, discrete=True, edge_prediction=False, distance_prediction=False):
+        super().__init__()
+        self.num_classes = num_classes
+        self.discrete = discrete
+        self.projection = MLP(feat_dim, feat_dim, num_classes)
+        if edge_prediction:
+            self.post_process = MLP(num_classes, num_classes, num_classes)
+        if distance_prediction:
+            self.post_process = MLP(feat_dim, feat_dim, num_classes, last_act="sigmoid")
+            self.embedding = MLP(feat_dim, feat_dim, feat_dim)
+
+    #! Even if we have a masking state we still predict it but always mask it even on the forward pass as done in MultiFlow. The loss is taken over teh logits so its not masked
+    def forward(self, batch, H):
+        logits = self.projection(H)
+        if self.discrete:
+            probs = F.softmax(logits, dim=-1)  # scatter_softmax(logits, index=batch, dim=0, dim_size=H.size(0))
+        else:
+            probs = H - scatter_mean(H, index=batch, dim=0)[batch]
+        return logits, probs
+
+    def predict_edges(self, batch, E, E_idx):
+        #! EQGAT also uses hi hj and Xi-Xj along with f(E) see coordsatomsbonds.py line 121 https://github.com/tuanle618/eqgat-diff/blob/68aea80691a8ba82e00816c82875347cbda2c2e5/eqgat_diff/e3moldiffusion/coordsatomsbonds.py#L121C32-L121C44
+        # import ipdb; ipdb.set_trace()
+        E = self.projection(E)
+        src, dst = E_idx
+        N = batch.size(0)
+        e_dense = torch.zeros(N, N, E.size(-1), device=E.device)
+        e_dense[src, dst, :] = E
+        e_dense = 0.5 * (e_dense + e_dense.permute(1, 0, 2))
+        e = e_dense[src, dst, :]  # E x 5
+        logits = self.post_process(e)  # E x 5
+        probs = F.softmax(logits, dim=-1)
+        return logits, probs
+
+    def predict_distances(self, batch, Z):
+        input = Z + Z.permute(1, 0, 2)
+        logits = self.post_process(input) * self.embedding(input)
+        logits = self.projection(logits).squeeze(-1)
+        return logits
+
+
+class BondRefine(nn.Module):
+    def __init__(
+        self,
+        invariant_node_feat_dim=64,
+        invariant_edge_feat_dim=32,
+    ):
+        super().__init__()
+        # self.x_norm = E3Norm()
+        self.h_norm = BatchLayerNorm(invariant_node_feat_dim)
+        self.edge_norm = BatchLayerNorm(invariant_edge_feat_dim)
+        self.bond_norm = BatchLayerNorm(invariant_edge_feat_dim)
+        in_feats = 2 * invariant_node_feat_dim + 1 + invariant_edge_feat_dim
+        self.refine_layer = torch.nn.Sequential(
+            torch.nn.Linear(in_feats, invariant_edge_feat_dim),
+            torch.nn.SiLU(inplace=False),
+            torch.nn.Linear(invariant_edge_feat_dim, invariant_edge_feat_dim),
+        )
+
+    def forward(self, batch, X, H, edge_index, edge_attr):
+        X = X - scatter_mean(X, index=batch, dim=0)[batch]
+        # X = self.x_norm(X, batch)
+        H = self.h_norm(H, batch)
+        source, target = edge_index
+        rel_coors = X[source] - X[target]
+        rel_dist = (rel_coors**2).sum(dim=-1, keepdim=True)
+        # edge_batch, counts = torch.unique(batch, return_counts=True)
+        # edge_batch = torch.repeat_interleave(edge_batch, counts * (counts - 1))  # E
+        edge_batch = batch[source]
+        edge_attr = self.edge_norm(edge_attr, edge_batch)
+        infeats = torch.cat([H[target], H[source], rel_dist, edge_attr], dim=-1)
+        return self.bond_norm(self.refine_layer(infeats), edge_batch)
+
+
+class EquivariantBlock(nn.Module):
     """
-    X only EGNN
+    X only EGNN-like architecture
     """
 
-    def __init__(self, invariant_node_feat_dim=64, n_vector_features=128):
-        super().__init__(node_dim=0, aggr=None, flow="source_to_target")  #! This should be target to source
+    def __init__(
+        self, invariant_node_feat_dim=64, invariant_edge_feat_dim=64, n_vector_features=128, use_cross_product=False
+    ):
+        super().__init__()  #! This should be target to source
         self.message_input_size = (
-            2 * invariant_node_feat_dim + n_vector_features + invariant_node_feat_dim + invariant_node_feat_dim
-        )  # + invariant_edge_feat_dim
+            2 * invariant_node_feat_dim + n_vector_features + invariant_edge_feat_dim + invariant_node_feat_dim
+        )
         self.phi_message = MLP(self.message_input_size, invariant_node_feat_dim, invariant_node_feat_dim)
         self.phi_x = MLP(invariant_node_feat_dim, invariant_node_feat_dim, n_vector_features)
         self.coor_update_clamp_value = 10.0
-        # self.reset_parameters()
         self.h_norm = BatchLayerNorm(invariant_node_feat_dim)
-        self.use_cross_product = True
+        self.use_cross_product = use_cross_product
         if self.use_cross_product:
             self.phi_x_cross = MLP(invariant_node_feat_dim, invariant_node_feat_dim, n_vector_features)
         self.x_norm = E3Norm(n_vector_features)
@@ -263,6 +317,7 @@ class XEGNNK(MessagePassing):
         X = self.x_norm(X, batch)
         H = self.h_norm(H, batch)
         source, target = edge_index
+
         rel_coors = X[source] - X[target]
         rel_dist = (rel_coors.transpose(1, 2) ** 2).sum(dim=-1, keepdim=False)
         if edge_attr is not None:
@@ -270,13 +325,14 @@ class XEGNNK(MessagePassing):
         else:
             edge_attr_feat = rel_dist
         m_ij = self.phi_message(torch.cat([H[target], H[source], edge_attr_feat, te], dim=-1))
+
         coor_wij = self.phi_x(m_ij)  # E x 3
         if self.coor_update_clamp_value:
             coor_wij.clamp_(min=-self.coor_update_clamp_value, max=self.coor_update_clamp_value)
-        # import ipdb; ipdb.set_trace()
         X_rel_norm = rel_coors / (1 + torch.sqrt(rel_dist.unsqueeze(1) + 1e-8))
         x_update = scatter(X_rel_norm * coor_wij.unsqueeze(1), index=target, dim=0, reduce='sum', dim_size=X.shape[0])
         X_out = X + x_update
+
         if self.use_cross_product:
             mean = scatter(X, index=batch, dim=0, reduce='mean', dim_size=X.shape[0])
             x_src = X[source] - mean[source]
@@ -294,62 +350,6 @@ class XEGNNK(MessagePassing):
         return X_out
 
 
-class BondRefine(MessagePassing):  #! can make this nn.Module to ensure no weird propagate error
-    def __init__(
-        self,
-        invariant_node_feat_dim=64,
-        invariant_edge_feat_dim=32,
-    ):
-        super().__init__(node_dim=0, aggr=None, flow="source_to_target")
-        # self.x_norm = E3Norm()
-        self.h_norm = BatchLayerNorm(invariant_node_feat_dim)
-        self.edge_norm = BatchLayerNorm(invariant_edge_feat_dim)
-        self.bond_norm = BatchLayerNorm(invariant_edge_feat_dim)
-        in_feats = 2 * invariant_node_feat_dim + 1 + invariant_edge_feat_dim
-        self.refine_layer = torch.nn.Sequential(
-            torch.nn.Linear(in_feats, invariant_edge_feat_dim),
-            torch.nn.SiLU(inplace=False),
-            torch.nn.Linear(invariant_edge_feat_dim, invariant_edge_feat_dim),
-        )
-
-    def forward(self, batch, X, H, edge_index, edge_attr):
-        X = X - scatter_mean(X, index=batch, dim=0)[batch]
-        # X = self.x_norm(X, batch)
-        H = self.h_norm(H, batch)
-        source, target = edge_index
-        rel_coors = X[source] - X[target]
-        rel_dist = (rel_coors**2).sum(dim=-1, keepdim=True)
-        edge_batch, counts = torch.unique(batch, return_counts=True)
-        edge_batch = torch.repeat_interleave(edge_batch, counts * (counts - 1))  # E
-        edge_attr = self.edge_norm(edge_attr, edge_batch)
-        infeats = torch.cat([H[target], H[source], rel_dist, edge_attr], dim=-1)
-        return self.bond_norm(self.refine_layer(infeats), edge_batch)
-
-
-def coord2dist(x, edge_index, scale_dist_features=1, batch=None):
-    row, col = edge_index
-    coord_diff = x[row] - x[col]
-    radial = torch.sum(coord_diff**2, 1)
-    # import ipdb; ipdb.set_trace()
-    if scale_dist_features >= 2:
-        # dotproduct = x[row] * x[col]  # shape [num_edges, 3, k]
-        # dotproduct = dotproduct.sum(-2)  # sum over the spatial dimension, shape [num_edges, k]
-        # # Concatenate the computed features
-        # radial = torch.cat([radial, dotproduct], dim=-1)  # shape [num_edges, 2*k]
-        dotproduct = (x[row] * x[col]).sum(dim=-2, keepdim=False)  # shape [num_edges, 1]
-        norms = torch.linalg.norm(x[row], dim=-2, keepdim=False) * torch.linalg.norm(x[col], dim=-2, keepdim=False)
-        cosine_similarity = dotproduct / (norms + 1e-8)  # Add epsilon to avoid division by zero
-        radial = torch.cat([radial, cosine_similarity], dim=-1)  # shape [num_edges, 2]
-    if scale_dist_features >= 3:
-        # mean = scatter(x, index=batch, dim=0, reduce='mean', dim_size=x.shape[0])
-        x_src = x[row]  # - mean[row]
-        x_tgt = x[col]  # - mean[col]
-        cross = torch.cross(x_src, x_tgt, dim=1)  # .sum(1)
-        sin_theta = torch.linalg.norm(cross, dim=1, keepdim=False) / (norms + 1e-8)
-        radial = torch.cat([radial, sin_theta], dim=-1)  # shape [num_edges, 3*k]
-    return radial
-
-
 class DiTeBlock(nn.Module):
     """
     Mimics DiT block
@@ -358,61 +358,56 @@ class DiTeBlock(nn.Module):
     def __init__(
         self,
         hidden_size,
+        edge_hidden_size,
         num_heads,
         mlp_expansion_ratio=4.0,
-        use_z=True,
-        mask_z=True,
-        use_rotary=False,
+        use_z=None,
         n_vector_features=128,
-        scale_dist_features=1,
+        scale_dist_features=4,
+        dropout=0.0,
         **block_kwargs,
     ):
         super().__init__()
         self.hidden_size = hidden_size
+        self.dropout = dropout
         self.num_heads = num_heads
-        self.norm1 = BatchLayerNorm(hidden_size, affine=False, eps=1e-6)
-        self.norm2 = BatchLayerNorm(hidden_size, affine=False, eps=1e-6)
+        self.pre_attn_norm = BatchLayerNorm(hidden_size, affine=False, eps=1e-6)
+        self.pre_attn_norm_edge = BatchLayerNorm(edge_hidden_size, affine=False, eps=1e-6)
+
+        self.adaLN_modulation = nn.Sequential(nn.SiLU(), nn.Linear(hidden_size, 6 * hidden_size, bias=True))
+        self.adaLN_edge_modulation = nn.Sequential(
+            nn.SiLU(), nn.Linear(edge_hidden_size, 6 * edge_hidden_size, bias=True)
+        )
+
         if scale_dist_features > 1:
             dist_size = n_vector_features * scale_dist_features
         else:
             dist_size = n_vector_features
-        self.feature_embedder = MLP(hidden_size + hidden_size + hidden_size + dist_size, hidden_size, hidden_size)
-        self.norm1_edge = BatchLayerNorm(hidden_size, affine=False, eps=1e-6)
-        self.norm2_edge = BatchLayerNorm(hidden_size, affine=False, eps=1e-6)
-
-        self.ffn_norm = BatchLayerNorm(hidden_size)
-        self.ffn = swiglu_ffn(hidden_size, mlp_expansion_ratio, bias=False)
-        self.adaLN_modulation = nn.Sequential(nn.SiLU(), nn.Linear(hidden_size, 6 * hidden_size, bias=True))
-        self.adaLN_edge_modulation = nn.Sequential(nn.SiLU(), nn.Linear(hidden_size, 6 * hidden_size, bias=True))
+        self.feature_embedder = MLP(hidden_size + hidden_size + edge_hidden_size + dist_size, hidden_size, hidden_size)
 
         # Single linear layer for QKV projection
         self.qkv_proj = nn.Linear(hidden_size, 3 * hidden_size, bias=False)
-        self.norm_q = BatchLayerNorm(hidden_size, affine=False, eps=1e-6)
-        self.norm_k = BatchLayerNorm(hidden_size, affine=False, eps=1e-6)
+        # self.norm_q = BatchLayerNorm(hidden_size, affine=False, eps=1e-6)
+        # self.norm_k = BatchLayerNorm(hidden_size, affine=False, eps=1e-6)
         self.out_projection = nn.Linear(hidden_size, hidden_size, bias=False)
 
-        self.use_rotary = use_rotary
         self.d_head = hidden_size // num_heads
+        self.use_z = use_z
+        if use_z is not None:
+            if use_z == "pair_embedding":
+                self.pair_bias = nn.Sequential(nn.SiLU(), nn.Linear(hidden_size, num_heads, bias=False))
+            else:
+                self.pair_bias = nn.Sequential(nn.SiLU(), nn.Linear(dist_size, num_heads, bias=False))
+            self.z_update = nn.Linear(hidden_size, hidden_size, bias=False)
 
-        if use_z:
-            self.use_z = use_z
-            self.pair_bias = nn.Sequential(nn.SiLU(), nn.Linear(hidden_size, 1, bias=False))
-            self.mask_z = mask_z
-
-        self.lin_edge0 = nn.Linear(hidden_size, hidden_size, bias=False)
-        # self.lin_edge1 = nn.Linear(hidden_size, hidden_size, bias=False)
-        self.lin_edge1 = nn.Linear(hidden_size + n_vector_features * scale_dist_features, hidden_size, bias=False)
-        self.ffn_norm_edge = BatchLayerNorm(hidden_size)
-        self.ffn_edge = swiglu_ffn(hidden_size, mlp_expansion_ratio, bias=False)
-        # self.tanh = nn.GELU(approximate='tanh')
-
-    def _apply_rotary(self, q: torch.Tensor, k: torch.Tensor):
-        q = q.unflatten(-1, (self.num_heads, self.d_head))
-        k = k.unflatten(-1, (self.num_heads, self.d_head))
-        q, k = self.rotary(q, k)
-        q = q.flatten(-2, -1)
-        k = k.flatten(-2, -1)
-        return q, k
+        self.lin_edge0 = nn.Linear(hidden_size, edge_hidden_size, bias=False)
+        self.lin_edge1 = nn.Linear(
+            edge_hidden_size + n_vector_features * scale_dist_features, edge_hidden_size, bias=False
+        )
+        self.residual_ffn_norm = BatchLayerNorm(hidden_size, affine=False, eps=1e-6)
+        self.ffn = swiglu_ffn(hidden_size, mlp_expansion_ratio, bias=False)
+        self.residual_ffn_norm_edge = BatchLayerNorm(edge_hidden_size, affine=False, eps=1e-6)
+        self.ffn_edge = swiglu_ffn(edge_hidden_size, mlp_expansion_ratio, bias=False)
 
     def forward(
         self,
@@ -423,7 +418,6 @@ class DiTeBlock(nn.Module):
         edge_index: torch.Tensor = None,
         t_emb_e: torch.Tensor = None,
         dist: torch.Tensor = None,
-        edge_batch: torch.Tensor = None,
         Z: torch.Tensor = None,
     ):
         """
@@ -435,9 +429,8 @@ class DiTeBlock(nn.Module):
         edge_attr: E x 256
         edge_index: 2 x E
         """
-        if Z is not None:
-            assert self.use_z
-
+        src, tgt = edge_index
+        edge_batch = batch[src]
         shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = self.adaLN_modulation(t_emb_h).chunk(6, dim=1)
         (
             edge_shift_msa,
@@ -447,326 +440,79 @@ class DiTeBlock(nn.Module):
             edge_scale_mlp,
             edge_gate_mlp,
         ) = self.adaLN_edge_modulation(t_emb_e).chunk(6, dim=1)
-        src, tgt = edge_index
         # Normalize x
-        x_norm = modulate(self.norm1(x, batch), shift_msa, scale_msa)
+        x_norm = modulate(self.pre_attn_norm(x, batch), shift_msa, scale_msa)
+        edge_attr_norm = modulate(self.pre_attn_norm_edge(edge_attr, edge_batch), edge_shift_msa, edge_scale_msa)
 
-        edge_attr_norm = modulate(self.norm1_edge(edge_attr, edge_batch), edge_shift_msa, edge_scale_msa)
         messages = self.feature_embedder(torch.cat([x_norm[src], x_norm[tgt], edge_attr_norm, dist], dim=-1))
         x_norm = scatter_mean(messages, src, dim=0)
 
-        # QKV projection
+        # Q K V Projection
         qkv = self.qkv_proj(x_norm)
         Q, K, V = qkv.chunk(3, dim=-1)
-        Q, K = self.norm_q(Q, batch), self.norm_k(K, batch)
-        # Reshape Q, K, V to (1, seq_len, num_heads*head_dim)
-        if x.dim() == 2:
-            Q = Q.unsqueeze(0)
-            K = K.unsqueeze(0)
-            V = V.unsqueeze(0)
-            self.use_rotary = False
+        Q = Q.reshape(-1, self.num_heads, self.d_head)
+        K = K.reshape(-1, self.num_heads, self.d_head)
+        V = V.reshape(-1, self.num_heads, self.d_head)
+        # Gather the query, key, and value tensors for the source and target nodes
+        query_i = Q[src]  # [E, heads, d_head]
+        key_j = K[tgt]  # [E, heads, d_head]
+        value_j = V[tgt]  # [E, heads, d_head]
+        # Compute the attention scores using dot-product attention mechanism
+        alpha = query_i * key_j
+        if self.use_z == 'pair_embedding':
+            # import ipdb; ipdb.set_trace()
+            alpha = alpha + self.pair_bias(Z).unsqueeze(-1)
+        elif self.use_z == "distance":
+            alpha = alpha + self.pair_bias(dist).unsqueeze(-1)
+        alpha = alpha.sum(dim=-1) / math.sqrt(self.d_head)  # [E, heads]
 
-        reshaper = functools.partial(einops.rearrange, pattern="b s (h d) -> b h s d", h=self.num_heads)
-        # Reshape Q, K, V to (1, num_heads, seq_len, head_dim)
-        Q, K, V = map(reshaper, (Q, K, V))
+        # Apply softmax to normalize attention scores across all edges directed to the same node
+        alpha = softmax(alpha, tgt)  # [E, heads]
+        alpha = F.dropout(alpha, p=self.dropout, training=self.training)  # Apply dropout to attention scores
 
-        if x.dim() == 2:
-            attn_mask = batch.unsqueeze(0) == batch.unsqueeze(1)
-            attn_mask = attn_mask.unsqueeze(0).unsqueeze(
-                0
-            )  #! if float it is added as the biasbut would still need a mask s -infs?
-        else:
-            attn_mask = batch
+        # Multiply normalized attention scores with the value tensor to compute the messages
+        msg = value_j * alpha.view(-1, self.num_heads, 1)  # [E, heads, d_head]
+        # Aggregate messages to the destination nodes
+        out = scatter(msg, tgt, dim=0, reduce='sum', dim_size=x.size(0))  # [N, heads, d_head]
 
-        if Z is not None:
-            if x.dim() == 2:
-                mask = torch.ones((x.size(0), x.size(0)))
-                if self.mask_z:
-                    mask.fill_diagonal_(0)
-                attn_mask = attn_mask.float()
-                attn_mask = attn_mask.masked_fill(attn_mask == 0, float('-inf'))
-                attn_mask = attn_mask.masked_fill(attn_mask == 1, 0.0)
-                bias = (self.pair_bias(Z).squeeze(-1) * mask).unsqueeze(0).unsqueeze(0)
-                attn_mask += bias
-            else:
-                raise ValueError("Have not implemented Batch wise pair embedding update")
+        # Merge the heads and the output channels
+        out = out.view(-1, self.num_heads * self.d_head)  # [N, heads * d_head]
+        y = self.out_projection(out)
 
-        attn_output = F.scaled_dot_product_attention(
-            Q, K, V, attn_mask=attn_mask
-        )  # mask [1 1 num_atoms num_atoms] QKV = [1, num_heads, num_atoms, hidden//num_heads]
-        attn_output = einops.rearrange(attn_output, "b h s d -> b s (h d)").squeeze(0)
-        y = self.out_projection(attn_output)
-
-        # TODO: need to add in gate unsqueeze when we use batch dim
         # Gated Residual
         x = x + gate_msa * y
         # Feed Forward
         edge = edge_attr + edge_gate_msa * self.lin_edge0((y[src] + y[tgt]))
-        x = x + gate_mlp * self.ffn(self.ffn_norm(modulate(self.norm2(x, batch), shift_mlp, scale_mlp), batch))
+        x = x + gate_mlp * self.ffn(modulate(self.residual_ffn_norm(x, batch), shift_mlp, scale_mlp))
         e_in = self.lin_edge1(torch.cat([edge, dist], dim=-1))
         # import ipdb; ipdb.set_trace()
         edge_attr = edge + edge_gate_mlp * self.ffn_edge(
-            self.ffn_norm_edge(modulate(self.norm2_edge(e_in, edge_batch), edge_shift_mlp, edge_scale_mlp), edge_batch)
+            modulate(self.residual_ffn_norm_edge(e_in, edge_batch), edge_shift_mlp, edge_scale_mlp)
         )
-        return x, edge_attr
+        if self.use_z == "pair_embedding":
+            Z = Z + self.z_update(self.pyg_outer_update(batch, x))
+            return x, edge_attr, Z
+        else:
+            return x, edge_attr, None
 
-
-class Megalodon(nn.Module):
-    def __init__(
-        self,
-        num_layers=8,
-        equivariant_node_feature_dim=3,
-        invariant_node_feat_dim=256,
-        invariant_edge_feat_dim=256,
-        atom_classes=16,
-        edge_classes=5,
-        num_heads=16,
-        n_vector_features=128,
-    ):
-        super(Megalodon, self).__init__()
-        self.atom_embedder = MLP(atom_classes, invariant_node_feat_dim, invariant_node_feat_dim)
-        self.edge_embedder = MLP(edge_classes, invariant_edge_feat_dim, invariant_edge_feat_dim)
-        self.num_atom_classes = atom_classes
-        self.num_edge_classes = edge_classes
-        self.n_vector_features = n_vector_features
-        self.coord_emb = nn.Linear(1, n_vector_features, bias=False)
-        self.coord_pred = nn.Linear(n_vector_features, 1, bias=False)
-        self.scale_dist_features = 3
-        #! TODO do we need coord prediction head which is mlp then 0 CoM?
-        self.atom_type_head = PredictionHead(atom_classes, invariant_node_feat_dim)
-        self.edge_type_head = PredictionHead(edge_classes, invariant_edge_feat_dim, edge_prediction=True)
-        self.time_embedding = TimestepEmbedder(invariant_node_feat_dim)
-        self.bond_refine = BondRefine(invariant_node_feat_dim, invariant_edge_feat_dim)
-        self.dit_layers = nn.ModuleList()
-        self.egnn_layers = nn.ModuleList()
-        self.attention_mix_layers = nn.ModuleList()
-        for i in range(num_layers):
-            self.dit_layers.append(
-                DiTeBlock(
-                    invariant_node_feat_dim, num_heads, use_z=False, scale_dist_features=self.scale_dist_features
-                )
+    def pyg_outer_update(self, batch, x):
+        outer_products = []
+        num_atoms = 0
+        for molecule in range(max(batch.unique()) + 1):
+            molecule_indices = (batch == molecule).nonzero(as_tuple=True)[0]
+            molecule_features = x[molecule_indices]
+            # Compute the outer product for the current molecule
+            outer_product = molecule_features.unsqueeze(0) * molecule_features.unsqueeze(
+                1
+            )  # torch.einsum('ij,ik->ijk', molecule_features, molecule_features)
+            outer_product = outer_product + outer_product.transpose(0, 1)
+            outer_product = outer_product[~torch.eye(outer_product.size(0), dtype=torch.bool)].view(
+                outer_product.size(0), -1
             )
-            self.egnn_layers.append(XEGNNK(invariant_node_feat_dim))
-        # self.h_feat_refine = DiTBlock(invariant_node_feat_dim, num_heads, use_z=False)
-        self.node_blocks = nn.ModuleList(
-            [nn.Linear(invariant_node_feat_dim, invariant_node_feat_dim) for i in range(num_layers)]
-        )
-        self.edge_blocks = nn.ModuleList(
-            [nn.Linear(invariant_edge_feat_dim, invariant_edge_feat_dim) for i in range(num_layers)]
-        )
-
-    def forward(self, batch, X, H, E_idx, E, t):
-        torch.max(batch) + 1
-        pos = self.coord_emb(X.unsqueeze(-1))  # N x 3 x K
-
-        H = self.atom_embedder(H)
-        E = self.edge_embedder(E)  # should be + n_vector_features not + 1
-        te = self.time_embedding(t)
-        te_h = te[batch]
-        edge_batch, counts = torch.unique(batch, return_counts=True)
-        edge_batch = torch.repeat_interleave(edge_batch, counts * (counts - 1))  #
-        te_e = te[edge_batch]
-        edge_attr = E
-
-        atom_hids = H
-        edge_hids = edge_attr
-        for layer_index in range(len(self.dit_layers)):
-            distances = coord2dist(pos, E_idx, self.scale_dist_features, batch)  # E x K
-            # import ipdb; ipdb.set_trace()
-            H, edge_attr = self.dit_layers[layer_index](batch, H, te_h, edge_attr, E_idx, te_e, distances, edge_batch)
-            pos = self.egnn_layers[layer_index](batch, pos, H, E_idx, edge_attr, te_e)  #! TODO at time here
-            atom_hids = atom_hids + self.node_blocks[layer_index](H)
-            edge_hids = edge_hids + self.edge_blocks[layer_index](edge_attr)
-
-        X = self.coord_pred(pos).squeeze(-1)
-        x = X - scatter_mean(X, index=batch, dim=0)[batch]
-        # import ipdb; ipdb.set_trace() #! if instability persists is the refine block the problem likely no as it massive help to valid??
-        # H = self.h_feat_refine(batch, atom_hids, te_h)
-        # edge_attr = self.edge_feat_refine(edge_batch, edge_attr, te_e) #! cannot do attn with edges due to memory
-        H = atom_hids
-        edge_attr = self.bond_refine(batch, X, H, E_idx, edge_hids)
-
-        h_logits, _ = self.atom_type_head(batch, H)
-        e_logits, _ = self.edge_type_head.predict_edges(batch, edge_attr, E_idx)
-        out = {
-            "x_hat": x,
-            "h_logits": h_logits,
-            "edge_attr_logits": e_logits,
-            # "Z_hat": z_logits,
-        }
-        return out
-
-
-class MegalodonNoGeom(nn.Module):
-    def __init__(
-        self,
-        num_layers=8,
-        equivariant_node_feature_dim=3,
-        invariant_node_feat_dim=256,
-        invariant_edge_feat_dim=256,
-        atom_classes=16,
-        edge_classes=5,
-        num_heads=16,
-        n_vector_features=128,
-    ):
-        super(MegalodonNoGeom, self).__init__()
-        self.atom_embedder = MLP(atom_classes, invariant_node_feat_dim, invariant_node_feat_dim)
-        self.edge_embedder = MLP(edge_classes, invariant_edge_feat_dim, invariant_edge_feat_dim)
-        self.num_atom_classes = atom_classes
-        self.num_edge_classes = edge_classes
-        self.n_vector_features = n_vector_features
-        self.coord_emb = nn.Linear(1, n_vector_features, bias=False)
-        self.coord_pred = nn.Linear(n_vector_features, 1, bias=False)
-        self.scale_dist_features = 1
-        #! TODO do we need coord prediction head which is mlp then 0 CoM?
-        self.atom_type_head = PredictionHead(atom_classes, invariant_node_feat_dim)
-        self.edge_type_head = PredictionHead(edge_classes, invariant_edge_feat_dim, edge_prediction=True)
-        self.time_embedding = TimestepEmbedder(invariant_node_feat_dim)
-        self.bond_refine = BondRefine(invariant_node_feat_dim, invariant_edge_feat_dim)
-        self.dit_layers = nn.ModuleList()
-        self.egnn_layers = nn.ModuleList()
-        self.attention_mix_layers = nn.ModuleList()
-        for i in range(num_layers):
-            self.dit_layers.append(
-                DiTeBlock(
-                    invariant_node_feat_dim, num_heads, use_z=False, scale_dist_features=self.scale_dist_features
-                )
-            )
-            self.egnn_layers.append(XEGNNK(invariant_node_feat_dim))
-        # self.h_feat_refine = DiTBlock(invariant_node_feat_dim, num_heads, use_z=False)
-        self.node_blocks = nn.ModuleList(
-            [nn.Linear(invariant_node_feat_dim, invariant_node_feat_dim) for i in range(num_layers)]
-        )
-        self.edge_blocks = nn.ModuleList(
-            [nn.Linear(invariant_edge_feat_dim, invariant_edge_feat_dim) for i in range(num_layers)]
-        )
-
-    def forward(self, batch, X, H, E_idx, E, t):
-        torch.max(batch) + 1
-        pos = self.coord_emb(X.unsqueeze(-1))  # N x 3 x K
-
-        H = self.atom_embedder(H)
-        E = self.edge_embedder(E)  # should be + n_vector_features not + 1
-        te = self.time_embedding(t)
-        te_h = te[batch]
-        edge_batch, counts = torch.unique(batch, return_counts=True)
-        edge_batch = torch.repeat_interleave(edge_batch, counts * (counts - 1))  #
-        te_e = te[edge_batch]
-        edge_attr = E
-
-        atom_hids = H
-        edge_hids = edge_attr
-        for layer_index in range(len(self.dit_layers)):
-            distances = coord2dist(pos, E_idx, self.scale_dist_features, batch)  # E x K
-            # import ipdb; ipdb.set_trace()
-            H, edge_attr = self.dit_layers[layer_index](batch, H, te_h, edge_attr, E_idx, te_e, distances, edge_batch)
-            pos = self.egnn_layers[layer_index](batch, pos, H, E_idx, edge_attr, te_e)  #! TODO at time here
-            atom_hids = atom_hids + self.node_blocks[layer_index](H)
-            edge_hids = edge_hids + self.edge_blocks[layer_index](edge_attr)
-
-        X = self.coord_pred(pos).squeeze(-1)
-        x = X - scatter_mean(X, index=batch, dim=0)[batch]
-        # import ipdb; ipdb.set_trace() #! if instability persists is the refine block the problem likely no as it massive help to valid??
-        # H = self.h_feat_refine(batch, atom_hids, te_h)
-        # edge_attr = self.edge_feat_refine(edge_batch, edge_attr, te_e) #! cannot do attn with edges due to memory
-        H = atom_hids
-        edge_attr = self.bond_refine(batch, X, H, E_idx, edge_hids)
-
-        h_logits, _ = self.atom_type_head(batch, H)
-        e_logits, _ = self.edge_type_head.predict_edges(batch, edge_attr, E_idx)
-        out = {
-            "x_hat": x,
-            "h_logits": h_logits,
-            "edge_attr_logits": e_logits,
-            # "Z_hat": z_logits,
-        }
-        return out
-
-
-class MegalodonNoRes(nn.Module):
-    def __init__(
-        self,
-        num_layers=8,
-        equivariant_node_feature_dim=3,
-        invariant_node_feat_dim=256,
-        invariant_edge_feat_dim=256,
-        atom_classes=16,
-        edge_classes=5,
-        num_heads=16,
-        n_vector_features=128,
-    ):
-        super(MegalodonNoRes, self).__init__()
-        self.atom_embedder = MLP(atom_classes, invariant_node_feat_dim, invariant_node_feat_dim)
-        self.edge_embedder = MLP(edge_classes, invariant_edge_feat_dim, invariant_edge_feat_dim)
-        self.num_atom_classes = atom_classes
-        self.num_edge_classes = edge_classes
-        self.n_vector_features = n_vector_features
-        self.coord_emb = nn.Linear(1, n_vector_features, bias=False)
-        self.coord_pred = nn.Linear(n_vector_features, 1, bias=False)
-        self.scale_dist_features = 1
-        #! TODO do we need coord prediction head which is mlp then 0 CoM?
-        self.atom_type_head = PredictionHead(atom_classes, invariant_node_feat_dim)
-        self.edge_type_head = PredictionHead(edge_classes, invariant_edge_feat_dim, edge_prediction=True)
-        self.time_embedding = TimestepEmbedder(invariant_node_feat_dim)
-        self.bond_refine = BondRefine(invariant_node_feat_dim, invariant_edge_feat_dim)
-        self.dit_layers = nn.ModuleList()
-        self.egnn_layers = nn.ModuleList()
-        self.attention_mix_layers = nn.ModuleList()
-        for i in range(num_layers):
-            self.dit_layers.append(
-                DiTeBlock(
-                    invariant_node_feat_dim, num_heads, use_z=False, scale_dist_features=self.scale_dist_features
-                )
-            )
-            self.egnn_layers.append(XEGNNK(invariant_node_feat_dim))
-        # self.h_feat_refine = DiTBlock(invariant_node_feat_dim, num_heads, use_z=False)
-        # self.node_blocks = nn.ModuleList(
-        #     [nn.Linear(invariant_node_feat_dim, invariant_node_feat_dim) for i in range(num_layers)]
-        # )
-        # self.edge_blocks = nn.ModuleList(
-        #     [nn.Linear(invariant_edge_feat_dim, invariant_edge_feat_dim) for i in range(num_layers)]
-        # )
-
-    def forward(self, batch, X, H, E_idx, E, t):
-        torch.max(batch) + 1
-        pos = self.coord_emb(X.unsqueeze(-1))  # N x 3 x K
-
-        H = self.atom_embedder(H)
-        E = self.edge_embedder(E)  # should be + n_vector_features not + 1
-        te = self.time_embedding(t)
-        te_h = te[batch]
-        edge_batch, counts = torch.unique(batch, return_counts=True)
-        edge_batch = torch.repeat_interleave(edge_batch, counts * (counts - 1))  #
-        te_e = te[edge_batch]
-        edge_attr = E
-
-        # atom_hids = H
-        # edge_hids = edge_attr
-        for layer_index in range(len(self.dit_layers)):
-            distances = coord2dist(pos, E_idx, self.scale_dist_features, batch)  # E x K
-            # import ipdb; ipdb.set_trace()
-            H, edge_attr = self.dit_layers[layer_index](batch, H, te_h, edge_attr, E_idx, te_e, distances, edge_batch)
-            pos = self.egnn_layers[layer_index](batch, pos, H, E_idx, edge_attr, te_e)  #! TODO at time here
-            # atom_hids = atom_hids + self.node_blocks[layer_index](H)
-            # edge_hids = edge_hids + self.edge_blocks[layer_index](edge_attr)
-
-        X = self.coord_pred(pos).squeeze(-1)
-        x = X - scatter_mean(X, index=batch, dim=0)[batch]
-        # import ipdb; ipdb.set_trace() #! if instability persists is the refine block the problem likely no as it massive help to valid??
-        # H = self.h_feat_refine(batch, atom_hids, te_h)
-        # edge_attr = self.edge_feat_refine(edge_batch, edge_attr, te_e) #! cannot do attn with edges due to memory
-        # H = atom_hids
-        edge_attr = self.bond_refine(batch, X, H, E_idx, edge_attr)
-
-        h_logits, _ = self.atom_type_head(batch, H)
-        e_logits, _ = self.edge_type_head.predict_edges(batch, edge_attr, E_idx)
-        out = {
-            "x_hat": x,
-            "h_logits": h_logits,
-            "edge_attr_logits": e_logits,
-            # "Z_hat": z_logits,
-        }
-        return out
+            outer_products.append(outer_product.reshape(-1, molecule_features.shape[-1]))
+            num_atoms += molecule_features.size(0)
+        update = torch.cat(outer_products, dim=0)
+        return update
 
 
 def coord2distfn(x, edge_index, scale_dist_features=1, batch=None):
@@ -792,19 +538,22 @@ def coord2distfn(x, edge_index, scale_dist_features=1, batch=None):
     return radial
 
 
-class MegalodonDot(nn.Module):
+class MoleculeDiffusion(nn.Module):
     def __init__(
         self,
-        num_layers=8,
+        num_layers=10,
         equivariant_node_feature_dim=3,
         invariant_node_feat_dim=256,
         invariant_edge_feat_dim=256,
-        atom_classes=16,
+        atom_classes=22,
         edge_classes=5,
-        num_heads=16,
+        num_heads=4,
         n_vector_features=128,
+        scale_dist_features=4,
+        use_z=None,
+        attn_dropout=0.0,
     ):
-        super(MegalodonDot, self).__init__()
+        super(MoleculeDiffusion, self).__init__()
         self.atom_embedder = MLP(atom_classes, invariant_node_feat_dim, invariant_node_feat_dim)
         self.edge_embedder = MLP(edge_classes, invariant_edge_feat_dim, invariant_edge_feat_dim)
         self.num_atom_classes = atom_classes
@@ -812,23 +561,38 @@ class MegalodonDot(nn.Module):
         self.n_vector_features = n_vector_features
         self.coord_emb = nn.Linear(1, n_vector_features, bias=False)
         self.coord_pred = nn.Linear(n_vector_features, 1, bias=False)
-        self.scale_dist_features = 2
-        #! TODO do we need coord prediction head which is mlp then 0 CoM?
+        self.scale_dist_features = scale_dist_features
+
         self.atom_type_head = PredictionHead(atom_classes, invariant_node_feat_dim)
         self.edge_type_head = PredictionHead(edge_classes, invariant_edge_feat_dim, edge_prediction=True)
         self.time_embedding = TimestepEmbedder(invariant_node_feat_dim)
         self.bond_refine = BondRefine(invariant_node_feat_dim, invariant_edge_feat_dim)
+
         self.dit_layers = nn.ModuleList()
         self.egnn_layers = nn.ModuleList()
-        self.attention_mix_layers = nn.ModuleList()
+        self.use_z = use_z
+        if use_z == "pair_embedding":
+            self.Z_lin = MLP(invariant_node_feat_dim, invariant_node_feat_dim, 1)
+
         for i in range(num_layers):
             self.dit_layers.append(
                 DiTeBlock(
-                    invariant_node_feat_dim, num_heads, use_z=False, scale_dist_features=self.scale_dist_features
+                    invariant_node_feat_dim,
+                    invariant_edge_feat_dim,
+                    num_heads,
+                    mlp_expansion_ratio=4.0,
+                    use_z=use_z,
+                    n_vector_features=128,
+                    scale_dist_features=scale_dist_features,
+                    dropout=attn_dropout,
                 )
             )
-            self.egnn_layers.append(XEGNNK(invariant_node_feat_dim))
-        # self.h_feat_refine = DiTBlock(invariant_node_feat_dim, num_heads, use_z=False)
+            self.egnn_layers.append(
+                EquivariantBlock(
+                    invariant_node_feat_dim, invariant_edge_feat_dim, n_vector_features, use_cross_product=False
+                )
+            )
+
         self.node_blocks = nn.ModuleList(
             [nn.Linear(invariant_node_feat_dim, invariant_node_feat_dim) for i in range(num_layers)]
         )
@@ -836,539 +600,78 @@ class MegalodonDot(nn.Module):
             [nn.Linear(invariant_edge_feat_dim, invariant_edge_feat_dim) for i in range(num_layers)]
         )
 
-    def forward(self, batch, X, H, E_idx, E, t):
-        torch.max(batch) + 1
-        pos = self.coord_emb(X.unsqueeze(-1))  # N x 3 x K
-
-        H = self.atom_embedder(H)
-        E = self.edge_embedder(E)  # should be + n_vector_features not + 1
-        te = self.time_embedding(t)
-        te_h = te[batch]
-        edge_batch, counts = torch.unique(batch, return_counts=True)
-        edge_batch = torch.repeat_interleave(edge_batch, counts * (counts - 1))  #
-        te_e = te[edge_batch]
-        edge_attr = E
-
-        atom_hids = H
-        edge_hids = edge_attr
-        for layer_index in range(len(self.dit_layers)):
-            distances = coord2distfn(pos, E_idx, self.scale_dist_features, batch)  # E x K
-            # import ipdb; ipdb.set_trace()
-            H, edge_attr = self.dit_layers[layer_index](batch, H, te_h, edge_attr, E_idx, te_e, distances, edge_batch)
-            pos = self.egnn_layers[layer_index](batch, pos, H, E_idx, edge_attr, te_e)  #! TODO at time here
-            atom_hids = atom_hids + self.node_blocks[layer_index](H)
-            edge_hids = edge_hids + self.edge_blocks[layer_index](edge_attr)
-
-        X = self.coord_pred(pos).squeeze(-1)
-        x = X - scatter_mean(X, index=batch, dim=0)[batch]
-        # import ipdb; ipdb.set_trace() #! if instability persists is the refine block the problem likely no as it massive help to valid??
-        # H = self.h_feat_refine(batch, atom_hids, te_h)
-        # edge_attr = self.edge_feat_refine(edge_batch, edge_attr, te_e) #! cannot do attn with edges due to memory
-        H = atom_hids
-        edge_attr = self.bond_refine(batch, X, H, E_idx, edge_hids)
-
-        h_logits, _ = self.atom_type_head(batch, H)
-        e_logits, _ = self.edge_type_head.predict_edges(batch, edge_attr, E_idx)
-        out = {
-            "x_hat": x,
-            "h_logits": h_logits,
-            "edge_attr_logits": e_logits,
-            # "Z_hat": z_logits,
-        }
-        return out
-
-
-class MegalodonDotFN(nn.Module):
-    def __init__(
-        self,
-        num_layers=8,
-        equivariant_node_feature_dim=3,
-        invariant_node_feat_dim=256,
-        invariant_edge_feat_dim=256,
-        atom_classes=16,
-        edge_classes=5,
-        num_heads=16,
-        n_vector_features=128,
-    ):
-        super(MegalodonDotFN, self).__init__()
-        self.atom_embedder = MLP(atom_classes, invariant_node_feat_dim, invariant_node_feat_dim)
-        self.edge_embedder = MLP(edge_classes, invariant_edge_feat_dim, invariant_edge_feat_dim)
-        self.num_atom_classes = atom_classes
-        self.num_edge_classes = edge_classes
-        self.n_vector_features = n_vector_features
-        self.coord_emb = nn.Linear(1, n_vector_features, bias=False)
-        self.coord_pred = nn.Linear(n_vector_features, 1, bias=False)
-        self.scale_dist_features = 4
-        #! TODO do we need coord prediction head which is mlp then 0 CoM?
-        self.atom_type_head = PredictionHead(atom_classes, invariant_node_feat_dim)
-        self.edge_type_head = PredictionHead(edge_classes, invariant_edge_feat_dim, edge_prediction=True)
-        self.time_embedding = TimestepEmbedder(invariant_node_feat_dim)
-        self.bond_refine = BondRefine(invariant_node_feat_dim, invariant_edge_feat_dim)
-        self.dit_layers = nn.ModuleList()
-        self.egnn_layers = nn.ModuleList()
-        self.attention_mix_layers = nn.ModuleList()
-        for i in range(num_layers):
-            self.dit_layers.append(
-                DiTeBlock(
-                    invariant_node_feat_dim, num_heads, use_z=False, scale_dist_features=self.scale_dist_features
-                )
+    def pyg_outer_update(self, batch, x):
+        outer_products = []
+        num_atoms = 0
+        for molecule in range(max(batch.unique()) + 1):
+            molecule_indices = (batch == molecule).nonzero(as_tuple=True)[0]
+            molecule_features = x[molecule_indices]
+            # Compute the outer product for the current molecule
+            outer_product = molecule_features.unsqueeze(0) * molecule_features.unsqueeze(
+                1
+            )  # torch.einsum('ij,ik->ijk', molecule_features, molecule_features)
+            outer_product = outer_product + outer_product.transpose(0, 1)
+            outer_product = outer_product[~torch.eye(outer_product.size(0), dtype=torch.bool)].view(
+                outer_product.size(0), -1
             )
-            self.egnn_layers.append(XEGNNK(invariant_node_feat_dim))
-        # self.h_feat_refine = DiTBlock(invariant_node_feat_dim, num_heads, use_z=False)
-        self.node_blocks = nn.ModuleList(
-            [nn.Linear(invariant_node_feat_dim, invariant_node_feat_dim) for i in range(num_layers)]
-        )
-        self.edge_blocks = nn.ModuleList(
-            [nn.Linear(invariant_edge_feat_dim, invariant_edge_feat_dim) for i in range(num_layers)]
-        )
+            outer_products.append(outer_product.reshape(-1, molecule_features.shape[-1]))
+            num_atoms += molecule_features.size(0)
+        update = torch.cat(outer_products, dim=0)
+        return update
 
-    def forward(self, batch, X, H, E_idx, E, t):
+    def forward(self, batch, X, H, E_idx, E, t_discrete, t_continuous=None):
         torch.max(batch) + 1
         pos = self.coord_emb(X.unsqueeze(-1))  # N x 3 x K
-
         H = self.atom_embedder(H)
-        E = self.edge_embedder(E)  # should be + n_vector_features not + 1
-        te = self.time_embedding(t)
+        E = self.edge_embedder(E)
+        te = self.time_embedding(t_discrete)
         te_h = te[batch]
         edge_batch, counts = torch.unique(batch, return_counts=True)
-        edge_batch = torch.repeat_interleave(edge_batch, counts * (counts - 1))  #
+        edge_batch = torch.repeat_interleave(edge_batch, counts * (counts - 1))
         te_e = te[edge_batch]
+        if t_continuous:
+            te_continuous = self.time_embedding(t_continuous)
+            te_e_cont = te_continuous[edge_batch]
+        else:
+            te_e_cont = te_e
         edge_attr = E
+        if self.use_z == "pair_embedding":
+            Z = self.pyg_outer_update(batch, H)
+        else:
+            Z = None
 
         atom_hids = H
         edge_hids = edge_attr
+
         for layer_index in range(len(self.dit_layers)):
-            distances = coord2distfn(pos, E_idx, self.scale_dist_features, batch)  # E x K
-            # import ipdb; ipdb.set_trace()
-            H, edge_attr = self.dit_layers[layer_index](batch, H, te_h, edge_attr, E_idx, te_e, distances, edge_batch)
-            pos = self.egnn_layers[layer_index](batch, pos, H, E_idx, edge_attr, te_e)  #! TODO at time here
+            with nvtx.range(f"DiTe Layer {layer_index}"):
+                distances = coord2distfn(pos, E_idx, self.scale_dist_features, batch)  # E x K
+                H, edge_attr, Z = self.dit_layers[layer_index](batch, H, te_h, edge_attr, E_idx, te_e, distances, Z)
+            with nvtx.range(f"EGNN Layer {layer_index}"):
+                pos = self.egnn_layers[layer_index](batch, pos, H, E_idx, edge_attr, te_e_cont)
             atom_hids = atom_hids + self.node_blocks[layer_index](H)
             edge_hids = edge_hids + self.edge_blocks[layer_index](edge_attr)
 
         X = self.coord_pred(pos).squeeze(-1)
         x = X - scatter_mean(X, index=batch, dim=0)[batch]
-        # import ipdb; ipdb.set_trace() #! if instability persists is the refine block the problem likely no as it massive help to valid??
-        # H = self.h_feat_refine(batch, atom_hids, te_h)
-        # edge_attr = self.edge_feat_refine(edge_batch, edge_attr, te_e) #! cannot do attn with edges due to memory
+
         H = atom_hids
         edge_attr = self.bond_refine(batch, x, H, E_idx, edge_hids)
 
         h_logits, _ = self.atom_type_head(batch, H)
         e_logits, _ = self.edge_type_head.predict_edges(batch, edge_attr, E_idx)
+
         out = {
             "x_hat": x,
             "h_logits": h_logits,
             "edge_attr_logits": e_logits,
-            # "Z_hat": z_logits,
         }
-        return out
-
-
-class MegalodonDotFNNoRes(nn.Module):
-    def __init__(
-        self,
-        num_layers=8,
-        equivariant_node_feature_dim=3,
-        invariant_node_feat_dim=256,
-        invariant_edge_feat_dim=256,
-        atom_classes=16,
-        edge_classes=5,
-        num_heads=16,
-        n_vector_features=128,
-    ):
-        super(MegalodonDotFNNoRes, self).__init__()
-        self.atom_embedder = MLP(atom_classes, invariant_node_feat_dim, invariant_node_feat_dim)
-        self.edge_embedder = MLP(edge_classes, invariant_edge_feat_dim, invariant_edge_feat_dim)
-        self.num_atom_classes = atom_classes
-        self.num_edge_classes = edge_classes
-        self.n_vector_features = n_vector_features
-        self.coord_emb = nn.Linear(1, n_vector_features, bias=False)
-        self.coord_pred = nn.Linear(n_vector_features, 1, bias=False)
-        self.scale_dist_features = 4
-        #! TODO do we need coord prediction head which is mlp then 0 CoM?
-        self.atom_type_head = PredictionHead(atom_classes, invariant_node_feat_dim)
-        self.edge_type_head = PredictionHead(edge_classes, invariant_edge_feat_dim, edge_prediction=True)
-        self.time_embedding = TimestepEmbedder(invariant_node_feat_dim)
-        self.bond_refine = BondRefine(invariant_node_feat_dim, invariant_edge_feat_dim)
-        self.dit_layers = nn.ModuleList()
-        self.egnn_layers = nn.ModuleList()
-        self.attention_mix_layers = nn.ModuleList()
-        for i in range(num_layers):
-            self.dit_layers.append(
-                DiTeBlock(
-                    invariant_node_feat_dim, num_heads, use_z=False, scale_dist_features=self.scale_dist_features
-                )
-            )
-            self.egnn_layers.append(XEGNNK(invariant_node_feat_dim))
-        # self.h_feat_refine = DiTBlock(invariant_node_feat_dim, num_heads, use_z=False)
-        # self.node_blocks = nn.ModuleList(
-        #     [nn.Linear(invariant_node_feat_dim, invariant_node_feat_dim) for i in range(num_layers)]
-        # )
-        # self.edge_blocks = nn.ModuleList(
-        #     [nn.Linear(invariant_edge_feat_dim, invariant_edge_feat_dim) for i in range(num_layers)]
-        # )
-
-    def forward(self, batch, X, H, E_idx, E, t):
-        torch.max(batch) + 1
-        pos = self.coord_emb(X.unsqueeze(-1))  # N x 3 x K
-
-        H = self.atom_embedder(H)
-        E = self.edge_embedder(E)  # should be + n_vector_features not + 1
-        te = self.time_embedding(t)
-        te_h = te[batch]
-        edge_batch, counts = torch.unique(batch, return_counts=True)
-        edge_batch = torch.repeat_interleave(edge_batch, counts * (counts - 1))  #
-        te_e = te[edge_batch]
-        edge_attr = E
-
-        for layer_index in range(len(self.dit_layers)):
-            distances = coord2distfn(pos, E_idx, self.scale_dist_features, batch)  # E x K
-            # import ipdb; ipdb.set_trace()
-            H, edge_attr = self.dit_layers[layer_index](batch, H, te_h, edge_attr, E_idx, te_e, distances, edge_batch)
-            pos = self.egnn_layers[layer_index](batch, pos, H, E_idx, edge_attr, te_e)  #! TODO at time here
-            # atom_hids = atom_hids + self.node_blocks[layer_index](H)
-            # edge_hids = edge_hids + self.edge_blocks[layer_index](edge_attr)
-
-        X = self.coord_pred(pos).squeeze(-1)
-        x = X - scatter_mean(X, index=batch, dim=0)[batch]
-        # import ipdb; ipdb.set_trace() #! if instability persists is the refine block the problem likely no as it massive help to valid??
-        # H = self.h_feat_refine(batch, atom_hids, te_h)
-        # edge_attr = self.edge_feat_refine(edge_batch, edge_attr, te_e) #! cannot do attn with edges due to memory
-        # H = atom_hids
-        edge_attr = self.bond_refine(batch, x, H, E_idx, edge_attr)
-
-        h_logits, _ = self.atom_type_head(batch, H)
-        e_logits, _ = self.edge_type_head.predict_edges(batch, edge_attr, E_idx)
-        out = {
-            "x_hat": x,
-            "h_logits": h_logits,
-            "edge_attr_logits": e_logits,
-            # "Z_hat": z_logits,
-        }
-        return out
-
-
-class SkinnyDiTeBlock(nn.Module):
-    """
-    Mimics DiT block
-    """
-
-    def __init__(
-        self,
-        hidden_size,
-        num_heads,
-        mlp_expansion_ratio=4.0,
-        use_z=True,
-        mask_z=True,
-        use_rotary=False,
-        n_vector_features=128,
-        scale_dist_features=1,
-        **block_kwargs,
-    ):
-        super().__init__()
-        self.hidden_size = hidden_size
-        self.num_heads = num_heads
-        self.norm1 = BatchLayerNorm(hidden_size, affine=False, eps=1e-6)
-        self.norm2 = BatchLayerNorm(hidden_size, affine=False, eps=1e-6)
-        if scale_dist_features > 1:
-            n_vector_features * scale_dist_features
-        else:
-            pass
-        # self.feature_embedder = MLP(hidden_size + hidden_size + hidden_size + dist_size, hidden_size, hidden_size)
-        # self.norm1_edge = BatchLayerNorm(hidden_size, affine=False, eps=1e-6)
-        self.norm2_edge = BatchLayerNorm(hidden_size, affine=False, eps=1e-6)
-
-        self.ffn_norm = BatchLayerNorm(hidden_size)
-        self.ffn = swiglu_ffn(hidden_size, mlp_expansion_ratio, bias=False)
-        self.adaLN_modulation = nn.Sequential(nn.SiLU(), nn.Linear(hidden_size, 6 * hidden_size, bias=True))
-        self.adaLN_edge_modulation = nn.Sequential(nn.SiLU(), nn.Linear(hidden_size, 6 * hidden_size, bias=True))
-
-        # Single linear layer for QKV projection
-        self.qkv_proj = nn.Linear(hidden_size, 3 * hidden_size, bias=False)
-        self.norm_q = BatchLayerNorm(hidden_size, affine=False, eps=1e-6)
-        self.norm_k = BatchLayerNorm(hidden_size, affine=False, eps=1e-6)
-        self.out_projection = nn.Linear(hidden_size, hidden_size, bias=False)
-
-        self.use_rotary = use_rotary
-        self.d_head = hidden_size // num_heads
-
-        if use_z:
-            self.use_z = use_z
-            self.pair_bias = nn.Sequential(nn.SiLU(), nn.Linear(hidden_size, 1, bias=False))
-            self.mask_z = mask_z
-
-        self.lin_edge0 = nn.Linear(hidden_size, hidden_size, bias=False)
-        # self.lin_edge1 = nn.Linear(hidden_size, hidden_size, bias=False)
-        self.lin_edge1 = nn.Linear(hidden_size + n_vector_features * scale_dist_features, hidden_size, bias=False)
-        self.ffn_norm_edge = BatchLayerNorm(hidden_size)
-        self.ffn_edge = swiglu_ffn(hidden_size, mlp_expansion_ratio, bias=False)
-        # self.tanh = nn.GELU(approximate='tanh')
-
-    def _apply_rotary(self, q: torch.Tensor, k: torch.Tensor):
-        q = q.unflatten(-1, (self.num_heads, self.d_head))
-        k = k.unflatten(-1, (self.num_heads, self.d_head))
-        q, k = self.rotary(q, k)
-        q = q.flatten(-2, -1)
-        k = k.flatten(-2, -1)
-        return q, k
-
-    def forward(
-        self,
-        batch: torch.Tensor,
-        x: torch.Tensor,
-        t_emb_h: torch.Tensor,
-        edge_attr: torch.Tensor = None,
-        edge_index: torch.Tensor = None,
-        t_emb_e: torch.Tensor = None,
-        dist: torch.Tensor = None,
-        edge_batch: torch.Tensor = None,
-        Z: torch.Tensor = None,
-    ):
-        """
-        This assume pytorch geometric batching so batch size of 1 so skip rotary as it depends on having an actual batch
-
-        batch: N
-        x: N x 256
-        temb: N x 256
-        edge_attr: E x 256
-        edge_index: 2 x E
-        """
-        if Z is not None:
-            assert self.use_z
-
-        shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = self.adaLN_modulation(t_emb_h).chunk(6, dim=1)
-        (
-            edge_shift_msa,
-            edge_scale_msa,
-            edge_gate_msa,
-            edge_shift_mlp,
-            edge_scale_mlp,
-            edge_gate_mlp,
-        ) = self.adaLN_edge_modulation(t_emb_e).chunk(6, dim=1)
-        src, tgt = edge_index
-        # Normalize x
-        x_norm = modulate(self.norm1(x, batch), shift_msa, scale_msa)
-
-        # edge_attr_norm = modulate(self.norm1_edge(edge_attr, edge_batch), edge_shift_msa, edge_scale_msa)
-        # messages = self.feature_embedder(torch.cat([x_norm[src], x_norm[tgt], edge_attr_norm, dist], dim=-1))
-        # x_norm = scatter_mean(messages, src, dim=0)
-
-        # QKV projection
-        qkv = self.qkv_proj(x_norm)
-        Q, K, V = qkv.chunk(3, dim=-1)
-        Q, K = self.norm_q(Q, batch), self.norm_k(K, batch)
-        # Reshape Q, K, V to (1, seq_len, num_heads*head_dim)
-        if x.dim() == 2:
-            Q = Q.unsqueeze(0)
-            K = K.unsqueeze(0)
-            V = V.unsqueeze(0)
-            self.use_rotary = False
-
-        reshaper = functools.partial(einops.rearrange, pattern="b s (h d) -> b h s d", h=self.num_heads)
-        # Reshape Q, K, V to (1, num_heads, seq_len, head_dim)
-        Q, K, V = map(reshaper, (Q, K, V))
-
-        if x.dim() == 2:
-            attn_mask = batch.unsqueeze(0) == batch.unsqueeze(1)
-            attn_mask = attn_mask.unsqueeze(0).unsqueeze(
-                0
-            )  #! if float it is added as the biasbut would still need a mask s -infs?
-        else:
-            attn_mask = batch
-
-        if Z is not None:
-            if x.dim() == 2:
-                mask = torch.ones((x.size(0), x.size(0)))
-                if self.mask_z:
-                    mask.fill_diagonal_(0)
-                attn_mask = attn_mask.float()
-                attn_mask = attn_mask.masked_fill(attn_mask == 0, float('-inf'))
-                attn_mask = attn_mask.masked_fill(attn_mask == 1, 0.0)
-                bias = (self.pair_bias(Z).squeeze(-1) * mask).unsqueeze(0).unsqueeze(0)
-                attn_mask += bias
-            else:
-                raise ValueError("Have not implemented Batch wise pair embedding update")
-
-        attn_output = F.scaled_dot_product_attention(
-            Q, K, V, attn_mask=attn_mask
-        )  # mask [1 1 num_atoms num_atoms] QKV = [1, num_heads, num_atoms, hidden//num_heads]
-        attn_output = einops.rearrange(attn_output, "b h s d -> b s (h d)").squeeze(0)
-        y = self.out_projection(attn_output)
-
-        # TODO: need to add in gate unsqueeze when we use batch dim
-        # Gated Residual
-        x = x + gate_msa * y
-        # Feed Forward
-        edge = edge_attr + edge_gate_msa * self.lin_edge0((y[src] + y[tgt]))
-        x = x + gate_mlp * self.ffn(self.ffn_norm(modulate(self.norm2(x, batch), shift_mlp, scale_mlp), batch))
-        e_in = self.lin_edge1(torch.cat([edge, dist], dim=-1))
-        # import ipdb; ipdb.set_trace()
-        edge_attr = edge + edge_gate_mlp * self.ffn_edge(
-            self.ffn_norm_edge(modulate(self.norm2_edge(e_in, edge_batch), edge_shift_mlp, edge_scale_mlp), edge_batch)
-        )
-        return x, edge_attr
-
-
-class EGNNK(nn.Module):
-    """
-    EGNN
-    """
-
-    def __init__(self, invariant_node_feat_dim=64, n_vector_features=128, scale_dist_feats=4):
-        super().__init__()  # node_dim=0, aggr=None, flow="source_to_target")  #! This should be target to source
-        self.message_input_size = (
-            2 * invariant_node_feat_dim
-            + scale_dist_feats * n_vector_features
-            + invariant_node_feat_dim
-            + invariant_node_feat_dim
-        )  # + invariant_edge_feat_dim
-        self.phi_message = MLP(self.message_input_size, invariant_node_feat_dim, invariant_node_feat_dim)
-        self.phi_x = MLP(self.message_input_size, invariant_node_feat_dim, n_vector_features)
-        # self.phi_x = MLP(invariant_node_feat_dim, invariant_node_feat_dim, n_vector_features)
-        self.coor_update_clamp_value = 10.0
-        # self.reset_parameters()
-        self.h_norm = BatchLayerNorm(invariant_node_feat_dim)
-        self.norm1_edge = BatchLayerNorm(invariant_node_feat_dim)
-        self.use_cross_product = True
-        if self.use_cross_product:
-            self.phi_x_cross = MLP(self.message_input_size, invariant_node_feat_dim, invariant_node_feat_dim)
-        self.x_norm = E3Norm(n_vector_features)
-
-        self.phi_h = MLP(
-            invariant_node_feat_dim + invariant_node_feat_dim, invariant_node_feat_dim, invariant_node_feat_dim
-        )
-        self.phi_e = MLP(invariant_node_feat_dim, invariant_node_feat_dim, invariant_node_feat_dim)
-        # TODO: @Ali what is good weight inititalization for EGNN?
-
-    def forward(self, batch, X, H, edge_index, edge_attr=None, te=None, edge_batch=None, distances=None):
-        X = X - scatter_mean(X, index=batch, dim=0, dim_size=X.shape[0])[batch]
-        X = self.x_norm(X, batch)
-        H = self.h_norm(H, batch)
-        edge_attr = self.norm1_edge(edge_attr, edge_batch)
-        source, target = edge_index
-        rel_coors = X[source] - X[target]
-        rel_dist = (rel_coors.transpose(1, 2) ** 2).sum(dim=-1, keepdim=False)
-        if distances is None:
-            if edge_attr is not None:
-                edge_attr_feat = torch.cat([edge_attr, rel_dist], dim=-1)
-            else:
-                edge_attr_feat = rel_dist
-        else:
-            edge_attr_feat = torch.cat([edge_attr, distances], dim=-1)
-        in_feats = torch.cat([H[target], H[source], edge_attr_feat, te], dim=-1)
-        m_ij = self.phi_message(in_feats)
-        coor_wij = self.phi_x(in_feats)  # E x 3
-        if self.coor_update_clamp_value:
-            coor_wij.clamp_(min=-self.coor_update_clamp_value, max=self.coor_update_clamp_value)
-        # import ipdb; ipdb.set_trace()
-        X_rel_norm = rel_coors / (1 + torch.sqrt(rel_dist.unsqueeze(1) + 1e-8))
-        # import ipdb; ipdb.set_trace()
-        x_update = scatter(X_rel_norm * coor_wij.unsqueeze(1), index=target, dim=0, reduce='sum', dim_size=X.shape[0])
-        X_out = X + x_update
-        if self.use_cross_product:
-            mean = scatter(X, index=batch, dim=0, reduce='mean', dim_size=X.shape[0])
-            x_src = X[source] - mean[source]
-            x_tgt = X[target] - mean[target]
-            cross = torch.cross(x_src, x_tgt, dim=1)
-            cross = cross / (1 + torch.linalg.norm(cross, dim=1, keepdim=True))
-            coor_wij_cross = self.phi_x_cross(in_feats)
-            if self.coor_update_clamp_value:
-                coor_wij_cross.clamp_(min=-self.coor_update_clamp_value, max=self.coor_update_clamp_value)
-            x_update_cross = scatter(
-                cross * coor_wij_cross.unsqueeze(1), index=target, dim=0, reduce='sum', dim_size=X.shape[0]
-            )
-            X_out = X_out + x_update_cross
-
-        m_i = scatter(
-            m_ij, index=target, dim=0, reduce='sum', dim_size=X.shape[0]
-        )  #! Sigmoid over the gate matters a lot
-        # import ipdb; ipdb.set_trace()
-        H_out = H + self.phi_h(torch.cat([H, m_i], dim=-1))
-        edge_attr_out = edge_attr + self.phi_e(m_ij)
-        return X_out, H_out, edge_attr_out
-
-
-class MegalodonDotFNNoResSkinny(nn.Module):
-    def __init__(
-        self,
-        num_layers=8,
-        equivariant_node_feature_dim=3,
-        invariant_node_feat_dim=256,
-        invariant_edge_feat_dim=256,
-        atom_classes=16,
-        edge_classes=5,
-        num_heads=16,
-        n_vector_features=128,
-    ):
-        super(MegalodonDotFNNoResSkinny, self).__init__()
-        self.atom_embedder = MLP(atom_classes, invariant_node_feat_dim, invariant_node_feat_dim)
-        self.edge_embedder = MLP(edge_classes, invariant_edge_feat_dim, invariant_edge_feat_dim)
-        self.num_atom_classes = atom_classes
-        self.num_edge_classes = edge_classes
-        self.n_vector_features = n_vector_features
-        self.coord_emb = nn.Linear(1, n_vector_features, bias=False)
-        self.coord_pred = nn.Linear(n_vector_features, 1, bias=False)
-        self.scale_dist_features = 4
-        #! TODO do we need coord prediction head which is mlp then 0 CoM?
-        self.atom_type_head = PredictionHead(atom_classes, invariant_node_feat_dim)
-        self.edge_type_head = PredictionHead(edge_classes, invariant_edge_feat_dim, edge_prediction=True)
-        self.time_embedding = TimestepEmbedder(invariant_node_feat_dim)
-        self.bond_refine = BondRefine(invariant_node_feat_dim, invariant_edge_feat_dim)
-        self.dit_layers = nn.ModuleList()
-        self.egnn_layers = nn.ModuleList()
-        # self.attention_mix_layers = nn.ModuleList()
-        for i in range(num_layers):
-            self.dit_layers.append(
-                SkinnyDiTeBlock(
-                    invariant_node_feat_dim, num_heads, use_z=False, scale_dist_features=self.scale_dist_features
-                )
-            )
-            self.egnn_layers.append(EGNNK(invariant_node_feat_dim, scale_dist_feats=self.scale_dist_features))
-        # self.h_feat_refine = DiTBlock(invariant_node_feat_dim, num_heads, use_z=False)
-        # self.node_blocks = nn.ModuleList(
-        #     [nn.Linear(invariant_node_feat_dim, invariant_node_feat_dim) for i in range(num_layers)]
-        # )
-        # self.edge_blocks = nn.ModuleList(
-        #     [nn.Linear(invariant_edge_feat_dim, invariant_edge_feat_dim) for i in range(num_layers)]
-        # )
-
-    def forward(self, batch, X, H, E_idx, E, t):
-        # torch.max(batch) + 1
-        pos = self.coord_emb(X.unsqueeze(-1))  # N x 3 x K
-
-        H = self.atom_embedder(H)
-        E = self.edge_embedder(E)  # should be + n_vector_features not + 1
-        te = self.time_embedding(t)
-        te_h = te[batch]
-        edge_batch, counts = torch.unique(batch, return_counts=True)
-        edge_batch = torch.repeat_interleave(edge_batch, counts * (counts - 1))  #
-        te_e = te[edge_batch]
-        edge_attr = E
-
-        for layer_index in range(len(self.dit_layers)):
-            distances = coord2distfn(pos, E_idx, self.scale_dist_features, batch)  # E x K
-            # import ipdb; ipdb.set_trace()
-            H, edge_attr = self.dit_layers[layer_index](batch, H, te_h, edge_attr, E_idx, te_e, distances, edge_batch)
-            pos, H, edge_attr = self.egnn_layers[layer_index](
-                batch, pos, H, E_idx, edge_attr, te_e, edge_batch, distances
-            )  #! TODO at time here
-            # atom_hids = atom_hids + self.node_blocks[layer_index](H)  X, H, edge_index, edge_attr=None, te=None, edge_batch=None, distances = None
-            # edge_hids = edge_hids + self.edge_blocks[layer_index](edge_attr)
-
-        X = self.coord_pred(pos).squeeze(-1)
-        x = X - scatter_mean(X, index=batch, dim=0)[batch]
-        # import ipdb; ipdb.set_trace() #! if instability persists is the refine block the problem likely no as it massive help to valid??
-        # H = self.h_feat_refine(batch, atom_hids, te_h)
-        # edge_attr = self.edge_feat_refine(edge_batch, edge_attr, te_e) #! cannot do attn with edges due to memory
-        # H = atom_hids
-        edge_attr = self.bond_refine(batch, x, H, E_idx, edge_attr)
-
-        h_logits, _ = self.atom_type_head(batch, H)
-        e_logits, _ = self.edge_type_head.predict_edges(batch, edge_attr, E_idx)
-        out = {
-            "x_hat": x,
-            "h_logits": h_logits,
-            "edge_attr_logits": e_logits,
-            # "Z_hat": z_logits,
-        }
+        if self.use_z == "pair_embedding":
+            num_atoms = H.size(0)
+            z_dense = torch.zeros(num_atoms, num_atoms, Z.size(-1), device=H.device)
+            src, tgt = E_idx
+            z_dense[src, tgt, :] = Z
+            z_dense = 0.5 * (z_dense + z_dense.permute(1, 0, 2))
+            Z = self.Z_lin(z_dense)
+            out["Z_hat"] = Z
         return out

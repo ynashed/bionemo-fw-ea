@@ -15,7 +15,7 @@ import torch.nn.functional as F
 from scipy.spatial.transform import Rotation as R
 from torch_scatter import scatter_mean
 
-from bionemo.model.molecule.moco.arch.model import MoleculeDiT
+from bionemo.model.molecule.moco.arch.old_model import MoleculeDiT
 
 
 ligand_pos = torch.rand((75, 3))

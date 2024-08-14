@@ -15,7 +15,17 @@ from torch_geometric.utils import to_dense_adj
 from torch_scatter import scatter_add
 
 from bionemo.model.molecule.moco.arch.equiformer_model import MoleculeDiTEquiformer
-from bionemo.model.molecule.moco.arch.final_model import (
+from bionemo.model.molecule.moco.arch.old_model import MoleculeDiTe as MoleculeDiT
+from bionemo.model.molecule.moco.arch.old_model import (
+    MoleculeDiTe2,
+    MoleculeDiTe3,
+    MoleculeDiTeMPNN,
+    MoleculeDiTeResidual,
+)
+
+# from bionemo.model.molecule.moco.arch.model import MoleculeDiT
+from bionemo.model.molecule.moco.arch.scratch.moco import MoCo
+from bionemo.model.molecule.moco.arch.working_model import (
     Megalodon,
     MegalodonDot,
     MegalodonDotFN,
@@ -24,11 +34,6 @@ from bionemo.model.molecule.moco.arch.final_model import (
     MegalodonNoGeom,
     MegalodonNoRes,
 )
-from bionemo.model.molecule.moco.arch.model import MoleculeDiTe as MoleculeDiT
-from bionemo.model.molecule.moco.arch.model import MoleculeDiTe2, MoleculeDiTe3, MoleculeDiTeMPNN, MoleculeDiTeResidual
-
-# from bionemo.model.molecule.moco.arch.model import MoleculeDiT
-from bionemo.model.molecule.moco.arch.scratch.moco import MoCo
 from bionemo.model.molecule.moco.models.model_zoo.eqgat.eqgat_denoising_model import DenoisingEdgeNetwork
 
 # from bionemo.model.molecule.moco.models.model_zoo.eqgat.eqgat_denoising_model_distance import DenoisingEdgeNetwork

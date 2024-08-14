@@ -965,7 +965,7 @@ class EquivariantTransformer(torch.nn.Module):
             node_features = self.out_dropout(node_features)
         outputs = self.head(node_features)
         hidden_states, dT = outputs[:, :H], outputs[:, H:]
-        print(torch.norm(dT, dim=-1), torch.norm(pos, dim=-1))
+        # print(torch.norm(dT, dim=-1), torch.norm(pos, dim=-1))
         # TODO: Update pos with dT and remove mean!
         return pos + dT, hidden_states  #! check dT and try to remove the hidden state update.
 

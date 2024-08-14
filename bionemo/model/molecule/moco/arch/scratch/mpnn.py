@@ -673,6 +673,8 @@ if __name__ == "__main__":
     Z = atom_embedder(F.one_hot(ligand_feats, num_classes).float()).unsqueeze(1) * atom_embedder(
         F.one_hot(ligand_feats, num_classes).float()
     ).unsqueeze(0)
+    source, target = E_idx
+    E = A[source, target]
 
     source, target = E_idx
     r = X[target] - X[source]  # E x 3
