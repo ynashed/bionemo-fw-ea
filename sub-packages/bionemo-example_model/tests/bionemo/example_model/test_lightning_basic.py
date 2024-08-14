@@ -14,20 +14,60 @@
 # limitations under the License.
 
 
+from collections import defaultdict
 from pathlib import Path
-from typing import Set, Type
+from typing import Dict, List, Set, Tuple, Type
 
 import pytest
+import torch
+from _pytest.compat import LEGACY_PATH
 from nemo import lightning as nl
 from nemo.collections import llm
 from nemo.lightning import NeMoLogger, io, resume
 from nemo.lightning.pytorch import callbacks as nl_callbacks
+from pytorch_lightning import Callback
 from pytorch_lightning.loggers import TensorBoardLogger
 
 from bionemo.core.model.config import BionemoTrainableModelConfig
 from bionemo.example_model import lightning_basic as lb
 from bionemo.llm.lightning import LossLoggingCallback
 from bionemo.testing import megatron_parallel_state_utils
+
+
+class MetricTracker(Callback):
+    def __init__(self, metrics_to_track_val: List[str], metrics_to_track_train: List[str]):
+        self.metrics_to_track_val = metrics_to_track_val
+        self.metrics_to_track_train = metrics_to_track_train
+        self._collection_val = defaultdict(list)
+        self._collection_train = defaultdict(list)
+
+    def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0):
+        for metric in self.metrics_to_track_val:
+            self._collection_val[metric].append(outputs[metric])
+
+    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0):
+        for metric in self.metrics_to_track_train:
+            self._collection_train[metric].append(outputs[metric])
+
+    def on_validation_epoch_end(self, trainer, pl_module):
+        elogs = trainer.logged_metrics  # access it here
+        self._collection_val["logged_metrics"].extend(elogs)
+
+    def on_train_epoch_end(self, trainer, pl_module):
+        elogs = trainer.logged_metrics  # access it here
+        self._collection_train["logged_metrics"].extend(elogs)
+
+    @property
+    def collection_val(self) -> Dict[str, torch.Tensor | List[str]]:
+        res = {k: torch.tensor(v) for k, v in self._collection_val.items() if k != "logged_metrics"}
+        res["logged_metrics"] = self._collection_val["logged_metrics"]
+        return res
+
+    @property
+    def collection_train(self) -> Dict[str, torch.Tensor | str]:
+        res = {k: torch.tensor(v) for k, v in self._collection_train.items() if k != "logged_metrics"}
+        res["logged_metrics"] = self._collection_train["logged_metrics"]
+        return res
 
 
 def _train_model_get_ckpt(
@@ -37,12 +77,12 @@ def _train_model_get_ckpt(
     model_cfg_cls: Type[BionemoTrainableModelConfig],
     ckpt_path: Path | None,
     skip_weight_prefixes: Set[str],
-) -> Path:
+) -> Tuple[Path, MetricTracker]:
     checkpoint_callback = nl_callbacks.ModelCheckpoint(
-        save_best_model=True,
+        save_best_model=False,
         save_last=True,
-        monitor="val_loss",  # TODO find out how to get val_loss logged and use "val_loss",
-        save_top_k=1,
+        save_on_train_epoch_end=True,
+        monitor="reduced_train_loss",  # TODO find out how to get val_loss logged and use "val_loss",
         every_n_train_steps=5,
         enable_nemo_ckpt_io=True,  # Enables the .nemo file-like checkpointing where all IOMixins are under SerDe
         # async_save=False,  # Tries to save asynchronously, previously led to race conditions.
@@ -70,18 +110,19 @@ def _train_model_get_ckpt(
         find_unused_parameters=True,
         enable_nemo_ckpt_io=True,
     )
+    metric_tracker = MetricTracker(metrics_to_track_val=["loss"], metrics_to_track_train=["loss"])
     trainer = nl.Trainer(
         accelerator="gpu",
         devices=1,
         strategy=strategy,
         limit_val_batches=5,
         val_check_interval=5,
-        max_steps=20,
+        max_steps=100,
         num_nodes=1,
         log_every_n_steps=5,
-        callbacks=[LossLoggingCallback()],
+        callbacks=[LossLoggingCallback(), metric_tracker],
     )
-    data_module = lb.MNISTDataModule(data_dir=str(data_dir))  # Re-use the same data directory
+    data_module = lb.MNISTDataModule(data_dir=str(data_dir), batch_size=64)  # Re-use the same data directory
     llm.train(
         model=model,
         data=data_module,
@@ -94,40 +135,42 @@ def _train_model_get_ckpt(
         ),
     )
     ckpt_dirpath = Path(checkpoint_callback.last_model_path.replace(".ckpt", ""))
-    return ckpt_dirpath
+    return ckpt_dirpath, metric_tracker
 
 
 @pytest.mark.needs_gpu
-def test_train_mnist_litautoencoder_with_megatron_strategy_single_gpu(tmpdir):
+def test_train_mnist_litautoencoder_with_megatron_strategy_single_gpu(tmpdir: LEGACY_PATH):
     data_dir: Path = tmpdir / "data"
     data_dir.mkdir()
     with megatron_parallel_state_utils.clean_parallel_state_context():
 
-        def train_model(tmpdir: Path) -> Path:
+        def train_model(tmpdir: Path) -> Tuple[Path, MetricTracker]:
             # Configure our custom Checkpointer
             name = "test_experiment"
             return _train_model_get_ckpt(name, tmpdir, data_dir, lb.ExampleConfig, None, set())
 
-        ckpt_path = train_model(tmpdir / "pretrain")
+        ckpt_path, initial_metrics = train_model(tmpdir / "pretrain")
         assert ckpt_path.exists()
         assert ckpt_path.is_dir()
         assert io.is_distributed_ckpt(ckpt_path)
+        assert initial_metrics.collection_train["loss"][0] > initial_metrics.collection_train["loss"][-1]
     with megatron_parallel_state_utils.clean_parallel_state_context():
 
-        def simple_finetune(tmpdir: Path, ckpt_path: Path) -> Path:
+        def simple_finetune(tmpdir: Path, ckpt_path: Path) -> Tuple[Path, MetricTracker]:
             """Now take that checkpoint and show that you can train it further without making changes to model/loss"""
 
             # Configure our custom Checkpointer
             name = "simple_finetune_experiment"
             return _train_model_get_ckpt(name, tmpdir, data_dir, lb.ExampleConfig, ckpt_path, set())
 
-        simple_ft_checkpoint = simple_finetune(tmpdir / "simple_finetune", ckpt_path)
+        simple_ft_checkpoint, simple_ft_metrics = simple_finetune(tmpdir / "simple_finetune", ckpt_path)
         assert simple_ft_checkpoint.exists()
         assert simple_ft_checkpoint.is_dir()
         assert io.is_distributed_ckpt(simple_ft_checkpoint)
+        assert initial_metrics.collection_train["loss"][-1] > simple_ft_metrics.collection_train["loss"][0]
     with megatron_parallel_state_utils.clean_parallel_state_context():
 
-        def add_head_finetune(tmpdir: Path, ckpt_path: Path) -> Path:
+        def add_head_finetune(tmpdir: Path, ckpt_path: Path) -> Tuple[Path, MetricTracker]:
             """Now take that checkpoint and show that you can add in a new head/task and update loss"""
             # Configure our custom Checkpointer
             name = "add_head_finetune_experiment"
@@ -135,19 +178,26 @@ def test_train_mnist_litautoencoder_with_megatron_strategy_single_gpu(tmpdir):
                 name, tmpdir, data_dir, lb.ExampleFineTuneBothConfig, ckpt_path, {"digit_classifier"}
             )
 
-        add_head_checkpoint = add_head_finetune(tmpdir / "add_head_finetune", simple_ft_checkpoint)
+        add_head_checkpoint, add_head_ft_metrics = add_head_finetune(
+            tmpdir / "add_head_finetune", simple_ft_checkpoint
+        )
         assert add_head_checkpoint.exists()
         assert add_head_checkpoint.is_dir()
         assert io.is_distributed_ckpt(add_head_checkpoint)
+        assert add_head_ft_metrics.collection_train["loss"][0] > add_head_ft_metrics.collection_train["loss"][-1]
 
     with megatron_parallel_state_utils.clean_parallel_state_context():
 
-        def drop_head_finetune(tmpdir: Path, ckpt_path: Path) -> Path:
+        def drop_head_finetune(tmpdir: Path, ckpt_path: Path) -> Tuple[Path, MetricTracker]:
             """Now take that checkpoint and show that you can drop a head and update loss"""
             name = "drop_head_finetune_experiment"
             return _train_model_get_ckpt(name, tmpdir, data_dir, lb.ExampleFineTuneDropParentConfig, ckpt_path, set())
 
-        drop_head_checkpoint = drop_head_finetune(tmpdir / "drop_head_finetune", add_head_checkpoint)
+        drop_head_checkpoint, drop_head_ft_metrics = drop_head_finetune(
+            tmpdir / "drop_head_finetune", add_head_checkpoint
+        )
         assert drop_head_checkpoint.exists()
         assert drop_head_checkpoint.is_dir()
         assert io.is_distributed_ckpt(drop_head_checkpoint)
+        assert drop_head_ft_metrics.collection_train["loss"][0] > drop_head_ft_metrics.collection_train["loss"][-1]
+        assert add_head_ft_metrics.collection_train["loss"][-1] > drop_head_ft_metrics.collection_train["loss"][0]
