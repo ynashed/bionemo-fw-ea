@@ -15,7 +15,7 @@
 
 
 from pathlib import Path
-from typing import Type
+from typing import Set, Type
 
 import pytest
 from nemo import lightning as nl
@@ -31,7 +31,12 @@ from bionemo.testing import megatron_parallel_state_utils
 
 
 def _train_model_get_ckpt(
-    name: str, root_dir: Path, data_dir: Path, model_cfg_cls: Type[BionemoTrainableModelConfig], ckpt_path: Path | None
+    name: str,
+    root_dir: Path,
+    data_dir: Path,
+    model_cfg_cls: Type[BionemoTrainableModelConfig],
+    ckpt_path: Path | None,
+    skip_weight_prefixes: Set[str],
 ) -> Path:
     checkpoint_callback = nl_callbacks.ModelCheckpoint(
         save_best_model=True,
@@ -55,7 +60,9 @@ def _train_model_get_ckpt(
     # nemo_logger.save_dir = tmpdir
     # ckpt_path needs to be a string for SerDe
     ckpt_path_optstr: str | None = str(ckpt_path) if ckpt_path is not None else None
-    model = lb.LitAutoEncoder(config=model_cfg_cls(initial_weights=ckpt_path_optstr))
+    model = lb.LitAutoEncoder(
+        config=model_cfg_cls(initial_weights=ckpt_path_optstr, skip_weight_prefixes=skip_weight_prefixes)
+    )
     strategy = nl.MegatronStrategy(
         tensor_model_parallel_size=1,
         pipeline_model_parallel_size=1,
@@ -99,7 +106,7 @@ def test_train_mnist_litautoencoder_with_megatron_strategy_single_gpu(tmpdir):
         def train_model(tmpdir: Path) -> Path:
             # Configure our custom Checkpointer
             name = "test_experiment"
-            return _train_model_get_ckpt(name, tmpdir, data_dir, lb.ExampleConfig, None)
+            return _train_model_get_ckpt(name, tmpdir, data_dir, lb.ExampleConfig, None, set())
 
         ckpt_path = train_model(tmpdir / "pretrain")
         assert ckpt_path.exists()
@@ -112,7 +119,7 @@ def test_train_mnist_litautoencoder_with_megatron_strategy_single_gpu(tmpdir):
 
             # Configure our custom Checkpointer
             name = "simple_finetune_experiment"
-            return _train_model_get_ckpt(name, tmpdir, data_dir, lb.ExampleConfig, ckpt_path)
+            return _train_model_get_ckpt(name, tmpdir, data_dir, lb.ExampleConfig, ckpt_path, set())
 
         simple_ft_checkpoint = simple_finetune(tmpdir / "simple_finetune", ckpt_path)
         assert simple_ft_checkpoint.exists()
@@ -124,7 +131,9 @@ def test_train_mnist_litautoencoder_with_megatron_strategy_single_gpu(tmpdir):
             """Now take that checkpoint and show that you can add in a new head/task and update loss"""
             # Configure our custom Checkpointer
             name = "add_head_finetune_experiment"
-            return _train_model_get_ckpt(name, tmpdir, data_dir, lb.ExampleFineTuneBothConfig, ckpt_path)
+            return _train_model_get_ckpt(
+                name, tmpdir, data_dir, lb.ExampleFineTuneBothConfig, ckpt_path, {"digit_classifier"}
+            )
 
         add_head_checkpoint = add_head_finetune(tmpdir / "add_head_finetune", simple_ft_checkpoint)
         assert add_head_checkpoint.exists()
@@ -136,7 +145,7 @@ def test_train_mnist_litautoencoder_with_megatron_strategy_single_gpu(tmpdir):
         def drop_head_finetune(tmpdir: Path, ckpt_path: Path) -> Path:
             """Now take that checkpoint and show that you can drop a head and update loss"""
             name = "drop_head_finetune_experiment"
-            return _train_model_get_ckpt(name, tmpdir, data_dir, lb.ExampleFineTuneDropParentConfig, ckpt_path)
+            return _train_model_get_ckpt(name, tmpdir, data_dir, lb.ExampleFineTuneDropParentConfig, ckpt_path, set())
 
         drop_head_checkpoint = drop_head_finetune(tmpdir / "drop_head_finetune", add_head_checkpoint)
         assert drop_head_checkpoint.exists()

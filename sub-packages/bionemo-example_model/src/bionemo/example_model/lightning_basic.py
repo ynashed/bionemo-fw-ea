@@ -15,9 +15,9 @@
 
 """This is intended to be a minimal self-container NeMo2 example."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Optional, Sequence, Tuple, Type, TypedDict
+from typing import Any, Dict, Optional, Sequence, Set, Tuple, Type, TypedDict
 
 import pytorch_lightning as pl
 import torch
@@ -27,7 +27,7 @@ from megatron.core.optimizer import OptimizerConfig
 from megatron.core.transformer.enums import ModelType
 from megatron.core.transformer.module import MegatronModule
 from nemo.lightning import io
-from nemo.lightning.megatron_parallel import DataT, MegatronLossReduction, ReductionT
+from nemo.lightning.megatron_parallel import MegatronLossReduction, ReductionT
 from nemo.lightning.pytorch.optim import MegatronOptimizerModule
 from nemo.lightning.pytorch.plugins import MegatronDataSampler
 from torch import Tensor, nn
@@ -52,7 +52,7 @@ __all__: Sequence[str] = (
 class MSELossReduction(MegatronLossReduction):
     """A class used for calculating the loss, and for logging the reduced loss across micro batches."""
 
-    def forward(self, batch: DataT, forward_out: Dict[str, Tensor]) -> Tuple[Tensor, ReductionT]:
+    def forward(self, batch: "MnistItem", forward_out: Dict[str, Tensor]) -> Tuple[Tensor, ReductionT]:
         """Calculates the loss within a micro-batch. A micro-batch is a batch of data on a single GPU.
 
         Args:
@@ -86,8 +86,12 @@ class MSELossReduction(MegatronLossReduction):
         return mse_losses.mean()
 
 
-def munge_key_megatron_to_nemo2(k: str) -> str:
-    return f"0.module.{k}"
+def munge_key_megatron_to_nemo2(k: str, keep_initial: bool = False) -> str:
+    if keep_initial:
+        parts = k.split(".")
+        new = [parts[0], "module", *parts[1:]]
+        return ".".join(new)
+    return f"module.{k}"
 
 
 def munge_sharded_tensor_key_megatron_to_nemo2(v: ShardedTensor) -> ShardedTensor:
@@ -97,11 +101,19 @@ def munge_sharded_tensor_key_megatron_to_nemo2(v: ShardedTensor) -> ShardedTenso
     return v
 
 
-def load_weights_shareded_inplace_nemo2_to_mcore(model, ckpt):
+def key_in_filter(k: str, filter: Set[str]) -> bool:
+    for prefix in filter:
+        if k.startswith(prefix):
+            return True
+    return False
+
+
+def load_weights_shareded_inplace_nemo2_to_mcore(model, ckpt, skip_loading_keys: Set[str]):
     # Loads checkpoint from state dict
     sharded_state_dict = {
-        munge_key_megatron_to_nemo2(k): munge_sharded_tensor_key_megatron_to_nemo2(v)
+        munge_key_megatron_to_nemo2(k, keep_initial=False): munge_sharded_tensor_key_megatron_to_nemo2(v)
         for k, v in model.sharded_state_dict().items()
+        if not key_in_filter(k, skip_loading_keys)
     }
     dist_checkpointing.load(
         sharded_state_dict=sharded_state_dict,
@@ -120,6 +132,7 @@ class ExampleConfig(BionemoTrainableModelConfig["ExampleModel", "MSELossReductio
 
     initial_weights: str | None = None
     calculate_per_token_loss: bool = False
+    skip_weight_prefixes: Set[str] = field(default_factory=set)
 
     def configure_model(self) -> "ExampleModel":
         """This function is called by the strategy to construct the model.
@@ -131,7 +144,7 @@ class ExampleConfig(BionemoTrainableModelConfig["ExampleModel", "MSELossReductio
         """
         model = ExampleModel(self)
         if self.initial_weights:
-            load_weights_shareded_inplace_nemo2_to_mcore(model, self.initial_weights)
+            load_weights_shareded_inplace_nemo2_to_mcore(model, self.initial_weights, self.skip_weight_prefixes)
         return model
 
     def get_loss_reduction_class(self) -> Type[MSELossReduction]:
@@ -149,6 +162,7 @@ class ExampleFineTuneBothConfig(
 
     initial_weights: Path | None = None
     calculate_per_token_loss: bool = False
+    skip_weight_prefixes: Set[str] = field(default_factory=set)
 
     def configure_model(self) -> "ExampleFineTuneBothModel":
         """This function is called by the strategy to construct the model.
@@ -160,7 +174,7 @@ class ExampleFineTuneBothConfig(
         """
         model = ExampleFineTuneBothModel(self)
         if self.initial_weights:
-            load_weights_shareded_inplace_nemo2_to_mcore(model, self.initial_weights)
+            load_weights_shareded_inplace_nemo2_to_mcore(model, self.initial_weights, self.skip_weight_prefixes)
         return model
 
     def get_loss_reduction_class(self) -> Type["MSEPlusClassifierLossReduction"]:
@@ -178,6 +192,7 @@ class ExampleFineTuneDropParentConfig(
 
     initial_weights: Path | None = None
     calculate_per_token_loss: bool = False
+    skip_weight_prefixes: Set[str] = field(default_factory=set)
 
     def configure_model(self) -> "ExampleFineTuneDropParentModel":
         """This function is called by the strategy to construct the model.
@@ -189,7 +204,7 @@ class ExampleFineTuneDropParentConfig(
         """
         model = ExampleFineTuneDropParentModel(self)
         if self.initial_weights:
-            load_weights_shareded_inplace_nemo2_to_mcore(model, self.initial_weights)
+            load_weights_shareded_inplace_nemo2_to_mcore(model, self.initial_weights, self.skip_weight_prefixes)
         return model
 
     def get_loss_reduction_class(self) -> Type["ClassifierLossReduction"]:
@@ -199,7 +214,7 @@ class ExampleFineTuneDropParentConfig(
 class MSEPlusClassifierLossReduction(MegatronLossReduction):
     """A class used for calculating the loss, and for logging the reduced loss across micro batches."""
 
-    def forward(self, batch: DataT, forward_out: Dict[str, Tensor]) -> Tuple[Tensor, ReductionT]:
+    def forward(self, batch: "MnistItem", forward_out: Dict[str, Tensor]) -> Tuple[Tensor, ReductionT]:
         """Calculates the loss within a micro-batch. A micro-batch is a batch of data on a single GPU.
 
         Args:
@@ -212,7 +227,7 @@ class MSEPlusClassifierLossReduction(MegatronLossReduction):
                 (which currently only works for logging.).
         """
         x = batch["data"]
-        digits = batch["labels"]
+        digits = batch["label"]
         x_hat = forward_out["x_hat"]
         digit_logits = forward_out["digit_logits"]
         xview = x.view(x.size(0), -1)
@@ -239,7 +254,7 @@ class MSEPlusClassifierLossReduction(MegatronLossReduction):
 class ClassifierLossReduction(MegatronLossReduction):
     """A class used for calculating the loss, and for logging the reduced loss across micro batches."""
 
-    def forward(self, batch: DataT, forward_out: Tensor) -> Tuple[Tensor, ReductionT]:
+    def forward(self, batch: "MnistItem", forward_out: Tensor) -> Tuple[Tensor, ReductionT]:
         """Calculates the loss within a micro-batch. A micro-batch is a batch of data on a single GPU.
 
         Args:
@@ -251,7 +266,7 @@ class ClassifierLossReduction(MegatronLossReduction):
                 backpropagation and the ReductionT will be passed to the reduce method
                 (which currently only works for logging.).
         """
-        digits = batch["labels"]
+        digits = batch["label"]
         digit_logits = forward_out
         loss = nn.functional.cross_entropy(digit_logits, digits)
         return loss, {"avg": loss}

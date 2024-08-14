@@ -178,28 +178,6 @@ setup() {
     # mkdir -p ${DATA_PATH}
     # mkdir -p ${RESULT_PATH}
     # mkdir -p ${MODEL_PATH}
-
-    if [ ! -z "${NEMO_HOME}" ];
-    then
-        # NOTE: If we change the Python version, we will have a different mount path!
-        #       The python3.X part of the path changes.
-        echo "Making a volume mount for NeMo!" \
-             "Mounting package (\$NEMO_HOME/nemo) in Python environment (/usr/local/lib/python3.10/dist-packages/nemo)" \
-             "and NEMO_HOME (${NEMO_HOME}) to /workspace/NeMo"
-        DOCKER_CMD="${DOCKER_CMD} -v ${NEMO_HOME}/nemo:/usr/local/lib/python3.10/dist-packages/nemo -v ${NEMO_HOME}:/workspace/NeMo"
-    fi
-
-    if [ ! -z "${MEGATRON_HOME}" ];
-    then
-        # NOTE: If we change the Python version, we will have a different mount path!
-        #       The python3.X part of the path changes.
-        echo "Making a volume mount for megatron!" \
-             "Mounting package (\$MEGATRON_HOME/nemo) in Python environment (/usr/local/lib/python3.10/dist-packages/nemo)" \
-             "and MEGATRON_HOME (${MEGATRON_HOME}) to /workspace/Megatron-LM"
-        DOCKER_CMD="${DOCKER_CMD} -v ${MEGATRON_HOME}/megatron:/usr/local/lib/python3.10/dist-packages/megatron -v ${MEGATRON_HOME}:/workspace/Megatron-LM"
-    fi
-
-
     # Note: For BIONEMO_HOME, if we are invoking docker, this should always be
     # the docker repo path.
     DOCKER_CMD="${DOCKER_CMD} --env BIONEMO_HOME=$DOCKER_REPO_PATH"
