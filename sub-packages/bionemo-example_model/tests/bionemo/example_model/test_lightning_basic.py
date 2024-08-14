@@ -144,12 +144,12 @@ def test_train_mnist_litautoencoder_with_megatron_strategy_single_gpu(tmpdir: LE
     data_dir.mkdir()
     with megatron_parallel_state_utils.clean_parallel_state_context():
         ckpt_path, initial_metrics = _train_model_get_ckpt(
-            "test_experiment",
-            tmpdir / "pretrain",
-            data_dir,
-            lb.ExampleConfig,
-            None,
-            set(),
+            name="test_experiment",
+            root_dir=tmpdir / "pretrain",
+            data_dir=data_dir,
+            model_cfg_cls=lb.ExampleConfig,
+            ckpt_path=None,
+            skip_weight_prefixes=set(),
         )
         assert ckpt_path.exists()
         assert ckpt_path.is_dir()
@@ -157,12 +157,12 @@ def test_train_mnist_litautoencoder_with_megatron_strategy_single_gpu(tmpdir: LE
         assert initial_metrics.collection_train["loss"][0] > initial_metrics.collection_train["loss"][-1]
     with megatron_parallel_state_utils.clean_parallel_state_context():
         simple_ft_checkpoint, simple_ft_metrics = _train_model_get_ckpt(
-            "simple_finetune_experiment",
-            tmpdir / "simple_finetune",
-            data_dir,
-            lb.ExampleConfig,
-            ckpt_path,
-            set(),
+            name="simple_finetune_experiment",
+            root_dir=tmpdir / "simple_finetune",  # new checkpoint will land in a subdir of this
+            data_dir=data_dir, # same data dir for all steps to skip re-download
+            model_cfg_cls=lb.ExampleConfig, # same config as before since we are just continuing training
+            ckpt_path=ckpt_path, # specify the initial checkpoint path now
+            skip_weight_prefixes=set(),  # no new weights in this model need skipping
         )
         assert simple_ft_checkpoint.exists()
         assert simple_ft_checkpoint.is_dir()
@@ -170,12 +170,12 @@ def test_train_mnist_litautoencoder_with_megatron_strategy_single_gpu(tmpdir: LE
         assert initial_metrics.collection_train["loss"][-1] > simple_ft_metrics.collection_train["loss"][0]
     with megatron_parallel_state_utils.clean_parallel_state_context():
         add_head_checkpoint, add_head_ft_metrics = _train_model_get_ckpt(
-            "add_head_finetune_experiment",
-            tmpdir / "add_head_finetune",
-            data_dir,
-            lb.ExampleFineTuneBothConfig,
-            simple_ft_checkpoint,
-            {"digit_classifier"},
+            name="add_head_finetune_experiment",
+            root_dir=tmpdir / "add_head_finetune",
+            data_dir=data_dir,
+            model_cfg_cls=lb.ExampleFineTuneBothConfig,  # config that returns a model/loss with a new task head
+            ckpt_path=simple_ft_checkpoint,  # cumulatively modify a checkpoint with subsequent experiments, (optional)
+            skip_weight_prefixes={"digit_classifier"},  # The new head weights are not in the ckpt so need skipping.
         )
         assert add_head_checkpoint.exists()
         assert add_head_checkpoint.is_dir()
@@ -186,12 +186,12 @@ def test_train_mnist_litautoencoder_with_megatron_strategy_single_gpu(tmpdir: LE
 
     with megatron_parallel_state_utils.clean_parallel_state_context():
         drop_head_checkpoint, drop_head_ft_metrics = _train_model_get_ckpt(
-            "drop_head_finetune_experiment",
-            tmpdir / "drop_head_finetune",
-            data_dir,
-            lb.ExampleFineTuneDropParentConfig,
-            add_head_checkpoint,
-            set(),
+            name="drop_head_finetune_experiment",
+            root_dir=tmpdir / "drop_head_finetune",
+            data_dir=data_dir,
+            model_cfg_cls=lb.ExampleFineTuneDropParentConfig,  # config that drops the decoder and head -> only cls now
+            ckpt_path=add_head_checkpoint,  # cumulatively build on the config that had this cls head (optional)
+            skip_weight_prefixes=set(), # no new parameters vs prior cfg, will continue training cls head by itself
         )
         assert drop_head_checkpoint.exists()
         assert drop_head_checkpoint.is_dir()
