@@ -36,8 +36,8 @@ from torchvision import transforms
 from torchvision.datasets import MNIST
 
 from bionemo.core.data.resamplers import PRNGDatasetShuffler
-from bionemo.core.model.config import BionemoTrainableModelConfig
 from bionemo.llm.lightning import LightningPassthroughPredictionMixin
+from bionemo.llm.model.config import MegatronBioNeMoTrainableModelConfig
 
 
 __all__: Sequence[str] = (
@@ -120,7 +120,7 @@ def load_weights_sharded_inplace_nemo2_to_mcore(model, ckpt, skip_loading_keys: 
 
 
 @dataclass
-class ExampleConfig(BionemoTrainableModelConfig["ExampleModel", "MSELossReduction"]):
+class ExampleConfig(MegatronBioNeMoTrainableModelConfig["ExampleModel", "MSELossReduction"]):
     """ExampleConfig is a dataclass that is used to configure the model.
 
     Timers from ModelParallelConfig are required for megatron forward compatibility.
@@ -150,7 +150,7 @@ class ExampleConfig(BionemoTrainableModelConfig["ExampleModel", "MSELossReductio
 
 @dataclass
 class ExampleFineTuneBothConfig(
-    BionemoTrainableModelConfig["ExampleFineTuneBothModel", "MSEPlusClassifierLossReduction"]
+    MegatronBioNeMoTrainableModelConfig["ExampleFineTuneBothModel", "MSEPlusClassifierLossReduction"]
 ):
     """ExampleConfig is a dataclass that is used to configure the model.
 
@@ -180,7 +180,7 @@ class ExampleFineTuneBothConfig(
 
 @dataclass
 class ExampleFineTuneDropParentConfig(
-    BionemoTrainableModelConfig["ExampleFineTuneDropParentModel", "ClassifierLossReduction"]
+    MegatronBioNeMoTrainableModelConfig["ExampleFineTuneDropParentModel", "ClassifierLossReduction"]
 ):
     """ExampleConfig is a dataclass that is used to configure the model.
 
@@ -286,7 +286,7 @@ class ClassifierLossReduction(MegatronLossReduction):
 class LitAutoEncoder(pl.LightningModule, io.IOMixin, LightningPassthroughPredictionMixin):
     """A very basic lightning module for testing the megatron strategy and the megatron-nemo2-bionemo contract."""
 
-    def __init__(self, config: BionemoTrainableModelConfig):
+    def __init__(self, config: MegatronBioNeMoTrainableModelConfig):
         """Initializes the model.
 
         Args:
