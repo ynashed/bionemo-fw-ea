@@ -28,19 +28,17 @@ from typing import Optional, Sequence, get_args
 from megatron.core.optimizer import OptimizerConfig
 from nemo import lightning as nl
 from nemo.collections import llm
-from nemo.lightning import io, resume
+from nemo.lightning import resume
 from nemo.lightning.pytorch import callbacks as nl_callbacks
 from nemo.lightning.pytorch.optim import MegatronOptimizerModule
 from nemo.lightning.pytorch.optim.lr_scheduler import CosineAnnealingScheduler
 from nemo.utils import logging
-from pytorch_lightning.callbacks import LearningRateMonitor, RichModelSummary
 from torch.nn import functional as F
 
 from bionemo.core.utils.dtypes import PrecisionTypes, get_autocast_dtype
 from bionemo.geneformer.api import GeneformerConfig
 from bionemo.geneformer.data.singlecell.datamodule import SingleCellDataModule
 from bionemo.geneformer.data.singlecell.preprocess import GeneformerPreprocess
-from bionemo.llm.lightning import LossLoggingCallback
 from bionemo.llm.model.biobert.lightning import BioBertLightningModule
 from bionemo.llm.model.biobert.model import BiobertSpecOption
 from bionemo.llm.utils.logger_utils import WandbLoggerOptions, setup_nemo_lightning_logger
@@ -148,12 +146,12 @@ def main(
         ],
         plugins=nl.MegatronMixedPrecision(precision=precision, amp_O2=False),
     )
-    '''
-    
+    """
+
             io.track_io(RichModelSummary)(max_depth=4),
             io.track_io(LearningRateMonitor)(),
-    
-    '''
+
+    """
 
     preprocessor = GeneformerPreprocess(
         download_directory=train_data_path,
@@ -240,14 +238,14 @@ def main(
     )
     # Configure our custom Checkpointer
     checkpoint_callback = nl_callbacks.ModelCheckpoint(
-        save_best_model=save_best_checkpoint, #save_best_checkpoint,
-        save_last=save_last_checkpoint, #save_last_checkpoint,
+        save_best_model=save_best_checkpoint,  # save_best_checkpoint,
+        save_last=save_last_checkpoint,  # save_last_checkpoint,
         monitor=metric_to_monitor_for_checkpoints,  # "val_loss",
         save_top_k=save_top_k,
         every_n_train_steps=save_every_n_steps,
         enable_nemo_ckpt_io=True,  # Enables the .nemo file-like checkpointing where all IOMixins are under SerDe
         async_save=False,  # Tries to save asynchronously, previously led to race conditions.
-        try_restore_best_ckpt=False, # True- restore the model with the best metrics. False- restore the last checkpoint (?)
+        try_restore_best_ckpt=False,  # True- restore the model with the best metrics. False- restore the last checkpoint (?)
     )
 
     # Setup the logger and train the model

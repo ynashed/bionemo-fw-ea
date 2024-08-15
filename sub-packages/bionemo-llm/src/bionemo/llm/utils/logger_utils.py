@@ -81,7 +81,7 @@ def setup_nemo_lightning_logger(
         wandb=wandb_logger,
         ckpt=ckpt_callback,
         use_datetime_version=False,
-        version='dev',
+        version="dev",
         **kwargs,
     )
     # Needed so that the trainer can find an output directory for the profiler

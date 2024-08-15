@@ -47,7 +47,10 @@ getter_function_map = {
     "global_step": get_global_step,
 }
 
-class StopAndGoException(Exception): pass
+
+class StopAndGoException(Exception):
+    pass
+
 
 class RaiseAfterMetadataCallback(Callback):
     """A callback that raises a StopAndGoException kills it if the metadata
@@ -67,14 +70,13 @@ class RaiseAfterMetadataCallback(Callback):
             # kill job afterwards
 
 
-
-
 class KillAfterSignalCallback(Callback):
     """A callback that sends a SIGTERM signal to the process and kills it if the metadata
     from the MetadataSaveCallback was saved successfully beforehand.
 
     Use this one for CLI based Stop and go tests.
     """
+
     def __init__(self, metadata_path: pathlib.Path):
         self.metadata_path = metadata_path
 
@@ -92,7 +94,6 @@ class KillAfterSignalCallback(Callback):
             time.sleep(5)
 
         if os.path.exists(pickle_file_path):
-
             # Register the signal handler
             signal.signal(signal.SIGTERM, terminate_process)
             # kill job afterwards
@@ -156,9 +157,7 @@ class TestCheckpointIntegrityCallback(Callback):
         self.metadata_keys = metadata_keys
 
     # Add outputs for on_train_batch_end
-    def on_train_batch_start(
-        self, trainer: "pl.Trainer", pl_module: "pl.LightningModule", batch , batch_idx 
-    ):
+    def on_train_batch_start(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule", batch, batch_idx):
         pickle_file_path = os.path.join(self.metadata_path, "checkpoints/metadata.pkl")
         # check that pickle file exists
         assert os.path.isfile(pickle_file_path), f"No file found at {pickle_file_path}"

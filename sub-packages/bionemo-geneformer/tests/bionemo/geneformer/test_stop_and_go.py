@@ -26,27 +26,21 @@ How to adapt these tests:
 
 import math
 import pathlib
-from typing import List, Literal, Tuple
+from typing import Literal
 
 import pytest
 import torch
-from bionemo.testing.megatron_parallel_state_utils import clean_parallel_state_context
-from bionemo.testing.testing_callbacks import MetadataSaveCallback, RaiseAfterMetadataCallback, StopAndGoException, TestCheckpointIntegrityCallback
-from megatron.core import parallel_state
 from megatron.core.optimizer.optimizer_config import OptimizerConfig
 from nemo import lightning as nl
 from nemo.collections import llm
-from nemo.lightning import resume
+from nemo.lightning import io, resume
 from nemo.lightning.nemo_logger import NeMoLogger
 from nemo.lightning.pytorch import callbacks as nl_callbacks
-from bionemo.llm.lightning import LossLoggingCallback
-from nemo.lightning import io
 from nemo.lightning.pytorch.optim.lr_scheduler import CosineAnnealingScheduler
 from nemo.lightning.pytorch.optim.megatron import MegatronOptimizerModule
 from torch.nn import functional as F
 
 from bionemo import geneformer
-from bionemo.core.utils.batching_utils import pad_token_ids
 from bionemo.core.utils.dtypes import get_autocast_dtype
 
 # Do we want to re-export stuff in api?
@@ -54,6 +48,13 @@ from bionemo.geneformer.api import GeneformerConfig
 from bionemo.geneformer.data.singlecell.preprocess import GeneformerPreprocess
 from bionemo.llm.model.biobert.lightning import BioBertLightningModule
 from bionemo.llm.model.biobert.transformer_specs import BiobertSpecOption
+from bionemo.testing.megatron_parallel_state_utils import clean_parallel_state_context
+from bionemo.testing.testing_callbacks import (
+    MetadataSaveCallback,
+    RaiseAfterMetadataCallback,
+    StopAndGoException,
+    TestCheckpointIntegrityCallback,
+)
 
 
 bionemo2_root: pathlib.Path = (
@@ -72,12 +73,14 @@ MODEL_PRECISION: Literal["bf16-mixed"] = "bf16-mixed"
 USE_TE: bool = False  # TODO use this for high level decisions around whether we're ready to switch to TE
 
 
-seq_length = 128 # NOTE(@skothenhill) decrease this if there are memory issues in CI
+seq_length = 128  # NOTE(@skothenhill) decrease this if there are memory issues in CI
+
 
 @pytest.fixture
 def geneformer_config():
     # Facilitates running inside/outside pytest contexts.
     return _geneformer_config()
+
 
 def _geneformer_config():
     """Setups the default geneformer config taken from pretrain.py. Update as needed."""
@@ -125,6 +128,7 @@ def _geneformer_config():
 
 def make_real_datamodule(tokenizer, seq_length, median_dict, devices, tensor_model_parallel_size, data_path):
     from bionemo.geneformer.data.singlecell.datamodule import SingleCellDataModule
+
     num_dataset_workers = 0
     data = SingleCellDataModule(
         seq_length=seq_length,
@@ -135,7 +139,7 @@ def make_real_datamodule(tokenizer, seq_length, median_dict, devices, tensor_mod
         random_token_prob=0.1,  # this is the incorrect setting we originally used.
         median_dict=median_dict,
         micro_batch_size=2,
-        global_batch_size=2 * int(devices), #  / tensor_model_parallel_size), TP is not involved here.
+        global_batch_size=2 * int(devices),  #  / tensor_model_parallel_size), TP is not involved here.
         # persistent workers is supported when num_dataset_workers > 0
         persistent_workers=num_dataset_workers > 0,
         pin_memory=False,
@@ -151,7 +155,7 @@ def test_geneformer_stop_and_go(geneformer_config: GeneformerConfig, seed: int =
     # Configuration stuff.
     data_dir = pathlib.Path(data_path)
     train_data_path = data_dir / "train"
-    val_check_interval = 50 
+    val_check_interval = 50
     lr = 1e-4
     num_steps = 200
     cosine_rampup_frac = 0.1
@@ -177,21 +181,21 @@ def test_geneformer_stop_and_go(geneformer_config: GeneformerConfig, seed: int =
 
     # Taken from default argparse.
     optim = MegatronOptimizerModule(
-            config=OptimizerConfig(
-                lr=lr,
-                optimizer="adam",
-                use_distributed_optimizer=True,
-            ),
-            lr_scheduler=CosineAnnealingScheduler(
-                max_steps=num_steps,
-                min_lr=lr / 100,
-                warmup_steps=int(math.ceil(num_steps * cosine_rampup_frac)),
-                interval="step",
-                monitor="reduced_train_loss",
-                constant_steps=int(math.ceil(num_steps * cosine_hold_frac)),
-            ),
-        )
- 
+        config=OptimizerConfig(
+            lr=lr,
+            optimizer="adam",
+            use_distributed_optimizer=True,
+        ),
+        lr_scheduler=CosineAnnealingScheduler(
+            max_steps=num_steps,
+            min_lr=lr / 100,
+            warmup_steps=int(math.ceil(num_steps * cosine_rampup_frac)),
+            interval="step",
+            monitor="reduced_train_loss",
+            constant_steps=int(math.ceil(num_steps * cosine_hold_frac)),
+        ),
+    )
+
     module = BioBertLightningModule(
         config=geneformer_config,
         tokenizer=tokenizer,
@@ -212,39 +216,46 @@ def test_geneformer_stop_and_go(geneformer_config: GeneformerConfig, seed: int =
         try_restore_best_ckpt=False,
     )
 
-    from pytorch_lightning.loggers import TensorBoardLogger, WandbLogger
     # TODO: probably want to nuke this directory on startup everytime.
     exp_name = "geneformer_stopngo"
     # NOTE: PR 10090 makes it so you can set a version with resume_if_exists. In our case, we dont care about version, so we just ignore.
     nemo_logger: NeMoLogger = NeMoLogger(
-        dir=str(root_dir), name=exp_name, use_datetime_version=False, version=None, tensorboard=None, wandb=None, ckpt=None
+        dir=str(root_dir),
+        name=exp_name,
+        use_datetime_version=False,
+        version=None,
+        tensorboard=None,
+        wandb=None,
+        ckpt=None,
     )
     metadata_dir = root_dir / exp_name
 
-
     # NOTE(SKH) Verified this is the same.
     with clean_parallel_state_context():
-        tp_size=1
+        tp_size = 1
         strategy = nl.MegatronStrategy(
             tensor_model_parallel_size=tp_size,
             pipeline_model_parallel_size=pp_size,
             ddp="megatron",
             find_unused_parameters=True,
-            ckpt_include_optimizer=True
+            ckpt_include_optimizer=True,
         )
         # NOTE(SKH) Verified this is the same.
         # NOTE(SKH) how do we consistently get the log directory? lots of magic happening.
         trainer = nl.Trainer(
             devices=devices,
-            max_steps = num_steps, # Hardcoded to debug
+            max_steps=num_steps,  # Hardcoded to debug
             accelerator="gpu",
             strategy=strategy,
-            limit_val_batches=2, # Hardcoded to coyp pretrain
+            limit_val_batches=2,  # Hardcoded to coyp pretrain
             logger=False,
             val_check_interval=val_check_interval,
             num_nodes=1,
             callbacks=[
-                io.track_io(MetadataSaveCallback)(metadata_path=metadata_dir, metadata_keys=["learning_rate", "global_step"]), io.track_io(RaiseAfterMetadataCallback)(metadata_path=metadata_dir),
+                io.track_io(MetadataSaveCallback)(
+                    metadata_path=metadata_dir, metadata_keys=["learning_rate", "global_step"]
+                ),
+                io.track_io(RaiseAfterMetadataCallback)(metadata_path=metadata_dir),
                 nl_callbacks.ModelCheckpoint(
                     save_best_model=False,
                     save_last=True,
@@ -254,7 +265,7 @@ def test_geneformer_stop_and_go(geneformer_config: GeneformerConfig, seed: int =
                     enable_nemo_ckpt_io=True,  # Enables the .nemo file-like checkpointing where all IOMixins are under SerDe
                     async_save=False,
                     try_restore_best_ckpt=False,
-                )
+                ),
             ],  # is this what I need for stop and go?
             plugins=nl.MegatronMixedPrecision(precision=MODEL_PRECISION, amp_O2=False),
         )
@@ -281,27 +292,29 @@ def test_geneformer_stop_and_go(geneformer_config: GeneformerConfig, seed: int =
     # TODO: what actually needs to be torn down? strategy and trainer?
     print("Resetting.......")
     with clean_parallel_state_context():
-        tp_size=1
+        tp_size = 1
         pp_size = 1
         strategy = nl.MegatronStrategy(
             tensor_model_parallel_size=tp_size,
             pipeline_model_parallel_size=pp_size,
             ddp="megatron",
             find_unused_parameters=True,
-            ckpt_include_optimizer=True
+            ckpt_include_optimizer=True,
         )
         # NOTE(SKH) Verified this is the same.
         trainer = nl.Trainer(
             devices=devices,
-            max_steps = num_steps, # Hardcoded to debug
+            max_steps=num_steps,  # Hardcoded to debug
             accelerator="gpu",
             strategy=strategy,
-            limit_val_batches=2, # Hardcoded to coyp pretrain
+            limit_val_batches=2,  # Hardcoded to coyp pretrain
             val_check_interval=val_check_interval,
             num_nodes=1,
             callbacks=[
-                TestCheckpointIntegrityCallback(metadata_path=metadata_dir, metadata_keys=["global_step", "learning_rate"]),
-                checkpoint_callback
+                TestCheckpointIntegrityCallback(
+                    metadata_path=metadata_dir, metadata_keys=["global_step", "learning_rate"]
+                ),
+                checkpoint_callback,
             ],
             plugins=nl.MegatronMixedPrecision(precision=MODEL_PRECISION, amp_O2=False),
         )
@@ -319,12 +332,13 @@ def test_geneformer_stop_and_go(geneformer_config: GeneformerConfig, seed: int =
             ),
         )
 
+
 # Here is code that does the same thing for GPT.
 def setup_gpt():
     import torch
+    from megatron.core.optimizer import OptimizerConfig
     from nemo import lightning as nl
     from nemo.collections import llm
-    from megatron.core.optimizer import OptimizerConfig
 
     seq_length = 128
     global_batch_size = 16
@@ -351,22 +365,27 @@ def setup_gpt():
 
     ## setup the optimizer
     opt_config = OptimizerConfig(
-        optimizer='adam',
+        optimizer="adam",
         lr=6e-4,
         bf16=True,
     )
 
     opt = nl.MegatronOptimizerModule(config=opt_config)
-    exp_name = 'gpt_stop_and_go'
+    exp_name = "gpt_stop_and_go"
     root_dir = bionemo2_root / "results"
     metadata_dir = root_dir / exp_name
 
-
     nemo_logger = nl.NeMoLogger(
-        dir="test_logdir", ## logs and checkpoints will be written here
+        dir="test_logdir",  ## logs and checkpoints will be written here
     )
     nemo_logger: NeMoLogger = NeMoLogger(
-        dir=str(root_dir), name=exp_name, use_datetime_version=False, version=None, tensorboard=None, wandb=None, ckpt=None
+        dir=str(root_dir),
+        name=exp_name,
+        use_datetime_version=False,
+        version=None,
+        tensorboard=None,
+        wandb=None,
+        ckpt=None,
     )
     with clean_parallel_state_context():
         strategy = nl.MegatronStrategy(
@@ -376,24 +395,27 @@ def setup_gpt():
             ckpt_include_optimizer=True,
         )
         trainer = nl.Trainer(
-            devices=1, ## you can change the numebr of devices to suit your setup
+            devices=1,  ## you can change the numebr of devices to suit your setup
             max_steps=500,
             accelerator="gpu",
             strategy=strategy,
             plugins=nl.MegatronMixedPrecision(precision="bf16-mixed", amp_O2=False),
             callbacks=[
-                    io.track_io(MetadataSaveCallback)(metadata_path=metadata_dir, metadata_keys=["learning_rate", "global_step"]), io.track_io(RaiseAfterMetadataCallback)(metadata_path=metadata_dir),
-                    nl_callbacks.ModelCheckpoint(
-                        save_best_model=False,
-                        save_last=True,
-                        monitor="reduced_train_loss",
-                        save_top_k=2,
-                        every_n_train_steps=50,
-                        enable_nemo_ckpt_io=True,  # Enables the .nemo file-like checkpointing where all IOMixins are under SerDe
-                        async_save=False,
-                        try_restore_best_ckpt=False,
-                    )
-            ]
+                io.track_io(MetadataSaveCallback)(
+                    metadata_path=metadata_dir, metadata_keys=["learning_rate", "global_step"]
+                ),
+                io.track_io(RaiseAfterMetadataCallback)(metadata_path=metadata_dir),
+                nl_callbacks.ModelCheckpoint(
+                    save_best_model=False,
+                    save_last=True,
+                    monitor="reduced_train_loss",
+                    save_top_k=2,
+                    every_n_train_steps=50,
+                    enable_nemo_ckpt_io=True,  # Enables the .nemo file-like checkpointing where all IOMixins are under SerDe
+                    async_save=False,
+                    try_restore_best_ckpt=False,
+                ),
+            ],
         )
         try:
             llm.train(
@@ -401,7 +423,7 @@ def setup_gpt():
                 data=data,
                 trainer=trainer,
                 log=nemo_logger,
-                tokenizer='data',
+                tokenizer="data",
                 optim=opt,
                 resume=resume.AutoResume(
                     path=None,  # Overrides the path found by resume_if_exists when set.
@@ -422,31 +444,33 @@ def setup_gpt():
             ckpt_include_optimizer=True,
         )
         trainer = nl.Trainer(
-            devices=1, ## you can change the numebr of devices to suit your setup
+            devices=1,  ## you can change the numebr of devices to suit your setup
             max_steps=50,
             accelerator="gpu",
             strategy=strategy,
             plugins=nl.MegatronMixedPrecision(precision="bf16-mixed", amp_O2=False),
             callbacks=[
-                    TestCheckpointIntegrityCallback(metadata_path=metadata_dir, metadata_keys=["global_step", "learning_rate"]),
-                    nl_callbacks.ModelCheckpoint(
-                        save_best_model=False,
-                        save_last=True,
-                        monitor="reduced_train_loss",
-                        save_top_k=2,
-                        every_n_train_steps=50,
-                        enable_nemo_ckpt_io=True,  # Enables the .nemo file-like checkpointing where all IOMixins are under SerDe
-                        async_save=False,
-                        try_restore_best_ckpt=False,
-                    )
-            ]
+                TestCheckpointIntegrityCallback(
+                    metadata_path=metadata_dir, metadata_keys=["global_step", "learning_rate"]
+                ),
+                nl_callbacks.ModelCheckpoint(
+                    save_best_model=False,
+                    save_last=True,
+                    monitor="reduced_train_loss",
+                    save_top_k=2,
+                    every_n_train_steps=50,
+                    enable_nemo_ckpt_io=True,  # Enables the .nemo file-like checkpointing where all IOMixins are under SerDe
+                    async_save=False,
+                    try_restore_best_ckpt=False,
+                ),
+            ],
         )
         llm.train(
             model=model,
             data=data,
             trainer=trainer,
             log=nemo_logger,
-            tokenizer='data',
+            tokenizer="data",
             optim=opt,
             resume=resume.AutoResume(
                 path=None,  # Overrides the path found by resume_if_exists when set.
@@ -454,7 +478,6 @@ def setup_gpt():
                 resume_ignore_no_checkpoint=True,  # When false this will throw an error with no existing checkpoint.
             ),
         )
-
 
 
 if __name__ == "__main__":
