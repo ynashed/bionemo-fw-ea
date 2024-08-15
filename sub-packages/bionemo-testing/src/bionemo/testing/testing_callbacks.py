@@ -47,12 +47,34 @@ getter_function_map = {
     "global_step": get_global_step,
 }
 
+class StopAndGoException(Exception): pass
+
+class RaiseAfterMetadataCallback(Callback):
+    """A callback that raises a StopAndGoException kills it if the metadata
+    from the MetadataSaveCallback was saved successfully beforehand.
+
+    Use this one for pytest based Stop and go tests.
+    """
+
+    def __init__(self, metadata_path: pathlib.Path):
+        self.metadata_path = metadata_path
+
+    def on_train_batch_start(self, trainer: Trainer, pl_module: LightningModule, batch: Any, batch_idx: int):
+        pickle_file_path = os.path.join(self.metadata_path, "checkpoints/metadata.pkl")
+        if os.path.exists(pickle_file_path):
+            # Register the signal handler
+            raise StopAndGoException("Terminating early, checkpoint exists.")
+            # kill job afterwards
+
+
+
 
 class KillAfterSignalCallback(Callback):
     """A callback that sends a SIGTERM signal to the process and kills it if the metadata
     from the MetadataSaveCallback was saved successfully beforehand.
-    """
 
+    Use this one for CLI based Stop and go tests.
+    """
     def __init__(self, metadata_path: pathlib.Path):
         self.metadata_path = metadata_path
 
@@ -70,6 +92,7 @@ class KillAfterSignalCallback(Callback):
             time.sleep(5)
 
         if os.path.exists(pickle_file_path):
+
             # Register the signal handler
             signal.signal(signal.SIGTERM, terminate_process)
             # kill job afterwards
@@ -87,7 +110,14 @@ class MetadataSaveCallback(Callback):
         """
         self.metadata_path = metadata_path
         self.metadata_keys = metadata_keys
+        self.pickle_file_path = os.path.join(self.metadata_path, "checkpoints/metadata.pkl")
         self.called = False  # indicates if callback was already called
+
+    def setup(self, trainer: Trainer, pl_module: LightningModule, stage: str):
+        # Cleanup if dirty.
+        super().setup(trainer, pl_module, stage)
+        if trainer.is_global_zero and os.path.exists(self.pickle_file_path):
+            os.remove(self.pickle_file_path)
 
     def on_validation_epoch_end(self, trainer: Trainer, pl_module: LightningModule):
         if self.called and trainer.is_global_zero:
@@ -97,13 +127,12 @@ class MetadataSaveCallback(Callback):
                 metadata_value = getter_function_map[metadata_key](trainer, pl_module)
                 metadata[metadata_key] = metadata_value
             # prepare paths for metadata save
-            pickle_file_path = os.path.join(self.metadata_path, "checkpoints/metadata.pkl")
+            pickle_file_path = self.pickle_file_path
             os.makedirs(os.path.dirname(pickle_file_path), exist_ok=True)
             with open(pickle_file_path, "wb") as metadata_file:
                 pickle.dump(metadata, metadata_file)
             # check that pickle file was saved correctly
             assert os.path.isfile(pickle_file_path), f"No file found at {pickle_file_path}"
-
         else:
             # first time this callback is called is before the ModelCheckpoint callback
             # since that one is always executed last. Therefore, we skip the first validation
@@ -126,17 +155,56 @@ class TestCheckpointIntegrityCallback(Callback):
         self.metadata_path = metadata_path
         self.metadata_keys = metadata_keys
 
-    def on_train_start(self, trainer: Trainer, pl_module: LightningModule):
-        if trainer.is_global_zero:
-            pickle_file_path = os.path.join(self.metadata_path, "checkpoints/metadata.pkl")
-            # check that pickle file exists
-            assert os.path.isfile(pickle_file_path), f"No file found at {pickle_file_path}"
-            with open(pickle_file_path, "rb") as metadata_file:
-                metadata_dict = pickle.load(metadata_file)
+    # Add outputs for on_train_batch_end
+    def on_train_batch_start(
+        self, trainer: "pl.Trainer", pl_module: "pl.LightningModule", batch , batch_idx 
+    ):
+        pickle_file_path = os.path.join(self.metadata_path, "checkpoints/metadata.pkl")
+        # check that pickle file exists
+        assert os.path.isfile(pickle_file_path), f"No file found at {pickle_file_path}"
+        with open(pickle_file_path, "rb") as metadata_file:
+            metadata_dict = pickle.load(metadata_file)
 
-            for metadata_key in self.metadata_keys:
-                expected_value = metadata_dict[metadata_key]
-                current_value = getter_function_map[metadata_key](trainer, pl_module)
-                assert (
-                    expected_value == current_value
-                ), f"Value mismatch for key {metadata_key}: stored_value={expected_value}, current_value={current_value}"
+        current_metadata = {}
+        for metadata_key in self.metadata_keys:
+            expected_value = metadata_dict[metadata_key]
+            current_value = getter_function_map[metadata_key](trainer, pl_module)
+            current_metadata[metadata_key] = current_value
+
+        breakpoint()
+        # TODO (SKH): make this a single comparison so we can collect multiple failures.
+        for metadata_key in self.metadata_keys:
+            expected_value = metadata_dict[metadata_key]
+            current_value = current_metadata[metadata_key]
+            assert (
+                expected_value == current_value
+            ), f"Value mismatch for key {metadata_key}: stored_value={expected_value}, current_value={current_value}"
+        # TODO: I think we need to cleanup the metadata file here.
+        # TODO: I think we also want to break out here, since we dont want training to continue really.
+        os.remove(pickle_file_path)
+
+    def on_train_start(self, trainer: Trainer, pl_module: LightningModule):
+        # NOTE(SKH) dont lock this to the zero process to allow all shards to fail. Not sure how pytest handles this.
+        return
+        pickle_file_path = os.path.join(self.metadata_path, "checkpoints/metadata.pkl")
+        # check that pickle file exists
+        assert os.path.isfile(pickle_file_path), f"No file found at {pickle_file_path}"
+        with open(pickle_file_path, "rb") as metadata_file:
+            metadata_dict = pickle.load(metadata_file)
+
+        current_metadata = {}
+        for metadata_key in self.metadata_keys:
+            expected_value = metadata_dict[metadata_key]
+            current_value = getter_function_map[metadata_key](trainer, pl_module)
+            current_metadata[metadata_key] = current_value
+
+        # TODO (SKH): make this a single comparison so we can collect multiple failures.
+        for metadata_key in self.metadata_keys:
+            expected_value = metadata_dict[metadata_key]
+            current_value = current_metadata[metadata_key]
+            assert (
+                expected_value == current_value
+            ), f"Value mismatch for key {metadata_key}: stored_value={expected_value}, current_value={current_value}"
+        # TODO: I think we need to cleanup the metadata file here.
+        # TODO: I think we also want to break out here, since we dont want training to continue really.
+        os.remove(pickle_file_path)

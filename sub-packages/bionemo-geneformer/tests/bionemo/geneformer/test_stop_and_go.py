@@ -30,12 +30,17 @@ from typing import List, Literal, Tuple
 
 import pytest
 import torch
+from bionemo.testing.megatron_parallel_state_utils import clean_parallel_state_context
+from bionemo.testing.testing_callbacks import MetadataSaveCallback, RaiseAfterMetadataCallback, StopAndGoException, TestCheckpointIntegrityCallback
+from megatron.core import parallel_state
 from megatron.core.optimizer.optimizer_config import OptimizerConfig
 from nemo import lightning as nl
 from nemo.collections import llm
 from nemo.lightning import resume
 from nemo.lightning.nemo_logger import NeMoLogger
 from nemo.lightning.pytorch import callbacks as nl_callbacks
+from bionemo.llm.lightning import LossLoggingCallback
+from nemo.lightning import io
 from nemo.lightning.pytorch.optim.lr_scheduler import CosineAnnealingScheduler
 from nemo.lightning.pytorch.optim.megatron import MegatronOptimizerModule
 from torch.nn import functional as F
@@ -65,125 +70,16 @@ data_path: pathlib.Path = bionemo2_root / "test_data/cellxgene_2023-12-15_small/
 
 MODEL_PRECISION: Literal["bf16-mixed"] = "bf16-mixed"
 USE_TE: bool = False  # TODO use this for high level decisions around whether we're ready to switch to TE
-CELLS_FOR_TEST: List[List[str]] = [
-    [
-        "ENSG00000288623",
-        "ENSG00000288658",
-        "ENSG00000288681",
-        "ENSG00000288698",
-        "ENSGR0000002586",
-        "ENSGR0000124333",
-        "ENSGR0000124334",
-        "ENSGR0000167393",
-        "ENSGR0000168939",
-        "ENSGR0000169084",
-    ],
-    [
-        "ENSG00000259900",
-        "ENSG00000259916",
-        "ENSG00000259956",
-        "ENSG00000259958",
-        "ENSG00000259991",
-        "ENSG00000260001",
-        "ENSG00000260007",
-        "ENSG00000260027",
-        "ENSG00000260040",
-        "ENSG00000260045",
-        "ENSG00000260092",
-        "ENSG00000260099",
-        "ENSG00000260119",
-    ],
-    [
-        "ENSG00000269743",
-        "ENSG00000269746",
-        "ENSG00000269748",
-        "ENSG00000269753",
-        "ENSG00000269754",
-        "ENSG00000269755",
-        "ENSG00000269759",
-        "ENSG00000269766",
-        "ENSG00000269773",
-        "ENSG00000269781",
-        "ENSG00000269782",
-        "ENSG00000269783",
-        "ENSG00000269790",
-        "ENSG00000269791",
-        "ENSG00000269795",
-    ],
-]
 
 
-def _apply_tokenizer(tokenizer, sequences: List[List[str]], device) -> List[torch.Tensor]:
-    # parent pulls the tokenizer from the loaded model.
-    try:
-        token_ids = [
-            torch.tensor(
-                [tokenizer.class_id] + [tokenizer.token_to_id(gene_symbol) for gene_symbol in gene_symbols],
-                device=device,
-                dtype=torch.long,
-            )
-            for gene_symbols in sequences
-        ]
-    except TypeError as e:
-        invalid_tokens = {gene_symbol for gene_symbols in sequences for gene_symbol in gene_symbols} - set(
-            tokenizer.vocab.keys()
-        )
-        raise ValueError(
-            f"Unknown token in gene symbols. Please filter genes for those present in self.tokenizer:\n{invalid_tokens}"
-        ) from e
-    return token_ids
-
-
-def _batched_tokenizer(
-    tokenizer, sequences: List[List[str]], device, seq_length: int = 2048, dynamic_padding: bool = True
-) -> Tuple[torch.Tensor, torch.Tensor]:
-    """
-    Tokenize sequences.
-    Returns:
-        token_ids (torch.Tensor, long): token ids
-        mask (torch.Tensor, long, float): boolean mask for padded sections
-    """
-    token_ids = _apply_tokenizer(tokenizer=tokenizer, sequences=sequences, device=device)
-
-    # Validate input sequences length
-    if any(len(t) > seq_length for t in token_ids):
-        raise ValueError(f"One or more sequence exceeds max length({seq_length}).")
-
-    # Set fixed padding when dynamic padding is disabled
-    if not dynamic_padding:
-        padding_length = seq_length
-    else:
-        padding_length = None
-    # Pad token ids (1/True = Active, 0/False = Inactive)
-    token_ids, mask = pad_token_ids(
-        token_ids,
-        padding_value=tokenizer.pad_id,
-        padding_len=padding_length,
-        device=device,
-    )
-
-    return token_ids, mask
-
-
-class _DummyDataSet(torch.utils.data.Dataset):
-    def __init__(self, cells: List[List[str]], tokenizer):
-        input_ids, mask = _batched_tokenizer(tokenizer, cells, device=torch.device("cuda"))
-        self.input_ids = input_ids
-        self.mask = mask
-        assert len(self.input_ids) == len(self.mask)
-
-    def __len__(self):
-        return len(self.input_ids)
-
-    def __getitem__(self, idx):
-        return {"text": self.input_ids[idx], "attention_mask": self.mask[idx]}
-
-
-seq_length = 2048  # NOTE(@skothenhill) decrease this if there are memory issues in CI
-
+seq_length = 128 # NOTE(@skothenhill) decrease this if there are memory issues in CI
 
 @pytest.fixture
 def geneformer_config():
+    # Facilitates running inside/outside pytest contexts.
+    return _geneformer_config()
+
+def _geneformer_config():
     """Setups the default geneformer config taken from pretrain.py. Update as needed."""
     autocast_dtype = get_autocast_dtype(MODEL_PRECISION)
     return GeneformerConfig(
@@ -217,27 +113,19 @@ def geneformer_config():
         attention_dropout=0.1,
         share_embeddings_and_output_weights=True,
         enable_autocast=False,
-        biobert_spec_option=BiobertSpecOption.bert_layer_with_transformer_engine_spec
-        if USE_TE
-        else BiobertSpecOption.bert_layer_local_spec,
+        biobert_spec_option=BiobertSpecOption.bert_layer_local_spec.value,
         nemo1_ckpt_path=None,
-        return_only_hidden_states=True,  # This is what we did in nemo1 for inference
+        # Okay this is an inference only thing lol
+        # return_only_hidden_states=True,  # This is what we did in nemo1 for inference
     )
+    # BiobertSpecOption.bert_layer_with_transformer_engine_spec
+    # if USE_TE
+    # else BiobertSpecOption.bert_layer_local_spec.value,
 
 
-# TODO (skothenhill) which dataloader makes more sense for this test?
-#   - dummy will have the loss descending faster, which is good. But we need it in a DataLoader, no bueno.
-#   - real will be more representative of the actual use case, but harder to maintain the test.
-def make_dummy_dataloader(tokenizer):
-    """Dummy dataloader for testing without requiring the full memmap."""
-    cells = CELLS_FOR_TEST
-    dataloader = torch.utils.data.DataLoader(_DummyDataSet(cells, tokenizer), batch_size=3, num_workers=0)
-    return dataloader
-
-
-def make_real_datamodule(tokenizer, seq_length, median_dict, devices, pipeline_model_parallel_size, data_path):
+def make_real_datamodule(tokenizer, seq_length, median_dict, devices, tensor_model_parallel_size, data_path):
     from bionemo.geneformer.data.singlecell.datamodule import SingleCellDataModule
-
+    num_dataset_workers = 0
     data = SingleCellDataModule(
         seq_length=seq_length,
         tokenizer=tokenizer,
@@ -246,12 +134,12 @@ def make_real_datamodule(tokenizer, seq_length, median_dict, devices, pipeline_m
         test_dataset_path=data_path / "test",
         random_token_prob=0.1,  # this is the incorrect setting we originally used.
         median_dict=median_dict,
-        micro_batch_size=3,
-        global_batch_size=3 * int(devices / pipeline_model_parallel_size),
+        micro_batch_size=2,
+        global_batch_size=2 * int(devices), #  / tensor_model_parallel_size), TP is not involved here.
         # persistent workers is supported when num_dataset_workers > 0
-        persistent_workers=True,
+        persistent_workers=num_dataset_workers > 0,
         pin_memory=False,
-        num_workers=2,
+        num_workers=num_dataset_workers,
     )
     return data
 
@@ -263,12 +151,14 @@ def test_geneformer_stop_and_go(geneformer_config: GeneformerConfig, seed: int =
     # Configuration stuff.
     data_dir = pathlib.Path(data_path)
     train_data_path = data_dir / "train"
-    val_check_interval = 100
+    val_check_interval = 50 
     lr = 1e-4
-    num_steps = 100000
+    num_steps = 200
     cosine_rampup_frac = 0.1
     cosine_hold_frac = 0.05
-    root_dir = pathlib.Path("/workspace/bionemo2/results")
+    root_dir = bionemo2_root / "results"
+    devices = 1
+    tp_size, pp_size = 1, 1
 
     if not train_data_path.exists():
         raise FileNotFoundError(f"Could not find train data at {train_data_path}. {data_error_str}")
@@ -286,10 +176,7 @@ def test_geneformer_stop_and_go(geneformer_config: GeneformerConfig, seed: int =
             raise ValueError("Preprocessing must have failed.")
 
     # Taken from default argparse.
-    module = BioBertLightningModule(
-        config=geneformer_config,
-        tokenizer=tokenizer,
-        optimizer=MegatronOptimizerModule(
+    optim = MegatronOptimizerModule(
             config=OptimizerConfig(
                 lr=lr,
                 optimizer="adam",
@@ -300,300 +187,276 @@ def test_geneformer_stop_and_go(geneformer_config: GeneformerConfig, seed: int =
                 min_lr=lr / 100,
                 warmup_steps=int(math.ceil(num_steps * cosine_rampup_frac)),
                 interval="step",
-                monitor="val_loss",
+                monitor="reduced_train_loss",
                 constant_steps=int(math.ceil(num_steps * cosine_hold_frac)),
             ),
-        ),
+        )
+ 
+    module = BioBertLightningModule(
+        config=geneformer_config,
+        tokenizer=tokenizer,
     )
     data_module = make_real_datamodule(
-        tokenizer, seq_length, median_dict, devices=1, pipeline_model_parallel_size=1, data_path=data_path
+        tokenizer, seq_length, median_dict, devices=devices, tensor_model_parallel_size=tp_size, data_path=data_path
     )
 
+    # TODO (SKH) uh oh this isnt going to be liked by IOMixin
     checkpoint_callback = nl_callbacks.ModelCheckpoint(
+        save_best_model=False,
         save_last=True,
-        monitor="val_loss",
-        save_top_k=1,
+        monitor="reduced_train_loss",
+        save_top_k=2,
         every_n_train_steps=val_check_interval,
         enable_nemo_ckpt_io=True,  # Enables the .nemo file-like checkpointing where all IOMixins are under SerDe
+        async_save=False,
+        try_restore_best_ckpt=False,
     )
 
+    from pytorch_lightning.loggers import TensorBoardLogger, WandbLogger
+    # TODO: probably want to nuke this directory on startup everytime.
+    exp_name = "geneformer_stopngo"
+    # NOTE: PR 10090 makes it so you can set a version with resume_if_exists. In our case, we dont care about version, so we just ignore.
     nemo_logger: NeMoLogger = NeMoLogger(
-        dir=str(root_dir), name="geneformer-stopngo", tensorboard=None, wandb=None, ckpt=checkpoint_callback
+        dir=str(root_dir), name=exp_name, use_datetime_version=False, version=None, tensorboard=None, wandb=None, ckpt=None
     )
-
-    # TODO (@skothenhill) Also impacts the DataModule? Should we be thinking about this?
-    tp_size, pp_size, devices = 1, 1, 1
-    micro_batch_size = 3
-    seq_len = 16  # Full size is 2048
-    strategy = nl.MegatronStrategy(
-        tensor_model_parallel_size=tp_size,
-        pipeline_model_parallel_size=pp_size,
-        ddp="megatron",
-        find_unused_parameters=True,
-        ckpt_include_optimizer=True,
-        val_check_interval=val_check_interval,
-        data_sampler=nl.MegatronDataSampler(
-            micro_batch_size=micro_batch_size,
-            global_batch_size=micro_batch_size * int(devices / pp_size),
-            seq_len=seq_len,
-        ),
-    )
-    trainer = nl.Trainer(
-        devices=tp_size * pp_size,
-        accelerator="gpu",
-        strategy=strategy,
-        num_nodes=1,
-        callbacks=None,  # is this what I need for stop and go?
-        plugins=nl.MegatronMixedPrecision(precision=MODEL_PRECISION, amp_O2=False),
-    )
-    llm.train(
-        module,
-        data_module,
-        trainer,
-        log=nemo_logger,
-        resume=resume.AutoResume(
-            path=None,  # Overrides the path found by resume_if_exists when set.
-            resume_if_exists=False,  # Looks for the -last checkpoint to continue training.
-            resume_ignore_no_checkpoint=True,  # When false this will throw an error with no existing checkpoint.
-        ),
-    )
-    # TODO (@skothenhill) setup a callback that throws an exception or something similar after saving a checkpoint.
-    # TODO (@skothenhill) setup the Trainer again, but this time use resume_if_exists=True
-    # TODO (@skothenhill) Factor out the configuration code into a fixture, only keep strategy, trainer and llm.train here.
-    # NOTE (@skothenhill) There are some variants of this we will want to test, such as: restoring from a direct path, using use_nemo_ckpt_io, changing parallelisms.
-    # NOTE (@skothenhill) Ensure that teardown is handled correctly.
-
-    llm.train(
-        module,
-        data_module,
-        trainer,
-        log=nemo_logger,
-        resume=resume.AutoResume(
-            path=None,  # Overrides the path found by resume_if_exists when set.
-            resume_if_exists=True,  # Looks for the -last checkpoint to continue training.
-            resume_ignore_no_checkpoint=True,  # When false this will throw an error with no existing checkpoint.
-        ),
-    )
+    metadata_dir = root_dir / exp_name
 
 
-'''
-## OLD CODE FROM BIONEMO 1 STARTS HERE
-import os
-import subprocess
-from typing import List, Literal, Tuple, TypedDict
-
-import pytest
-import torch
-
-
-BIONEMO_HOME = os.environ["BIONEMO_HOME"]
-TEST_DATA_DIR = os.path.join(BIONEMO_HOME, "examples/tests/test_data")
-
-
-class StopAndGoTestParams(TypedDict):
-    script_path: str
-    metadata_keys: List[str]
-
-
-# possible values for metadata_list defined in getter_function_map in bionemo/callbacks/testing_callbacks.py
-# new values can be defined there by adding new getter functions
-TEST_PARAMS: List[StopAndGoTestParams] = [
-    {"script_path": "examples/protein/openfold/train.py", "metadata_keys": ["learning_rate", "global_step"]},
-    {"script_path": "examples/dna/dnabert/pretrain.py", "metadata_keys": ["learning_rate", "global_step"]},
-    {"script_path": "examples/singlecell/geneformer/pretrain.py", "metadata_keys": ["learning_rate", "global_step"]},
-    {"script_path": "examples/molecule/molmim/pretrain.py", "metadata_keys": ["learning_rate", "global_step"]},
-    {"script_path": "examples/protein/esm2nv/pretrain.py", "metadata_keys": ["learning_rate", "global_step"]},
-]
-
-TRAINING_SCRIPTS_PATH = [params["script_path"] for params in TEST_PARAMS]
-METADATA_LIST = [params["metadata_keys"] for params in TEST_PARAMS]
-
-
-@pytest.fixture
-def train_args():
-    return {
-        "trainer.devices": torch.cuda.device_count(),
-        "trainer.num_nodes": 1,
-        "trainer.max_steps": 8,
-        "trainer.val_check_interval": 2,  # check validation set every 2 training batches
-        "trainer.limit_val_batches": 1,  # run validation for 2 validation batches
-        "model.data.val.use_upsampling": False,
-        "trainer.limit_test_batches": 1,
-        "model.data.test.use_upsampling": True,
-        "exp_manager.create_wandb_logger": False,
-        "exp_manager.create_tensorboard_logger": False,
-        "model.micro_batch_size": 2,
-    }
-
-
-@pytest.fixture
-def data_args():
-    return {
-        "model.data.dataset.train": "x000",
-        "model.data.dataset.val": "x000",
-        "model.data.dataset.test": "x000",
-    }
-
-
-def get_data_overrides(script_or_cfg_path: str) -> str:
-    """Replace datasets with smaller samples included in the repo
-
-    Based on the script/config file provided, checks what kind of task
-    the script performs and selects compatible data sample from test data.
-    Returns string that can be appended to the python command for launching the script
-    """
-    DATA = " ++model.data"
-    MAIN = f"{DATA}.dataset_path={TEST_DATA_DIR}/%s"
-    DOWNSTREAM = f" ++model.dwnstr_task_validation.dataset.dataset_path={TEST_DATA_DIR}/%s"
-
-    root, domain, model, *conf, script = script_or_cfg_path.split("/")
-    assert root == "examples" and model in (
-        "megamolbart",
-        "esm1nv",
-        "esm2nv",
-        "prott5nv",
-        "downstream",
-        "openfold",
-        "dnabert",
-        "diffdock",
-        "molmim",
-        "geneformer",
-    ), "update this function, patterns might be wrong"
-
-    task = {
-        "molecule": "physchem/SAMPL",
-        "protein": "downstream",
-        "dna": "downstream",
-        "singlecell": "downstream",
-    }
-    if conf == ["conf"]:
-        if model in ("megamolbart", "openfold", "molmim"):
-            return ""
-        elif model == "geneformer":
-            return MAIN % "singlecell"
-        else:
-            return MAIN % f"{domain}/{task[domain]}/test/x000"
-
-    if "retro" in script:
-        return MAIN % "reaction"
-    elif model == "geneformer":
-        return (
-            # This is what we run inference on when running infer.py. This is not checked or used during pretraining.
-            f" {DATA}.dataset_path={TEST_DATA_DIR}/cellxgene_2023-12-15_small/processed_data/test"
-            # The following three paths are used for pretrain.py, but also are required to support model loading currently when running inference.
-            f" {DATA}.train_dataset_path={TEST_DATA_DIR}/cellxgene_2023-12-15_small/processed_data/train"
-            f" {DATA}.val_dataset_path={TEST_DATA_DIR}/cellxgene_2023-12-15_small/processed_data/val"
-            f" {DATA}.test_dataset_path={TEST_DATA_DIR}/cellxgene_2023-12-15_small/processed_data/test"
+    # NOTE(SKH) Verified this is the same.
+    with clean_parallel_state_context():
+        tp_size=1
+        strategy = nl.MegatronStrategy(
+            tensor_model_parallel_size=tp_size,
+            pipeline_model_parallel_size=pp_size,
+            ddp="megatron",
+            find_unused_parameters=True,
+            ckpt_include_optimizer=True
         )
-    elif model == "openfold":
-        return MAIN % "openfold_data/processed_sample"
-    elif model == "diffdock":
-        return (
-            f" ++data.split_train={TEST_DATA_DIR}/molecule/diffdock/splits/split_train"
-            f" ++data.split_val={TEST_DATA_DIR}/molecule/diffdock/splits/split_val"
-            f" ++data.split_test={TEST_DATA_DIR}/molecule/diffdock/splits/split_test"
-            f" ++data.cache_path={TEST_DATA_DIR}/molecule/diffdock/data_cache"
+        # NOTE(SKH) Verified this is the same.
+        # NOTE(SKH) how do we consistently get the log directory? lots of magic happening.
+        trainer = nl.Trainer(
+            devices=devices,
+            max_steps = num_steps, # Hardcoded to debug
+            accelerator="gpu",
+            strategy=strategy,
+            limit_val_batches=2, # Hardcoded to coyp pretrain
+            logger=False,
+            val_check_interval=val_check_interval,
+            num_nodes=1,
+            callbacks=[
+                io.track_io(MetadataSaveCallback)(metadata_path=metadata_dir, metadata_keys=["learning_rate", "global_step"]), io.track_io(RaiseAfterMetadataCallback)(metadata_path=metadata_dir),
+                nl_callbacks.ModelCheckpoint(
+                    save_best_model=False,
+                    save_last=True,
+                    monitor="reduced_train_loss",
+                    save_top_k=2,
+                    every_n_train_steps=val_check_interval,
+                    enable_nemo_ckpt_io=True,  # Enables the .nemo file-like checkpointing where all IOMixins are under SerDe
+                    async_save=False,
+                    try_restore_best_ckpt=False,
+                )
+            ],  # is this what I need for stop and go?
+            plugins=nl.MegatronMixedPrecision(precision=MODEL_PRECISION, amp_O2=False),
         )
-    elif "downstream" in script:
-        if model == "dnabert":
-            fasta_directory = os.path.join(TEST_DATA_DIR, "dna/downstream")
-            fasta_pattern = fasta_directory + "/test-chr1.fa"
-            splicesite_overrides = (
-                f"++model.data.fasta_directory={fasta_directory} "
-                "++model.data.fasta_pattern=" + fasta_pattern + " "
-                f"++model.data.train_file={fasta_directory}/train.csv "
-                f"++model.data.val_file={fasta_directory}/val.csv "
-                f"++model.data.predict_file={fasta_directory}/test.csv "
+        # io.track_io(LossLoggingCallback)()
+        # Strategy has no attribute trainer.
+        try:
+            llm.train(
+                model=module,
+                data=data_module,
+                trainer=trainer,
+                log=nemo_logger,
+                optim=optim,
+                # NOTE (SKH) it seems like resume-if-exists isnt working how we expect.
+                resume=resume.AutoResume(
+                    path=None,  # Overrides the path found by resume_if_exists when set.
+                    resume_if_exists=False,  # Looks for the -last checkpoint to continue training.
+                    resume_ignore_no_checkpoint=True,  # When false this will throw an error with no existing checkpoint.
+                ),
             )
-            return splicesite_overrides
-        else:
-            return MAIN % f"{domain}/{task[domain]}"
-    elif model == "dnabert":
-        DNABERT_TEST_DATA_DIR = os.path.join(BIONEMO_HOME, "examples/dna/dnabert/data/small-example")
-        dnabert_overrides = (
-            f"++model.data.dataset_path={DNABERT_TEST_DATA_DIR} "
-            "++model.data.dataset.train=chr1-trim-train.fna "
-            "++model.data.dataset.val=chr1-trim-val.fna "
-            "++model.data.dataset.test=chr1-trim-test.fna "
+        except StopAndGoException:
+            # Everything is as expected!
+            ...
+
+    # TODO: what actually needs to be torn down? strategy and trainer?
+    print("Resetting.......")
+    with clean_parallel_state_context():
+        tp_size=1
+        pp_size = 1
+        strategy = nl.MegatronStrategy(
+            tensor_model_parallel_size=tp_size,
+            pipeline_model_parallel_size=pp_size,
+            ddp="megatron",
+            find_unused_parameters=True,
+            ckpt_include_optimizer=True
         )
-        return dnabert_overrides
-    elif model == "esm2nv" and "infer" not in script:
-        UNIREF_FOLDER = "uniref202104_esm2_qc_test200_val200"
-        esm2_overwrites = MAIN % UNIREF_FOLDER + DOWNSTREAM % f"{domain}/{task[domain]}"
-        return esm2_overwrites
+        # NOTE(SKH) Verified this is the same.
+        trainer = nl.Trainer(
+            devices=devices,
+            max_steps = num_steps, # Hardcoded to debug
+            accelerator="gpu",
+            strategy=strategy,
+            limit_val_batches=2, # Hardcoded to coyp pretrain
+            val_check_interval=val_check_interval,
+            num_nodes=1,
+            callbacks=[
+                TestCheckpointIntegrityCallback(metadata_path=metadata_dir, metadata_keys=["global_step", "learning_rate"]),
+                checkpoint_callback
+            ],
+            plugins=nl.MegatronMixedPrecision(precision=MODEL_PRECISION, amp_O2=False),
+        )
+        # LossLoggingCallback()
+        llm.train(
+            module,
+            data_module,
+            trainer,
+            log=nemo_logger,
+            optim=optim,
+            resume=resume.AutoResume(
+                path=None,  # Overrides the path found by resume_if_exists when set.
+                resume_if_exists=True,  # Looks for the -last checkpoint to continue training.
+                resume_ignore_no_checkpoint=True,  # When false this will throw an error with no existing checkpoint.
+            ),
+        )
 
-    else:
-        return (MAIN + DOWNSTREAM) % (domain, f"{domain}/{task[domain]}")
+# Here is code that does the same thing for GPT.
+def setup_gpt():
+    import torch
+    from nemo import lightning as nl
+    from nemo.collections import llm
+    from megatron.core.optimizer import OptimizerConfig
 
+    seq_length = 128
+    global_batch_size = 16
 
-def get_train_args_overrides(script_or_cfg_path, train_args):
-    root, domain, model, *conf, script = script_or_cfg_path.split("/")
-    if model == "openfold":
-        train_args["model.micro_batch_size"] = 1
-        train_args["model.train_ds.num_workers"] = 1
-        train_args["model.train_sequence_crop_size"] = 16
-        # do not use kalign as it requires third-party-download and it not essential for testing
-        train_args["model.data.realign_when_required"] = False
-    elif model == "diffdock":
-        # Use size aware batch sampler, and set the size control to default
-        train_args["model.micro_batch_size"] = 2
-        train_args["model.estimate_memory_usage.maximal"] = "null"
-        train_args["model.max_total_size"] = "null"
-        train_args["model.tensor_product.type"] = "fast_tp"
+    ## setup the dummy dataset
+    data = llm.MockDataModule(seq_length=seq_length, global_batch_size=global_batch_size)
 
-    return train_args
-
-
-@pytest.mark.needs_fork
-@pytest.mark.needs_gpu
-@pytest.mark.parametrize("script_path, metadata_keys", list(zip(TRAINING_SCRIPTS_PATH, METADATA_LIST)))
-def test_stop_and_go(script_path: str, metadata_keys: List[str], train_args, data_args, tmp_path):
-    data_str = get_data_overrides(script_path)
-    train_args = get_train_args_overrides(script_path, train_args)
-    # add kill-after-checkpoint and metadata-save callbacks for first run
-    train_args["create_kill_after_signal_callback"] = True
-    train_args["kill_after_signal_callback_kwargs.metadata_path"] = tmp_path
-    train_args["create_metadata_save_callback"] = True
-    train_args["metadata_save_callback_kwargs.metadata_path"] = tmp_path
-
-    cmd = f"python {script_path} ++exp_manager.exp_dir={tmp_path} {data_str} " + " ".join(
-        f"++{k}={v}" for k, v in train_args.items()
+    ## initialize a small GPT model
+    gpt_config = llm.GPTConfig(
+        num_layers=6,
+        hidden_size=384,
+        ffn_hidden_size=1536,
+        num_attention_heads=6,
+        seq_length=seq_length,
+        init_method_std=0.023,
+        hidden_dropout=0.1,
+        attention_dropout=0.1,
+        layernorm_epsilon=1e-5,
+        make_vocab_size_divisible_by=128,
     )
-    cmd = cmd + f' "++metadata_save_callback_kwargs.metadata_keys={metadata_keys}"'
-    # TODO(dorotat) Trye to simplify when data-related utils for ESM2 are refactored
-    if "esm2" not in script_path and "dnabert" not in script_path:
-        cmd += " " + " ".join(f"++{k}={v}" for k, v in data_args.items())
-    print(cmd)
-    # run initial training run to save a checkpoint and some metadata and kill the job afterwards
-    process_handle = subprocess.run(cmd, shell=True, capture_output=True)
-    error_out = process_handle.stderr.decode("utf-8")
-    assert process_handle.returncode == 0, f"Initial training command failed:\n{cmd}\n Error log:\n{error_out}"
+    model = llm.GPTModel(gpt_config, tokenizer=data.tokenizer)
 
-    # assert that metadata was saved correctly
-    assert os.path.isfile(
-        tmp_path / "checkpoints/metadata.pkl"
-    ), f"No file found at {tmp_path / 'checkpoints/metadata.pkl'}"
+    ## initialize the strategy
 
-    # add check checkpoint integrity callback for second run
-    train_args["create_checkpoint_integrity_callback"] = True
-    train_args["checkpoint_integrity_callback_kwargs.metadata_path"] = tmp_path
-    # remove kill after checkpoint and metadata save callbacks for second run
-    train_args["create_kill_after_signal_callback"] = False
-    train_args["kill_after_signal_callback_kwargs"] = None
-    train_args["create_metadata_save_callback"] = False
-    train_args["metadata_save_callback_kwargs.metadata_path"] = None
-
-    cmd = f"python {script_path} ++exp_manager.exp_dir={tmp_path} {data_str} " + " ".join(
-        f"++{k}={v}" for k, v in train_args.items()
+    ## setup the optimizer
+    opt_config = OptimizerConfig(
+        optimizer='adam',
+        lr=6e-4,
+        bf16=True,
     )
-    cmd = cmd + f' "++checkpoint_integrity_callback_kwargs.metadata_keys={metadata_keys}"'
-    # TODO(dorotat) Trye to simplify  when data-related utils for ESM2 are refactored
-    if "esm2" not in script_path and "dnabert" not in script_path:
-        cmd += " " + " ".join(f"++{k}={v}" for k, v in data_args.items())
-    print(cmd)
-    # run resume training run to load checkpoint and check against saved metadata
-    process_handle = subprocess.run(cmd, shell=True, capture_output=True)
-    error_out = process_handle.stderr.decode("utf-8")
-    assert process_handle.returncode == 0, f"Resuming training command failed:\n{cmd}\n Error log:\n{error_out}"
 
-'''
+    opt = nl.MegatronOptimizerModule(config=opt_config)
+    exp_name = 'gpt_stop_and_go'
+    root_dir = bionemo2_root / "results"
+    metadata_dir = root_dir / exp_name
+
+
+    nemo_logger = nl.NeMoLogger(
+        dir="test_logdir", ## logs and checkpoints will be written here
+    )
+    nemo_logger: NeMoLogger = NeMoLogger(
+        dir=str(root_dir), name=exp_name, use_datetime_version=False, version=None, tensorboard=None, wandb=None, ckpt=None
+    )
+    with clean_parallel_state_context():
+        strategy = nl.MegatronStrategy(
+            tensor_model_parallel_size=1,
+            pipeline_model_parallel_size=1,
+            pipeline_dtype=torch.bfloat16,
+            ckpt_include_optimizer=True,
+        )
+        trainer = nl.Trainer(
+            devices=1, ## you can change the numebr of devices to suit your setup
+            max_steps=500,
+            accelerator="gpu",
+            strategy=strategy,
+            plugins=nl.MegatronMixedPrecision(precision="bf16-mixed", amp_O2=False),
+            callbacks=[
+                    io.track_io(MetadataSaveCallback)(metadata_path=metadata_dir, metadata_keys=["learning_rate", "global_step"]), io.track_io(RaiseAfterMetadataCallback)(metadata_path=metadata_dir),
+                    nl_callbacks.ModelCheckpoint(
+                        save_best_model=False,
+                        save_last=True,
+                        monitor="reduced_train_loss",
+                        save_top_k=2,
+                        every_n_train_steps=50,
+                        enable_nemo_ckpt_io=True,  # Enables the .nemo file-like checkpointing where all IOMixins are under SerDe
+                        async_save=False,
+                        try_restore_best_ckpt=False,
+                    )
+            ]
+        )
+        try:
+            llm.train(
+                model=model,
+                data=data,
+                trainer=trainer,
+                log=nemo_logger,
+                tokenizer='data',
+                optim=opt,
+                resume=resume.AutoResume(
+                    path=None,  # Overrides the path found by resume_if_exists when set.
+                    resume_if_exists=False,  # Looks for the -last checkpoint to continue training.
+                    resume_ignore_no_checkpoint=True,  # When false this will throw an error with no existing checkpoint.
+                ),
+            )
+        except StopAndGoException:
+            # Everything is as expected!
+            ...
+
+    # Teardown and do it again
+    with clean_parallel_state_context():
+        strategy = nl.MegatronStrategy(
+            tensor_model_parallel_size=1,
+            pipeline_model_parallel_size=1,
+            pipeline_dtype=torch.bfloat16,
+            ckpt_include_optimizer=True,
+        )
+        trainer = nl.Trainer(
+            devices=1, ## you can change the numebr of devices to suit your setup
+            max_steps=50,
+            accelerator="gpu",
+            strategy=strategy,
+            plugins=nl.MegatronMixedPrecision(precision="bf16-mixed", amp_O2=False),
+            callbacks=[
+                    TestCheckpointIntegrityCallback(metadata_path=metadata_dir, metadata_keys=["global_step", "learning_rate"]),
+                    nl_callbacks.ModelCheckpoint(
+                        save_best_model=False,
+                        save_last=True,
+                        monitor="reduced_train_loss",
+                        save_top_k=2,
+                        every_n_train_steps=50,
+                        enable_nemo_ckpt_io=True,  # Enables the .nemo file-like checkpointing where all IOMixins are under SerDe
+                        async_save=False,
+                        try_restore_best_ckpt=False,
+                    )
+            ]
+        )
+        llm.train(
+            model=model,
+            data=data,
+            trainer=trainer,
+            log=nemo_logger,
+            tokenizer='data',
+            optim=opt,
+            resume=resume.AutoResume(
+                path=None,  # Overrides the path found by resume_if_exists when set.
+                resume_if_exists=True,  # Looks for the -last checkpoint to continue training.
+                resume_ignore_no_checkpoint=True,  # When false this will throw an error with no existing checkpoint.
+            ),
+        )
+
+
+
+if __name__ == "__main__":
+    setup_gpt()
+    # test_geneformer_stop_and_go(_geneformer_config())

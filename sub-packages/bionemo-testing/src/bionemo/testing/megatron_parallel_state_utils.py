@@ -100,6 +100,9 @@ def clean_parallel_state_context() -> Iterator[None]:
     try:
         _teardown_apex_megatron_cuda()
         yield
+    except Exception as e:
+        # TODO (@skothenhill) verify this is a problem and that this is a solution. Had issues with keyboard interrupts being ignored inside context manager.
+        raise Exception from e
     finally:
         _teardown_apex_megatron_cuda()
 

@@ -144,12 +144,16 @@ def main(
         num_nodes=num_nodes,
         callbacks=[
             # TODO(@skothenhill-nv) these need to be cleaned up when we have the automatic addition of track_io
-            io.track_io(LossLoggingCallback)(),
-            io.track_io(RichModelSummary)(max_depth=4),
-            io.track_io(LearningRateMonitor)(),
+            # io.track_io(LossLoggingCallback)(),
         ],
         plugins=nl.MegatronMixedPrecision(precision=precision, amp_O2=False),
     )
+    '''
+    
+            io.track_io(RichModelSummary)(max_depth=4),
+            io.track_io(LearningRateMonitor)(),
+    
+    '''
 
     preprocessor = GeneformerPreprocess(
         download_directory=train_data_path,
@@ -229,20 +233,21 @@ def main(
                 min_lr=lr / 100,
                 warmup_steps=int(math.ceil(num_steps * cosine_rampup_frac)),
                 interval="step",
-                monitor="val_loss",
+                monitor="reduced_train_loss",
                 constant_steps=int(math.ceil(num_steps * cosine_hold_frac)),
             ),
         ),
     )
     # Configure our custom Checkpointer
     checkpoint_callback = nl_callbacks.ModelCheckpoint(
-        save_best_model=save_best_checkpoint,
-        save_last=save_last_checkpoint,
+        save_best_model=save_best_checkpoint, #save_best_checkpoint,
+        save_last=save_last_checkpoint, #save_last_checkpoint,
         monitor=metric_to_monitor_for_checkpoints,  # "val_loss",
         save_top_k=save_top_k,
         every_n_train_steps=save_every_n_steps,
         enable_nemo_ckpt_io=True,  # Enables the .nemo file-like checkpointing where all IOMixins are under SerDe
         async_save=False,  # Tries to save asynchronously, previously led to race conditions.
+        try_restore_best_ckpt=False, # True- restore the model with the best metrics. False- restore the last checkpoint (?)
     )
 
     # Setup the logger and train the model

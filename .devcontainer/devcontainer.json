@@ -1,7 +1,10 @@
 {
 	"name": "BioNeMo2 Development Container",
 	"runArgs": [
-		"--gpus=all"
+		"--gpus=all",
+		"--shm-size=4g",
+		"-e TMPDIR=/tmp/",
+		"-e NUMBA_CACHE_DIR=/tmp/"
 	],
 	"build": {
 		"context": "${localWorkspaceFolder}",
