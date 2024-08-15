@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import importlib.metadata
 import json
 import logging
 import os
@@ -25,7 +26,6 @@ from bionemo.scdl.api.single_cell_row_dataset import SingleCellRowDatasetCore
 from bionemo.scdl.index.row_feature_index import RowFeatureIndex
 from bionemo.scdl.io.single_cell_memmap_dataset import Mode, SingleCellMemMapDataset
 from bionemo.scdl.util.async_worker_queue import AsyncWorkQueue
-from bionemo.scdl.util.pytoml_utils import get_version_from_pyproject
 
 
 __all__: Sequence[str] = (
@@ -91,7 +91,7 @@ class SingleCellCollection(SingleCellRowDatasetCore):
             data_path: Where the class will be stored.
         """
         self.data_path: str = data_path
-        self._version: str = get_version_from_pyproject()
+        self._version: str = importlib.metadata.version("bionemo.scdl")
         self.metadata: Dict[str, int] = {}
         self._feature_index: RowFeatureIndex = RowFeatureIndex()
         self.fname_to_mmap: Dict[str, SingleCellMemMapDataset] = {}
@@ -132,7 +132,7 @@ class SingleCellCollection(SingleCellRowDatasetCore):
             directory_path: The path to the directory with the AnnData files
             max_workers: the maximal number of workers to use
             use_processes: If True, use ProcessPoolExecutor; otherwise, use
-            ThreadPoolExecutor
+                ThreadPoolExecutor
         """
         directory_path = Path(directory_path)
         ann_data_paths = sorted(directory_path.rglob("*.h5ad"))
@@ -197,7 +197,7 @@ class SingleCellCollection(SingleCellRowDatasetCore):
         Returns:
             The total number of elements across dataset
             A list containing the number of variables for each entry in the
-            RowFeatureIndex.
+                RowFeatureIndex.
         """
         return self.number_of_rows(), self.number_of_variables()
 

@@ -13,11 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import tomli
+
+import functools
+from pathlib import Path
+
+import transformers
 
 
-def get_version_from_pyproject():
-    """Get the code version from pyproject.toml file."""
-    with open("pyproject.toml", "rb") as f:
-        pyproject_data = tomli.load(f)
-    return pyproject_data["project"]["version"]
+HFTokenizer = transformers.PreTrainedTokenizer | transformers.PreTrainedTokenizerFast
+
+
+@functools.cache
+def get_tokenizer() -> HFTokenizer:
+    """Get the tokenizer for the ESM2 model."""
+    return transformers.AutoTokenizer.from_pretrained(Path(__file__).parent.resolve(), use_fast=True)

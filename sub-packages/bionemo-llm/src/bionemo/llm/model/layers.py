@@ -12,13 +12,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import math
 from typing import Sequence
 
+import torch
 import transformer_engine as te
 from megatron.core.transformer.transformer_config import TransformerConfig
+from megatron.core.utils import divide
 
 
-__all__: Sequence[str] = ("TELayerNorm",)
+__all__: Sequence[str] = ("TELayerNorm", "ESM2QueryScaling")
 
 
 class TELayerNorm(te.pytorch.LayerNorm):  # noqa: D101
@@ -37,3 +40,21 @@ class TELayerNorm(te.pytorch.LayerNorm):  # noqa: D101
             sequence_parallel=config.sequence_parallel,
             **kwargs,
         )
+
+
+class ESM2QueryScaling(torch.nn.Module):  # noqa: D101
+    def __init__(self, config: TransformerConfig, *args, **kwargs) -> None:  # noqa: D417
+        """A custom layer that scales quary values.
+
+        This layer should replace the q_layernorm=IdentityOp in ESM2 ModuleSpec to reproduce ESM2
+        which apply 1/sqrt(hidden_size_per_attention_head) scaling prior to apply_rotary_pos_emb()
+
+        Args:
+            config (TransformerConfig): The megatron config. This is used for computing projection_size
+        """
+        super().__init__()
+        projection_size = config.kv_channels * config.num_attention_heads
+        self.hidden_size_per_attention_head = divide(projection_size, config.num_attention_heads)
+
+    def forward(self, query, *args, **kwargs):  # noqa: D102
+        return query / math.sqrt(self.hidden_size_per_attention_head)

@@ -35,7 +35,7 @@ from megatron.core.transformer.mlp import MLP, MLPSubmodules
 from megatron.core.transformer.transformer_layer import TransformerLayer, TransformerLayerSubmodules
 from torch.nn import Module
 
-from bionemo.llm.model.layers import TELayerNorm
+from bionemo.llm.model.layers import ESM2QueryScaling, TELayerNorm
 
 
 __all__: Sequence[str] = (
@@ -167,7 +167,7 @@ def get_biobert_spec(  # noqa: D417
                             linear_qkv=ColumnParallelLinear,
                             core_attention=core_attention,
                             linear_proj=RowParallelLinear,
-                            q_layernorm=IdentityOp,
+                            q_layernorm=ESM2QueryScaling,
                             k_layernorm=IdentityOp,
                         ),
                     ),
