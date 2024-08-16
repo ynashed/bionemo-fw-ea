@@ -118,7 +118,7 @@ def _train_model_get_ckpt(
         enable_autocast=precision not in {32, "32"},
     )
 
-    model = lb.LitAutoEncoder(
+    lightning_module = lb.LitAutoEncoder(
         config=config,
     )
     strategy = nl.MegatronStrategy(
@@ -143,7 +143,7 @@ def _train_model_get_ckpt(
     )
     data_module = lb.MNISTDataModule(data_dir=str(data_dir), batch_size=64)  # Re-use the same data directory
     llm.train(
-        model=model,
+        model=lightning_module,
         data=data_module,
         trainer=trainer,
         log=nemo_logger,
@@ -223,3 +223,10 @@ def test_train_mnist_litautoencoder_with_megatron_strategy_single_gpu(tmpdir: LE
         # We're dropping a loss, so initially we should be better than before
         assert drop_head_ft_metrics.collection_train["loss"][0] > drop_head_ft_metrics.collection_train["loss"][-1]
         assert add_head_ft_metrics.collection_train["loss"][-1] > drop_head_ft_metrics.collection_train["loss"][0]
+
+
+# TODO:
+# 1. With a fine-tuning cycle we'll ideally want new features in downstream dataloaders. The BERT/ESM examples look
+#  too static in this regard. What is our recommended mechanism for retrofitting a new dataloader into a lightning
+#  module? Cover this in tutorials!
+# 2.

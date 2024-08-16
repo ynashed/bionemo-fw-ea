@@ -214,6 +214,7 @@ class ClassifierLossReduction(MegatronLossReduction):
 #  1. they need a config argument of type ModelParallelConfig
 #  2. they need a self.model_type:ModelType enum defined (ModelType.encoder_or_decoder is probably usually fine)
 #  3. def set_input_tensor(self, input_tensor) needs to be present. This is used in model parallelism
+# TODO add example where we specify things like shape etc to the model so it's clear how we recommend how to do this.
 
 
 class ExampleModelTrunk(MegatronModule):
@@ -326,6 +327,9 @@ class ExampleConfig(MegatronBioNeMoTrainableModelConfig["ExampleModel", "MSELoss
         Returns:
             The model object.
         """
+        # TODO: if checkpoint is provided, load config settings from checkpoint before we intialize the model.
+        # cckpt_settings = ...
+        # self.n_layers = cckpt_settings.n_layers # something like that
         model = ExampleModel(self)
         if self.initial_weights:
             load_weights_sharded_inplace_nemo2_to_mcore(model, self.initial_weights, self.skip_weight_prefixes)
@@ -466,6 +470,7 @@ class LitAutoEncoder(pl.LightningModule, io.IOMixin, LightningPassthroughPredict
         return self.loss_reduction_class()()
 
     def configure_model(self) -> None:  # noqa: D102
+        # Called lazily by the megatron strategy.
         self.module = self.config.configure_model()
 
     def loss_reduction_class(self) -> Type[MegatronLossReduction]:
