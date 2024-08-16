@@ -157,34 +157,8 @@ class TestCheckpointIntegrityCallback(Callback):
         self.metadata_keys = metadata_keys
 
     # Add outputs for on_train_batch_end
-    def on_train_batch_start(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule", batch, batch_idx):
-        pickle_file_path = os.path.join(self.metadata_path, "checkpoints/metadata.pkl")
-        # check that pickle file exists
-        assert os.path.isfile(pickle_file_path), f"No file found at {pickle_file_path}"
-        with open(pickle_file_path, "rb") as metadata_file:
-            metadata_dict = pickle.load(metadata_file)
-
-        current_metadata = {}
-        for metadata_key in self.metadata_keys:
-            expected_value = metadata_dict[metadata_key]
-            current_value = getter_function_map[metadata_key](trainer, pl_module)
-            current_metadata[metadata_key] = current_value
-
-        breakpoint()
-        # TODO (SKH): make this a single comparison so we can collect multiple failures.
-        for metadata_key in self.metadata_keys:
-            expected_value = metadata_dict[metadata_key]
-            current_value = current_metadata[metadata_key]
-            assert (
-                expected_value == current_value
-            ), f"Value mismatch for key {metadata_key}: stored_value={expected_value}, current_value={current_value}"
-        # TODO: I think we need to cleanup the metadata file here.
-        # TODO: I think we also want to break out here, since we dont want training to continue really.
-        os.remove(pickle_file_path)
-
     def on_train_start(self, trainer: Trainer, pl_module: LightningModule):
-        # NOTE(SKH) dont lock this to the zero process to allow all shards to fail. Not sure how pytest handles this.
-        return
+    # def on_train_batch_end(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule", outputs: Any, batch: Any, batch_idx: int) -> None:
         pickle_file_path = os.path.join(self.metadata_path, "checkpoints/metadata.pkl")
         # check that pickle file exists
         assert os.path.isfile(pickle_file_path), f"No file found at {pickle_file_path}"
@@ -198,6 +172,7 @@ class TestCheckpointIntegrityCallback(Callback):
             current_metadata[metadata_key] = current_value
 
         # TODO (SKH): make this a single comparison so we can collect multiple failures.
+        breakpoint()
         for metadata_key in self.metadata_keys:
             expected_value = metadata_dict[metadata_key]
             current_value = current_metadata[metadata_key]
@@ -205,5 +180,5 @@ class TestCheckpointIntegrityCallback(Callback):
                 expected_value == current_value
             ), f"Value mismatch for key {metadata_key}: stored_value={expected_value}, current_value={current_value}"
         # TODO: I think we need to cleanup the metadata file here.
-        # TODO: I think we also want to break out here, since we dont want training to continue really.
+        # TODO: Do we need to signal an end of training? I think if we set the steps low enough we can just keep going.
         os.remove(pickle_file_path)

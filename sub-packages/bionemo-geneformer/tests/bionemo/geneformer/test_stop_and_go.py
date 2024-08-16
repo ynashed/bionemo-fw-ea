@@ -212,7 +212,6 @@ def test_geneformer_stop_and_go(geneformer_config: GeneformerConfig, seed: int =
         save_top_k=2,
         every_n_train_steps=val_check_interval,
         enable_nemo_ckpt_io=True,  # Enables the .nemo file-like checkpointing where all IOMixins are under SerDe
-        async_save=False,
         try_restore_best_ckpt=False,
     )
 
@@ -239,6 +238,8 @@ def test_geneformer_stop_and_go(geneformer_config: GeneformerConfig, seed: int =
             ddp="megatron",
             find_unused_parameters=True,
             ckpt_include_optimizer=True,
+            ckpt_parallel_save=False,
+            ckpt_parallel_save_optim=False,
         )
         # NOTE(SKH) Verified this is the same.
         # NOTE(SKH) how do we consistently get the log directory? lots of magic happening.
@@ -263,7 +264,6 @@ def test_geneformer_stop_and_go(geneformer_config: GeneformerConfig, seed: int =
                     save_top_k=2,
                     every_n_train_steps=val_check_interval,
                     enable_nemo_ckpt_io=True,  # Enables the .nemo file-like checkpointing where all IOMixins are under SerDe
-                    async_save=False,
                     try_restore_best_ckpt=False,
                 ),
             ],  # is this what I need for stop and go?
@@ -324,7 +324,7 @@ def test_geneformer_stop_and_go(geneformer_config: GeneformerConfig, seed: int =
             data_module,
             trainer,
             log=nemo_logger,
-            optim=optim,
+            optim=None,
             resume=resume.AutoResume(
                 path=None,  # Overrides the path found by resume_if_exists when set.
                 resume_if_exists=True,  # Looks for the -last checkpoint to continue training.
@@ -344,7 +344,7 @@ def setup_gpt():
     global_batch_size = 16
 
     ## setup the dummy dataset
-    data = llm.MockDataModule(seq_length=seq_length, global_batch_size=global_batch_size)
+    data = llm.MockDataModule(seq_length=seq_length, global_batch_size=global_batch_size, num_val_samples=32)
 
     ## initialize a small GPT model
     gpt_config = llm.GPTConfig(
@@ -364,13 +364,31 @@ def setup_gpt():
     ## initialize the strategy
 
     ## setup the optimizer
-    opt_config = OptimizerConfig(
-        optimizer="adam",
-        lr=6e-4,
-        bf16=True,
-    )
 
-    opt = nl.MegatronOptimizerModule(config=opt_config)
+    # NOTE(SKH) Working arguments
+    # optimizer="adam",
+    # lr=6e-4,
+    # bf16=True,
+    lr = 1e-4
+    opt_config = OptimizerConfig(
+        lr = lr,
+        optimizer="adam",
+        use_distributed_optimizer=True,
+    )
+    num_steps = 500
+    cosine_rampup_frac = 0.1
+    cosine_hold_frac = 0.05
+    opt = nl.MegatronOptimizerModule(config=opt_config,
+        lr_scheduler=CosineAnnealingScheduler(
+            max_steps=num_steps,
+            min_lr=lr / 100,
+            warmup_steps=int(math.ceil(num_steps * cosine_rampup_frac)),
+            interval="step",
+            monitor="reduced_train_loss",
+            constant_steps=int(math.ceil(num_steps * cosine_hold_frac)),
+        ),
+    )
+    # opt = nl.MegatronOptimizerModule(config=opt_config)
     exp_name = "gpt_stop_and_go"
     root_dir = bionemo2_root / "results"
     metadata_dir = root_dir / exp_name
@@ -399,6 +417,7 @@ def setup_gpt():
             max_steps=500,
             accelerator="gpu",
             strategy=strategy,
+            val_check_interval = 2,
             plugins=nl.MegatronMixedPrecision(precision="bf16-mixed", amp_O2=False),
             callbacks=[
                 io.track_io(MetadataSaveCallback)(
@@ -412,7 +431,6 @@ def setup_gpt():
                     save_top_k=2,
                     every_n_train_steps=50,
                     enable_nemo_ckpt_io=True,  # Enables the .nemo file-like checkpointing where all IOMixins are under SerDe
-                    async_save=False,
                     try_restore_best_ckpt=False,
                 ),
             ],
@@ -442,12 +460,14 @@ def setup_gpt():
             pipeline_model_parallel_size=1,
             pipeline_dtype=torch.bfloat16,
             ckpt_include_optimizer=True,
+            find_unused_parameters=True,
         )
         trainer = nl.Trainer(
             devices=1,  ## you can change the numebr of devices to suit your setup
-            max_steps=50,
+            max_steps=55,
             accelerator="gpu",
             strategy=strategy,
+            val_check_interval = 2,
             plugins=nl.MegatronMixedPrecision(precision="bf16-mixed", amp_O2=False),
             callbacks=[
                 TestCheckpointIntegrityCallback(
@@ -460,10 +480,14 @@ def setup_gpt():
                     save_top_k=2,
                     every_n_train_steps=50,
                     enable_nemo_ckpt_io=True,  # Enables the .nemo file-like checkpointing where all IOMixins are under SerDe
-                    async_save=False,
                     try_restore_best_ckpt=False,
                 ),
             ],
+        )
+        opt_config = OptimizerConfig(
+            lr = 1e2,
+            optimizer="adam",
+            use_distributed_optimizer=True,
         )
         llm.train(
             model=model,
