@@ -49,6 +49,47 @@ __all__: Sequence[str] = (
     "MNISTDataModule",
 )
 
+#############################################################################################
+# Core utility functions: Below are some utility functions that allow for loading a nemo2
+#  trained model back into a newly initialized megatron core model. The key insight is that
+#  the nemo2 lightning module owns a single `self.module = config.configure_model(...)`
+#  object. This `config.configure_module(...)` object is the megatron model that we want
+#  to load weights into. So we need to adjust the checkpoint keys since they will all
+#  have the extra `module.` prefix on them, while the megatron model we just initialized
+#  will not.
+
+
+def munge_key_megatron_to_nemo2(k: str) -> str:
+    return f"module.{k}"
+
+
+def munge_sharded_tensor_key_megatron_to_nemo2(v: ShardedTensor) -> ShardedTensor:
+    # This works with PP=1, how do we handle PP>1?
+    key = v.key
+    v.key = munge_key_megatron_to_nemo2(key)
+    return v
+
+
+def key_in_filter(k: str, filter: Set[str]) -> bool:
+    for prefix in filter:
+        if k.startswith(prefix):
+            return True
+    return False
+
+
+def load_weights_sharded_inplace_nemo2_to_mcore(model, ckpt, skip_loading_keys: Set[str]):
+    # Loads checkpoint from state dict
+    sharded_state_dict = {
+        munge_key_megatron_to_nemo2(k): munge_sharded_tensor_key_megatron_to_nemo2(v)
+        for k, v in model.sharded_state_dict().items()
+        if not key_in_filter(k, skip_loading_keys)
+    }
+    dist_checkpointing.load(
+        sharded_state_dict=sharded_state_dict,
+        checkpoint_dir=ckpt,
+        strict=dist_checkpointing.serialization.StrictHandling.ASSUME_OK_UNEXPECTED,
+    )
+
 
 #############################################################################################
 # Losses: here we define some loss functions. The output of forward happens in parallel
@@ -91,38 +132,6 @@ class MSELossReduction(MegatronLossReduction):
         """
         mse_losses = torch.stack([loss["avg"] for loss in losses_reduced_per_micro_batch])
         return mse_losses.mean()
-
-
-def munge_key_megatron_to_nemo2(k: str) -> str:
-    return f"module.{k}"
-
-
-def munge_sharded_tensor_key_megatron_to_nemo2(v: ShardedTensor) -> ShardedTensor:
-    # This works with PP=1, how do we handle PP>1?
-    key = v.key
-    v.key = munge_key_megatron_to_nemo2(key)
-    return v
-
-
-def key_in_filter(k: str, filter: Set[str]) -> bool:
-    for prefix in filter:
-        if k.startswith(prefix):
-            return True
-    return False
-
-
-def load_weights_sharded_inplace_nemo2_to_mcore(model, ckpt, skip_loading_keys: Set[str]):
-    # Loads checkpoint from state dict
-    sharded_state_dict = {
-        munge_key_megatron_to_nemo2(k): munge_sharded_tensor_key_megatron_to_nemo2(v)
-        for k, v in model.sharded_state_dict().items()
-        if not key_in_filter(k, skip_loading_keys)
-    }
-    dist_checkpointing.load(
-        sharded_state_dict=sharded_state_dict,
-        checkpoint_dir=ckpt,
-        strict=dist_checkpointing.serialization.StrictHandling.ASSUME_OK_UNEXPECTED,
-    )
 
 
 class MSEPlusClassifierLossReduction(MegatronLossReduction):
