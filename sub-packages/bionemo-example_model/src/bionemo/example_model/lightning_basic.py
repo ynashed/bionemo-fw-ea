@@ -398,7 +398,8 @@ class ExampleFineTuneDropParentConfig(
 
 ################################################################################
 # General training wrapper that can be re-used for all model/loss combos
-#  just specify different configs
+#  just specify different configs. TODO make this an ABC since it will likely
+#  not change much between models, other than the data step and forward step.
 
 
 class LitAutoEncoder(pl.LightningModule, io.IOMixin, LightningPassthroughPredictionMixin):
@@ -473,15 +474,19 @@ class LitAutoEncoder(pl.LightningModule, io.IOMixin, LightningPassthroughPredict
 
 
 #######################################################################################
-# Data
+# Data methods. The dataset has no changes vs a vanilla pytorch dataset. The data module
+#  has a data_sampler in it which is a nemo2 peculiarity. Also the sampler will not
+#  shuffle your data! So you need to wrap your dataset in a dataset shuffler that maps
+#  sequential ids to random ids in your dataset.
+# TODO make an ABC for nemo2 DataModules
+#  which allow us to re-use some of these common functions and not forget to implement
+#  the key things that nemo2 uses/needs.
 class MnistItem(TypedDict):
     data: Tensor
     label: Tensor
     idx: int
 
 
-#######################################################################################
-# Dataset has no customizations
 class MNISTCustom(MNIST):  # noqa: D101
     def __getitem__(self, index: int) -> MnistItem:
         """Wraps the getitem method of the MNIST dataset such that we return a Dict
