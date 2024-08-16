@@ -291,8 +291,11 @@ class ExampleFineTuneDropParentModel(ExampleModelTrunk):
         return digit_logits
 
 
-#########################################################
-# Model+Loss Configs
+#################################################################################################################
+# Model+Loss Configs: these have a configure_model function which allows the megatron strategy to lazily initialize
+#  the model after the parallel computing environment has been setup. These also handle loading starting weights
+#  for fine-tuning cases. Additionally these configs tell the trainer which loss you want to use with a matched
+#  model.
 
 
 @dataclass
