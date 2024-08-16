@@ -7,9 +7,11 @@ theme:
   name: "material"
   features:
     - content.code.annotate
-    - navigation.tabs
     - navigation.sections
+    - navigation.indexes
     - navigation.instant
+    - navigation.sections
+    - navigation.path
     - navigation.instant.prefetch
     - search.suggest
     - search.highlight
@@ -52,12 +54,25 @@ plugins:
           paths:
             - ../sub-packages/*/src
   - mkdocs-jupyter
+  - include_dir_to_nav:
+      file_pattern: '.*\.(md|ipynb)$'
 
 markdown_extensions:
   - pymdownx.snippets:
       check_paths: true
       restrict_base_path: False
       base_path: "."
+  - attr_list
+  - md_in_html
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
 
 copyright: |
   &copy; Copyright 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
+nav:
+  - index.md
+  - Getting Started: getting-started
+  - User Guide: user-guide
+  - Contributing: contributing

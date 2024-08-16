@@ -1,19 +1,39 @@
-# Getting Started
 
-## Initializing 3rd-party dependencies as git submodules
 
-For development, the NeMo and Megatron-LM dependencies are vendored in the bionemo-2 repository workspace as git
-submodules. The pinned commits for these submodules represent the "last-known-good" versions of these packages that are
-confirmed to be working with bionemo2 (and those that are tested in CI).
 
-To initialize these sub-modules when cloning the repo, add the `--recursive` flag to the git clone command:
+<div class="grid cards" markdown>
 
-```bash
-git clone --recursive git@github.com:NVIDIA/bionemo-fw-ea.git
-```
+-   :material-clock-fast:{ .lg .middle } __Set up in 5 minutes__
 
-To download the pinned versions of these submodules within an existing git repository, run
+    ---
 
-```bash
-git submodule update --init --recursive
-```
+    Install [`mkdocs-material`](#) with [`pip`](#) and get up
+    and running in minutes
+
+    [:octicons-arrow-right-24: Getting started](#)
+
+-   :fontawesome-brands-markdown:{ .lg .middle } __It's just Markdown__
+
+    ---
+
+    Focus on your content and generate a responsive and searchable static site
+
+    [:octicons-arrow-right-24: Reference](#)
+
+-   :material-format-font:{ .lg .middle } __Made to measure__
+
+    ---
+
+    Change the colors, fonts, language, icons, logo and more with a few lines
+
+    [:octicons-arrow-right-24: Customization](#)
+
+-   :material-scale-balance:{ .lg .middle } __Open Source, MIT__
+
+    ---
+
+    Material for MkDocs is licensed under MIT and available on [GitHub]
+
+    [:octicons-arrow-right-24: License](#)
+
+</div>
