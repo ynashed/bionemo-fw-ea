@@ -21,8 +21,7 @@ from typing import Any, Dict, Optional, Sequence, Set, Tuple, Type, TypedDict
 
 import pytorch_lightning as pl
 import torch
-from megatron.core import ModelParallelConfig, dist_checkpointing
-from megatron.core.dist_checkpointing.mapping import ShardedTensor
+from megatron.core import ModelParallelConfig
 from megatron.core.optimizer import OptimizerConfig
 from megatron.core.transformer.enums import ModelType
 from megatron.core.transformer.module import MegatronModule
@@ -38,6 +37,7 @@ from torchvision.datasets import MNIST
 from bionemo.core.data.resamplers import PRNGDatasetShuffler
 from bionemo.llm.lightning import LightningPassthroughPredictionMixin
 from bionemo.llm.model.config import MegatronBioNeMoTrainableModelConfig
+from bionemo.llm.utils.weight_utils import load_weights_sharded_inplace_nemo2_to_mcore
 
 
 __all__: Sequence[str] = (
@@ -48,48 +48,6 @@ __all__: Sequence[str] = (
     "MNISTCustom",
     "MNISTDataModule",
 )
-
-#############################################################################################
-# Core utility functions: Below are some utility functions that allow for loading a nemo2
-#  trained model back into a newly initialized megatron core model. The key insight is that
-#  the nemo2 lightning module owns a single `self.module = config.configure_model(...)`
-#  object. This `config.configure_module(...)` object is the megatron model that we want
-#  to load weights into. So we need to adjust the checkpoint keys since they will all
-#  have the extra `module.` prefix on them, while the megatron model we just initialized
-#  will not.
-
-
-def munge_key_megatron_to_nemo2(k: str) -> str:
-    return f"module.{k}"
-
-
-def munge_sharded_tensor_key_megatron_to_nemo2(v: ShardedTensor) -> ShardedTensor:
-    # This works with PP=1, how do we handle PP>1?
-    key = v.key
-    v.key = munge_key_megatron_to_nemo2(key)
-    return v
-
-
-def key_in_filter(k: str, filter: Set[str]) -> bool:
-    for prefix in filter:
-        if k.startswith(prefix):
-            return True
-    return False
-
-
-def load_weights_sharded_inplace_nemo2_to_mcore(model, ckpt, skip_loading_keys: Set[str]):
-    # Loads checkpoint from state dict
-    sharded_state_dict = {
-        munge_key_megatron_to_nemo2(k): munge_sharded_tensor_key_megatron_to_nemo2(v)
-        for k, v in model.sharded_state_dict().items()
-        if not key_in_filter(k, skip_loading_keys)
-    }
-    dist_checkpointing.load(
-        sharded_state_dict=sharded_state_dict,
-        checkpoint_dir=ckpt,
-        strict=dist_checkpointing.serialization.StrictHandling.ASSUME_OK_UNEXPECTED,
-    )
-
 
 #############################################################################################
 # Losses: here we define some loss functions. The output of forward happens in parallel
@@ -332,7 +290,11 @@ class ExampleConfig(MegatronBioNeMoTrainableModelConfig["ExampleModel", "MSELoss
         # self.n_layers = cckpt_settings.n_layers # something like that
         model = ExampleModel(self)
         if self.initial_weights:
-            load_weights_sharded_inplace_nemo2_to_mcore(model, self.initial_weights, self.skip_weight_prefixes)
+            load_weights_sharded_inplace_nemo2_to_mcore(
+                model=model,
+                distributed_checkpoint_dir=self.initial_weights,
+                skip_keys_with_these_prefixes=self.skip_weight_prefixes,
+            )
         return model
 
     def get_loss_reduction_class(self) -> Type[MSELossReduction]:
@@ -363,7 +325,11 @@ class ExampleFineTuneBothConfig(
         """
         model = ExampleFineTuneBothModel(self)
         if self.initial_weights:
-            load_weights_sharded_inplace_nemo2_to_mcore(model, self.initial_weights, self.skip_weight_prefixes)
+            load_weights_sharded_inplace_nemo2_to_mcore(
+                model=model,
+                distributed_checkpoint_dir=self.initial_weights,
+                skip_keys_with_these_prefixes=self.skip_weight_prefixes,
+            )
         return model
 
     def get_loss_reduction_class(self) -> Type["MSEPlusClassifierLossReduction"]:
@@ -393,7 +359,11 @@ class ExampleFineTuneDropParentConfig(
         """
         model = ExampleFineTuneDropParentModel(self)
         if self.initial_weights:
-            load_weights_sharded_inplace_nemo2_to_mcore(model, self.initial_weights, self.skip_weight_prefixes)
+            load_weights_sharded_inplace_nemo2_to_mcore(
+                model=model,
+                distributed_checkpoint_dir=self.initial_weights,
+                skip_keys_with_these_prefixes=self.skip_weight_prefixes,
+            )
         return model
 
     def get_loss_reduction_class(self) -> Type["ClassifierLossReduction"]:
@@ -418,7 +388,14 @@ class LitAutoEncoder(pl.LightningModule, io.IOMixin, LightningPassthroughPredict
         super().__init__()
         self.config = config
         self.optim = MegatronOptimizerModule(
-            config=OptimizerConfig(lr=1e-4, optimizer="adam", use_distributed_optimizer=True),
+            config=OptimizerConfig(
+                lr=1e-4,
+                optimizer="adam",
+                use_distributed_optimizer=True,
+                bf16=config.bf16,
+                fp16=config.fp16,
+                params_dtype=config.params_dtype,
+            ),
         )
         # Bind the configure_optimizers method to the model
         self.optim.connect(self)

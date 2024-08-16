@@ -29,7 +29,7 @@ from nemo.lightning.pytorch.optim import MegatronOptimizerModule
 from torch.optim import Optimizer
 
 from bionemo.llm.lightning import LightningPassthroughPredictionMixin
-from bionemo.llm.model.biobert.model import BioBertConfig
+from bionemo.llm.model.config import MegatronBioNeMoTrainableModelConfig
 
 
 __all__: Sequence[str] = (
@@ -45,7 +45,7 @@ class BioBertLightningModule(  # noqa: D101
 ):
     def __init__(
         self,
-        config: BioBertConfig,
+        config: MegatronBioNeMoTrainableModelConfig,
         # TODO: Add transformer_layer_spec when we update mcore
         tokenizer: Optional[TokenizerSpec] = None,
         optimizer: MegatronOptimizerModule = MegatronOptimizerModule(

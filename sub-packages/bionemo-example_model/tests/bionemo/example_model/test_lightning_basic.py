@@ -82,7 +82,7 @@ def _train_model_get_ckpt(
 ) -> Tuple[Path, MetricTracker]:
     if precision not in {"32", 32}:
         extra_args: Dict[str, Any] = {
-            "plugins": nl.MegatronMixedPrecision(precision=precision, amp_O2=False),
+            "plugins": nl.MegatronMixedPrecision(precision=precision),
         }
     else:
         extra_args = {}
@@ -112,6 +112,10 @@ def _train_model_get_ckpt(
     config = model_cfg_cls(
         initial_weights=ckpt_path_optstr,
         skip_weight_prefixes=skip_weight_prefixes,
+        # NOTE: the optimizer needs fp16 and bf16 bools set to match the model. For now get them from the config and
+        #  set them here.
+        fp16=get_autocast_dtype(precision) == torch.float16,
+        bf16=get_autocast_dtype(precision) == torch.bfloat16,
         autocast_dtype=get_autocast_dtype(precision),
         params_dtype=get_autocast_dtype(precision),
         pipeline_dtype=get_autocast_dtype(precision),
