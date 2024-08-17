@@ -1,5 +1,8 @@
+import functools
 import math
+import time
 
+import einops
 import torch
 
 # import torch.cuda.nvtx as nvtx
@@ -374,7 +377,7 @@ class DiTeBlock(nn.Module):
         self.num_heads = num_heads
         self.pre_attn_norm = BatchLayerNorm(hidden_size, affine=False, eps=1e-6)
         self.pre_attn_norm_edge = BatchLayerNorm(edge_hidden_size, affine=False, eps=1e-6)
-
+        #! AlphaFold3 has the scale as linear then sigmoid
         self.adaLN_modulation = nn.Sequential(nn.SiLU(), nn.Linear(hidden_size, 6 * hidden_size, bias=True))
         self.adaLN_edge_modulation = nn.Sequential(
             nn.SiLU(), nn.Linear(edge_hidden_size, 6 * edge_hidden_size, bias=True)
@@ -652,6 +655,363 @@ class MoleculeDiffusion(nn.Module):
             # with nvtx.range(f"DiTe Layer {layer_index}"):
             distances = coord2distfn(pos, E_idx, self.scale_dist_features, batch)  # E x K
             H, edge_attr, Z = self.dit_layers[layer_index](batch, H, te_h, edge_attr, E_idx, te_e, distances, Z)
+            # with nvtx.range(f"EGNN Layer {layer_index}"):
+            pos = self.egnn_layers[layer_index](batch, pos, H, E_idx, edge_attr, te_e_cont)
+            atom_hids = atom_hids + self.node_blocks[layer_index](H)
+            edge_hids = edge_hids + self.edge_blocks[layer_index](edge_attr)
+
+        X = self.coord_pred(pos).squeeze(-1)
+        x = X - scatter_mean(X, index=batch, dim=0)[batch]
+
+        H = atom_hids
+        edge_attr = self.bond_refine(batch, x, H, E_idx, edge_hids)
+
+        h_logits, _ = self.atom_type_head(batch, H)
+        e_logits, _ = self.edge_type_head.predict_edges(batch, edge_attr, E_idx)
+
+        out = {
+            "x_hat": x,
+            "h_logits": h_logits,
+            "edge_attr_logits": e_logits,
+        }
+        if self.use_z == "pair_embedding":
+            num_atoms = H.size(0)
+            z_dense = torch.zeros(num_atoms, num_atoms, Z.size(-1), device=H.device)
+            src, tgt = E_idx
+            z_dense[src, tgt, :] = Z
+            z_dense = 0.5 * (z_dense + z_dense.permute(1, 0, 2))
+            Z = self.Z_lin(z_dense)
+            out["Z_hat"] = Z
+        return out
+
+
+class DiTeBlockAli(nn.Module):
+    """
+    Mimics DiT block
+    """
+
+    def __init__(
+        self,
+        hidden_size,
+        edge_hidden_size,
+        num_heads,
+        mlp_expansion_ratio=4.0,
+        use_z=None,
+        n_vector_features=128,
+        scale_dist_features=4,
+        dropout=0.0,
+        **block_kwargs,
+    ):
+        super().__init__()
+        self.hidden_size = hidden_size
+        self.dropout = dropout
+        self.num_heads = num_heads
+        self.pre_attn_norm = BatchLayerNorm(hidden_size, affine=False, eps=1e-6)
+        self.pre_attn_norm_edge = BatchLayerNorm(edge_hidden_size, affine=False, eps=1e-6)
+        #! AlphaFold3 has the scale as linear then sigmoid
+        self.adaLN_modulation = nn.Sequential(nn.SiLU(), nn.Linear(hidden_size, 6 * hidden_size, bias=True))
+        self.adaLN_edge_modulation = nn.Sequential(
+            nn.SiLU(), nn.Linear(edge_hidden_size, 6 * edge_hidden_size, bias=True)
+        )
+
+        if scale_dist_features > 1:
+            dist_size = n_vector_features * scale_dist_features
+        else:
+            dist_size = n_vector_features
+        self.feature_embedder = MLP(hidden_size + hidden_size + edge_hidden_size + dist_size, hidden_size, hidden_size)
+
+        # Single linear layer for QKV projection
+        self.qkv_proj = nn.Linear(hidden_size, 3 * hidden_size, bias=False)
+        # self.norm_q = BatchLayerNorm(hidden_size, affine=False, eps=1e-6)
+        # self.norm_k = BatchLayerNorm(hidden_size, affine=False, eps=1e-6)
+        self.out_projection = nn.Linear(hidden_size, hidden_size, bias=False)
+
+        self.d_head = hidden_size // num_heads
+        self.use_z = use_z
+        if use_z is not None:
+            if use_z == "pair_embedding":
+                self.pair_bias = nn.Sequential(nn.SiLU(), nn.Linear(hidden_size, num_heads, bias=False))
+            else:
+                self.pair_bias = nn.Sequential(nn.SiLU(), nn.Linear(dist_size, num_heads, bias=False))
+            self.z_update = nn.Linear(hidden_size, hidden_size, bias=False)
+
+        self.lin_edge0 = nn.Linear(hidden_size, edge_hidden_size, bias=False)
+        self.lin_edge1 = nn.Linear(
+            edge_hidden_size + n_vector_features * scale_dist_features, edge_hidden_size, bias=False
+        )
+        self.residual_ffn_norm = BatchLayerNorm(hidden_size, affine=False, eps=1e-6)
+        self.ffn = swiglu_ffn(hidden_size, mlp_expansion_ratio, bias=False)
+        self.residual_ffn_norm_edge = BatchLayerNorm(edge_hidden_size, affine=False, eps=1e-6)
+        self.ffn_edge = swiglu_ffn(edge_hidden_size, mlp_expansion_ratio, bias=False)
+
+    def forward(
+        self,
+        batch: torch.Tensor,
+        x: torch.Tensor,
+        t_emb_h: torch.Tensor,
+        edge_attr: torch.Tensor = None,
+        edge_index: torch.Tensor = None,
+        t_emb_e: torch.Tensor = None,
+        dist: torch.Tensor = None,
+        Z: torch.Tensor = None,
+        sbl=None,
+    ):
+        """
+        This assume pytorch geometric batching so batch size of 1 so skip rotary as it depends on having an actual batch
+
+        batch: N
+        x: N x 256
+        temb: N x 256
+        edge_attr: E x 256
+        edge_index: 2 x E
+        """
+        src, tgt = edge_index
+        edge_batch = batch[src]
+        shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = self.adaLN_modulation(t_emb_h).chunk(6, dim=1)
+        (
+            edge_shift_msa,
+            edge_scale_msa,
+            edge_gate_msa,
+            edge_shift_mlp,
+            edge_scale_mlp,
+            edge_gate_mlp,
+        ) = self.adaLN_edge_modulation(t_emb_e).chunk(6, dim=1)
+        # Normalize x
+        x_norm = modulate(self.pre_attn_norm(x, batch), shift_msa, scale_msa)
+        edge_attr_norm = modulate(self.pre_attn_norm_edge(edge_attr, edge_batch), edge_shift_msa, edge_scale_msa)
+
+        messages = self.feature_embedder(torch.cat([x_norm[src], x_norm[tgt], edge_attr_norm, dist], dim=-1))
+        x_norm = scatter_mean(messages, src, dim=0)
+        start = time.perf_counter()
+        out = self.og_mha(x_norm, batch)
+        mid = time.perf_counter()
+        self.ali_mha(x_norm, batch, sbl)
+        end = time.perf_counter()
+        print(f"OG {mid - start} Ali {end - mid}")
+        y = self.out_projection(out)
+
+        # Gated Residual
+        x = x + gate_msa * y
+        # Feed Forward
+        edge = edge_attr + edge_gate_msa * self.lin_edge0((y[src] + y[tgt]))
+        x = x + gate_mlp * self.ffn(modulate(self.residual_ffn_norm(x, batch), shift_mlp, scale_mlp))
+        e_in = self.lin_edge1(torch.cat([edge, dist], dim=-1))
+        # import ipdb; ipdb.set_trace()
+        edge_attr = edge + edge_gate_mlp * self.ffn_edge(
+            modulate(self.residual_ffn_norm_edge(e_in, edge_batch), edge_shift_mlp, edge_scale_mlp)
+        )
+        if self.use_z == "pair_embedding":
+            Z = Z + self.z_update(self.pyg_outer_update(batch, x))
+            return x, edge_attr, Z
+        else:
+            return x, edge_attr, None
+
+    def pyg_outer_update(self, batch, x):
+        outer_products = []
+        num_atoms = 0
+        for molecule in range(max(batch.unique()) + 1):
+            molecule_indices = (batch == molecule).nonzero(as_tuple=True)[0]
+            molecule_features = x[molecule_indices]
+            # Compute the outer product for the current molecule
+            outer_product = molecule_features.unsqueeze(0) * molecule_features.unsqueeze(
+                1
+            )  # torch.einsum('ij,ik->ijk', molecule_features, molecule_features)
+            outer_product = outer_product + outer_product.transpose(0, 1)
+            outer_product = outer_product[~torch.eye(outer_product.size(0), dtype=torch.bool)].view(
+                outer_product.size(0), -1
+            )
+            outer_products.append(outer_product.reshape(-1, molecule_features.shape[-1]))
+            num_atoms += molecule_features.size(0)
+        update = torch.cat(outer_products, dim=0)
+        return update
+
+    def ali_mha(self, x_norm, batch, sbl):
+        # QKV projection
+        qkv = self.qkv_proj(x_norm)  # seq_len, num_heads*head_dim
+        new_id, mask, n_batch, max_b = sbl
+        device = qkv.device
+        # import ipdb; ipdb.set_trace()
+        head_h = qkv.shape[-1]
+
+        new_qkv = torch.zeros((n_batch * max_b, head_h), dtype=qkv.dtype, device=device)
+
+        new_qkv[new_id, :] = qkv[:, :]
+
+        new_qkv = new_qkv.reshape(n_batch, max_b, self.num_heads, -1).permute(
+            (0, 2, 1, 3)
+        )  # batch x num-head x max_atoms x D
+        Q, K, V = new_qkv.chunk(3, dim=-1)
+
+        attn_output = F.scaled_dot_product_attention(Q, K, V, attn_mask=mask)
+        # mask [1 1 num_atoms num_atoms] QKV = [1, num_heads, num_atoms, hidden//num_heads]
+
+        attn_output = einops.rearrange(attn_output, "b h s d -> (b s) (h d)")[new_id, :]
+        return attn_output
+
+    def og_mha(self, x_norm, batch):
+        qkv = self.qkv_proj(x_norm)
+        Q, K, V = qkv.chunk(3, dim=-1)
+        # Q, K = self.norm_q(Q, batch), self.norm_k(K, batch)
+        # Reshape Q, K, V to (1, seq_len, num_heads*head_dim)
+        # if x.dim() == 2:
+        Q = Q.unsqueeze(0)
+        K = K.unsqueeze(0)
+        V = V.unsqueeze(0)
+
+        reshaper = functools.partial(einops.rearrange, pattern="b s (h d) -> b h s d", h=self.num_heads)
+        # Reshape Q, K, V to (1, num_heads, seq_len, head_dim)
+        Q, K, V = map(reshaper, (Q, K, V))
+
+        attn_mask = batch.unsqueeze(0) == batch.unsqueeze(1)
+        attn_mask = attn_mask.unsqueeze(0).unsqueeze(
+            0
+        )  #! if float it is added as the biasbut would still need a mask s -infs?
+
+        attn_output = F.scaled_dot_product_attention(
+            Q, K, V, attn_mask=attn_mask
+        )  # mask [1 1 num_atoms num_atoms] QKV = [1, num_heads, num_atoms, hidden//num_heads]
+        attn_output = einops.rearrange(attn_output, "b h s d -> b s (h d)").squeeze(0)
+        return attn_output
+
+
+class MoleculeDiffusionAli(nn.Module):
+    def __init__(
+        self,
+        num_layers=10,
+        equivariant_node_feature_dim=3,
+        invariant_node_feat_dim=256,
+        invariant_edge_feat_dim=256,
+        atom_classes=22,
+        edge_classes=5,
+        num_heads=4,
+        n_vector_features=128,
+        scale_dist_features=4,
+        use_z=None,
+        attn_dropout=0.0,
+        use_cross_product=False,
+    ):
+        super(MoleculeDiffusionAli, self).__init__()
+        self.atom_embedder = MLP(atom_classes, invariant_node_feat_dim, invariant_node_feat_dim)
+        self.edge_embedder = MLP(edge_classes, invariant_edge_feat_dim, invariant_edge_feat_dim)
+        self.num_atom_classes = atom_classes
+        self.num_edge_classes = edge_classes
+        self.n_vector_features = n_vector_features
+        self.coord_emb = nn.Linear(1, n_vector_features, bias=False)
+        self.coord_pred = nn.Linear(n_vector_features, 1, bias=False)
+        self.scale_dist_features = scale_dist_features
+
+        self.atom_type_head = PredictionHead(atom_classes, invariant_node_feat_dim)
+        self.edge_type_head = PredictionHead(edge_classes, invariant_edge_feat_dim, edge_prediction=True)
+        self.time_embedding = TimestepEmbedder(invariant_node_feat_dim)
+        self.bond_refine = BondRefine(invariant_node_feat_dim, invariant_edge_feat_dim)
+
+        self.dit_layers = nn.ModuleList()
+        self.egnn_layers = nn.ModuleList()
+        self.use_z = use_z
+        if use_z == "pair_embedding":
+            self.Z_lin = MLP(invariant_node_feat_dim, invariant_node_feat_dim, 1)
+
+        for i in range(num_layers):
+            self.dit_layers.append(
+                DiTeBlockAli(
+                    invariant_node_feat_dim,
+                    invariant_edge_feat_dim,
+                    num_heads,
+                    mlp_expansion_ratio=4.0,
+                    use_z=use_z,
+                    n_vector_features=n_vector_features,
+                    scale_dist_features=scale_dist_features,
+                    dropout=attn_dropout,
+                )
+            )
+            self.egnn_layers.append(
+                EquivariantBlock(
+                    invariant_node_feat_dim,
+                    invariant_edge_feat_dim,
+                    n_vector_features,
+                    use_cross_product=use_cross_product,
+                )
+            )
+
+        self.node_blocks = nn.ModuleList(
+            [nn.Linear(invariant_node_feat_dim, invariant_node_feat_dim) for i in range(num_layers)]
+        )
+        self.edge_blocks = nn.ModuleList(
+            [nn.Linear(invariant_edge_feat_dim, invariant_edge_feat_dim) for i in range(num_layers)]
+        )
+
+    def pyg_outer_update(self, batch, x):
+        outer_products = []
+        num_atoms = 0
+        for molecule in range(max(batch.unique()) + 1):
+            molecule_indices = (batch == molecule).nonzero(as_tuple=True)[0]
+            molecule_features = x[molecule_indices]
+            # Compute the outer product for the current molecule
+            outer_product = molecule_features.unsqueeze(0) * molecule_features.unsqueeze(
+                1
+            )  # torch.einsum('ij,ik->ijk', molecule_features, molecule_features)
+            outer_product = outer_product + outer_product.transpose(0, 1)
+            outer_product = outer_product[~torch.eye(outer_product.size(0), dtype=torch.bool)].view(
+                outer_product.size(0), -1
+            )
+            outer_products.append(outer_product.reshape(-1, molecule_features.shape[-1]))
+            num_atoms += molecule_features.size(0)
+        update = torch.cat(outer_products, dim=0)
+        return update
+
+    def shared_between_layers(self, batch, device="cuda"):
+        particle_nums = batch.shape[0]
+        _, batch_atoms = torch.unique_consecutive(batch, return_counts=True)
+        n_batch = batch[-1].item() + 1
+
+        max_b = torch.max(batch_atoms).item()
+
+        cumsum_result = torch.cat(
+            [torch.tensor([0], device=device, dtype=torch.long), torch.cumsum(max_b - batch_atoms, dim=0)[:-1]]
+        )
+
+        new_id = torch.repeat_interleave(cumsum_result, batch_atoms) + torch.arange(
+            0, particle_nums, device=device, dtype=torch.long
+        )
+
+        mask = torch.tensor([[]], dtype=torch.bool, device=device)
+        # max_b = batch.max().item()
+        mask = torch.arange(max_b).cuda().unsqueeze(0).unsqueeze(0)  # [1, 1, max_b]
+        mask = mask.expand(n_batch, max_b, max_b)  # [n_batch, max_b, max_b]
+        mask = mask < batch_atoms.unsqueeze(1).unsqueeze(2)  # [n_batch, max_b, max_b]
+        mask = mask & mask.transpose(1, 2)
+        mask = mask.unsqueeze(1)
+
+        return new_id, mask, n_batch, max_b
+
+    def forward(self, batch, X, H, E_idx, E, t_discrete, t_continuous=None):
+        torch.max(batch) + 1
+        pos = self.coord_emb(X.unsqueeze(-1))  # N x 3 x K
+        H = self.atom_embedder(H)
+        E = self.edge_embedder(E)
+        te = self.time_embedding(t_discrete)
+        te_h = te[batch]
+        edge_batch, counts = torch.unique(batch, return_counts=True)
+        edge_batch = torch.repeat_interleave(edge_batch, counts * (counts - 1))
+        te_e = te[edge_batch]
+        if t_continuous:
+            te_continuous = self.time_embedding(t_continuous)
+            te_e_cont = te_continuous[edge_batch]
+        else:
+            te_e_cont = te_e
+        edge_attr = E
+        if self.use_z == "pair_embedding":
+            Z = self.pyg_outer_update(batch, H)
+        else:
+            Z = None
+
+        atom_hids = H
+        edge_hids = edge_attr
+        sbl = self.shared_between_layers(batch, pos.device)
+        for layer_index in range(len(self.dit_layers)):
+            # with nvtx.range(f"DiTe Layer {layer_index}"):
+            distances = coord2distfn(pos, E_idx, self.scale_dist_features, batch)  # E x K
+            H, edge_attr, Z = self.dit_layers[layer_index](batch, H, te_h, edge_attr, E_idx, te_e, distances, Z, sbl)
             # with nvtx.range(f"EGNN Layer {layer_index}"):
             pos = self.egnn_layers[layer_index](batch, pos, H, E_idx, edge_attr, te_e_cont)
             atom_hids = atom_hids + self.node_blocks[layer_index](H)

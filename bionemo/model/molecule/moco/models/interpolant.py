@@ -626,7 +626,7 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
         """
         Perform a euler step in the continuous flow matching method.
         Here we allow two options for the choic of vector field
-         A) VF = x1 - xt /(1-t) --> x_next = xt + 1/(1-t) * dt * (x_hat - xt) see Lipman et al. https://arxiv.org/pdf/2210.02747
+         A) VF = (x1 - xt) /(1-t) --> x_next = xt + 1/(1-t) * dt * (x_hat - xt) see Lipman et al. https://arxiv.org/pdf/2210.02747
          B) Linear with dynamics as data prediction VF = x1 - x0 --> x_next = xt +  dt * (x_hat - x0) see Tong et al. https://arxiv.org/pdf/2302.00482
         Both of which can add additional noise.
         """

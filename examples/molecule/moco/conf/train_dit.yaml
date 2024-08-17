@@ -92,7 +92,7 @@ interpolant:
 
   
 dynamics:
-  model_name: "megadotfn"
+  model_name: "mdali"
   model_args:
     atom_classes: 22
     edge_classes: 5
@@ -186,7 +186,7 @@ lr_scheduler:
   initial_lr: 2.e-5
   final_lr: 2.e-4
   num_warmup_steps: 10000
-  milestone_steps: 200000
+  milestone_steps: 150000
   min_lr_decay: 2.e-5
   num_decay_steps: 10000
   interval: step
