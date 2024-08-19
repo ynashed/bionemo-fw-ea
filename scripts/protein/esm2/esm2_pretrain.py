@@ -335,8 +335,8 @@ if __name__ == "__main__":
         "--num-dataset-workers",
         type=int,
         required=False,
-        default=0,
-        help="Number of steps to use for training. Default is 0.",
+        default=1,
+        help="Number of steps to use for training. Default is 1.",
     )
     parser.add_argument(
         "--val-check-interval",
