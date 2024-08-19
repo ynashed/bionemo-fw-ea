@@ -153,7 +153,7 @@ class Molecule2DStability:
             f" -- No error {error_message[5]}"
         )
         self.validity_metric.update(value=len(valid_smiles) / len(generated), weight=len(generated))
-
+        # import ipdb; ipdb.set_trace()
         valid_smiles, duplicate_ids = canonicalize_list(valid_smiles)
         valid_molecules = [mol for i, mol in enumerate(valid_molecules) if i not in duplicate_ids]
 
@@ -184,19 +184,42 @@ class Molecule2DStability:
             Dictionary of stability metrics, valid SMILES, valid molecules, and stable molecules.
         """
         stable_molecules = []
+        stabs = []
         for mol in molecules:
             mol_stable, at_stable, num_bonds = check_stability(mol, self.dataset_info)
+            stabs.append(mol_stable.item())
             self.mol_stable.update(value=mol_stable)
             self.atom_stable.update(value=at_stable / num_bonds, weight=num_bonds)
             if mol_stable:
                 stable_molecules.append(mol)
         valid_smiles, valid_molecules, validity, is_valid = self.evaluate(molecules)
-
+        # import ipdb; ipdb.set_trace()
+        both = 0
+        A = 0
+        B = 0
+        C = 0
+        for a, b in zip(stabs, is_valid):
+            if b[0] and not a:
+                print("valid not stable molecule", a, b)
+                B += 1
+            elif b[0] and a:
+                both += 1
+            elif not b[0] and a:
+                A += 1
+            else:
+                C += 1
         results = {
             "mol_stable": self.mol_stable.compute().item(),
             "atm_stable": self.atom_stable.compute().item(),
             "validity": validity,
+            "stable_valid": both / len(is_valid),
+            "not_stable_valid": B / len(is_valid),
+            "stable_not_valid": A / len(is_valid),
+            "not_stable_not_valid": C / len(is_valid),
         }
+        # self.validity_metric.reset()
+        # self.mol_stable.reset()
+        # self.atom_stable.reset()
         return results, valid_smiles, valid_molecules, stable_molecules, is_valid
 
     @staticmethod

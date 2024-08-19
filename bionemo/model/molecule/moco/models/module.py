@@ -557,7 +557,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
     #     self.log_dict(results, sync_dist=True)
 
     @torch.no_grad()
-    def sample(self, num_samples, timesteps=500, time_discretization="linear", batch=None):
+    def sample(self, num_samples, timesteps=500, time_discretization="linear", batch=None, num_atoms=None):
         """
         Generates num_samples. Can supply a batch for inital starting points for conditional sampling for any interpolants set to None.
         """
@@ -575,14 +575,15 @@ class Graph3DInterpolantModel(pl.LightningModule):
             timeline = torch.arange(timesteps + 1)
             DT = [1 / timesteps] * timesteps
 
-        if self.node_distribution is not None:
-            num_atoms = torch.multinomial(
-                input=self.node_distribution,
-                num_samples=num_samples,
-                replacement=True,
-            )
-        else:
-            num_atoms = torch.randint(20, 55, (num_samples,)).to(torch.int64)
+        if num_atoms is None:
+            if self.node_distribution is not None:
+                num_atoms = torch.multinomial(
+                    input=self.node_distribution,
+                    num_samples=num_samples,
+                    replacement=True,
+                )
+            else:
+                num_atoms = torch.randint(20, 55, (num_samples,)).to(torch.int64)
         batch_index = torch.repeat_interleave(torch.arange(num_samples), num_atoms).to(self.device)
         edge_index = (
             torch.eq(batch_index.unsqueeze(0), batch_index.unsqueeze(-1)).int().fill_diagonal_(0).to(self.device)
