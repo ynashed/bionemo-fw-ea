@@ -118,10 +118,11 @@ def test_main_runs(tmpdir, dummy_protein_dataset, dummy_parquet_train_val_inputs
         warmup_steps=5,
         limit_val_batches=1,
         val_check_interval=1,
-        num_dataset_workers=2,
+        num_dataset_workers=1,
         biobert_spec_option=BiobertSpecOption.esm2_bert_layer_local_spec,
         lr=1e-4,
         micro_batch_size=2,
+        accumulate_grad_batches=2,
         precision="bf16-mixed",
         experiment_name="test_experiment",
         resume_if_exists=False,
@@ -165,11 +166,12 @@ def test_pretrain_cli(tmpdir, dummy_protein_dataset, dummy_parquet_train_val_inp
     --num-gpus 1  \
     --num-nodes 1 \
     --val-check-interval 10 \
-    --num-dataset-workers 0 \
+    --num-dataset-workers 1 \
     --num-steps 55 \
     --seq-length 128 \
     --limit-val-batches 2 \
-    --micro-batch-size 2
+    --micro-batch-size 2 \
+    --accumulate-grad-batches 2
     """.strip()
     env = dict(**os.environ)  # a local copy of the environment
     env["MASTER_PORT"] = str(open_port)

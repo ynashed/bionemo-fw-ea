@@ -40,6 +40,21 @@ from bionemo.llm.utils.logger_utils import WandbLoggerOptions, setup_nemo_lightn
 __all__: Sequence[str] = ("main",)
 
 
+def infer_global_batch_size(  # TODO(@sichu) migrate function into utilities
+    micro_batch_size: int,
+    num_nodes: int,
+    devices: int,
+    accumulate_grad_batches: int = 1,
+    tensor_model_parallel_size: int = 1,
+    pipeline_model_parallel_size: int = 1,
+):
+    world_size = num_nodes * devices
+    model_parallel_size = tensor_model_parallel_size * pipeline_model_parallel_size
+    data_parallel_size = world_size // model_parallel_size
+    global_batch_size = micro_batch_size * data_parallel_size * accumulate_grad_batches
+    return global_batch_size
+
+
 def main(
     train_cluster_path: Path,
     train_database_path: Path,
@@ -59,6 +74,7 @@ def main(
     biobert_spec_option: BiobertSpecOption,
     lr: float,
     micro_batch_size: int,
+    accumulate_grad_batches: int,
     experiment_name: str,
     resume_if_exists: bool,
     precision: PrecisionTypes,
@@ -105,8 +121,18 @@ def main(
 
     # Setup the strategy and trainer
     pipeline_model_parallel_size = 1
+    tensor_model_parallel_size = 1
+    global_batch_size = infer_global_batch_size(
+        micro_batch_size=micro_batch_size,
+        num_nodes=num_nodes,
+        devices=devices,
+        accumulate_grad_batches=accumulate_grad_batches,
+        tensor_model_parallel_size=tensor_model_parallel_size,
+        pipeline_model_parallel_size=pipeline_model_parallel_size,
+    )
+
     strategy = nl.MegatronStrategy(
-        tensor_model_parallel_size=1,
+        tensor_model_parallel_size=tensor_model_parallel_size,
         pipeline_model_parallel_size=pipeline_model_parallel_size,
         ddp="megatron",
         find_unused_parameters=True,
@@ -146,9 +172,9 @@ def main(
     data = ESMDataModule(
         train_cluster_path=train_cluster_path,
         train_database_path=train_database_path,
-        valid_cluster_path=valid_cluster_path,
-        valid_database_path=valid_database_path,
-        global_batch_size=micro_batch_size * int(num_nodes * devices / pipeline_model_parallel_size),
+        valid_cluster_path=val_cluster_path,
+        valid_database_path=val_database_path,
+        global_batch_size=global_batch_size,
         micro_batch_size=micro_batch_size,
         min_seq_length=None,
         max_seq_length=seq_length,
@@ -340,6 +366,13 @@ if __name__ == "__main__":
         default=64,
         help="Micro-batch size. Global batch size is inferred from this.",
     )
+    parser.add_argument(  # TODO(@sichu) standardize this in geneformer
+        "--accumulate-grad-batches",
+        type=int,
+        required=False,
+        default=1,
+        help="Gradient accumulation steps. Global batch size is inferred from this.",
+    )
     parser.add_argument(
         "--biobert-spec-option",
         type=BiobertSpecOption,
@@ -410,6 +443,7 @@ if __name__ == "__main__":
         biobert_spec_option=args.biobert_spec_option,
         lr=args.lr,
         micro_batch_size=args.micro_batch_size,
+        accumulate_grad_batches=args.accumulate_grad_batches,
         precision=args.precision,
         experiment_name=args.experiment_name,
         resume_if_exists=args.resume_if_exists,
