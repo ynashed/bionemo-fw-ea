@@ -27,8 +27,9 @@ def collate_sparse_matrix_batch(batch: List[torch.Tensor], max_dimesion: Optiona
     Returns:
         The tensors collated into a CSR (Compressed Sparse Row) Format.
     """
-
-    batch_rows = torch.tensor([0] + [sparse_representation.shape[1] for sparse_representation in batch])
+    batch_rows = torch.cumsum(
+        torch.tensor([0] + [sparse_representation.shape[1] for sparse_representation in batch]), dim=0
+    )
     batch_cols = torch.cat([sparse_representation[1] for sparse_representation in batch]).to(torch.int32)
     batch_values = torch.cat([sparse_representation[0] for sparse_representation in batch])
     if len(batch_cols) == 0:

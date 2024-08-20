@@ -92,5 +92,4 @@ def test_dataloading_batch_size_three_with_collate(tmpdir):
     expected_tensor = torch.tensor([[0, 8], [0, 0], [7, 18]])
 
     batch = next(iter(dataloader))
-    print(batch)
     assert torch.equal(batch.to_dense(), expected_tensor)
