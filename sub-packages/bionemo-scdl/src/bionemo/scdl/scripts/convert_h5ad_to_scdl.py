@@ -19,7 +19,7 @@ import tempfile
 from bionemo.scdl.io.single_cell_collection import SingleCellCollection
 
 
-def parse_args():
+if __name__ == "__main__":
     """Parse the arguments to process the single cell collection."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -40,11 +40,7 @@ def parse_args():
     parser.add_argument(
         "--save-path", required=True, type=str, help="An output path where an SCDataset will be stored."
     )
-    return parser.parse_args()
-
-
-if __name__ == "__main__":
-    args = parse_args()
+    args = parser.parse_args()
 
     with tempfile.TemporaryDirectory() as temp_dir:
         coll = SingleCellCollection(temp_dir)
