@@ -87,6 +87,10 @@ def main(
     metric_to_monitor_for_checkpoints: str = "val_loss",
     save_top_k: int = 2,
     save_every_n_steps: int = 100,
+    num_layers: int = 33,
+    hidden_size: int = 1280,
+    num_attention_heads: int = 20,
+    ffn_hidden_size: int = 1280 * 4,
 ) -> None:
     """Train an ESM2 model on UR data.
 
@@ -184,6 +188,10 @@ def main(
     # Configure the model
     esm2_config = ESM2Config(
         seq_length=seq_length,
+        num_layers=num_layers,
+        hidden_size=hidden_size,
+        num_attention_heads=num_attention_heads,
+        ffn_hidden_size=ffn_hidden_size,
         params_dtype=get_autocast_dtype(precision),
         pipeline_dtype=get_autocast_dtype(precision),
         autocast_dtype=get_autocast_dtype(precision),  # setting this speeds things up a lot
@@ -421,6 +429,36 @@ if __name__ == "__main__":
         help="Path to the checkpoint directory to restore from. Will override `--resume-if-exists` when set.",
     )
 
+    # ESM2 specific configuration (default: 650M)
+    parser.add_argument(
+        "--num-layers",
+        type=int,
+        required=False,
+        default=33,
+        help="Number of layers in the model. Default is 33.",
+    )
+    parser.add_argument(
+        "--hidden-size",
+        type=int,
+        required=False,
+        default=1280,
+        help="Hidden size of the model. Default is 1280.",
+    )
+    parser.add_argument(
+        "--num-attention-heads",
+        type=int,
+        required=False,
+        default=20,
+        help="Number of attention heads in the model. Default is 20.",
+    )
+    parser.add_argument(
+        "--ffn-hidden-size",
+        type=int,
+        required=False,
+        default=4 * 1280,
+        help="FFN hidden size of the model. Default is 4 * 1280.",
+    )
+
     # Parse the arguments and pull them out into local variables for ease of future refactor to a
     #   config management system.
     args = parser.parse_args()
@@ -454,4 +492,8 @@ if __name__ == "__main__":
         metric_to_monitor_for_checkpoints=args.metric_to_monitor_for_checkpoints,
         save_top_k=args.save_top_k,
         save_every_n_steps=args.val_check_interval,
+        num_layers=args.num_layers,
+        hidden_size=args.hidden_size,
+        num_attention_heads=args.num_attention_heads,
+        ffn_hidden_size=args.ffn_hidden_size,
     )

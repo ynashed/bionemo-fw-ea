@@ -127,6 +127,10 @@ def test_main_runs(tmpdir, dummy_protein_dataset, dummy_parquet_train_val_inputs
         experiment_name="test_experiment",
         resume_if_exists=False,
         create_tensorboard_logger=False,
+        num_layers=2,
+        num_attention_heads=2,
+        hidden_size=4,
+        ffn_hidden_size=4 * 4,
     )
 
     assert (result_dir / "test_experiment").exists(), "Could not find test experiment directory."
