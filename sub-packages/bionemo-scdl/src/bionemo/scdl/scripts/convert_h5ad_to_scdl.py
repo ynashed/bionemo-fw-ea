@@ -19,7 +19,7 @@ import tempfile
 from bionemo.scdl.io.single_cell_collection import SingleCellCollection
 
 
-if __name__ == "__main__":
+def main():
     """Parse the arguments to process the single cell collection."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -46,3 +46,7 @@ if __name__ == "__main__":
         coll = SingleCellCollection(temp_dir)
         coll.load_h5ad_multi(args.data_path, max_workers=args.num_workers, use_processes=args.use_mp)
         coll.flatten(args.save_path, destroy_on_copy=True)
+
+
+if __name__ == "__main__":
+    main()
