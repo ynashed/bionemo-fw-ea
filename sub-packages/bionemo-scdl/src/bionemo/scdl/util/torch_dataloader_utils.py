@@ -13,12 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List
-
 import torch
 
 
-def collate_sparse_matrix_batch(batch: List[torch.Tensor]) -> torch.Tensor:
+def collate_sparse_matrix_batch(batch: list[torch.Tensor]) -> torch.Tensor:
     """Collate function to create a batch out of sparse tensors.
 
     This is necessary to collate sparse matrices of various lengths.

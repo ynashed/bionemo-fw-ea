@@ -20,7 +20,7 @@ from bionemo.scdl.io.single_cell_memmap_dataset import SingleCellMemMapDataset
 from bionemo.scdl.util.torch_dataloader_utils import collate_sparse_matrix_batch
 
 
-def test_sparse_collate_function():
+def test_sparse_collate_function_produces_correct_batch():
     columns_one = torch.tensor([2, 3, 5])
     columns_two = torch.tensor([1, 2, 5, 6])
     values_one = torch.tensor([1, 2, 3])
@@ -31,7 +31,7 @@ def test_sparse_collate_function():
     assert torch.equal(csr_matrix.to_dense(), torch.tensor([[0, 0, 1, 2, 0, 3, 0], [0, 4, 5, 0, 0, 6, 7]]))
 
 
-def test_one_empty():
+def test_sparse_collate_function_with_one_empty_entry_correct():
     columns_one = torch.tensor([2, 3, 5])
     columns_two = torch.tensor([])
     values_one = torch.tensor([1, 2, 3])
@@ -42,7 +42,7 @@ def test_one_empty():
     assert torch.equal(csr_matrix.to_dense(), torch.tensor([[0, 0, 1, 2, 0, 3], [0, 0, 0, 0, 0, 0]]))
 
 
-def test_both_empty():
+def test_sparse_collate_function_with_all_empty_entries_correct():
     columns_one = torch.tensor([])
     columns_two = torch.tensor([])
     values_one = torch.tensor([])
@@ -53,7 +53,7 @@ def test_both_empty():
     assert csr_matrix.to_dense().shape == torch.Size([2, 0])
 
 
-def test_dataloading_batch_size_one_no_collate(tmpdir):
+def test_dataloading_batch_size_one_work_without_collate(tmpdir):
     ds = SingleCellMemMapDataset(f"{tmpdir}/scy", h5ad_path="tests/test_data/adata_sample1.h5ad")
     dataloader = DataLoader(ds, batch_size=1, shuffle=False)
     expected_tensors = [
@@ -68,7 +68,7 @@ def test_dataloading_batch_size_one_no_collate(tmpdir):
         assert torch.equal(batch, expected_tensors[index])
 
 
-def test_dataloading_batch_size_one_with_collate(tmpdir):
+def test_dataloading_batch_size_one_works_with_collate(tmpdir):
     ds = SingleCellMemMapDataset(f"{tmpdir}/scy", h5ad_path="tests/test_data/adata_sample1.h5ad")
     dataloader = DataLoader(ds, batch_size=1, shuffle=False, collate_fn=collate_sparse_matrix_batch)
     expected_tensors = [
@@ -86,7 +86,7 @@ def test_dataloading_batch_size_one_with_collate(tmpdir):
         assert torch.equal(batch.to_dense(), torch.sparse_csr_tensor(rows, columns, values).to_dense())
 
 
-def test_dataloading_batch_size_three_with_collate(tmpdir):
+def test_dataloading_batch_size_three_works_with_collate(tmpdir):
     ds = SingleCellMemMapDataset(f"{tmpdir}/scy", h5ad_path="tests/test_data/adata_sample1.h5ad")
     dataloader = DataLoader(ds, batch_size=3, shuffle=False, collate_fn=collate_sparse_matrix_batch)
     expected_tensor = torch.tensor([[0, 8], [0, 0], [7, 18]])
