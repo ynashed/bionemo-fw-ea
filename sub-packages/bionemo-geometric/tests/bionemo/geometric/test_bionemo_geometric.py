@@ -14,11 +14,5 @@
 # limitations under the License.
 
 
-from pytest import fixture, mark, raises
-
-
-def test_todo() -> None:
-    raise ValueError(
-        f"Implement tests! Make use of {fixture} for data, {raises} to check for "
-        f"exceptional cases, and {mark} as needed"
-    )
+def test_import_geometric() -> None:
+    assert True

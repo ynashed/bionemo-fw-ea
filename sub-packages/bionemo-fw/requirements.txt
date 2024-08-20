@@ -22,5 +22,3 @@ numba>=0.57.1
 # 8.791       [end of output]
 lightning>=2.2.1
 pytorch-lightning>=2.2.1
-
--e ../bionemo-geometric
