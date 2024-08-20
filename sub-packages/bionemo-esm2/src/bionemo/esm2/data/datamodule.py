@@ -25,6 +25,7 @@ from nemo.lightning.pytorch.plugins import MegatronDataSampler
 from nemo.utils import logging
 from pytorch_lightning.utilities.types import EVAL_DATALOADERS, TRAIN_DATALOADERS
 
+from bionemo.core.data.resamplers import PRNGDatasetShuffler
 from bionemo.core.utils import random_utils
 from bionemo.esm2.data import dataset, tokenizer
 from bionemo.llm.data import collate
@@ -134,7 +135,7 @@ class ESMDataModule(pl.LightningDataModule):
             # This is to make sure we only have one epoch on every validation iteration
             num_val_samples = 1
 
-        self._train_ds = dataset.create_train_dataset(
+        _train_ds = dataset.create_train_dataset(
             cluster_file=self._train_cluster_path,
             db_path=self._train_database_path,
             total_samples=num_train_samples,
@@ -145,8 +146,11 @@ class ESMDataModule(pl.LightningDataModule):
             mask_random_prob=self._mask_random_prob,
             tokenizer=self._tokenizer,
         )
+        self._train_ds = self._sample_and_shuffle_dataset(
+            _train_ds, num_train_samples, "train"
+        )  # shuffle manually without MegatronPretrainingRandomSampler
 
-        self._valid_ds = dataset.create_valid_dataset(
+        _valid_ds = dataset.create_valid_dataset(
             cluster_file=self._valid_cluster_path,
             db_path=self._valid_database_path,
             total_samples=num_val_samples,
@@ -157,6 +161,9 @@ class ESMDataModule(pl.LightningDataModule):
             mask_random_prob=self._mask_random_prob,
             tokenizer=self._tokenizer,
         )
+        self._valid_ds = self._sample_and_shuffle_dataset(
+            _valid_ds, num_val_samples, "val"
+        )  # shuffle manually without MegatronPretrainingRandomSampler
 
         assert (
             hasattr(self, "trainer") and self.trainer is not None
@@ -190,3 +197,20 @@ class ESMDataModule(pl.LightningDataModule):
     def test_dataloader(self) -> EVAL_DATALOADERS:
         """Raises a not implemented error."""
         raise NotImplementedError("No test dataset provided for ESM2")
+
+    def _sample_and_shuffle_dataset(self, dataset: dataset.ESMMaskedResidueDataset, num_samples: int, stage: str):  # noqa: D417
+        """Sample the training dataset.
+
+        Args:
+            dataset (torch.utils.data.Dataset): The dataset to sample from
+
+        Returns:
+            ResamplingMappedDataset: Resampled dataset
+
+        """
+        # This is where re-sampling occurs.
+        return PRNGDatasetShuffler(
+            dataset,
+            num_samples=num_samples,
+            seed=self._seed + len(stage),
+        )

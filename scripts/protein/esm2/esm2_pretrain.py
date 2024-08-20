@@ -300,9 +300,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--result-dir", type=Path, required=False, default=Path("./results"), help="Path to the result directory."
     )
-    parser.add_argument(
-        "--experiment-name", type=str, required=False, default="esm2", help="Name of the experiment."
-    )
+    parser.add_argument("--experiment-name", type=str, required=False, default="esm2", help="Name of the experiment.")
     parser.add_argument("--wandb-offline", action="store_true", default=False, help="Use wandb in offline mode.")
     parser.add_argument(
         "--wandb-project",
@@ -365,7 +363,7 @@ if __name__ == "__main__":
         type=int,
         required=False,
         default=2,
-        help="Number of steps to use for training. Default is 2.",
+        help="Number of global batches used for validation if int, otherwise the portion of validation data used. Default is 2.",
     )
     parser.add_argument(
         "--micro-batch-size",
