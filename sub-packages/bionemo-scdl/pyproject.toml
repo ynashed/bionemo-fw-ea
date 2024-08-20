@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "bionemo-scdl"
 license.file = "LICENSE"
-version = "0.0.1"
+version = "0.0.4"
 readme = "README.md"
 description = "SCDL, a Dataset class for Single Cell data."
 authors = [
