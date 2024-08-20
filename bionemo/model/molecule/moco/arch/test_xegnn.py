@@ -12,7 +12,7 @@
 import torch
 from scipy.spatial.transform import Rotation as R
 
-from bionemo.model.molecule.moco.arch.xegnn import EGNN, E3Norm, remove_mean_with_mask
+from bionemo.bionemo.model.molecule.moco.arch.egnn import EGNN, E3Norm, remove_mean_with_mask
 from bionemo.utils.tests import Deterministic
 
 

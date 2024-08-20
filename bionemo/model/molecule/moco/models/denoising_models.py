@@ -16,6 +16,7 @@ from torch_scatter import scatter_add
 
 from bionemo.model.molecule.moco.arch.equiformer_model import MoleculeDiTEquiformer
 from bionemo.model.molecule.moco.arch.final_model import MoleculeDiffusion, MoleculeDiffusionAli
+from bionemo.model.molecule.moco.arch.model_nopyg import MDNoPyg
 from bionemo.model.molecule.moco.arch.old_model import MoleculeDiTe as MoleculeDiT
 from bionemo.model.molecule.moco.arch.old_model import (
     MoleculeDiTe2,
@@ -65,6 +66,7 @@ class ModelBuilder:
             "skinny": MegalodonDotFNNoResSkinnyWrapper,
             "md": MoleculeDiffusionWrapper,
             "mdali": MoleculeDiffusionAliWrapper,
+            "mdnopyg": MDNoPygWrapper,
         }
 
     def create_model(self, model_name: str, args_dict: dict, wrapper_args: dict):
@@ -129,6 +131,49 @@ class MOCOWrapper(MoCo):
             H=batch["h_t"],
             E=batch["edge_attr_t"],
             E_idx=batch["edge_index"],
+            t=time,
+        )
+        return out
+
+
+class MDNoPygWrapper(MDNoPyg):
+    """A wrapper class for the MoCo model."""
+
+    def __init__(self, args_dict, time_type="continuous", timesteps=None):
+        """
+        Initializes the DiTWrapper.
+
+        Args:
+            args_dict (dict): A dictionary of arguments for initializing the MoCo model.
+        """
+        self.args = args_dict
+        self.time_type = time_type
+        self.timesteps = timesteps
+        super().__init__(**args_dict)
+
+    def forward(self, batch, time, conditional_batch=None, timesteps=None):
+        """
+        Forward pass of the MoCo model.
+
+        Args:
+            batch (torch_geometric.data.Batch): The input batch.
+            time (Tensor): The time tensor.
+
+        Returns:
+            dict: The output of the MoCo model.
+        """
+        timesteps = timesteps if timesteps is not None else self.timesteps
+        if self.time_type == "discrete" and timesteps is not None:
+            time = (timesteps - time.float()) / timesteps
+        import ipdb
+
+        ipdb.set_trace()
+        out = super().forward(
+            mask=batch["node_mask"],
+            edge_mask=batch["edge_mask"],
+            X=batch["x_t"],
+            H=batch["h_t"],
+            E=batch["edge_attr_t"],
             t=time,
         )
         return out

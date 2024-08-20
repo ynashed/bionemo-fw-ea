@@ -21,7 +21,9 @@ from omegaconf import DictConfig, OmegaConf
 
 from bionemo.model.molecule.moco.data.molecule_datamodule import MoleculeDataModule
 from bionemo.model.molecule.moco.metrics.molecule_evaluation_callback import MoleculeEvaluationCallback
-from bionemo.model.molecule.moco.models.module import Graph3DInterpolantModel
+
+# from bionemo.model.molecule.moco.models.module import Graph3DInterpolantModel
+from bionemo.model.molecule.moco.models.module_no_pyg import NoPygGraph3DInterpolantModel as Graph3DInterpolantModel
 from bionemo.model.molecule.moco.models.utils_train import EMACallback
 
 

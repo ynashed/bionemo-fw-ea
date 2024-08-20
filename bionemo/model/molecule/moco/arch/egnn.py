@@ -15,7 +15,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 from scipy.stats import truncnorm  # this function uses np.random internally
-from taylor_series_linear_attention import TaylorSeriesLinearAttn
+
+# from taylor_series_linear_attention import TaylorSeriesLinearAttn
 from torch import Size, Tensor
 from torch.nn import LayerNorm, Module
 
@@ -367,14 +368,14 @@ class EGNNBlock(Module):
                     nn.Sigmoid(),
                 ]
             )
-        else:
-            self.phi_att = TaylorSeriesLinearAttn(
-                dim=self.invariant_node_feat_dim,
-                dim_head=max(4, self.invariant_node_feat_dim // 2),
-                heads=1,
-                one_headed_kv=1,
-                prenorm=True,
-            )
+        # else:
+        #     self.phi_att = TaylorSeriesLinearAttn(
+        #         dim=self.invariant_node_feat_dim,
+        #         dim_head=max(4, self.invariant_node_feat_dim // 2),
+        #         heads=1,
+        #         one_headed_kv=1,
+        #         prenorm=True,
+        #     )
 
         self.use_cross_product = use_cross_product
         if self.use_cross_product:

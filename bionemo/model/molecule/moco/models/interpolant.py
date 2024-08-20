@@ -415,6 +415,53 @@ class ContinuousDiffusionInterpolant(Interpolant):
         data_scale, noise_scale = self.forward_schedule(batch, time)
         return x1, data_scale * x1 + noise_scale * x0, x0
 
+    def interpolate_nopyg(self, mask, x1, time):
+        """
+        Interpolate using continuous diffusion.
+        """
+        # import ipdb; ipdb.set_trace()
+        x0 = torch.randn(x1.shape).to(x1.device) * mask.unsqueeze(-1)
+        x0 = self.zero_com(x0, mask)
+        t_idx = self.timesteps - 1 - time
+        data_scale = self.forward_data_schedule[t_idx].unsqueeze(1).unsqueeze(2)
+        noise_scale = self.forward_noise_schedule[t_idx].unsqueeze(1).unsqueeze(2)
+        return x1, data_scale * x1 + noise_scale * x0, x0
+
+    def calc_com(self, coords, node_mask=None):
+        """Calculates the centre of mass of a pointcloud
+
+        Args:
+            coords (torch.Tensor): Coordinate tensor, shape [*, num_nodes, 3]
+            node_mask (torch.Tensor): Mask for points, shape [*, num_nodes], 1 for real node, 0 otherwise
+
+        Returns:
+            torch.Tensor: CoM of pointclouds with imaginary nodes excluded, shape [*, 1, 3]
+        """
+
+        node_mask = torch.ones_like(coords[..., 0]) if node_mask is None else node_mask
+
+        assert node_mask.shape == coords[..., 0].shape
+
+        num_nodes = node_mask.sum(dim=-1)
+        real_coords = coords * node_mask.unsqueeze(-1)
+        com = real_coords.sum(dim=-2) / num_nodes.unsqueeze(-1)
+        return com.unsqueeze(-2)
+
+    def zero_com(self, coords, node_mask=None):
+        """Sets the centre of mass for a batch of pointclouds to zero for each pointcloud
+
+        Args:
+            coords (torch.Tensor): Coordinate tensor, shape [*, num_nodes, 3]
+            node_mask (torch.Tensor): Mask for points, shape [*, num_nodes], 1 for real node, 0 otherwise
+
+        Returns:
+            torch.Tensor: CoM-free coordinates, where imaginary nodes are excluded from CoM calculation
+        """
+
+        com = self.calc_com(coords, node_mask=node_mask)
+        shifted = coords - com
+        return shifted
+
     def prior(self, batch, shape, device, x1=None):
         if self.prior_type == "gaussian" or self.prior_type == "normal":
             x0 = torch.randn(shape).to(device)
@@ -443,6 +490,34 @@ class ContinuousDiffusionInterpolant(Interpolant):
 
         if self.com_free:
             x_next = x_next - scatter_mean(x_next, batch, dim=0)[batch]
+        return x_next
+
+    def step_nopyg(self, mask, xt, x_hat, x0, time, dt=None):
+        """
+        Perform a euler step.
+        """
+        import ipdb
+
+        ipdb.set_trace()
+        t_idx = self.timesteps - 1 - time
+        data_scale, noise_scale, log_var = (
+            self.reverse_data_schedule[t_idx].unsqueeze(1),
+            self.reverse_noise_schedule[t_idx].unsqueeze(1),
+            self.log_var[t_idx].unsqueeze(1),
+        )
+        mean = data_scale * x_hat + noise_scale * xt
+        # if self.diffusion_type == "ddpm":
+        #     # no noise when diffusion t == 0 so flow matching t == 1
+        #     nonzero_mask = (1 - (time == (self.timesteps - 1)).float())[batch].unsqueeze(-1)
+        #     x_next = mean + nonzero_mask * (0.5 * log_var).exp() * self.prior(batch, xt.shape, device=xt.device)
+        # elif self.diffusion_type == "vdm":
+        noise = torch.randn(x_hat.shape).to(x_hat.device) * mask.unsqueeze(-1)
+        noise = self.zero_com(x0, mask)
+        x_next = mean + (0.5 * log_var).exp() * noise * mask.unsqueeze(-1)
+        # TODO: can add guidance module here
+
+        if self.com_free:
+            return self.zero_com(x_next, mask)
         return x_next
 
     def snr(self, time):
@@ -782,6 +857,55 @@ class DiscreteDiffusionInterpolant(Interpolant):
 
         return x1, xt, None
 
+    def interpolate_nopyg(self, mask, x1, time):
+        """
+        Interpolate using discrete interpolation method.
+        """
+        # import ipdb; ipdb.set_trace()
+        # if len(x1.shape) == 2:
+        x1_hot = F.one_hot(x1, self.num_classes)
+        # else:
+        #     x1_hot = x1
+        assert self.discrete_time_only
+        t_idx = self.timesteps - 1 - time
+        ford = self.forward_data_schedule[t_idx]
+        probs = torch.einsum(
+            "b...j, bji -> b...i", [x1_hot.float(), ford]
+        )  #! Eqn 3 of D3PM https://arxiv.org/pdf/2107.03006
+        # assert torch.all((probs.sum(-1) - 1.0).abs() < 1e-4) #! Note this fails come back and check if this is right
+        xt = torch.distributions.Categorical(probs).sample()
+        xt = xt * mask
+        # xt = probs.multinomial(
+        #     1,
+        # ).squeeze()
+        return x1, xt, probs
+
+    def interpolate_edges_nopyg(self, mask, x1, time):
+        """
+        Interpolate using discrete interpolation method.
+        Similar to sample_edges_categorical https://github.com/tuanle618/eqgat-diff/blob/68aea80691a8ba82e00816c82875347cbda2c2e5/eqgat_diff/experiments/diffusion/categorical.py#L242
+        """
+        # import ipdb; ipdb.set_trace()
+        N = mask.size(-1)
+        upper_triangular_mask = torch.triu(torch.ones(N, N), diagonal=1).long().to(x1.device)
+        upper_triangular_mask = upper_triangular_mask.unsqueeze(0) * mask
+        _, edge_attr_t, upper_probs = self.interpolate_nopyg(upper_triangular_mask, x1, time)  #! step through nhere
+        # Create a mask for the upper triangular part (including the diagonal)
+        upper_triangular_indices = torch.triu_indices(N, N, offset=0)
+
+        # Mirror the upper triangle to the lower triangle
+        # Using the upper triangular indices to fill the lower triangle
+        edge_attr_t[:, upper_triangular_indices[1], upper_triangular_indices[0]] = edge_attr_t[
+            :, upper_triangular_indices[0], upper_triangular_indices[1]
+        ]
+
+        # edge_index_global_perturbed, edge_attr_global_perturbed = self.clean_edges(x1_index, edge_attr_t)
+        return (
+            x1,
+            edge_attr_t.long(),
+            _,
+        )  #! h ok but edges seem to shift to not ints for one hot operation could be due to the mask
+
     def interpolate_edges(self, batch, x1, x1_index, time):
         """
         Interpolate using discrete interpolation method.
@@ -875,6 +999,37 @@ class DiscreteDiffusionInterpolant(Interpolant):
 
         return x_next
 
+    def step_nopyg(self, mask, xt, x_hat, time, x0=None, dt=None):
+        """
+        Perform a euler step in the discrete interpolant method.
+        xt is the discrete variable at time t (or one hot)
+        x_hat is the softmax of the logits
+        """
+        if self.solver_type == "sde" and self.diffusion_type == "d3pm":
+            assert self.discrete_time_only
+            # if len(x_hat.shape) <= 1:
+            #     x_hat = F.one_hot(x_hat, num_classes=self.num_classes).float()
+            if len(xt.shape) <= 2:
+                xt = F.one_hot(xt, num_classes=self.num_classes).float()
+            t_idx = self.timesteps - 1 - time
+
+            # ! The above is the exact same but uses one more einsum so probably slower
+            A = torch.einsum("bnj, nji -> bni", [xt, self.Qt[t_idx].permute(0, 2, 1)]).unsqueeze(1)  # [A, 1, 16]
+            B = self.Qt_prev_bar[t_idx]  # [A, 16, 16]
+            p0 = A * B
+            p1 = torch.einsum("nij, bnj -> bni", [self.Qt_bar[t_idx], xt]).unsqueeze(-1)
+            probs = p0 / (p1.clamp(min=1e-5))
+            unweighted_probs = (probs * x_hat.unsqueeze(-1)).sum(1)
+            unweighted_probs[unweighted_probs.sum(dim=-1) == 0] = 1e-5
+            # (N, a_t-1)
+            probs = unweighted_probs / (unweighted_probs.sum(-1, keepdims=True) + 1.0e-5)
+            x_next = torch.distributions.Categorical(probs).sample()
+            x_next = x_next * mask
+        else:
+            raise ValueError("Only SDE Implemented for D3PM")
+
+        return x_next
+
     def step_edges(
         self, batch, edge_index, edge_attr_t, edge_attr_hat, time, mask=None, mask_i=None, return_masks=False
     ):
@@ -886,6 +1041,29 @@ class DiscreteDiffusionInterpolant(Interpolant):
         edge_attr_hat = edge_attr_hat[mask]
         edge_attr_next = self.step(batch[mask_i], edge_attr_t, edge_attr_hat, time)
         return self.clean_edges(edge_index, edge_attr_next, return_masks=return_masks)
+
+    def step_edges_nopyg(self, mask, xt, x_hat, time, x0=None, dt=None):
+        """
+        Interpolate using discrete interpolation method.
+        Similar to sample_edges_categorical https://github.com/tuanle618/eqgat-diff/blob/68aea80691a8ba82e00816c82875347cbda2c2e5/eqgat_diff/experiments/diffusion/categorical.py#L242
+        """
+        # import ipdb; ipdb.set_trace()
+        N = mask.size(-1)
+        upper_triangular_mask = torch.triu(torch.ones(N, N), diagonal=1).long().to(x_hat.device)
+        upper_triangular_mask = upper_triangular_mask.unsqueeze(0) * mask
+        edge_attr_next = self.step_nopyg(upper_triangular_mask, xt, x_hat, time, x0, dt)
+        # Create a mask for the upper triangular part (including the diagonal)
+        upper_triangular_indices = torch.triu_indices(N, N, offset=0)
+
+        # Mirror the upper triangle to the lower triangle
+        # Using the upper triangular indices to fill the lower triangle
+        edge_attr_next[:, upper_triangular_indices[1], upper_triangular_indices[0]] = edge_attr_next[
+            :, upper_triangular_indices[0], upper_triangular_indices[1]
+        ]
+
+        return (
+            edge_attr_next  #! h ok but edges seem to shift to not ints for one hot operation could be due to the mask
+        )
 
     def clean_edges(self, edge_index, edge_attr_next, one_hot=False, return_masks=False):
         j, i = edge_index
