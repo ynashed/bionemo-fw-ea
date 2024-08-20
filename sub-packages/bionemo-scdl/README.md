@@ -119,7 +119,7 @@ The examples directory contains various examples for utilizing SCDL.
 To convert existing AnnData files from CellxGene, you can either write your own
 script using the SCDL API or utilize the convenience script in `scripts/convert_h5ad_to_scdl.py`.
 
-This script crawls the filesystem to recursively find AnnData files (with the h5ad extension) and converts them to a single SCMMAP. Here's an example:
+This script crawls the filesystem to recursively find AnnData files (with the h5ad extension) and converts them to a single SingleCellMemMapDataset. Here's an example:
 
 ```bash
 python scripts/convert_h5ad_to_scdl.py --data-path hdf5s --save-path example_dataset
