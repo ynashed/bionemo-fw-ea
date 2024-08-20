@@ -2,8 +2,7 @@
 
 ## Package Overview
 
-SCDL provides an independent pytorch-compatible dataset class for single cell data with a consistent API.
-It improves upon simple AnnData-based dataset classes in the following ways:
+SCDL provides an independent pytorch-compatible dataset class for single cell data with a consistent API. This can be run independently from bionemo. It improves upon simple AnnData-based dataset classes in the following ways:
 
 - A consistent API across input formats that is promised to be consistent across package versions.
 - Improved performance when loading large datasets.
@@ -24,7 +23,7 @@ pip install -e .
 
 Alternatively, it can be installed with
 ```bash
-pip install bionemo[scdl]
+pip install bionemo-scdl
 ```
 ## Usage
 
@@ -43,6 +42,8 @@ from bionemo.scdl.io.single_cell_memmap_dataset import SingleCellMemMapDataset
 data = SingleCellMemMapDataset("97e_scmm", "hdf5s/97e96fb1-8caf-4f08-9174-27308eabd4ea.h5ad")
 
 ```
+This creates a SingleCellMemMapDataset that is stored at 97e_scmm in large, memory-mapped arrays
+that enables fast access of datasets larger than the available amount of RAM on a system.
 
 ### Interrogating single cell datasets and exploring the API
 
@@ -52,7 +53,7 @@ data.number_of_rows()
 ## 25382
 
 data.number_of_variables()
-## 34455
+## [34455]
 
 data.number_of_values()
 ## 874536810
@@ -60,24 +61,6 @@ data.number_of_values()
 data.number_nonzero_values()
 ## 26947275
 
-```
-
-### Using SCDL datasets in model training
-
-SCDL implements the required functions of the PyTorch Dataset abstract class.
-You can use PyTorch-compatible DataLoaders to load batches of data from a SCDL class.
-
-```python
-from torch.utils.data import DataLoader
-
-## Mock model: you can remove this and pass the batch to your own model in actual code.
-model = lambda x : x
-
-dataloader = DataLoader(data, batch_size=8, shuffle=True)
-n_epochs = 2
-for e in range(n_epochs):
-    for batch in dataloader:
-        model(batch)
 ```
 
 ### Saving SCDL datasets to disk
@@ -105,6 +88,24 @@ data:
 reloaded_data = SingleCellMemMapDataset("97e_scmm")
 ```
 
+### Using SCDL datasets in model training
+
+SCDL implements the required functions of the PyTorch Dataset abstract class.
+You can use PyTorch-compatible DataLoaders to load batches of data from a SCDL class.
+
+```python
+from torch.utils.data import DataLoader
+
+## Mock model: you can remove this and pass the batch to your own model in actual code.
+model = lambda x : x
+
+dataloader = DataLoader(data, batch_size=8, shuffle=True)
+n_epochs = 2
+for e in range(n_epochs):
+    for batch in dataloader:
+        model(batch)
+```
+
 ## Examples
 
 The examples directory contains various examples for utilizing SCDL.
@@ -119,6 +120,7 @@ This script crawls the filesystem to recursively find AnnData files (with the h5
 ```bash
 python scripts/convert_h5ad_to_scdl.py --data-path hdf5s --save-path example_dataset
 ```
+
 
 ## Future Work and Roadmap
 

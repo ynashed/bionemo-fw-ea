@@ -27,6 +27,7 @@ import anndata as ad
 import numpy as np
 import pandas as pd
 import scipy
+import torch
 
 from bionemo.scdl.api.single_cell_row_dataset import SingleCellRowDataset
 from bionemo.scdl.index.row_feature_index import RowFeatureIndex
@@ -169,7 +170,7 @@ def _create_compressed_sparse_row_memmaps(
 class SingleCellMemMapDataset(SingleCellRowDataset):
     """Represents one or more AnnData matrices.
 
-    Data is stored in a large, memory-mapped array that enables fast access of
+    Data is stored in large, memory-mapped arrays that enables fast access of
     datasets larger than the available amount of RAM on a system. SCMMAP
     implements a consistent API defined in SingleCellRowDataset.
 
@@ -555,9 +556,9 @@ class SingleCellMemMapDataset(SingleCellRowDataset):
         """Return the number of rows."""
         return self.number_of_rows()
 
-    def __getitem__(self, idx: int) -> Tuple[np.ndarray, np.ndarray]:
+    def __getitem__(self, idx: int) -> torch.Tensor:
         """Get the row values located and index idx."""
-        return self.get_row(idx)[0]
+        return torch.from_numpy(np.stack(self.get_row(idx)[0]))
 
     def number_of_variables(self) -> List[int]:
         """Get the number of features in every entry in the dataset.
