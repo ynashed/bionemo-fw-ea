@@ -309,7 +309,7 @@ if __name__ == "__main__":
         type=str,
         required=False,
         default=None,
-        help="Wandb project name. Wandb will only happen if this is set..",
+        help="Wandb project name. Wandb will only happen if this is set.",
     )
     parser.add_argument(
         "--num-gpus",
@@ -330,7 +330,7 @@ if __name__ == "__main__":
         type=int,
         required=False,
         default=500000,
-        help="Number of steps to use for training. Default is 10000.",
+        help="Number of steps to use for training. Default is 500000.",
     )
     parser.add_argument(
         "--warmup-steps",
@@ -344,21 +344,21 @@ if __name__ == "__main__":
         type=int,
         required=False,
         default=1,
-        help="Number of steps to use for training. Default is 1.",
+        help="Number of workers to use for training. Default is 1.",
     )
     parser.add_argument(
         "--val-check-interval",
         type=int,
         required=False,
         default=10000,
-        help="Number of steps to use for training. Default is 10000.",
+        help="Number of steps between validation. Default is 10000.",
     )
     parser.add_argument(
         "--seq-length",
         type=int,
         required=False,
         default=1024,
-        help="Sequence length of cell. Default is 2048.",
+        help="Sequence length of cell. Default is 1024.",
     )
     parser.add_argument(
         "--limit-val-batches",
