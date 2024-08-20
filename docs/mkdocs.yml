@@ -11,6 +11,9 @@ theme:
     - navigation.sections
     - navigation.instant
     - navigation.instant.prefetch
+    - search.suggest
+    - search.highlight
+    - content.code.copy
   font:
     text: NVIDIA Sans
     code: Roboto Mono
