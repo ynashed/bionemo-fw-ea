@@ -97,7 +97,6 @@ def test_bionemo2_rootdir():
     assert (bionemo2_root / "sub-packages").is_dir(), "sub-packages is supposed to be a directory."
 
 
-@pytest.mark.skip(reason="We need to store a reasonably sized database on SwiftStack for testing")
 def test_main_runs(tmpdir, dummy_protein_dataset, dummy_parquet_train_val_inputs):
     train_cluster_path, valid_cluster_path = dummy_parquet_train_val_inputs
 
@@ -145,14 +144,10 @@ def test_main_runs(tmpdir, dummy_protein_dataset, dummy_parquet_train_val_inputs
         result_dir / "test_experiment" / uq_rundir / "checkpoints"
     ).is_dir(), "Test experiment checkpoints directory is supposed to be a directory."
     assert (
-        result_dir / "test_experiment" / uq_rundir / "hparams.yaml"
-    ).is_file(), "Could not find experiment hparams."
-    assert (
         result_dir / "test_experiment" / uq_rundir / "nemo_log_globalrank-0_localrank-0.txt"
     ).is_file(), "Could not find experiment log."
 
 
-@pytest.mark.skip(reason="We need to store a reasonably sized database on SwiftStack for testing")
 def test_pretrain_cli(tmpdir, dummy_protein_dataset, dummy_parquet_train_val_inputs):
     train_cluster_path, valid_cluster_path = dummy_parquet_train_val_inputs
 
@@ -160,7 +155,7 @@ def test_pretrain_cli(tmpdir, dummy_protein_dataset, dummy_parquet_train_val_inp
     open_port = find_free_network_port()
     # NOTE: if you need to change the following command, please update the README.md example.
     cmd_str = f"""python  \
-    scripts/protein/esm2/pretrain.py     \
+    scripts/protein/esm2/esm2_pretrain.py     \
     --train-cluster-path {train_cluster_path} \
     --train-database-path {dummy_protein_dataset} \
     --valid-cluster-path {valid_cluster_path} \

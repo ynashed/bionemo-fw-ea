@@ -358,12 +358,12 @@ if __name__ == "__main__":
         default=1024,
         help="Sequence length of cell. Default is 1024.",
     )
-    parser.add_argument(
+    parser.add_argument(  # TODO(@sichu) NeMo will silently skip validation if smaller than one
         "--limit-val-batches",
         type=int,
         required=False,
         default=2,
-        help="Number of global batches used for validation if int, otherwise the portion of validation data used. Default is 2.",
+        help="Number of global batches used for validation. Default is 2.",
     )
     parser.add_argument(
         "--micro-batch-size",
