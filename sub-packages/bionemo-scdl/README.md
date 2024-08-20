@@ -92,14 +92,18 @@ reloaded_data = SingleCellMemMapDataset("97e_scmm")
 
 SCDL implements the required functions of the PyTorch Dataset abstract class.
 You can use PyTorch-compatible DataLoaders to load batches of data from a SCDL class.
+With a batch size greater than 1, there is a collation function (collate_sparse_matrix_batch),
+that will collate several sparse arrays into the CSR (Compressed Sparse Row) torch tensor
+format.
 
 ```python
 from torch.utils.data import DataLoader
+from bionemo.scdl.util.torch_dataloader_utils import collate_sparse_matrix_batch
 
 ## Mock model: you can remove this and pass the batch to your own model in actual code.
 model = lambda x : x
 
-dataloader = DataLoader(data, batch_size=8, shuffle=True)
+dataloader = DataLoader(data, batch_size=8, shuffle=True, collate_fn=collate_sparse_matrix_batch)
 n_epochs = 2
 for e in range(n_epochs):
     for batch in dataloader:
