@@ -176,8 +176,8 @@ def main(
     data = ESMDataModule(
         train_cluster_path=train_cluster_path,
         train_database_path=train_database_path,
-        valid_cluster_path=val_cluster_path,
-        valid_database_path=val_database_path,
+        valid_cluster_path=valid_cluster_path,
+        valid_database_path=valid_database_path,
         global_batch_size=global_batch_size,
         micro_batch_size=micro_batch_size,
         min_seq_length=None,
