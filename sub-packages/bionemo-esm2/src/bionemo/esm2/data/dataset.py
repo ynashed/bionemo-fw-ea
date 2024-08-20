@@ -315,7 +315,7 @@ _T = TypeVar("_T", str, torch.Tensor)
 
 def _random_crop(s: _T, crop_length: int, rng: np.random.Generator) -> _T:
     """Randomly crops a input to a maximum length."""
-    if crop_length > len(s):
+    if crop_length >= len(s):
         return s
 
     start_index = rng.integers(0, len(s) - crop_length)
