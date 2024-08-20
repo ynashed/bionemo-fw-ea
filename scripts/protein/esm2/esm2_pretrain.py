@@ -301,7 +301,7 @@ if __name__ == "__main__":
         "--result-dir", type=Path, required=False, default=Path("./results"), help="Path to the result directory."
     )
     parser.add_argument(
-        "--experiment-name", type=str, required=False, default="geneformer", help="Name of the experiment."
+        "--experiment-name", type=str, required=False, default="esm2", help="Name of the experiment."
     )
     parser.add_argument("--wandb-offline", action="store_true", default=False, help="Use wandb in offline mode.")
     parser.add_argument(
