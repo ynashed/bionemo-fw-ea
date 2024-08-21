@@ -50,6 +50,7 @@ jobs:
           github.actor == 'broland-hat' ||
           github.actor == 'polinabinder1' ||
           github.actor == 'camirr-nv' ||
+          github.actor == 'sichu2023' ||
           github.actor == 'jwilber')
     steps:
       - name: Check if comment is issued by authorized person
