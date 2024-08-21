@@ -128,15 +128,13 @@ class E3Norm(nn.Module):
 
     # [b, a, 3]  # [b, a]
     def forward(self, pos: torch.Tensor, mask: torch.Tensor = None):
-        import ipdb
+        # import ipdb; ipdb.set_trace()
+        mask = mask.unsqueeze(-1).unsqueeze(-1)  # [B, N, 1, 1]
 
-        ipdb.set_trace()
-        mask = mask.unsqueeze(-1)
+        norm = torch.norm(pos * mask, dim=2, keepdim=False)  # [B N K]
+        mean_norm = torch.sum(norm, dim=1, keepdim=True) / torch.sum(mask, dim=1, keepdim=False)
 
-        norm = torch.norm(pos * mask, dim=-1, keepdim=True)
-        mean_norm = torch.sum(norm, dim=-2, keepdim=True) / torch.sum(mask, dim=-2, keepdim=True)
-
-        new_pos = self.weight * pos / (mean_norm + self.eps)
+        new_pos = self.weight * pos / (mean_norm.unsqueeze(1) + self.eps)
 
         return new_pos * mask
 
@@ -182,8 +180,11 @@ class TimestepEmbedder(nn.Module):
         return t_emb
 
 
-def modulate(x, shift, scale):
-    return x * (1 + scale) + shift
+def modulate(x, shift, scale, unsqueeze=True):
+    if unsqueeze:
+        return x * (1 + scale.unsqueeze(1)) + shift.unsqueeze(1)
+    else:
+        return x * (1 + scale) + shift
 
 
 #! Below are taken from ESM3 for now
@@ -232,18 +233,17 @@ class BondRefine(nn.Module):  #! can make this nn.Module to ensure no weird prop
             Linear(invariant_edge_feat_dim, invariant_edge_feat_dim),
         )
 
-    def forward(self, mask, X, H, edge_attr):
-        X = zero_com(X, mask)
+    def forward(self, mask, X, H, edge_attr, edge_mask):
+        # import ipdb; ipdb.set_trace()
         n_atoms = X.size(1)
-        # X = self.x_norm(X, batch)
         H = self.h_norm(H * mask.unsqueeze(-1))
         rel_vec = X.unsqueeze(-2) - X.unsqueeze(-3)  # [b, a, a, 3]
         rel_dist = (rel_vec**2).sum(dim=-1, keepdim=True)  # [b, a, a, 1]
-        edge_attr = self.edge_norm(edge_attr * mask.unsqueeze(-1))
+        edge_attr = self.edge_norm(edge_attr * edge_mask.unsqueeze(-1))
         h1 = H[:, :, None, :].repeat(1, 1, n_atoms, 1)
         h2 = H[:, None, :, :].repeat(1, n_atoms, 1, 1)
         h_message = torch.cat([h1, h2, edge_attr, rel_dist], dim=-1)
-        return self.bond_norm(self.refine_layer(h_message) * mask.unsqueeze(-1))
+        return self.bond_norm(self.refine_layer(h_message) * edge_mask.unsqueeze(-1))
 
 
 class EGNNBlock(nn.Module):
@@ -265,6 +265,7 @@ class EGNNBlock(nn.Module):
         use_cross_product: bool = False,
         attenion_type: Literal["None", "Simple"] = "None",
         update_nodes: bool = False,
+        input_edges: bool = False,
     ):
         super(EGNNBlock, self).__init__()
 
@@ -273,13 +274,14 @@ class EGNNBlock(nn.Module):
 
         self.invariant_node_feat_dim = invariant_node_feat_dim
 
-        self.message_in_dim = (
-            2 * invariant_node_feat_dim + n_vector_features + invariant_edge_feat_dim + time_embedding_dim
-        )
+        self.message_in_dim = 2 * invariant_node_feat_dim + n_vector_features + time_embedding_dim
+
+        if input_edges:
+            self.message_in_dim += invariant_edge_feat_dim
 
         self.h_norm = LayerNormNoBias(normalized_shape=(invariant_node_feat_dim), elementwise_affine=True)
 
-        self.x_norm = E3Norm()
+        self.x_norm = E3Norm(n_vector_features=n_vector_features)
 
         self.phi_x = nn.Sequential(
             *[
@@ -347,7 +349,9 @@ class EGNNBlock(nn.Module):
     def _clamp(self, x):
         return torch.clamp(x, min=-self.coors_range, max=self.coors_range)
 
-    def forward(self, x: Tensor, h: Tensor, mask: Tensor, t: Tensor, edge_attr: Tensor = None):
+    def forward(
+        self, mask: Tensor, x: Tensor, h: Tensor, edge_mask: Tensor, edge_attr: Tensor = None, t: Tensor = None
+    ):
         """_summary_
 
         Args:
@@ -360,58 +364,57 @@ class EGNNBlock(nn.Module):
         Returns:
             Updated x position
         """
-        bs, n_atoms, hdim = h.shape
-
+        bs, n_atoms, _ = h.shape
         x = self.x_norm(x, mask)
-        h = self.h_norm(h * mask.unsqueeze(-1))
+        h_norm = self.h_norm(h * mask.unsqueeze(-1))
 
         rel_vec = x.unsqueeze(-4) - x.unsqueeze(-3)  # [b, a, a, 3, K]
         rel_dist = (rel_vec**2).sum(dim=3, keepdim=False)  # [b, a, a, K]
 
-        if edge_attr:
+        if edge_attr is not None:
             edge_attr_feat = torch.cat([edge_attr, rel_dist], dim=-1)  # [b, a, a, K + d_e]
         else:
             edge_attr_feat = rel_dist
 
-        h1 = h[:, :, None, :].repeat(1, 1, n_atoms, 1)
-        h2 = h[:, None, :, :].repeat(1, n_atoms, 1, 1)
+        h1 = h_norm[:, :, None, :].repeat(1, 1, n_atoms, 1)
+        h2 = h_norm[:, None, :, :].repeat(1, n_atoms, 1, 1)
 
         h_message = torch.cat([h1, h2, edge_attr_feat], dim=-1)  # b, a, a,  d_m
         if t is not None:
             h_message = torch.cat([h_message, t.view(bs, 1, 1, -1).repeat(1, n_atoms, n_atoms, 1)], dim=-1)
 
-        mask = mask.int()
-        mask = (mask[:, :, None] + mask[:, None, :] > 1).float()
+        # mask = mask.int()
+        # mask = (mask[:, :, None] + mask[:, None, :] > 1).float()
 
-        mask = mask.unsqueeze(-1)
+        # mask = mask.unsqueeze(-1)
 
-        m_ij = self.phi_e(h_message * mask)  # b, a, a,  d_m
+        m_ij = self.phi_e(h_message * edge_mask.unsqueeze(-1))  # b, a, a,  d_m
 
-        if self.attenion_type == "Simple":
-            att_val = self.phi_att(m_ij)  # b, a, a,  1
-            m_ij = m_ij * att_val * mask  # b, a, a,  d_m
+        # if self.attenion_type == "Simple":
+        #     att_val = self.phi_att(m_ij)  # b, a, a,  1
+        #     m_ij = m_ij * att_val * mask  # b, a, a,  d_m
         # m_ij = torch.sum(m_ij * mask, dim=-2)  # b, a, d_h
 
         if self.update_nodes:
-            h_out = h + self.phi_h(torch.cat([h, m_ij], dim=-1))
+            h_out = (h_norm + self.phi_h(torch.cat([h, m_ij], dim=-1))) * mask.unsqueeze(-1)
         else:
             h_out = h
 
-        x_updates_vals = self.clamp(self.phi_x(m_ij) * mask)  # b, a, a, K
-        x_updates_vals = torch.sum(x_updates_vals * mask, dim=-2)  # b, a, k
+        x_updates_vals = self.clamp(self.phi_x(m_ij) * edge_mask.unsqueeze(-1)).unsqueeze(-2)  # b, a, a, K
+        # x_updates_vals = torch.sum(x_updates_vals, dim=-2)  # b, a, k
 
         if self.use_cross_product:
-            x_updates_cross = self.clamp(self.phi_x_cross(m_ij) * mask)
+            x_updates_cross = self.clamp(self.phi_x_cross(m_ij) * edge_mask.unsqueeze(-1)).unsqueeze(-2)
 
         if self.aggregation_method == 'sum':
             x_update = torch.sum(
-                x_updates_vals * rel_vec / (self.norm_constant + torch.sqrt(rel_dist + 1e-8)), dim=-2
+                x_updates_vals * rel_vec / (self.norm_constant + torch.sqrt(rel_dist.unsqueeze(-2) + 1e-8)), dim=2
             )  # b, a, 3
             if self.use_cross_product:
-                rel_cross = torch.linalg.cross(x.unsqueeze(-3), x.unsqueeze(-4))
+                rel_cross = torch.linalg.cross(x.unsqueeze(-3), x.unsqueeze(-4), dim=-2)
                 x_update = x_update + (
-                    (rel_cross) / (self.norm_constant + rel_cross.norm(dim=-1, keepdim=True)) * x_updates_cross
-                ).sum(dim=-2)
+                    (rel_cross) / (self.norm_constant + rel_cross.norm(dim=-2, keepdim=True)) * x_updates_cross
+                ).sum(dim=2)
 
         x = x + x_update
 
@@ -447,21 +450,22 @@ class DiTeBlock(nn.Module):
         else:
             dist_size = n_vector_features
         # self.feature_embedder = MLP(hidden_size + hidden_size + hidden_size + dist_size, hidden_size, hidden_size)
-        self.message_in_dim = 2 * hidden_size + edge_feature_size + dist_size
+        # import ipdb; ipdb.set_trace()
+        self.message_in_dim = 2 * hidden_size + dist_size
         self.input_edges = input_edges
 
         if self.input_edges:
             self.message_in_dim += edge_feature_size
-            self.input_adaln_norm_edge = LayerNorm(hidden_size, elementwise_affine=False, eps=1e-6)
             self.adaLN_edge_modulation = nn.Sequential(
-                nn.SiLU(), nn.Linear(edge_feature_size, 6 * edge_feature_size, bias=True)
+                nn.SiLU(), nn.Linear(hidden_size, 6 * edge_feature_size, bias=True)
             )
+            self.input_adaln_norm_edge = LayerNorm(edge_feature_size, elementwise_affine=False, eps=1e-6)
 
         self.feature_embedder = nn.Sequential(
             *[
-                Linear(self.message_in_dim, self.message_in_dim),
-                nn.SiLU(),
                 Linear(self.message_in_dim, hidden_size),
+                nn.SiLU(),
+                Linear(hidden_size, hidden_size),
             ]
         )
         # Single linear layer for QKV projection
@@ -475,6 +479,9 @@ class DiTeBlock(nn.Module):
         self.ff_norm_inner = LayerNorm(hidden_size, elementwise_affine=False, eps=1e-6)
         self.output_edges = output_edges
         if self.output_edges:
+            self.adaLN_edge_modulation = nn.Sequential(
+                nn.SiLU(), nn.Linear(hidden_size, 6 * edge_feature_size, bias=True)
+            )
             self.lin_edge0 = nn.Linear(hidden_size, edge_feature_size, bias=False)
             self.lin_edge1 = nn.Linear(
                 edge_feature_size + n_vector_features * scale_dist_features, edge_feature_size, bias=False
@@ -503,6 +510,7 @@ class DiTeBlock(nn.Module):
         """
         n_atoms = x.size(1)
         shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = self.adaLN_modulation(t_emb).chunk(6, dim=1)
+        # import ipdb; ipdb.set_trace()
         x_norm = modulate(self.input_adaln_norm(x * mask.unsqueeze(-1)), shift_msa, scale_msa)
         h1 = x_norm[:, :, None, :].repeat(1, 1, n_atoms, 1)
         h2 = x_norm[:, None, :, :].repeat(1, n_atoms, 1, 1)
@@ -516,47 +524,71 @@ class DiTeBlock(nn.Module):
                 edge_gate_mlp,
             ) = self.adaLN_edge_modulation(t_emb).chunk(6, dim=1)
             edge_attr_norm = modulate(
-                self.input_adaln_norm_edge(edge_attr * mask.unsqueeze(-1).unsqueeze(-1)),
-                edge_shift_msa,
-                edge_scale_msa,
+                self.input_adaln_norm_edge(edge_attr * edge_mask.unsqueeze(-1)),
+                edge_shift_msa.unsqueeze(1),
+                edge_scale_msa.unsqueeze(1),
             )
             input_features = torch.cat([h1, h2, edge_attr_norm, dist], dim=-1)
         else:
             input_features = torch.cat([h1, h2, dist], dim=-1)
-        messages = self.feature_embedder(input_features * mask)
-        x_norm = torch.sum(messages * mask, dim=-2)
 
+        messages = self.feature_embedder(input_features * edge_mask.unsqueeze(-1))
+        x_norm = torch.sum(messages, dim=-2)  # * mask.unsqueeze(-1)
+        # import ipdb; ipdb.set_trace()
         # QKV projection
         qkv = self.qkv_proj(x_norm)
         Q, K, V = qkv.chunk(3, dim=-1)
         Q, K = self.norm_q(Q * mask.unsqueeze(-1)), self.norm_k(K * mask.unsqueeze(-1))
+        # Q, K = self.norm_q(Q), self.norm_k(K)
 
         reshaper = functools.partial(einops.rearrange, pattern="b s (h d) -> b h s d", h=self.num_heads)
         Q, K, V = map(reshaper, (Q, K, V))
 
         # Assume n_atoms is the sequence length
         # Create a causal mask (upper triangular matrix with -inf above the diagonal)
-        causal_mask = torch.triu(torch.ones(n_atoms, n_atoms, dtype=torch.bool), diagonal=1)
-        causal_mask = causal_mask.unsqueeze(0).unsqueeze(1)  # Shape: 1 x 1 x n_atoms x n_atoms
-        attn_mask = mask.unsqueeze(1).unsqueeze(2) & causal_mask
-        attn_output = F.scaled_dot_product_attention(Q, K, V, attn_mask=attn_mask.to(mask.device))
+        # import ipdb; ipdb.set_trace()
+        # attn_mask = edge_mask.bool().unsqueeze(1) #! having rows as all false causes issues for now will be upated in pytroch 2.5? https://github.com/pytorch/pytorch/pull/133882
+        attn_mask = mask.unsqueeze(1).expand(-1, mask.size(1), -1).bool().unsqueeze(1)
+        # float_attn_mask = torch.zeros_like(attn_mask, dtype=torch.float32).to(attn_mask.device)
+        # float_attn_mask.masked_fill_(~attn_mask, torch.finfo(torch.float32).min)
+        attn_output = F.scaled_dot_product_attention(Q, K, V, attn_mask=attn_mask)
         attn_output = einops.rearrange(attn_output, "b h s d -> b s (h d)")
         y = self.out_projection(attn_output)
+        # import ipdb; ipdb.set_trace()
         # Gated Residual
-        x = x + gate_msa * y
+        x = x + gate_msa.unsqueeze(1) * y
         # Feed Forward
-        x = x + gate_mlp * self.ffn(
-            modulate(self.ff_norm_inner(x * mask.unsquueze(-1)), shift_mlp, scale_mlp) * mask.unsqueeze(-1)
-        )
+        x = (
+            x
+            + gate_mlp.unsqueeze(1)
+            * self.ffn(modulate(self.ff_norm_inner(x * mask.unsqueeze(-1)), shift_mlp, scale_mlp))
+        ) * mask.unsqueeze(-1)
         if self.output_edges:
+            (
+                edge_shift_msa,
+                edge_scale_msa,
+                edge_gate_msa,
+                edge_shift_mlp,
+                edge_scale_mlp,
+                edge_gate_mlp,
+            ) = self.adaLN_edge_modulation(t_emb).chunk(6, dim=1)
             y1 = y[:, :, None, :].repeat(1, 1, n_atoms, 1)
             y2 = y[:, None, :, :].repeat(1, n_atoms, 1, 1)
             edge_input = y1 + y2
-            edge = edge_attr + edge_gate_msa * self.lin_edge0(edge_input)
+            # edge = edge_attr + edge_gate_msa.unsqueeze(1).unsqueeze(2) * self.lin_edge0(edge_input) #! edge_attr is None here
+            edge = edge_gate_msa.unsqueeze(1).unsqueeze(2) * self.lin_edge0(edge_input)
             e_in = self.lin_edge1(torch.cat([edge, dist], dim=-1))
-            edge_attr = edge + edge_gate_mlp * self.ffn_edge(
-                modulate(self.ff_norm_inner_edge(e_in * edge_mask.unsqueeze(-1)), edge_shift_mlp, edge_scale_mlp)
-            )
+            edge_attr = (
+                edge
+                + edge_gate_mlp.unsqueeze(1).unsqueeze(2)
+                * self.ffn_edge(
+                    modulate(
+                        self.ff_norm_inner_edge(e_in * edge_mask.unsqueeze(-1)),
+                        edge_shift_mlp.unsqueeze(1),
+                        edge_scale_mlp.unsqueeze(1),
+                    )
+                )
+            ) * edge_mask.unsqueeze(-1)
             return x, edge_attr
         else:
             return x, None
@@ -636,42 +668,44 @@ class MDNoPyg(nn.Module):
                     scale_dist_features=self.scale_dist_features,
                 )
             )
-            self.egnn_layers.append(EGNNBlock(invariant_node_feat_dim))
+            self.egnn_layers.append(
+                EGNNBlock(
+                    invariant_node_feat_dim=invariant_node_feat_dim,
+                    invariant_edge_feat_dim=invariant_edge_feat_dim,
+                    n_vector_features=n_vector_features,
+                    time_embedding_dim=invariant_node_feat_dim,
+                    use_cross_product=True,
+                    input_edges=i == num_layers - 1,
+                )
+            )
 
         self.node_blocks = nn.ModuleList(
             [Linear(invariant_node_feat_dim, invariant_node_feat_dim) for i in range(num_layers)]
         )
-        self.edge_blocks = nn.ModuleList(
-            [Linear(invariant_edge_feat_dim, invariant_edge_feat_dim) for i in range(num_layers)]
-        )
+        # self.edge_blocks = nn.ModuleList(
+        #     [Linear(invariant_edge_feat_dim, invariant_edge_feat_dim) for i in range(num_layers)]
+        # )
 
     def forward(self, mask, edge_mask, X, H, E, t):
         pos = self.coord_emb(X.unsqueeze(-1))  # N x 3 x K
-
         H = self.atom_embedder(H)
-        E = self.edge_embedder(E)  # should be + n_vector_features not + 1
+        E = self.edge_embedder(E)
         te = self.time_embedding(t)
-        import ipdb
-
-        ipdb.set_trace()
         edge_attr = E
         atom_hids = H
-        edge_hids = edge_attr
+        # edge_hids = edge_attr
         for layer_index in range(len(self.dit_layers)):
+            # import ipdb; ipdb.set_trace()
             distances = coord2distfn(pos, self.scale_dist_features, mask)  # E x K
             H, edge_attr = self.dit_layers[layer_index](mask, H, te, edge_attr, edge_mask, distances)
-            pos = self.egnn_layers[layer_index](mask, pos, H, edge_mask, edge_attr, te)  #! TODO at time here
+            pos, _ = self.egnn_layers[layer_index](mask, pos, H, edge_mask, edge_attr, te)  #! TODO at time here
             atom_hids = atom_hids + self.node_blocks[layer_index](H)
-            edge_hids = edge_hids + self.edge_blocks[layer_index](edge_attr)
+            # edge_hids = edge_hids + self.edge_blocks[layer_index](edge_attr)
 
-        X = self.coord_pred(pos).squeeze(-1)
-        x = zero_com(X, mask)
-        # import ipdb; ipdb.set_trace() #! if instability persists is the refine block the problem likely no as it massive help to valid??
-        # H = self.h_feat_refine(batch, atom_hids, te_h)
-        # edge_attr = self.edge_feat_refine(edge_batch, edge_attr, te_e) #! cannot do attn with edges due to memory
+        X = self.coord_pred(pos).squeeze(-1) * mask.unsqueeze(-1)
+        x = zero_com(X, mask) * mask.unsqueeze(-1)
         H = atom_hids
-        edge_attr = self.bond_refine(mask, x, H, edge_hids)
-
+        edge_attr = self.bond_refine(mask, x, H, edge_attr, edge_mask)
         h_logits, _ = self.atom_type_head(mask, H)
         e_logits, _ = self.edge_type_head.predict_edges(edge_mask, edge_attr)
         out = {

@@ -370,6 +370,9 @@ class NoPygGraph3DInterpolantModel(pl.LightningModule):
         return loss
 
     def calculate_loss(self, batch, out, time, stage="train"):
+        import ipdb
+
+        ipdb.set_trace()
         batch_geo = batch.batch
         batch_size = int(batch.batch.max()) + 1
         ws_t = self.interpolants[self.global_variable].snr_loss_weight(time)

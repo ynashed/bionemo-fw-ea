@@ -165,9 +165,6 @@ class MDNoPygWrapper(MDNoPyg):
         timesteps = timesteps if timesteps is not None else self.timesteps
         if self.time_type == "discrete" and timesteps is not None:
             time = (timesteps - time.float()) / timesteps
-        import ipdb
-
-        ipdb.set_trace()
         out = super().forward(
             mask=batch["node_mask"],
             edge_mask=batch["edge_mask"],
