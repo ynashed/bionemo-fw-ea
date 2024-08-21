@@ -1,12 +1,18 @@
 [project]
-name = "bionemo-example-model"
-version = "0.1.0"
-description = "Add your description here"
-authors = [
-    { name = "Malcolm Greaves", email = "mgreaves@nvidia.com" }
-]
-dependencies = []
+name = "bionemo-example_model"
+version = "2.0.0"
+license.file = "LICENSE"
 readme = "README.md"
+description = "BioNeMo example_model: Example model for documentation and tutorials. Do Not Distriburte on PyPI !!"
+authors = [
+    { name = "John St. John", email = "jstjohn@nvidia.com" },
+    { name = "Jonathan Mitchell", email = "jomitchell@nvidia.com" },
+]
+dependencies = [
+    # internal
+    "bionemo-llm",
+    # external
+]
 requires-python = ">= 3.10"
 
 [build-system]
