@@ -32,6 +32,8 @@ from typing import Any, List
 
 from nemo.utils import logging
 from pytorch_lightning import Callback, LightningModule, Trainer
+from torch.nn import functional as F
+from torch.utils.data import DataLoader
 
 
 def get_global_step(trainer: Trainer, pl_module: LightningModule) -> int:
@@ -42,9 +44,42 @@ def get_learning_rate(trainer: Trainer, pl_module: LightningModule) -> float:
     return trainer.optimizers[0].param_groups[0]["lr"]
 
 
+def get_val_loss(trainer: Trainer, pl_module: LightningModule, on_save: bool = False) -> float:
+    # This works sometimes, like on_train_start. Does not work on_validation_end
+    if on_save:
+        # NOTE (@skothenhill) Not available in a on_train_start context
+        result = compute_loss(pl_module, trainer.datamodule.val_dataloader())
+        return result
+    else:
+        result = compute_loss(pl_module, trainer.datamodule.val_dataloader())
+        return result
+
+
+def compute_loss(model, dl: DataLoader):
+    n, loss = 0, 0.0
+    model.eval()
+    batch = next(iter(dl))
+    result = model(
+        input_ids=batch["text"].cuda(),
+        attention_mask=batch["attention_mask"].cuda(),
+    )
+    loss_mask = batch["loss_mask"].cuda()
+    logits = result["token_logits"]
+    target = batch["labels"].cuda()
+
+    loss += F.cross_entropy(logits[loss_mask].float(), target[loss_mask], reduction="sum")
+    n += loss_mask.sum()
+
+    mean_loss: float = (loss / n).detach().cpu().numpy().item()
+    model.train()
+    return mean_loss
+
+
 getter_function_map = {
     "learning_rate": get_learning_rate,
     "global_step": get_global_step,
+    "val_loss": get_val_loss,
+    # How do we compute a simple validation loss here
 }
 
 
@@ -125,7 +160,10 @@ class MetadataSaveCallback(Callback):
             # save metadata to compare to after resuming with checkpoint
             metadata = {}
             for metadata_key in self.metadata_keys:
-                metadata_value = getter_function_map[metadata_key](trainer, pl_module)
+                if metadata_key == "val_loss":
+                    metadata_value = getter_function_map[metadata_key](trainer, pl_module, on_save=True)
+                else:
+                    metadata_value = getter_function_map[metadata_key](trainer, pl_module)
                 metadata[metadata_key] = metadata_value
             # prepare paths for metadata save
             pickle_file_path = self.pickle_file_path
@@ -156,29 +194,24 @@ class TestCheckpointIntegrityCallback(Callback):
         self.metadata_path = metadata_path
         self.metadata_keys = metadata_keys
 
-    # Add outputs for on_train_batch_end
     def on_train_start(self, trainer: Trainer, pl_module: LightningModule):
-    # def on_train_batch_end(self, trainer: "pl.Trainer", pl_module: "pl.LightningModule", outputs: Any, batch: Any, batch_idx: int) -> None:
         pickle_file_path = os.path.join(self.metadata_path, "checkpoints/metadata.pkl")
         # check that pickle file exists
         assert os.path.isfile(pickle_file_path), f"No file found at {pickle_file_path}"
         with open(pickle_file_path, "rb") as metadata_file:
             metadata_dict = pickle.load(metadata_file)
-
         current_metadata = {}
         for metadata_key in self.metadata_keys:
             expected_value = metadata_dict[metadata_key]
             current_value = getter_function_map[metadata_key](trainer, pl_module)
             current_metadata[metadata_key] = current_value
 
-        # TODO (SKH): make this a single comparison so we can collect multiple failures.
-        breakpoint()
+        # TODO (SKH): Ideally this would collect _all_ failures instead of failing on the first one.
         for metadata_key in self.metadata_keys:
             expected_value = metadata_dict[metadata_key]
             current_value = current_metadata[metadata_key]
             assert (
                 expected_value == current_value
             ), f"Value mismatch for key {metadata_key}: stored_value={expected_value}, current_value={current_value}"
-        # TODO: I think we need to cleanup the metadata file here.
-        # TODO: Do we need to signal an end of training? I think if we set the steps low enough we can just keep going.
+        # Cleanup
         os.remove(pickle_file_path)
