@@ -7,7 +7,7 @@ authors = [
 ]
 dependencies = []
 readme = "README.md"
-requires-python = ">= 3.12"
+requires-python = ">= 3.10"
 
 [build-system]
 requires = ["hatchling"]
@@ -15,10 +15,10 @@ build-backend = "hatchling.build"
 
 [tool.rye]
 managed = true
-dev-dependencies = []
+
 
 [tool.hatch.metadata]
 allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/bionemo_scdl"]
+packages = ["src/bionemo"]
