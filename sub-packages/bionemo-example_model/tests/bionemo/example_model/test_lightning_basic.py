@@ -14,9 +14,8 @@
 # limitations under the License.
 
 
-from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, List, Set, Tuple, Type
+from typing import Any, Dict, Set, Tuple, Type
 
 import pytest
 import torch
@@ -25,7 +24,6 @@ from nemo import lightning as nl
 from nemo.collections import llm
 from nemo.lightning import NeMoLogger, io, resume
 from nemo.lightning.pytorch import callbacks as nl_callbacks
-from pytorch_lightning import Callback
 from pytorch_lightning.loggers import TensorBoardLogger
 
 from bionemo.core.utils.dtypes import PrecisionTypes, get_autocast_dtype
@@ -33,42 +31,7 @@ from bionemo.example_model import lightning_basic as lb
 from bionemo.llm.lightning import LossLoggingCallback
 from bionemo.llm.model.config import MegatronBioNeMoTrainableModelConfig
 from bionemo.testing import megatron_parallel_state_utils
-
-
-class MetricTracker(Callback):
-    def __init__(self, metrics_to_track_val: List[str], metrics_to_track_train: List[str]):
-        self.metrics_to_track_val = metrics_to_track_val
-        self.metrics_to_track_train = metrics_to_track_train
-        self._collection_val = defaultdict(list)
-        self._collection_train = defaultdict(list)
-
-    def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0):
-        for metric in self.metrics_to_track_val:
-            self._collection_val[metric].append(outputs[metric])
-
-    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0):
-        for metric in self.metrics_to_track_train:
-            self._collection_train[metric].append(outputs[metric])
-
-    def on_validation_epoch_end(self, trainer, pl_module):
-        elogs = trainer.logged_metrics  # access it here
-        self._collection_val["logged_metrics"].extend(elogs)
-
-    def on_train_epoch_end(self, trainer, pl_module):
-        elogs = trainer.logged_metrics  # access it here
-        self._collection_train["logged_metrics"].extend(elogs)
-
-    @property
-    def collection_val(self) -> Dict[str, torch.Tensor | List[str]]:
-        res = {k: torch.tensor(v) for k, v in self._collection_val.items() if k != "logged_metrics"}
-        res["logged_metrics"] = self._collection_val["logged_metrics"]
-        return res
-
-    @property
-    def collection_train(self) -> Dict[str, torch.Tensor | str]:
-        res = {k: torch.tensor(v) for k, v in self._collection_train.items() if k != "logged_metrics"}
-        res["logged_metrics"] = self._collection_train["logged_metrics"]
-        return res
+from bionemo.testing.callbacks import MetricTracker
 
 
 def _train_model_get_ckpt(
@@ -227,10 +190,3 @@ def test_train_mnist_litautoencoder_with_megatron_strategy_single_gpu(tmpdir: LE
         # We're dropping a loss, so initially we should be better than before
         assert drop_head_ft_metrics.collection_train["loss"][0] > drop_head_ft_metrics.collection_train["loss"][-1]
         assert add_head_ft_metrics.collection_train["loss"][-1] > drop_head_ft_metrics.collection_train["loss"][0]
-
-
-# TODO:
-# 1. With a fine-tuning cycle we'll ideally want new features in downstream dataloaders. The BERT/ESM examples look
-#  too static in this regard. What is our recommended mechanism for retrofitting a new dataloader into a lightning
-#  module? Cover this in tutorials!
-# 2.

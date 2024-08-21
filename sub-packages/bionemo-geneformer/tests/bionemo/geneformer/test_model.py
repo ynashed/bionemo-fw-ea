@@ -21,8 +21,15 @@ from typing import List, Tuple
 
 import pytest
 import torch
+from megatron.core.optimizer.optimizer_config import OptimizerConfig
 from megatron.core.transformer.module import Float16Module
 from nemo import lightning as nl
+from nemo.collections import llm as nllm
+from nemo.lightning import io, resume
+from nemo.lightning.nemo_logger import NeMoLogger
+from nemo.lightning.pytorch import callbacks as nl_callbacks
+from nemo.lightning.pytorch.optim.megatron import MegatronOptimizerModule
+from pytorch_lightning.loggers import TensorBoardLogger
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -32,14 +39,18 @@ from bionemo.core.data.resamplers import PRNGDatasetShuffler
 from bionemo.core.utils.batching_utils import pad_token_ids
 from bionemo.core.utils.dtypes import get_autocast_dtype
 from bionemo.core.utils.random_utils import random_numpy_context
-from bionemo.geneformer.api import GeneformerConfig
+from bionemo.geneformer.api import GeneformerConfig, GeneformerModel
+from bionemo.geneformer.data.singlecell.datamodule import SingleCellDataModule
 from bionemo.geneformer.data.singlecell.dataset import SingleCellDataset
 from bionemo.geneformer.data.singlecell.preprocess import GeneformerPreprocess
+from bionemo.geneformer.model.finetune_token_regressor import FineTuneSeqLenBioBertConfig
 from bionemo.llm.data import collate
+from bionemo.llm.lightning import LossLoggingCallback
 from bionemo.llm.model.biobert.lightning import BioBertLightningModule
 from bionemo.llm.model.biobert.model import BiobertSpecOption
 from bionemo.llm.utils.weight_utils import nemo1_to_nemo2_biobert_key_mapping
 from bionemo.testing import megatron_parallel_state_utils
+from bionemo.testing.callbacks import MetricTracker
 from bionemo.testing.utils import assert_matrix_correlation_above_value, assert_matrix_mape_below_value
 
 
@@ -121,6 +132,7 @@ def cells() -> List[List[str]]:
 def geneformer_config():
     autocast_dtype = get_autocast_dtype(MODEL_PRECISION)
     return GeneformerConfig(
+        model_cls=GeneformerModel,
         num_layers=6,
         hidden_size=256,
         ffn_hidden_size=512,
@@ -404,9 +416,18 @@ def test_geneformer_nemo1_v_nemo2_inference_golden_values(
         accelerator="gpu",
         strategy=strategy,
         num_nodes=1,
-        plugins=nl.MegatronMixedPrecision(precision=MODEL_PRECISION, amp_O2=False),
+        plugins=nl.MegatronMixedPrecision(precision=MODEL_PRECISION),
     )
-    module = BioBertLightningModule(config=geneformer_config, tokenizer=tokenizer)
+    optimizer = MegatronOptimizerModule(
+        config=OptimizerConfig(
+            lr=1e-4,
+            optimizer="adam",
+            use_distributed_optimizer=True,
+            fp16=geneformer_config.fp16,
+            bf16=geneformer_config.bf16,
+        )
+    )
+    module = BioBertLightningModule(config=geneformer_config, tokenizer=tokenizer, optimizer=optimizer)
 
     dataloader = torch.utils.data.DataLoader(_DummyDataSet(cells, tokenizer), batch_size=3, num_workers=0)
     with megatron_parallel_state_utils.distributed_model_parallel_state(seed):
@@ -759,3 +780,140 @@ def test_inference_loss_10m_released_checkpoint_wrong_activation(geneformer_conf
     #  Perhaps a future model is more robust, so if this value needs to come down we can
     #  do that.
     assert mean_loss > 5
+
+
+def _train_model_get_ckpt(
+    name: str,
+    root_dir: Path,
+    config: GeneformerConfig,
+) -> Tuple[Path, MetricTracker, nl.Trainer]:
+    data_error_str = "Please download test data with:\n`python scripts/download_artifacts.py --models all --model_dir ./models --data all --data_dir ./ --verbose --source pbss`"
+    data_dir = Path(data_path)
+    train_data_path = data_dir / "train"
+    val_data_path = data_dir / "val"
+    test_data_path = data_dir / "test"
+    if not nemo1_checkpoint_path.exists():
+        raise FileNotFoundError(f"Could not find checkpoint at {nemo1_checkpoint_path}. {data_error_str}")
+    if not train_data_path.exists():
+        raise FileNotFoundError(f"Could not find train data at {train_data_path}. {data_error_str}")
+
+    preprocessor = GeneformerPreprocess(
+        download_directory=train_data_path,
+        medians_file_path=train_data_path / "medians.json",
+        tokenizer_vocab_path=train_data_path / "geneformer.vocab",
+    )
+    match preprocessor.preprocess():
+        case {"tokenizer": tokenizer, "median_dict": median_dict}:
+            pass
+        case _:
+            assert False
+
+    data_module = SingleCellDataModule(
+        tokenizer=tokenizer,
+        median_dict=median_dict,
+        train_dataset_path=str(train_data_path),
+        val_dataset_path=str(val_data_path),
+        test_dataset_path=str(test_data_path),
+        random_token_prob=0.1,
+        micro_batch_size=4,
+        global_batch_size=4,
+    )
+
+    checkpoint_callback = nl_callbacks.ModelCheckpoint(
+        save_best_model=False,
+        save_last=True,
+        save_on_train_epoch_end=True,
+        monitor="reduced_train_loss",  # TODO find out how to get val_loss logged and use "val_loss",
+        every_n_train_steps=5,
+        enable_nemo_ckpt_io=True,  # Enables the .nemo file-like checkpointing where all IOMixins are under SerDe
+        # async_save=False,  # Tries to save asynchronously, previously led to race conditions.
+    )
+    save_dir = root_dir / name
+    tb_logger = TensorBoardLogger(save_dir=save_dir, name=name)
+    # Setup the logger and train the model
+    nemo_logger = NeMoLogger(
+        dir=str(root_dir),
+        name=name,
+        tensorboard=tb_logger,
+        ckpt=checkpoint_callback,
+    )
+    # Needed so that the trainer can find an output directory for the profiler
+    # nemo_logger.save_dir = tmpdir
+    # ckpt_path needs to be a string for SerDe
+    optimizer = MegatronOptimizerModule(
+        config=OptimizerConfig(
+            lr=1e-4,
+            optimizer="adam",
+            use_distributed_optimizer=True,
+            fp16=config.fp16,
+            bf16=config.bf16,
+        )
+    )
+    module = BioBertLightningModule(config=config, tokenizer=tokenizer, optimizer=optimizer)
+
+    strategy = nl.MegatronStrategy(
+        tensor_model_parallel_size=1,
+        pipeline_model_parallel_size=1,
+        ddp="megatron",
+        find_unused_parameters=True,
+        enable_nemo_ckpt_io=True,
+    )
+    metric_tracker = MetricTracker(metrics_to_track_val=["loss"], metrics_to_track_train=["loss"])
+    trainer = nl.Trainer(
+        accelerator="gpu",
+        devices=1,
+        strategy=strategy,
+        limit_val_batches=5,
+        val_check_interval=5,
+        max_steps=100,
+        num_nodes=1,
+        log_every_n_steps=5,
+        callbacks=[LossLoggingCallback(), metric_tracker],
+        precision=MODEL_PRECISION,
+    )
+    nllm.train(
+        model=module,
+        data=data_module,
+        trainer=trainer,
+        log=nemo_logger,
+        resume=resume.AutoResume(
+            path=None,  # Overrides the path found by resume_if_exists when set.
+            resume_if_exists=True,  # Looks for the -last checkpoint to continue training.
+            resume_ignore_no_checkpoint=True,  # When false this will throw an error with no existing checkpoint.
+        ),
+    )
+    ckpt_dirpath = Path(checkpoint_callback.last_model_path.replace(".ckpt", ""))
+    return ckpt_dirpath, metric_tracker, trainer
+
+
+@pytest.mark.needs_gpu
+def test_finetune_geneformer(tmpdir, geneformer_config: GeneformerConfig):
+    base_geneformer_config = deepcopy(geneformer_config)
+    base_geneformer_config.num_layers = 3  # set to 3 layers
+
+    with megatron_parallel_state_utils.distributed_model_parallel_state(32):
+        ckpt_path, initial_metrics, initial_trainer = _train_model_get_ckpt(
+            name="test_experiment",
+            root_dir=tmpdir / "pretrain",
+            config=base_geneformer_config,
+        )
+        assert ckpt_path.exists()
+        assert ckpt_path.is_dir()
+        assert io.is_distributed_ckpt(ckpt_path)
+        assert initial_trainer.model.config.num_layers == 3
+        assert initial_metrics.collection_train["loss"][0] > initial_metrics.collection_train["loss"][-1]
+    with megatron_parallel_state_utils.distributed_model_parallel_state(43):
+        ft_geneformer_config = FineTuneSeqLenBioBertConfig(
+            # Most defaults, including the number of layers, should be overridden
+            initial_ckpt_path=str(ckpt_path),
+        )
+        simple_ft_checkpoint, simple_ft_metrics, ft_trainer = _train_model_get_ckpt(
+            name="finetune_new_head",
+            root_dir=tmpdir / "finetune_new_head",  # new checkpoint will land in a subdir of this
+            config=ft_geneformer_config,  # same config as before since we are just continuing training
+        )
+        assert simple_ft_checkpoint.exists()
+        assert simple_ft_checkpoint.is_dir()
+        assert io.is_distributed_ckpt(simple_ft_checkpoint)
+        assert ft_trainer.model.config.num_layers == 3
+        assert initial_metrics.collection_train["loss"][-1] > simple_ft_metrics.collection_train["loss"][0]

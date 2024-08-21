@@ -14,10 +14,12 @@
 # limitations under the License.
 
 
+import logging
 import os
 import tarfile
-from dataclasses import dataclass
-from typing import Callable, Literal, Optional, Sequence, Type, TypedDict, Union
+from dataclasses import dataclass, field, fields
+from pathlib import Path
+from typing import Callable, Generic, List, Literal, Optional, Sequence, Type, TypedDict, TypeVar, Union
 
 import torch
 from megatron.core import parallel_state, tensor_parallel
@@ -37,11 +39,23 @@ from nemo.lightning.megatron_parallel import MegatronLossReduction
 from torch import Tensor
 from torch.optim import Optimizer
 
-from bionemo.core.api import BionemoTrainableModelConfig
 from bionemo.llm.model.biobert.transformer_specs import BiobertSpecOption, get_biobert_spec
+from bionemo.llm.model.config import MegatronBioNeMoTrainableModelConfig
 from bionemo.llm.model.loss import BERTMLMLossWithReduction
-from bionemo.llm.utils.weight_utils import nemo1_to_nemo2_biobert_key_mapping
+from bionemo.llm.utils.weight_utils import (
+    load_weights_sharded_inplace_nemo2_to_mcore,
+    nemo1_to_nemo2_biobert_key_mapping,
+)
 
+
+# Configure the logger
+logging.basicConfig(
+    level=logging.INFO,  # Set the minimum logging level
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",  # Log format
+    datefmt="%Y-%m-%d %H:%M:%S",  # Date format
+)
+
+logger = logging.getLogger(__file__)
 
 __all__: Sequence[str] = (
     "BioBertConfig",
@@ -94,6 +108,7 @@ class MegatronBioBertModel(LanguageModule):
         add_binary_head: bool = True,
         return_embeddings: bool = False,
         use_full_attention_mask: bool = False,
+        include_hiddens: bool = False,
     ):
         # TODO (@jstjohn) come up with a cleaner way for this model to return a set of things the user wants.
         #  hidden states, embeddings, logits, etc. The defaults should work for training but we need to make it
@@ -102,6 +117,7 @@ class MegatronBioBertModel(LanguageModule):
         super(MegatronBioBertModel, self).__init__(config=config)
         self.post_process = post_process
         self.add_binary_head = add_binary_head
+        self.include_hiddens = include_hiddens
         if return_embeddings:
             assert self.post_process and self.add_binary_head
         # `b` = batch, `s` = sequence.
@@ -120,6 +136,7 @@ class MegatronBioBertModel(LanguageModule):
         self.position_embedding_type = position_embedding_type
         self.add_binary_head = add_binary_head
         self.return_embeddings = return_embeddings
+        self.include_hiddens = include_hiddens
 
         # megatron core pipelining currently depends on model type
         self.model_type = ModelType.encoder_or_decoder
@@ -333,18 +350,28 @@ class MegatronBioBertModel(LanguageModule):
 
         # [s b h] => [b s h]  # move batch to the first dimension after forward
         logits = logits.transpose(0, 1).contiguous()
-        return {"token_logits": logits, "binary_logits": binary_logits}
+        output = {"token_logits": logits, "binary_logits": binary_logits}
+        if self.include_hiddens:
+            output["hidden_states"] = hidden_states.transpose(0, 1).contiguous()  # [s b h] => [b s h]
+        return output
+
+
+# Typevar that works for all children of MegatronBioBertModel
+MegatronBioBertModelT = TypeVar("MegatronBioBertModelT", bound=MegatronBioBertModel)
 
 
 @dataclass
 class BioBertConfig(
-    BionemoTrainableModelConfig[MegatronBioBertModel, MegatronLossReduction], TransformerConfig, io.IOMixin
+    Generic[MegatronBioBertModelT],
+    MegatronBioNeMoTrainableModelConfig[MegatronBioBertModelT, MegatronLossReduction],
+    TransformerConfig,
 ):
     """Config class for BioBert model, responsible for the partial configuration of Transformer models.
 
     `configure_model()` is ultimately called by the LightningModule using PTL lightning module hooks.
     """
 
+    model_cls: Optional[Type[MegatronBioBertModelT]] = None
     # From megatron.core.models.gpt.bert_model.GPTModel
     fp16_lm_cross_entropy: bool = False
     parallel_output: bool = True
@@ -367,11 +394,37 @@ class BioBertConfig(
     #  where some acceptible layers (eg lm_head) may or may not be absent from the model, and others
     #  (like a new head) may be new and missing from the initial checkpoint.
     nemo1_ckpt_path: Optional[str] = None
-    # TODO (@jstjohn) come up with a cleaner way in the biobert module to return user requested
-    #  things as part of the workflow for inference and fine-tuning.
-    return_only_hidden_states: bool = False
 
-    def configure_model(self, tokenizer) -> "MegatronBioBertModel":  # noqa: D102
+    initial_ckpt_path: Optional[str] = None
+    initial_ckpt_skip_keys_with_these_prefixes: List[str] = field(default_factory=list)
+    # Used if initializing from a checkpoint, set this to any fields you want to override rather than re-set.
+    #  by default all fields will be overridden.
+    override_parent_fields: List[str] = field(
+        default_factory=lambda: [
+            "initial_ckpt_skip_keys_with_these_prefixes",
+            "initial_ckpt_path_ignore_weights",
+            "initial_ckpt_path",
+            "return_only_hidden_states",
+            "include_hiddens",
+            "model_cls",
+        ]
+    )
+    return_only_hidden_states: bool = False
+    include_hiddens: bool = False  # Include hidden layers in the output of the model
+
+    def __post_init__(self):
+        super().__post_init__()
+        if self.model_cls is None:
+            raise ValueError(
+                f"You must supply `model_cls` to the {type(self)} for module to initialization in `configure_model`."
+            )
+        if self.nemo1_ckpt_path is not None and self.initial_ckpt_path is not None:
+            raise ValueError(
+                "Only supply nemo1 checkpoint or nemo2 checkpoint. "
+                f"Got: {self.nemo1_ckpt_path} and {self.initial_ckpt_path}"
+            )
+
+    def configure_model(self, tokenizer) -> MegatronBioBertModelT:  # noqa: D102
         vp_size = self.virtual_pipeline_model_parallel_size
         if vp_size:
             p_size = self.pipeline_model_parallel_size
@@ -388,8 +441,26 @@ class BioBertConfig(
         }
 
         do_next_sentence = False
+        if self.model_cls is None:
+            raise ValueError(
+                f"You must supply `model_cls` to the {type(self)} for module to initialization in `configure_model`."
+            )
 
-        model = MegatronBioBertModel(
+        # TODO refactor this next block out into a reusable config function.
+        if self.initial_ckpt_path:
+            logger.warn
+            # 1. get the config
+            # TODO type(self) is probably not correct, maybe make the class name of the config to load an argument?
+            initial_config = io.load(Path(self.initial_ckpt_path), type(self))
+            initial_fields = {f.name for f in fields(initial_config)}
+            my_fields = [f.name for f in fields(self)]
+            skip_fields = set(self.override_parent_fields)
+            override_fields = [f for f in my_fields if f in initial_fields and f not in skip_fields]
+            # 2. override key variables in this config based on the parent config
+            for f in override_fields:
+                setattr(self, f, getattr(initial_config, f))
+
+        model = self.model_cls(
             self,
             transformer_layer_spec=get_biobert_spec(self.biobert_spec_option, qk_layernorm=self.qk_layernorm),
             num_tokentypes=2 if do_next_sentence else 0,
@@ -407,6 +478,7 @@ class BioBertConfig(
             post_process=parallel_state.is_pipeline_last_stage(),  # set to False for inference
             add_binary_head=do_next_sentence,
             use_full_attention_mask=use_full_attention_mask,
+            include_hiddens=self.include_hiddens,
         )
         # TODO (@skothenhill) this is a hack to load the old checkpoint.
         # This should be removed once we have a proper checkpoint conversion
@@ -415,6 +487,7 @@ class BioBertConfig(
         # and an adapter may also be the right way to handle expected missing/extra keys when importing
         # a checkpoint for fine-tuning (eg ignore misisng lm_head, if not there in model, etc).
         if self.nemo1_ckpt_path is not None:
+            assert self.initial_ckpt_path is None, "Mutually exclusive checkpoint path used twice"
             te_mapping = self.biobert_spec_option in {
                 BiobertSpecOption.bert_layer_with_transformer_engine_spec,
                 BiobertSpecOption.bert_layer_with_transformer_engine_and_qk_ln_spec,
@@ -430,6 +503,13 @@ class BioBertConfig(
                 #  so we need to allow those to pass through if we're loading from bionemo1 which did not
                 #  use TE.
                 model.load_state_dict(new_state_dict_from_old, strict=not te_mapping)
+        if self.initial_ckpt_path is not None:
+            assert self.nemo1_ckpt_path is None, "Mutually exclusive checkpoint path used twice"
+            load_weights_sharded_inplace_nemo2_to_mcore(
+                model=model,
+                distributed_checkpoint_dir=self.initial_ckpt_path,
+                skip_keys_with_these_prefixes=set(self.initial_ckpt_skip_keys_with_these_prefixes),
+            )
 
         # TODO (@jstjohn) come up with a cleaner way in the biobert module to return hidden states.
         #  maybe a suite of options like hugging face has so a user can ask for several or only one thing.
