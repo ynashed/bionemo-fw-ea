@@ -14,11 +14,10 @@ dependencies = [
     # external
     "lightning>=2.2.1",
     "pytorch-lightning>=2.2.1",
-    # TODO: https://rye.astral.sh/guide/deps/#git-local-dependencies
-    #git+https://github.com/NVIDIA/TransformerEngine.git@7d576ed25266a17a7b651f2c12e8498f67e0baea
-    #git+https://github.com/NVIDIA/apex.git@810ffae374a2b9cb4b5c5e28eaeca7d7998fca0c
-    #git+https://github.com/NVIDIA/NeMo.git@d28c1b2dd7c8539299a4c31f7c8d1678e2cbb9c8
-    #git+https://github.com/NVIDIA/Megatron-LM.git@c7a1f82d761577e6ca0338d3521eac82f2aa0904
+    "megatron-core @ git+https://github.com/NVIDIA/Megatron-LM.git@c7a1f82d761577e6ca0338d3521eac82f2aa0904",
+    "nemo-toolkit @ git+https://github.com/NVIDIA/NeMo.git@d28c1b2dd7c8539299a4c31f7c8d1678e2cbb9c8",
+    "apex @ git+https://github.com/NVIDIA/apex.git@810ffae374a2b9cb4b5c5e28eaeca7d7998fca0c",
+    "transformer_engine @ git+https://github.com/NVIDIA/TransformerEngine.git@7d576ed25266a17a7b651f2c12e8498f67e0baea",
 ]
 requires-python = ">= 3.10"
 
@@ -30,7 +29,7 @@ build-backend = "hatchling.build"
 managed = true
 
 [tool.rye.workspace]
-members = ["bionemo-core"]
+members = ["cdbionemo-core"]
 
 [tool.hatch.metadata]
 allow-direct-references = true
