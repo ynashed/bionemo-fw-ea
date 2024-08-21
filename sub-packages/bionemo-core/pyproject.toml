@@ -1,12 +1,21 @@
 [project]
 name = "bionemo-core"
-version = "0.1.0"
-description = "Add your description here"
-authors = [
-    { name = "Malcolm Greaves", email = "mgreaves@nvidia.com" }
-]
-dependencies = []
+version = "2.0.0"
+license.file = "LICENSE"
 readme = "README.md"
+description = "BioNeMo core interfaces and PyTorch-related code."
+authors = [
+    { name = "John St. John", email = "jstjohn@nvidia.com" },
+    { name = "Malcolm Greaves", email = "mgreaves@nvidia.com" },
+]
+dependencies = [
+    "torch>=2.2.1",
+    "numpy",
+    "pytorch-lightning",
+    # nemo-toolkit?
+    # megatron?
+    # apex?
+]
 requires-python = ">= 3.10"
 
 [build-system]
@@ -16,10 +25,8 @@ build-backend = "hatchling.build"
 [tool.rye]
 managed = true
 
-
 [tool.rye.workspace]
-members = ["bionemo-*"]
-
+members = []
 
 [tool.hatch.metadata]
 allow-direct-references = true
