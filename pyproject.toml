@@ -32,6 +32,7 @@ dev-dependencies = [
     "pre-commit==3.4.0",
     "virtualenv==20.26.3",
     "ipdb==0.13.11",
+    "ipython",
     "click==8.1.7",
     "tenacity==8.5.0",
     "tach>=0.9.0",
