@@ -16,7 +16,26 @@ build-backend = "hatchling.build"
 [tool.rye]
 managed = true
 virtual = true
-dev-dependencies = []
+dev-dependencies = [
+    # requirements-dev.txt
+    "ruff==0.0.292",
+    "black==23.1.0",
+    "pre-commit==3.4.0",
+    "virtualenv==20.26.3",
+    "ipdb==0.13.11",
+    "click==8.1.7",
+    "tenacity==8.5.0",
+    "tach>=0.9.0",
+    # requirements-test.txt
+    "pytest-cov==4.1.0",
+    "pytest-timeout==2.2.0",
+    "pytest-dependency==0.5.1",
+    "testbook==0.4.2",
+    "requests_mock==1.11.0",
+    # For SwiftStack access
+    "awscli==1.33.33",
+    "nbval==0.11.0",
+]
 
 [tool.rye.workspace]
 members = ["sub-packages/*"]
