@@ -165,6 +165,15 @@ def test_geneformer_stop_and_go(seed: int = 42):
     devices = 1
     tp_size, pp_size = 1, 1
 
+    def setup_geneformer_model():
+        # TODO:
+        return model, data, opt
+
+    def setup_trainer_and_strategy_geneformer(mode: Literal["stop", "go"], metrics=[]):
+        # TODO:
+        return trainer
+    
+
     if not train_data_path.exists():
         raise FileNotFoundError(f"Could not find train data at {train_data_path}. {data_error_str}")
 
@@ -347,7 +356,7 @@ def test_gpt_example():
     ## setup the dummy dataset
 
     # Setup model, this should be the same for both calls.
-    def setup_gpt():
+    def setup_gpt_model():
         seq_length = 128
         global_batch_size = 16
         gpt_config = llm.GPTConfig(
@@ -455,7 +464,7 @@ def test_gpt_example():
 
     with clean_parallel_state_context():
         try:
-            model, data, opt = setup_gpt()
+            model, data, opt = setup_gpt_model()
             trainer = setup_trainer_and_strategy_gpt("stop", metrics=["global_step"])
             llm.train(
                 model=model,
@@ -476,7 +485,7 @@ def test_gpt_example():
 
     # Teardown and do it again
     with clean_parallel_state_context():
-        model, data, opt = setup_gpt()
+        model, data, opt = setup_gpt_model()
         trainer = setup_trainer_and_strategy_gpt("go", metrics=["global_step"])
         llm.train(
             model=model,
