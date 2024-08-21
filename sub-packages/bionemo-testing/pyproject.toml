@@ -16,6 +16,8 @@ build-backend = "hatchling.build"
 [tool.rye]
 managed = true
 
+[tool.rye.workspace]
+members = []
 
 [tool.hatch.metadata]
 allow-direct-references = true

@@ -16,9 +16,11 @@ build-backend = "hatchling.build"
 [tool.rye]
 managed = true
 
+[tool.rye.workspace]
+members = []
 
 [tool.hatch.metadata]
 allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/bionemo_esm2"]
+packages = ["src/bionemo"]
