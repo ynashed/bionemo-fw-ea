@@ -129,11 +129,15 @@ class ESMDataModule(pl.LightningDataModule):
 
         eval_iters = int((max_train_steps // self.trainer.val_check_interval + 1) * self.trainer.limit_val_batches)
         num_train_samples = int(max_train_steps * self.data_sampler.global_batch_size)
-        num_val_samples = int(eval_iters * self.data_sampler.global_batch_size)
 
+        val_clusters = dataset.create_valid_clusters(cluster_file=self._valid_cluster_path)
         if self.trainer.limit_val_batches <= 1.0 and isinstance(self.trainer.limit_val_batches, float):
-            # This is to make sure we only have one epoch on every validation iteration
-            num_val_samples = 1
+            num_val_samples_per_epoch = int(len(val_clusters) * self.trainer.limit_val_batches)
+            num_val_samples = eval_iters * num_val_samples_per_epoch // self.data_sampler.global_batch_size
+        elif self.trainer.limit_val_batches > 1 and isinstance(self.trainer.limit_val_batches, int):
+            num_val_samples = int(eval_iters * self.data_sampler.global_batch_size)
+        else:
+            raise ValueError("Invalid choice of limit_val_batches size: %s" % self.trainer.limit_val_batches)
 
         _train_ds = dataset.create_train_dataset(
             cluster_file=self._train_cluster_path,
@@ -151,7 +155,7 @@ class ESMDataModule(pl.LightningDataModule):
         )  # shuffle manually without MegatronPretrainingRandomSampler
 
         _valid_ds = dataset.create_valid_dataset(
-            cluster_file=self._valid_cluster_path,
+            clusters=val_clusters,
             db_path=self._valid_database_path,
             total_samples=num_val_samples,
             seed=random_utils.get_seed_from_rng(rng),

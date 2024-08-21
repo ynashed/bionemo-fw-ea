@@ -16,7 +16,7 @@
 
 import argparse
 from pathlib import Path
-from typing import Optional, Sequence, get_args
+from typing import Optional, Sequence, Union, get_args
 
 from megatron.core.optimizer import OptimizerConfig
 from nemo import lightning as nl
@@ -40,7 +40,16 @@ from bionemo.llm.utils.logger_utils import WandbLoggerOptions, setup_nemo_lightn
 __all__: Sequence[str] = ("main",)
 
 
-def infer_global_batch_size(  # TODO(@sichu) migrate function into utilities
+# TODO(@sichu) migrate functions into utilities
+def float_or_int(value: Union[str, float, int]) -> float | int:
+    if isinstance(value, (int, float)):
+        return value
+    if value.isdigit():
+        return int(value)
+    return float(value)
+
+
+def infer_global_batch_size(
     micro_batch_size: int,
     num_nodes: int,
     devices: int,
@@ -358,12 +367,12 @@ if __name__ == "__main__":
         default=1024,
         help="Sequence length of cell. Default is 1024.",
     )
-    parser.add_argument(  # TODO(@sichu) NeMo will silently skip validation if smaller than one
+    parser.add_argument(
         "--limit-val-batches",
-        type=int,
+        type=float_or_int,
         required=False,
         default=2,
-        help="Number of global batches used for validation. Default is 2.",
+        help="Number of global batches used for validation if int. Fraction of validation dataset if float. Default is 2.",
     )
     parser.add_argument(
         "--micro-batch-size",
