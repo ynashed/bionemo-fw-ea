@@ -126,4 +126,4 @@ and data loading performance.
 
 ## LICENSE
 
-See LICENSE/license.txt.
+Bionemo-scdl has an Apache 2.0 license, as found in the LICENSE file.
