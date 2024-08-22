@@ -10,6 +10,7 @@
 
 
 import pickle
+import time as timep
 from collections import defaultdict
 
 import numpy as np
@@ -358,7 +359,7 @@ class NoPygGraph3DInterpolantModel(pl.LightningModule):
         time = self.sample_time(batch)
         out, batch, time = self(batch, time)
         loss, _ = self.calculate_loss(batch, out, time, "val")
-        self.sample(100)
+        self.sample(20)
         return loss
 
     def training_step(self, batch, batch_idx):
@@ -420,6 +421,7 @@ class NoPygGraph3DInterpolantModel(pl.LightningModule):
         6. Seperate the aggregated discrete predictions for easier loss calculation.
         """
         batch_size = batch['node_mask'].size(0)
+        print(batch['node_mask'].shape)
         batch = self.pre_format_molecules(batch, batch_size)
         batch = self.interpolate(batch, time)  #! discrete variables are one hot after this point
         if self.self_conditioning_module is not None:
@@ -547,7 +549,11 @@ class NoPygGraph3DInterpolantModel(pl.LightningModule):
             data = self.aggregate_discrete_variables(data)
             data["node_mask"] = mask
             data["edge_mask"] = edge_mask
+            s = timep.perf_counter()
             out = self.dynamics(data, time, conditional_batch=out, timesteps=timesteps)
+            torch.cuda.synchronize()
+            e = timep.perf_counter()
+            print("Forward Pass", e - s)
             out, data = self.separate_discrete_variables(out, data)
             for key in pre_conditioning_variables:
                 data[key] = pre_conditioning_variables[key]
@@ -570,6 +576,8 @@ class NoPygGraph3DInterpolantModel(pl.LightningModule):
                         time=time,
                         dt=dt,
                     )
+            ee = timep.perf_counter()
+            print("Forward Pass", ee - s)
         samples = {key: data[f"{key}_t"] for key in self.interpolants.keys()}
         samples["node_mask"] = mask
         samples["edge_mask"] = edge_mask
