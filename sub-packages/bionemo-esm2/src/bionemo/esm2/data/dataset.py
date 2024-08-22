@@ -279,7 +279,7 @@ def create_valid_clusters(cluster_file: str | os.PathLike) -> pd.Series:
     return clusters
 
 
-def create_valid_dataset(
+def create_valid_dataset(  # noqa: D417
     clusters: pd.Series | str | os.PathLike,
     db_path: str | os.PathLike,
     total_samples: int,
