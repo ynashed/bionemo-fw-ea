@@ -10,6 +10,7 @@
 
 import functools
 import math
+import time as time_keeper
 
 import einops
 import torch
@@ -19,6 +20,23 @@ from torch_geometric.nn.norm import LayerNorm as BatchLayerNorm
 from torch_scatter import scatter, scatter_mean
 
 from bionemo.model.molecule.moco.models.utils import PredictionHead
+
+
+def on():
+    return time_keeper.perf_counter()
+
+
+def off(start, keyword=""):
+    end = time_keeper.perf_counter()
+    print(keyword, end - start)
+    return end
+
+
+def off_gpu(start, keyword=""):
+    torch.cuda.synchronize()
+    end = time_keeper.perf_counter()
+    print(keyword, end - start)
+    return end
 
 
 NONLINEARITIES = {
@@ -48,6 +66,7 @@ class E3Norm(nn.Module):
 
     def forward(self, pos: torch.Tensor, batch: torch.Tensor):
         # pos is expected to be of shape [n, 3, n_vector_features]
+        # import ipdb; ipdb.set_trace() #! the weight is what keeps it from being all identical
         norm = torch.norm(pos, dim=1, keepdim=True)  # Normalize over the 3 dimension
         batch_size = int(batch.max()) + 1
         mean_norm = scatter_mean(norm, batch, dim=0, dim_size=batch_size)
@@ -266,19 +285,63 @@ class XEGNNK(nn.Module):
     #         # seems to be needed to keep the network from exploding to NaN with greater depths
     #         nn.init.xavier_normal_(module.weight)
     #         nn.init.zeros_(module.bias)
+    def prune_edge_index(self, edge_index, rel_dist, batch, k=10):
+        # Initialize a list to collect pruned edge indices and their corresponding distances
+        pruned_edges = []
+        pruned_distances = []
 
-    def forward(self, batch, X, H, edge_index, edge_attr=None, te=None):
+        # Number of nodes in the batch
+        num_nodes = batch.size(0)
+
+        # Iterate over each node to find the top-k closest nodes within the same batch
+        for node in range(num_nodes):
+            # Get the indices of edges where 'node' is the source (edge_index[0] == node)
+            node_edges_mask = edge_index[0] == node
+            node_edge_indices = torch.where(node_edges_mask)[0]
+
+            # Get corresponding destination nodes and distances
+            node_dists = rel_dist[node_edges_mask].sum(-1)
+
+            # Sort by distance and select the top-k nearest neighbors
+            _, topk_indices = torch.topk(node_dists, k, largest=False)
+
+            # Select the top-k edges and distances
+            topk_edge_indices = node_edge_indices[topk_indices]
+            pruned_edges.append(edge_index[:, topk_edge_indices])
+            pruned_distances.append(rel_dist[topk_indices])
+
+        # Concatenate pruned edges and distances
+        pruned_edges = torch.cat(pruned_edges, dim=1)
+        pruned_distances = torch.cat(pruned_distances)
+
+        return pruned_edges, pruned_distances
+
+    def forward(self, batch, X, H, edge_index, edge_attr=None, te=None, sbl=None):
         X = X - scatter_mean(X, index=batch, dim=0, dim_size=X.shape[0])[batch]
         X = self.x_norm(X, batch)
         H = self.h_norm(H, batch)
         source, target = edge_index
         rel_coors = X[source] - X[target]
         rel_dist = (rel_coors.transpose(1, 2) ** 2).sum(dim=-1, keepdim=False)
+        # import ipdb; ipdb.set_trace()
+
+        if not self.input_edges:
+            test = scatter_mean(rel_dist.sum(-1), batch[source])
+            edge_cut_mask = rel_dist.sum(-1) < test[batch[source]] / 2
+            # edge_index.size(1)
+            edge_index = edge_index[:, edge_cut_mask]
+            # print(edge_index.size(1), " edges from", start_count)
+            source, target = edge_index
+            rel_coors = X[source] - X[target]
+            rel_dist = (rel_coors.transpose(1, 2) ** 2).sum(dim=-1, keepdim=False)
+            # edge_index, rel_dist = self.prune_edge_index(edge_index, rel_dist, batch)
+            # source, target = edge_index
+            # rel_coors = X[source] - X[target]
         if edge_attr is not None and self.input_edges:
             edge_attr_feat = torch.cat([edge_attr, rel_dist], dim=-1)
         else:
             edge_attr_feat = rel_dist
-        m_ij = self.phi_message(torch.cat([H[target], H[source], edge_attr_feat, te], dim=-1))
+        m_ij = self.phi_message(torch.cat([H[target], H[source], edge_attr_feat, te[batch[source]]], dim=-1))
         coor_wij = self.phi_x(m_ij)  # E x 3
         if self.coor_update_clamp_value:
             coor_wij.clamp_(min=-self.coor_update_clamp_value, max=self.coor_update_clamp_value)
@@ -366,13 +429,14 @@ class DiTeBlock(nn.Module):
         else:
             dist_size = n_vector_features
         if self.input_edges:
-            self.feature_embedder = MLP(
-                hidden_size + hidden_size + edge_feature_size + dist_size, hidden_size, hidden_size
+            self.feature_embedder = MLP(2 * hidden_size + edge_feature_size + dist_size, hidden_size, hidden_size)
+            self.adaLN_edge_modulation = nn.Sequential(
+                nn.SiLU(), nn.Linear(hidden_size, 6 * edge_feature_size, bias=True)
             )
-            self.adaLN_edge_modulation = nn.Sequential(nn.SiLU(), nn.Linear(hidden_size, 6 * hidden_size, bias=True))
-            self.norm1_edge = BatchLayerNorm(hidden_size, affine=False, eps=1e-6)
+            self.norm1_edge = BatchLayerNorm(edge_feature_size, affine=False, eps=1e-6)
         else:
             self.feature_embedder = MLP(hidden_size + hidden_size + dist_size, hidden_size, hidden_size)
+            self.adaLN_edge_modulation = None
 
         self.ffn_norm = BatchLayerNorm(hidden_size)
         self.ffn = swiglu_ffn(hidden_size, mlp_expansion_ratio, bias=False)
@@ -387,7 +451,10 @@ class DiTeBlock(nn.Module):
         self.d_head = hidden_size // num_heads
 
         if self.output_edges:
-            self.adaLN_edge_modulation = nn.Sequential(nn.SiLU(), nn.Linear(hidden_size, 6 * hidden_size, bias=True))
+            if self.adaLN_edge_modulation is None:
+                self.adaLN_edge_modulation = nn.Sequential(
+                    nn.SiLU(), nn.Linear(hidden_size, 6 * edge_feature_size, bias=True)
+                )
             self.lin_edge0 = nn.Linear(hidden_size, edge_feature_size, bias=False)
             # self.lin_edge1 = nn.Linear(hidden_size, hidden_size, bias=False)
             self.lin_edge1 = nn.Linear(
@@ -472,6 +539,7 @@ class DiTeBlock(nn.Module):
         # Normalize x
         edge_batch = batch[src]
         x_norm = modulate(self.norm1(x, batch), shift_msa, scale_msa)
+        # import ipdb; ipdb.set_trace()
         if self.input_edges:
             (
                 edge_shift_msa,
@@ -487,7 +555,7 @@ class DiTeBlock(nn.Module):
         else:
             messages = self.feature_embedder(torch.cat([x_norm[src], x_norm[tgt], dist], dim=-1))
         x_norm = scatter_mean(messages, src, dim=0)
-        # attn_output = self.ali_mha(x_norm, batch, sbl) #!1.5 it/sec Causes NaN's everywhere after 37 iter
+        # attn_output = self.ali_mha(x_norm, batch, sbl) #!1.5 it/sec Causes NaN's everywhere after 37 iter #TODO need to add QK prenorm with mask?
         # if torch.isnan(attn_output).any():
         #     import ipdb; ipdb.set_trace()
         attn_output = self.og_mha(x_norm, batch)  #! No NaN 1.4 it/sec local bs 150
@@ -500,13 +568,15 @@ class DiTeBlock(nn.Module):
         x = x + gate_mlp * self.ffn(self.ffn_norm(modulate(self.norm2(x, batch), shift_mlp, scale_mlp), batch))
         if self.output_edges:
             (
-                edge_shift_msa,
-                edge_scale_msa,
+                _,
+                _,
                 edge_gate_msa,
                 edge_shift_mlp,
                 edge_scale_mlp,
                 edge_gate_mlp,
-            ) = self.adaLN_edge_modulation(t_emb_e).chunk(6, dim=1)
+            ) = self.adaLN_edge_modulation(
+                t_emb_e
+            ).chunk(6, dim=1)
             edge = edge_attr + edge_gate_msa * self.lin_edge0((y[src] + y[tgt]))
             e_in = self.lin_edge1(torch.cat([edge, dist], dim=-1))
             # import ipdb; ipdb.set_trace()
@@ -580,6 +650,7 @@ class MegalodonV2(nn.Module):
                     input_edges=i == 0,
                     output_edges=i == num_layers - 1,
                     scale_dist_features=self.scale_dist_features,
+                    n_vector_features=n_vector_features,
                 )
             )
             self.egnn_layers.append(
@@ -627,11 +698,14 @@ class MegalodonV2(nn.Module):
 
     def forward(self, batch, X, H, E_idx, E, t):
         torch.max(batch) + 1
+        # start = on()
         pos = self.coord_emb(X.unsqueeze(-1))  # N x 3 x K
+        # import ipdb; ipdb.set_trace()
 
         H = self.atom_embedder(H)
         E = self.edge_embedder(E)  # should be + n_vector_features not + 1
         te = self.time_embedding(t)
+        # end = off_gpu(start, "inits")
         te_h = te[batch]
         edge_batch, counts = torch.unique(batch, return_counts=True)
         edge_batch = torch.repeat_interleave(edge_batch, counts * (counts - 1))  #
@@ -640,25 +714,20 @@ class MegalodonV2(nn.Module):
 
         atom_hids = H
         # edge_hids = edge_attr
-        sbl = self.shared_between_layers(batch, pos.device)
+        # start = on()
+        # sbl = self.shared_between_layers(batch, pos.device)
+        sbl = None
         for layer_index in range(len(self.dit_layers)):
-            if torch.isnan(pos).any():
-                import ipdb
-
-                ipdb.set_trace()
-            if torch.isnan(H).any():
-                import ipdb
-
-                ipdb.set_trace()
-            if torch.isnan(edge_attr).any():
-                import ipdb
-
-                ipdb.set_trace()
+            # end = off_gpu(start, "shared between layers")
             distances = coord2distfn(pos, E_idx, self.scale_dist_features, batch)  # E x K
+            # end = off_gpu(end, "coord2dist")
             # import ipdb; ipdb.set_trace()
             H, edge_attr = self.dit_layers[layer_index](batch, H, te_h, edge_attr, E_idx, te_e, distances, sbl)
-            pos = self.egnn_layers[layer_index](batch, pos, H, E_idx, edge_attr, te_e)  #! TODO at time here
+            # end = off_gpu(end, "DiT")
+            pos = self.egnn_layers[layer_index](batch, pos, H, E_idx, edge_attr, te, sbl)  #! TODO at time here
+            # end = off_gpu(end, "EGNN")
             atom_hids = atom_hids + self.node_blocks[layer_index](H)
+            # start = off_gpu(end, "residual")
             # edge_hids = edge_hids + self.edge_blocks[layer_index](edge_attr)
 
         X = self.coord_pred(pos).squeeze(-1)
@@ -668,6 +737,7 @@ class MegalodonV2(nn.Module):
 
         h_logits, _ = self.atom_type_head(batch, H)
         e_logits, _ = self.edge_type_head.predict_edges(batch, edge_attr, E_idx)
+        # end = off_gpu(start, "output layer")
         out = {
             "x_hat": x,
             "h_logits": h_logits,
