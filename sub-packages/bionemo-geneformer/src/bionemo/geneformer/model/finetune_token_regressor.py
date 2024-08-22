@@ -12,11 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-"""This package demonstrates how you can take a pretrained geneformer module and fine-tune the classifier
-token to output cell type predictions.
-"""
-
 from dataclasses import dataclass, field
 from typing import Dict, List, Tuple, Union
 
@@ -36,6 +31,10 @@ from torch import nn
 from bionemo.llm.model.biobert.model import BioBertGenericConfig, MegatronBioBertModel
 from bionemo.llm.model.loss import BERTMLMLossWithReduction, PerTokenLossDict, SameSizeLossDict
 
+
+"""This package demonstrates how you can take a pretrained geneformer module and fine-tune the classifier
+token to output cell type predictions.
+"""
 
 __all__ = []
 

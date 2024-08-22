@@ -21,43 +21,43 @@ import torch
 from pytorch_lightning import Callback
 
 
-class MetricTracker(Callback):
-    def __init__(self, metrics_to_track_val: List[str], metrics_to_track_train: List[str]):
+class MetricTracker(Callback):  # noqa: D101
+    def __init__(self, metrics_to_track_val: List[str], metrics_to_track_train: List[str]):  # noqa: D107
         self.metrics_to_track_val = metrics_to_track_val
         self.metrics_to_track_train = metrics_to_track_train
         self._collection_val = defaultdict(list)
         self._collection_train = defaultdict(list)
 
-    def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0):
+    def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0):  # noqa: D102
         if isinstance(outputs, torch.Tensor):
             self._collection_val["unnamed"].append(outputs)
         else:
             for metric in self.metrics_to_track_val:
                 self._collection_val[metric].append(outputs[metric])
 
-    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0):
+    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0):  # noqa: D102
         if isinstance(outputs, torch.Tensor):
             self._collection_train["unnamed"].append(outputs)
         else:
             for metric in self.metrics_to_track_train:
                 self._collection_train[metric].append(outputs[metric])
 
-    def on_validation_epoch_end(self, trainer, pl_module):
+    def on_validation_epoch_end(self, trainer, pl_module):  # noqa: D102
         elogs = trainer.logged_metrics  # access it here
         self._collection_val["logged_metrics"].extend(elogs)
 
-    def on_train_epoch_end(self, trainer, pl_module):
+    def on_train_epoch_end(self, trainer, pl_module):  # noqa: D102
         elogs = trainer.logged_metrics  # access it here
         self._collection_train["logged_metrics"].extend(elogs)
 
     @property
-    def collection_val(self) -> Dict[str, torch.Tensor | List[str]]:
+    def collection_val(self) -> Dict[str, torch.Tensor | List[str]]:  # noqa: D102
         res = {k: torch.tensor(v) for k, v in self._collection_val.items() if k != "logged_metrics"}
         res["logged_metrics"] = self._collection_val["logged_metrics"]
         return res
 
     @property
-    def collection_train(self) -> Dict[str, torch.Tensor | str]:
+    def collection_train(self) -> Dict[str, torch.Tensor | str]:  # noqa: D102
         res = {k: torch.tensor(v) for k, v in self._collection_train.items() if k != "logged_metrics"}
         res["logged_metrics"] = self._collection_train["logged_metrics"]
         return res

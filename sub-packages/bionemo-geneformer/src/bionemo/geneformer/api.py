@@ -31,7 +31,9 @@ GeneformerModel = MegatronBioBertModel
 
 @dataclass
 class GeneformerConfig(BioBertGenericConfig[GeneformerModel], io.IOMixin):
-    """A geneformer config overrides the parent config, and adds a leaf-level iomixin, please do not inherit from this
+    """A geneformer config.
+
+    The geneformer config overrides the parent config, and adds a leaf-level iomixin, please do not inherit from this
     directly, as your parameters will likely be reset to this method's parameters silently.
     """
 
