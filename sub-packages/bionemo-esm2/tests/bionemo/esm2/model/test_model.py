@@ -148,7 +148,7 @@ def test_esm2_650m_checkpoint(esm2_model):
 
 def test_esm2_golden_values(esm2_650M_config_w_ckpt, sample_data):
     device = "cuda"
-
+    assert esm2_650M_config_w_ckpt.core_attention_override is not None
     tokenizer = AutoTokenizer(pretrained_model_name="facebook/esm2_t33_650M_UR50D")
     tokens = tokenizer.tokenizer([row[1] for row in sample_data], return_tensors="pt", padding=True).to(device)
     input_ids = tokens["input_ids"]
@@ -183,7 +183,7 @@ def test_esm2_golden_values(esm2_650M_config_w_ckpt, sample_data):
 
         # configure the model to return hiddens
         esm2_650M_config_hiddens = deepcopy(esm2_650M_config_w_ckpt)
-        esm2_650M_config_hiddens.return_only_hidden_states = True
+        esm2_650M_config_hiddens.mutate_hparam("return_only_hidden_states", True)
         model = esm2_650M_config_hiddens.configure_model(tokenizer).to(device)
         model.eval()
         hiddens = model(input_ids, attention_mask)

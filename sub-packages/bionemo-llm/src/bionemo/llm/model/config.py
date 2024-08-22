@@ -13,7 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Generic, Type
+from dataclasses import dataclass, field
+from typing import Type
 
 from megatron.core.transformer import TransformerConfig
 from nemo.lightning import io
@@ -21,15 +22,13 @@ from nemo.lightning import io
 from bionemo.core.model.config import BionemoModelConfig, BionemoTrainableModelConfig, Loss, Model
 
 
-class MegatronBioNeMoModelConfig(Generic[Model], BionemoModelConfig[Model], TransformerConfig):
+@dataclass(kw_only=True)
+class MegatronBioNeMoModelConfig(BionemoModelConfig[Model], TransformerConfig, io.NeedsIOMixin):
     """A ModelConfig class for bionemo that supports usage with Megatron models, for example as NeMo2 requires."""
 
-    model_cls: Type[Model]
+    model_cls: Type[Model] = field(init=False)
 
 
-class MegatronBioNeMoTrainableModelConfig(
-    Generic[Model, Loss], BionemoTrainableModelConfig[Model, Loss], MegatronBioNeMoModelConfig[Model], io.NeedsIOMixin
-):
-    """A ModelConfig class for bionemo that supports usage with Megatron models, for example as NeMo2 requires."""
-
-    model_cls: Type[Model]
+@dataclass(kw_only=True)
+class MegatronBioNeMoTrainableModelConfig(MegatronBioNeMoModelConfig[Model], BionemoTrainableModelConfig[Model, Loss]):
+    pass

@@ -24,7 +24,6 @@ from typing import (
     Any,
     Callable,
     Dict,
-    Generic,
     List,
     Literal,
     Optional,
@@ -128,7 +127,7 @@ class MegatronBioBertModel(LanguageModule):
         transformer_layer_spec: spec_utils.ModuleSpec,
         vocab_size: int,
         max_sequence_length: int,
-        tokrnizer: Optional[AutoTokenizer] = None,
+        tokenizer: Optional[AutoTokenizer] = None,
         pre_process: bool = True,
         post_process: bool = True,
         fp16_lm_cross_entropy: bool = False,
@@ -407,12 +406,9 @@ def override_mutate_possibly_extra_mutated_fiddle(
         setattr(target_cfg, f, getattr(source_cfg, f))
 
 
-@dataclass
+@dataclass(kw_only=True)
 class BioBertGenericConfig(
-    Generic[MegatronBioBertModelT],
     MegatronBioNeMoTrainableModelConfig[MegatronBioBertModelT, MegatronLossReduction],
-    TransformerConfig,
-    # Do not add iomixin here
 ):
     """Config class for BioBert model, responsible for the partial configuration of Transformer models.
 
@@ -421,7 +417,6 @@ class BioBertGenericConfig(
     `configure_model()` is ultimately called by the LightningModule using PTL lightning module hooks.
     """
 
-    model_cls: Type[MegatronBioBertModelT] = MegatronBioBertModel
     # From megatron.core.models.gpt.bert_model.GPTModel
     fp16_lm_cross_entropy: bool = False
     parallel_output: bool = True
@@ -457,6 +452,7 @@ class BioBertGenericConfig(
     override_parent_fields: List[str] = field(default_factory=lambda: _OVERRIDE_BIONEMO_CONFIG_DEFAULTS)
     return_only_hidden_states: bool = False
     include_hiddens: bool = False  # Include hidden layers in the output of the model
+    core_attention_override: Type[torch.nn.Module] | None = field(default_factory=lambda: None)
 
     def configure_model(self, tokenizer) -> MegatronBioBertModelT:  # noqa: D102
         vp_size = self.virtual_pipeline_model_parallel_size
@@ -496,11 +492,15 @@ class BioBertGenericConfig(
 
         model = self.model_cls(
             self,
-            transformer_layer_spec=get_biobert_spec(self.biobert_spec_option, qk_layernorm=self.qk_layernorm),
+            transformer_layer_spec=get_biobert_spec(
+                self.biobert_spec_option,
+                qk_layernorm=self.qk_layernorm,
+                core_attention=self.core_attention_override,
+            ),
             num_tokentypes=2 if do_next_sentence else 0,
             vocab_size=get_vocab_size(self, tokenizer.vocab_size, self.make_vocab_size_divisible_by),
             max_sequence_length=self.seq_length,
-            tokrnizer=tokenizer,
+            tokenizer=tokenizer,
             fp16_lm_cross_entropy=self.fp16_lm_cross_entropy,
             parallel_output=self.parallel_output,
             share_embeddings_and_output_weights=self.share_embeddings_and_output_weights,
