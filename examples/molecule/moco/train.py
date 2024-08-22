@@ -142,7 +142,7 @@ def main(cfg: DictConfig) -> None:
         check_val_every_n_epoch=cfg.train.val_freq,
         gradient_clip_val=cfg.train.gradient_clip_value,
         log_every_n_steps=cfg.train.log_freq,  # for train steps
-        num_sanity_val_steps=1,  # skip sanity since sampling from random weights causes explosion in discrete elements
+        num_sanity_val_steps=0,  # skip sanity since sampling from random weights causes explosion in discrete elements
     )
 
     train_loader = datamodule.train_dataloader()

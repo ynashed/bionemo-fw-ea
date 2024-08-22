@@ -359,7 +359,7 @@ class NoPygGraph3DInterpolantModel(pl.LightningModule):
         time = self.sample_time(batch)
         out, batch, time = self(batch, time)
         loss, _ = self.calculate_loss(batch, out, time, "val")
-        self.sample(20)
+        self.sample(100)
         return loss
 
     def training_step(self, batch, batch_idx):

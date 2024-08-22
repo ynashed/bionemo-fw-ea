@@ -1,5 +1,6 @@
 import functools
 import math
+import time as time_keeper
 from typing import Literal
 
 import einops
@@ -22,6 +23,23 @@ NONLINEARITIES = {
     "gelu_tanh": nn.GELU(approximate='tanh'),
     "sigmoid": nn.Sigmoid(),
 }
+
+
+def on():
+    return time_keeper.perf_counter()
+
+
+def off(start, keyword=""):
+    end = time_keeper.perf_counter()
+    print(keyword, end - start)
+    return end
+
+
+def off_gpu(start, keyword=""):
+    torch.cuda.synchronize()
+    end = time_keeper.perf_counter()
+    print(keyword, end - start)
+    return end
 
 
 def calc_com(coords, node_mask=None):
@@ -687,19 +705,26 @@ class MDNoPyg(nn.Module):
         # )
 
     def forward(self, mask, edge_mask, X, H, E, t):
+        start = on()
         pos = self.coord_emb(X.unsqueeze(-1))  # N x 3 x K
         H = self.atom_embedder(H)
         E = self.edge_embedder(E)
         te = self.time_embedding(t)
+        end = off_gpu(start, "inits")
         edge_attr = E
         atom_hids = H
         # edge_hids = edge_attr
         for layer_index in range(len(self.dit_layers)):
             # import ipdb; ipdb.set_trace()
+            start = on()
             distances = coord2distfn(pos, self.scale_dist_features, mask)  # E x K
+            end = off_gpu(start, "coord2dist")
             H, edge_attr = self.dit_layers[layer_index](mask, H, te, edge_attr, edge_mask, distances)
+            end = off_gpu(end, "dit")
             pos, _ = self.egnn_layers[layer_index](mask, pos, H, edge_mask, edge_attr, te)  #! TODO at time here
+            end = off_gpu(end, "egnn")
             atom_hids = atom_hids + self.node_blocks[layer_index](H)
+            end = off_gpu(end, "residual")
             # edge_hids = edge_hids + self.edge_blocks[layer_index](edge_attr)
 
         X = self.coord_pred(pos).squeeze(-1) * mask.unsqueeze(-1)
@@ -708,6 +733,7 @@ class MDNoPyg(nn.Module):
         edge_attr = self.bond_refine(mask, x, H, edge_attr, edge_mask)
         h_logits, _ = self.atom_type_head(mask, H)
         e_logits, _ = self.edge_type_head.predict_edges(edge_mask, edge_attr)
+        end = off_gpu(end, "output layer")
         out = {
             "x_hat": x,
             "h_logits": h_logits,
