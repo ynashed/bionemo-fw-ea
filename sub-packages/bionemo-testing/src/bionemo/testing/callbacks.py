@@ -29,12 +29,18 @@ class MetricTracker(Callback):
         self._collection_train = defaultdict(list)
 
     def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0):
-        for metric in self.metrics_to_track_val:
-            self._collection_val[metric].append(outputs[metric])
+        if isinstance(outputs, torch.Tensor):
+            self._collection_val["unnamed"].append(outputs)
+        else:
+            for metric in self.metrics_to_track_val:
+                self._collection_val[metric].append(outputs[metric])
 
     def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0):
-        for metric in self.metrics_to_track_train:
-            self._collection_train[metric].append(outputs[metric])
+        if isinstance(outputs, torch.Tensor):
+            self._collection_train["unnamed"].append(outputs)
+        else:
+            for metric in self.metrics_to_track_train:
+                self._collection_train[metric].append(outputs[metric])
 
     def on_validation_epoch_end(self, trainer, pl_module):
         elogs = trainer.logged_metrics  # access it here

@@ -164,7 +164,7 @@ class MegatronBioBertFineTuneSeqLengthModel(MegatronBioBertModel):
 
 
 @dataclass
-class FineTuneSeqLenBioBertConfig(BioBertConfig[MegatronBioBertFineTuneSeqLengthModel]):
+class FineTuneSeqLenBioBertConfig(BioBertConfig):
     model_cls = MegatronBioBertFineTuneSeqLengthModel
     # typical case is fine-tune the base biobert that doesn't have this head. If you are instead loading a checkpoint
     # that has this new head and want to keep using these weights, please drop this next line or set to []

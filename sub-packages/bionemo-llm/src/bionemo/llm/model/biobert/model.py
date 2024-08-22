@@ -19,7 +19,7 @@ import os
 import tarfile
 from dataclasses import dataclass, field, fields
 from pathlib import Path
-from typing import Callable, Generic, List, Literal, Optional, Sequence, Type, TypedDict, TypeVar, Union
+from typing import Callable, List, Literal, Optional, Sequence, Type, TypedDict, TypeVar, Union
 
 import torch
 from megatron.core import parallel_state, tensor_parallel
@@ -362,16 +362,15 @@ MegatronBioBertModelT = TypeVar("MegatronBioBertModelT", bound=MegatronBioBertMo
 
 @dataclass
 class BioBertConfig(
-    Generic[MegatronBioBertModelT],
-    MegatronBioNeMoTrainableModelConfig[MegatronBioBertModelT, MegatronLossReduction],
     TransformerConfig,
+    MegatronBioNeMoTrainableModelConfig[MegatronBioBertModelT, MegatronLossReduction],
 ):
     """Config class for BioBert model, responsible for the partial configuration of Transformer models.
 
     `configure_model()` is ultimately called by the LightningModule using PTL lightning module hooks.
     """
 
-    model_cls: Optional[Type[MegatronBioBertModelT]] = None
+    model_cls: Type[MegatronBioBertModelT] = MegatronBioBertModel
     # From megatron.core.models.gpt.bert_model.GPTModel
     fp16_lm_cross_entropy: bool = False
     parallel_output: bool = True
@@ -382,6 +381,9 @@ class BioBertConfig(
     rotary_percent: float = 1.0
     seq_len_interpolation_factor: Optional[float] = None
     seq_length: int = 1024
+    hidden_size: int = 512
+    num_attention_heads: int = 8
+    num_layers: int = 6
     biobert_spec_option: BiobertSpecOption = BiobertSpecOption.bert_layer_local_spec
 
     # TODO: Move this to better places?
@@ -411,18 +413,6 @@ class BioBertConfig(
     )
     return_only_hidden_states: bool = False
     include_hiddens: bool = False  # Include hidden layers in the output of the model
-
-    def __post_init__(self):
-        super().__post_init__()
-        if self.model_cls is None:
-            raise ValueError(
-                f"You must supply `model_cls` to the {type(self)} for module to initialization in `configure_model`."
-            )
-        if self.nemo1_ckpt_path is not None and self.initial_ckpt_path is not None:
-            raise ValueError(
-                "Only supply nemo1 checkpoint or nemo2 checkpoint. "
-                f"Got: {self.nemo1_ckpt_path} and {self.initial_ckpt_path}"
-            )
 
     def configure_model(self, tokenizer) -> MegatronBioBertModelT:  # noqa: D102
         vp_size = self.virtual_pipeline_model_parallel_size
@@ -456,6 +446,7 @@ class BioBertConfig(
             my_fields = [f.name for f in fields(self)]
             skip_fields = set(self.override_parent_fields)
             override_fields = [f for f in my_fields if f in initial_fields and f not in skip_fields]
+            assert False
             # 2. override key variables in this config based on the parent config
             for f in override_fields:
                 setattr(self, f, getattr(initial_config, f))

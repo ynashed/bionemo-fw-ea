@@ -15,7 +15,7 @@
 
 import functools
 import tarfile
-from copy import deepcopy
+from copy import copy, deepcopy
 from pathlib import Path
 from typing import List, Tuple
 
@@ -166,7 +166,7 @@ def geneformer_config():
         biobert_spec_option=BiobertSpecOption.bert_layer_with_transformer_engine_spec
         if USE_TE
         else BiobertSpecOption.bert_layer_local_spec,
-        nemo1_ckpt_path=nemo1_checkpoint_path,
+        nemo1_ckpt_path=str(nemo1_checkpoint_path),
         return_only_hidden_states=True,  # This is what we did in nemo1 for inference
     )
 
@@ -869,7 +869,7 @@ def _train_model_get_ckpt(
         num_nodes=1,
         log_every_n_steps=5,
         callbacks=[LossLoggingCallback(), metric_tracker],
-        precision=MODEL_PRECISION,
+        plugins=nl.MegatronMixedPrecision(precision=MODEL_PRECISION),
     )
     nllm.train(
         model=module,
@@ -888,9 +888,14 @@ def _train_model_get_ckpt(
 
 @pytest.mark.needs_gpu
 def test_finetune_geneformer(tmpdir, geneformer_config: GeneformerConfig):
-    base_geneformer_config = deepcopy(geneformer_config)
+    base_geneformer_config = copy(geneformer_config)
+    base_geneformer_config.return_only_hidden_states = False
+    base_geneformer_config.nemo1_ckpt_path = None
     base_geneformer_config.num_layers = 3  # set to 3 layers
-
+    ft_geneformer_config = FineTuneSeqLenBioBertConfig(
+        # Most defaults, including the number of layers, should be overridden
+        initial_ckpt_path=None,  # FIXME fill this in later, we need to do this because the types get wrapped
+    )
     with megatron_parallel_state_utils.distributed_model_parallel_state(32):
         ckpt_path, initial_metrics, initial_trainer = _train_model_get_ckpt(
             name="test_experiment",
@@ -903,10 +908,7 @@ def test_finetune_geneformer(tmpdir, geneformer_config: GeneformerConfig):
         assert initial_trainer.model.config.num_layers == 3
         assert initial_metrics.collection_train["loss"][0] > initial_metrics.collection_train["loss"][-1]
     with megatron_parallel_state_utils.distributed_model_parallel_state(43):
-        ft_geneformer_config = FineTuneSeqLenBioBertConfig(
-            # Most defaults, including the number of layers, should be overridden
-            initial_ckpt_path=str(ckpt_path),
-        )
+        ft_geneformer_config.initial_ckpt_path = ckpt_path  # FIXME make it so we don't have to wait to init...
         simple_ft_checkpoint, simple_ft_metrics, ft_trainer = _train_model_get_ckpt(
             name="finetune_new_head",
             root_dir=tmpdir / "finetune_new_head",  # new checkpoint will land in a subdir of this

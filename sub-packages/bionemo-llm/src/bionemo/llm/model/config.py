@@ -13,19 +13,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Generic
+from typing import Generic, Type
 
 from megatron.core.model_parallel_config import ModelParallelConfig
-from nemo.lightning.io import IOMixin
 
+# from nemo.lightning.io import IOMixin
 from bionemo.core.model.config import BionemoModelConfig, BionemoTrainableModelConfig, Loss, Model
 
 
-class MegatronBioNeMoModelConfig(Generic[Model], BionemoModelConfig[Model], ModelParallelConfig, IOMixin):
+class MegatronBioNeMoModelConfig(Generic[Model], BionemoModelConfig[Model], ModelParallelConfig):
     """A ModelConfig class for bionemo that supports usage with Megatron models, for example as NeMo2 requires."""
+
+    model_cls: Type[Model]
 
 
 class MegatronBioNeMoTrainableModelConfig(
     Generic[Model, Loss], BionemoTrainableModelConfig[Model, Loss], MegatronBioNeMoModelConfig[Model]
 ):
     """A ModelConfig class for bionemo that supports usage with Megatron models, for example as NeMo2 requires."""
+
+    model_cls: Type[Model]
