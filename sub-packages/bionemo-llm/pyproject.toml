@@ -16,6 +16,7 @@ dependencies = [
     "pytorch-lightning>=2.2.1",
     "megatron-core @ git+https://github.com/NVIDIA/Megatron-LM.git@c7a1f82d761577e6ca0338d3521eac82f2aa0904",
     "nemo-toolkit @ git+https://github.com/NVIDIA/NeMo.git@d28c1b2dd7c8539299a4c31f7c8d1678e2cbb9c8",
+    #
 #    $ time rye sync
 #    Reusing already existing virtualenv
 #    Generating production lockfile: /Users/mgreaves/dev/oss/nvidia/bionemo-fw-ea/requirements.lock
@@ -37,9 +38,31 @@ dependencies = [
 #    ---
 #      Caused by: This error likely indicates that apex @ git+https://github.com/NVIDIA/apex.git@810ffae374a2b9cb4b5c5e28eaeca7d7998fca0c depends on torch, but doesn't declare it as a build dependency. If apex @ git+https://github.com/NVIDIA/apex.git@810ffae374a2b9cb4b5c5e28eaeca7d7998fca0c is a first-party package, consider adding torch to its `build-system.requires`. Otherwise, `uv pip install torch` into the environment and re-run with `--no-build-isolation`.
 #    error: could not write production lockfile for workspace
-    # TODO: need to get apex to define torch in its pyproject.toml
+    # TODO: need to get apex to define torch in its pyproject.toml OR provide prebuilt binaries!
 #    "apex @ git+https://github.com/NVIDIA/apex.git@810ffae374a2b9cb4b5c5e28eaeca7d7998fca0c",
-    "transformer_engine @ git+https://github.com/NVIDIA/TransformerEngine.git@7d576ed25266a17a7b651f2c12e8498f67e0baea",
+    #
+    #
+#    Building CMake extension transformer_engine
+#    Running command /usr/bin/cmake -S /home/mgreaves/.cache/uv/git-v0/checkouts/f679917ede501d2d/7d576ed/transformer_engine -B /home/mgreaves/.cache/uv/git-v0/checkouts/f679917ede501d2d/7d576ed/build_tools/build/cmake -DPython_EXECUTABLE=/home/mgreaves/.cache/uv/builds-v0/.tmpPCzZfy/bin/python -DPython_INCLUDE_DIR=/home/mgreaves/.rye/py/cpython@3.10.14/include/python3.10 -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/home/mgreaves/.cache/uv/git-v0/checkouts/f679917ede501d2d/7d576ed/build/lib.linux-x86_64-cpython-310 -GNinja -Dpybind11_DIR=/home/mgreaves/.cache/uv/builds-v0/.tmpPCzZfy/lib/python3.10/site-packages/pybind11/share/cmake/pybind11
+#    --- stderr:
+#    CMake Error at /usr/share/cmake-3.22/Modules/CMakeDetermineCUDACompiler.cmake:179 (message):
+#      Failed to find nvcc.
+#
+#      Compiler requires the CUDA toolkit.  Please set the CUDAToolkit_ROOT
+#      variable.
+#    Call Stack (most recent call first):
+#      CMakeLists.txt:15 (project)
+#
+#
+#    CMake Error: CMAKE_CXX_COMPILER not set, after EnableLanguage
+#    Traceback (most recent call last):
+#      File "/home/mgreaves/.cache/uv/git-v0/checkouts/f679917ede501d2d/7d576ed/build_tools/build_ext.py", line 79, in _build_cmake
+#        subprocess.run(command, cwd=build_dir, check=True)
+#      File "/home/mgreaves/.rye/py/cpython@3.10.14/lib/python3.10/subprocess.py", line 526, in run
+#        raise CalledProcessError(retcode, process.args,
+#    subprocess.CalledProcessError: Command '['/usr/bin/cmake', '-S', '/home/mgreaves/.cache/uv/git-v0/checkouts/f679917ede501d2d/7d576ed/transformer_engine', '-B', '/home/mgreaves/.cache/uv/git-v0/checkouts/f679917ede501d2d/7d576ed/build_tools/build/cmake', '-DPython_EXECUTABLE=/home/mgreaves/.cache/uv/builds-v0/.tmpPCzZfy/bin/python', '-DPython_INCLUDE_DIR=/home/mgreaves/.rye/py/cpython@3.10.14/include/python3.10', '-DCMAKE_BUILD_TYPE=Release', '-DCMAKE_INSTALL_PREFIX=/home/mgreaves/.cache/uv/git-v0/checkouts/f679917ede501d2d/7d576ed/build/lib.linux-x86_64-cpython-310', '-GNinja', '-Dpybind11_DIR=/home/mgreaves/.cache/uv/builds-v0/.tmpPCzZfy/lib/python3.10/site-packages/pybind11/share/cmake/pybind11']' returned non-zero exit status 1.
+    # TODO: need to get transformer engine to provide prebuilt binaries OR declare nvcc as build-time dependency (and obtain!)
+#    "transformer_engine @ git+https://github.com/NVIDIA/TransformerEngine.git@7d576ed25266a17a7b651f2c12e8498f67e0baea",
 ]
 requires-python = ">= 3.10"
 
