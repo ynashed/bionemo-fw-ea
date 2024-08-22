@@ -11,8 +11,8 @@ wandb_params:
 data:
   dataset_root: "/workspace/bionemo/data/pyg_geom_drug"
   processed_folder: "processed"
-  batch_size: &batch_size 100 #200
-  inference_batch_size: 100 #200
+  batch_size: &batch_size 150 #200
+  inference_batch_size: 150 #200
   removed_h: False
   data_loader_type: "midi"
 
@@ -92,7 +92,7 @@ interpolant:
 
   
 dynamics:
-  model_name: "mdali"
+  model_name: "megav2" #megadotfn
   model_args:
     atom_classes: 22
     edge_classes: 5
