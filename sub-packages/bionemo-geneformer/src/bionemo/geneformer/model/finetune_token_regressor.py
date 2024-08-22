@@ -60,10 +60,10 @@ class SequenceLengthRMSEPlusBERTMLMLossWithReduction(BERTMLMLossWithReduction):
             raise ValueError("Labels not provided in the batch. These are required for this loss computation.")
 
         unreduced_token_loss = self.unreduced_token_loss_fn(forward_out["token_logits"], batch["labels"])
-        n_tokens = batch["attention_mask"].sum(dim=-1, keepdim=True)
+        regression_output = forward_out["regression_output"]
+        n_tokens = batch["attention_mask"].sum(dim=-1, keepdim=True).to(dtype=regression_output.dtype)
         assert len(n_tokens.shape) == 2
         assert n_tokens.shape[-1] == 1
-        regression_output = forward_out["regression_output"]
         rmse_loss = torch.nn.functional.mse_loss(regression_output, n_tokens)
 
         # TODO(@jstjohn) also handle different output keys, like the sequence loss.
@@ -169,7 +169,7 @@ class FineTuneSeqLenBioBertConfig(BioBertGenericConfig[MegatronBioBertFineTuneSe
     model_cls = MegatronBioBertFineTuneSeqLengthModel
     # typical case is fine-tune the base biobert that doesn't have this head. If you are instead loading a checkpoint
     # that has this new head and want to keep using these weights, please drop this next line or set to []
-    initial_ckpt_path_ignore_weights: List[str] = field(default_factory=lambda: ["regression_head"])
+    initial_ckpt_skip_keys_with_these_prefixes: List[str] = field(default_factory=lambda: ["regression_head"])
 
     def get_loss_reduction_class(self) -> type[MegatronLossReduction]:
         return SequenceLengthRMSEPlusBERTMLMLossWithReduction

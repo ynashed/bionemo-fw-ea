@@ -493,7 +493,6 @@ def test_geneformer_inference_nemo1_v_nemo2_golden_values_by_layer(
                 pass
             case _:
                 assert False
-        geneformer_config
         new_model = geneformer_config.configure_model(tokenizer).eval().cuda()
         # TE adds non-null ._extra_state objects to layers, which store some kind of buffer bits
         #  so we need to allow those to pass through.
@@ -889,10 +888,15 @@ def _train_model_get_ckpt(
 
 @pytest.mark.needs_gpu
 def test_finetune_geneformer(tmpdir, geneformer_config: GeneformerConfig):
-    base_geneformer_config = deepcopy(geneformer_config)
-    base_geneformer_config.return_only_hidden_states = False
-    base_geneformer_config.nemo1_ckpt_path = None
-    base_geneformer_config.num_layers = 3  # set to 3 layers
+    base_geneformer_config = io.reinit(geneformer_config)  # generate a new copy by calling the cached init.
+
+    # Modify both the variable and associated saved init hyper-param by calling config.mutate(...)
+    base_geneformer_config.mutate_hparam("return_only_hidden_states", False)
+    base_geneformer_config.mutate_hparam("nemo1_ckpt_path", None)
+    base_geneformer_config.mutate_hparam("num_layers", 3)  # set to 3 layers
+    assert base_geneformer_config.num_layers == 3
+    assert base_geneformer_config.nemo1_ckpt_path is None
+    assert not base_geneformer_config.return_only_hidden_states
     with megatron_parallel_state_utils.distributed_model_parallel_state(32):
         ckpt_path, initial_metrics, initial_trainer = _train_model_get_ckpt(
             name="test_experiment",
@@ -923,4 +927,4 @@ def test_finetune_geneformer(tmpdir, geneformer_config: GeneformerConfig):
         assert simple_ft_checkpoint.is_dir()
         assert io.is_distributed_ckpt(simple_ft_checkpoint)
         assert ft_trainer.model.config.num_layers == 3
-        assert initial_metrics.collection_train["loss"][-1] > simple_ft_metrics.collection_train["loss"][0]
+        assert simple_ft_metrics.collection_train["loss"][0] > simple_ft_metrics.collection_train["loss"][-1]

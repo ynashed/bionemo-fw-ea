@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from dataclasses import dataclass
 from typing import Sequence
 
 from nemo.lightning import io
@@ -28,6 +29,7 @@ __all__: Sequence[str] = (
 GeneformerModel = MegatronBioBertModel
 
 
+@dataclass
 class GeneformerConfig(BioBertGenericConfig[GeneformerModel], io.IOMixin):
     """A geneformer config overrides the parent config, and adds a leaf-level iomixin, please do not inherit from this
     directly, as your parameters will likely be reset to this method's parameters silently.

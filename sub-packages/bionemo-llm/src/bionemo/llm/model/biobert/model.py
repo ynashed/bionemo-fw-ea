@@ -17,9 +17,24 @@
 import logging
 import os
 import tarfile
+from copy import deepcopy
 from dataclasses import dataclass, field, fields
 from pathlib import Path
-from typing import Callable, Generic, List, Literal, Optional, Sequence, Type, TypedDict, TypeVar, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Generic,
+    List,
+    Literal,
+    Optional,
+    Protocol,
+    Sequence,
+    Type,
+    TypedDict,
+    TypeVar,
+    Union,
+)
 
 import torch
 from megatron.core import parallel_state, tensor_parallel
@@ -62,7 +77,23 @@ __all__: Sequence[str] = (
     "BioBertGenericConfig",
     "MegatronBioBertModel",
     "BioBertOutput",
+    "OVERRIDE_BIONEMO_CONFIG_DEFAULTS",
 )
+
+_OVERRIDE_BIONEMO_CONFIG_DEFAULTS: List[str] = [
+    "initial_ckpt_skip_keys_with_these_prefixes",
+    "override_parent_fields",
+    "initial_ckpt_path_ignore_weights",
+    "initial_ckpt_path",
+    "return_only_hidden_states",
+    "include_hiddens",
+    "initial_ckpt_model_cfg_cls",
+    "model_cls",
+]
+
+# A copy that we do not use internally. Useful for external users who want to
+#  start with these defaults and add some new keys that they want to not override.
+OVERRIDE_BIONEMO_CONFIG_DEFAULTS = deepcopy(_OVERRIDE_BIONEMO_CONFIG_DEFAULTS)
 
 
 class BioBertOutput(TypedDict):  # noqa: D101
@@ -361,11 +392,27 @@ class MegatronBioBertModel(LanguageModule):
 MegatronBioBertModelT = TypeVar("MegatronBioBertModelT", bound=MegatronBioBertModel)
 
 
+class IOMixinProto(Protocol):
+    @property
+    def __io__(self) -> Dict[str, Any]: ...
+
+
+def override_mutate_possibly_extra_mutated_fiddle(
+    target_cfg: IOMixinProto, source_cfg: IOMixinProto, maybe_mutated_elements_to_clone: List[str]
+):
+    for f in maybe_mutated_elements_to_clone:
+        # 1. Update the tracked config values
+        setattr(target_cfg.__io__, f, getattr(source_cfg.__io__, f))
+        # 2. Update the lazily untracked values (if the same variable name is used post-init)
+        setattr(target_cfg, f, getattr(source_cfg, f))
+
+
 @dataclass
 class BioBertGenericConfig(
     Generic[MegatronBioBertModelT],
     MegatronBioNeMoTrainableModelConfig[MegatronBioBertModelT, MegatronLossReduction],
     TransformerConfig,
+    # Do not add iomixin here
 ):
     """Config class for BioBert model, responsible for the partial configuration of Transformer models.
 
@@ -407,17 +454,7 @@ class BioBertGenericConfig(
     initial_ckpt_skip_keys_with_these_prefixes: List[str] = field(default_factory=list)
     # Used if initializing from a checkpoint, set this to any fields you want to override rather than re-set.
     #  by default all fields will be overridden.
-    override_parent_fields: List[str] = field(
-        default_factory=lambda: [
-            "initial_ckpt_skip_keys_with_these_prefixes",
-            "initial_ckpt_path_ignore_weights",
-            "initial_ckpt_path",
-            "return_only_hidden_states",
-            "include_hiddens",
-            "initial_ckpt_model_cfg_cls",
-            "model_cls",
-        ]
-    )
+    override_parent_fields: List[str] = field(default_factory=lambda: _OVERRIDE_BIONEMO_CONFIG_DEFAULTS)
     return_only_hidden_states: bool = False
     include_hiddens: bool = False  # Include hidden layers in the output of the model
 
@@ -455,9 +492,7 @@ class BioBertGenericConfig(
             my_fields = [f.name for f in fields(self)]
             skip_fields = set(self.override_parent_fields)
             override_fields = [f for f in my_fields if f in initial_fields and f not in skip_fields]
-            # 2. override key variables in this config based on the parent config
-            for f in override_fields:
-                setattr(self, f, getattr(initial_config, f))
+            override_mutate_possibly_extra_mutated_fiddle(self, initial_config, override_fields)
 
         model = self.model_cls(
             self,
