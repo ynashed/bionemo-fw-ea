@@ -1,8 +1,8 @@
-# SCDL: Single Cell Data Loading for Scalable Training of Single Cell Foundation Models
+# Bionemo-scdl: Single Cell Data Loading for Scalable Training of Single Cell Foundation Models.
 
 ## Package Overview
 
-SCDL provides an independent pytorch-compatible dataset class for single cell data with a consistent API. This can be run independently from bionemo. It improves upon simple AnnData-based dataset classes in the following ways:
+Bionemo-scdl provides an independent pytorch-compatible dataset class for single cell data with a consistent API. Bionemo-scdl is developed and maintained by NVIDIA. This package can be run independently from bionemo. It improves upon simple AnnData-based dataset classes in the following ways:
 
 - A consistent API across input formats that is promised to be consistent across package versions.
 - Improved performance when loading large datasets.
@@ -10,25 +10,18 @@ SCDL provides an independent pytorch-compatible dataset class for single cell da
 - Ability to use datasets that are much, much larger than memory.
 - [Future] Support for improved compression.
 
-SCDL's API resembles that of AnnData, so code changes are minimal.
+Bionemo-scdl's API resembles that of AnnData, so code changes are minimal.
 In most places a simple swap from an attribute to a function is sufficient (i.e., swapping `data.n_obs` for `data.number_of_rows()`).
 
 ## Installation
 
-SCDL is available as an independent `pip` package from the local source tree:
-
-```bash
-pip install -e .
-```
-
-Alternatively, it can be installed with
+This package can be installed with
 ```bash
 pip install bionemo-scdl
 ```
 ## Usage
 
 ### Getting example data
-
 
 Here is how to process an example dataset from CellxGene with ~25,000 cells:
 
@@ -63,7 +56,7 @@ data.number_nonzero_values()
 
 ```
 
-### Saving SCDL datasets to disk
+### Saving SCDL (Single Cell Dataloader) datasets to disk
 
 When you open a SCDL dataset, you *must* choose a path where the backing
 data structures are stored. However, these structures are not guaranteed
@@ -92,9 +85,9 @@ reloaded_data = SingleCellMemMapDataset("97e_scmm")
 
 SCDL implements the required functions of the PyTorch Dataset abstract class.
 You can use PyTorch-compatible DataLoaders to load batches of data from a SCDL class.
-With a batch size greater than 1, there is a collation function (collate_sparse_matrix_batch),
-that will collate several sparse arrays into the CSR (Compressed Sparse Row) torch tensor
-format.
+With a batch size of 1 this can be run without a collating function. With a batch size
+greater than 1, there is a collation function (collate_sparse_matrix_batch), that will
+collate several sparse arrays into the CSR (Compressed Sparse Row) torch tensor format.
 
 ```python
 from torch.utils.data import DataLoader
@@ -133,4 +126,4 @@ and data loading performance.
 
 ## LICENSE
 
-See LICENSE/license.txt.
+Bionemo-scdl has an Apache 2.0 license, as found in the LICENSE file.
