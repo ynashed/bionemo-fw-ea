@@ -172,6 +172,129 @@ class InterpolantLossFunction(nn.Module):
                 return A.sum(), B.sum(), C.sum()
 
 
+class InterpolantLossFunctionNoPyg(nn.Module):
+    def __init__(
+        self,
+        continuous=True,
+        aggregation='mean',
+        loss_scale=1.0,
+        discrete_class_weight=None,
+        use_distance=None,
+        distance_scale=None,
+    ):
+        super().__init__()
+        if continuous:
+            self.f_continuous = nn.MSELoss(reduction='none')  # can also use HuberLoss
+        else:
+            if discrete_class_weight is None:
+                self.f_discrete = nn.CrossEntropyLoss(reduction='none')
+            else:
+                self.f_discrete = nn.CrossEntropyLoss(weight=discrete_class_weight, reduction='none')
+                #! We can up weight certain bonds to make sure this is correct
+        self.continuous = continuous
+        self.aggregation = aggregation
+        self.scale = loss_scale
+        self.use_distance = use_distance
+        self.distance_scale = distance_scale
+
+    def forward(self, batch, logits, data, batch_weight=None, element_weight=None):
+        # d (λx, λh, λe) = (3, 0.4, 2)
+        # import ipdb; ipdb.set_trace()
+        mask = batch['node_mask']
+        if self.continuous:
+            coord_loss = self.f_continuous(logits, data)
+            loss = (coord_loss * mask.unsqueeze(-1)).sum(
+                -1
+            )  # B x N x 3 #! before I was taking a mean here over the 3 coordinates
+        else:
+            loss = self.f_discrete(logits.view(-1, logits.size(-1)), data.view(-1)) * mask.view(-1)
+            loss = loss.unflatten(0, mask.shape)
+            # output = torch.argmax(logits*mask.unsqueeze(-1), dim=-1)
+        loss = loss.sum(dim=1) / mask.sum(-1)
+        if element_weight is not None:
+            loss = loss * element_weight
+
+        if batch_weight is not None:
+            loss = loss * batch_weight
+        if self.aggregation == "mean":  #! Aggregation is over the batch dimension
+            loss = self.scale * loss.mean()
+        elif self.aggregation == "sum":
+            loss = self.scale * loss.sum()
+        return loss
+
+    def edge_loss(self, batch, logits, data, batch_weight=None, element_weight=None):
+        # import ipdb; ipdb.set_trace()
+        mask = batch['edge_mask']
+        # batch_size = len(batch.unique())
+        loss = self.f_discrete(logits.view(-1, logits.size(-1)), data.view(-1)) * mask.view(-1)
+        loss = loss.unflatten(0, mask.shape)
+        loss = loss.sum(dim=(1, 2)) / mask.sum(dim=(1, 2))
+        # loss = 0.5 * scatter_mean(loss, index=index, dim=0, dim_size=num_atoms)  # Aggregate on the bonds first
+        # output = torch.argmax(logits, dim=-1)
+        if element_weight:
+            loss = loss * element_weight
+        # loss = scatter_mean(loss, index=batch, dim=0, dim_size=batch_size)
+        if batch_weight is not None:
+            loss = loss * batch_weight  # .unsqueeze(1)
+        if self.aggregation == "mean":
+            loss = self.scale * loss.mean()
+        elif self.aggregation == "sum":
+            loss = self.scale * loss.sum()
+        return loss
+
+    def distance_loss(self, batch, X_pred, X_true, Z_pred=None, time=None, time_cutoff=0.5):
+        if Z_pred is None:
+            true_distance = torch.tensor([], device=X_true.device)
+            x_pred_distance = torch.tensor([], device=X_true.device)
+            batch_size = len(batch.unique())
+            c_batch = []
+            for element in range(batch_size):
+                x_true = X_true[batch == element]
+                x_pred = X_pred[batch == element]
+                c_batch.extend([element] * x_true.size(0) * x_true.size(0))
+                dist = torch.cdist(x_true, x_true).flatten()
+                dist_pred = torch.cdist(x_pred, x_pred).flatten()
+                true_distance = torch.cat([true_distance, dist], dim=-1)
+                x_pred_distance = torch.cat([x_pred_distance, dist_pred], dim=-1)
+            c_batch = torch.Tensor(c_batch).to(torch.int64).to(X_true.device)
+            A = self.f_continuous(true_distance, x_pred_distance)
+            time_filter = time > time_cutoff
+            A = scatter_mean(A, c_batch, dim=0, dim_size=batch_size) * time_filter
+            if self.aggregation == "mean":
+                loss = A.mean()
+            elif self.aggregation == "sum":
+                loss = A.sum()
+            return loss, 0, 0
+        else:
+            true_distance = torch.tensor([], device=X_true.device)
+            x_pred_distance = torch.tensor([], device=X_true.device)
+            z_pred_distance = torch.tensor([], device=X_true.device)
+            batch_size = len(batch.unique())
+            c_batch = []
+            for element in range(batch_size):
+                x_true = X_true[batch == element]
+                x_pred = X_pred[batch == element]
+                c_batch.extend([element] * x_true.size(0) * x_true.size(0))
+                dist = torch.cdist(x_true, x_true).flatten()
+                dist_pred = torch.cdist(x_pred, x_pred).flatten()
+                dist_z = Z_pred[batch == element][:, batch == element].flatten()
+                true_distance = torch.cat([true_distance, dist], dim=-1)
+                x_pred_distance = torch.cat([x_pred_distance, dist_pred], dim=-1)
+                z_pred_distance = torch.cat([z_pred_distance, dist_z], dim=-1)
+            c_batch = torch.Tensor(c_batch).to(torch.int64).to(X_true.device)
+            A = self.f_continuous(true_distance, x_pred_distance)
+            B = self.f_continuous(true_distance, z_pred_distance)
+            C = self.f_continuous(x_pred_distance, z_pred_distance)
+            time_filter = time > time_cutoff
+            A = scatter_mean(A, c_batch, dim=0, dim_size=batch_size) * time_filter
+            B = scatter_mean(B, c_batch, dim=0, dim_size=batch_size) * time_filter
+            C = scatter_mean(C, c_batch, dim=0, dim_size=batch_size) * time_filter
+            if self.aggregation == "mean":
+                return A.mean(), B.mean(), C.mean()
+            elif self.aggregation == "sum":
+                return A.sum(), B.sum(), C.sum()
+
+
 if __name__ == "__main__":
     ligand_pos = torch.rand((75, 3))
     batch_ligand = torch.Tensor(

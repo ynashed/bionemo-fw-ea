@@ -20,7 +20,6 @@ from nemo.utils import logging
 from omegaconf import DictConfig, OmegaConf
 
 from bionemo.model.molecule.moco.data.molecule_datamodule import MoleculeDataModule
-from bionemo.model.molecule.moco.metrics.molecule_evaluation_callback import MoleculeEvaluationCallback
 
 # from bionemo.model.molecule.moco.models.module import Graph3DInterpolantModel
 from bionemo.model.molecule.moco.models.module_no_pyg import NoPygGraph3DInterpolantModel as Graph3DInterpolantModel
@@ -109,17 +108,17 @@ def main(cfg: DictConfig) -> None:
         filename="best-{epoch}-{step}--{" + metric_name + ":.3f}",
     )
 
-    evaluation_callback = MoleculeEvaluationCallback(
-        n_graphs=cfg.evaluation.n_molecules,
-        batch_size=cfg.evaluation.batch_size,
-        timesteps=cfg.evaluation.timesteps,
-        train_smiles=datamodule.train_dataset.smiles,
-        statistics=datamodule.statistics,
-        compute_2D_metrics=cfg.evaluation.compute_2D_metrics,
-        compute_3D_metrics=cfg.evaluation.compute_3D_metrics,
-        compute_dihedrals=cfg.evaluation.compute_dihedrals,
-        compute_train_data_metrics=cfg.evaluation.compute_train_data_metrics,
-    )
+    # evaluation_callback = MoleculeEvaluationCallback(
+    #     n_graphs=cfg.evaluation.n_molecules,
+    #     batch_size=cfg.evaluation.batch_size,
+    #     timesteps=cfg.evaluation.timesteps,
+    #     train_smiles=datamodule.train_dataset.smiles,
+    #     statistics=datamodule.statistics,
+    #     compute_2D_metrics=cfg.evaluation.compute_2D_metrics,
+    #     compute_3D_metrics=cfg.evaluation.compute_3D_metrics,
+    #     compute_dihedrals=cfg.evaluation.compute_dihedrals,
+    #     compute_train_data_metrics=cfg.evaluation.compute_train_data_metrics,
+    # )
 
     if 'num_nodes' in cfg.train:
         num_nodes = cfg.train.num_nodes
@@ -129,7 +128,12 @@ def main(cfg: DictConfig) -> None:
     trainer = pl.Trainer(
         max_epochs=cfg.train.n_epochs,
         logger=logger,
-        callbacks=[lr_monitor, ema_callback, evaluation_callback, last_checkpoint_callback, best_checkpoint_callback],
+        callbacks=[
+            lr_monitor,
+            ema_callback,
+            last_checkpoint_callback,
+            best_checkpoint_callback,
+        ],  # evaluation_callback], #! Skipping for now
         enable_progress_bar=cfg.train.enable_progress_bar,
         accelerator='gpu',
         devices=cfg.train.gpus,
@@ -138,7 +142,7 @@ def main(cfg: DictConfig) -> None:
         check_val_every_n_epoch=cfg.train.val_freq,
         gradient_clip_val=cfg.train.gradient_clip_value,
         log_every_n_steps=cfg.train.log_freq,  # for train steps
-        num_sanity_val_steps=0,  # skip sanity since sampling from random weights causes explosion in discrete elements
+        num_sanity_val_steps=1,  # skip sanity since sampling from random weights causes explosion in discrete elements
     )
 
     train_loader = datamodule.train_dataloader()

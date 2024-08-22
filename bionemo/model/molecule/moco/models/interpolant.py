@@ -471,6 +471,15 @@ class ContinuousDiffusionInterpolant(Interpolant):
             raise ValueError("Only Gaussian is supported")
         return x0.to(device)
 
+    def prior_nopyg(self, mask, shape, device, x1=None):
+        if self.prior_type == "gaussian" or self.prior_type == "normal":
+            x0 = torch.randn(shape).to(device)
+            if self.com_free:
+                x0 = self.zero_com(x0, mask) * mask.unsqueeze(-1)
+        else:
+            raise ValueError("Only Gaussian is supported")
+        return x0.to(device)
+
     def step(self, batch, xt, x_hat, x0, time, dt=None):
         """
         Perform a euler step.
@@ -496,24 +505,22 @@ class ContinuousDiffusionInterpolant(Interpolant):
         """
         Perform a euler step.
         """
-        import ipdb
-
-        ipdb.set_trace()
+        # import ipdb; ipdb.set_trace()
         t_idx = self.timesteps - 1 - time
         data_scale, noise_scale, log_var = (
             self.reverse_data_schedule[t_idx].unsqueeze(1),
             self.reverse_noise_schedule[t_idx].unsqueeze(1),
             self.log_var[t_idx].unsqueeze(1),
         )
-        mean = data_scale * x_hat + noise_scale * xt
+        mean = data_scale.unsqueeze(-1) * x_hat + noise_scale.unsqueeze(-1) * xt
         # if self.diffusion_type == "ddpm":
         #     # no noise when diffusion t == 0 so flow matching t == 1
         #     nonzero_mask = (1 - (time == (self.timesteps - 1)).float())[batch].unsqueeze(-1)
         #     x_next = mean + nonzero_mask * (0.5 * log_var).exp() * self.prior(batch, xt.shape, device=xt.device)
         # elif self.diffusion_type == "vdm":
-        noise = torch.randn(x_hat.shape).to(x_hat.device) * mask.unsqueeze(-1)
+        noise = torch.randn(x_hat.shape).to(x_hat.device)  # * mask.unsqueeze(-1)
         noise = self.zero_com(x0, mask)
-        x_next = mean + (0.5 * log_var).exp() * noise * mask.unsqueeze(-1)
+        x_next = mean + (0.5 * log_var.unsqueeze(-1)).exp() * noise  # * mask.unsqueeze(-1)
         # TODO: can add guidance module here
 
         if self.com_free:
@@ -936,6 +943,44 @@ class DiscreteDiffusionInterpolant(Interpolant):
             x0 = F.one_hot(x0, num_classes=self.num_classes)
         return x0.to(device)
 
+    def prior_nopyg(self, mask, shape, device, one_hot=False):
+        """
+        Returns discrete index (num_samples,) or one hot if True (num_samples, num_classes)
+        """
+        num_samples = shape[0] * shape[1]
+        if self.prior_type in ["absorb", "mask"]:
+            x0 = torch.ones((num_samples,)).to(torch.int64) * (self.num_classes - 1)
+        elif self.prior_type == "uniform":
+            x0 = torch.randint(0, self.num_classes, (num_samples,)).to(torch.int64)
+        elif self.prior_type in ["custom", "data"]:
+            x0 = torch.multinomial(self.custom_prior, num_samples, replacement=True).to(torch.int64)
+        else:
+            raise ValueError("Only uniform and mask are supported")
+        if one_hot:
+            x0 = F.one_hot(x0, num_classes=self.num_classes)
+        return x0.reshape(shape[0], shape[1]).to(device) * mask
+
+    def prior_edges_nopyg(self, mask, shape, device, one_hot=False):
+        # import ipdb; ipdb.set_trace()
+        N = mask.size(-1)
+        B = mask.size(0)
+        upper_triangular_mask = torch.triu(torch.ones(N, N), diagonal=1).long().to(device)
+        upper_triangular_mask = upper_triangular_mask.unsqueeze(0) * mask
+        edge_attr_0 = self.prior_nopyg(upper_triangular_mask.view(B, -1), shape, device, one_hot).reshape(
+            B, N, N
+        )  #! step through nhere
+        # Create a mask for the upper triangular part (including the diagonal)
+        upper_triangular_indices = torch.triu_indices(N, N, offset=0)
+
+        # Mirror the upper triangle to the lower triangle
+        # Using the upper triangular indices to fill the lower triangle
+        edge_attr_0[:, upper_triangular_indices[1], upper_triangular_indices[0]] = edge_attr_0[
+            :, upper_triangular_indices[0], upper_triangular_indices[1]
+        ]
+
+        # edge_index_global_perturbed, edge_attr_global_perturbed = self.clean_edges(x1_index, edge_attr_t)
+        return edge_attr_0
+
     def prior_edges(self, batch, shape, index, device, one_hot=False, return_masks=False):
         """
         Returns discrete index (num_samples,) or one hot if True (num_samples, num_classes)
@@ -1005,6 +1050,7 @@ class DiscreteDiffusionInterpolant(Interpolant):
         xt is the discrete variable at time t (or one hot)
         x_hat is the softmax of the logits
         """
+        # import ipdb; ipdb.set_trace()
         if self.solver_type == "sde" and self.diffusion_type == "d3pm":
             assert self.discrete_time_only
             # if len(x_hat.shape) <= 1:
@@ -1014,12 +1060,17 @@ class DiscreteDiffusionInterpolant(Interpolant):
             t_idx = self.timesteps - 1 - time
 
             # ! The above is the exact same but uses one more einsum so probably slower
-            A = torch.einsum("bnj, nji -> bni", [xt, self.Qt[t_idx].permute(0, 2, 1)]).unsqueeze(1)  # [A, 1, 16]
-            B = self.Qt_prev_bar[t_idx]  # [A, 16, 16]
-            p0 = A * B
-            p1 = torch.einsum("nij, bnj -> bni", [self.Qt_bar[t_idx], xt]).unsqueeze(-1)
-            probs = p0 / (p1.clamp(min=1e-5))
-            unweighted_probs = (probs * x_hat.unsqueeze(-1)).sum(1)
+            # import ipdb; ipdb.set_trace()
+            A = torch.einsum("b...j, bji -> b...i", [xt, self.Qt[t_idx].permute(0, 2, 1)]).unsqueeze(
+                -1
+            )  # [B, N, 16, 1]
+            B = self.Qt_prev_bar[t_idx].unsqueeze(1)  # [B, 16, 16]
+            if xt.dim() == 4:
+                B = B.unsqueeze(1)
+            p0 = A * B  #! Cna do this if its B N 16 1 * B 1 16 16
+            p1 = torch.einsum("bij, b...j -> b...i", [self.Qt_bar[t_idx], xt]).unsqueeze(-1)
+            probs = p0 / (p1.clamp(min=1e-5))  # torch.Size([20, 69, 16, 16])
+            unweighted_probs = (probs * x_hat.unsqueeze(-1)).sum(-1)  # torch.Size([20, 69, 16])
             unweighted_probs[unweighted_probs.sum(dim=-1) == 0] = 1e-5
             # (N, a_t-1)
             probs = unweighted_probs / (unweighted_probs.sum(-1, keepdims=True) + 1.0e-5)

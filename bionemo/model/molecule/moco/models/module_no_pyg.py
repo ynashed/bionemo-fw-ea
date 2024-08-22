@@ -17,7 +17,6 @@ import torch
 import torch.nn.functional as F
 from lightning import pytorch as pl
 from omegaconf import DictConfig, OmegaConf
-from torch_geometric.utils import dense_to_sparse, sort_edge_index
 from tqdm import tqdm
 
 # TODO create general data module class that can do 3dmg, sbdd, docking etc
@@ -25,7 +24,7 @@ from tqdm import tqdm
 from bionemo.model.molecule.moco.models.denoising_models import ModelBuilder
 from bionemo.model.molecule.moco.models.interpolant import build_interpolant
 from bionemo.model.molecule.moco.models.self_conditioning import SelfConditioningBuilder
-from bionemo.model.molecule.moco.models.utils import InterpolantLossFunction
+from bionemo.model.molecule.moco.models.utils import InterpolantLossFunctionNoPyg
 
 
 def calc_com(coords, node_mask=None):
@@ -106,7 +105,7 @@ class NoPygGraph3DInterpolantModel(pl.LightningModule):
         for loss_params in self.loss_params.variables:
             index = loss_params.variable_name
             if "use_distance" in loss_params:
-                loss_functions[index] = InterpolantLossFunction(
+                loss_functions[index] = InterpolantLossFunctionNoPyg(
                     loss_scale=loss_params.loss_scale,
                     aggregation=loss_params.aggregate,
                     continuous=loss_params.continuous,
@@ -114,7 +113,7 @@ class NoPygGraph3DInterpolantModel(pl.LightningModule):
                     distance_scale=loss_params.distance_scale,
                 )
             else:
-                loss_functions[index] = InterpolantLossFunction(
+                loss_functions[index] = InterpolantLossFunctionNoPyg(
                     loss_scale=loss_params.loss_scale,
                     aggregation=loss_params.aggregate,
                     continuous=loss_params.continuous,
@@ -358,71 +357,55 @@ class NoPygGraph3DInterpolantModel(pl.LightningModule):
         #! Swapping names for now
         time = self.sample_time(batch)
         out, batch, time = self(batch, time)
-        loss, predictions = self.calculate_loss(batch, out, time, "val")
+        loss, _ = self.calculate_loss(batch, out, time, "val")
+        self.sample(100)
         return loss
 
     def training_step(self, batch, batch_idx):
         #! Swapping names for now
-        # import ipdb; ipdb.set_trace()
         time = self.sample_time(batch)
         out, batch, time = self(batch, time)
-        loss, predictions = self.calculate_loss(batch, out, time, "train")
+        loss, _ = self.calculate_loss(batch, out, time, "train")
         return loss
 
     def calculate_loss(self, batch, out, time, stage="train"):
-        import ipdb
-
-        ipdb.set_trace()
-        batch_geo = batch.batch
-        batch_size = int(batch.batch.max()) + 1
+        batch_size = batch['node_mask'].size(0)
         ws_t = self.interpolants[self.global_variable].snr_loss_weight(time)
         loss = 0
         predictions = {}
         for key, loss_fn in self.loss_functions.items():
             if "edge" in key:
-                sub_loss, sub_pred = loss_fn.edge_loss(
-                    batch_geo,
+                sub_loss = loss_fn.edge_loss(
+                    batch,
                     out['edge_attr_logits'],
                     batch['edge_attr'],
-                    index=batch['edge_index'][1],
-                    num_atoms=batch_geo.size(0),
                     batch_weight=ws_t,
                 )
             else:
                 if loss_fn.continuous:
-                    sub_loss, sub_pred = loss_fn(batch_geo, out[f'{key}_hat'], batch[f'{key}'], batch_weight=ws_t)
+                    sub_loss = loss_fn(batch, out[f'{key}_hat'], batch[f'{key}'], batch_weight=ws_t)
                 else:
-                    true_data = batch[f'{key}']
-                    if len(true_data.shape) > 1:
-                        if true_data.size(1) == 1:
-                            true_data = true_data.unsqueeze(1)
-                        else:
-                            true_data = true_data.argmax(dim=-1)
-                    sub_loss, sub_pred = loss_fn(batch_geo, out[f'{key}_logits'], true_data, batch_weight=ws_t)
+                    sub_loss = loss_fn(batch, out[f'{key}_logits'], batch[f'{key}'], batch_weight=ws_t)
             # print(key, sub_loss)
             self.log(f"{stage}/{key}_loss", sub_loss, batch_size=batch_size, prog_bar=True)
             loss = loss + sub_loss
-            predictions[f'{key}'] = sub_pred
+            # predictions[f'{key}'] = sub_pred
 
-            if loss_fn.use_distance in ["single", "triple"]:
-                if "Z_hat" in out.keys() and loss_fn.use_distance == "triple":
-                    z_hat = out["Z_hat"]
-                else:
-                    z_hat = None
-                distance_loss_tp, distance_loss_tz, distance_loss_pz = loss_fn.distance_loss(
-                    batch_geo, out[f'{key}_hat'], batch[f'{key}'], z_hat
-                )
-                distance_loss = distance_loss_tp + distance_loss_tz + distance_loss_pz
-                self.log(f"{stage}/distance_loss", distance_loss, batch_size=batch_size)
-                self.log(f"{stage}/distance_loss_tp", distance_loss_tp, batch_size=batch_size)
-                self.log(f"{stage}/distance_loss_tz", distance_loss_tz, batch_size=batch_size)
-                self.log(f"{stage}/distance_loss_pz", distance_loss_pz, batch_size=batch_size)
-                loss = loss + loss_fn.distance_scale * distance_loss
-            # if loss_fn.use_distance in ["angle"]:
-            #     # import ipdb; ipdb.set_trace()
-            #     angle_loss = angle_cosine_loss(X= out[f'x_hat'], X_true = batch[f'x'], edge_index = batch[f'edge_index'], edge_attr = batch[f'edge_attr'], batch=batch["batch"])
-            #     self.log(f"{stage}/bond_angle_loss", angle_loss, batch_size=batch_size, prog_bar=True)
-            #     loss = loss + angle_loss
+            # if loss_fn.use_distance in ["single", "triple"]:
+            #     if "Z_hat" in out.keys() and loss_fn.use_distance == "triple":
+            #         z_hat = out["Z_hat"]
+            #     else:
+            #         z_hat = None
+            #     distance_loss_tp, distance_loss_tz, distance_loss_pz = loss_fn.distance_loss(
+            #         batch_geo, out[f'{key}_hat'], batch[f'{key}'], z_hat
+            #     )
+            #     distance_loss = distance_loss_tp + distance_loss_tz + distance_loss_pz
+            #     self.log(f"{stage}/distance_loss", distance_loss, batch_size=batch_size)
+            #     self.log(f"{stage}/distance_loss_tp", distance_loss_tp, batch_size=batch_size)
+            #     self.log(f"{stage}/distance_loss_tz", distance_loss_tz, batch_size=batch_size)
+            #     self.log(f"{stage}/distance_loss_pz", distance_loss_pz, batch_size=batch_size)
+            #     loss = loss + loss_fn.distance_scale * distance_loss
+
         self.log(f"{stage}/loss", loss, batch_size=batch_size)
         return loss, predictions
 
@@ -436,12 +419,9 @@ class NoPygGraph3DInterpolantModel(pl.LightningModule):
         5. Dynamics forward pass to predict clean data given noisy data.
         6. Seperate the aggregated discrete predictions for easier loss calculation.
         """
-        # import ipdb; ipdb.set_trace()
-        # batch_size = int(batch.batch.max()) + 1
         batch_size = batch['node_mask'].size(0)
         batch = self.pre_format_molecules(batch, batch_size)
         batch = self.interpolate(batch, time)  #! discrete variables are one hot after this point
-        # import ipdb; ipdb.set_trace()
         if self.self_conditioning_module is not None:
             batch, _ = self.self_conditioning(batch, time)
         batch = self.aggregate_discrete_variables(batch)
@@ -493,9 +473,7 @@ class NoPygGraph3DInterpolantModel(pl.LightningModule):
         """
         Generates num_samples. Can supply a batch for inital starting points for conditional sampling for any interpolants set to None.
         """
-        import ipdb
 
-        ipdb.set_trace()
         time_type = self.interpolants[self.global_variable].time_type
         if time_type == "continuous":
             if time_discretization == "linear":
@@ -519,17 +497,21 @@ class NoPygGraph3DInterpolantModel(pl.LightningModule):
                 )
             else:
                 num_atoms = torch.randint(20, 55, (num_samples,)).to(torch.int64)
-        batch_index = torch.repeat_interleave(torch.arange(num_samples), num_atoms).to(self.device)
-        edge_index = (
-            torch.eq(batch_index.unsqueeze(0), batch_index.unsqueeze(-1)).int().fill_diagonal_(0).to(self.device)
-        )  # N x N
-        edge_index, _ = dense_to_sparse(edge_index)  # 2 x E
-        edge_index = sort_edge_index(edge_index, sort_by_row=False)
-
+        # batch_index = torch.repeat_interleave(torch.arange(num_samples), num_atoms).to(self.device)
+        # edge_index = (
+        #     torch.eq(batch_index.unsqueeze(0), batch_index.unsqueeze(-1)).int().fill_diagonal_(0).to(self.device)
+        # )  # N x N
+        # edge_index, _ = dense_to_sparse(edge_index)  # 2 x E
+        # edge_index = sort_edge_index(edge_index, sort_by_row=False)
+        # import ipdb; ipdb.set_trace()
         data, prior = {}, {}
-        total_num_atoms = num_atoms.sum().item()
-
+        # total_num_atoms = num_atoms.sum().item()
+        max_num_atoms = num_atoms.max().item()
         # Sample from all Priors
+        mask = torch.arange(max_num_atoms).expand(len(num_atoms), max_num_atoms) < num_atoms.unsqueeze(1)
+        edge_mask = mask.unsqueeze(1) & mask.unsqueeze(2)
+        mask = mask.to(self.device)
+        edge_mask = edge_mask.to(self.device)
         for key, interpolant in self.interpolants.items():
             if interpolant is None:
                 if batch is not None:
@@ -538,19 +520,19 @@ class NoPygGraph3DInterpolantModel(pl.LightningModule):
                 else:
                     # If no batch is supplied just give zeros
                     data[f"{key}_t"] = torch.zeros(
-                        (total_num_atoms, self.interpolant_param_variables[key].num_classes)
+                        (num_samples, max_num_atoms, self.interpolant_param_variables[key].num_classes)
                     ).to(self.device)
                     if "offset" in self.interpolant_param_variables[key]:
                         data[f"{key}_t"] += self.interpolant_param_variables[key].offset
                 continue
             if "edge" in key:
-                shape = (edge_index.size(1), interpolant.num_classes)
-                prior[key], edge_index = interpolant.prior_edges(batch_index, shape, edge_index, self.device)
+                shape = (num_samples, max_num_atoms * max_num_atoms, interpolant.num_classes)
+                prior[key] = interpolant.prior_edges_nopyg(edge_mask, shape, self.device)
                 data[f"{key}_t"] = prior[key]
             else:
-                shape = (total_num_atoms, interpolant.num_classes)
-                data[f"{key}_t"] = prior[key] = interpolant.prior(batch_index, shape, self.device)
-
+                shape = (num_samples, max_num_atoms, interpolant.num_classes)
+                data[f"{key}_t"] = prior[key] = interpolant.prior_nopyg(mask, shape, self.device)
+        # import ipdb; ipdb.set_trace()
         # Iterate through time, query the dynamics, apply interpolant step update
         out = {}
         for idx in tqdm(list(range(len(DT))), total=len(DT)):
@@ -563,8 +545,8 @@ class NoPygGraph3DInterpolantModel(pl.LightningModule):
             if self.self_conditioning_module is not None:
                 data, pre_conditioning_variables = self.self_conditioning(data, time, conditional_batch=out)
             data = self.aggregate_discrete_variables(data)
-            data["batch"] = batch_index
-            data["edge_index"] = edge_index
+            data["node_mask"] = mask
+            data["edge_mask"] = edge_mask
             out = self.dynamics(data, time, conditional_batch=out, timesteps=timesteps)
             out, data = self.separate_discrete_variables(out, data)
             for key in pre_conditioning_variables:
@@ -574,10 +556,9 @@ class NoPygGraph3DInterpolantModel(pl.LightningModule):
                     continue
                 if "edge" in key:
                     data[f"{key}_t"] = interpolant.step_edges_nopyg(
-                        batch_index,
-                        edge_index=edge_index,
-                        edge_attr_t=data[f"{key}_t"],
-                        edge_attr_hat=out[f"{key}_hat"],
+                        edge_mask,
+                        xt=data[f"{key}_t"],
+                        x_hat=out[f"{key}_hat"],
                         time=time,
                     )
                 else:
@@ -585,13 +566,13 @@ class NoPygGraph3DInterpolantModel(pl.LightningModule):
                         xt=data[f"{key}_t"],
                         x_hat=out[f"{key}_hat"],
                         x0=prior[key],
-                        batch=batch_index,
+                        mask=mask,
                         time=time,
                         dt=dt,
                     )
         samples = {key: data[f"{key}_t"] for key in self.interpolants.keys()}
-        samples["batch"] = batch_index
-        samples["edge_index"] = edge_index
+        samples["node_mask"] = mask
+        samples["edge_mask"] = edge_mask
         for interp_params in self.interpolant_params.variables:
             if "offset" in interp_params:
                 samples[interp_params.variable_name] -= interp_params.offset

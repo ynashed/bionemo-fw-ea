@@ -91,6 +91,8 @@ class MoleculeEvaluationCallback(pl.Callback):
         Returns:
             Dict: Results of the evaluation.
         """
+        print("\n\n\n\n\n TODO Build get_molecules from non pyg")
+        assert 1 == 0
         mols = []
         with torch.no_grad():
             while len(mols) < self.n_graphs:
