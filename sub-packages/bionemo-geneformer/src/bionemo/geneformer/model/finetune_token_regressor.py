@@ -25,6 +25,7 @@ from megatron.core import parallel_state
 from megatron.core.transformer.module import MegatronModule
 from megatron.core.transformer.transformer_config import TransformerConfig
 from nemo.collections.nlp.modules.common.megatron.utils import average_losses_across_data_parallel_group
+from nemo.lightning import io
 from nemo.lightning.megatron_parallel import (
     MegatronLossReduction,
     masked_token_loss,
@@ -32,7 +33,7 @@ from nemo.lightning.megatron_parallel import (
 )
 from torch import nn
 
-from bionemo.llm.model.biobert.model import BioBertConfig, MegatronBioBertModel
+from bionemo.llm.model.biobert.model import BioBertGenericConfig, MegatronBioBertModel
 from bionemo.llm.model.loss import BERTMLMLossWithReduction, PerTokenLossDict, SameSizeLossDict
 
 
@@ -164,7 +165,7 @@ class MegatronBioBertFineTuneSeqLengthModel(MegatronBioBertModel):
 
 
 @dataclass
-class FineTuneSeqLenBioBertConfig(BioBertConfig):
+class FineTuneSeqLenBioBertConfig(BioBertGenericConfig[MegatronBioBertFineTuneSeqLengthModel], io.IOMixin):
     model_cls = MegatronBioBertFineTuneSeqLengthModel
     # typical case is fine-tune the base biobert that doesn't have this head. If you are instead loading a checkpoint
     # that has this new head and want to keep using these weights, please drop this next line or set to []

@@ -15,7 +15,7 @@
 
 import functools
 import tarfile
-from copy import copy, deepcopy
+from copy import deepcopy
 from pathlib import Path
 from typing import List, Tuple
 
@@ -43,7 +43,10 @@ from bionemo.geneformer.api import GeneformerConfig, GeneformerModel
 from bionemo.geneformer.data.singlecell.datamodule import SingleCellDataModule
 from bionemo.geneformer.data.singlecell.dataset import SingleCellDataset
 from bionemo.geneformer.data.singlecell.preprocess import GeneformerPreprocess
-from bionemo.geneformer.model.finetune_token_regressor import FineTuneSeqLenBioBertConfig
+from bionemo.geneformer.model.finetune_token_regressor import (
+    FineTuneSeqLenBioBertConfig,
+    MegatronBioBertFineTuneSeqLengthModel,
+)
 from bionemo.llm.data import collate
 from bionemo.llm.lightning import LossLoggingCallback
 from bionemo.llm.model.biobert.lightning import BioBertLightningModule
@@ -826,7 +829,6 @@ def _train_model_get_ckpt(
         monitor="reduced_train_loss",  # TODO find out how to get val_loss logged and use "val_loss",
         every_n_train_steps=5,
         enable_nemo_ckpt_io=True,  # Enables the .nemo file-like checkpointing where all IOMixins are under SerDe
-        # async_save=False,  # Tries to save asynchronously, previously led to race conditions.
     )
     save_dir = root_dir / name
     tb_logger = TensorBoardLogger(save_dir=save_dir, name=name)
@@ -838,7 +840,6 @@ def _train_model_get_ckpt(
         ckpt=checkpoint_callback,
     )
     # Needed so that the trainer can find an output directory for the profiler
-    # nemo_logger.save_dir = tmpdir
     # ckpt_path needs to be a string for SerDe
     optimizer = MegatronOptimizerModule(
         config=OptimizerConfig(
@@ -888,14 +889,10 @@ def _train_model_get_ckpt(
 
 @pytest.mark.needs_gpu
 def test_finetune_geneformer(tmpdir, geneformer_config: GeneformerConfig):
-    base_geneformer_config = copy(geneformer_config)
+    base_geneformer_config = deepcopy(geneformer_config)
     base_geneformer_config.return_only_hidden_states = False
     base_geneformer_config.nemo1_ckpt_path = None
     base_geneformer_config.num_layers = 3  # set to 3 layers
-    ft_geneformer_config = FineTuneSeqLenBioBertConfig(
-        # Most defaults, including the number of layers, should be overridden
-        initial_ckpt_path=None,  # FIXME fill this in later, we need to do this because the types get wrapped
-    )
     with megatron_parallel_state_utils.distributed_model_parallel_state(32):
         ckpt_path, initial_metrics, initial_trainer = _train_model_get_ckpt(
             name="test_experiment",
@@ -908,7 +905,15 @@ def test_finetune_geneformer(tmpdir, geneformer_config: GeneformerConfig):
         assert initial_trainer.model.config.num_layers == 3
         assert initial_metrics.collection_train["loss"][0] > initial_metrics.collection_train["loss"][-1]
     with megatron_parallel_state_utils.distributed_model_parallel_state(43):
-        ft_geneformer_config.initial_ckpt_path = ckpt_path  # FIXME make it so we don't have to wait to init...
+        # FIXME there's an error at this stage when we attempt to reload settings from the parent, for whatever reason
+        #  this isn't working and the default values from the parent are getting filled in rather than the actual
+        #  values.
+        ft_geneformer_config = FineTuneSeqLenBioBertConfig(
+            # Most defaults, including the number of layers, should be overridden
+            model_cls=MegatronBioBertFineTuneSeqLengthModel,  # FIXME why do I need to pass this here??
+            initial_ckpt_model_cfg_cls=GeneformerConfig,
+            initial_ckpt_path=str(ckpt_path),
+        )
         simple_ft_checkpoint, simple_ft_metrics, ft_trainer = _train_model_get_ckpt(
             name="finetune_new_head",
             root_dir=tmpdir / "finetune_new_head",  # new checkpoint will land in a subdir of this

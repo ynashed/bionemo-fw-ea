@@ -15,13 +15,13 @@
 
 from typing import Generic, Type
 
-from megatron.core.model_parallel_config import ModelParallelConfig
+from megatron.core.transformer import TransformerConfig
 
 # from nemo.lightning.io import IOMixin
 from bionemo.core.model.config import BionemoModelConfig, BionemoTrainableModelConfig, Loss, Model
 
 
-class MegatronBioNeMoModelConfig(Generic[Model], BionemoModelConfig[Model], ModelParallelConfig):
+class MegatronBioNeMoModelConfig(Generic[Model], BionemoModelConfig[Model], TransformerConfig):
     """A ModelConfig class for bionemo that supports usage with Megatron models, for example as NeMo2 requires."""
 
     model_cls: Type[Model]

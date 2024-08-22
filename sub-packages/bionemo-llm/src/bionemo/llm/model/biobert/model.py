@@ -19,7 +19,7 @@ import os
 import tarfile
 from dataclasses import dataclass, field, fields
 from pathlib import Path
-from typing import Callable, List, Literal, Optional, Sequence, Type, TypedDict, TypeVar, Union
+from typing import Callable, Generic, List, Literal, Optional, Sequence, Type, TypedDict, TypeVar, Union
 
 import torch
 from megatron.core import parallel_state, tensor_parallel
@@ -35,6 +35,7 @@ from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.transformer.utils import get_linear_layer
 from nemo.collections.common.tokenizers.huggingface.auto_tokenizer import AutoTokenizer
 from nemo.lightning import get_vocab_size, io
+from nemo.lightning.io.pl import TrainerContext
 from nemo.lightning.megatron_parallel import MegatronLossReduction
 from torch import Tensor
 from torch.optim import Optimizer
@@ -58,7 +59,7 @@ logging.basicConfig(
 logger = logging.getLogger(__file__)
 
 __all__: Sequence[str] = (
-    "BioBertConfig",
+    "BioBertGenericConfig",
     "MegatronBioBertModel",
     "BioBertOutput",
 )
@@ -361,11 +362,14 @@ MegatronBioBertModelT = TypeVar("MegatronBioBertModelT", bound=MegatronBioBertMo
 
 
 @dataclass
-class BioBertConfig(
-    TransformerConfig,
+class BioBertGenericConfig(
+    Generic[MegatronBioBertModelT],
     MegatronBioNeMoTrainableModelConfig[MegatronBioBertModelT, MegatronLossReduction],
+    TransformerConfig,
 ):
     """Config class for BioBert model, responsible for the partial configuration of Transformer models.
+
+    NOTE: do not use this config directly, define a child config that overrides items from this parent config
 
     `configure_model()` is ultimately called by the LightningModule using PTL lightning module hooks.
     """
@@ -384,6 +388,7 @@ class BioBertConfig(
     hidden_size: int = 512
     num_attention_heads: int = 8
     num_layers: int = 6
+    init_method_std: float = 0.02
     biobert_spec_option: BiobertSpecOption = BiobertSpecOption.bert_layer_local_spec
 
     # TODO: Move this to better places?
@@ -398,6 +403,7 @@ class BioBertConfig(
     nemo1_ckpt_path: Optional[str] = None
 
     initial_ckpt_path: Optional[str] = None
+    initial_ckpt_model_cfg_cls: Optional[Type[MegatronBioNeMoTrainableModelConfig]] = None
     initial_ckpt_skip_keys_with_these_prefixes: List[str] = field(default_factory=list)
     # Used if initializing from a checkpoint, set this to any fields you want to override rather than re-set.
     #  by default all fields will be overridden.
@@ -408,6 +414,7 @@ class BioBertConfig(
             "initial_ckpt_path",
             "return_only_hidden_states",
             "include_hiddens",
+            "initial_ckpt_model_cfg_cls",
             "model_cls",
         ]
     )
@@ -438,15 +445,16 @@ class BioBertConfig(
 
         # TODO refactor this next block out into a reusable config function.
         if self.initial_ckpt_path:
-            logger.warn
+            logger.warn(f"Loading {self.initial_ckpt_path} of type {self.initial_ckpt_model_cfg_cls}")
+            assert self.initial_ckpt_model_cfg_cls is not None
             # 1. get the config
             # TODO type(self) is probably not correct, maybe make the class name of the config to load an argument?
-            initial_config = io.load(Path(self.initial_ckpt_path), type(self))
+            cfg_trainer_ctx: TrainerContext = io.load(Path(self.initial_ckpt_path), TrainerContext)
+            initial_config: MegatronBioNeMoTrainableModelConfig = cfg_trainer_ctx.model.config
             initial_fields = {f.name for f in fields(initial_config)}
             my_fields = [f.name for f in fields(self)]
             skip_fields = set(self.override_parent_fields)
             override_fields = [f for f in my_fields if f in initial_fields and f not in skip_fields]
-            assert False
             # 2. override key variables in this config based on the parent config
             for f in override_fields:
                 setattr(self, f, getattr(initial_config, f))

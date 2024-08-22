@@ -15,7 +15,9 @@
 
 from typing import Sequence
 
-from bionemo.llm.model.biobert.model import BioBertConfig, MegatronBioBertModel
+from nemo.lightning import io
+
+from bionemo.llm.model.biobert.model import BioBertGenericConfig, MegatronBioBertModel
 
 
 __all__: Sequence[str] = (
@@ -25,4 +27,10 @@ __all__: Sequence[str] = (
 
 GeneformerModel = MegatronBioBertModel
 
-GeneformerConfig = BioBertConfig
+
+class GeneformerConfig(BioBertGenericConfig[GeneformerModel], io.IOMixin):
+    """A geneformer config overrides the parent config, and adds a leaf-level iomixin, please do not inherit from this
+    directly, as your parameters will likely be reset to this method's parameters silently.
+    """
+
+    model_cls = GeneformerModel
