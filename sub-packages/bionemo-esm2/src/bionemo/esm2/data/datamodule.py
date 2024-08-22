@@ -127,15 +127,20 @@ class ESMDataModule(pl.LightningDataModule):
         if max_train_steps <= 0:
             raise RuntimeError("Please specify trainer.max_steps")
 
-        eval_iters = int((max_train_steps // self.trainer.val_check_interval + 1) * self.trainer.limit_val_batches)
+        eval_iters = max_train_steps // self.trainer.val_check_interval + 1
         num_train_samples = int(max_train_steps * self.data_sampler.global_batch_size)
 
         val_clusters = dataset.create_valid_clusters(cluster_file=self._valid_cluster_path)
         if self.trainer.limit_val_batches <= 1.0 and isinstance(self.trainer.limit_val_batches, float):
             num_val_samples_per_epoch = int(len(val_clusters) * self.trainer.limit_val_batches)
+            if num_val_samples_per_epoch < self.data_sampler.global_batch_size:
+                raise ValueError(
+                    "The limited number of val samples %s is less than the global batch size %s"
+                    % (num_val_samples_per_epoch, self.data_sampler.global_batch_size)
+                )
             num_val_samples = eval_iters * num_val_samples_per_epoch // self.data_sampler.global_batch_size
-        elif self.trainer.limit_val_batches > 1 and isinstance(self.trainer.limit_val_batches, int):
-            num_val_samples = int(eval_iters * self.data_sampler.global_batch_size)
+        elif self.trainer.limit_val_batches >= 1 and isinstance(self.trainer.limit_val_batches, int):
+            num_val_samples = int(eval_iters * self.trainer.limit_val_batches * self.data_sampler.global_batch_size)
         else:
             raise ValueError("Invalid choice of limit_val_batches size: %s" % self.trainer.limit_val_batches)
 
