@@ -23,6 +23,7 @@ from pretrain import main  # TODO: needs to be refactored to a package and impor
 
 from bionemo import geneformer
 from bionemo.llm.model.biobert.transformer_specs import BiobertSpecOption
+from bionemo.testing import megatron_parallel_state_utils
 
 
 # TODO(@jstjohn) use fixtures for pulling down data and checkpoints
@@ -53,28 +54,29 @@ def test_bionemo2_rootdir():
 def test_main_runs(tmpdir):
     result_dir = Path(tmpdir.mkdir("results"))
 
-    main(
-        data_dir=data_path,
-        num_nodes=1,
-        devices=1,
-        seq_length=128,
-        result_dir=result_dir,
-        wandb_project=None,
-        wandb_offline=True,
-        num_steps=55,
-        limit_val_batches=1,
-        val_check_interval=1,
-        num_dataset_workers=0,
-        biobert_spec_option=BiobertSpecOption.bert_layer_local_spec,
-        lr=1e-4,
-        micro_batch_size=2,
-        cosine_rampup_frac=0.01,
-        cosine_hold_frac=0.01,
-        precision="bf16-mixed",
-        experiment_name="test_experiment",
-        resume_if_exists=False,
-        create_tensorboard_logger=False,
-    )
+    with megatron_parallel_state_utils.distributed_model_parallel_state():
+        main(
+            data_dir=data_path,
+            num_nodes=1,
+            devices=1,
+            seq_length=128,
+            result_dir=result_dir,
+            wandb_project=None,
+            wandb_offline=True,
+            num_steps=55,
+            limit_val_batches=1,
+            val_check_interval=1,
+            num_dataset_workers=0,
+            biobert_spec_option=BiobertSpecOption.bert_layer_local_spec,
+            lr=1e-4,
+            micro_batch_size=2,
+            cosine_rampup_frac=0.01,
+            cosine_hold_frac=0.01,
+            precision="bf16-mixed",
+            experiment_name="test_experiment",
+            resume_if_exists=False,
+            create_tensorboard_logger=False,
+        )
 
     assert (result_dir / "test_experiment").exists(), "Could not find test experiment directory."
     assert (result_dir / "test_experiment").is_dir(), "Test experiment directory is supposed to be a directory."

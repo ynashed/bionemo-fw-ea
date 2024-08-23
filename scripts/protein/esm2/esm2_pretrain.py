@@ -21,7 +21,7 @@ from typing import Optional, Sequence, Union, get_args
 from megatron.core.optimizer import OptimizerConfig
 from nemo import lightning as nl
 from nemo.collections import llm
-from nemo.lightning import io, resume
+from nemo.lightning import resume
 from nemo.lightning.pytorch import callbacks as nl_callbacks
 from nemo.lightning.pytorch.optim import MegatronOptimizerModule
 from pytorch_lightning.callbacks import LearningRateMonitor, RichModelSummary

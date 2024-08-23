@@ -26,6 +26,7 @@ from lightning.fabric.plugins.environments.lightning import find_free_network_po
 
 from bionemo import esm2
 from bionemo.llm.model.biobert.transformer_specs import BiobertSpecOption
+from bionemo.testing import megatron_parallel_state_utils
 
 
 # python scripts/download_artifacts.py --models all --model_dir ./models --data all --data_dir ./ --verbose --source pbss
@@ -102,35 +103,36 @@ def test_main_runs(tmpdir, dummy_protein_dataset, dummy_parquet_train_val_inputs
 
     result_dir = Path(tmpdir.mkdir("results"))
 
-    main(
-        train_cluster_path=train_cluster_path,
-        train_database_path=dummy_protein_dataset,
-        valid_cluster_path=valid_cluster_path,
-        valid_database_path=dummy_protein_dataset,
-        num_nodes=1,
-        devices=1,
-        seq_length=128,
-        result_dir=result_dir,
-        wandb_project=None,
-        wandb_offline=True,
-        num_steps=55,
-        warmup_steps=5,
-        limit_val_batches=1,
-        val_check_interval=1,
-        num_dataset_workers=1,
-        biobert_spec_option=BiobertSpecOption.esm2_bert_layer_local_spec,
-        lr=1e-4,
-        micro_batch_size=2,
-        accumulate_grad_batches=2,
-        precision="bf16-mixed",
-        experiment_name="test_experiment",
-        resume_if_exists=False,
-        create_tensorboard_logger=False,
-        num_layers=2,
-        num_attention_heads=2,
-        hidden_size=4,
-        ffn_hidden_size=4 * 4,
-    )
+    with megatron_parallel_state_utils.distributed_model_parallel_state():
+        main(
+            train_cluster_path=train_cluster_path,
+            train_database_path=dummy_protein_dataset,
+            valid_cluster_path=valid_cluster_path,
+            valid_database_path=dummy_protein_dataset,
+            num_nodes=1,
+            devices=1,
+            seq_length=128,
+            result_dir=result_dir,
+            wandb_project=None,
+            wandb_offline=True,
+            num_steps=55,
+            warmup_steps=5,
+            limit_val_batches=1,
+            val_check_interval=1,
+            num_dataset_workers=1,
+            biobert_spec_option=BiobertSpecOption.esm2_bert_layer_local_spec,
+            lr=1e-4,
+            micro_batch_size=2,
+            accumulate_grad_batches=2,
+            precision="bf16-mixed",
+            experiment_name="test_experiment",
+            resume_if_exists=False,
+            create_tensorboard_logger=False,
+            num_layers=2,
+            num_attention_heads=2,
+            hidden_size=4,
+            ffn_hidden_size=4 * 4,
+        )
 
     assert (result_dir / "test_experiment").exists(), "Could not find test experiment directory."
     assert (result_dir / "test_experiment").is_dir(), "Test experiment directory is supposed to be a directory."
@@ -148,42 +150,44 @@ def test_main_runs(tmpdir, dummy_protein_dataset, dummy_parquet_train_val_inputs
     ).is_file(), "Could not find experiment log."
 
 
-@pytest.mark.skip(reason="get_current_global_batch_size() != global_batch_size")
 @pytest.mark.parametrize("limit_val_batches", [0.5, 0.75, 1.0])
-def test_main_runs_fraction_limit_val_batches(tmpdir, dummy_protein_dataset, dummy_parquet_train_val_inputs, limit_val_batches):
+def test_main_runs_fraction_limit_val_batches(
+    tmpdir, dummy_protein_dataset, dummy_parquet_train_val_inputs, limit_val_batches
+):
     train_cluster_path, valid_cluster_path = dummy_parquet_train_val_inputs
 
     result_dir = Path(tmpdir.mkdir("results"))
 
-    main(
-        train_cluster_path=train_cluster_path,
-        train_database_path=dummy_protein_dataset,
-        valid_cluster_path=valid_cluster_path,
-        valid_database_path=dummy_protein_dataset,
-        num_nodes=1,
-        devices=1,
-        seq_length=128,
-        result_dir=result_dir,
-        wandb_project=None,
-        wandb_offline=True,
-        num_steps=55,
-        warmup_steps=5,
-        limit_val_batches=limit_val_batches,
-        val_check_interval=1,
-        num_dataset_workers=1,
-        biobert_spec_option=BiobertSpecOption.esm2_bert_layer_local_spec,
-        lr=1e-4,
-        micro_batch_size=2,
-        accumulate_grad_batches=1,
-        precision="bf16-mixed",
-        experiment_name="test_experiment",
-        resume_if_exists=False,
-        create_tensorboard_logger=False,
-        num_layers=2,
-        num_attention_heads=2,
-        hidden_size=4,
-        ffn_hidden_size=4 * 4,
-    )
+    with megatron_parallel_state_utils.distributed_model_parallel_state():
+        main(
+            train_cluster_path=train_cluster_path,
+            train_database_path=dummy_protein_dataset,
+            valid_cluster_path=valid_cluster_path,
+            valid_database_path=dummy_protein_dataset,
+            num_nodes=1,
+            devices=1,
+            seq_length=128,
+            result_dir=result_dir,
+            wandb_project=None,
+            wandb_offline=True,
+            num_steps=55,
+            warmup_steps=5,
+            limit_val_batches=limit_val_batches,
+            val_check_interval=1,
+            num_dataset_workers=1,
+            biobert_spec_option=BiobertSpecOption.esm2_bert_layer_local_spec,
+            lr=1e-4,
+            micro_batch_size=2,
+            accumulate_grad_batches=1,
+            precision="bf16-mixed",
+            experiment_name="test_experiment",
+            resume_if_exists=False,
+            create_tensorboard_logger=False,
+            num_layers=2,
+            num_attention_heads=2,
+            hidden_size=4,
+            ffn_hidden_size=4 * 4,
+        )
 
     assert (result_dir / "test_experiment").exists(), "Could not find test experiment directory."
     assert (result_dir / "test_experiment").is_dir(), "Test experiment directory is supposed to be a directory."
