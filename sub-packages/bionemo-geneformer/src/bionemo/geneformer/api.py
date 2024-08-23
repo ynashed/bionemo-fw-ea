@@ -37,4 +37,4 @@ class GeneformerConfig(BioBertGenericConfig[GeneformerModel], io.IOMixin):
     directly, as your parameters will likely be reset to this method's parameters silently.
     """
 
-    model_cls = GeneformerModel
+    model_cls: type[GeneformerModel] = GeneformerModel

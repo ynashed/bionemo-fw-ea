@@ -452,7 +452,7 @@ class BioBertGenericConfig(
     override_parent_fields: List[str] = field(default_factory=lambda: _OVERRIDE_BIONEMO_CONFIG_DEFAULTS)
     return_only_hidden_states: bool = False
     include_hiddens: bool = False  # Include hidden layers in the output of the model
-    core_attention_override: Type[torch.nn.Module] | None = field(default_factory=lambda: None)
+    core_attention_override: Type[torch.nn.Module] | None = None
 
     def configure_model(self, tokenizer) -> MegatronBioBertModelT:  # noqa: D102
         vp_size = self.virtual_pipeline_model_parallel_size
