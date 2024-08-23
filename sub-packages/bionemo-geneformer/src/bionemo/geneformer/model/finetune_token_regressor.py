@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from dataclasses import dataclass, field
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Tuple, Type, Union
 
 import torch
 from megatron.core import parallel_state
@@ -165,10 +165,11 @@ class MegatronBioBertFineTuneSeqLengthModel(MegatronBioBertModel):
 
 @dataclass
 class FineTuneSeqLenBioBertConfig(BioBertGenericConfig[MegatronBioBertFineTuneSeqLengthModel], io.IOMixin):
-    model_cls: type[MegatronBioBertFineTuneSeqLengthModel] = MegatronBioBertFineTuneSeqLengthModel
+    # When overriding fields in a dataclass _always_ declare types: https://github.com/python/cpython/issues/123269
+    model_cls: Type[MegatronBioBertFineTuneSeqLengthModel] = MegatronBioBertFineTuneSeqLengthModel
     # typical case is fine-tune the base biobert that doesn't have this head. If you are instead loading a checkpoint
     # that has this new head and want to keep using these weights, please drop this next line or set to []
     initial_ckpt_skip_keys_with_these_prefixes: List[str] = field(default_factory=lambda: ["regression_head"])
 
-    def get_loss_reduction_class(self) -> type[MegatronLossReduction]:
+    def get_loss_reduction_class(self) -> Type[MegatronLossReduction]:
         return SequenceLengthRMSEPlusBERTMLMLossWithReduction

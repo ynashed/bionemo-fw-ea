@@ -14,7 +14,7 @@
 # limitations under the License.
 
 from dataclasses import dataclass
-from typing import Sequence
+from typing import Sequence, Type
 
 from nemo.lightning import io
 
@@ -37,4 +37,4 @@ class GeneformerConfig(BioBertGenericConfig[GeneformerModel], io.IOMixin):
     directly, as your parameters will likely be reset to this method's parameters silently.
     """
 
-    model_cls: type[GeneformerModel] = GeneformerModel
+    model_cls: Type[GeneformerModel] = GeneformerModel

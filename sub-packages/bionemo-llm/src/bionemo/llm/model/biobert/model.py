@@ -406,7 +406,7 @@ def override_mutate_possibly_extra_mutated_fiddle(
         setattr(target_cfg, f, getattr(source_cfg, f))
 
 
-@dataclass(kw_only=True)
+@dataclass
 class BioBertGenericConfig(
     MegatronBioNeMoTrainableModelConfig[MegatronBioBertModelT, MegatronLossReduction],
 ):

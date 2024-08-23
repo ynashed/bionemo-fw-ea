@@ -92,6 +92,7 @@ class ESM2Model(MegatronBioBertModel):
             add_binary_head (bool): Whether to add a binary head. Defaults to True.
             return_embeddings (bool): Whether to return embeddings. Defaults to False.
             use_full_attention_mask (bool): Whether to use full attention mask. Defaults to False.
+            include_hiddens: Whether to include hidden states in the output dictionary. Defaults to False.
         """
         super(MegatronBioBertModel, self).__init__(config=config)
         self.post_process = post_process
@@ -214,7 +215,7 @@ def esm_gelu_func(x: Tensor) -> Tensor:
     return x * 0.5 * (1.0 + torch.erf(x / math.sqrt(2.0)))
 
 
-@dataclass(kw_only=True)
+@dataclass
 class ESM2Config(BioBertGenericConfig[ESM2Model], io.IOMixin):
     """Configuration class for ESM2 model.
 
@@ -253,7 +254,8 @@ class ESM2Config(BioBertGenericConfig[ESM2Model], io.IOMixin):
         return_only_hidden_states: Whether to return only hidden states.
     """
 
-    model_cls = ESM2Model
+    # When overriding fields in a dataclass _always_ declare types: https://github.com/python/cpython/issues/123269
+    model_cls: Type[ESM2Model] = ESM2Model
     num_layers: int = 33  # 650M
     hidden_size: int = 1280  # 650M
     num_attention_heads: int = 20
