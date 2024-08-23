@@ -85,7 +85,7 @@ def dummy_parquet_train_val_inputs(tmp_path):
     valid_cluster_path = tmp_path / "valid_clusters.parquet"
     valid_clusters = pd.DataFrame(
         {
-            "ur50_id": ["UniRef50_A", "UniRef50_B"],
+            "ur50_id": ["UniRef50_A", "UniRef50_B", "UniRef50_A", "UniRef50_B"],  # 2 IDs more than confest
         }
     )
     valid_clusters.to_parquet(valid_cluster_path)
@@ -148,8 +148,9 @@ def test_main_runs(tmpdir, dummy_protein_dataset, dummy_parquet_train_val_inputs
     ).is_file(), "Could not find experiment log."
 
 
-pytest.mark.skip(reason="Node traverser registration error on LossLoggingCallback")
-def test_main_runs_fraction_limit_val_batches(tmpdir, dummy_protein_dataset, dummy_parquet_train_val_inputs):
+@pytest.mark.skip(reason="get_current_global_batch_size() != global_batch_size")
+@pytest.mark.parametrize("limit_val_batches", [0.5, 0.75, 1.0])
+def test_main_runs_fraction_limit_val_batches(tmpdir, dummy_protein_dataset, dummy_parquet_train_val_inputs, limit_val_batches):
     train_cluster_path, valid_cluster_path = dummy_parquet_train_val_inputs
 
     result_dir = Path(tmpdir.mkdir("results"))
@@ -167,7 +168,7 @@ def test_main_runs_fraction_limit_val_batches(tmpdir, dummy_protein_dataset, dum
         wandb_offline=True,
         num_steps=55,
         warmup_steps=5,
-        limit_val_batches=1.0,  # float point value of limit_val_batches when dummy dataset has only 2 samples
+        limit_val_batches=limit_val_batches,
         val_check_interval=1,
         num_dataset_workers=1,
         biobert_spec_option=BiobertSpecOption.esm2_bert_layer_local_spec,
