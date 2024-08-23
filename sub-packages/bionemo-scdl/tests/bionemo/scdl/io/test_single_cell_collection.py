@@ -32,9 +32,9 @@ def test_sccollection_empty(tmpdir):
     assert coll.data_path == f"{tmpdir}/sccz"
 
 
-def test_sccollection_basics(tmpdir):
+def test_sccollection_basics(tmpdir, get_test_directory):
     coll = SingleCellCollection(f"{tmpdir}/sccz")
-    coll.load_h5ad("tests/test_data/adata_sample0.h5ad")
+    coll.load_h5ad(get_test_directory / "adata_sample0.h5ad")
     assert coll.number_of_rows() == 8
     assert coll.number_of_variables() == [10]
     assert coll.number_of_values() == 80
@@ -43,10 +43,10 @@ def test_sccollection_basics(tmpdir):
     assert coll.shape() == (8, [10])
 
 
-def test_sccollection_multi(tmpdir):
+def test_sccollection_multi(tmpdir, get_test_directory):
     coll = SingleCellCollection(f"{tmpdir}")
 
-    coll.load_h5ad_multi("tests/test_data/", max_workers=4, use_processes=False)
+    coll.load_h5ad_multi(get_test_directory / "", max_workers=4, use_processes=False)
     assert sorted(coll.fname_to_mmap) == [
         Path(f"{tmpdir}/adata_sample0"),
         Path(f"{tmpdir}/adata_sample1"),
@@ -69,9 +69,9 @@ def test_sccollection_multi(tmpdir):
     assert shape[0] == 114
 
 
-def test_sccollection_serialization(tmpdir):
+def test_sccollection_serialization(tmpdir, get_test_directory):
     coll = SingleCellCollection(f"{tmpdir}/sccy")
-    coll.load_h5ad_multi("tests/test_data/", max_workers=4, use_processes=False)
+    coll.load_h5ad_multi(get_test_directory / "", max_workers=4, use_processes=False)
     coll.flatten(f"{tmpdir}/flattened")
     dat = SingleCellMemMapDataset(f"{tmpdir}/flattened")
     assert dat.number_of_rows() == 114

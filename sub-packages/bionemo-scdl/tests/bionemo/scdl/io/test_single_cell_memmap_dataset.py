@@ -27,7 +27,7 @@ second_array_values = [10, 9, 8, 7, 6, 5, 4, 3]
 
 
 @pytest.fixture
-def generate_dataset(tmpdir) -> SingleCellMemMapDataset:
+def generate_dataset(tmpdir, get_test_directory) -> SingleCellMemMapDataset:
     """
     Create a SingleCellMemMapDataset, save and reload it
 
@@ -36,7 +36,7 @@ def generate_dataset(tmpdir) -> SingleCellMemMapDataset:
     Returns:
         A SingleCellMemMapDataset
     """
-    ds = SingleCellMemMapDataset(f"{tmpdir}/scy", h5ad_path="tests/test_data/adata_sample0.h5ad")
+    ds = SingleCellMemMapDataset(f"{tmpdir}/scy", h5ad_path=get_test_directory / "adata_sample0.h5ad")
     ds.save()
     del ds
     reloaded = SingleCellMemMapDataset(f"{tmpdir}/scy")
@@ -105,8 +105,8 @@ def test_wrong_arguments_for_dataset(tmpdir):
         SingleCellMemMapDataset(data_path=f"{tmpdir}/scy")
 
 
-def test_load_h5ad(tmpdir):
-    ds = SingleCellMemMapDataset(f"{tmpdir}/scy", h5ad_path="tests/test_data/adata_sample0.h5ad")
+def test_load_h5ad(tmpdir, get_test_directory):
+    ds = SingleCellMemMapDataset(f"{tmpdir}/scy", h5ad_path=get_test_directory / "adata_sample0.h5ad")
     assert ds.number_of_rows() == 8
     assert ds.number_of_variables() == [10]
     assert len(ds) == 8
@@ -201,9 +201,9 @@ def test_SingleCellMemMapDataset_get_row_padded(generate_dataset):
     assert len(generate_dataset.get_row_padded(2)[0]) == 10
 
 
-def test_concat_SingleCellMemMapDatasets_same(tmpdir):
-    ds = SingleCellMemMapDataset(f"{tmpdir}/scy", h5ad_path="tests/test_data/adata_sample0.h5ad")
-    dt = SingleCellMemMapDataset(f"{tmpdir}/sct", h5ad_path="tests/test_data/adata_sample0.h5ad")
+def test_concat_SingleCellMemMapDatasets_same(tmpdir, get_test_directory):
+    ds = SingleCellMemMapDataset(f"{tmpdir}/scy", h5ad_path=get_test_directory / "adata_sample0.h5ad")
+    dt = SingleCellMemMapDataset(f"{tmpdir}/sct", h5ad_path=get_test_directory / "adata_sample0.h5ad")
     dt.concat(ds)
 
     assert dt.number_of_rows() == 2 * ds.number_of_rows()
@@ -211,9 +211,9 @@ def test_concat_SingleCellMemMapDatasets_same(tmpdir):
     assert dt.number_nonzero_values() == 2 * ds.number_nonzero_values()
 
 
-def test_concat_SingleCellMemMapDatasets_diff(tmpdir):
-    ds = SingleCellMemMapDataset(f"{tmpdir}/scy", h5ad_path="tests/test_data/adata_sample0.h5ad")
-    dt = SingleCellMemMapDataset(f"{tmpdir}/sct", h5ad_path="tests/test_data/adata_sample1.h5ad")
+def test_concat_SingleCellMemMapDatasets_diff(tmpdir, get_test_directory):
+    ds = SingleCellMemMapDataset(f"{tmpdir}/scy", h5ad_path=get_test_directory / "adata_sample0.h5ad")
+    dt = SingleCellMemMapDataset(f"{tmpdir}/sct", h5ad_path=get_test_directory / "adata_sample1.h5ad")
 
     exp_number_of_rows = ds.number_of_rows() + dt.number_of_rows()
     exp_n_val = ds.number_of_values() + dt.number_of_values()
@@ -224,15 +224,15 @@ def test_concat_SingleCellMemMapDatasets_diff(tmpdir):
     assert dt.number_nonzero_values() == exp_nnz
 
 
-def test_concat_SingleCellMemMapDatasets_multi(tmpdir, compare_fn):
-    ds = SingleCellMemMapDataset(f"{tmpdir}/scy", h5ad_path="tests/test_data/adata_sample0.h5ad")
-    dt = SingleCellMemMapDataset(f"{tmpdir}/sct", h5ad_path="tests/test_data/adata_sample1.h5ad")
-    dx = SingleCellMemMapDataset(f"{tmpdir}/sccx", h5ad_path="tests/test_data/adata_sample2.h5ad")
+def test_concat_SingleCellMemMapDatasets_multi(tmpdir, compare_fn, get_test_directory):
+    ds = SingleCellMemMapDataset(f"{tmpdir}/scy", h5ad_path=get_test_directory / "adata_sample0.h5ad")
+    dt = SingleCellMemMapDataset(f"{tmpdir}/sct", h5ad_path=get_test_directory / "adata_sample1.h5ad")
+    dx = SingleCellMemMapDataset(f"{tmpdir}/sccx", h5ad_path=get_test_directory / "adata_sample2.h5ad")
     exp_n_obs = ds.number_of_rows() + dt.number_of_rows() + dx.number_of_rows()
     dt.concat(ds)
     dt.concat(dx)
     assert dt.number_of_rows() == exp_n_obs
-    dns = SingleCellMemMapDataset(f"{tmpdir}/scdns", h5ad_path="tests/test_data/adata_sample1.h5ad")
+    dns = SingleCellMemMapDataset(f"{tmpdir}/scdns", h5ad_path=get_test_directory / "adata_sample1.h5ad")
 
     dns.concat([ds, dx])
     compare_fn(dns, dt)
