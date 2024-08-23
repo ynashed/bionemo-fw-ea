@@ -103,6 +103,23 @@ class InterpolantLossFunction(nn.Module):
             loss = self.scale * loss.sum()
         return loss, output
 
+    def backbone_loss(self, batch, logits, data, batch_weight, cutoff=2.5):
+        batch_size = len(batch.unique())
+        grel = logits.unsqueeze(1) - logits.unsqueeze(0)
+        trel = data.unsqueeze(1) - data.unsqueeze(0)
+        gnorm = torch.linalg.norm(grel, dim=-1)
+        tnorm = torch.linalg.norm(trel, dim=-1)
+        mask = tnorm < cutoff
+        mask.fill_diagonal_(False)
+        gbackbone = gnorm * mask.int()
+        tbackbone = tnorm * mask.int()
+        loss = self.f_continuous(gbackbone, tbackbone)
+        loss_mask = (batch.unsqueeze(0) == batch.unsqueeze(1)).int()
+        loss = loss * loss_mask
+        loss = loss.sum(-1)
+        loss = scatter_mean(loss, index=batch, dim=0, dim_size=batch_size) * batch_weight
+        return loss.mean()
+
     def edge_loss(self, batch, logits, data, index, num_atoms, batch_weight=None, element_weight=None):
         batch_size = len(batch.unique())
         loss = self.f_discrete(logits, data)

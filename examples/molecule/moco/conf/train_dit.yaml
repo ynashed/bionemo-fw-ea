@@ -102,6 +102,7 @@ dynamics:
     equivariant_node_feature_dim: 3
     num_layers: 10
     num_heads: 4
+    prune_edges: True
     # use_cross_product: True
   wrapper_args:
     timesteps: *timesteps

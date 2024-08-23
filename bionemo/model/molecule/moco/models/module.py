@@ -462,6 +462,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
                 )
             else:
                 if loss_fn.continuous:
+                    # import ipdb; ipdb.set_trace()
                     sub_loss, sub_pred = loss_fn(batch_geo, out[f'{key}_hat'], batch[f'{key}'], batch_weight=ws_t)
                 else:
                     true_data = batch[f'{key}']
@@ -474,7 +475,12 @@ class Graph3DInterpolantModel(pl.LightningModule):
             # print(key, sub_loss)
             self.log(f"{stage}/{key}_loss", sub_loss, batch_size=batch_size, prog_bar=True)
             loss = loss + sub_loss
-            predictions[f'{key}'] = sub_pred
+            # predictions[f'{key}'] = sub_pred
+            bbloss = self.loss_functions['x'].backbone_loss(
+                batch_geo, out['x_hat'], batch['x'], batch_weight=(time > 250).int()
+            )
+            self.log(f"{stage}/backbone_loss", bbloss, batch_size=batch_size, prog_bar=True)
+            loss = loss + bbloss
 
             if loss_fn.use_distance in ["single", "triple"]:
                 if "Z_hat" in out.keys() and loss_fn.use_distance == "triple":
