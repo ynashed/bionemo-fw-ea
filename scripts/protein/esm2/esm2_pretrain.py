@@ -171,10 +171,9 @@ def main(
         val_check_interval=val_check_interval,  # TODO(@jstjohn) Checkpoint saving is currently broken, fix and change this.
         num_nodes=num_nodes,
         callbacks=[
-            # TODO(@skothenhill-nv) these need to be cleaned up when we have the automatic addition of track_io
-            io.track_io(LossLoggingCallback)(),
-            io.track_io(RichModelSummary)(max_depth=4),
-            io.track_io(LearningRateMonitor)(),
+            LossLoggingCallback(),
+            RichModelSummary(max_depth=4),
+            LearningRateMonitor(),
         ],
         plugins=nl.MegatronMixedPrecision(precision=precision),
     )
