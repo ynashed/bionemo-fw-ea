@@ -45,7 +45,6 @@ from bionemo.geneformer.data.singlecell.dataset import SingleCellDataset
 from bionemo.geneformer.data.singlecell.preprocess import GeneformerPreprocess
 from bionemo.geneformer.model.finetune_token_regressor import (
     FineTuneSeqLenBioBertConfig,
-    MegatronBioBertFineTuneSeqLengthModel,
 )
 from bionemo.llm.data import collate
 from bionemo.llm.lightning import LossLoggingCallback
@@ -739,8 +738,10 @@ def test_inference_loss_10m_released_checkpoint(geneformer_config: GeneformerCon
     """Test that we get a good loss when loading a bionemo1 checkpoint with a properly initialized config"""
     geneformer_config_logit = deepcopy(geneformer_config)
     # Set up the model to return logits and switch to the released 10M checkpoint
-    geneformer_config_logit.return_only_hidden_states = False  # return logits
-    geneformer_config_logit.nemo1_ckpt_path = nemo1_release_checkpoint_path  # release checkpoint is important
+    geneformer_config_logit.mutate_hparam("return_only_hidden_states", False)  # return logits
+    geneformer_config_logit.mutate_hparam(
+        "nemo1_ckpt_path", nemo1_release_checkpoint_path
+    )  # release checkpoint is important
 
     mean_loss = _get_loss_from_model(geneformer_config_logit, seed)
 
@@ -766,12 +767,14 @@ def test_inference_loss_10m_released_checkpoint_wrong_activation(geneformer_conf
     """
     geneformer_config_logit = deepcopy(geneformer_config)
     # Set up the model to return logits and switch to the released 10M checkpoint
-    geneformer_config_logit.return_only_hidden_states = False  # return logits
-    geneformer_config_logit.nemo1_ckpt_path = nemo1_release_checkpoint_path  # release checkpoint is important
+    geneformer_config_logit.mutate_hparam("return_only_hidden_states", False)  # return logits
+    geneformer_config_logit.mutate_hparam(
+        "nemo1_ckpt_path", nemo1_release_checkpoint_path
+    )  # release checkpoint is important
 
     # introduce a breaking change with a future xfail as a negative control for our test
-    geneformer_config_logit.activation_func = torch.nn.functional.relu  # the model should be gelu
-    geneformer_config_logit.bias_activation_fusion = False  # this needs to be off for ReLu support
+    geneformer_config_logit.mutate_hparam("activation_func", torch.nn.functional.relu)  # the model should be gelu
+    geneformer_config_logit.mutate_hparam("bias_activation_fusion", False)  # this needs to be off for ReLu support
 
     mean_loss = _get_loss_from_model(geneformer_config_logit, seed)
     # In one run, this gave a mean_loss of 7.9! Very much broke the model.
@@ -817,8 +820,8 @@ def _train_model_get_ckpt(
         val_dataset_path=str(val_data_path),
         test_dataset_path=str(test_data_path),
         random_token_prob=0.1,
-        micro_batch_size=4,
-        global_batch_size=4,
+        micro_batch_size=32,
+        global_batch_size=32,
     )
 
     checkpoint_callback = nl_callbacks.ModelCheckpoint(
@@ -842,7 +845,7 @@ def _train_model_get_ckpt(
     # ckpt_path needs to be a string for SerDe
     optimizer = MegatronOptimizerModule(
         config=OptimizerConfig(
-            lr=1e-4,
+            lr=5e-4,
             optimizer="adam",
             use_distributed_optimizer=True,
             fp16=config.fp16,
@@ -863,11 +866,11 @@ def _train_model_get_ckpt(
         accelerator="gpu",
         devices=1,
         strategy=strategy,
-        limit_val_batches=5,
-        val_check_interval=5,
-        max_steps=100,
+        limit_val_batches=2,
+        val_check_interval=10,
+        max_steps=50,
         num_nodes=1,
-        log_every_n_steps=5,
+        log_every_n_steps=10,
         callbacks=[LossLoggingCallback(), metric_tracker],
         plugins=nl.MegatronMixedPrecision(precision=MODEL_PRECISION),
     )
@@ -884,6 +887,44 @@ def _train_model_get_ckpt(
     )
     ckpt_dirpath = Path(checkpoint_callback.last_model_path.replace(".ckpt", ""))
     return ckpt_dirpath, metric_tracker, trainer
+
+
+@pytest.mark.needs_gpu
+def test_continue_from_checkpoint_geneformer(tmpdir, geneformer_config: GeneformerConfig):
+    base_geneformer_config = io.reinit(geneformer_config)  # generate a new copy by calling the cached init.
+
+    # Modify both the variable and associated saved init hyper-param by calling config.mutate(...)
+    base_geneformer_config.mutate_hparam("return_only_hidden_states", False)
+    base_geneformer_config.mutate_hparam("nemo1_ckpt_path", None)
+    base_geneformer_config.mutate_hparam("num_layers", 3)  # set to 3 layers
+    assert base_geneformer_config.num_layers == 3
+    assert base_geneformer_config.nemo1_ckpt_path is None
+    assert not base_geneformer_config.return_only_hidden_states
+    with megatron_parallel_state_utils.distributed_model_parallel_state(32):
+        ckpt_path, initial_metrics, initial_trainer = _train_model_get_ckpt(
+            name="test_experiment",
+            root_dir=tmpdir / "pretrain",
+            config=base_geneformer_config,
+        )
+        assert ckpt_path.exists()
+        assert ckpt_path.is_dir()
+        assert io.is_distributed_ckpt(ckpt_path)
+        assert initial_trainer.model.config.num_layers == 3
+        assert initial_metrics.collection_train["loss"][0] > initial_metrics.collection_train["loss"][-1]
+    with megatron_parallel_state_utils.distributed_model_parallel_state(43):
+        # NOTE all other hparams will be pulled from this checkpoint.
+        base_geneformer_config = GeneformerConfig(initial_ckpt_path=str(ckpt_path))
+        continue_checkpoint, continue_metrics, continue_trainer = _train_model_get_ckpt(
+            name="test_experiment_continue",
+            root_dir=tmpdir / "continue_training",  # new checkpoint will land in a subdir of this
+            config=base_geneformer_config,  # same config as before since we are just continuing training
+        )
+        assert continue_checkpoint.exists()
+        assert continue_checkpoint.is_dir()
+        assert io.is_distributed_ckpt(continue_checkpoint)
+        assert continue_trainer.model.config.num_layers == 3
+        assert continue_metrics.collection_train["loss"][0] > continue_metrics.collection_train["loss"][-1]
+        assert sum(continue_metrics.collection_train["loss"][:5]) < sum(initial_metrics.collection_train["loss"][-5:])
 
 
 @pytest.mark.needs_gpu
@@ -909,13 +950,8 @@ def test_finetune_geneformer(tmpdir, geneformer_config: GeneformerConfig):
         assert initial_trainer.model.config.num_layers == 3
         assert initial_metrics.collection_train["loss"][0] > initial_metrics.collection_train["loss"][-1]
     with megatron_parallel_state_utils.distributed_model_parallel_state(43):
-        # FIXME there's an error at this stage when we attempt to reload settings from the parent, for whatever reason
-        #  this isn't working and the default values from the parent are getting filled in rather than the actual
-        #  values.
         ft_geneformer_config = FineTuneSeqLenBioBertConfig(
-            # Most defaults, including the number of layers, should be overridden
-            model_cls=MegatronBioBertFineTuneSeqLengthModel,  # FIXME why do I need to pass this here??
-            initial_ckpt_model_cfg_cls=GeneformerConfig,
+            # All other hparams will be pulled from this checkpoint, aside from those in `override_parent_fields``
             initial_ckpt_path=str(ckpt_path),
         )
         simple_ft_checkpoint, simple_ft_metrics, ft_trainer = _train_model_get_ckpt(

@@ -86,7 +86,6 @@ _OVERRIDE_BIONEMO_CONFIG_DEFAULTS: List[str] = [
     "initial_ckpt_path",
     "return_only_hidden_states",
     "include_hiddens",
-    "initial_ckpt_model_cfg_cls",
     "model_cls",
 ]
 
@@ -445,7 +444,6 @@ class BioBertGenericConfig(
     nemo1_ckpt_path: Optional[str] = None
 
     initial_ckpt_path: Optional[str] = None
-    initial_ckpt_model_cfg_cls: Optional[Type[MegatronBioNeMoTrainableModelConfig]] = None
     initial_ckpt_skip_keys_with_these_prefixes: List[str] = field(default_factory=list)
     # Used if initializing from a checkpoint, set this to any fields you want to override rather than re-set.
     #  by default all fields will be overridden.
@@ -478,8 +476,7 @@ class BioBertGenericConfig(
 
         # TODO refactor this next block out into a reusable config function.
         if self.initial_ckpt_path:
-            logger.warn(f"Loading {self.initial_ckpt_path} of type {self.initial_ckpt_model_cfg_cls}")
-            assert self.initial_ckpt_model_cfg_cls is not None
+            logger.warn(f"Loading {self.initial_ckpt_path}")
             # 1. get the config
             # TODO type(self) is probably not correct, maybe make the class name of the config to load an argument?
             cfg_trainer_ctx: TrainerContext = io.load(Path(self.initial_ckpt_path), TrainerContext)

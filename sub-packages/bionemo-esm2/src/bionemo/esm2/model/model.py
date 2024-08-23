@@ -297,10 +297,10 @@ class ESM2Config(BioBertGenericConfig[ESM2Model], io.IOMixin):
     optimizer_fn: Optional[Callable[[MegatronBioBertModel], Optimizer]] = None
     # TODO (@skothenhill,@georgea) update to use the nemo2 checkpoint mixins
     #  support HF (requires weight interleaving on qkv layer) and nemo1 checkpoints ideally.
-    # TODO (@skothenhill,@jstjohn) come up with a nice way of doing fine-tuning checkpoint loading,
-    #  where some acceptible layers (eg lm_head) may or may not be absent from the model, and others
-    #  (like a new head) may be new and missing from the initial checkpoint.
     nemo1_ckpt_path: str | None = None
+    # The following checkpoint path is for nemo2 checkpoints. Config parameters not present in
+    #  self.override_parent_fields will be loaded from the checkpoint and override those values here.
+    initial_ckpt_path: str | None = None
     # TODO (@jstjohn) come up with a cleaner way in the biobert module to return user requested
     #  things as part of the workflow for inference and fine-tuning.
     return_only_hidden_states: bool = False  # return logits
