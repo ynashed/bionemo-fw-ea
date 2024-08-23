@@ -1,0 +1,36 @@
+# For documentation, see: https://docs.gitlab.com/ee/user/project/codeowners/
+#
+# *** NOTE ***
+#   KEEP THE LISTS OF INDIVIDUAL CODEOWNERS/TEAMS IN ALPHABETICALLY SORTED ORDER
+#
+
+# LEGAL
+LICENSE
+license_header
+
+# DOCUMENTATION
+README.md
+docs
+
+# INFRASTRUCTURE
+CODEOWNERS
+Dockerfile
+launch.sh
+3rdparty
+pyproject.toml
+requirements-cve.txt
+requirements-dev.txt
+requirements-test.txt
+tach.yml
+
+# CODE
+scripts
+
+sub-packages/bionemo-fw
+sub-packages/bionemo-testing
+sub-packages/bionemo-core
+sub-packages/bionemo-llm
+sub-packages/bionemo-geometric
+sub-packages/bionemo-example_model
+sub-packages/bionemo-geneformer
+sub-packages/bionemo-scdl
