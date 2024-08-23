@@ -20,9 +20,8 @@ import pytest
 
 
 @pytest.fixture
-def get_test_directory() -> Path:
-    """
-    Gets the path to the directory with test data.
+def test_directory() -> Path:
+    """Gets the path to the directory with test data.
 
     Returns:
         A Path object that is the directory with test data.
