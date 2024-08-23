@@ -174,7 +174,6 @@ def main(
             LossLoggingCallback(),
             RichModelSummary(max_depth=4),
             LearningRateMonitor(),
-            PerplexityLoggingCallback(),
         ],
         plugins=nl.MegatronMixedPrecision(precision=precision),
     )
