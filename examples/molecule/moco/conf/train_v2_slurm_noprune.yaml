@@ -11,8 +11,8 @@ wandb_params:
 data:
   dataset_root: "/data/pyg_geom_drug"
   processed_folder: "processed"
-  batch_size: &batch_size 600
-  inference_batch_size: 600
+  batch_size: &batch_size 200
+  inference_batch_size: 200
   removed_h: False
   data_loader_type: "midi"
 
@@ -103,7 +103,7 @@ dynamics:
     equivariant_node_feature_dim: 3
     num_layers: 10
     num_heads: 4
-    prune_edges: True
+    prune_edges: False
   wrapper_args:
     timesteps: *timesteps
     time_type: *time_type

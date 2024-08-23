@@ -259,8 +259,10 @@ class XEGNNK(nn.Module):
         time_embedding_dim=256,
         input_edges=False,
         use_cross_product=True,
+        prune_edges=False,
     ):
         super().__init__()  #! This should be target to source
+        self.prune_edges = prune_edges
         self.message_input_size = (
             2 * invariant_node_feat_dim + n_vector_features + time_embedding_dim
         )  # + invariant_edge_feat_dim
@@ -325,7 +327,7 @@ class XEGNNK(nn.Module):
         rel_dist = (rel_coors.transpose(1, 2) ** 2).sum(dim=-1, keepdim=False)
         # import ipdb; ipdb.set_trace()
 
-        if not self.input_edges:
+        if self.prune_edges and not self.input_edges:
             test = scatter_mean(rel_dist.sum(-1), batch[source])
             edge_cut_mask = rel_dist.sum(-1) < test[batch[source]] / 2
             # edge_index.size(1)
@@ -623,6 +625,7 @@ class MegalodonV2(nn.Module):
         edge_classes=5,
         num_heads=16,
         n_vector_features=128,
+        prune_edges=False,
     ):
         super(MegalodonV2, self).__init__()
         self.atom_embedder = MLP(atom_classes, invariant_node_feat_dim, invariant_node_feat_dim)
@@ -660,6 +663,7 @@ class MegalodonV2(nn.Module):
                     n_vector_features=n_vector_features,
                     time_embedding_dim=invariant_node_feat_dim,
                     input_edges=i == num_layers - 1,
+                    prune_edges=prune_edges,
                 )
             )
         # self.h_feat_refine = DiTBlock(invariant_node_feat_dim, num_heads, use_z=False)
