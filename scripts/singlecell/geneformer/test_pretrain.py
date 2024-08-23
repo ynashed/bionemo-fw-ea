@@ -70,6 +70,7 @@ def test_main_runs(tmpdir):
             biobert_spec_option=BiobertSpecOption.bert_layer_local_spec,
             lr=1e-4,
             micro_batch_size=2,
+            accumulate_grad_batches=2,
             cosine_rampup_frac=0.01,
             cosine_hold_frac=0.01,
             precision="bf16-mixed",
@@ -110,7 +111,8 @@ def test_pretrain_cli(tmpdir):
     --num-steps 55 \
     --seq-length 128 \
     --limit-val-batches 2 \
-    --micro-batch-size 2
+    --micro-batch-size 2 \
+    --accumulate-grad-batches 2
     """.strip()
     env = dict(**os.environ)  # a local copy of the environment
     env["MASTER_PORT"] = str(open_port)

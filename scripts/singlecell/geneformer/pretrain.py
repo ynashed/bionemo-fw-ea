@@ -49,6 +49,21 @@ from bionemo.llm.utils.logger_utils import WandbLoggerOptions, setup_nemo_lightn
 __all__: Sequence[str] = ("main",)
 
 
+def infer_global_batch_size(
+    micro_batch_size: int,
+    num_nodes: int,
+    devices: int,
+    accumulate_grad_batches: int = 1,
+    tensor_model_parallel_size: int = 1,
+    pipeline_model_parallel_size: int = 1,
+):
+    world_size = num_nodes * devices
+    model_parallel_size = tensor_model_parallel_size * pipeline_model_parallel_size
+    data_parallel_size = world_size // model_parallel_size
+    global_batch_size = micro_batch_size * data_parallel_size * accumulate_grad_batches
+    return global_batch_size
+
+
 def main(
     data_dir: Path,
     num_nodes: int,
@@ -64,6 +79,7 @@ def main(
     biobert_spec_option: BiobertSpecOption,
     lr: float,
     micro_batch_size: int,
+    accumulate_grad_batches: int,
     cosine_rampup_frac: float,
     cosine_hold_frac: float,
     experiment_name: str,
@@ -116,8 +132,18 @@ def main(
 
     # Setup the strategy and trainer
     pipeline_model_parallel_size = 1
+    tensor_model_parallel_size = 1
+    global_batch_size = infer_global_batch_size(
+        micro_batch_size=micro_batch_size,
+        num_nodes=num_nodes,
+        devices=devices,
+        accumulate_grad_batches=accumulate_grad_batches,
+        tensor_model_parallel_size=tensor_model_parallel_size,
+        pipeline_model_parallel_size=pipeline_model_parallel_size,
+    )
+
     strategy = nl.MegatronStrategy(
-        tensor_model_parallel_size=1,
+        tensor_model_parallel_size=tensor_model_parallel_size,
         pipeline_model_parallel_size=pipeline_model_parallel_size,
         ddp="megatron",
         find_unused_parameters=True,
@@ -172,7 +198,7 @@ def main(
         random_token_prob=0.02,  # changed to represent the incorrect setting we originally used.
         median_dict=median_dict,
         micro_batch_size=micro_batch_size,
-        global_batch_size=micro_batch_size * int(num_nodes * devices / pipeline_model_parallel_size),
+        global_batch_size=global_batch_size,
         # persistent workers is supported when num_dataset_workers > 0
         persistent_workers=num_dataset_workers > 0,
         pin_memory=False,
@@ -382,6 +408,13 @@ if __name__ == "__main__":
         help="Micro-batch size. Global batch size is inferred from this.",
     )
     parser.add_argument(
+        "--accumulate-grad-batches",
+        type=int,
+        required=False,
+        default=1,
+        help="Gradient accumulation steps. Global batch size is inferred from this.",
+    )
+    parser.add_argument(
         "--biobert-spec-option",
         type=BiobertSpecOption,
         choices=[e.value for e in BiobertSpecOption],
@@ -447,6 +480,7 @@ if __name__ == "__main__":
         biobert_spec_option=args.biobert_spec_option,
         lr=args.lr,
         micro_batch_size=args.micro_batch_size,
+        accumulate_grad_batches=args.accumulate_grad_batches,
         cosine_rampup_frac=args.cosine_rampup_frac,
         cosine_hold_frac=args.cosine_hold_frac,
         precision=args.precision,
