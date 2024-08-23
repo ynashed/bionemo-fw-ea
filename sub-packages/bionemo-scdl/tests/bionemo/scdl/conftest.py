@@ -20,7 +20,13 @@ import pytest
 
 
 @pytest.fixture
-def get_test_directory(tmpdir) -> Path:
+def get_test_directory() -> Path:
+    """
+    Gets the path to the directory with test data.
+
+    Returns:
+        A Path object that is the directory with test data.
+    """
     current_file = Path(__file__).resolve()
     target_path = current_file.parents[5].absolute() / "test_data/scdl_data"
     return target_path
