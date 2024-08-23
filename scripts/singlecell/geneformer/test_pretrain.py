@@ -27,6 +27,7 @@ from bionemo import geneformer
 from bionemo.llm.model.biobert.transformer_specs import BiobertSpecOption
 from bionemo.llm.utils.datamodule_utils import parse_kwargs_to_arglist
 from bionemo.testing import megatron_parallel_state_utils
+from bionemo.testing.data.load import load
 
 
 # TODO(@jstjohn) use fixtures for pulling down data and checkpoints
@@ -39,7 +40,8 @@ bionemo2_root: Path = (
     # From here, we want to get to the root of the repository: _before_ sub-packages/
     .parent.parent
 ).absolute()
-data_path: Path = bionemo2_root / "test_data/cellxgene_2023-12-15_small/processed_data"
+assert bionemo2_root != Path("/")
+data_path: Path = load("single_cell/testdata-20240506") / "cellxgene_2023-12-15_small" / "processed_data"
 
 
 def test_bionemo2_rootdir():

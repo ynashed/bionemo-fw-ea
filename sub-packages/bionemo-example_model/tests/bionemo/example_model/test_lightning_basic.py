@@ -19,6 +19,7 @@ from nemo import lightning as nl
 
 from bionemo.example_model import lightning_basic as lb
 from bionemo.testing import megatron_parallel_state_utils
+from bionemo.testing.data.load import BIONEMO_CACHE_DIR
 
 
 @pytest.mark.needs_gpu
@@ -33,5 +34,5 @@ def test_train_mnist_litautoencoder_with_megatron_strategy_single_gpu():
             enable_nemo_ckpt_io=False,
         )
         trainer = nl.Trainer(accelerator="gpu", devices=1, strategy=strategy, max_steps=10, num_nodes=1)
-        data_module = lb.MNISTDataModule()
+        data_module = lb.MNISTDataModule(str(BIONEMO_CACHE_DIR))
         trainer.fit(model, data_module)

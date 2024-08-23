@@ -40,6 +40,7 @@ from bionemo.llm.model.biobert.lightning import BioBertLightningModule
 from bionemo.llm.model.biobert.model import BiobertSpecOption
 from bionemo.llm.utils.weight_utils import nemo1_to_nemo2_biobert_key_mapping
 from bionemo.testing import megatron_parallel_state_utils
+from bionemo.testing.data.load import load
 from bionemo.testing.utils import assert_matrix_correlation_above_value, assert_matrix_mape_below_value
 
 
@@ -54,11 +55,11 @@ bionemo2_root: Path = (
     .parent.parent
 ).absolute()
 assert bionemo2_root != Path("/")
-nemo1_checkpoint_path: Path = bionemo2_root / "models/singlecell/geneformer/geneformer-qa.nemo"
-nemo1_release_checkpoint_path: Path = bionemo2_root / "models/singlecell/geneformer/geneformer-10M-240530.nemo"
-nemo_1_per_layer_outputs_path: Path = bionemo2_root / "test_data/nemo1-test-outputs-geneformer-qa.pt"
-nemo_1_expected_values_path: Path = bionemo2_root / "test_data/nemo1_geneformer_qa_test_golden_values.pt"
-data_path: Path = bionemo2_root / "test_data/cellxgene_2023-12-15_small/processed_data"
+nemo1_checkpoint_path: Path = load("geneformer/qa")
+nemo1_release_checkpoint_path: Path = load("geneformer/10M_240530")
+nemo_1_per_layer_outputs_path: Path = load("single_cell/nemo1-geneformer-per-layer-outputs")
+nemo_1_expected_values_path: Path = load("single_cell/nemo1-geneformer-golden-vals")
+data_path: Path = load("single_cell/testdata-20240506") / "cellxgene_2023-12-15_small" / "processed_data"
 
 
 CELLS_FOR_TEST: List[List[str]] = [

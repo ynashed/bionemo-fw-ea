@@ -36,6 +36,7 @@ from bionemo.esm2.model.embedding import ESM2Embedding
 from bionemo.llm.model.biobert.model import MegatronBioBertModel
 from bionemo.llm.utils.weight_utils import nemo1_to_nemo2_biobert_key_mapping
 from bionemo.testing import megatron_parallel_state_utils
+from bionemo.testing.data.load import load
 
 
 bionemo2_root: Path = (
@@ -47,7 +48,7 @@ bionemo2_root: Path = (
     .parent.parent
 ).absolute()
 assert bionemo2_root != Path("/")
-nemo1_checkpoint_path: Path = bionemo2_root / "models/protein/esm2nv/esm2nv_650M_converted.nemo"
+nemo1_checkpoint_path: Path = load("esm2/nv_650m:1.0")
 
 
 def reduce_hiddens(hiddens: Tensor, attention_mask: Tensor) -> Tensor:
