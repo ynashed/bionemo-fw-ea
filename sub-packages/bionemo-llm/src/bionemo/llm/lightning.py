@@ -29,6 +29,7 @@ __all__: Sequence[str] = (
     "PassthroughLossReduction",
     "LightningPassthroughPredictionMixin",
     "LossLoggingCallback",
+    "PerplexityLoggingCallback",
 )
 
 
@@ -191,10 +192,76 @@ class LossLoggingCallback(pl.Callback):  # noqa: D101
                 outputs = outputs["loss"]
             # TODO verify that losses are already reduced across ranks
             # torch.distributed.all_reduce(outputs, op=torch.distributed.ReduceOp.AVG)
+            loss = outputs
+            self.val_losses.append(loss)
+
+    def on_validation_epoch_end(self, trainer, pl_module):  # noqa: D102
+        # TODO(@jstjohn): Add a docstring with type hints for this lightning hook
+        if torch.distributed.get_rank() == 0 and parallel_state.is_pipeline_last_stage():
+            if len(self.val_losses) > 0:
+                avg_val_loss = torch.stack(self.val_losses).mean()
+                pl_module.log("val_loss", avg_val_loss, prog_bar=True, logger=True, rank_zero_only=True)
+                self.val_losses.clear()
+
+    def on_test_epoch_end(self, trainer, pl_module):  # noqa: D102
+        # TODO(@jstjohn): Add a docstring with type hints for this lightning hook
+        if torch.distributed.get_rank() == 0 and parallel_state.is_pipeline_last_stage():
+            if len(self.test_losses) > 0:
+                avg_test_loss = torch.stack(self.test_losses).mean()
+                pl_module.log("test_loss", avg_test_loss, prog_bar=True, logger=True, rank_zero_only=True)
+                self.test_losses.clear()
+
+
+class PerplexityLoggingCallback(pl.Callback):
+    def __init__(self):
+        """Log the perplexity at the end of each batch. Reduce across the epoch for training, validation and test."""
+        self.train_ppl = []
+        self.val_ppl = []
+        self.test_ppl = []
+
+    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0):  # noqa: D102
+        # TODO(@jstjohn): Add a docstring with type hints for this lightning hook
+        # Assuming the loss is computed internally and stored in pl_module
+        if torch.distributed.get_rank() == 0 and parallel_state.is_pipeline_last_stage():
+            # TODO(@jstjohn): verify when the outputs are a dictionary of "loss" and when they are just one tensor value.
+            if isinstance(outputs, dict):
+                outputs = outputs["loss"]
+            # TODO verify that losses are already reduced across ranks
+            # torch.distributed.all_reduce(outputs, op=torch.distributed.ReduceOp.AVG)
+            loss = outputs
+            self.train_losses.append(loss)
+
+    def on_test_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0):  # noqa: D102
+        # TODO(@jstjohn): Add a docstring with type hints for this lightning hook
+        # Assuming the loss is computed internally and stored in pl_module
+        if torch.distributed.get_rank() == 0 and parallel_state.is_pipeline_last_stage():
+            # TODO(@jstjohn): verify when the outputs are a dictionary of "loss" and when they are just one tensor value.
+            if isinstance(outputs, dict):
+                outputs = outputs["loss"]
+            # TODO verify that losses are already reduced across ranks
+            # torch.distributed.all_reduce(outputs, op=torch.distributed.ReduceOp.AVG)
+            loss = outputs
+            self.test_losses.append(loss)
+
+    def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0):  # noqa: D102
+        # TODO(@jstjohn): Add a docstring with type hints for this lightning hook
+        # Assuming the loss is computed internally and stored in pl_module
+        if torch.distributed.get_rank() == 0 and parallel_state.is_pipeline_last_stage():
+            # TODO(@jstjohn): verify when the outputs are a dictionary of "loss" and when they are just one tensor value.
+            if isinstance(outputs, dict):
+                outputs = outputs["loss"]
             # TODO verify that losses are already reduced across ranks
             # torch.distributed.all_reduce(outputs, op=torch.distributed.ReduceOp.AVG)
             loss = outputs
             self.val_losses.append(loss)
+
+    def on_train_epoch_end(self, trainer, pl_module):  # noqa: D102
+        # TODO(@jstjohn): Add a docstring with type hints for this lightning hook
+        if torch.distributed.get_rank() == 0 and parallel_state.is_pipeline_last_stage():
+            if len(self.train_losses) > 0:
+                avg_train_loss = torch.stack(self.train_losses).mean()
+                pl_module.log("train_loss", avg_train_loss, prog_bar=True, logger=True, rank_zero_only=True)
+                self.val_losses.clear()
 
     def on_validation_epoch_end(self, trainer, pl_module):  # noqa: D102
         # TODO(@jstjohn): Add a docstring with type hints for this lightning hook

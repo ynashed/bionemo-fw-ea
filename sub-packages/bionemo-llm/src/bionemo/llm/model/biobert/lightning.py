@@ -88,7 +88,7 @@ class BioBertLightningModule(  # noqa: D101
         return biobert_data_step(dataloader_iter)
 
     def forward_step(self, batch) -> torch.Tensor:  # noqa: D102
-        return bert_forward_step(self, batch)
+        return bert_forward_step(self, batch)  # NOTE(@sichu) reduced to loss
 
     def training_step(self, batch, batch_idx=None) -> torch.Tensor:  # noqa: D102
         # In mcore the loss-function is part of the forward-pass (when labels are provided)

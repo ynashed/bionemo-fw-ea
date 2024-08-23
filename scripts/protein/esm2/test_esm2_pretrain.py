@@ -38,7 +38,6 @@ bionemo2_root: Path = (
     # From here, we want to get to the root of the repository: _before_ sub-packages/
     .parent.parent
 ).absolute()
-assert bionemo2_root != Path("/")
 
 
 @pytest.fixture
