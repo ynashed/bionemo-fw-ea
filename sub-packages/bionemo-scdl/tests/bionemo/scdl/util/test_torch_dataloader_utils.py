@@ -53,8 +53,8 @@ def test_sparse_collate_function_with_all_empty_entries_correct():
     assert csr_matrix.to_dense().shape == torch.Size([2, 0])
 
 
-def test_dataloading_batch_size_one_work_without_collate(tmpdir):
-    ds = SingleCellMemMapDataset(f"{tmpdir}/scy", h5ad_path="tests/test_data/adata_sample1.h5ad")
+def test_dataloading_batch_size_one_work_without_collate(tmp_path, test_directory):
+    ds = SingleCellMemMapDataset(tmp_path / "scy", h5ad_path=test_directory / "adata_sample1.h5ad")
     dataloader = DataLoader(ds, batch_size=1, shuffle=False)
     expected_tensors = [
         torch.tensor([[[8.0], [1.0]]]),
@@ -68,8 +68,8 @@ def test_dataloading_batch_size_one_work_without_collate(tmpdir):
         assert torch.equal(batch, expected_tensors[index])
 
 
-def test_dataloading_batch_size_one_works_with_collate(tmpdir):
-    ds = SingleCellMemMapDataset(f"{tmpdir}/scy", h5ad_path="tests/test_data/adata_sample1.h5ad")
+def test_dataloading_batch_size_one_works_with_collate(tmp_path, test_directory):
+    ds = SingleCellMemMapDataset(tmp_path / "scy", h5ad_path=test_directory / "adata_sample1.h5ad")
     dataloader = DataLoader(ds, batch_size=1, shuffle=False, collate_fn=collate_sparse_matrix_batch)
     expected_tensors = [
         torch.tensor([[[8.0], [1.0]]]),
@@ -86,8 +86,8 @@ def test_dataloading_batch_size_one_works_with_collate(tmpdir):
         assert torch.equal(batch.to_dense(), torch.sparse_csr_tensor(rows, columns, values).to_dense())
 
 
-def test_dataloading_batch_size_three_works_with_collate(tmpdir):
-    ds = SingleCellMemMapDataset(f"{tmpdir}/scy", h5ad_path="tests/test_data/adata_sample1.h5ad")
+def test_dataloading_batch_size_three_works_with_collate(tmp_path, test_directory):
+    ds = SingleCellMemMapDataset(tmp_path / "scy", h5ad_path=test_directory / "adata_sample1.h5ad")
     dataloader = DataLoader(ds, batch_size=3, shuffle=False, collate_fn=collate_sparse_matrix_batch)
     expected_tensor = torch.tensor([[0, 8], [0, 0], [7, 18]])
 
