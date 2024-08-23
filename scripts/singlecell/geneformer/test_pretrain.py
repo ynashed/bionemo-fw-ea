@@ -36,7 +36,6 @@ bionemo2_root: Path = (
     # From here, we want to get to the root of the repository: _before_ sub-packages/
     .parent.parent
 ).absolute()
-assert bionemo2_root != Path("/")
 data_path: Path = bionemo2_root / "test_data/cellxgene_2023-12-15_small/processed_data"
 
 
@@ -100,7 +99,7 @@ def test_pretrain_cli(tmpdir):
     open_port = find_free_network_port()
     # NOTE: if you need to change the following command, please update the README.md example.
     cmd_str = f"""python  \
-    scripts/singlecell/geneformer/pretrain.py     \
+    {bionemo2_root}/scripts/singlecell/geneformer/pretrain.py     \
     --data-dir {data_path}     \
     --result-dir {result_dir}     \
     --experiment-name test_experiment     \
@@ -119,7 +118,7 @@ def test_pretrain_cli(tmpdir):
     cmd = shlex.split(cmd_str)
     result = subprocess.run(
         cmd,
-        cwd=bionemo2_root,
+        cwd=tmpdir,
         env=env,
         capture_output=True,
     )
