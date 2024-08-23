@@ -211,7 +211,7 @@ def test_pretrain_cli(tmpdir, dummy_protein_dataset, dummy_parquet_train_val_inp
     open_port = find_free_network_port()
     # NOTE: if you need to change the following command, please update the README.md example.
     cmd_str = f"""python  \
-    scripts/protein/esm2/esm2_pretrain.py     \
+    {bionemo2_root}/scripts/protein/esm2/esm2_pretrain.py     \
     --train-cluster-path {train_cluster_path} \
     --train-database-path {dummy_protein_dataset} \
     --valid-cluster-path {valid_cluster_path} \
@@ -233,7 +233,7 @@ def test_pretrain_cli(tmpdir, dummy_protein_dataset, dummy_parquet_train_val_inp
     cmd = shlex.split(cmd_str)
     result = subprocess.run(
         cmd,
-        cwd=bionemo2_root,
+        cwd=tmpdir,
         env=env,
         capture_output=True,
     )
