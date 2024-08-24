@@ -132,6 +132,8 @@ class MegatronBioBertFineTuneSeqLengthModel(MegatronBioBertModel):
         self.include_hiddens_finetuning = (
             include_hiddens  # this include_hiddens is for the final output of fine-tuning
         )
+        # If post_process is True that means that we are at the last megatron parallelism stage and we can
+        #   apply the head.
         if post_process:
             # if we are doing post process (eg pipeline last stage) then we need to add the output layers
             self.regression_head = MegatronRegressionMLPHead(config)

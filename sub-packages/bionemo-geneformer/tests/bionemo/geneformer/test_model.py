@@ -913,7 +913,9 @@ def test_continue_from_checkpoint_geneformer(tmpdir, geneformer_config: Geneform
         assert initial_metrics.collection_train["loss"][0] > initial_metrics.collection_train["loss"][-1]
     with megatron_parallel_state_utils.distributed_model_parallel_state(43):
         # NOTE all other hparams will be pulled from this checkpoint.
-        base_geneformer_config = GeneformerConfig(initial_ckpt_path=str(ckpt_path))
+        base_geneformer_config = GeneformerConfig(
+            initial_ckpt_path=str(ckpt_path),
+        )
         continue_checkpoint, continue_metrics, continue_trainer = _train_model_get_ckpt(
             name="test_experiment_continue",
             root_dir=tmpdir / "continue_training",  # new checkpoint will land in a subdir of this
