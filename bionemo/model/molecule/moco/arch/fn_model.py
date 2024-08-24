@@ -15,7 +15,6 @@ import einops
 import torch
 import torch.nn.functional as F
 from torch import nn
-from torch_geometric.nn.conv import MessagePassing
 from torch_geometric.nn.norm import LayerNorm as BatchLayerNorm
 from torch_scatter import scatter, scatter_mean
 
@@ -236,7 +235,7 @@ def swiglu_ffn_edge(d_model: int, bias: bool):
     )
 
 
-class XEGNNK(MessagePassing):
+class XEGNNK(nn.Module):
     """
     X only EGNN
     """
@@ -249,7 +248,7 @@ class XEGNNK(MessagePassing):
         dist_size=4,
         prune_edges=False,
     ):
-        super().__init__(node_dim=0, aggr=None, flow="source_to_target")  #! This should be target to source
+        super().__init__()  #! This should be target to source node_dim=0, aggr=None, flow="source_to_target"
         self.h_projection = nn.Sequential(nn.Linear(invariant_node_feat_dim, invariant_edge_feat_dim), nn.SiLU())
         self.coord_projection = nn.Linear(n_vector_features, dist_size)
         self.message_input_size = 4 * invariant_edge_feat_dim + dist_size
@@ -316,13 +315,13 @@ class XEGNNK(MessagePassing):
         return X_out
 
 
-class BondRefine(MessagePassing):  #! can make this nn.Module to ensure no weird propagate error
+class BondRefine(nn.Module):  #! can make this nn.Module to ensure no weird propagate error
     def __init__(
         self,
         invariant_node_feat_dim=64,
         invariant_edge_feat_dim=32,
     ):
-        super().__init__(node_dim=0, aggr=None, flow="source_to_target")
+        super().__init__()  # node_dim=0, aggr=None, flow="source_to_target"
         # self.x_norm = E3Norm()
         self.h_norm = BatchLayerNorm(invariant_node_feat_dim)
         self.edge_norm = BatchLayerNorm(invariant_edge_feat_dim)
