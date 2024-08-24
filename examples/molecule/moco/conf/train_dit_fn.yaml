@@ -1,4 +1,4 @@
-run_name: 'prune_new_test' #CUDA_VISIBLE_DEVICES=1 python train.py --config-name "train_dit"
+run_name: 'no_prune_fn_new_test' #CUDA_VISIBLE_DEVICES=1 python train.py --config-name "train_dit"
 outdir: /workspace/bionemo/results/eqgatdiff
 resume: null
 ema_resume: null
@@ -11,8 +11,8 @@ wandb_params:
 data:
   dataset_root: "/workspace/bionemo/data/pyg_geom_drug"
   processed_folder: "processed"
-  batch_size: &batch_size 450 #200
-  inference_batch_size: 450 #200
+  batch_size: &batch_size 300 #450 #200
+  inference_batch_size: 300 #450 #200
   removed_h: False
   data_loader_type: "midi"
 
@@ -92,7 +92,7 @@ interpolant:
 
   
 dynamics:
-  model_name: "megav2" #megadotfn
+  model_name: "megav3" #megadotfn
   model_args:
     atom_classes: 22
     edge_classes: 5
@@ -102,7 +102,8 @@ dynamics:
     equivariant_node_feature_dim: 3
     num_layers: 10
     num_heads: 4
-    prune_edges: True
+    prune_edges: False
+    dist_size: 16
     # use_cross_product: True
   wrapper_args:
     timesteps: *timesteps

@@ -171,6 +171,9 @@ class Graph3DInterpolantModel(pl.LightningModule):
             var["inp_dim"] = self.interpolants[var["variable_name"]].num_classes
         return SelfConditioningBuilder().create_self_cond(self_cond_params)
 
+    # def setup(self, stage = None):
+    #     self.loss_functions = self.initialize_loss_functions()
+
     def initialize_loss_functions(self):
         loss_functions = {}
         for loss_params in self.loss_params.variables:
@@ -184,6 +187,11 @@ class Graph3DInterpolantModel(pl.LightningModule):
                     distance_scale=loss_params.distance_scale,
                 )
             else:
+                # if "edge" in index:
+                #     import ipdb; ipdb.set_trace()
+                #     weight = torch.tensor([1.0000e+00, 3.1123e+01, 4.7676e+02, 2.1425e+04, 7.9271e+01]).to(self.device)
+                # else:
+                #     weight = None
                 loss_functions[index] = InterpolantLossFunction(
                     loss_scale=loss_params.loss_scale,
                     aggregation=loss_params.aggregate,
@@ -476,11 +484,11 @@ class Graph3DInterpolantModel(pl.LightningModule):
             self.log(f"{stage}/{key}_loss", sub_loss, batch_size=batch_size, prog_bar=True)
             loss = loss + sub_loss
             # predictions[f'{key}'] = sub_pred
-            bbloss = self.loss_functions['x'].backbone_loss(
-                batch_geo, out['x_hat'], batch['x'], batch_weight=(time > 250).int()
-            )
-            self.log(f"{stage}/backbone_loss", bbloss, batch_size=batch_size, prog_bar=True)
-            loss = loss + bbloss
+            # bbloss = self.loss_functions['x'].backbone_loss(
+            #     batch_geo, out['x_hat'], batch['x'], batch_weight=(time > 250).int()
+            # )
+            # self.log(f"{stage}/backbone_loss", bbloss, batch_size=batch_size, prog_bar=True)
+            # loss = loss + bbloss
 
             if loss_fn.use_distance in ["single", "triple"]:
                 if "Z_hat" in out.keys() and loss_fn.use_distance == "triple":
@@ -625,6 +633,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
 
         # Iterate through time, query the dynamics, apply interpolant step update
         out = {}
+        # print("DT", len(DT))
         for idx in tqdm(list(range(len(DT))), total=len(DT)):
             t = timeline[idx]
             dt = DT[idx]

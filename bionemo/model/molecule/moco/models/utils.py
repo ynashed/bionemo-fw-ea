@@ -82,12 +82,13 @@ class InterpolantLossFunction(nn.Module):
         self.scale = loss_scale
         self.use_distance = use_distance
         self.distance_scale = distance_scale
+        self.level = 1000000
 
     def forward(self, batch, logits, data, batch_weight=None, element_weight=None):
         # d (λx, λh, λe) = (3, 0.4, 2)
         batch_size = len(batch.unique())
         if self.continuous:
-            loss = self.f_continuous(logits, data).mean(-1)  # [N]
+            loss = self.f_continuous(logits, data).sum(-1)  # .mean(-1)  # [N]
             output = logits
         else:
             loss = self.f_discrete(logits, data)
@@ -97,13 +98,18 @@ class InterpolantLossFunction(nn.Module):
         loss = scatter_mean(loss, index=batch, dim=0, dim_size=batch_size)
         if batch_weight is not None:
             loss = loss * batch_weight  # .unsqueeze(1)
+        loss = loss.clamp(0, self.level)
+        self.level = min(loss.mean().item() * 15, self.level)
         if self.aggregation == "mean":
             loss = self.scale * loss.mean()
         elif self.aggregation == "sum":
             loss = self.scale * loss.sum()
+
         return loss, output
 
     def backbone_loss(self, batch, logits, data, batch_weight, cutoff=2.5):
+        # import ipdb; ipdb.set_trace()
+        # a, b = self.forward(batch, logits, data)
         batch_size = len(batch.unique())
         grel = logits.unsqueeze(1) - logits.unsqueeze(0)
         trel = data.unsqueeze(1) - data.unsqueeze(0)
@@ -118,7 +124,7 @@ class InterpolantLossFunction(nn.Module):
         loss = loss * loss_mask
         loss = loss.sum(-1)
         loss = scatter_mean(loss, index=batch, dim=0, dim_size=batch_size) * batch_weight
-        return loss.mean()
+        return loss.sum() / batch_weight.sum()
 
     def edge_loss(self, batch, logits, data, index, num_atoms, batch_weight=None, element_weight=None):
         batch_size = len(batch.unique())
@@ -130,6 +136,8 @@ class InterpolantLossFunction(nn.Module):
         loss = scatter_mean(loss, index=batch, dim=0, dim_size=batch_size)
         if batch_weight is not None:
             loss = loss * batch_weight  # .unsqueeze(1)
+        loss = loss.clamp(0, self.level)
+        self.level = min(loss.mean().item() * 15, self.level)
         if self.aggregation == "mean":
             loss = self.scale * loss.mean()
         elif self.aggregation == "sum":

@@ -128,9 +128,20 @@ class Molecule2DStability:
             if rdmol is not None:
                 try:
                     num_atoms = rdmol.GetNumAtoms()
+                    bond_type_counter = Counter()
+                    # Iterate over all bonds in the molecule and count bond types
+                    for bond in rdmol.GetBonds():
+                        bond_type = bond.GetBondType()
+                        bond_type_counter[bond_type] += 1
                     is_valid[i] = (0, num_atoms)
                     mol_frags = Chem.rdmolops.GetMolFrags(rdmol, asMols=True, sanitizeFrags=False)
                     num_components.append(len(mol_frags))
+                    print(num_atoms, len(mol_frags), bond_type_counter)
+                    # adjacency_matrix = Chem.GetAdjacencyMatrix(rdmol)
+                    # print("Adjacency matrix:")
+                    # print(adjacency_matrix)
+                    # print(rdmol.GetConformer().GetPositions())
+                    # print()
                     if len(mol_frags) > 1:
                         error_message[4] += 1
                     else:
