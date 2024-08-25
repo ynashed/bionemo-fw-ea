@@ -4,33 +4,71 @@
 #   KEEP THE LISTS OF INDIVIDUAL CODEOWNERS/TEAMS IN ALPHABETICALLY SORTED ORDER
 #
 
-# LEGAL
-LICENSE
-license_header
+#
+## MAPPING: PEOPLE <--> USERNAME
+#
+# @gwarmstrong - George Armstrong
+# @kdidiNVIDIA - Kieran Didi
+# @jstjohn - John St. John
+# @malcolmgreaves - Malcolm Greaves
+# @trvachov - Timur Rvachov
+# @jomitchellnv - Jonathan Mitchell
+# @jwilber  - Jared Wilber
+# @nv-mcclure - Zachary McClure
+# @ohadmo - Ohad Mosafi
+# @nvdreidenbach - Danny Reidenbach
+# @pstjohn - Peter St. John
+# @polinabinder1 - Polina Binder
+# @skothenhill-nv - Steven Kothen-Hill
 
-# DOCUMENTATION
-README.md
-docs
+#
+## LEGAL
+#
+LICENSE @trvachov @jstjohn @malcolmgreaves
+license_header @trvachov @jstjohn @malcolmgreaves
 
-# INFRASTRUCTURE
-CODEOWNERS
-Dockerfile
-launch.sh
-3rdparty
-pyproject.toml
-requirements-cve.txt
-requirements-dev.txt
-requirements-test.txt
-tach.yml
 
-# CODE
-scripts
+#
+## DOCUMENTATION
+#
+README.md @trvachov @jstjohn @malcolmgreaves @jomitchellnv @pstjohn
+docs @trvachov @jstjohn @malcolmgreaves @jomitchellnv @pstjohn
 
-sub-packages/bionemo-fw
-sub-packages/bionemo-testing
-sub-packages/bionemo-core
-sub-packages/bionemo-llm
-sub-packages/bionemo-geometric
-sub-packages/bionemo-example_model
-sub-packages/bionemo-geneformer
-sub-packages/bionemo-scdl
+
+#
+## INFRASTRUCTURE
+#
+#.gitignore
+#.dockerignore
+.devcontainer @pstjohn @malcolmgreaves
+CODEOWNERS @trvachov @jstjohn @malcolmgreaves @jomitchellnv @pstjohn
+Dockerfile @trvachov @jstjohn @malcolmgreaves @jomitchellnv @ohadmo @pstjohn
+launch.sh @trvachov @jstjohn @malcolmgreaves @jomitchellnv @ohadmo @pstjohn
+3rdparty @trvachov @jstjohn @malcolmgreaves @jomitchellnv @ohadmo @pstjohn
+pyproject.toml @trvachov @jstjohn @malcolmgreaves @jomitchellnv @ohadmo @pstjohn
+requirements-cve.txt @trvachov @jstjohn @malcolmgreaves @jomitchellnv @ohadmo @pstjohn
+requirements-dev.txt @trvachov @jstjohn @malcolmgreaves @jomitchellnv @ohadmo @pstjohn
+requirements-test.txt @trvachov @jstjohn @malcolmgreaves @jomitchellnv @ohadmo @pstjohn
+tach.yml @trvachov @jstjohn @malcolmgreaves @jomitchellnv @ohadmo @pstjohn
+
+
+#
+## LIBRARY CODE
+#
+scripts @jstjohn @malcolmgreaves @jomitchellnv @skothenhill-nv
+
+sub-packages/bionemo-fw @jstjohn @malcolmgreaves @farhadrgh @gwarmstrong @jomitchellnv @pstjohn @skothenhill-nv
+
+sub-packages/bionemo-testing @jstjohn @malcolmgreaves @farhadrgh @gwarmstrong @jomitchellnv @skothenhill-nv
+
+sub-packages/bionemo-core @jstjohn @malcolmgreaves @gwarmstrong @jomitchellnv @pstjohn @skothenhill-nv
+
+sub-packages/bionemo-llm @jstjohn @malcolmgreaves @farhadrgh @gwarmstrong @jomitchellnv @pstjohn @skothenhill-nv
+
+sub-packages/bionemo-geometric @DejunL @guoqing-zhou @jstjohn @malcolmgreaves
+
+sub-packages/bionemo-example_model @jstjohn @malcolmgreaves @jomitchellnv @skothenhill-nv
+
+sub-packages/bionemo-geneformer @jstjohn @malcolmgreaves @skothenhill-nv
+
+sub-packages/bionemo-scdl @polinabinder1 @jstjohn @malcolmgreaves @jomitchellnv @skothenhill-nv
