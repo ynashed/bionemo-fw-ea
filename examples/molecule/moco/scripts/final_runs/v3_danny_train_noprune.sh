@@ -23,7 +23,7 @@ CONFIG_NAME="train_v3_slurm_no_prune"
 # Logging
 # =========================
 EXP_GROUP="danny-ord-testing"
-EXP_NAME="train_v3_slurm_noprune_bs200_v2"
+EXP_NAME="train_v3_slurm_noprune_bs200_v3"
 WANDB_ENTITY="clara-discovery"
 WANDB_GROUP=${EXP_GROUP}
 WANDB_PROJECT="MoCo"
