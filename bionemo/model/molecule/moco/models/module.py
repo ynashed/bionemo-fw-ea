@@ -176,8 +176,10 @@ class Graph3DInterpolantModel(pl.LightningModule):
 
     def initialize_loss_functions(self):
         loss_functions = {}
+        self.loss_clamps = {}
         for loss_params in self.loss_params.variables:
             index = loss_params.variable_name
+            self.loss_clamps[index] = 1e6
             if "use_distance" in loss_params:
                 loss_functions[index] = InterpolantLossFunction(
                     loss_scale=loss_params.loss_scale,
@@ -467,11 +469,14 @@ class Graph3DInterpolantModel(pl.LightningModule):
                     index=batch['edge_index'][1],
                     num_atoms=batch_geo.size(0),
                     batch_weight=ws_t,
+                    level=self.loss_clamps[key],
                 )
             else:
                 if loss_fn.continuous:
                     # import ipdb; ipdb.set_trace()
-                    sub_loss, sub_pred = loss_fn(batch_geo, out[f'{key}_hat'], batch[f'{key}'], batch_weight=ws_t)
+                    sub_loss, sub_pred = loss_fn(
+                        batch_geo, out[f'{key}_hat'], batch[f'{key}'], batch_weight=ws_t, level=self.loss_clamps[key]
+                    )
                 else:
                     true_data = batch[f'{key}']
                     if len(true_data.shape) > 1:
@@ -479,7 +484,11 @@ class Graph3DInterpolantModel(pl.LightningModule):
                             true_data = true_data.unsqueeze(1)
                         else:
                             true_data = true_data.argmax(dim=-1)
-                    sub_loss, sub_pred = loss_fn(batch_geo, out[f'{key}_logits'], true_data, batch_weight=ws_t)
+                    sub_loss, sub_pred = loss_fn(
+                        batch_geo, out[f'{key}_logits'], true_data, batch_weight=ws_t, level=self.loss_clamps[key]
+                    )
+
+            self.loss_clamps[key] = min(self.loss_clamps[key], sub_loss.item() / loss_fn.scale * 5)
             # print(key, sub_loss)
             self.log(f"{stage}/{key}_loss", sub_loss, batch_size=batch_size, prog_bar=True)
             loss = loss + sub_loss

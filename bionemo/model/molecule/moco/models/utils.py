@@ -82,9 +82,8 @@ class InterpolantLossFunction(nn.Module):
         self.scale = loss_scale
         self.use_distance = use_distance
         self.distance_scale = distance_scale
-        self.level = 1000000
 
-    def forward(self, batch, logits, data, batch_weight=None, element_weight=None):
+    def forward(self, batch, logits, data, batch_weight=None, element_weight=None, level=10000):
         # d (λx, λh, λe) = (3, 0.4, 2)
         batch_size = len(batch.unique())
         if self.continuous:
@@ -98,8 +97,7 @@ class InterpolantLossFunction(nn.Module):
         loss = scatter_mean(loss, index=batch, dim=0, dim_size=batch_size)
         if batch_weight is not None:
             loss = loss * batch_weight  # .unsqueeze(1)
-        loss = loss.clamp(0, self.level)
-        self.level = min(loss.mean().item() * 15, self.level)
+        loss = loss.clamp(0, level)
         if self.aggregation == "mean":
             loss = self.scale * loss.mean()
         elif self.aggregation == "sum":
