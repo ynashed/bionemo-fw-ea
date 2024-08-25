@@ -20,7 +20,6 @@ import torch
 import torch.distributed
 from megatron.core import parallel_state
 from megatron.core.transformer.module import MegatronModule
-from nemo.collections.common.tokenizers.tokenizer_spec import TokenizerSpec
 from nemo.lightning import io as nlio
 from nemo.lightning.megatron_parallel import DataT, MegatronLossReduction, ReductionT
 from nemo.lightning.pytorch.optim import MegatronOptimizerModule, OptimizerConfig
@@ -232,29 +231,23 @@ class BionemoLightningModule(  # noqa: D101
         self,
         config: BionemoTrainableModelConfig[Model, Loss],
         # TODO: Add transformer_layer_spec when we update mcore
-        tokenizer: Optional[TokenizerSpec] = None,
         optimizer: MegatronOptimizerModule = MegatronOptimizerModule(
             config=OptimizerConfig(lr=1e-4, optimizer="adam", use_distributed_optimizer=True),
         ),
-    ):
-        """A pytorch lightning module for BioBert-derived models. This module is designed to be used with the Megatron-LM strategy and nemo 2.0 conventions.
-        To change the your loss, pass in a different config object that returns a different loss reduction class. To change your model and what it outputs,
-        pass in a different config object that returns a different model. Do not modify this function unless you need to change higher level logic. You may
-        need to modify the various step and forward functions towards the bottom of this file to handle new/different keys in the batch. In the future some of
-        those functions may need to be refactored out into the config object or a different place so that they live closer to the model definition.
-        """  # noqa: D205
+        **model_construct_args,
+    ):  # noqa: D205
         super().__init__()
         self.config = config
-        self.tokenizer = tokenizer
+        self.model_construct_args = model_construct_args
+        self.model: Optional[Model] = None  # set up in configure_model()
         self.loss_reduction_class = config.get_loss_reduction_class()
         # TODO replace the self.configure_optimizer call with the optimizer below
         #  once it all works. This is the future direction for how things are going.
         self.optim = optimizer
         self.optim.connect(self)  # This will bind the `configure_optimizers` method
-        self.model: Optional[Model] = None
 
     def configure_model(self) -> None:  # noqa: D102
-        self.model = self.config.configure_model(self.tokenizer)
+        self.model = self.config.configure_model(**self.model_construct_args)
 
     # This is now replaced by the init hook on self.optimizer
     # def configure_optimizers(self) -> Optimizer:
@@ -298,6 +291,3 @@ class BionemoLightningModule(  # noqa: D101
 
     def test_loss_reduction(self) -> Loss:  # noqa: D102
         return self.loss_reduction_class(validation_step=True)
-
-    def copy(self) -> "BionemoLightningModule":  # noqa: D102
-        return self.__class__(config=self.config, tokenizer=self.tokenizer, optimizer=self.optim)
