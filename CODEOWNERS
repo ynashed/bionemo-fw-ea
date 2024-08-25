@@ -32,15 +32,15 @@
 #
 ## LEGAL
 #
-LICENSE @trvachov @jstjohn @malcolmgreaves
-license_header @trvachov @jstjohn @malcolmgreaves
+LICENSE @jstjohn @malcolmgreaves
+license_header @jstjohn @malcolmgreaves
 
 
 #
 ## DOCUMENTATION
 #
-README.md @trvachov @jstjohn @malcolmgreaves @jomitchellnv @pstjohn
-docs @trvachov @jstjohn @malcolmgreaves @jomitchellnv @pstjohn
+README.md @jstjohn @malcolmgreaves @jomitchellnv @pstjohn
+docs @jstjohn @malcolmgreaves @jomitchellnv @pstjohn
 
 
 #
@@ -58,6 +58,7 @@ requirements-cve.txt  @jomitchellnv @jstjohn @malcolmgreaves @ohadmo @pstjohn @t
 requirements-dev.txt  @jomitchellnv @jstjohn @malcolmgreaves @ohadmo @pstjohn @trvachov
 requirements-test.txt @jomitchellnv @jstjohn @malcolmgreaves @ohadmo @pstjohn @trvachov
 tach.yml @jomitchellnv @jstjohn @malcolmgreaves @ohadmo @pstjohn @trvachov
+.secrets.baseline @jomitchellnv @jstjohn @malcolmgreaves @ohadmo @pstjohn @trvachov
 
 
 #
