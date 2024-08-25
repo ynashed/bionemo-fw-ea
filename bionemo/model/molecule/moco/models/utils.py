@@ -124,7 +124,7 @@ class InterpolantLossFunction(nn.Module):
         loss = scatter_mean(loss, index=batch, dim=0, dim_size=batch_size) * batch_weight
         return loss.sum() / batch_weight.sum()
 
-    def edge_loss(self, batch, logits, data, index, num_atoms, batch_weight=None, element_weight=None):
+    def edge_loss(self, batch, logits, data, index, num_atoms, batch_weight=None, element_weight=None, level=10000):
         batch_size = len(batch.unique())
         loss = self.f_discrete(logits, data)
         loss = 0.5 * scatter_mean(loss, index=index, dim=0, dim_size=num_atoms)  # Aggregate on the bonds first
@@ -134,8 +134,7 @@ class InterpolantLossFunction(nn.Module):
         loss = scatter_mean(loss, index=batch, dim=0, dim_size=batch_size)
         if batch_weight is not None:
             loss = loss * batch_weight  # .unsqueeze(1)
-        loss = loss.clamp(0, self.level)
-        self.level = min(loss.mean().item() * 15, self.level)
+        loss = loss.clamp(0, level)
         if self.aggregation == "mean":
             loss = self.scale * loss.mean()
         elif self.aggregation == "sum":
