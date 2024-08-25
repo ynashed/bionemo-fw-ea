@@ -519,6 +519,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
             #     self.log(f"{stage}/bond_angle_loss", angle_loss, batch_size=batch_size, prog_bar=True)
             #     loss = loss + angle_loss
         self.log(f"{stage}/loss", loss, batch_size=batch_size)
+        print(self.loss_clamps)
         return loss, predictions
 
     def forward(self, batch, time):
