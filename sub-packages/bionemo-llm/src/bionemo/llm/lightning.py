@@ -12,15 +12,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
-from typing import Iterable, List, Optional, Sequence, Tuple, TypeVar, Union
+from abc import ABC, abstractmethod
+from typing import Generic, Iterable, List, Optional, Sequence, Tuple, TypeVar, Union
 
 import pytorch_lightning as pl
 import torch
 import torch.distributed
 from megatron.core import parallel_state
+from megatron.core.transformer.module import MegatronModule
+from nemo.collections.common.tokenizers.tokenizer_spec import TokenizerSpec
+from nemo.lightning import io as nlio
 from nemo.lightning.megatron_parallel import DataT, MegatronLossReduction, ReductionT
+from nemo.lightning.pytorch.optim import MegatronOptimizerModule, OptimizerConfig
+
+from bionemo.core.model.config import BionemoTrainableModelConfig
 
 
 __all__: Sequence[str] = (
@@ -29,10 +34,14 @@ __all__: Sequence[str] = (
     "PassthroughLossReduction",
     "LightningPassthroughPredictionMixin",
     "LossLoggingCallback",
+    "BionemoLightningModule",
 )
 
 
 T = TypeVar("T")
+
+Model = TypeVar("Model", bound=MegatronModule)
+Loss = TypeVar("Loss", bound=MegatronLossReduction)
 
 
 def some_first(seq: Iterable[Optional[T]]) -> T:
@@ -209,3 +218,86 @@ class LossLoggingCallback(pl.Callback):  # noqa: D101
                 avg_test_loss = torch.stack(self.test_losses).mean()
                 pl_module.log("test_loss", avg_test_loss, prog_bar=True, logger=True, rank_zero_only=True)
                 self.test_losses.clear()
+
+
+class BionemoLightningModule(  # noqa: D101
+    pl.LightningModule,
+    nlio.IOMixin,
+    nlio.ConnectorMixin,
+    LightningPassthroughPredictionMixin,
+    Generic[Model, Loss],
+    ABC,
+):  # noqa: D205
+    def __init__(
+        self,
+        config: BionemoTrainableModelConfig[Model, Loss],
+        # TODO: Add transformer_layer_spec when we update mcore
+        tokenizer: Optional[TokenizerSpec] = None,
+        optimizer: MegatronOptimizerModule = MegatronOptimizerModule(
+            config=OptimizerConfig(lr=1e-4, optimizer="adam", use_distributed_optimizer=True),
+        ),
+    ):
+        """A pytorch lightning module for BioBert-derived models. This module is designed to be used with the Megatron-LM strategy and nemo 2.0 conventions.
+        To change the your loss, pass in a different config object that returns a different loss reduction class. To change your model and what it outputs,
+        pass in a different config object that returns a different model. Do not modify this function unless you need to change higher level logic. You may
+        need to modify the various step and forward functions towards the bottom of this file to handle new/different keys in the batch. In the future some of
+        those functions may need to be refactored out into the config object or a different place so that they live closer to the model definition.
+        """  # noqa: D205
+        super().__init__()
+        self.config = config
+        self.tokenizer = tokenizer
+        self.loss_reduction_class = config.get_loss_reduction_class()
+        # TODO replace the self.configure_optimizer call with the optimizer below
+        #  once it all works. This is the future direction for how things are going.
+        self.optim = optimizer
+        self.optim.connect(self)  # This will bind the `configure_optimizers` method
+        self.model: Optional[Model] = None
+
+    def configure_model(self) -> None:  # noqa: D102
+        self.model = self.config.configure_model(self.tokenizer)
+
+    # This is now replaced by the init hook on self.optimizer
+    # def configure_optimizers(self) -> Optimizer:
+    #     return bert_default_optimizer(self)
+
+    def forward(self, *args, **kwargs) -> torch.Tensor:
+        """Call the forward method of the underlying model, and return whatever it outputs."""
+        if self.model is None:
+            self.configure_model()
+        output_tensor = self.model(*args, **kwargs)  # for now just pass through to the underlying model
+        return output_tensor
+
+    @abstractmethod
+    def data_step(self, dataloader_iter) -> dict[str, torch.Tensor]:  # noqa: D102
+        raise NotImplementedError()
+
+    @abstractmethod
+    def forward_step(self, batch) -> torch.Tensor:  # noqa: D102
+        raise NotImplementedError()
+
+    def training_step(self, batch, batch_idx: Optional[int] = None) -> torch.Tensor:  # noqa: D102
+        # In mcore the loss-function is part of the forward-pass (when labels are provided)
+        return self.forward_step(batch)
+
+    def validation_step(self, batch, batch_idx: Optional[int] = None) -> torch.Tensor:  # noqa: D102
+        # In mcore the loss-function is part of the forward-pass (when labels are provided)
+        return self.forward_step(batch)
+
+    def predict_step(self, batch, batch_idx: Optional[int] = None) -> torch.Tensor:  # noqa: D102
+        return self.forward_step(batch)
+
+    def training_loss_reduction(self) -> Loss:  # noqa: D102
+        # This is the function that takes batch['loss_mask'] and the logits output by the model and reduces the loss
+        #  This function will
+        return self.loss_reduction_class()
+
+    # The predict step comes from the LightningPassthroughPredictionMixin
+
+    def validation_loss_reduction(self) -> Loss:  # noqa: D102
+        return self.loss_reduction_class(validation_step=True)
+
+    def test_loss_reduction(self) -> Loss:  # noqa: D102
+        return self.loss_reduction_class(validation_step=True)
+
+    def copy(self) -> "BionemoLightningModule":  # noqa: D102
+        return self.__class__(config=self.config, tokenizer=self.tokenizer, optimizer=self.optim)
