@@ -183,7 +183,7 @@ def test_esm2_golden_values(esm2_650M_config_w_ckpt, sample_data):
 
         # configure the model to return hiddens
         esm2_650M_config_hiddens = deepcopy(esm2_650M_config_w_ckpt)
-        esm2_650M_config_hiddens.mutate_hparam("return_only_hidden_states", True)
+        esm2_650M_config_hiddens.set_hparam("return_only_hidden_states", True)
         model = esm2_650M_config_hiddens.configure_model(tokenizer).to(device)
         model.eval()
         hiddens = model(input_ids, attention_mask)
