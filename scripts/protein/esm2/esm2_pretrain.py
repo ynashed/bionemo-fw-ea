@@ -16,7 +16,7 @@
 
 import argparse
 from pathlib import Path
-from typing import Optional, Sequence, Union, get_args
+from typing import Optional, Sequence, get_args
 
 from megatron.core.optimizer import OptimizerConfig
 from nemo import lightning as nl
@@ -34,34 +34,11 @@ from bionemo.esm2.model.lr_scheduler import WarmupAnnealDecayHoldScheduler
 from bionemo.llm.lightning import LossLoggingCallback
 from bionemo.llm.model.biobert.lightning import BioBertLightningModule
 from bionemo.llm.model.biobert.model import BiobertSpecOption
+from bionemo.llm.utils.datamodule_utils import float_or_int_or_none, infer_global_batch_size
 from bionemo.llm.utils.logger_utils import WandbLoggerOptions, setup_nemo_lightning_logger
 
 
-__all__: Sequence[str] = ("main",)
-
-
-# TODO(@sichu) migrate functions into utilities
-def float_or_int(value: Union[str, float, int]) -> float | int:
-    if isinstance(value, (int, float)):
-        return value
-    if value.isdigit():
-        return int(value)
-    return float(value)
-
-
-def infer_global_batch_size(
-    micro_batch_size: int,
-    num_nodes: int,
-    devices: int,
-    accumulate_grad_batches: int = 1,
-    tensor_model_parallel_size: int = 1,
-    pipeline_model_parallel_size: int = 1,
-):
-    world_size = num_nodes * devices
-    model_parallel_size = tensor_model_parallel_size * pipeline_model_parallel_size
-    data_parallel_size = world_size // model_parallel_size
-    global_batch_size = micro_batch_size * data_parallel_size * accumulate_grad_batches
-    return global_batch_size
+__all__: Sequence[str] = ("main", "parser")
 
 
 def main(
@@ -80,7 +57,7 @@ def main(
     limit_val_batches: int,
     val_check_interval: int,
     num_dataset_workers: int,
-    biobert_spec_option: BiobertSpecOption,
+    biobert_spec_option: BiobertSpecOption,  # TODO(@farhadrgh) clarify how to parse this.
     lr: float,
     micro_batch_size: int,
     accumulate_grad_batches: int,
@@ -257,216 +234,217 @@ def main(
     )
 
 
+# TODO migrate to hydra config
+# Parse the arguments and pull them out into local variables for ease of future refactor to a
+#   config management system.
+parser = argparse.ArgumentParser(description="Pretrain ESM2 with UR data.")
+parser.add_argument(
+    "--train-cluster-path",
+    type=Path,
+    required=True,
+    help="Path to the train cluster data parquet file",
+)
+parser.add_argument(
+    "--train-database-path",
+    type=Path,
+    required=True,
+    help="Path to the train sequence database file",
+)
+parser.add_argument(
+    "--valid-cluster-path",
+    type=Path,
+    required=True,
+    help="Path to the valid cluster data parquet file",
+)
+parser.add_argument(
+    "--valid-database-path",
+    type=Path,
+    required=True,
+    help="Path to the vali sequence database file",
+)
+parser.add_argument(
+    "--precision",
+    type=str,
+    choices=get_args(PrecisionTypes),
+    required=False,
+    default="bf16-mixed",
+    help="Precision type to use for training.",
+)
+parser.add_argument(
+    "--lr",
+    type=float,
+    required=False,
+    default=4e-4,
+    help="Learning rate for training. Default is 4e-4",
+)
+parser.add_argument(
+    "--create-tensorboard-logger", action="store_true", default=False, help="Create a tensorboard logger."
+)
+# FIXME (@skothenhill) figure out how checkpointing and resumption should work with the new nemo trainer
+parser.add_argument(
+    "--resume-if-exists", action="store_true", default=False, help="Resume training if a checkpoint exists."
+)
+parser.add_argument(
+    "--result-dir", type=Path, required=False, default=Path("./results"), help="Path to the result directory."
+)
+parser.add_argument("--experiment-name", type=str, required=False, default="esm2", help="Name of the experiment.")
+parser.add_argument("--wandb-offline", action="store_true", default=False, help="Use wandb in offline mode.")
+parser.add_argument(
+    "--wandb-project",
+    type=str,
+    required=False,
+    default=None,
+    help="Wandb project name. Wandb will only happen if this is set.",
+)
+parser.add_argument(
+    "--num-gpus",
+    type=int,
+    required=False,
+    default=1,
+    help="Number of GPUs to use for training. Default is 1.",
+)
+parser.add_argument(
+    "--num-nodes",
+    type=int,
+    required=False,
+    default=1,
+    help="Number of nodes to use for training. Default is 1.",
+)
+parser.add_argument(
+    "--num-steps",
+    type=int,
+    required=False,
+    default=500000,
+    help="Number of steps to use for training. Default is 500000.",
+)
+parser.add_argument(
+    "--warmup-steps",
+    type=int,
+    required=False,
+    default=2000,
+    help="Number of warmup steps for WarmupAnnealDecayHold Scheduler. Default is 2000.",
+)
+parser.add_argument(
+    "--num-dataset-workers",
+    type=int,
+    required=False,
+    default=1,
+    help="Number of workers to use for training. Default is 1.",
+)
+parser.add_argument(
+    "--val-check-interval",
+    type=int,
+    required=False,
+    default=10000,
+    help="Number of steps between validation. Default is 10000.",
+)
+parser.add_argument(
+    "--seq-length",
+    type=int,
+    required=False,
+    default=1024,
+    help="Sequence length of cell. Default is 1024.",
+)
+parser.add_argument(
+    "--limit-val-batches",
+    type=float_or_int_or_none,
+    required=False,
+    default=2,
+    help="Number of global batches used for validation if int. Fraction of validation dataset if float. Default is 2.",
+)
+parser.add_argument(
+    "--micro-batch-size",
+    type=int,
+    required=False,
+    default=64,
+    help="Micro-batch size. Global batch size is inferred from this.",
+)
+parser.add_argument(
+    "--accumulate-grad-batches",
+    type=int,
+    required=False,
+    default=1,
+    help="Gradient accumulation steps. Global batch size is inferred from this.",
+)
+parser.add_argument(
+    "--biobert-spec-option",
+    type=BiobertSpecOption,
+    choices=[e.value for e in BiobertSpecOption],
+    required=False,
+    default=BiobertSpecOption.esm2_bert_layer_local_spec.value,
+    help="Biobert spec option to use for the model. Default is 'esm2_bert_layer_local_spec'.",
+)
+parser.add_argument(
+    "--nemo1-init-path",
+    type=Path,
+    required=False,
+    help="Path to nemo1 file, if desired to load at init time.",
+)
+parser.add_argument(
+    "--save-best-checkpoint",
+    action="store_true",
+    default=True,
+    help="Save the best checkpoint based on the metric to monitor.",
+)
+parser.add_argument(
+    "--save-last-checkpoint",
+    action="store_true",
+    default=True,
+    help="Save the last checkpoint.",
+)
+parser.add_argument(
+    "--metric-to-monitor-for-checkpoints",
+    type=str,
+    required=False,
+    default="val_loss",
+    help="The metric to monitor for checkpointing.",
+)
+parser.add_argument(
+    "--save-top-k",
+    type=int,
+    required=False,
+    default=2,
+    help="Save the top k checkpoints.",
+)
+parser.add_argument(
+    "--restore-from-checkpoint-path",
+    type=Path,
+    required=False,
+    default=None,
+    help="Path to the checkpoint directory to restore from. Will override `--resume-if-exists` when set.",
+)
+
+# ESM2 specific configuration (default: 650M)
+parser.add_argument(
+    "--num-layers",
+    type=int,
+    required=False,
+    default=33,
+    help="Number of layers in the model. Default is 33.",
+)
+parser.add_argument(
+    "--hidden-size",
+    type=int,
+    required=False,
+    default=1280,
+    help="Hidden size of the model. Default is 1280.",
+)
+parser.add_argument(
+    "--num-attention-heads",
+    type=int,
+    required=False,
+    default=20,
+    help="Number of attention heads in the model. Default is 20.",
+)
+parser.add_argument(
+    "--ffn-hidden-size",
+    type=int,
+    required=False,
+    default=4 * 1280,
+    help="FFN hidden size of the model. Default is 4 * 1280.",
+)
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Pretrain ESM2 with UR data.")
-    parser.add_argument(
-        "--train-cluster-path",
-        type=Path,
-        required=True,
-        help="Path to the train cluster data parquet file",
-    )
-    parser.add_argument(
-        "--train-database-path",
-        type=Path,
-        required=True,
-        help="Path to the train sequence database file",
-    )
-    parser.add_argument(
-        "--valid-cluster-path",
-        type=Path,
-        required=True,
-        help="Path to the valid cluster data parquet file",
-    )
-    parser.add_argument(
-        "--valid-database-path",
-        type=Path,
-        required=True,
-        help="Path to the vali sequence database file",
-    )
-    parser.add_argument(
-        "--precision",
-        type=str,
-        choices=get_args(PrecisionTypes),
-        required=False,
-        default="bf16-mixed",
-        help="Precision type to use for training.",
-    )
-    parser.add_argument(
-        "--lr",
-        type=float,
-        required=False,
-        default=4e-4,
-        help="Learning rate for training. Default is 4e-4",
-    )
-    parser.add_argument(
-        "--create-tensorboard-logger", action="store_true", default=False, help="Create a tensorboard logger."
-    )
-    # FIXME (@skothenhill) figure out how checkpointing and resumption should work with the new nemo trainer
-    parser.add_argument(
-        "--resume-if-exists", action="store_true", default=False, help="Resume training if a checkpoint exists."
-    )
-    parser.add_argument(
-        "--result-dir", type=Path, required=False, default=Path("./results"), help="Path to the result directory."
-    )
-    parser.add_argument("--experiment-name", type=str, required=False, default="esm2", help="Name of the experiment.")
-    parser.add_argument("--wandb-offline", action="store_true", default=False, help="Use wandb in offline mode.")
-    parser.add_argument(
-        "--wandb-project",
-        type=str,
-        required=False,
-        default=None,
-        help="Wandb project name. Wandb will only happen if this is set.",
-    )
-    parser.add_argument(
-        "--num-gpus",
-        type=int,
-        required=False,
-        default=1,
-        help="Number of GPUs to use for training. Default is 1.",
-    )
-    parser.add_argument(
-        "--num-nodes",
-        type=int,
-        required=False,
-        default=1,
-        help="Number of nodes to use for training. Default is 1.",
-    )
-    parser.add_argument(
-        "--num-steps",
-        type=int,
-        required=False,
-        default=500000,
-        help="Number of steps to use for training. Default is 500000.",
-    )
-    parser.add_argument(
-        "--warmup-steps",
-        type=int,
-        required=False,
-        default=2000,
-        help="Number of warmup steps for WarmupAnnealDecayHold Scheduler. Default is 2000.",
-    )
-    parser.add_argument(
-        "--num-dataset-workers",
-        type=int,
-        required=False,
-        default=1,
-        help="Number of workers to use for training. Default is 1.",
-    )
-    parser.add_argument(
-        "--val-check-interval",
-        type=int,
-        required=False,
-        default=10000,
-        help="Number of steps between validation. Default is 10000.",
-    )
-    parser.add_argument(
-        "--seq-length",
-        type=int,
-        required=False,
-        default=1024,
-        help="Sequence length of cell. Default is 1024.",
-    )
-    parser.add_argument(
-        "--limit-val-batches",
-        type=float_or_int,
-        required=False,
-        default=2,
-        help="Number of global batches used for validation if int. Fraction of validation dataset if float. Default is 2.",
-    )
-    parser.add_argument(
-        "--micro-batch-size",
-        type=int,
-        required=False,
-        default=64,
-        help="Micro-batch size. Global batch size is inferred from this.",
-    )
-    parser.add_argument(  # TODO(@sichu) standardize this in geneformer
-        "--accumulate-grad-batches",
-        type=int,
-        required=False,
-        default=1,
-        help="Gradient accumulation steps. Global batch size is inferred from this.",
-    )
-    parser.add_argument(
-        "--biobert-spec-option",
-        type=BiobertSpecOption,
-        choices=[e.value for e in BiobertSpecOption],
-        required=False,
-        default=BiobertSpecOption.esm2_bert_layer_local_spec.value,
-        help="Biobert spec option to use for the model. Default is 'esm2_bert_layer_local_spec'.",
-    )
-    parser.add_argument(
-        "--nemo1-init-path",
-        type=Path,
-        required=False,
-        help="Path to nemo1 file, if desired to load at init time.",
-    )
-    parser.add_argument(
-        "--save-best-checkpoint",
-        action="store_true",
-        default=True,
-        help="Save the best checkpoint based on the metric to monitor.",
-    )
-    parser.add_argument(
-        "--save-last-checkpoint",
-        action="store_true",
-        default=True,
-        help="Save the last checkpoint.",
-    )
-    parser.add_argument(
-        "--metric-to-monitor-for-checkpoints",
-        type=str,
-        required=False,
-        default="val_loss",
-        help="The metric to monitor for checkpointing.",
-    )
-    parser.add_argument(
-        "--save-top-k",
-        type=int,
-        required=False,
-        default=2,
-        help="Save the top k checkpoints.",
-    )
-    parser.add_argument(
-        "--restore-from-checkpoint-path",
-        type=Path,
-        required=False,
-        default=None,
-        help="Path to the checkpoint directory to restore from. Will override `--resume-if-exists` when set.",
-    )
-
-    # ESM2 specific configuration (default: 650M)
-    parser.add_argument(
-        "--num-layers",
-        type=int,
-        required=False,
-        default=33,
-        help="Number of layers in the model. Default is 33.",
-    )
-    parser.add_argument(
-        "--hidden-size",
-        type=int,
-        required=False,
-        default=1280,
-        help="Hidden size of the model. Default is 1280.",
-    )
-    parser.add_argument(
-        "--num-attention-heads",
-        type=int,
-        required=False,
-        default=20,
-        help="Number of attention heads in the model. Default is 20.",
-    )
-    parser.add_argument(
-        "--ffn-hidden-size",
-        type=int,
-        required=False,
-        default=4 * 1280,
-        help="FFN hidden size of the model. Default is 4 * 1280.",
-    )
-
-    # Parse the arguments and pull them out into local variables for ease of future refactor to a
-    #   config management system.
     args = parser.parse_args()
     main(
         train_cluster_path=args.train_cluster_path,

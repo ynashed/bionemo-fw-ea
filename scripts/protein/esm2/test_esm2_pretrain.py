@@ -18,14 +18,16 @@ import shlex
 import sqlite3
 import subprocess
 from pathlib import Path
+from typing import Dict
 
 import pandas as pd
 import pytest
-from esm2_pretrain import main  # TODO: needs to be refactored to a package and imported!
+from esm2_pretrain import main, parser  # TODO: needs to be refactored to a package and imported!
 from lightning.fabric.plugins.environments.lightning import find_free_network_port
 
 from bionemo import esm2
 from bionemo.llm.model.biobert.transformer_specs import BiobertSpecOption
+from bionemo.llm.utils.datamodule_utils import parse_kwargs_to_arglist
 from bionemo.testing import megatron_parallel_state_utils
 
 
@@ -40,6 +42,7 @@ bionemo2_root: Path = (
 ).absolute()
 
 
+@pytest.mark.skip("duplicate unittest")
 @pytest.fixture
 def dummy_protein_dataset(tmp_path):
     """Create a mock protein dataset."""
@@ -71,6 +74,7 @@ def dummy_protein_dataset(tmp_path):
     return db_file
 
 
+@pytest.mark.skip("duplicate unittest")
 @pytest.fixture
 def dummy_parquet_train_val_inputs(tmp_path):
     """Create a mock protein train and val cluster parquet."""
@@ -97,6 +101,7 @@ def test_bionemo2_rootdir():
     assert (bionemo2_root / "sub-packages").is_dir(), "sub-packages is supposed to be a directory."
 
 
+@pytest.mark.skip("duplicate unittest")
 def test_main_runs(tmpdir, dummy_protein_dataset, dummy_parquet_train_val_inputs):
     train_cluster_path, valid_cluster_path = dummy_parquet_train_val_inputs
 
@@ -149,6 +154,7 @@ def test_main_runs(tmpdir, dummy_protein_dataset, dummy_parquet_train_val_inputs
     ).is_file(), "Could not find experiment log."
 
 
+@pytest.mark.skip("duplicate unittest")
 @pytest.mark.parametrize("limit_val_batches", [0.5, 0.75, 1.0])
 def test_main_runs_fraction_limit_val_batches(
     tmpdir, dummy_protein_dataset, dummy_parquet_train_val_inputs, limit_val_batches
@@ -204,6 +210,7 @@ def test_main_runs_fraction_limit_val_batches(
     ).is_file(), "Could not find experiment log."
 
 
+@pytest.mark.skip("duplicate unittest")
 def test_pretrain_cli(tmpdir, dummy_protein_dataset, dummy_parquet_train_val_inputs):
     train_cluster_path, valid_cluster_path = dummy_parquet_train_val_inputs
 
@@ -239,3 +246,137 @@ def test_pretrain_cli(tmpdir, dummy_protein_dataset, dummy_parquet_train_val_inp
     )
     assert result.returncode == 0, f"Pretrain script failed: {cmd_str}"
     assert (result_dir / "test_experiment").exists(), "Could not find test experiment directory."
+
+
+@pytest.fixture(scope="function")
+def required_args_reference() -> Dict[str, str]:
+    """
+    This fixture provides a dictionary of required arguments for the pretraining script.
+
+    It includes the following keys:
+    - train_cluster_path: The path to the training cluster parquet file.
+    - train_database_path: The path to the training database file.
+    - valid_cluster_path: The path to the validation cluster parquet file.
+    - valid_database_path: The path to the validation database file.
+
+    The values for these keys are placeholders and should be replaced with actual file paths.
+
+    Returns:
+        A dictionary with the required arguments for the pretraining script.
+    """
+    return {
+        "train_cluster_path": "path/to/train_cluster.parquet",
+        "train_database_path": "path/to/train.db",
+        "valid_cluster_path": "path/to/valid_cluster.parquet",
+        "valid_database_path": "path/to/valid.db",
+    }
+
+
+# TODO(@sichu) add test on dataset/datamodule on invalid path
+def test_required_train_cluster_path(required_args_reference):
+    """
+    Test train_cluster_path is required.
+
+    Args:
+        required_args_reference (Dict[str, str]): A dictionary with the required arguments for the pretraining script.
+    """
+    required_args_reference.pop("train_cluster_path")
+    arglist = parse_kwargs_to_arglist(required_args_reference)
+    with pytest.raises(SystemExit):
+        parser.parse_args(arglist)
+
+
+def test_required_train_database_path(required_args_reference):
+    """
+    Test train_database_path is required.
+
+    Args:
+        required_args_reference (Dict[str, str]): A dictionary with the required arguments for the pretraining script.
+    """
+    required_args_reference.pop("train_database_path")
+    arglist = parse_kwargs_to_arglist(required_args_reference)
+    with pytest.raises(SystemExit):
+        parser.parse_args(arglist)
+
+
+def test_required_valid_cluster_path(required_args_reference):
+    """
+    Test valid_cluster_path is required.
+
+    Args:
+        required_args_reference (Dict[str, str]): A dictionary with the required arguments for the pretraining script.
+    """
+    required_args_reference.pop("valid_cluster_path")
+    arglist = parse_kwargs_to_arglist(required_args_reference)
+    with pytest.raises(SystemExit):
+        parser.parse_args(arglist)
+
+
+def test_required_valid_database_path(required_args_reference):
+    """
+    Test valid_database_path is required.
+
+    Args:
+        required_args_reference (Dict[str, str]): A dictionary with the required arguments for the pretraining script.
+    """
+    required_args_reference.pop("valid_database_path")
+    arglist = parse_kwargs_to_arglist(required_args_reference)
+    with pytest.raises(SystemExit):
+        parser.parse_args(arglist)
+
+
+#### test expected behavior on parser ####
+@pytest.mark.parametrize("limit_val_batches", [0.1, 0.5, 1.0])
+def test_limit_val_batches_is_float(required_args_reference, limit_val_batches):
+    """
+    Test whether limit_val_batches can be parsed as a float.
+
+    Args:
+        required_args_reference (Dict[str, str]): A dictionary with the required arguments for the pretraining script.
+        limit_val_batches (float): The value of limit_val_batches.
+    """
+    required_args_reference["limit_val_batches"] = limit_val_batches
+    arglist = parse_kwargs_to_arglist(required_args_reference)
+    parser.parse_args(arglist)
+
+
+@pytest.mark.parametrize("limit_val_batches", ["0.1", "0.5", "1.0"])
+def test_limit_val_batches_is_float_string(required_args_reference, limit_val_batches):
+    """
+    Test whether limit_val_batches can be parsed as a string of float.
+
+    Args:
+        required_args_reference (Dict[str, str]): A dictionary with the required arguments for the pretraining script.
+        limit_val_batches (float): The value of limit_val_batches.
+    """
+    required_args_reference["limit_val_batches"] = limit_val_batches
+    arglist = parse_kwargs_to_arglist(required_args_reference)
+    parser.parse_args(arglist)
+
+
+def test_limit_val_batches_is_none(required_args_reference):
+    """
+    Test whether limit_val_batches can be parsed as none.
+
+    Args:
+        required_args_reference (Dict[str, str]): A dictionary with the required arguments for the pretraining script.
+    """
+    required_args_reference["limit_val_batches"] = "None"
+    arglist = parse_kwargs_to_arglist(required_args_reference)
+    args = parser.parse_args(arglist)
+    assert args.limit_val_batches is None
+
+
+# TODO(@sichu) add datamodule unittest when limit_val_batches smaller than gbs
+@pytest.mark.parametrize("limit_val_batches", [1, 2])
+def test_limit_val_batches_is_int(required_args_reference, limit_val_batches):
+    """
+    Test whether limit_val_batches can be parsed as integer.
+
+    Args:
+        required_args_reference (Dict[str, str]): A dictionary with the required arguments for the pretraining script.
+        limit_val_batches (int): The value of limit_val_batches.
+    """
+    required_args_reference["limit_val_batches"] = limit_val_batches
+    arglist = parse_kwargs_to_arglist(required_args_reference)
+    parser.parse_args(arglist)
