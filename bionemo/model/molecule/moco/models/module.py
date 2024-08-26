@@ -176,7 +176,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
 
     def initialize_loss_functions(self):
         loss_functions = {}
-        self.loss_clamps = {'x': 1.0, 'edge_attr': 0.1, 'h': 1, 'charge': 0.1}
+        self.loss_clamps = {'x': 1.0, 'edge_attr': 0.1, 'h': 1, 'charges': 0.1}
         for loss_params in self.loss_params.variables:
             index = loss_params.variable_name
             if "use_distance" in loss_params:
