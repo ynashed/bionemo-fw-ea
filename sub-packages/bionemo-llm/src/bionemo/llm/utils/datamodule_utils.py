@@ -152,6 +152,6 @@ def tensor_dict_hash(tensor_dict: Dict[str, torch.Tensor], hash_func: Optional[C
     a contiguous array on the CPU and then to bytes before hashing.
     """
     hash_value = ""
-    for k, v in tensor_dict.items():
-        hash_value += tensor_hash(v, hash_func)
+    for k in sorted(tensor_dict):
+        hash_value += tensor_hash(tensor_dict[k], hash_func)
     return hash_value
