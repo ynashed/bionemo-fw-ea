@@ -24,7 +24,7 @@ from nemo.lightning import io as nlio
 from nemo.lightning.megatron_parallel import DataT, MegatronLossReduction, ReductionT
 from nemo.lightning.pytorch.optim import MegatronOptimizerModule, OptimizerConfig
 
-from bionemo.core.model.config import BionemoTrainableModelConfig
+from bionemo.core.model.config import BionemoTrainableModelConfig, ModelOutput
 
 
 __all__: Sequence[str] = (
@@ -41,7 +41,6 @@ T = TypeVar("T")
 
 Model = TypeVar("Model", bound=MegatronModule)
 Loss = TypeVar("Loss", bound=MegatronLossReduction)
-ModelOutput = TypeVar("ModelOutput", torch.Tensor, list[torch.Tensor], tuple[torch.Tensor], dict[str, torch.Tensor])
 
 
 def some_first(seq: Iterable[Optional[T]]) -> T:
@@ -225,7 +224,7 @@ class BionemoLightningModule(  # noqa: D101
     nlio.IOMixin,
     nlio.ConnectorMixin,
     LightningPassthroughPredictionMixin,
-    Generic[Model, Loss, ModelOutput],
+    Generic[Model, Loss],
     ABC,
 ):  # noqa: D205
     def __init__(
@@ -265,12 +264,13 @@ class BionemoLightningModule(  # noqa: D101
     # def configure_optimizers(self) -> Optimizer:
     #     return bert_default_optimizer(self)
 
-    def forward(self, *args, **kwargs) -> torch.Tensor:
+    def forward(self, *args, **kwargs) -> ModelOutput:
         """Call the forward method of the underlying model, and return whatever it outputs."""
         if self.model is None:
             self.configure_model()
-        output_tensor = self.model(*args, **kwargs)  # for now just pass through to the underlying model
-        return output_tensor
+        assert self.model is not None
+        prediction = self.model(*args, **kwargs)  # for now just pass through to the underlying model
+        return prediction
 
     @abstractmethod
     def data_step(self, dataloader_iter) -> dict[str, torch.Tensor]:  # noqa: D102
