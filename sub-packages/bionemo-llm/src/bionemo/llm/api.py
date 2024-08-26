@@ -41,7 +41,7 @@ class BionemoMegatronModel(MegatronModule, ABC):
     """
 
     @abstractmethod
-    def forward(self, *args, **kwargs) -> ModelOutput:  # D102
+    def forward(self, *args, **kwargs) -> ModelOutput:  # noqa: D102
         raise NotImplementedError()
 
 
