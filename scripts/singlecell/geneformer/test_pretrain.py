@@ -17,12 +17,15 @@ import os
 import shlex
 import subprocess
 from pathlib import Path
+from typing import Dict
 
+import pytest
 from lightning.fabric.plugins.environments.lightning import find_free_network_port
-from pretrain import main  # TODO: needs to be refactored to a package and imported!
+from pretrain import main, parser  # TODO: needs to be refactored to a package and imported!
 
 from bionemo import geneformer
 from bionemo.llm.model.biobert.transformer_specs import BiobertSpecOption
+from bionemo.llm.utils.datamodule_utils import parse_kwargs_to_arglist
 from bionemo.testing import megatron_parallel_state_utils
 
 
@@ -50,6 +53,7 @@ def test_bionemo2_rootdir():
     assert data_path.is_dir(), f"Test data directory is supposed to be a directory.\n{data_error_str}"
 
 
+@pytest.mark.skip("duplicate unittest")
 def test_main_runs(tmpdir):
     result_dir = Path(tmpdir.mkdir("results"))
 
@@ -94,6 +98,7 @@ def test_main_runs(tmpdir):
     ).is_file(), "Could not find experiment log."
 
 
+@pytest.mark.skip("duplicate unittest")
 def test_pretrain_cli(tmpdir):
     result_dir = Path(tmpdir.mkdir("results"))
     open_port = find_free_network_port()
@@ -124,3 +129,89 @@ def test_pretrain_cli(tmpdir):
     )
     assert result.returncode == 0, f"Pretrain script failed: {cmd_str}"
     assert (result_dir / "test_experiment").exists(), "Could not find test experiment directory."
+
+
+@pytest.fixture(scope="function")
+def required_args_reference() -> Dict[str, str]:
+    """
+    This fixture provides a dictionary of required arguments for the pretraining script.
+
+    It includes the following keys:
+    - data_dir: The path to the data directory.
+
+    Returns:
+        A dictionary with the required arguments for the pretraining script.
+    """
+    return {
+        "data_dir": "path/to/cellxgene_2023-12-15_small",
+    }
+
+
+def test_required_data_dir(required_args_reference):
+    """
+    Test data_dir is required.
+
+    Args:
+        required_args_reference (Dict[str, str]): A dictionary with the required arguments for the pretraining script.
+    """
+    required_args_reference.pop("data_dir")
+    arglist = parse_kwargs_to_arglist(required_args_reference)
+    with pytest.raises(SystemExit):
+        parser.parse_args(arglist)
+
+
+#### test expected behavior on parser ####
+@pytest.mark.parametrize("limit_val_batches", [0.1, 0.5, 1.0])
+def test_limit_val_batches_is_float(required_args_reference, limit_val_batches):
+    """
+    Test whether limit_val_batches can be parsed as a float.
+
+    Args:
+        required_args_reference (Dict[str, str]): A dictionary with the required arguments for the pretraining script.
+        limit_val_batches (float): The value of limit_val_batches.
+    """
+    required_args_reference["limit_val_batches"] = limit_val_batches
+    arglist = parse_kwargs_to_arglist(required_args_reference)
+    parser.parse_args(arglist)
+
+
+@pytest.mark.parametrize("limit_val_batches", ["0.1", "0.5", "1.0"])
+def test_limit_val_batches_is_float_string(required_args_reference, limit_val_batches):
+    """
+    Test whether limit_val_batches can be parsed as a string of float.
+
+    Args:
+        required_args_reference (Dict[str, str]): A dictionary with the required arguments for the pretraining script.
+        limit_val_batches (float): The value of limit_val_batches.
+    """
+    required_args_reference["limit_val_batches"] = limit_val_batches
+    arglist = parse_kwargs_to_arglist(required_args_reference)
+    parser.parse_args(arglist)
+
+
+def test_limit_val_batches_is_none(required_args_reference):
+    """
+    Test whether limit_val_batches can be parsed as none.
+
+    Args:
+        required_args_reference (Dict[str, str]): A dictionary with the required arguments for the pretraining script.
+    """
+    required_args_reference["limit_val_batches"] = "None"
+    arglist = parse_kwargs_to_arglist(required_args_reference)
+    args = parser.parse_args(arglist)
+    assert args.limit_val_batches is None
+
+
+# TODO(@sichu) add datamodule unittest when limit_val_batches smaller than gbs
+@pytest.mark.parametrize("limit_val_batches", [1, 2])
+def test_limit_val_batches_is_int(required_args_reference, limit_val_batches):
+    """
+    Test whether limit_val_batches can be parsed as integer.
+
+    Args:
+        required_args_reference (Dict[str, str]): A dictionary with the required arguments for the pretraining script.
+        limit_val_batches (int): The value of limit_val_batches.
+    """
+    required_args_reference["limit_val_batches"] = limit_val_batches
+    arglist = parse_kwargs_to_arglist(required_args_reference)
+    parser.parse_args(arglist)
