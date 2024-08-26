@@ -65,8 +65,7 @@ def infer_global_batch_size(
     tensor_model_parallel_size: int = 1,
     pipeline_model_parallel_size: int = 1,
 ) -> int:
-    """Infers the global batch size based on the micro batch size, number of nodes, devices,
-    accumulation of gradient batches, and model parallel sizes.
+    """Infers the global batch size based on the micro batch size, number of nodes, devices, accumulation of gradient batches, and model parallel sizes.
 
     Args:
         micro_batch_size (int): The micro batch size.
