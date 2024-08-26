@@ -14,5 +14,8 @@
 # limitations under the License.
 
 
+# TODO: replace this "test" once bionemo-geometric has some real code!
 def test_import_geometric() -> None:
-    assert True
+    from bionemo import geometric
+
+    assert geometric is not None
