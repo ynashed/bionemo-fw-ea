@@ -60,7 +60,8 @@ def override_mutate_possibly_extra_mutated_fiddle(
         None, the target config is updated in place.
     """
     for f in maybe_mutated_elements_to_clone:
-        # 1. Update the tracked config values
-        target_cfg.set_hparam(f, source_cfg.get_hparam(f))
+        # 1. Update the tracked config values. Note that the associated attribute in self may have been modified
+        #  post-init, so we don't want to change the value in self here. We do that separately next.
+        target_cfg.set_hparam(f, source_cfg.get_hparam(f), also_change_value=False)
         # 2. Update the lazily untracked values (if the same variable name is used post-init)
         setattr(target_cfg, f, getattr(source_cfg, f))
