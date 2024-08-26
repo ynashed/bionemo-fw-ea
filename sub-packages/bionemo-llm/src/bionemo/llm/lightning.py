@@ -278,6 +278,11 @@ class BionemoLightningModule(  # noqa: D101
 
     @abstractmethod
     def forward_step(self, batch) -> torch.Tensor:  # noqa: D102
+        """The training forward step for the model, which Megatron requires.
+
+        See the Megatron docs for details:
+        https://github.com/NVIDIA/Megatron-LM/blob/main/megatron/core/pipeline_parallel/schedules.py#L170
+        """
         raise NotImplementedError()
 
     def training_step(self, batch, batch_idx: Optional[int] = None) -> torch.Tensor:  # noqa: D102

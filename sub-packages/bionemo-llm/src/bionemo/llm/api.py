@@ -14,26 +14,28 @@
 # limitations under the License.
 
 
-from abc import ABC
-from typing import Generic, Sequence, TypeVar
+from abc import ABC, abstractmethod
+from typing import Sequence
 
-import torch
-import torch.distributed
 from megatron.core.transformer.module import MegatronModule
 from nemo.lightning.megatron_parallel import MegatronLossReduction
 
+from bionemo.core.model.config import Model, ModelOutput
+
 
 __all__: Sequence[str] = (
-    "Model",
+    "BionemoMegatronModel",
     "Loss",
 )
 
-ModelOutput = TypeVar("ModelOutput", torch.Tensor, list[torch.Tensor], tuple[torch.Tensor], dict[str, torch.Tensor])
+Loss = MegatronLossReduction
 
 
-class BionemoMegatronModule(MegatronModule, Generic[ModelOutput], ABC):
-    pass
+class BionemoMegatronModel(MegatronModule, ABC):
+    @abstractmethod
+    def forward(self, *args, **kwargs) -> ModelOutput:
+        raise NotImplementedError()
 
 
-Model = TypeVar("Model", bound=BionemoMegatronModule)
-Loss = TypeVar("Loss", bound=MegatronLossReduction)
+# Typechecking: ensure that the bionemo megatron model abstraction is compliant with bionemo-core's Model
+_: type[Model] = BionemoMegatronModel
