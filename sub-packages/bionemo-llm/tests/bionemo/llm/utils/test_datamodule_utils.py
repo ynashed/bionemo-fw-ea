@@ -18,33 +18,25 @@ from bionemo.llm.utils.datamodule_utils import float_or_int_or_none, infer_globa
 
 
 def test_float_or_int_or_none_type_float():
-    """
-    Test that float_or_int_or_none returns a float when given a float on edge case 1.0
-    """
+    """Test that float_or_int_or_none returns a float when given a float on edge case 1.0"""
     assert isinstance(float_or_int_or_none(1.0), float)
     assert isinstance(float_or_int_or_none("1.0"), float)
 
 
 def test_float_or_int_or_none_type_int():
-    """
-    Test that float_or_int_or_none returns an int when given an int on edge case 1
-    """
+    """Test that float_or_int_or_none returns an int when given an int on edge case 1"""
     assert isinstance(float_or_int_or_none(1), int)
     assert isinstance(float_or_int_or_none("1"), int)
 
 
 def test_float_or_int_or_none_type_none():
-    """
-    Test that float_or_int_or_none returns None when given None
-    """
+    """Test that float_or_int_or_none returns None when given None"""
     assert float_or_int_or_none(None) is None
     assert float_or_int_or_none("None") is None
 
 
 def test_infer_global_batch_size():
-    """
-    Test that infer_global_batch_size returns the correct global batch size
-    """
+    """Test that infer_global_batch_size returns the correct global batch size"""
     assert infer_global_batch_size(micro_batch_size=1, num_nodes=1, devices=1) == 1  # single node, single device
     assert infer_global_batch_size(micro_batch_size=1, num_nodes=1, devices=8) == 8  # single node, multi device
     assert (

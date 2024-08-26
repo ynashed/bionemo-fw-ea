@@ -145,7 +145,7 @@ def main(
         accelerator="gpu",
         strategy=strategy,
         limit_val_batches=limit_val_batches,  # This controls upsampling and downsampling
-        val_check_interval=val_check_interval,  # TODO(@jstjohn) Checkpoint saving is currently broken, fix and change this.
+        val_check_interval=val_check_interval,
         num_nodes=num_nodes,
         callbacks=[
             LossLoggingCallback(),
