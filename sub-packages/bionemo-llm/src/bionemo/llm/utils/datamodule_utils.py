@@ -82,6 +82,39 @@ def infer_global_batch_size(
     Returns:
     int: The global batch size.
     """
+    if not all(
+        isinstance(arg, int)
+        for arg in [
+            micro_batch_size,
+            num_nodes,
+            devices,
+            accumulate_grad_batches,
+            tensor_model_parallel_size,
+            pipeline_model_parallel_size,
+        ]
+    ):
+        raise ValueError(
+            f"All arguments must be of type int, got {type(micro_batch_size)}, {type(num_nodes)}, {type(devices)}, "
+            f"{type(accumulate_grad_batches)}, {type(tensor_model_parallel_size)}, and {type(pipeline_model_parallel_size)}"
+        )
+    if micro_batch_size <= 0:
+        raise ValueError(f"micro_batch_size must be greater than 0, got {micro_batch_size}")
+    if num_nodes <= 0:
+        raise ValueError(f"num_nodes must be greater than 0, got {num_nodes}")
+    if devices <= 0:
+        raise ValueError(f"devices must be greater than 0, got {devices}")
+    if accumulate_grad_batches <= 0:
+        raise ValueError(f"accumulate_grad_batches must be greater than 0, got {accumulate_grad_batches}")
+    if tensor_model_parallel_size <= 0:
+        raise ValueError(f"tensor_model_parallel_size must be greater than 0, got {tensor_model_parallel_size}")
+    if pipeline_model_parallel_size <= 0:
+        raise ValueError(f"pipeline_model_parallel_size must be greater than 0, got {pipeline_model_parallel_size}")
+    if devices % (tensor_model_parallel_size * pipeline_model_parallel_size) != 0:
+        raise ValueError(
+            f"devices must be divisible by tensor_model_parallel_size * pipeline_model_parallel_size, "
+            f"got {devices} and {tensor_model_parallel_size} * {pipeline_model_parallel_size}"
+        )
+
     world_size = num_nodes * devices
     model_parallel_size = tensor_model_parallel_size * pipeline_model_parallel_size
     data_parallel_size = world_size // model_parallel_size

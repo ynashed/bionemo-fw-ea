@@ -39,3 +39,39 @@ def test_float_or_int_or_none_type_none():
     """
     assert float_or_int_or_none(None) is None
     assert float_or_int_or_none("None") is None
+
+
+def test_infer_global_batch_size():
+    """
+    Test that infer_global_batch_size returns the correct global batch size
+    """
+    assert infer_global_batch_size(micro_batch_size=1, num_nodes=1, devices=1) == 1  # single node, single device
+    assert infer_global_batch_size(micro_batch_size=1, num_nodes=1, devices=8) == 8  # single node, multi device
+    assert (
+        infer_global_batch_size(
+            micro_batch_size=1,
+            num_nodes=2,
+            devices=8,
+        )
+        == 16
+    )  # multi node, multi device
+    assert (
+        infer_global_batch_size(micro_batch_size=1, num_nodes=2, devices=8, pipeline_model_parallel_size=2) == 8
+    )  # multi node, multi device with pipeline parallel
+    assert (
+        infer_global_batch_size(
+            micro_batch_size=1, num_nodes=2, devices=8, pipeline_model_parallel_size=2, tensor_model_parallel_size=2
+        )
+        == 4
+    )  # multi node, multi device with pipeline and tensor parallel
+    assert (
+        infer_global_batch_size(
+            micro_batch_size=1,
+            num_nodes=2,
+            devices=8,
+            pipeline_model_parallel_size=2,
+            tensor_model_parallel_size=2,
+            accumulate_grad_batches=2,
+        )
+        == 8
+    )  # multi node, multi device with pipeline and tensor parallel, and accumulate grad batches
