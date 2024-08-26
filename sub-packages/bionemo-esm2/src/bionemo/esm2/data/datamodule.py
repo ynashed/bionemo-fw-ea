@@ -134,7 +134,7 @@ class ESMDataModule(pl.LightningDataModule):
         limit_val_batches = 1.0 if self.trainer.limit_val_batches is None else self.trainer.limit_val_batches
 
         if limit_val_batches <= 1.0 and isinstance(limit_val_batches, float):
-            num_val_samples_per_epoch = int(len(val_clusters) * self.trainer.limit_val_batches)
+            num_val_samples_per_epoch = int(len(val_clusters) * limit_val_batches)
             if num_val_samples_per_epoch < self.data_sampler.global_batch_size:
                 raise ValueError(
                     "The limited number of val samples %s is less than the global batch size %s"

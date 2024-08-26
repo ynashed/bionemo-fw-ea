@@ -14,8 +14,8 @@
 # limitations under the License.
 
 
-from typing import Dict, Union, List, Any, Callable, Optional
 import hashlib
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import torch
 
@@ -55,9 +55,7 @@ def parse_kwargs_to_arglist(kwargs: Dict[str, Any]) -> List[str]:
     """
     arglist = []
     for k, v in kwargs.items():
-        arglist.extend([
-            f"--{k.replace('_', '-')}", str(v)
-        ])
+        arglist.extend([f"--{k.replace('_', '-')}", str(v)])
     return arglist
 
 
@@ -70,7 +68,7 @@ def infer_global_batch_size(
     pipeline_model_parallel_size: int = 1,
 ) -> int:
     """
-    Infers the global batch size based on the micro batch size, number of nodes, devices, 
+    Infers the global batch size based on the micro batch size, number of nodes, devices,
     accumulation of gradient batches, and model parallel sizes.
 
     Args:
@@ -102,7 +100,7 @@ def tensor_hash(tensor: torch.Tensor, hash_func: Optional[Callable] = None) -> s
     Returns:
         str: The resulting hash string.
 
-    If no hash function is provided, SHA-256 is used by default. The function first converts the tensor to 
+    If no hash function is provided, SHA-256 is used by default. The function first converts the tensor to
     a contiguous array on the CPU and then to bytes before hashing.
     """
     tensor_bytes = tensor.cpu().contiguous().numpy().tobytes()
@@ -123,10 +121,10 @@ def tensor_dict_hash(tensor_dict: Dict[str, torch.Tensor], hash_func: Optional[C
     Returns:
         str: The resulting hash string.
 
-    If no hash function is provided, SHA-256 is used by default. The function first converts the tensor to 
+    If no hash function is provided, SHA-256 is used by default. The function first converts the tensor to
     a contiguous array on the CPU and then to bytes before hashing.
     """
-    hash_value = ''
+    hash_value = ""
     for k, v in tensor_dict.items():
         hash_value += tensor_hash(v, hash_func)
     return hash_value

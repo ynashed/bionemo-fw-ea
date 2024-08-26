@@ -213,7 +213,7 @@ def test_create_esm_datamodule_creates_valid_dataloaders_fractional_limit_val_ba
     )  # number of eval iters * number of validation clusters // global batch size
 
 
-def test_create_esm_datamodule_creates_valid_dataloaders_fractional_limit_val_batches_1(
+def test_create_esm_datamodule_creates_valid_dataloaders_fractional_limit_val_batches_1p0(
     dummy_protein_dataset, dummy_parquet_train_val_inputs
 ):
     train_cluster_path, valid_cluster_path = dummy_parquet_train_val_inputs
@@ -249,6 +249,57 @@ def test_create_esm_datamodule_creates_valid_dataloaders_fractional_limit_val_ba
     assert (
         len(val_dataloader) == (10 // 2 + 1) * 2 // 1
     )  # number of eval iters * number of validation clusters // global batch size
+
+
+def test_create_esm_datamodule_limit_val_batches_none_equals_limit_val_batches_1p0(
+    dummy_protein_dataset, dummy_parquet_train_val_inputs
+):
+    train_cluster_path, valid_cluster_path = dummy_parquet_train_val_inputs
+
+    # Initialize the data module with limit_val_batches = 1.0
+    data_module_one = ESMDataModule(
+        train_cluster_path=train_cluster_path,
+        train_database_path=dummy_protein_dataset,
+        valid_cluster_path=valid_cluster_path,
+        valid_database_path=dummy_protein_dataset,
+        global_batch_size=1,
+        micro_batch_size=1,
+        min_seq_length=36,
+        max_seq_length=36,
+    )
+    assert data_module_one is not None
+
+    data_module_one.trainer = mock.Mock()
+    data_module_one.trainer.max_epochs = 1
+    data_module_one.trainer.max_steps = 10
+    data_module_one.trainer.val_check_interval = 2
+    data_module_one.trainer.limit_val_batches = 1.0  # fractional value to use the whole dataset
+
+    data_module_one.setup()
+
+    # Initialize the data module with limit_val_batches = None
+    data_module_none = ESMDataModule(
+        train_cluster_path=train_cluster_path,
+        train_database_path=dummy_protein_dataset,
+        valid_cluster_path=valid_cluster_path,
+        valid_database_path=dummy_protein_dataset,
+        global_batch_size=1,
+        micro_batch_size=1,
+        min_seq_length=36,
+        max_seq_length=36,
+    )
+    assert data_module_none is not None
+
+    data_module_none.trainer = mock.Mock()
+    data_module_none.trainer.max_epochs = 1
+    data_module_none.trainer.max_steps = 10
+    data_module_none.trainer.val_check_interval = 2
+    data_module_none.trainer.limit_val_batches = None  # None to use the whole dataset
+
+    data_module_none.setup()
+
+    # Check that the two dataloaders have the same number of samples.
+    assert len(data_module_one.val_dataloader()) == len(data_module_none.val_dataloader())
 
 
 def test_create_esm_datamodule_valid_dataloaders_has_consistent_samples_per_epoch(
@@ -293,12 +344,11 @@ def test_create_esm_datamodule_valid_dataloaders_has_consistent_samples_per_epoc
     # hash values from batches of the first epoch
     batch_hashes1 = [tensor_dict_hash(batch) for batch in data_module.val_dataloader()]
 
-    # second epoch should have the same output but can be reshuffled
-    if is_ordered:
+    if is_ordered:  # second epoch should have exactly the same output includeing order
         for batch in data_module.val_dataloader():
             batch_hash = tensor_dict_hash(batch)
             assert batch_hash == batch_hashes1.pop()
-    else:
+    else:  # second epoch should have the same output but can be reshuffled
         batch_hashes1 = set(batch_hashes1)
         batch_hashes2 = {tensor_dict_hash(batch) for batch in data_module.val_dataloader()}
         assert batch_hashes1 == batch_hashes2
