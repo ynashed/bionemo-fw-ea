@@ -28,15 +28,25 @@ __all__: Sequence[str] = (
 )
 
 ModelOutput = Tensor | list[Tensor] | tuple[Tensor] | dict[str, Tensor]
+"""A Model's forward pass may produce a tensor, multiple tensors, or named tensors.
+"""
 
 LossType = TypeVar("LossType")
+"""Stand-in for a loss function; no constraints.
+"""
 
 
 class Model(Protocol[ModelOutput]):
-    def forward(self, *args, **kwargs) -> ModelOutput: ...
+    """Lightweight interface for a model: must have a forward method."""
+
+    def forward(self, *args, **kwargs) -> ModelOutput:
+        """Prediction / forward-step for a model."""
+        ...
 
 
 ModelType = TypeVar("ModelType", bound=Model)
+"""Generic type for things that have a forward pass.
+"""
 
 
 class BionemoModelConfig(Generic[ModelType], ABC):

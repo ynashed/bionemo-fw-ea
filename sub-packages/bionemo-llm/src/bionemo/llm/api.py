@@ -29,11 +29,19 @@ __all__: Sequence[str] = (
 )
 
 Loss = MegatronLossReduction
+"""Loss functions that interact with Megatron need to either be or inherit from `MegatronLossReduction`.
+"""
 
 
 class BionemoMegatronModel(MegatronModule, ABC):
+    """Models that use Megatron must be a MegatronModule type.
+
+    The only major difference is the explicit `forward` pass method signature that makes this class compatible
+    with bionemo-core's `Model` structural type.
+    """
+
     @abstractmethod
-    def forward(self, *args, **kwargs) -> ModelOutput:
+    def forward(self, *args, **kwargs) -> ModelOutput:  # D102
         raise NotImplementedError()
 
 
