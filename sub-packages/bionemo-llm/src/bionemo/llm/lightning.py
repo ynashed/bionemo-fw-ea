@@ -227,7 +227,7 @@ class BionemoLightningModule(
     Generic[Model, Loss],
     ABC,
 ):
-    """Reusable PyTorch Lightning module for Megatron models that is compatible with NeMo's conventions."""  # noqa: D200
+    """Reusable PyTorch Lightning module for Megatron models that is compatible with NeMo's conventions."""
 
     def __init__(
         self,
@@ -278,7 +278,7 @@ class BionemoLightningModule(
         raise NotImplementedError()
 
     @abstractmethod
-    def forward_step(self, batch) -> torch.Tensor:  # noqa: D102
+    def forward_step(self, batch) -> torch.Tensor:
         """Megatron-required: the training forward step for the model, which is required to produce the loss.
 
         Normally, the forward pass of a model means its inference. Loss is computed using the predictions
