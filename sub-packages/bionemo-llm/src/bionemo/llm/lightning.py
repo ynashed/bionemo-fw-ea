@@ -219,14 +219,16 @@ class LossLoggingCallback(pl.Callback):  # noqa: D101
                 self.test_losses.clear()
 
 
-class BionemoLightningModule(  # noqa: D101
+class BionemoLightningModule(
     pl.LightningModule,
     nlio.IOMixin,
     nlio.ConnectorMixin,
     LightningPassthroughPredictionMixin,
     Generic[Model, Loss],
     ABC,
-):  # noqa: D205
+):
+    """Reusable PyTorch Lightning module for Megatron models that is compatible with NeMo's conventions."""  # noqa: D200
+
     def __init__(
         self,
         config: BionemoTrainableModelConfig[Model, Loss],
@@ -236,10 +238,9 @@ class BionemoLightningModule(  # noqa: D101
         ),
         **model_construct_args,
     ):
-        """
+        """Constructor.
 
         Args:
-
             config: Serializable configuration object that allows one to construct a new model instance and loss function.
                     Necessary for Megatron-based training as the model itself cannot be serialized and distributed to nodes.
                     Instead, we serialize the procedure for making the model and distribute that.
@@ -278,10 +279,14 @@ class BionemoLightningModule(  # noqa: D101
 
     @abstractmethod
     def forward_step(self, batch) -> torch.Tensor:  # noqa: D102
-        """The training forward step for the model, which Megatron requires.
+        """Megatron-required: the training forward step for the model, which is required to produce the loss.
 
-        See the Megatron docs for details:
+        Normally, the forward pass of a model means its inference. Loss is computed using the predictions
+        from the forward pass against labels. Megatron unfortunately conflates these two different concepts
+        and instead has models "forward" method produce the loss. See the Megatron docs for details:
         https://github.com/NVIDIA/Megatron-LM/blob/main/megatron/core/pipeline_parallel/schedules.py#L170
+
+        To get actual predictions, use the :func:`forward` method instead.
         """
         raise NotImplementedError()
 
