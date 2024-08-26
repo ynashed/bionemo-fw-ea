@@ -39,7 +39,7 @@ addopts = ["--ignore=3rdparty"]
 license = { file = "LICENSE/license.txt" }
 
 [tool.pyright]
-include = ["./sub-packages/bionemo-*/src"]
+include = ["./sub-packages/", "./scripts/"]
 exclude = ["*/tests/"]
 executionEnvironments = [
     { "root" = ".", pythonVersion = "3.10", extraPaths = [
