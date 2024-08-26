@@ -21,11 +21,10 @@ import torch
 
 
 def float_or_int_or_none(value: Union[str, float, int, None]) -> Union[float, int, None]:
-    """
-    Converts a given value into a float, int, or None.
+    """Converts a given value into a float, int, or None.
 
     Args:
-        value Union[str, float, int, None]: A value that can be either a string, float, int, or None.
+        value (Union[str, float, int, None]): A value that can be either a string, float, int, or None.
 
     Returns:
         Union[float, int, None]: A float, int, or None based on the input value.
@@ -44,8 +43,7 @@ def float_or_int_or_none(value: Union[str, float, int, None]) -> Union[float, in
 
 
 def parse_kwargs_to_arglist(kwargs: Dict[str, Any]) -> List[str]:
-    """
-    Converts a dictionary of keyword arguments into a list of command-line arguments.
+    """Converts a dictionary of keyword arguments into a list of command-line arguments.
 
     Args:
         kwargs (Dict[str, Any]): A dictionary where keys are argument names and values are argument values.
@@ -67,20 +65,19 @@ def infer_global_batch_size(
     tensor_model_parallel_size: int = 1,
     pipeline_model_parallel_size: int = 1,
 ) -> int:
-    """
-    Infers the global batch size based on the micro batch size, number of nodes, devices,
+    """Infers the global batch size based on the micro batch size, number of nodes, devices,
     accumulation of gradient batches, and model parallel sizes.
 
     Args:
-    micro_batch_size (int): The micro batch size.
-    num_nodes (int): The number of nodes.
-    devices (int): The number of devices.
-    accumulate_grad_batches (int): The accumulation of gradient batches. Defaults to 1.
-    tensor_model_parallel_size (int): The tensor model parallel size. Defaults to 1.
-    pipeline_model_parallel_size (int): The pipeline model parallel size. Defaults to 1.
+        micro_batch_size (int): The micro batch size.
+        num_nodes (int): The number of nodes.
+        devices (int): The number of devices.
+        accumulate_grad_batches (int): The accumulation of gradient batches. Defaults to 1.
+        tensor_model_parallel_size (int): The tensor model parallel size. Defaults to 1.
+        pipeline_model_parallel_size (int): The pipeline model parallel size. Defaults to 1.
 
     Returns:
-    int: The global batch size.
+        int: The global batch size.
     """
     if not all(
         isinstance(arg, int)
@@ -123,8 +120,7 @@ def infer_global_batch_size(
 
 
 def tensor_hash(tensor: torch.Tensor, hash_func: Optional[Callable] = None) -> str:
-    """
-    Generates a hash for the given tensor using the specified hash function.
+    """Generates a hash for the given tensor using the specified hash function.
 
     Args:
         tensor (torch.Tensor): The input tensor to be hashed.
@@ -144,8 +140,7 @@ def tensor_hash(tensor: torch.Tensor, hash_func: Optional[Callable] = None) -> s
 
 
 def tensor_dict_hash(tensor_dict: Dict[str, torch.Tensor], hash_func: Optional[Callable] = None) -> str:
-    """
-    Generates a hash for the given tensor dictionary using the specified hash function.
+    """Generates a hash for the given tensor dictionary using the specified hash function.
 
     Args:
         tensor_dict (Dict[str, torch.Tensor]): The input tensor dictionary to be hashed.
