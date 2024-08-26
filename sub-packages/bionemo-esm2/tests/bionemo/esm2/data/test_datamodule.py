@@ -19,6 +19,7 @@ import pytest
 import torch.utils.data
 
 from bionemo.esm2.data.datamodule import ESMDataModule
+from bionemo.llm.utils.datamodule_utils import tensor_dict_hash
 
 
 def test_create_esm_datamodule_raises_without_trainer(dummy_protein_dataset, dummy_parquet_train_val_inputs):
@@ -248,3 +249,56 @@ def test_create_esm_datamodule_creates_valid_dataloaders_fractional_limit_val_ba
     assert (
         len(val_dataloader) == (10 // 2 + 1) * 2 // 1
     )  # number of eval iters * number of validation clusters // global batch size
+
+
+def test_create_esm_datamodule_valid_dataloaders_has_consistent_samples_per_epoch(
+    dummy_protein_dataset, dummy_parquet_train_val_inputs
+):
+    """
+    Test that the ESMDataModule dataloaders produce consistent samples per epoch.
+
+    This test ensures that the ESMDataModule creates dataloaders that produce consistent
+    samples across epochs, even if the data is reshuffled (controlled by `is_ordered`).
+
+    Parameters:
+    - dummy_protein_dataset: A dummy protein dataset used for testing.
+    - dummy_parquet_train_val_inputs: A tuple containing paths to dummy parquet files
+      for training and validation clusters.
+    """
+    train_cluster_path, valid_cluster_path = dummy_parquet_train_val_inputs
+    micro_batch_size = 2
+    is_ordered = False  # allow random sampling to be independent between epoches
+
+    # Initialize the data module.
+    data_module = ESMDataModule(
+        train_cluster_path=train_cluster_path,
+        train_database_path=dummy_protein_dataset,
+        valid_cluster_path=valid_cluster_path,
+        valid_database_path=dummy_protein_dataset,
+        global_batch_size=1,
+        micro_batch_size=micro_batch_size,
+        min_seq_length=36,
+        max_seq_length=36,
+    )
+    assert data_module is not None
+
+    data_module.trainer = mock.Mock()
+    data_module.trainer.max_epochs = 1
+    data_module.trainer.max_steps = 1
+    data_module.trainer.val_check_interval = 1
+    data_module.trainer.limit_val_batches = 1.0  # use the whole validation dataset
+
+    data_module.setup()
+
+    # hash values from batches of the first epoch
+    batch_hashes1 = [tensor_dict_hash(batch) for batch in data_module.val_dataloader()]
+
+    # second epoch should have the same output but can be reshuffled
+    if is_ordered:
+        for batch in data_module.val_dataloader():
+            batch_hash = tensor_dict_hash(batch)
+            assert batch_hash == batch_hashes1.pop()
+    else:
+        batch_hashes1 = set(batch_hashes1)
+        batch_hashes2 = {tensor_dict_hash(batch) for batch in data_module.val_dataloader()}
+        assert batch_hashes1 == batch_hashes2
