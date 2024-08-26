@@ -14,14 +14,26 @@
 # limitations under the License.
 
 
-from typing import Sequence
+from abc import ABC
+from typing import Generic, Sequence, TypeVar
 
-from bionemo.core.model.config import BionemoModelConfig, BionemoTrainableModelConfig, Model, ModelOutput
+import torch
+import torch.distributed
+from megatron.core.transformer.module import MegatronModule
+from nemo.lightning.megatron_parallel import MegatronLossReduction
 
 
 __all__: Sequence[str] = (
-    "BionemoModelConfig",
-    "BionemoTrainableModelConfig",
-    "ModelOutput",
     "Model",
+    "Loss",
 )
+
+ModelOutput = TypeVar("ModelOutput", torch.Tensor, list[torch.Tensor], tuple[torch.Tensor], dict[str, torch.Tensor])
+
+
+class BionemoMegatronModule(MegatronModule, Generic[ModelOutput], ABC):
+    pass
+
+
+Model = TypeVar("Model", bound=BionemoMegatronModule)
+Loss = TypeVar("Loss", bound=MegatronLossReduction)

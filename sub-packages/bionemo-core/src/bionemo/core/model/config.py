@@ -15,21 +15,31 @@
 
 
 from abc import ABC, abstractmethod
-from typing import Generic, Sequence, Type, TypeVar
+from typing import Generic, Protocol, Sequence, Type, TypeVar
+
+from torch import Tensor
 
 
 __all__: Sequence[str] = (
     "BionemoModelConfig",
     "BionemoTrainableModelConfig",
+    "ModelOutput",
+    "Model",
 )
 
+ModelOutput = Tensor | list[Tensor] | tuple[Tensor] | dict[str, Tensor]
 
-Loss = TypeVar("Loss")
-
-Model = TypeVar("Model")
+LossType = TypeVar("LossType")
 
 
-class BionemoModelConfig(Generic[Model], ABC):
+class Model(Protocol[ModelOutput]):
+    def forward(self, *args, **kwargs) -> ModelOutput: ...
+
+
+ModelType = TypeVar("ModelType", bound=Model)
+
+
+class BionemoModelConfig(Generic[ModelType], ABC):
     """An abstract class for model configuration."""
 
     @abstractmethod
@@ -38,10 +48,10 @@ class BionemoModelConfig(Generic[Model], ABC):
         raise NotImplementedError()
 
 
-class BionemoTrainableModelConfig(Generic[Model, Loss], BionemoModelConfig[Model]):
+class BionemoTrainableModelConfig(Generic[ModelType, LossType], BionemoModelConfig[Model]):
     """An abstract class for trainable model configuration."""
 
     @abstractmethod
-    def get_loss_reduction_class(self) -> Type[Loss]:
+    def get_loss_reduction_class(self) -> Type[LossType]:
         """Returns the loss reduction class."""
         raise NotImplementedError()

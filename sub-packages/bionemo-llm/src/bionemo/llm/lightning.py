@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from abc import ABC, abstractmethod
-from typing import Generic, Iterable, List, Optional, Sequence, Tuple, TypeVar, Union
+from typing import Any, Generic, Iterable, List, Optional, Sequence, Tuple, TypeVar, Union
 
 import pytorch_lightning as pl
 import torch
@@ -41,6 +41,7 @@ T = TypeVar("T")
 
 Model = TypeVar("Model", bound=MegatronModule)
 Loss = TypeVar("Loss", bound=MegatronLossReduction)
+ModelOutput = TypeVar("ModelOutput", torch.Tensor, list[torch.Tensor], tuple[torch.Tensor], dict[str, torch.Tensor])
 
 
 def some_first(seq: Iterable[Optional[T]]) -> T:
@@ -224,7 +225,7 @@ class BionemoLightningModule(  # noqa: D101
     nlio.IOMixin,
     nlio.ConnectorMixin,
     LightningPassthroughPredictionMixin,
-    Generic[Model, Loss],
+    Generic[Model, Loss, ModelOutput],
     ABC,
 ):  # noqa: D205
     def __init__(
@@ -235,18 +236,29 @@ class BionemoLightningModule(  # noqa: D101
             config=OptimizerConfig(lr=1e-4, optimizer="adam", use_distributed_optimizer=True),
         ),
         **model_construct_args,
-    ):  # noqa: D205
+    ):
+        """
+
+        Args:
+
+            config: Serializable configuration object that allows one to construct a new model instance and loss function.
+                    Necessary for Megatron-based training as the model itself cannot be serialized and distributed to nodes.
+                    Instead, we serialize the procedure for making the model and distribute that.
+            optimizer: Megatron-compatible distributed optimizer instance. Defaults to using ADAM with a 1e-4 learning rate.
+            model_construct_args: Optional. Any arguments necessary to construct the model in the `config`'s `configure_model` method.
+        """
         super().__init__()
         self.config = config
-        self.model_construct_args = model_construct_args
+        self.model_construct_args: Optional[dict[str, Any]] = model_construct_args
         self.model: Optional[Model] = None  # set up in configure_model()
-        self.loss_reduction_class = config.get_loss_reduction_class()
+        self.loss_reduction_class: type[Loss] = config.get_loss_reduction_class()
         # TODO replace the self.configure_optimizer call with the optimizer below
         #  once it all works. This is the future direction for how things are going.
         self.optim = optimizer
         self.optim.connect(self)  # This will bind the `configure_optimizers` method
 
-    def configure_model(self) -> None:  # noqa: D102
+    def configure_model(self) -> None:
+        """Updates internal state: instantiates the model from the object's config, assigns to `model` attribute."""
         self.model = self.config.configure_model(**self.model_construct_args)
 
     # This is now replaced by the init hook on self.optimizer
