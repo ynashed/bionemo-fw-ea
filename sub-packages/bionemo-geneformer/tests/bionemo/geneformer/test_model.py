@@ -738,8 +738,8 @@ def test_inference_loss_10m_released_checkpoint(geneformer_config: GeneformerCon
     """Test that we get a good loss when loading a bionemo1 checkpoint with a properly initialized config"""
     geneformer_config_logit = deepcopy(geneformer_config)
     # Set up the model to return logits and switch to the released 10M checkpoint
-    geneformer_config_logit.mutate_hparam("return_only_hidden_states", False)  # return logits
-    geneformer_config_logit.mutate_hparam(
+    geneformer_config_logit.set_hparam("return_only_hidden_states", False)  # return logits
+    geneformer_config_logit.set_hparam(
         "nemo1_ckpt_path", nemo1_release_checkpoint_path
     )  # release checkpoint is important
 
@@ -767,14 +767,14 @@ def test_inference_loss_10m_released_checkpoint_wrong_activation(geneformer_conf
     """
     geneformer_config_logit = deepcopy(geneformer_config)
     # Set up the model to return logits and switch to the released 10M checkpoint
-    geneformer_config_logit.mutate_hparam("return_only_hidden_states", False)  # return logits
-    geneformer_config_logit.mutate_hparam(
+    geneformer_config_logit.set_hparam("return_only_hidden_states", False)  # return logits
+    geneformer_config_logit.set_hparam(
         "nemo1_ckpt_path", nemo1_release_checkpoint_path
     )  # release checkpoint is important
 
     # introduce a breaking change with a future xfail as a negative control for our test
-    geneformer_config_logit.mutate_hparam("activation_func", torch.nn.functional.relu)  # the model should be gelu
-    geneformer_config_logit.mutate_hparam("bias_activation_fusion", False)  # this needs to be off for ReLu support
+    geneformer_config_logit.set_hparam("activation_func", torch.nn.functional.relu)  # the model should be gelu
+    geneformer_config_logit.set_hparam("bias_activation_fusion", False)  # this needs to be off for ReLu support
 
     mean_loss = _get_loss_from_model(geneformer_config_logit, seed)
     # In one run, this gave a mean_loss of 7.9! Very much broke the model.
@@ -894,9 +894,9 @@ def test_continue_from_checkpoint_geneformer(tmpdir, geneformer_config: Geneform
     base_geneformer_config = io.reinit(geneformer_config)  # generate a new copy by calling the cached init.
 
     # Modify both the variable and associated saved init hyper-param by calling config.mutate(...)
-    base_geneformer_config.mutate_hparam("return_only_hidden_states", False)
-    base_geneformer_config.mutate_hparam("nemo1_ckpt_path", None)
-    base_geneformer_config.mutate_hparam("num_layers", 3)  # set to 3 layers
+    base_geneformer_config.set_hparam("return_only_hidden_states", False)
+    base_geneformer_config.set_hparam("nemo1_ckpt_path", None)
+    base_geneformer_config.set_hparam("num_layers", 3)  # set to 3 layers
     assert base_geneformer_config.num_layers == 3
     assert base_geneformer_config.nemo1_ckpt_path is None
     assert not base_geneformer_config.return_only_hidden_states
@@ -934,9 +934,9 @@ def test_finetune_geneformer(tmpdir, geneformer_config: GeneformerConfig):
     base_geneformer_config = io.reinit(geneformer_config)  # generate a new copy by calling the cached init.
 
     # Modify both the variable and associated saved init hyper-param by calling config.mutate(...)
-    base_geneformer_config.mutate_hparam("return_only_hidden_states", False)
-    base_geneformer_config.mutate_hparam("nemo1_ckpt_path", None)
-    base_geneformer_config.mutate_hparam("num_layers", 3)  # set to 3 layers
+    base_geneformer_config.set_hparam("return_only_hidden_states", False)
+    base_geneformer_config.set_hparam("nemo1_ckpt_path", None)
+    base_geneformer_config.set_hparam("num_layers", 3)  # set to 3 layers
     assert base_geneformer_config.num_layers == 3
     assert base_geneformer_config.nemo1_ckpt_path is None
     assert not base_geneformer_config.return_only_hidden_states

@@ -21,13 +21,10 @@ from copy import deepcopy
 from dataclasses import dataclass, field, fields
 from pathlib import Path
 from typing import (
-    Any,
     Callable,
-    Dict,
     List,
     Literal,
     Optional,
-    Protocol,
     Sequence,
     Type,
     TypedDict,
@@ -55,7 +52,7 @@ from torch import Tensor
 from torch.optim import Optimizer
 
 from bionemo.llm.model.biobert.transformer_specs import BiobertSpecOption, get_biobert_spec
-from bionemo.llm.model.config import MegatronBioNeMoTrainableModelConfig
+from bionemo.llm.model.config import MegatronBioNeMoTrainableModelConfig, override_mutate_possibly_extra_mutated_fiddle
 from bionemo.llm.model.loss import BERTMLMLossWithReduction
 from bionemo.llm.utils.weight_utils import (
     load_weights_sharded_inplace_nemo2_to_mcore,
@@ -388,21 +385,6 @@ class MegatronBioBertModel(LanguageModule):
 
 # Typevar that works for all children of MegatronBioBertModel
 MegatronBioBertModelT = TypeVar("MegatronBioBertModelT", bound=MegatronBioBertModel)
-
-
-class IOMixinProto(Protocol):
-    @property
-    def __io__(self) -> Dict[str, Any]: ...
-
-
-def override_mutate_possibly_extra_mutated_fiddle(
-    target_cfg: IOMixinProto, source_cfg: IOMixinProto, maybe_mutated_elements_to_clone: List[str]
-):
-    for f in maybe_mutated_elements_to_clone:
-        # 1. Update the tracked config values
-        setattr(target_cfg.__io__, f, getattr(source_cfg.__io__, f))
-        # 2. Update the lazily untracked values (if the same variable name is used post-init)
-        setattr(target_cfg, f, getattr(source_cfg, f))
 
 
 @dataclass

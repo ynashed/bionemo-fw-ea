@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Type
+from typing import Any, List, Protocol, Type
 
 from megatron.core.transformer import TransformerConfig
 from nemo.lightning import io
@@ -29,3 +29,18 @@ class MegatronBioNeMoModelConfig(BionemoModelConfig[Model], TransformerConfig, i
 
 class MegatronBioNeMoTrainableModelConfig(MegatronBioNeMoModelConfig[Model], BionemoTrainableModelConfig[Model, Loss]):
     """A TrainableModelConfig class for bionemo that supports usage with Megatron models, for example as NeMo2 requires."""
+
+
+class IOMixinProto(Protocol):
+    def set_hparam(self, attribute: str, value: Any, also_change_value: bool = True) -> None: ...
+    def get_hparam(self, attribute: str) -> Any: ...
+
+
+def override_mutate_possibly_extra_mutated_fiddle(
+    target_cfg: IOMixinProto, source_cfg: IOMixinProto, maybe_mutated_elements_to_clone: List[str]
+) -> None:
+    for f in maybe_mutated_elements_to_clone:
+        # 1. Update the tracked config values
+        target_cfg.set_hparam(f, source_cfg.get_hparam(f))
+        # 2. Update the lazily untracked values (if the same variable name is used post-init)
+        setattr(target_cfg, f, getattr(source_cfg, f))
