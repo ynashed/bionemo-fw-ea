@@ -14,6 +14,8 @@
 # limitations under the License.
 
 
+import itertools
+from collections import Counter
 from pathlib import Path
 from typing import Annotated
 
@@ -26,12 +28,8 @@ class Resource(pydantic.BaseModel):
 
     model_config = pydantic.ConfigDict(use_attribute_docstrings=True)
 
-    tag: str
-    """A unique identifier for the resource.
-
-    The file(s) will be accessible via load("filename/tag"), where everything before the first slash is the name of the
-    containing file (with the yaml suffix dropped), and everything after the first slash is the tag. Therefore if the
-    tag contained a forward slash, the you could load the file with load("filename/tag/with/slash").
+    tag: Annotated[str, pydantic.StringConstraints(pattern=r"^[^/]*/[^/]*$")]  # Only slash between filename and tag.
+    """A unique identifier for the resource. The file(s) will be accessible via load("filename/tag").
     """
 
     ngc: str | None = None
@@ -55,20 +53,24 @@ def get_all_resources(resource_path: Path | None = None) -> dict[str, Resource]:
     if not resource_path:
         resource_path = Path(__file__).parent / "resources"
 
-    resources_files = resource_path.glob("*.yaml")
+    resources_files = itertools.chain(resource_path.glob("*.yaml"), resource_path.glob("*.yml"))
 
-    all_resources = []
-    for file in resources_files:
-        with file.open("r") as f:
-            resources = yaml.safe_load(f)
-            for resource in resources:
-                resource["tag"] = f"{file.stem}/{resource['tag']}"
-            all_resources += resources
+    all_resources = [resource for file in resources_files for resource in _parse_resource_file(file)]
 
     resource_list = pydantic.TypeAdapter(list[Resource]).validate_python(all_resources)
     resource_dict = {resource.tag: resource for resource in resource_list}
 
     if len(resource_dict) != len(resource_list):
-        raise ValueError("Duplicate resource tags found!")
+        # Show the # of and which ones are duplicated so that a user can begin debugging and resolve the issue.
+        tag_counts = Counter([resource.tag for resource in resource_list])
+        raise ValueError(f"Duplicate resource tags found!: {[tag for tag, count in tag_counts.items() if count > 1]}")
 
     return resource_dict
+
+
+def _parse_resource_file(file) -> list:
+    with file.open("r") as f:
+        resources = yaml.safe_load(f)
+        for resource in resources:
+            resource["tag"] = f"{file.stem}/{resource['tag']}"
+        return resources

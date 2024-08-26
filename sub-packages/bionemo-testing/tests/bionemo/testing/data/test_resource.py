@@ -14,7 +14,11 @@
 # limitations under the License.
 
 
+import re
 from pathlib import Path
+
+import pydantic
+import pytest
 
 from bionemo.testing.data.resource import Resource, get_all_resources
 
@@ -37,7 +41,7 @@ def test_get_all_resources_returns_combines_multiple_yamls(tmp_path: Path):
         """
     )
 
-    (tmp_path / "resources2.yaml").write_text(
+    (tmp_path / "resources2.yml").write_text(
         """
         - tag: "foo2"
           ngc: "bar"
@@ -66,3 +70,41 @@ def test_get_all_resources_returns_assigns_correct_tag(tmp_path: Path):
 
     resources = get_all_resources(tmp_path)
     assert "file_name/tag_name" in resources
+
+
+def test_get_all_resources_fails_with_slash_in_tag(tmp_path: Path):
+    (tmp_path / "file_name.yaml").write_text(
+        """
+        - tag: "tag/name"
+          ngc: "bar"
+          pbss: "s3://baz"
+          sha256: "qux"
+          owner: Peter St John <pstjohn@nvidia.com>
+          description: "quux"
+        """
+    )
+
+    with pytest.raises(pydantic.ValidationError):
+        get_all_resources(tmp_path)
+
+
+def test_get_all_resources_errors_on_duplicate_tag(tmp_path: Path):
+    (tmp_path / "file_name.yaml").write_text(
+        """
+        - tag: "tag_name"
+          ngc: "bar"
+          pbss: "s3://baz"
+          sha256: "qux"
+          owner: Peter St John <pstjohn@nvidia.com>
+          description: "quux"
+        - tag: "tag_name"
+          ngc: "bar"
+          pbss: "s3://baz"
+          sha256: "qux"
+          owner: Peter St John <pstjohn@nvidia.com>
+          description: "quux"
+        """
+    )
+
+    with pytest.raises(ValueError, match=re.escape("Duplicate resource tags found!: ['file_name/tag_name']")):
+        get_all_resources(tmp_path)
