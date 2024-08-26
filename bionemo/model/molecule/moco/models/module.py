@@ -176,10 +176,9 @@ class Graph3DInterpolantModel(pl.LightningModule):
 
     def initialize_loss_functions(self):
         loss_functions = {}
-        self.loss_clamps = {}
+        self.loss_clamps = {'x': 1.0, 'edge_attr': 0.1, 'h': 1, 'charge': 0.1}
         for loss_params in self.loss_params.variables:
             index = loss_params.variable_name
-            self.loss_clamps[index] = 1e6
             if "use_distance" in loss_params:
                 loss_functions[index] = InterpolantLossFunction(
                     loss_scale=loss_params.loss_scale,
@@ -461,6 +460,10 @@ class Graph3DInterpolantModel(pl.LightningModule):
         loss = 0
         predictions = {}
         for key, loss_fn in self.loss_functions.items():
+            if self.current_epoch < 10:
+                level = None
+            else:
+                level = self.loss_clamps[key]
             if "edge" in key:
                 sub_loss, sub_pred = loss_fn.edge_loss(
                     batch_geo,
@@ -469,13 +472,13 @@ class Graph3DInterpolantModel(pl.LightningModule):
                     index=batch['edge_index'][1],
                     num_atoms=batch_geo.size(0),
                     batch_weight=ws_t,
-                    level=self.loss_clamps[key],
+                    level=level,
                 )
             else:
                 if loss_fn.continuous:
                     # import ipdb; ipdb.set_trace()
                     sub_loss, sub_pred = loss_fn(
-                        batch_geo, out[f'{key}_hat'], batch[f'{key}'], batch_weight=ws_t, level=self.loss_clamps[key]
+                        batch_geo, out[f'{key}_hat'], batch[f'{key}'], batch_weight=ws_t, level=level
                     )
                 else:
                     true_data = batch[f'{key}']
@@ -485,11 +488,12 @@ class Graph3DInterpolantModel(pl.LightningModule):
                         else:
                             true_data = true_data.argmax(dim=-1)
                     sub_loss, sub_pred = loss_fn(
-                        batch_geo, out[f'{key}_logits'], true_data, batch_weight=ws_t, level=self.loss_clamps[key]
+                        batch_geo, out[f'{key}_logits'], true_data, batch_weight=ws_t, level=level
                     )
 
-            self.loss_clamps[key] = min(self.loss_clamps[key], sub_loss.item() / loss_fn.scale * 5)
+            # self.loss_clamps[key] = min(self.loss_clamps[key], sub_loss.item() / loss_fn.scale * 5)
             # print(key, sub_loss)
+            # import ipdb; ipdb.set_trace() #! TODO see if we can hard code clamps based on epoch or train step self.current_epoch
             self.log(f"{stage}/{key}_loss", sub_loss, batch_size=batch_size, prog_bar=True)
             loss = loss + sub_loss
             # predictions[f'{key}'] = sub_pred
@@ -519,7 +523,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
             #     self.log(f"{stage}/bond_angle_loss", angle_loss, batch_size=batch_size, prog_bar=True)
             #     loss = loss + angle_loss
         self.log(f"{stage}/loss", loss, batch_size=batch_size)
-        print(self.loss_clamps)
+        # print(self.loss_clamps)
         return loss, predictions
 
     def forward(self, batch, time):
