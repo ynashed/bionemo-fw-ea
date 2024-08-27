@@ -115,7 +115,6 @@ def _train_model_get_ckpt(
         trainer=trainer,
         log=nemo_logger,
         resume=resume.AutoResume(
-            path=None,  # Overrides the path found by resume_if_exists when set.
             resume_if_exists=True,  # Looks for the -last checkpoint to continue training.
             resume_ignore_no_checkpoint=True,  # When false this will throw an error with no existing checkpoint.
         ),

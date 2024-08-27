@@ -227,7 +227,7 @@ def main(
         trainer=trainer,
         log=nemo_logger,
         resume=resume.AutoResume(
-            path=restore_from_checkpoint_path,  # Overrides the path found by resume_if_exists when set.
+            resume_from_directory=restore_from_checkpoint_path,  # Overrides the path found by resume_if_exists when set.
             resume_if_exists=resume_if_exists,  # Looks for the -last checkpoint to continue training.
             resume_ignore_no_checkpoint=True,  # When false this will throw an error with no existing checkpoint.
         ),

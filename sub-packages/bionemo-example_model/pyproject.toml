@@ -3,6 +3,17 @@ requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
+
+# UV doesn't seem to pick up on changes to requirements.txt files as a signal that it needs to re-lock a project's
+# dependencies. We should probably just move to listing requirements in these pyproject.toml files directly, and also
+# now include bionemo-* sub-packages explicitly.
+dependencies = [
+    'bionemo-core',
+    'bionemo-llm',
+    'megatron-core',
+    'nemo_toolkit',
+    'torchvision >= 0.15.1',
+]
 name = "bionemo-example_model"
 version = "2.0.0"
 license.file = "LICENSE"
@@ -12,14 +23,9 @@ authors = [
     { name = "John St. John", email = "jstjohn@nvidia.com" },
     { name = "Jonathan Mitchell", email = "jomitchell@nvidia.com" },
 ]
-dynamic = ["dependencies"]
-
-[tool.setuptools.dynamic]
-dependencies = {file = ["requirements.txt"]}
-# TODO: how to specify bionemo-{feature packages} & bionemo-core ???
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include=["bionemo.*"]
+include = ["bionemo.*"]
 namespaces = true
 exclude = ["test*."]
