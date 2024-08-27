@@ -101,7 +101,7 @@ def test_bionemo2_rootdir():
     assert (bionemo2_root / "sub-packages").is_dir(), "sub-packages is supposed to be a directory."
 
 
-@pytest.mark.skip("duplicate unittest")
+@pytest.mark.skip("duplicate with argparse, model and data unittests")
 def test_main_runs(tmpdir, dummy_protein_dataset, dummy_parquet_train_val_inputs):
     train_cluster_path, valid_cluster_path = dummy_parquet_train_val_inputs
 
@@ -154,11 +154,18 @@ def test_main_runs(tmpdir, dummy_protein_dataset, dummy_parquet_train_val_inputs
     ).is_file(), "Could not find experiment log."
 
 
-@pytest.mark.skip("duplicate unittest")
-@pytest.mark.parametrize("limit_val_batches", [0.5, 0.75, 1.0])
-def test_main_runs_fraction_limit_val_batches(
+@pytest.mark.parametrize("limit_val_batches", [1.0, 4, None])
+def test_val_dataloader_in_main_runs_with_limit_val_batches(
     tmpdir, dummy_protein_dataset, dummy_parquet_train_val_inputs, limit_val_batches
 ):
+    """Ensures doesn't run out of validation samples whenever updating limit_val_batches logic.
+
+    Args:
+        tmpdir (str): Temporary directory.
+        dummy_protein_dataset (str): Path to dummy protein dataset.
+        dummy_parquet_train_val_inputs (tuple[str, str]): Tuple of dummy protein train and val cluster parquet paths.
+        limit_val_batches (Union[int, float, None]): Limit validation batches. None implies 1.0 as in PTL.
+    """
     train_cluster_path, valid_cluster_path = dummy_parquet_train_val_inputs
 
     result_dir = Path(tmpdir.mkdir("results"))
@@ -175,8 +182,8 @@ def test_main_runs_fraction_limit_val_batches(
             result_dir=result_dir,
             wandb_project=None,
             wandb_offline=True,
-            num_steps=55,
-            warmup_steps=5,
+            num_steps=10,
+            warmup_steps=2,
             limit_val_batches=limit_val_batches,
             val_check_interval=1,
             num_dataset_workers=1,
@@ -210,7 +217,7 @@ def test_main_runs_fraction_limit_val_batches(
     ).is_file(), "Could not find experiment log."
 
 
-@pytest.mark.skip("duplicate unittest")
+@pytest.mark.skip("duplicate with argparse, model and data unittests")
 def test_pretrain_cli(tmpdir, dummy_protein_dataset, dummy_parquet_train_val_inputs):
     train_cluster_path, valid_cluster_path = dummy_parquet_train_val_inputs
 
