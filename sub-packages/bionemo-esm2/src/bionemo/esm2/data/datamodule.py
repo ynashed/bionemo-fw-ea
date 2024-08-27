@@ -25,7 +25,7 @@ from nemo.lightning.pytorch.plugins import MegatronDataSampler
 from nemo.utils import logging
 from pytorch_lightning.utilities.types import EVAL_DATALOADERS, TRAIN_DATALOADERS
 
-from bionemo.core.data.resamplers import PRNGDatasetShuffler
+from bionemo.core.data.resamplers import PRNGResampleDataset
 from bionemo.core.utils import random_utils
 from bionemo.esm2.data import dataset, tokenizer
 from bionemo.llm.data import collate
@@ -218,7 +218,7 @@ class ESMDataModule(pl.LightningDataModule):
 
         """
         # This is where re-sampling occurs.
-        return PRNGDatasetShuffler(
+        return PRNGResampleDataset(
             dataset,
             num_samples=num_samples,
             seed=self._seed + len(stage),

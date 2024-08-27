@@ -28,7 +28,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from bionemo import geneformer
-from bionemo.core.data.resamplers import PRNGDatasetShuffler
+from bionemo.core.data.resamplers import PRNGResampleDataset
 from bionemo.core.utils.batching_utils import pad_token_ids
 from bionemo.core.utils.dtypes import get_autocast_dtype
 from bionemo.core.utils.random_utils import random_numpy_context
@@ -671,7 +671,7 @@ def _get_loss_from_model(model_config: GeneformerConfig, seed: int) -> float:
             prepend_cls_token=True,
             seed=42,
         )
-        dss = PRNGDatasetShuffler(
+        dss = PRNGResampleDataset(
             ds,
             seed=seed,
         )

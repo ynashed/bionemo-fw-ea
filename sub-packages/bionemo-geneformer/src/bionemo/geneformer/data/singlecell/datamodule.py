@@ -26,7 +26,7 @@ from pytorch_lightning.utilities.types import EVAL_DATALOADERS, TRAIN_DATALOADER
 from tokenizers import Tokenizer
 from torch.utils.data import DataLoader
 
-from bionemo.core.data.resamplers import PRNGDatasetShuffler
+from bionemo.core.data.resamplers import PRNGResampleDataset
 from bionemo.core.utils import random_utils
 from bionemo.geneformer.data.singlecell.dataset import SingleCellDataset
 from bionemo.geneformer.tokenizer.gene_tokenizer import GeneTokenizer
@@ -199,7 +199,7 @@ class SingleCellDataModule(pl.LightningDataModule):
 
         """
         # This is where re-sampling occurs.
-        return PRNGDatasetShuffler(
+        return PRNGResampleDataset(
             dataset,
             num_samples=num_samples,
             seed=self.seed + len(stage),
