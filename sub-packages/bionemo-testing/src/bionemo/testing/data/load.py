@@ -16,21 +16,20 @@
 
 import contextlib
 import os
+import shutil
+import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
 import boto3
+import ngcsdk
 import platformdirs
 import pooch
 from botocore.config import Config
 from tqdm import tqdm
 
-from bionemo.testing.data import resource
-
-
-def _default_pbss_client():
-    retry_config = Config(retries={"max_attempts": 10, "mode": "standard"})
-    return boto3.client("s3", endpoint_url="https://pbss.s8k.io", config=retry_config)
+from bionemo.testing.data.resource import Resource, get_all_resources
 
 
 def _get_cache_dir() -> Path:
@@ -43,7 +42,12 @@ def _get_cache_dir() -> Path:
 
 BIONEMO_CACHE_DIR = _get_cache_dir()
 BIONEMO_CACHE_DIR.mkdir(exist_ok=True)
-RESOURCES = resource.get_all_resources()
+
+
+def default_pbss_client():
+    """Create a default S3 client for PBSS."""
+    retry_config = Config(retries={"max_attempts": 10, "mode": "standard"})
+    return boto3.client("s3", endpoint_url="https://pbss.s8k.io", config=retry_config)
 
 
 def _s3_download(url: str, output_file: str | Path, _: pooch.Pooch) -> None:
@@ -53,7 +57,7 @@ def _s3_download(url: str, output_file: str | Path, _: pooch.Pooch) -> None:
     bucket = parts[0]
     key = "/".join(parts[1:])
 
-    with contextlib.closing(_default_pbss_client()) as s3:
+    with contextlib.closing(default_pbss_client()) as s3:
         object_size = s3.head_object(Bucket=bucket, Key=key)["ContentLength"]
         progress_bar = tqdm(total=object_size, unit="B", unit_scale=True, desc=url)
 
@@ -65,14 +69,50 @@ def _s3_download(url: str, output_file: str | Path, _: pooch.Pooch) -> None:
         s3.download_file(bucket, key, output_file, Callback=progress_callback)
 
 
-def _ngc_download(url: str, output_file: str | Path, _: pooch.Pooch) -> None:
-    raise NotImplementedError("NGC download not implemented.")
+def default_ngc_client() -> ngcsdk.Client:
+    """Create a default NGC client.
+
+    This should load the NGC API key from ~/.ngc/config, or from environment variables passed to the docker container.
+    """
+    return ngcsdk.Client()
+
+
+@dataclass
+class NGCDownloader:
+    """A class to download files from NGC in a Pooch-compatible way.
+
+    NGC downloads are typically structured as directories, while pooch expects a single file. This class
+    downloads a single file from an NGC directory and moves it to the desired location.
+    """
+
+    filename: str
+    ngc_registry: Literal["model", "resource"]
+
+    def __call__(self, url: str, output_file: str | Path, _: pooch.Pooch) -> None:
+        """Download a file from NGC."""
+        client = default_ngc_client()
+
+        download_fns = {
+            "model": client.registry.model.download_version,
+            "resource": client.registry.resource.download_version,
+        }
+
+        output_file = Path(output_file)
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+
+        # NGC seems to always download to a specific directory that we can't specify ourselves.
+        ngc_dirname = Path(url).name.replace(":", "_v")
+
+        with tempfile.TemporaryDirectory(dir=output_file.parent) as temp_dir:
+            download_fns[self.ngc_registry](url, temp_dir, file_patterns=[self.filename])
+            shutil.move(Path(temp_dir) / ngc_dirname / self.filename, output_file)
 
 
 def load(
     model_or_data_tag: str,
     source: Literal["ngc", "pbss"] = "pbss",
-    resources: dict[str, resource.Resource] | None = None,
+    resources: dict[str, Resource] | None = None,
+    cache_dir: Path | None = None,
 ) -> Path:
     """Download a resource from PBSS or NGC.
 
@@ -80,6 +120,7 @@ def load(
         model_or_data_tag: A pointer to the desired resource. Must be a key in the resources dictionary.
         source: Either "pbss" (NVIDIA-internal download) or "ngc" (NVIDIA GPU Cloud). Defaults to "pbss".
         resources: A custom dictionary of resources. If None, the default resources will be used. (Mostly for testing.)
+        cache_dir: The directory to store downloaded files. Defaults to BIONEMO_CACHE_DIR. (Mostly for testing.)
 
     Raises:
         ValueError: If the desired tag was not found, or if an NGC url was requested but not provided.
@@ -94,26 +135,21 @@ def load(
         PosixPath(/tmp/bionemo/downloaded-file-name)
     """
     if resources is None:
-        resources = RESOURCES
+        resources = get_all_resources()
+
+    if cache_dir is None:
+        cache_dir = BIONEMO_CACHE_DIR
 
     if model_or_data_tag not in resources:
         raise ValueError(f"Resource '{model_or_data_tag}' not found.")
 
+    if source == "ngc" and resources[model_or_data_tag].ngc is None:
+        raise ValueError(f"Resource '{model_or_data_tag}' does not have an NGC URL.")
+
     resource = resources[model_or_data_tag]
+    filename = str(resource.pbss).split("/")[-1]
 
-    match source:
-        case "pbss":
-            download_func = _s3_download
-            url = resource.pbss
-        case "ngc":
-            download_func = _ngc_download
-            url = resource.ngc
-            if resource.ngc is None:
-                raise ValueError(f"Resource '{model_or_data_tag}' does not have an NGC URL.")
-        case _:
-            raise ValueError(f"Source '{source}' not supported.")
-
-    match "".join(Path(str(url)).suffixes):
+    match "".join(Path(filename).suffixes):
         case ".gz" | ".bz2" | ".xz":
             processor = pooch.Decompress()
 
@@ -126,11 +162,22 @@ def load(
         case _:
             processor = None
 
+    match source:
+        case "pbss":
+            download_fn = _s3_download
+            url = resource.pbss
+        case "ngc":
+            assert resource.ngc_registry is not None
+            download_fn = NGCDownloader(filename=filename, ngc_registry=resource.ngc_registry)
+            url = resource.ngc
+        case _:
+            raise ValueError(f"Source '{source}' not supported.")
+
     download = pooch.retrieve(
         url=str(url),
         known_hash=resource.sha256,
-        path=BIONEMO_CACHE_DIR,
-        downloader=download_func,
+        path=cache_dir,
+        downloader=download_fn,
         processor=processor,
     )
 

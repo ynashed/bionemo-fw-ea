@@ -33,7 +33,6 @@ def test_get_all_resources_returns_combines_multiple_yamls(tmp_path: Path):
     (tmp_path / "resources1.yaml").write_text(
         """
         - tag: "foo"
-          ngc: "bar"
           pbss: "s3://baz"
           sha256: "qux"
           owner: Peter St John <pstjohn@nvidia.com>
@@ -45,6 +44,7 @@ def test_get_all_resources_returns_combines_multiple_yamls(tmp_path: Path):
         """
         - tag: "foo2"
           ngc: "bar"
+          ngc_registry: "model"
           pbss: "s3://baz"
           sha256: "qux"
           owner: Peter St John <pstjohn@nvidia.com>
@@ -60,7 +60,6 @@ def test_get_all_resources_returns_assigns_correct_tag(tmp_path: Path):
     (tmp_path / "file_name.yaml").write_text(
         """
         - tag: "tag_name"
-          ngc: "bar"
           pbss: "s3://baz"
           sha256: "qux"
           owner: Peter St John <pstjohn@nvidia.com>
@@ -76,7 +75,6 @@ def test_get_all_resources_fails_with_slash_in_tag(tmp_path: Path):
     (tmp_path / "file_name.yaml").write_text(
         """
         - tag: "tag/name"
-          ngc: "bar"
           pbss: "s3://baz"
           sha256: "qux"
           owner: Peter St John <pstjohn@nvidia.com>
@@ -92,13 +90,11 @@ def test_get_all_resources_errors_on_duplicate_tag(tmp_path: Path):
     (tmp_path / "file_name.yaml").write_text(
         """
         - tag: "tag_name"
-          ngc: "bar"
           pbss: "s3://baz"
           sha256: "qux"
           owner: Peter St John <pstjohn@nvidia.com>
           description: "quux"
         - tag: "tag_name"
-          ngc: "bar"
           pbss: "s3://baz"
           sha256: "qux"
           owner: Peter St John <pstjohn@nvidia.com>
@@ -108,3 +104,52 @@ def test_get_all_resources_errors_on_duplicate_tag(tmp_path: Path):
 
     with pytest.raises(ValueError, match=re.escape("Duplicate resource tags found!: ['file_name/tag_name']")):
         get_all_resources(tmp_path)
+
+
+def test_get_all_resources_errors_on_missing_ngc_registry(tmp_path: Path):
+    (tmp_path / "file_name.yaml").write_text(
+        """
+        - tag: "tag_name"
+          ngc: "bar"
+          pbss: "s3://baz"
+          sha256: "qux"
+          owner: Peter St John <pstjohn@nvidia.com>
+        """
+    )
+
+    with pytest.raises(
+        pydantic.ValidationError, match="ngc_registry must be provided if ngc is not None: file_name/tag_name"
+    ):
+        get_all_resources(tmp_path)
+
+
+def test_get_all_resources_errors_on_invalid_ngc_registry(tmp_path: Path):
+    (tmp_path / "file_name.yaml").write_text(
+        """
+        - tag: "tag_name"
+          ngc: "bar"
+          ngc_registry: "foo"
+          pbss: "s3://baz"
+          sha256: "qux"
+          owner: Peter St John <pstjohn@nvidia.com>
+        """
+    )
+
+    with pytest.raises(pydantic.ValidationError, match="Input should be 'model' or 'resource'"):
+        get_all_resources(tmp_path)
+
+
+def test_get_all_resources_with_valid_registry(tmp_path: Path):
+    (tmp_path / "file_name.yaml").write_text(
+        """
+        - tag: "tag_name"
+          ngc: "bar"
+          ngc_registry: "resource"
+          pbss: "s3://baz"
+          sha256: "qux"
+          owner: Peter St John <pstjohn@nvidia.com>
+        """
+    )
+
+    resource = get_all_resources(tmp_path)
+    assert resource["file_name/tag_name"].ngc_registry == "resource"

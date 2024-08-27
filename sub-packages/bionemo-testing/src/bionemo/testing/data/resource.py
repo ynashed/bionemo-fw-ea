@@ -14,13 +14,19 @@
 # limitations under the License.
 
 
+import functools
 import itertools
 from collections import Counter
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 import pydantic
 import yaml
+from registry.api.utils import RegistryTarget
+
+
+def _validate_ngc_resource(value: str) -> str:
+    return str(RegistryTarget(value, "Pattern should be in format [org/[team/]]name[:version]"))
 
 
 class Resource(pydantic.BaseModel):
@@ -29,11 +35,16 @@ class Resource(pydantic.BaseModel):
     model_config = pydantic.ConfigDict(use_attribute_docstrings=True)
 
     tag: Annotated[str, pydantic.StringConstraints(pattern=r"^[^/]*/[^/]*$")]  # Only slash between filename and tag.
-    """A unique identifier for the resource. The file(s) will be accessible via load("filename/tag").
+    """A unique identifier for the resource. The file(s) will be accessible via load("filename/tag")."""
+
+    ngc: Annotated[str, pydantic.AfterValidator(_validate_ngc_resource)] | None = None
+    """The NGC URL for the resource.
+
+    Should be in format [org/[team/]]name[:version]. If None, the resource is not available on NGC.
     """
 
-    ngc: str | None = None
-    """The NGC URL for the resource. If None, the resource is not available on NGC."""
+    ngc_registry: Literal["model", "resource"] | None = None
+    """The NGC resource type (model or resource) for the data. Must be provided if ngc is not None."""
 
     pbss: Annotated[pydantic.AnyUrl, pydantic.UrlConstraints(allowed_schemes=["s3"])]
     """The PBSS (NVIDIA-internal) URL of the resource."""
@@ -47,7 +58,14 @@ class Resource(pydantic.BaseModel):
     description: str | None = None
     """A description of the file(s)."""
 
+    @pydantic.model_validator(mode="after")
+    def _validate_ngc_registry(self):
+        if self.ngc and not self.ngc_registry:
+            raise ValueError(f"ngc_registry must be provided if ngc is not None: {self.tag}")
+        return self
 
+
+@functools.cache
 def get_all_resources(resource_path: Path | None = None) -> dict[str, Resource]:
     """Return a dictionary of all resources."""
     if not resource_path:
