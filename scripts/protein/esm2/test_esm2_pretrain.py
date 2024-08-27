@@ -361,7 +361,7 @@ def test_limit_val_batches_is_float_string(required_args_reference, limit_val_ba
     parser.parse_args(arglist)
 
 
-@pytest.mark.parametrize("limit_val_batches", None, "None")
+@pytest.mark.parametrize("limit_val_batches", [None, "None"])
 def test_limit_val_batches_is_none(required_args_reference, limit_val_batches):
     """
     Test whether limit_val_batches can be parsed as none.
