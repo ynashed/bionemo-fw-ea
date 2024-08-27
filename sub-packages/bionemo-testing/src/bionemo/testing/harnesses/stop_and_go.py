@@ -29,7 +29,9 @@ from bionemo.testing.megatron_parallel_state_utils import distributed_model_para
 
 
 class StopAndGoHarness(ABC):
-    """Abstract base class for a stop-and-go harness. Stop and go tests act as follows:
+    """Abstract base class for a stop-and-go harness.
+
+    Stop and go tests act as follows:
         - setup a clean model for a brief training run, select metrics to track.
         - interrupt training via the StopAndGoException in the callback InterruptAfterMetadataCallback.
         - setup a model to be resumed from the checkpoint, with the same metrics.
@@ -80,6 +82,14 @@ class StopAndGoHarness(ABC):
         val_check_interval=2,
         exp_name="stop_and_go_harness",
     ):
+        """Initializes the StopAndGoHarness object.
+
+        Args:
+            metrics (list[str]): A list of metrics.
+            root_dir (pathlib.Path | str, optional): The root directory. Defaults to pathlib.Path("./").
+            val_check_interval (int, optional): The validation check interval. Defaults to 2.
+            exp_name (str, optional): The experiment name. Defaults to "stop_and_go_harness".
+        """
         self.root_dir = root_dir  # Set to bionemo2_home ideally.
         self.exp_name = exp_name
         self.metadata_dir = self.root_dir / self.exp_name
@@ -99,15 +109,28 @@ class StopAndGoHarness(ABC):
     def setup_model(
         self, mode: Literal["stop", "go"]
     ) -> tuple[pl.LightningModule, pl.LightningDataModule, nl.MegatronOptimizerModule]:
-        """Constructs the model, data, and optimizer for the test harness. Optionally supports separate code paths for 'stop'/'go', although implementors are
+        """Constructs the model, data, and optimizer for the test harness.
+
+        Optionally supports separate code paths for 'stop'/'go', although implementors are
         encouraged to use the same code path for both.
+
+        Args:
+            mode (Literal['stop', 'go']): The mode indicating whether to stop or go.
+
+        Returns:
+            tuple: A tuple containing the model, data, and optimizer.
         """
         ...
 
     @abstractmethod
-    def setup_trainer_and_strategy(self, mode: Literal["stop", "go"], metrics) -> pl.Trainer:
-        """Constructs the trainer object for the stop and go test. This method invokes the
-        get_callbacks method to get the appropriate callbacks for the mode and passes it to the trainer.
+    def setup_trainer_and_strategy(self, mode: Literal["stop", "go"], metrics: list[str]) -> pl.Trainer:
+        """Constructs the trainer object for the stop and go test.
+
+        This method invokes the get_callbacks method to get the appropriate callbacks for the mode and passes it to the trainer.
+
+        Args:
+            mode (Literal['stop', 'go']): The mode indicating whether to stop or go.
+            metrics: The metrics to be used for tracking.
         """
         ...
 
@@ -172,6 +195,16 @@ class StopAndGoHarness(ABC):
 
     # stop() and go() are provided methods and run the requisite methods with the appropriate mode.
     def stop(self):
+        """Runs pre-training and 'stops' after the first checkpoint is saved.
+
+        This method sets up the model, data, and optimizer for the "stop" mode.
+        It then sets up the trainer and strategy for the "stop" mode with the given metrics.
+        The training process is executed using the `llm.train` function, passing the model, data, trainer, logger, optimizer, and resume options.
+        If a `testing_callbacks.StopAndGoException` is raised during training, it is caught and no action is taken.
+
+        Raises:
+            testing_callbacks.StopAndGoException: If a stop and go exception occurs during training.
+        """
         model, data, opt = self.setup_model(mode="stop")
         trainer = self.setup_trainer_and_strategy("stop", self.metrics)
         with distributed_model_parallel_state():
@@ -192,6 +225,7 @@ class StopAndGoHarness(ABC):
                 ...
 
     def go(self):
+        """Resumes the model from the checkpoint saved at the end of `stop()` and verifies the metadata integrity."""
         model, data, opt = self.setup_model(mode="go")
         trainer = self.setup_trainer_and_strategy("go", self.metrics)
         with distributed_model_parallel_state():
@@ -210,5 +244,6 @@ class StopAndGoHarness(ABC):
 
     # Finally, execution is a simple stop => go.
     def run_test(self):
+        """Executes the stop => go process."""
         self.stop()
         self.go()

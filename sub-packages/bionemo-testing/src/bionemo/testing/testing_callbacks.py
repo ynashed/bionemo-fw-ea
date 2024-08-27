@@ -27,20 +27,20 @@
 import os
 import pathlib
 import pickle
-import signal
 from typing import Any, List
 
-from nemo.utils import logging
 from pytorch_lightning import Callback, LightningModule, Trainer
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
 
 
 def get_global_step(trainer: Trainer, pl_module: LightningModule) -> int:
+    """Fetches the global step from the trainer state."""
     return trainer.global_step
 
 
 def get_learning_rate(trainer: Trainer, pl_module: LightningModule) -> float:
+    """Fetches the learning rate from the trainers optimizer state."""
     return trainer.optimizers[0].param_groups[0]["lr"]
 
 
@@ -50,21 +50,23 @@ def get_biobert_val_loss(trainer: Trainer, pl_module: LightningModule, on_save: 
     return result
 
 
-def _unused_loss_hint(trainer, pl_module):
-    """Have been unable to get this working. Ideally we are grabbing `reduced_train_loss`. We may need a hook in
-    megatron to actually invoke the method that computes it.
-
-    (Pdb) trainer.state
-    TrainerState(status=<TrainerStatus.RUNNING: 'running'>, fn=<TrainerFn.FITTING: 'fit'>, stage=<RunningStage.VALIDATING: 'validate'>)
-    (Pdb) trainer.state.__module__
-    'pytorch_lightning.trainer.states'
-
-    return trainer.model.training_step(trainer.model.data_step(iter(trainer.datamodule.train_dataloader())))
-    """
-    raise NotImplementedError
-
-
 def compute_biobert_loss_singlegpu(model, dl: DataLoader):
+    """Computes the loss for BioBert models on a single GPU.
+
+    This will not function in multi-gpu settings nor with models that do not conform to BioBert.
+
+    Args:
+        model (torch.nn.Module): The Biobert model.
+        dl (torch.utils.data.DataLoader): The data loader.
+
+    Returns:
+        float: The mean loss.
+
+    See Also:
+    - :class: BioBertModel
+    """
+    pass
+
     n, loss = 0, 0.0
     model.eval()
     # batch = next(iter(dl))
@@ -93,21 +95,21 @@ getter_function_map = {
 }
 
 
-class StopAndGoException(Exception):
+class StopAndGoException(Exception):  # noqa: D101
     pass
 
 
 class RaiseAfterMetadataCallback(Callback):
-    """A callback that raises a StopAndGoException kills it if the metadata
-    from the MetadataSaveCallback was saved successfully beforehand.
+    """A callback that raises a StopAndGoException kills it if the metadata from the MetadataSaveCallback was saved successfully beforehand.
 
-    Use this one for pytest based Stop and go tests.
+    Use this callback for pytest based Stop and go tests.
     """
 
-    def __init__(self, metadata_path: pathlib.Path):
+    def __init__(self, metadata_path: pathlib.Path):  # noqa: D107
         self.metadata_path = metadata_path
 
     def on_train_batch_start(self, trainer: Trainer, pl_module: LightningModule, batch: Any, batch_idx: int):
+        """PTL callback that raises a StopAndGoException if metadata exists."""
         pickle_file_path = os.path.join(self.metadata_path, "checkpoints/metadata.pkl")
         if os.path.exists(pickle_file_path):
             # Register the signal handler
@@ -115,41 +117,12 @@ class RaiseAfterMetadataCallback(Callback):
             # kill job afterwards
 
 
-class KillAfterSignalCallback(Callback):
-    """A callback that sends a SIGTERM signal to the process and kills it if the metadata
-    from the MetadataSaveCallback was saved successfully beforehand.
-
-    Use this one for CLI based Stop and go tests.
-    """
-
-    def __init__(self, metadata_path: pathlib.Path):
-        self.metadata_path = metadata_path
-
-    def on_train_batch_start(self, trainer: Trainer, pl_module: LightningModule, batch: Any, batch_idx: int):
-        def terminate_process(signum, frame):
-            logging.info("\nReceived SIGTERM signal, terminating process...\n")
-            exit(0)
-
-        pickle_file_path = os.path.join(self.metadata_path, "checkpoints/metadata.pkl")
-
-        if not trainer.is_global_zero:
-            # Sleep the process if not global zero to clean up hanging procs
-            import time
-
-            time.sleep(5)
-
-        if os.path.exists(pickle_file_path):
-            # Register the signal handler
-            signal.signal(signal.SIGTERM, terminate_process)
-            # kill job afterwards
-            os.kill(os.getpid(), signal.SIGTERM)
-
-
 class MetadataSaveCallback(Callback):
     """A callback that saves metadata about the current training at the second validation epoch."""
 
     def __init__(self, metadata_path: pathlib.Path, metadata_keys: List[str]):
         """Initialises callback with path and called information.
+
         Args:
             metadata_path (pathlib.Path): Path where the metadata will be saved.
             metadata_keys (List[str]): keys for metadata to be checked.
@@ -160,24 +133,31 @@ class MetadataSaveCallback(Callback):
         self.called = False  # indicates if callback was already called
 
     def setup(self, trainer: Trainer, pl_module: LightningModule, stage: str):
-        # Cleanup if dirty.
+        """Set up the testing callbacks and removes lingering metadata."""
         super().setup(trainer, pl_module, stage)
         if trainer.is_global_zero and os.path.exists(self.pickle_file_path):
             os.remove(self.pickle_file_path)
 
     def on_validation_epoch_end(self, trainer: Trainer, pl_module: LightningModule):
+        """Stores requisite metadata at the end of the first non-warmup validation epoch.
+
+        Executes on the second validation epoch -only- due to how warmups are handled. May not work as intended in the
+        absence of a warmup.
+
+        Args:
+            trainer (Trainer): The Lightning Trainer object.
+            pl_module (LightningModule): The LightningModule being trained.
+
+        Notes:
+            - If `called` is True and `trainer.is_global_zero` is True, the function saves metadata to compare after resuming with a checkpoint.
+            - The metadata is obtained using `getter_function_map` and saved as a pickle file.
+
+        """
         if self.called and trainer.is_global_zero:
             # save metadata to compare to after resuming with checkpoint
             metadata = {}
-            # trainer.model.training_step(next(iter(trainer.datamodule.train_dataloader())))
-            #   tensors not on same device, which means they are sitting on 'cpu' instead of cuda, there is an extra
-            #   step to move the tensors to cuda
-
             for metadata_key in self.metadata_keys:
-                if metadata_key == "val_loss":
-                    metadata_value = getter_function_map[metadata_key](trainer, pl_module, on_save=True)
-                else:
-                    metadata_value = getter_function_map[metadata_key](trainer, pl_module)
+                metadata_value = getter_function_map[metadata_key](trainer, pl_module)
                 metadata[metadata_key] = metadata_value
             # prepare paths for metadata save
             pickle_file_path = self.pickle_file_path
@@ -194,13 +174,14 @@ class MetadataSaveCallback(Callback):
 
 
 class TestCheckpointIntegrityCallback(Callback):
-    """A callback that, after resuming from a checkpoint, checks that attributes of this
-    resumed checkpoint are the same as the metadata that was saved at the time of
-    checkpoint creation as part of stop-and-go tests.
+    """Callback that tests if current metrics match those saved in the associated metadata file.
+
+    This callback expects to be invoked _only_ after resuming a model that used the MetadataSaveCallback. When training begins, it checks the value of each metric and compares to the metadata stored in the metadata pickle file. Any deviances are assumed to be a failure in restoration.
     """
 
     def __init__(self, metadata_path: pathlib.Path, metadata_keys: List[str]):
         """Initialises callback with path and called information.
+
         Args:
             metadata_path (pathlib.Path): Path where the metadata will be saved.
             metadata_keys (List[str]): keys for metadata to be checked.
@@ -209,6 +190,7 @@ class TestCheckpointIntegrityCallback(Callback):
         self.metadata_keys = metadata_keys
 
     def on_train_start(self, trainer: Trainer, pl_module: LightningModule):
+        """Loads associated metadata and compares with current metrics."""
         pickle_file_path = os.path.join(self.metadata_path, "checkpoints/metadata.pkl")
         # check that pickle file exists
         assert os.path.isfile(pickle_file_path), f"No file found at {pickle_file_path}"
