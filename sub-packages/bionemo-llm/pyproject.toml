@@ -14,8 +14,8 @@ dependencies = [
     # external
     "lightning>=2.2.1",
     "pytorch-lightning>=2.2.1",
-#    "megatron-core @ git+https://github.com/NVIDIA/Megatron-LM.git@c7a1f82d761577e6ca0338d3521eac82f2aa0904",
-#    "nemo-toolkit @ git+https://github.com/NVIDIA/NeMo.git@d28c1b2dd7c8539299a4c31f7c8d1678e2cbb9c8",
+    "megatron-core @ git+https://github.com/NVIDIA/Megatron-LM.git@c7a1f82d761577e6ca0338d3521eac82f2aa0904",
+    "nemo-toolkit @ git+https://github.com/NVIDIA/NeMo.git@d28c1b2dd7c8539299a4c31f7c8d1678e2cbb9c8",
     #
 #    $ time rye sync
 #    Reusing already existing virtualenv
@@ -62,7 +62,7 @@ dependencies = [
 #        raise CalledProcessError(retcode, process.args,
 #    subprocess.CalledProcessError: Command '['/usr/bin/cmake', '-S', '/home/mgreaves/.cache/uv/git-v0/checkouts/f679917ede501d2d/7d576ed/transformer_engine', '-B', '/home/mgreaves/.cache/uv/git-v0/checkouts/f679917ede501d2d/7d576ed/build_tools/build/cmake', '-DPython_EXECUTABLE=/home/mgreaves/.cache/uv/builds-v0/.tmpPCzZfy/bin/python', '-DPython_INCLUDE_DIR=/home/mgreaves/.rye/py/cpython@3.10.14/include/python3.10', '-DCMAKE_BUILD_TYPE=Release', '-DCMAKE_INSTALL_PREFIX=/home/mgreaves/.cache/uv/git-v0/checkouts/f679917ede501d2d/7d576ed/build/lib.linux-x86_64-cpython-310', '-GNinja', '-Dpybind11_DIR=/home/mgreaves/.cache/uv/builds-v0/.tmpPCzZfy/lib/python3.10/site-packages/pybind11/share/cmake/pybind11']' returned non-zero exit status 1.
     # TODO: need to get transformer engine to provide prebuilt binaries OR declare nvcc as build-time dependency (and obtain!)
-#    "transformer_engine @ git+https://github.com/NVIDIA/TransformerEngine.git@7d576ed25266a17a7b651f2c12e8498f67e0baea",
+    "transformer_engine @ git+https://github.com/NVIDIA/TransformerEngine.git@7d576ed25266a17a7b651f2c12e8498f67e0baea",
 ]
 requires-python = ">= 3.10"
 
