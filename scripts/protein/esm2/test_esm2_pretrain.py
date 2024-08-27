@@ -374,7 +374,6 @@ def test_limit_val_batches_is_none(required_args_reference):
     assert args.limit_val_batches is None
 
 
-# TODO(@sichu) add datamodule unittest when limit_val_batches smaller than gbs
 @pytest.mark.parametrize("limit_val_batches", [1, 2])
 def test_limit_val_batches_is_int(required_args_reference, limit_val_batches):
     """
