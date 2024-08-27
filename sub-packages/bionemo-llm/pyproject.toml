@@ -74,7 +74,7 @@ build-backend = "hatchling.build"
 managed = true
 
 [tool.rye.workspace]
-members = ["cdbionemo-core"]
+members = ["bionemo-core"]
 
 [tool.hatch.metadata]
 allow-direct-references = true
