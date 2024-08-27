@@ -44,29 +44,39 @@ def get_learning_rate(trainer: Trainer, pl_module: LightningModule) -> float:
     return trainer.optimizers[0].param_groups[0]["lr"]
 
 
-def get_val_loss(trainer: Trainer, pl_module: LightningModule, on_save: bool = False) -> float:
-    # This works sometimes, like on_train_start. Does not work on_validation_end
-    if on_save:
-        # NOTE (@skothenhill) Not available in a on_train_start context
-        result = compute_loss(pl_module, trainer.datamodule.val_dataloader())
-        return result
-    else:
-        result = compute_loss(pl_module, trainer.datamodule.val_dataloader())
-        return result
+def get_biobert_val_loss(trainer: Trainer, pl_module: LightningModule, on_save: bool = False) -> float:
+    """Only works for the BioBert model when using a single gpu (or ddp)."""
+    result = compute_biobert_loss_singlegpu(pl_module, trainer.datamodule.val_dataloader())
+    return result
 
 
-def compute_loss(model, dl: DataLoader):
+def _unused_loss_hint(trainer, pl_module):
+    """Have been unable to get this working. Ideally we are grabbing `reduced_train_loss`. We may need a hook in
+    megatron to actually invoke the method that computes it.
+
+    (Pdb) trainer.state
+    TrainerState(status=<TrainerStatus.RUNNING: 'running'>, fn=<TrainerFn.FITTING: 'fit'>, stage=<RunningStage.VALIDATING: 'validate'>)
+    (Pdb) trainer.state.__module__
+    'pytorch_lightning.trainer.states'
+
+    return trainer.model.training_step(trainer.model.data_step(iter(trainer.datamodule.train_dataloader())))
+    """
+    raise NotImplementedError
+
+
+def compute_biobert_loss_singlegpu(model, dl: DataLoader):
     n, loss = 0, 0.0
     model.eval()
-    batch = next(iter(dl))
+    # batch = next(iter(dl))
+    batch = model.data_step(iter(dl))
     result = model(
-        input_ids=batch["text"].cuda(),
+        input_ids=batch["text"].cuda(),  # 'tokens' also a valid input for MockGPTDataModule
         attention_mask=batch["attention_mask"].cuda(),
     )
     loss_mask = batch["loss_mask"].cuda()
+    # Not guaranteed i guess?
     logits = result["token_logits"]
     target = batch["labels"].cuda()
-
     loss += F.cross_entropy(logits[loss_mask].float(), target[loss_mask], reduction="sum")
     n += loss_mask.sum()
 
@@ -78,7 +88,7 @@ def compute_loss(model, dl: DataLoader):
 getter_function_map = {
     "learning_rate": get_learning_rate,
     "global_step": get_global_step,
-    "val_loss": get_val_loss,
+    "val_biobert_loss": get_biobert_val_loss,
     # How do we compute a simple validation loss here
 }
 
@@ -159,6 +169,10 @@ class MetadataSaveCallback(Callback):
         if self.called and trainer.is_global_zero:
             # save metadata to compare to after resuming with checkpoint
             metadata = {}
+            # trainer.model.training_step(next(iter(trainer.datamodule.train_dataloader())))
+            #   tensors not on same device, which means they are sitting on 'cpu' instead of cuda, there is an extra
+            #   step to move the tensors to cuda
+
             for metadata_key in self.metadata_keys:
                 if metadata_key == "val_loss":
                     metadata_value = getter_function_map[metadata_key](trainer, pl_module, on_save=True)
