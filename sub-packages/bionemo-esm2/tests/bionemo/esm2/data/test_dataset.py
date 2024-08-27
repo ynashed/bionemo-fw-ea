@@ -189,7 +189,9 @@ def test_create_train_dataset(dummy_protein_dataset, tmp_path):
 
     cluster_file.to_parquet(tmp_path / "train_clusters.parquet")
 
-    dataset = create_train_dataset(tmp_path / "train_clusters.parquet", dummy_protein_dataset, 10, 123)
+    dataset = create_train_dataset(
+        cluster_file=tmp_path / "train_clusters.parquet", db_path=dummy_protein_dataset, total_samples=10, seed=123
+    )
     assert len(dataset) == 10
     dataset[6]  # Make sure it doesn't crash.
 
@@ -203,6 +205,8 @@ def test_create_valid_dataset(dummy_protein_dataset, tmp_path):
 
     cluster_file.to_parquet(tmp_path / "valid_clusters.parquet")
 
-    dataset = create_valid_dataset(tmp_path / "valid_clusters.parquet", dummy_protein_dataset, 10, 123)
-    assert len(dataset) == 10
-    dataset[6]  # Make sure it doesn't crash.
+    dataset = create_valid_dataset(
+        clusters=tmp_path / "valid_clusters.parquet", db_path=dummy_protein_dataset, seed=123
+    )
+    assert len(dataset) == 3
+    dataset[2]  # Make sure it doesn't crash.
