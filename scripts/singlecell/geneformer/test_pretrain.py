@@ -189,14 +189,15 @@ def test_limit_val_batches_is_float_string(required_args_reference, limit_val_ba
     parser.parse_args(arglist)
 
 
-def test_limit_val_batches_is_none(required_args_reference):
+@pytest.mark.parametrize("limit_val_batches", None, "None")
+def test_limit_val_batches_is_none(required_args_reference, limit_val_batches):
     """
     Test whether limit_val_batches can be parsed as none.
 
     Args:
         required_args_reference (Dict[str, str]): A dictionary with the required arguments for the pretraining script.
     """
-    required_args_reference["limit_val_batches"] = "None"
+    required_args_reference["limit_val_batches"] = limit_val_batches
     arglist = parse_kwargs_to_arglist(required_args_reference)
     args = parser.parse_args(arglist)
     assert args.limit_val_batches is None
