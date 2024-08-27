@@ -144,7 +144,7 @@ def main(
             # TODO(@skothenhill-nv) these need to be cleaned up when we have the automatic addition of track_io
             # io.track_io(LossLoggingCallback)(),
         ],
-        plugins=nl.MegatronMixedPrecision(precision=precision, amp_O2=False),
+        plugins=nl.MegatronMixedPrecision(precision=precision),
     )
     """
 
