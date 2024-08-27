@@ -29,8 +29,7 @@ from bionemo.testing.megatron_parallel_state_utils import distributed_model_para
 
 
 class StopAndGoHarness(ABC):
-    """
-    Abstract base class for a stop-and-go harness. Stop and go tests act as follows:
+    """Abstract base class for a stop-and-go harness. Stop and go tests act as follows:
         - setup a clean model for a brief training run, select metrics to track.
         - interrupt training via the StopAndGoException in the callback InterruptAfterMetadataCallback.
         - setup a model to be resumed from the checkpoint, with the same metrics.
@@ -100,8 +99,7 @@ class StopAndGoHarness(ABC):
     def setup_model(
         self, mode: Literal["stop", "go"]
     ) -> tuple[pl.LightningModule, pl.LightningDataModule, nl.MegatronOptimizerModule]:
-        """
-        Constructs the model, data, and optimizer for the test harness. Optionally supports separate code paths for 'stop'/'go', although implementors are
+        """Constructs the model, data, and optimizer for the test harness. Optionally supports separate code paths for 'stop'/'go', although implementors are
         encouraged to use the same code path for both.
         """
         ...
@@ -114,8 +112,7 @@ class StopAndGoHarness(ABC):
         ...
 
     def get_callbacks(self, mode: Literal["stop", "go"], metrics: list[str]) -> list[pl.Callback]:
-        """
-        Returns a list of callbacks based on the specified mode. Base implemention provides reasonable defaults.
+        """Returns a list of callbacks based on the specified mode. Base implemention provides reasonable defaults.
 
         To extend this method, call the super and append to the callbacks, depending on which mode you are in:
 
@@ -128,8 +125,10 @@ class StopAndGoHarness(ABC):
         Args:
             mode (Literal['stop', 'go']): The mode indicating whether to stop or go.
             metrics: The metrics to be used for tracking.
+
         Returns:
             list: A list of callbacks based on the specified mode.
+
         Raises:
             ValueError: If the mode is neither 'stop' nor 'go'.
         """
