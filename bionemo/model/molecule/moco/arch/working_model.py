@@ -388,7 +388,7 @@ class DiTeBlock(nn.Module):
         self.ffn = swiglu_ffn(hidden_size, mlp_expansion_ratio, bias=False)
         self.adaLN_modulation = nn.Sequential(nn.SiLU(), nn.Linear(hidden_size, 6 * hidden_size, bias=True))
         self.adaLN_edge_modulation = nn.Sequential(
-            nn.SiLU(), nn.Linear(invariant_edge_feat_dim, 6 * invariant_edge_feat_dim, bias=True)
+            nn.SiLU(), nn.Linear(hidden_size, 6 * invariant_edge_feat_dim, bias=True)
         )
 
         # Single linear layer for QKV projection
@@ -408,7 +408,7 @@ class DiTeBlock(nn.Module):
         self.lin_edge0 = nn.Linear(hidden_size, invariant_edge_feat_dim, bias=False)
         # self.lin_edge1 = nn.Linear(hidden_size, hidden_size, bias=False)
         self.lin_edge1 = nn.Linear(
-            invariant_edge_feat_dim + n_vector_features * scale_dist_features, hidden_size, bias=False
+            invariant_edge_feat_dim + n_vector_features * scale_dist_features, invariant_edge_feat_dim, bias=False
         )
         self.ffn_norm_edge = BatchLayerNorm(invariant_edge_feat_dim)
         self.ffn_edge = swiglu_ffn(invariant_edge_feat_dim, mlp_expansion_ratio, bias=False)
