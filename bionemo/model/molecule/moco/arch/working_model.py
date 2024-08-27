@@ -234,10 +234,10 @@ class XEGNNK(MessagePassing):
     X only EGNN
     """
 
-    def __init__(self, invariant_node_feat_dim=64, n_vector_features=128):
+    def __init__(self, invariant_node_feat_dim=64, invariant_edge_feat_dim=32, n_vector_features=128):
         super().__init__(node_dim=0, aggr=None, flow="source_to_target")  #! This should be target to source
         self.message_input_size = (
-            2 * invariant_node_feat_dim + n_vector_features + invariant_node_feat_dim + invariant_node_feat_dim
+            2 * invariant_node_feat_dim + n_vector_features + invariant_edge_feat_dim + invariant_node_feat_dim
         )  # + invariant_edge_feat_dim
         self.phi_message = MLP(self.message_input_size, invariant_node_feat_dim, invariant_node_feat_dim)
         self.phi_x = MLP(invariant_node_feat_dim, invariant_node_feat_dim, n_vector_features)
@@ -359,6 +359,7 @@ class DiTeBlock(nn.Module):
     def __init__(
         self,
         hidden_size,
+        invariant_edge_feat_dim,
         num_heads,
         mlp_expansion_ratio=4.0,
         use_z=True,
@@ -377,14 +378,18 @@ class DiTeBlock(nn.Module):
             dist_size = n_vector_features * scale_dist_features
         else:
             dist_size = n_vector_features
-        self.feature_embedder = MLP(hidden_size + hidden_size + hidden_size + dist_size, hidden_size, hidden_size)
+        self.feature_embedder = MLP(
+            hidden_size + hidden_size + invariant_edge_feat_dim + dist_size, hidden_size, hidden_size
+        )
         self.norm1_edge = BatchLayerNorm(hidden_size, affine=False, eps=1e-6)
         self.norm2_edge = BatchLayerNorm(hidden_size, affine=False, eps=1e-6)
 
         self.ffn_norm = BatchLayerNorm(hidden_size)
         self.ffn = swiglu_ffn(hidden_size, mlp_expansion_ratio, bias=False)
         self.adaLN_modulation = nn.Sequential(nn.SiLU(), nn.Linear(hidden_size, 6 * hidden_size, bias=True))
-        self.adaLN_edge_modulation = nn.Sequential(nn.SiLU(), nn.Linear(hidden_size, 6 * hidden_size, bias=True))
+        self.adaLN_edge_modulation = nn.Sequential(
+            nn.SiLU(), nn.Linear(invariant_edge_feat_dim, 6 * invariant_edge_feat_dim, bias=True)
+        )
 
         # Single linear layer for QKV projection
         self.qkv_proj = nn.Linear(hidden_size, 3 * hidden_size, bias=False)
@@ -400,11 +405,13 @@ class DiTeBlock(nn.Module):
             self.pair_bias = nn.Sequential(nn.SiLU(), nn.Linear(hidden_size, 1, bias=False))
             self.mask_z = mask_z
 
-        self.lin_edge0 = nn.Linear(hidden_size, hidden_size, bias=False)
+        self.lin_edge0 = nn.Linear(hidden_size, invariant_edge_feat_dim, bias=False)
         # self.lin_edge1 = nn.Linear(hidden_size, hidden_size, bias=False)
-        self.lin_edge1 = nn.Linear(hidden_size + n_vector_features * scale_dist_features, hidden_size, bias=False)
-        self.ffn_norm_edge = BatchLayerNorm(hidden_size)
-        self.ffn_edge = swiglu_ffn(hidden_size, mlp_expansion_ratio, bias=False)
+        self.lin_edge1 = nn.Linear(
+            invariant_edge_feat_dim + n_vector_features * scale_dist_features, hidden_size, bias=False
+        )
+        self.ffn_norm_edge = BatchLayerNorm(invariant_edge_feat_dim)
+        self.ffn_edge = swiglu_ffn(invariant_edge_feat_dim, mlp_expansion_ratio, bias=False)
         # self.tanh = nn.GELU(approximate='tanh')
 
     def _apply_rotary(self, q: torch.Tensor, k: torch.Tensor):
@@ -498,7 +505,6 @@ class DiTeBlock(nn.Module):
         attn_output = einops.rearrange(attn_output, "b h s d -> b s (h d)").squeeze(0)
         y = self.out_projection(attn_output)
 
-        # TODO: need to add in gate unsqueeze when we use batch dim
         # Gated Residual
         x = x + gate_msa * y
         # Feed Forward
@@ -911,10 +917,15 @@ class MegalodonDotFN(nn.Module):
         for i in range(num_layers):
             self.dit_layers.append(
                 DiTeBlock(
-                    invariant_node_feat_dim, num_heads, use_z=False, scale_dist_features=self.scale_dist_features
+                    invariant_node_feat_dim,
+                    invariant_edge_feat_dim,
+                    num_heads,
+                    use_z=False,
+                    scale_dist_features=self.scale_dist_features,
+                    n_vector_features=n_vector_features,
                 )
             )
-            self.egnn_layers.append(XEGNNK(invariant_node_feat_dim))
+            self.egnn_layers.append(XEGNNK(invariant_node_feat_dim, invariant_edge_feat_dim, n_vector_features))
         # self.h_feat_refine = DiTBlock(invariant_node_feat_dim, num_heads, use_z=False)
         self.node_blocks = nn.ModuleList(
             [nn.Linear(invariant_node_feat_dim, invariant_node_feat_dim) for i in range(num_layers)]
