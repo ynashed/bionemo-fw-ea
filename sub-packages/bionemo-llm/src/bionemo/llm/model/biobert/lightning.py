@@ -14,67 +14,83 @@
 # limitations under the License.
 
 
-from typing import Dict, Optional, Sequence
+from typing import Dict, Optional, Protocol, Sequence, TypedDict, cast
 
-import pytorch_lightning as pl
 import torch
 import torch.distributed
 from apex.optimizers import FusedAdam
 from megatron.core import parallel_state
-from megatron.core.optimizer import OptimizerConfig
 from megatron.core.packed_seq_params import PackedSeqParams
 from nemo.collections.common.tokenizers.tokenizer_spec import TokenizerSpec
 from nemo.lightning.megatron_parallel import DataT, MegatronLossReduction
 from nemo.lightning.pytorch.optim import MegatronOptimizerModule
-from torch.optim import Optimizer
+from torch import Tensor
 
-from bionemo.llm.lightning import BionemoLightningModule
+from bionemo.llm.lightning import BionemoLightningModule, default_megatron_optimizer
 from bionemo.llm.model.biobert.model import BioBertConfig, MegatronBioBertModel
 
 
 __all__: Sequence[str] = (
-    "BioBertLightningModule",
+    "biobert_lightning_module",
     "biobert_data_step",
     "bert_forward_step",
     "bert_default_optimizer",
+    "BertModel",
+    "BertBatch",
+    "SequenceBatch",
 )
 
 
-class BioBertLightningModule(  # noqa: D101
-    BionemoLightningModule[MegatronBioBertModel, MegatronLossReduction],
-):
-    def __init__(
-        self,
-        config: BioBertConfig,
-        optimizer: MegatronOptimizerModule = MegatronOptimizerModule(
-            config=OptimizerConfig(lr=1e-4, optimizer="adam", use_distributed_optimizer=True),
-        ),
-        tokenizer: Optional[TokenizerSpec] = None,
-    ):
-        """A pytorch lightning module for BioBert-derived models. This module is designed to be used with the Megatron-LM strategy and nemo 2.0 conventions.
-        To change the your loss, pass in a different config object that returns a different loss reduction class. To change your model and what it outputs,
-        pass in a different config object that returns a different model. Do not modify this function unless you need to change higher level logic. You may
-        need to modify the various step and forward functions towards the bottom of this file to handle new/different keys in the batch. In the future some of
-        those functions may need to be refactored out into the config object or a different place so that they live closer to the model definition.
-        """  # noqa: D205
-        super().__init__(config=config, optimizer=optimizer)
-        self.tokenizer = tokenizer
+class BertModel(Protocol[DataT]):
+    def forward(
+        self, input_ids: Tensor, attention_mask: Tensor, packed_seq_params: Optional[Tensor] = None
+    ) -> DataT: ...
 
-    def configure_model(self) -> None:  # noqa: D102
-        self.model = self.config.configure_model(self.tokenizer)
 
-    def data_step(self, dataloader_iter) -> Dict[str, torch.Tensor]:  # noqa: D102
-        return biobert_data_step(dataloader_iter)
+class BertBatchCore(TypedDict):
+    text: Tensor
+    attention_mask: Tensor
 
-    def forward_step(self, batch) -> torch.Tensor:  # noqa: D102
-        return bert_forward_step(self, batch)  # NOTE(@sichu) reduced to loss
+
+class BertBatch(BertBatchCore, total=False):
+    cu_seqlens: Tensor
+
+
+class SequenceBatchCore(TypedDict):
+    cu_seqlens: Tensor
+
+
+class SequenceBatch(SequenceBatchCore, total=False):
+    cu_seqlens_argmin: Tensor
+    max_seqlen: Tensor
+
+
+def biobert_lightning_module(
+    config: BioBertConfig,
+    optimizer: Optional[MegatronOptimizerModule] = None,
+    tokenizer: Optional[TokenizerSpec] = None,
+) -> BionemoLightningModule[MegatronBioBertModel, MegatronLossReduction]:
+    """A pytorch lightning module for BioBert-derived models. This module is designed to be used with the Megatron-LM strategy and nemo 2.0 conventions.
+    To change the your loss, pass in a different config object that returns a different loss reduction class. To change your model and what it outputs,
+    pass in a different config object that returns a different model. Do not modify this function unless you need to change higher level logic. You may
+    need to modify the various step and forward functions towards the bottom of this file to handle new/different keys in the batch. In the future some of
+    those functions may need to be refactored out into the config object or a different place so that they live closer to the model definition.
+    """
+
+    return BionemoLightningModule(
+        config=config,
+        optimizer=optimizer if optimizer is not None else default_megatron_optimizer(),
+        data_step=biobert_data_step,
+        forward_step=bert_forward_step,
+        tokenizer=tokenizer,
+    )
 
 
 ############################################################################################################
 # Below are static helper functions for handling various steps in the above class.
 
 
-def biobert_data_step(dataloader_iter) -> Dict[str, torch.Tensor]:
+def biobert_data_step(dataloader_iter) -> Dict[str, Tensor]:
     """Preprocesses a batch of data for the GeneFormer model, and ingest a single batch of data from the dataloader iterator.
         only necessary batch keys are subsetted and passed to the model's forward pass, and the loss forward pass, depending on stage.
         TODO document how parallel_state pipeline stages work.
@@ -113,7 +129,7 @@ def biobert_data_step(dataloader_iter) -> Dict[str, torch.Tensor]:
     return output
 
 
-def bert_forward_step(model: pl.LightningModule, batch: Dict[str, torch.Tensor]) -> DataT:
+def bert_forward_step(model: BertModel[DataT], batch: BertBatch) -> DataT:
     """This subsets the batch keys to the ones actually used by forward pass of the model, and then calls the model's forward pass.
     if "cu_seqsens" are defined in the batch, then the packed sequence parameters are also passed to the model for forward pass efficiency.
     """  # noqa: D205
@@ -125,33 +141,45 @@ def bert_forward_step(model: pl.LightningModule, batch: Dict[str, torch.Tensor])
     }
 
     if "cu_seqlens" in batch:
-        forward_args["packed_seq_params"] = get_packed_seq_params(batch)
+        forward_args["packed_seq_params"] = get_packed_seq_params(cast(SequenceBatch, batch))
 
-    forward_results = model(**forward_args)
-    return forward_results  # TODO support losses that also include the binary head, this means doing something more fancy than the one default GPT reduction function above MaskedTokenLossReduction()
+    forward_results = model.forward(**forward_args)
+    # TODO support losses that also include the binary head, this means doing something more fancy than the one
+    #      default GPT reduction function above MaskedTokenLossReduction()
+    return forward_results
 
 
-def bert_default_optimizer(module) -> Optimizer:
-    """Returns the default optimizer for the BERT module.
+def bert_default_optimizer(model: torch.nn.Module) -> FusedAdam:
+    """Returns the default optimizer for the BERT model.
 
     Args:
-        module: The BERT module.
+        model: The BERT model.
 
     Returns:
-        The default optimizer initialized for this BERT module's parameters
+        The default optimizer initialized for this BERT module's parameters.
+        Uses a learning rate of 1e-4 and weight decay of 1e-2.
     """
-    return FusedAdam(module.parameters(), lr=1e-4, weight_decay=0.01)
+    return FusedAdam(model.parameters(), lr=1e-4, weight_decay=0.01)
 
 
-def get_batch_on_this_context_parallel_rank(batch: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
-    """Modifies the batch data based on the context parallel rank, if the context parallel world size is greater than 1. Otherwise the batch is returned as-is.
+def get_batch_on_this_context_parallel_rank(batch: Dict[str, Tensor], in_place: bool = True) -> Dict[str, Tensor]:
+    """Ensures that the input batch is in the right format for context parallel rank.
+
+    Modifies the batch data based on the context parallel rank, if the context parallel world size is greater than 1.
+    Otherwise, the batch is returned as-is.
 
     Args:
-        batch (dict): The input batch data.
+        batch: The input batch data.
+        in_place: If true, then the input is mutated. The returned dict is a reference to the input.
+                  Otherwise, the input data is always shallow-copied and this copy is modified and returned.
 
     Returns:
         dict: The modified batch data based on the context parallel rank.
     """
+
+    if not in_place:
+        batch = dict(**batch)
+
     if cp_size := parallel_state.get_context_parallel_world_size() > 1:
         num_valid_tokens_in_ub = None
         if "loss_mask" in batch and batch["loss_mask"] is not None:
@@ -174,24 +202,24 @@ def get_batch_on_this_context_parallel_rank(batch: Dict[str, torch.Tensor]) -> D
                 _val = _val.view(*val.shape[0:seq_dim], -1, *_val.shape[(seq_dim + 2) :])
                 batch[key] = _val
         batch["num_valid_tokens_in_ub"] = num_valid_tokens_in_ub
+
     return batch
 
 
-def get_packed_seq_params(batch: Dict[str, torch.Tensor]) -> PackedSeqParams:
-    """Get the packed sequence parameters for the given batch. This function should only be called if `cu_seqlens` is defined in the batch.
+def get_packed_seq_params(batch: SequenceBatch) -> PackedSeqParams:
+    """Get the packed sequence parameters for the given batch.
+
+    This function should only be called if `cu_seqlens` is defined in the batch.
 
     Args:
-        batch (dict): The input batch containing the following keys:
-            - cu_seqlens (torch.Tensor): The sequence lengths of the input batch.
-            - cu_seqlens_argmin (torch.Tensor, optional): The minimum sequence length index.
-            - max_seqlen (torch.Tensor, optional): The maximum sequence length.
+        batch: The input batch to pack.
 
     Returns:
         PackedSeqParams: The packed sequence parameters containing the following attributes:
-            - cu_seqlens_q (torch.Tensor): The sequence lengths for query.
-            - cu_seqlens_kv (torch.Tensor): The sequence lengths for key and value.
-            - max_seqlen_q (torch.Tensor, optional): The maximum sequence length for query.
-            - max_seqlen_kv (torch.Tensor, optional): The maximum sequence length for key and value.
+            - cu_seqlens_q (Tensor): The sequence lengths for query.
+            - cu_seqlens_kv (Tensor): The sequence lengths for key and value.
+            - max_seqlen_q (Tensor, optional): The maximum sequence length for query.
+            - max_seqlen_kv (Tensor, optional): The maximum sequence length for key and value.
             - qkv_format (str): The format of query, key, and value tensors.
 
     """

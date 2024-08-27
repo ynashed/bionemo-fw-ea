@@ -15,12 +15,12 @@
 
 
 from abc import ABC, abstractmethod
-from typing import Sequence
+from typing import Generic, Sequence
 
 from megatron.core.transformer.module import MegatronModule
-from nemo.lightning.megatron_parallel import MegatronLossReduction
+from nemo.lightning.megatron_parallel import DataT, MegatronLossReduction
 
-from bionemo.core.model.config import Model, ModelOutput
+from bionemo.core.model.config import Model
 
 
 __all__: Sequence[str] = (
@@ -33,7 +33,7 @@ Loss = MegatronLossReduction
 """
 
 
-class BionemoMegatronModel(MegatronModule, ABC):
+class BionemoMegatronModel(MegatronModule, Generic[DataT], ABC):
     """Models that use Megatron must be a MegatronModule type.
 
     The only major difference is the explicit `forward` pass method signature that makes this class compatible
@@ -41,7 +41,7 @@ class BionemoMegatronModel(MegatronModule, ABC):
     """
 
     @abstractmethod
-    def forward(self, *args, **kwargs) -> ModelOutput:  # noqa: D102
+    def forward(self, *args, **kwargs) -> DataT:  # noqa: D102
         raise NotImplementedError()
 
 

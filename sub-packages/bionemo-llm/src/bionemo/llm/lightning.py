@@ -12,19 +12,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from abc import ABC, abstractmethod
-from typing import Any, Generic, Iterable, List, Optional, Sequence, Tuple, TypeVar, Union
+from abc import ABC
+from typing import Any, Callable, Generic, Iterable, Iterator, List, Optional, Sequence, Tuple, TypeVar, Union
 
 import pytorch_lightning as pl
-import torch
 import torch.distributed
 from megatron.core import parallel_state
 from megatron.core.transformer.module import MegatronModule
 from nemo.lightning import io as nlio
 from nemo.lightning.megatron_parallel import DataT, MegatronLossReduction, ReductionT
 from nemo.lightning.pytorch.optim import MegatronOptimizerModule, OptimizerConfig
+from torch import Tensor
 
-from bionemo.core.model.config import BionemoTrainableModelConfig, ModelOutput
+from bionemo.core.model.config import BionemoTrainableModelConfig
+from bionemo.llm.api import BionemoMegatronModel
 
 
 __all__: Sequence[str] = (
@@ -34,6 +35,7 @@ __all__: Sequence[str] = (
     "LightningPassthroughPredictionMixin",
     "LossLoggingCallback",
     "BionemoLightningModule",
+    "default_megatron_optimizer",
 )
 
 
@@ -57,7 +59,7 @@ def get_dtype_device(torch_object) -> Tuple[torch.dtype, torch.device]:  # noqa:
             raise ValueError("Looking up dtype on an empty list")
         case {**data} if not data:
             raise ValueError("Looking up dtype on an empty dict")
-        case torch.Tensor(dtype=dtype, device=device):
+        case Tensor(dtype=dtype, device=device):
             return dtype, device
         case torch.nn.Module() as m:
             try:
@@ -75,7 +77,7 @@ def get_dtype_device(torch_object) -> Tuple[torch.dtype, torch.device]:  # noqa:
             raise TypeError("Got something we didnt expect")
 
 
-# NOTE(SKH): These types are all wrong, but are close. The inner type must always be a torch.Tensor, but the outer container should be generic.
+# NOTE(SKH): These types are all wrong, but are close. The inner type must always be a Tensor, but the outer container should be generic.
 def batch_collator(batches: Optional[Union[Tuple[ReductionT], List[ReductionT]]]) -> Optional[ReductionT]:
     """Takes a sequence of batches and collates them into a single batch.
         This is distinct from the standard pytorch default_collator since it does
@@ -84,7 +86,7 @@ def batch_collator(batches: Optional[Union[Tuple[ReductionT], List[ReductionT]]]
         parallelizing across minibatches.
 
     IMPORTANT: The underlying data primitive _must_ be a torch Tensor. The input to this function is a recurisve type,
-    there can be any amount of nesting between dictionaries, tuples, and lists, as long as the inner type is a n-d torch.Tensor.
+    there can be any amount of nesting between dictionaries, tuples, and lists, as long as the inner type is a n-d Tensor.
 
     Examples:
         Outer container = Dict:
@@ -101,7 +103,7 @@ def batch_collator(batches: Optional[Union[Tuple[ReductionT], List[ReductionT]]]
         A single batch of the same type as the elements of your input sequence.
     """  # noqa: D205
     match batches:
-        case [torch.Tensor(), *_]:
+        case [Tensor(), *_]:
             return torch.cat(batches, dim=0)
         case [dict(), *_]:
             return {key: batch_collator([batch[key] for batch in batches]) for key in batches[0]}
@@ -119,22 +121,22 @@ def batch_collator(batches: Optional[Union[Tuple[ReductionT], List[ReductionT]]]
 
 # TODO(@jstjohn): Properly use the Generic for DataT and ReductionT usage. Define our own batch/output types.
 # TODO(@skothenhill): Re-think the generics here- the way that `batch_collator` is expressed, `batches` should be a recursive generic type.
-class PassthroughLossReduction(MegatronLossReduction):
+class PassthroughLossReduction(MegatronLossReduction, Generic[DataT]):
     """Internally in NeMo2.0 the forward step is always expected to return a loss reduction class, and forward is expected to return a loss.
     This class hijacks that mechanism to instead pass through the forward output unperturbed as the loss (to enable inference in the predict step), and then the
     reduce method is used to collate the batch of forward outputs into a single batch. This supports the model forward output being a tensor, dict, tuple,
     or list of tensors. The inner type _must always be a torch.Tensor_.
     """  # noqa: D205
 
-    def forward(self, batch: DataT, forward_out: DataT) -> Tuple[torch.Tensor, DataT]:
+    def forward(self, batch: DataT, forward_out: DataT) -> Tuple[Tensor, DataT]:
         """_summary_
 
         Args:
             batch (DataT): The batch of data that was passed through the model to generate output.
-            forward_out (torch.Tensor): The output from your model's forward pass.
+            forward_out (Tensor): The output from your model's forward pass.
 
         Returns:
-            Tuple[torch.Tensor, ReductionT]: A tuple containing the loss tensor (dummy in this case) and the forward output (unmodified).
+            Tuple[Tensor, ReductionT]: A tuple containing the loss tensor (dummy in this case) and the forward output (unmodified).
         """  # noqa: D415
         dtype, device = get_dtype_device(forward_out)
         return torch.zeros(1, device=device, dtype=dtype), forward_out
@@ -168,7 +170,7 @@ class LossLoggingCallback(pl.Callback):  # noqa: D101
         self.val_losses = []
         self.test_losses = []
 
-    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):  # noqa: D102
+    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx) -> None:  # noqa: D102
         # Assuming the loss is computed internally and stored in pl_module
         if torch.distributed.get_rank() == 0 and parallel_state.is_pipeline_last_stage():
             # TODO(@jstjohn): verify when the outputs are a dictionary of "loss" and when they are just one tensor value.
@@ -178,7 +180,7 @@ class LossLoggingCallback(pl.Callback):  # noqa: D101
             loss = outputs
             pl_module.log("train_loss", loss, on_step=True, prog_bar=True, logger=True, rank_zero_only=True)
 
-    def on_test_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0):  # noqa: D102
+    def on_test_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx: int = 0) -> None:  # noqa: D102
         # TODO(@jstjohn): Add a docstring with type hints for this lightning hook
         # Assuming the loss is computed internally and stored in pl_module
         if torch.distributed.get_rank() == 0 and parallel_state.is_pipeline_last_stage():
@@ -190,7 +192,7 @@ class LossLoggingCallback(pl.Callback):  # noqa: D101
             loss = outputs
             self.test_losses.append(loss)
 
-    def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=0):  # noqa: D102
+    def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx: int = 0) -> None:  # noqa: D102
         # TODO(@jstjohn): Add a docstring with type hints for this lightning hook
         # Assuming the loss is computed internally and stored in pl_module
         if torch.distributed.get_rank() == 0 and parallel_state.is_pipeline_last_stage():
@@ -202,7 +204,7 @@ class LossLoggingCallback(pl.Callback):  # noqa: D101
             loss = outputs
             self.val_losses.append(loss)
 
-    def on_validation_epoch_end(self, trainer, pl_module):  # noqa: D102
+    def on_validation_epoch_end(self, trainer, pl_module) -> None:  # noqa: D102
         # TODO(@jstjohn): Add a docstring with type hints for this lightning hook
         if torch.distributed.get_rank() == 0 and parallel_state.is_pipeline_last_stage():
             if len(self.val_losses) > 0:
@@ -210,13 +212,31 @@ class LossLoggingCallback(pl.Callback):  # noqa: D101
                 pl_module.log("val_loss", avg_val_loss, prog_bar=True, logger=True, rank_zero_only=True)
                 self.val_losses.clear()
 
-    def on_test_epoch_end(self, trainer, pl_module):  # noqa: D102
+    def on_test_epoch_end(self, trainer, pl_module) -> None:  # noqa: D102
         # TODO(@jstjohn): Add a docstring with type hints for this lightning hook
         if torch.distributed.get_rank() == 0 and parallel_state.is_pipeline_last_stage():
             if len(self.test_losses) > 0:
                 avg_test_loss = torch.stack(self.test_losses).mean()
                 pl_module.log("test_loss", avg_test_loss, prog_bar=True, logger=True, rank_zero_only=True)
                 self.test_losses.clear()
+
+
+ForwardStep = Callable[[BionemoMegatronModel, dict[str, Tensor]], DataT]
+"""Megatron-compatible forward pass function.
+"""
+
+DataStep = Callable[[Iterator[DataT]], DataT]
+"""Batches together an iterator of individual examples.
+
+Necessary for compatability with Megatron. This function type is similiar to the collate function of PyTorch.
+
+A `DataStep` function takes an iterator over individual examples. Each example may be a tensor, sequence of tensors,
+or a set of named tensors (provided as a `dict` mapping `str` names to each `torch.Tensor`). Each iteration must
+yield the same type.
+
+The output of this function will mirror the same structure of each yielded example. It will be a concatenation of all
+of the examples in the iterator.
+"""
 
 
 class BionemoLightningModule(
@@ -232,18 +252,20 @@ class BionemoLightningModule(
     def __init__(
         self,
         config: BionemoTrainableModelConfig[Model, Loss],
+        forward_step: ForwardStep,
+        data_step: DataStep,
         # TODO: Add transformer_layer_spec when we update mcore
-        optimizer: MegatronOptimizerModule = MegatronOptimizerModule(
-            config=OptimizerConfig(lr=1e-4, optimizer="adam", use_distributed_optimizer=True),
-        ),
+        optimizer: MegatronOptimizerModule,
         **model_construct_args,
-    ):
+    ) -> None:
         """Constructor.
 
         Args:
             config: Serializable configuration object that allows one to construct a new model instance and loss function.
                     Necessary for Megatron-based training as the model itself cannot be serialized and distributed to nodes.
                     Instead, we serialize the procedure for making the model and distribute that.
+            forward_step: Performs forward pass using the model and a batch of data.
+            data_step: Custom batch-creating function for the model.
             optimizer: Megatron-compatible distributed optimizer instance. Defaults to using ADAM with a 1e-4 learning rate.
             model_construct_args: Optional. Any arguments necessary to construct the model in the `config`'s `configure_model` method.
         """
@@ -256,29 +278,38 @@ class BionemoLightningModule(
         #  once it all works. This is the future direction for how things are going.
         self.optim = optimizer
         self.optim.connect(self)  # This will bind the `configure_optimizers` method
+        self._data_step = data_step
+        self._forward_step = forward_step
 
     def configure_model(self) -> None:
-        """Updates internal state: instantiates the model from the object's config, assigns to `model` attribute."""
-        self.model = self.config.configure_model(**self.model_construct_args)
+        """Updates internal state: instantiates the model from the object's config, assigns to `model` attribute.
+
+        NOTE: this method is idempotent; successive calls have no effect. The model is only initialized once.
+
+        Raises
+            ValueError iff the internal config's configure_model method returns None.
+        """
+        if self.model is None:
+            self.model = self.config.configure_model(**self.model_construct_args)
+        if self.model is None:
+            raise ValueError("Invalid semantics: configure_model method **MUST** initialize the model.")
 
     # This is now replaced by the init hook on self.optimizer
     # def configure_optimizers(self) -> Optimizer:
     #     return bert_default_optimizer(self)
 
-    def forward(self, *args, **kwargs) -> ModelOutput:
+    def forward(self, *args, **kwargs) -> DataT:
         """Call the forward method of the underlying model, and return whatever it outputs."""
-        if self.model is None:
-            self.configure_model()
+        # safe to do because configure_model is idempotent
+        self.configure_model()
         assert self.model is not None
         prediction = self.model(*args, **kwargs)  # for now just pass through to the underlying model
         return prediction
 
-    @abstractmethod
-    def data_step(self, dataloader_iter) -> dict[str, torch.Tensor]:  # noqa: D102
-        raise NotImplementedError()
+    def data_step(self, dataloader_iter: Iterator[DataT]) -> DataT:  # noqa: D102
+        return self._data_step(dataloader_iter)
 
-    @abstractmethod
-    def forward_step(self, batch) -> torch.Tensor:
+    def forward_step(self, batch) -> Tensor:
         """Megatron-required: the training forward step for the model, which is required to produce the loss.
 
         Normally, the forward pass of a model means its inference. Loss is computed using the predictions
@@ -288,17 +319,20 @@ class BionemoLightningModule(
 
         To get actual predictions, use the :func:`forward` method instead.
         """
-        raise NotImplementedError()
+        # safe to do because configure_model is idempotent
+        self.configure_model()
+        assert self.model is not None
+        return self._forward_step(self.model, batch)
 
-    def training_step(self, batch, batch_idx: Optional[int] = None) -> torch.Tensor:  # noqa: D102
+    def training_step(self, batch, batch_idx: Optional[int] = None) -> Tensor:  # noqa: D102
         # In mcore the loss-function is part of the forward-pass (when labels are provided)
         return self.forward_step(batch)
 
-    def validation_step(self, batch, batch_idx: Optional[int] = None) -> torch.Tensor:  # noqa: D102
+    def validation_step(self, batch, batch_idx: Optional[int] = None) -> Tensor:  # noqa: D102
         # In mcore the loss-function is part of the forward-pass (when labels are provided)
         return self.forward_step(batch)
 
-    def predict_step(self, batch, batch_idx: Optional[int] = None) -> torch.Tensor:  # noqa: D102
+    def predict_step(self, batch, batch_idx: Optional[int] = None) -> Tensor:  # noqa: D102
         return self.forward_step(batch)
 
     def training_loss_reduction(self) -> Loss:  # noqa: D102
@@ -313,3 +347,10 @@ class BionemoLightningModule(
 
     def test_loss_reduction(self) -> Loss:  # noqa: D102
         return self.loss_reduction_class(validation_step=True)
+
+
+def default_megatron_optimizer() -> MegatronOptimizerModule:
+    """Default distributed optimizer uses Adam with a 1e-4 learning rate."""
+    return MegatronOptimizerModule(
+        config=OptimizerConfig(lr=1e-4, optimizer="adam", use_distributed_optimizer=True),
+    )

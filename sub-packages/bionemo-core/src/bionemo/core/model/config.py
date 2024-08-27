@@ -36,7 +36,7 @@ LossType = TypeVar("LossType")
 """
 
 
-class Model(Protocol[ModelOutput]):
+class Model(Protocol):
     """Lightweight interface for a model: must have a forward method."""
 
     def forward(self, *args, **kwargs) -> ModelOutput:
