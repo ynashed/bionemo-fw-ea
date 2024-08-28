@@ -210,10 +210,3 @@ class GeneformerStopAndGoTest(stop_and_go.StopAndGoHarness):
 
 def test_geneformer_example():
     GeneformerStopAndGoTest()
-
-
-if __name__ == "__main__":
-    """TODO- make sure
-    this is too messed up and ruff fails on
-    it"""
-    test_geneformer_example()
