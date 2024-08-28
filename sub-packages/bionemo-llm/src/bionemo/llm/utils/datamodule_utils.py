@@ -167,6 +167,7 @@ def infer_num_samples(
             between 0 and 1, an integer, a string, or None. If None, defaults to 1.0.
         num_samples_in_dataset (int): The number of samples in the dataset.
         global_batch_size (int): The global batch size.
+        stage (str): The stage of the training.
 
     Returns:
         int: The number of samples from the limit.
