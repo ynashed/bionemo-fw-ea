@@ -167,7 +167,7 @@ class ESMDataModule(pl.LightningDataModule):
             tokenizer=self._tokenizer,
         )
         self._valid_ds = self._sample_and_shuffle_dataset(
-            _valid_ds, num_val_samples, "val"
+            _valid_ds, None, "val"
         )  # shuffle manually without cyclic MegatronPretrainingRandomSampler
 
         assert (
