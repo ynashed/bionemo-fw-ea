@@ -13,8 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 import functools
+from pathlib import Path
 
 import transformers
 from nemo.lightning.io import IOMixin
@@ -38,4 +38,4 @@ class BioNeMoAutoTokenizer(transformers.AutoTokenizer, IOMixin):  # noqa D101
 @functools.cache
 def get_tokenizer() -> BioNeMoAutoTokenizer:
     """Get the tokenizer for the ESM2 model."""
-    return BioNeMoAutoTokenizer(pretrained_model_name="facebook/esm2_t33_650M_UR50D", use_fast=True)
+    return BioNeMoAutoTokenizer(Path(__file__).parent.resolve().as_posix(), use_fast=True)
