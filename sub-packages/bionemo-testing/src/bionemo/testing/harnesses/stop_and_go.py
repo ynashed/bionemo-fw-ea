@@ -16,7 +16,7 @@
 
 import pathlib
 from abc import ABC, abstractmethod
-from typing import Literal
+from typing import Any, Callable, Literal
 
 import nemo.lightning as nl
 import pytorch_lightning as pl
@@ -26,6 +26,32 @@ from nemo.lightning.pytorch import callbacks as nl_callbacks
 
 from bionemo.testing import testing_callbacks
 from bionemo.testing.megatron_parallel_state_utils import distributed_model_parallel_state
+
+
+def get_learning_rate(trainer: pl.Trainer, model: pl.LightningModule) -> Any:
+    """Returns the learning rate of the model.
+
+    Args:
+        trainer (pl.Trainer): The PyTorch Lightning trainer.
+        model (pl.LightningModule): The PyTorch Lightning model.
+
+    Returns:
+        Any: The learning rate of the model.
+    """
+    return trainer.optimizers[0].param_groups[0]["lr"]
+
+
+def get_global_step(trainer: pl.Trainer, model: pl.LightningModule) -> Any:
+    """Returns the global step of the model.
+
+    Args:
+        trainer (pl.Trainer): The PyTorch Lightning trainer.
+        model (pl.LightningModule): The PyTorch Lightning model.
+
+    Returns:
+        Any: The global step of the model.
+    """
+    return trainer.global_step
 
 
 class StopAndGoHarness(ABC):
@@ -60,6 +86,7 @@ class StopAndGoHarness(ABC):
         metadata_dir (str): The metadata directory.
         metrics (list[str]): The list of metrics.
         nemo_logger (NeMoLogger): The NeMo logger.
+        metrics_getter (dict[str, Callable[[pl.Trainer, pl.LightningModule], Any]]): A dictionary of metrics and their corresponding functions.
         val_check_interval (int): The validation check interval. Stored as an attribute to ensure consistency between
             validation
 
@@ -77,23 +104,26 @@ class StopAndGoHarness(ABC):
 
     def __init__(
         self,
-        metrics: list[str],
         root_dir: pathlib.Path | str = pathlib.Path("./"),
         val_check_interval=2,
         exp_name="stop_and_go_harness",
+        extra_metrics_dict: dict[str, Callable[[pl.Trainer, pl.LightningModule], Any]] | None = None,
     ):
         """Initializes the StopAndGoHarness object.
 
         Args:
-            metrics (list[str]): A list of metrics.
             root_dir (pathlib.Path | str, optional): The root directory. Defaults to pathlib.Path("./").
             val_check_interval (int, optional): The validation check interval. Defaults to 2.
             exp_name (str, optional): The experiment name. Defaults to "stop_and_go_harness".
+            extra_metrics_dict (dict, optional): A dictionary that maps keys to 'functions capable of computing metrics in a callback.'
+                Callbacks typically have an interface where both the Trainer and LightningModule are available, meaning any metric that
+                can be computed using these are viable functions to pass in to this dictionary. By default 'global_step' and 'learning_rate' are available.
         """
         self.root_dir = root_dir  # Set to bionemo2_home ideally.
         self.exp_name = exp_name
         self.metadata_dir = self.root_dir / self.exp_name
-        self.metrics = metrics
+        self.metrics_getter = self.get_default_metrics_dict()
+        self.metrics_getter.update(extra_metrics_dict or {})
         self.val_check_interval = val_check_interval
         self.nemo_logger: nemo_logger.NeMoLogger = nemo_logger.NeMoLogger(
             dir=str(self.root_dir),
@@ -123,18 +153,32 @@ class StopAndGoHarness(ABC):
         ...
 
     @abstractmethod
-    def setup_trainer_and_strategy(self, mode: Literal["stop", "go"], metrics: list[str]) -> pl.Trainer:
+    def setup_trainer_and_strategy(
+        self, mode: Literal["stop", "go"], metrics_getter: dict[str, Callable[[pl.Trainer, pl.LightningModule], Any]]
+    ) -> pl.Trainer:
         """Constructs the trainer object for the stop and go test.
 
         This method invokes the get_callbacks method to get the appropriate callbacks for the mode and passes it to the trainer.
 
         Args:
             mode (Literal['stop', 'go']): The mode indicating whether to stop or go.
-            metrics: The metrics to be used for tracking.
+            metrics_getter (Callable[[pl.Trainer, pl.LightningModule], Any]): A dictionary of functions that computes the metrics.
         """
         ...
 
-    def get_callbacks(self, mode: Literal["stop", "go"], metrics: list[str]) -> list[pl.Callback]:
+    def get_default_metrics_dict(self) -> dict[str, Callable[[pl.Trainer, pl.LightningModule], Any]]:
+        """Returns a dictionary of default metrics that can be used in the StopAndGoHarness.
+
+        Returns:
+            dict: A dictionary of default metrics that can be used in the StopAndGoHarness.
+        """
+        return {
+            "global_step": get_global_step,
+            # TODO  (Update when we are ToT.)
+            # "learning_rate": get_learning_rate
+        }
+
+    def get_callbacks(self, mode: Literal["stop", "go"]) -> list[pl.Callback]:
         """Returns a list of callbacks based on the specified mode. Base implemention provides reasonable defaults.
 
         To extend this method, call the super and append to the callbacks, depending on which mode you are in:
@@ -147,7 +191,6 @@ class StopAndGoHarness(ABC):
 
         Args:
             mode (Literal['stop', 'go']): The mode indicating whether to stop or go.
-            metrics: The metrics to be used for tracking.
 
         Returns:
             list: A list of callbacks based on the specified mode.
@@ -159,7 +202,7 @@ class StopAndGoHarness(ABC):
             callbacks = [
                 testing_callbacks.MetadataSaveCallback(
                     metadata_path=self.metadata_dir,
-                    metadata_keys=metrics,
+                    metrics_getter=self.metrics_getter,
                 ),
                 testing_callbacks.RaiseAfterMetadataCallback(metadata_path=self.metadata_dir),
                 nl_callbacks.ModelCheckpoint(
@@ -176,7 +219,7 @@ class StopAndGoHarness(ABC):
             # we must setup the integrity callback.
             callbacks = [
                 testing_callbacks.TestCheckpointIntegrityCallback(
-                    metadata_path=self.metadata_dir, metadata_keys=metrics
+                    metadata_path=self.metadata_dir, metrics_getter=self.metrics_getter
                 ),
                 nl_callbacks.ModelCheckpoint(
                     save_best_model=False,
@@ -206,7 +249,7 @@ class StopAndGoHarness(ABC):
             testing_callbacks.StopAndGoException: If a stop and go exception occurs during training.
         """
         model, data, opt = self.setup_model(mode="stop")
-        trainer = self.setup_trainer_and_strategy("stop", self.metrics)
+        trainer = self.setup_trainer_and_strategy("stop", self.metrics_getter)
         with distributed_model_parallel_state():
             try:
                 llm.train(
@@ -227,7 +270,7 @@ class StopAndGoHarness(ABC):
     def go(self):
         """Resumes the model from the checkpoint saved at the end of `stop()` and verifies the metadata integrity."""
         model, data, opt = self.setup_model(mode="go")
-        trainer = self.setup_trainer_and_strategy("go", self.metrics)
+        trainer = self.setup_trainer_and_strategy("go", self.metrics_getter)
         with distributed_model_parallel_state():
             llm.train(
                 model=model,

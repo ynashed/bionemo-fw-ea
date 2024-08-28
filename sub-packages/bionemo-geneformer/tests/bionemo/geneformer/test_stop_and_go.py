@@ -26,13 +26,12 @@ How to adapt these tests:
 
 import math
 import pathlib
-from typing import List, Literal
+from typing import Literal
 
 import pytorch_lightning as pl
 import torch
 from megatron.core.optimizer.optimizer_config import OptimizerConfig
 from nemo import lightning as nl
-from nemo.collections import llm
 from nemo.lightning.pytorch.optim.lr_scheduler import CosineAnnealingScheduler
 from nemo.lightning.pytorch.optim.megatron import MegatronOptimizerModule
 from torch.nn import functional as F
@@ -42,6 +41,7 @@ from bionemo.core.utils.dtypes import get_autocast_dtype
 from bionemo.geneformer.api import GeneformerConfig
 from bionemo.geneformer.data.singlecell.preprocess import GeneformerPreprocess
 from bionemo.llm.model.biobert.lightning import BioBertLightningModule
+from bionemo.llm.model.biobert.testing_utils import compute_biobert_loss_singlegpu
 from bionemo.llm.model.biobert.transformer_specs import BiobertSpecOption
 from bionemo.testing.harnesses import stop_and_go
 
@@ -62,7 +62,7 @@ MODEL_PRECISION: Literal["bf16-mixed"] = "bf16-mixed"
 USE_TE: bool = False  # TODO use this for high level decisions around whether we're ready to switch to TE
 
 
-def _geneformer_config():
+def geneformer_config():
     """Setups the default geneformer config taken from pretrain.py. Update as needed."""
     autocast_dtype = get_autocast_dtype(MODEL_PRECISION)
     return GeneformerConfig(
@@ -101,7 +101,7 @@ def _geneformer_config():
     )
 
 
-def _geneformer_datamodule(tokenizer, seq_length, median_dict, devices, tensor_model_parallel_size, data_path):
+def geneformer_datamodule(tokenizer, seq_length, median_dict, devices, tensor_model_parallel_size, data_path):
     from bionemo.geneformer.data.singlecell.datamodule import SingleCellDataModule
 
     num_dataset_workers = 0
@@ -123,96 +123,20 @@ def _geneformer_datamodule(tokenizer, seq_length, median_dict, devices, tensor_m
     return data
 
 
-class GPTStopAndGoTest(stop_and_go.StopAndGoHarness):
-    """NOTE(SKH) this test is... okay but the validation loss doesnt actually work.
-    There are key interface differences between GPT and BioBert, which makes it hard to generalize.
-    """
-
-    def __init__(
-        self,
-        metrics: List[str],
-        exp_name="gpt_stop_and_go",
-        root_dir: pathlib.Path = bionemo2_root,
-        val_check_interval=2,
-    ):
-        super().__init__(metrics=metrics, exp_name=exp_name, root_dir=root_dir, val_check_interval=val_check_interval)
-
-    # The two abstract methods we must implement.
-    def setup_model(
-        self, mode: Literal["stop", "go"]
-    ) -> tuple[pl.LightningModule, pl.LightningDataModule, nl.MegatronOptimizerModule]:
-        """Setups up the example GPT model. We ignore mode as there is no change in model definition, data, or optimizer in this test."""
-        global_batch_size = 16
-        gpt_config = llm.GPTConfig(
-            num_layers=6,
-            hidden_size=384,
-            ffn_hidden_size=1536,
-            num_attention_heads=6,
-            seq_length=128,
-            init_method_std=0.023,
-            hidden_dropout=0.1,
-            attention_dropout=0.1,
-            layernorm_epsilon=1e-5,
-            make_vocab_size_divisible_by=128,
-        )
-        data = llm.MockDataModule(seq_length=128, global_batch_size=global_batch_size, num_val_samples=32)
-        model = llm.GPTModel(gpt_config, tokenizer=data.tokenizer)
-
-        lr = 1e-4
-        opt_config = OptimizerConfig(
-            lr=lr,
-            optimizer="adam",
-            use_distributed_optimizer=True,
-        )
-        num_steps = 500
-        cosine_rampup_frac = 0.1
-        cosine_hold_frac = 0.05
-        opt = nl.MegatronOptimizerModule(
-            config=opt_config,
-            lr_scheduler=CosineAnnealingScheduler(
-                max_steps=num_steps,
-                min_lr=lr / 100,
-                warmup_steps=int(math.ceil(num_steps * cosine_rampup_frac)),
-                interval="step",
-                monitor="reduced_train_loss",
-                constant_steps=int(math.ceil(num_steps * cosine_hold_frac)),
-            ),
-        )
-        return model, data, opt
-
-    def setup_trainer_and_strategy(self, mode: Literal["stop", "go"], metrics):
-        """sets up a simple trainer that runs for two steps before pausing, and resumes for two more steps."""
-        num_steps = 4
-        val_check_interval = 2
-        devices, tp_size, pp_size = 1, 1, 1
-        callbacks = self.get_callbacks(mode, metrics)
-        strategy = nl.MegatronStrategy(
-            tensor_model_parallel_size=tp_size,
-            pipeline_model_parallel_size=pp_size,
-            ddp="megatron",
-            find_unused_parameters=True,
-            ckpt_include_optimizer=True,
-        )
-
-        trainer = nl.Trainer(
-            devices=devices,
-            max_steps=num_steps,
-            accelerator="gpu",
-            strategy=strategy,
-            limit_val_batches=2,
-            val_check_interval=val_check_interval,
-            log_every_n_steps=val_check_interval,
-            num_nodes=1,
-            callbacks=callbacks,
-        )
-        return trainer
-
-
 class GeneformerStopAndGoTest(stop_and_go.StopAndGoHarness):
     def __init__(
-        self, metrics, val_check_interval=2, exp_name="geneformer_stop_and_go", root_dir: pathlib.Path = bionemo2_root
+        self,
+        val_check_interval=2,
+        exp_name="geneformer_stop_and_go",
+        root_dir: pathlib.Path = bionemo2_root,
     ):
-        super().__init__(metrics=metrics, val_check_interval=val_check_interval, exp_name=exp_name, root_dir=root_dir)
+        extra_metrics_dict = {"val_loss": compute_biobert_loss_singlegpu}
+        super().__init__(
+            extra_metrics_dict=extra_metrics_dict,
+            val_check_interval=val_check_interval,
+            exp_name=exp_name,
+            root_dir=root_dir,
+        )
         self.data_dir: pathlib.Path = self.root_dir / "test_data/cellxgene_2023-12-15_small/processed_data"
         train_data_path = self.data_dir / "train"
         preprocessor = GeneformerPreprocess(
@@ -247,9 +171,9 @@ class GeneformerStopAndGoTest(stop_and_go.StopAndGoHarness):
                 constant_steps=int(math.ceil(num_steps * 0.1)),
             ),
         )
-        module = BioBertLightningModule(config=_geneformer_config(), tokenizer=self.tokenizer, optimizer=optim)
+        module = BioBertLightningModule(config=geneformer_config(), tokenizer=self.tokenizer, optimizer=optim)
 
-        data = _geneformer_datamodule(
+        data = geneformer_datamodule(
             self.tokenizer,
             128,
             self.median_dict,
@@ -284,15 +208,12 @@ class GeneformerStopAndGoTest(stop_and_go.StopAndGoHarness):
         return trainer
 
 
-def test_gpt_example():
-    # GPTStopAndGoTest(["global_step", "val_loss"]).run_test()
-    GPTStopAndGoTest(["global_step"]).run_test()
-
-
 def test_geneformer_example():
-    GeneformerStopAndGoTest(["global_step", "val_biobert_loss"]).run_test()
+    GeneformerStopAndGoTest()
 
 
 if __name__ == "__main__":
-    # test_gpt_example()
+    """TODO- make sure
+    this is too messed up and ruff fails on
+    it"""
     test_geneformer_example()

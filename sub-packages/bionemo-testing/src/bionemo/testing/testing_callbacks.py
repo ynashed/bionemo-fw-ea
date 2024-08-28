@@ -27,27 +27,12 @@
 import os
 import pathlib
 import pickle
-from typing import Any, List
+from typing import Any, Callable
 
+import pytorch_lightning as pl
 from pytorch_lightning import Callback, LightningModule, Trainer
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
-
-
-def get_global_step(trainer: Trainer, pl_module: LightningModule) -> int:
-    """Fetches the global step from the trainer state."""
-    return trainer.global_step
-
-
-def get_learning_rate(trainer: Trainer, pl_module: LightningModule) -> float:
-    """Fetches the learning rate from the trainers optimizer state."""
-    return trainer.optimizers[0].param_groups[0]["lr"]
-
-
-def get_biobert_val_loss(trainer: Trainer, pl_module: LightningModule, on_save: bool = False) -> float:
-    """Only works for the BioBert model when using a single gpu (or ddp)."""
-    result = compute_biobert_loss_singlegpu(pl_module, trainer.datamodule.val_dataloader())
-    return result
 
 
 def compute_biobert_loss_singlegpu(model, dl: DataLoader):
@@ -65,8 +50,6 @@ def compute_biobert_loss_singlegpu(model, dl: DataLoader):
     See Also:
     - :class: BioBertModel
     """
-    pass
-
     n, loss = 0, 0.0
     model.eval()
     # batch = next(iter(dl))
@@ -85,14 +68,6 @@ def compute_biobert_loss_singlegpu(model, dl: DataLoader):
     mean_loss: float = (loss / n).detach().cpu().numpy().item()
     model.train()
     return mean_loss
-
-
-getter_function_map = {
-    "learning_rate": get_learning_rate,
-    "global_step": get_global_step,
-    "val_biobert_loss": get_biobert_val_loss,
-    # How do we compute a simple validation loss here
-}
 
 
 class StopAndGoException(Exception):  # noqa: D101
@@ -120,17 +95,21 @@ class RaiseAfterMetadataCallback(Callback):
 class MetadataSaveCallback(Callback):
     """A callback that saves metadata about the current training at the second validation epoch."""
 
-    def __init__(self, metadata_path: pathlib.Path, metadata_keys: List[str]):
+    def __init__(
+        self, metadata_path: pathlib.Path, metrics_getter: dict[str, Callable[[pl.Trainer, pl.LightningModule], Any]]
+    ):
         """Initialises callback with path and called information.
 
         Args:
             metadata_path (pathlib.Path): Path where the metadata will be saved.
-            metadata_keys (List[str]): keys for metadata to be checked.
+            metrics_getter (dict[str, Callable[[pl.Trainer, pl.LightningModule], Any]]): A dictionary of metadata keys and their corresponding functions.
+
+        See Also: bionemo.testing.stop_and_go
         """
         self.metadata_path = metadata_path
-        self.metadata_keys = metadata_keys
         self.pickle_file_path = os.path.join(self.metadata_path, "checkpoints/metadata.pkl")
         self.called = False  # indicates if callback was already called
+        self.metrics_getter = metrics_getter
 
     def setup(self, trainer: Trainer, pl_module: LightningModule, stage: str):
         """Set up the testing callbacks and removes lingering metadata."""
@@ -150,14 +129,14 @@ class MetadataSaveCallback(Callback):
 
         Notes:
             - If `called` is True and `trainer.is_global_zero` is True, the function saves metadata to compare after resuming with a checkpoint.
-            - The metadata is obtained using `getter_function_map` and saved as a pickle file.
+            - The metadata is obtained using the `metrics_getter` dict and results are saved as a pickle file.
 
         """
         if self.called and trainer.is_global_zero:
             # save metadata to compare to after resuming with checkpoint
             metadata = {}
-            for metadata_key in self.metadata_keys:
-                metadata_value = getter_function_map[metadata_key](trainer, pl_module)
+            for metadata_key, func in self.metrics_getter.items():
+                metadata_value = func(trainer, pl_module)
                 metadata[metadata_key] = metadata_value
             # prepare paths for metadata save
             pickle_file_path = self.pickle_file_path
@@ -179,15 +158,17 @@ class TestCheckpointIntegrityCallback(Callback):
     This callback expects to be invoked _only_ after resuming a model that used the MetadataSaveCallback. When training begins, it checks the value of each metric and compares to the metadata stored in the metadata pickle file. Any deviances are assumed to be a failure in restoration.
     """
 
-    def __init__(self, metadata_path: pathlib.Path, metadata_keys: List[str]):
+    def __init__(
+        self, metadata_path: pathlib.Path, metrics_getter: dict[str, Callable[[pl.Trainer, pl.LightningModule], Any]]
+    ):
         """Initialises callback with path and called information.
 
         Args:
             metadata_path (pathlib.Path): Path where the metadata will be saved.
-            metadata_keys (List[str]): keys for metadata to be checked.
+            metrics_getter (dict[str, Callable[[pl.Trainer, pl.LightningModule], Any]]): A dictionary of metadata keys and their corresponding functions. Must be a subset of the dictionary passed to MetadataSaveCallback.
         """
         self.metadata_path = metadata_path
-        self.metadata_keys = metadata_keys
+        self.metrics_getter = metrics_getter
 
     def on_train_start(self, trainer: Trainer, pl_module: LightningModule):
         """Loads associated metadata and compares with current metrics."""
@@ -197,13 +178,13 @@ class TestCheckpointIntegrityCallback(Callback):
         with open(pickle_file_path, "rb") as metadata_file:
             metadata_dict = pickle.load(metadata_file)
         current_metadata = {}
-        for metadata_key in self.metadata_keys:
+        for metadata_key, func in self.metrics_getter.items():
             expected_value = metadata_dict[metadata_key]
-            current_value = getter_function_map[metadata_key](trainer, pl_module)
+            current_value = func(trainer, pl_module)
             current_metadata[metadata_key] = current_value
 
         # TODO (SKH): Ideally this would collect _all_ failures instead of failing on the first one.
-        for metadata_key in self.metadata_keys:
+        for metadata_key in current_metadata:
             expected_value = metadata_dict[metadata_key]
             current_value = current_metadata[metadata_key]
             assert (
