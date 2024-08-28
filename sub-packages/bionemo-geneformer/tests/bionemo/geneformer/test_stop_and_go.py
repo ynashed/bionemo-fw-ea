@@ -279,7 +279,7 @@ class GeneformerStopAndGoTest(stop_and_go.StopAndGoHarness):
             log_every_n_steps=self.val_check_interval,
             num_nodes=1,
             callbacks=self.get_callbacks(mode=mode, metrics=metrics),
-            plugins=nl.MegatronMixedPrecision(precision=MODEL_PRECISION, amp_O2=False),
+            plugins=nl.MegatronMixedPrecision(precision=MODEL_PRECISION),
         )
         return trainer
 
