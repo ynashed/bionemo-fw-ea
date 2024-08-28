@@ -18,7 +18,6 @@ from unittest import mock
 import pytest
 import torch.utils.data
 
-from bionemo.core.data.resamplers import PRNGResampleDataset
 from bionemo.esm2.data.datamodule import ESMDataModule
 from bionemo.llm.utils.datamodule_utils import tensor_dict_hash
 

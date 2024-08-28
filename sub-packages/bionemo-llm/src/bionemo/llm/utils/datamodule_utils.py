@@ -155,3 +155,43 @@ def tensor_dict_hash(tensor_dict: Dict[str, torch.Tensor], hash_func: Optional[C
     for k in sorted(tensor_dict):
         hash_value += tensor_hash(tensor_dict[k], hash_func)
     return hash_value
+
+
+def infer_num_val_samples(limit_val_batches: Union[float, int, str, None], len_valid_ds: int, global_batch_size: int):
+    """Infers the number of validation samples based on the limit_val_batches parameter, the length of the validation dataset,
+    and the global batch size.
+
+    Args:
+        limit_val_batches (Union[float, int, str, None]): The limit on the number of validation batches. Can be a float
+            between 0 and 1, an integer, a string, or None. If None, defaults to 1.0.
+        len_valid_ds (int): The length of the validation dataset.
+        global_batch_size (int): The global batch size.
+
+    Returns:
+        int: The number of validation samples.
+
+    Raises:
+        ValueError: If the limited number of validation samples is less than the global batch size, or if the
+            limit_val_batches parameter is invalid.
+
+    If limit_val_batches is a float between 0 and 1, the number of validation samples is inferred as a fraction of the
+    validation dataset length. If limit_val_batches is an integer greater than or equal to 1, the number of validation
+    samples is inferred as the product of limit_val_batches and global batch size. If limit_val_batches is None, it defaults
+    to 1.0, indicating that all validation samples should be used.
+    """
+    limit_val_batches = (
+        1.0 if limit_val_batches is None else limit_val_batches
+    )  # validation data does not require upsampling
+    if 0 < limit_val_batches <= 1.0 and isinstance(limit_val_batches, float):
+        num_val_samples = int(len_valid_ds * limit_val_batches)
+        if num_val_samples < global_batch_size:
+            raise ValueError(
+                "The limited number of val samples %s is less than the global batch size %s"
+                % (num_val_samples, global_batch_size)
+            )
+    elif limit_val_batches >= 1 and isinstance(limit_val_batches, int):
+        num_val_samples = int(limit_val_batches * global_batch_size)
+    else:
+        raise ValueError("Invalid choice of limit_val_batches size: %s" % limit_val_batches)
+
+    return num_val_samples

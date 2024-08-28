@@ -45,9 +45,7 @@ def test_ESMPreTrainingDataset_getitem_has_expected_structure(dummy_protein_data
 
     protein_dataset = ProteinSQLiteDataset(dummy_protein_dataset)
     clusters = [["UniRef90_A"], ["UniRef90_B", "UniRef90_C"]]
-    esm_dataset = ESMMaskedResidueDataset(
-        protein_dataset=protein_dataset, clusters=clusters, seed=123
-    )
+    esm_dataset = ESMMaskedResidueDataset(protein_dataset=protein_dataset, clusters=clusters, seed=123)
 
     sample = esm_dataset[0]
     assert len(sample["text"]) == len(protein_dataset["UniRef90_A"]) + 2
@@ -128,17 +126,13 @@ def test_ESMPreTrainingDataset_crops_out_start_and_end(dummy_protein_dataset, to
     prot_dataset = ProteinSQLiteDataset(dummy_protein_dataset)
     clusters = [["UniRef90_A"]]
 
-    dataset = ESMMaskedResidueDataset(
-        protein_dataset=prot_dataset, clusters=clusters, seed=123, max_seq_length=1024
-    )
+    dataset = ESMMaskedResidueDataset(protein_dataset=prot_dataset, clusters=clusters, seed=123, max_seq_length=1024)
 
     assert len(dataset[0]["text"]) == len(prot_dataset["UniRef90_A"]) + 2
     assert dataset[0]["text"][0] == tokenizer.cls_token_id
     assert dataset[0]["text"][-1] == tokenizer.eos_token_id
 
-    dataset = ESMMaskedResidueDataset(
-        protein_dataset=prot_dataset, clusters=clusters, seed=123, max_seq_length=3
-    )
+    dataset = ESMMaskedResidueDataset(protein_dataset=prot_dataset, clusters=clusters, seed=123, max_seq_length=3)
 
     assert len(dataset[0]["text"]) == 3
 

@@ -17,7 +17,7 @@
 import os
 import sqlite3
 from pathlib import Path
-from typing import Optional, Sequence, TypeVar
+from typing import Sequence, TypeVar
 
 import numpy as np
 import pandas as pd

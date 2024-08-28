@@ -29,6 +29,7 @@ from bionemo.core.data.resamplers import PRNGResampleDataset
 from bionemo.core.utils import random_utils
 from bionemo.esm2.data import dataset, tokenizer
 from bionemo.llm.data import collate
+from bionemo.llm.utils.datamodule_utils import infer_num_val_samples
 
 
 class ESMDataModule(pl.LightningDataModule):
@@ -138,7 +139,9 @@ class ESMDataModule(pl.LightningDataModule):
             mask_random_prob=self._mask_random_prob,
             tokenizer=self._tokenizer,
         )
-        num_train_samples = int(max_train_steps * self.data_sampler.global_batch_size)  # training data requires upsampling (multiply by max_train_steps) on single MegatronPretrainingRandomSampler
+        num_train_samples = int(
+            max_train_steps * self.data_sampler.global_batch_size
+        )  # training data requires upsampling (multiply by max_train_steps) on single MegatronPretrainingRandomSampler
         self._train_ds = self._sample_and_shuffle_dataset(
             _train_ds, num_train_samples, "train"
         )  # shuffle manually without cyclic MegatronPretrainingRandomSampler
@@ -155,19 +158,11 @@ class ESMDataModule(pl.LightningDataModule):
             tokenizer=self._tokenizer,
         )
 
-        limit_val_batches = 1.0 if self.trainer.limit_val_batches is None else self.trainer.limit_val_batches  # validation data does not require upsampling
-        if 0 < limit_val_batches <= 1.0 and isinstance(limit_val_batches, float):
-            num_val_samples = int(len(_valid_ds) * limit_val_batches)
-            if num_val_samples < self.data_sampler.global_batch_size:
-                raise ValueError(
-                    "The limited number of val samples %s is less than the global batch size %s"
-                    % (num_val_samples, self.data_sampler.global_batch_size)
-                )
-        elif limit_val_batches >= 1 and isinstance(limit_val_batches, int):
-            num_val_samples = int(limit_val_batches * self.data_sampler.global_batch_size)
-        else:
-            raise ValueError("Invalid choice of limit_val_batches size: %s" % self.trainer.limit_val_batches)
-
+        num_val_samples = infer_num_val_samples(
+            limit_val_batches=self.trainer.limit_val_batches,
+            len_valid_ds=len(_valid_ds),
+            global_batch_size=self.data_sampler.global_batch_size,
+        )
         self._valid_ds = self._sample_and_shuffle_dataset(
             _valid_ds, num_val_samples, "val"
         )  # shuffle manually without cyclic MegatronPretrainingRandomSampler
