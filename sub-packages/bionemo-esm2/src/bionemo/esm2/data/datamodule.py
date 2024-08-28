@@ -29,7 +29,7 @@ from bionemo.core.data.resamplers import PRNGResampleDataset
 from bionemo.core.utils import random_utils
 from bionemo.esm2.data import dataset, tokenizer
 from bionemo.llm.data import collate
-from bionemo.llm.utils.datamodule_utils import infer_num_val_samples
+from bionemo.llm.utils.datamodule_utils import infer_num_samples
 
 
 class ESMDataModule(pl.LightningDataModule):
@@ -158,10 +158,11 @@ class ESMDataModule(pl.LightningDataModule):
             tokenizer=self._tokenizer,
         )
 
-        num_val_samples = infer_num_val_samples(
-            limit_val_batches=self.trainer.limit_val_batches,
-            len_valid_ds=len(_valid_ds),
+        num_val_samples = infer_num_samples(
+            limit_batches=self.trainer.limit_val_batches,
+            num_samples_in_dataset=len(_valid_ds),
             global_batch_size=self.data_sampler.global_batch_size,
+            stage="val",
         )
         self._valid_ds = self._sample_and_shuffle_dataset(
             _valid_ds, num_val_samples, "val"
