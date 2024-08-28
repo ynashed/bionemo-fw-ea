@@ -348,7 +348,7 @@ class MultiTimeGraph3DInterpolantModel(pl.LightningModule):
         time = self.sample_time(batch)
         out, batch, time = self(batch, time)
         loss, predictions = self.calculate_loss(batch, out, time, "val")
-        # self.sample(100)
+        self.sample(100)
         return loss
 
     def training_step(self, batch, batch_idx):
@@ -448,7 +448,7 @@ class MultiTimeGraph3DInterpolantModel(pl.LightningModule):
                 times["discrete"] += self.interpolants['h'].timesteps - 1
         return times
 
-    def forward(self, batch, time):
+    def forward(self, batch, time):  # CUDA_VISIBLE_DEVICES=0 python multitime_train.py --config-name "train_multitime"
         """
         This forward function assumes we are doing some form (including none) of interpolation on positions X, node features H, and edge attributes edge_attr.
         1. Sample time from the distribution that is defined via the X interpolant params
@@ -548,7 +548,7 @@ class MultiTimeGraph3DInterpolantModel(pl.LightningModule):
 
         data, prior = {}, {}
         total_num_atoms = num_atoms.sum().item()
-
+        # import ipdb; ipdb.set_trace()
         # Sample from all Priors
         for key, interpolant in self.interpolants.items():
             if interpolant is None:
@@ -570,7 +570,7 @@ class MultiTimeGraph3DInterpolantModel(pl.LightningModule):
             else:
                 shape = (total_num_atoms, interpolant.num_classes)
                 data[f"{key}_t"] = prior[key] = interpolant.prior(batch_index, shape, self.device)
-
+        # import ipdb; ipdb.set_trace()
         # Iterate through time, query the dynamics, apply interpolant step update
         out = {}
         # print("DT", len(DT))
@@ -578,6 +578,7 @@ class MultiTimeGraph3DInterpolantModel(pl.LightningModule):
             t = timeline[idx]
             dt = DT[idx]
             time = torch.tensor([t] * num_samples).to(self.device)
+            time = {"continuous": time, "discrete": time}
             data = self.one_hot(data)
             # Apply Self Conditioning
             pre_conditioning_variables = {}
@@ -591,6 +592,10 @@ class MultiTimeGraph3DInterpolantModel(pl.LightningModule):
             for key in pre_conditioning_variables:
                 data[key] = pre_conditioning_variables[key]
             for key, interpolant in self.interpolants.items():
+                if "discrete" in self.interpolant_param_variables[key].interpolant_type:
+                    ttime = time["discrete"]
+                else:
+                    ttime = time["continuous"]
                 if interpolant is None:
                     continue
                 if "edge" in key:
@@ -599,7 +604,7 @@ class MultiTimeGraph3DInterpolantModel(pl.LightningModule):
                         edge_index=edge_index,
                         edge_attr_t=data[f"{key}_t"],
                         edge_attr_hat=out[f"{key}_hat"],
-                        time=time,
+                        time=ttime,
                     )
                 else:
                     data[f"{key}_t"] = interpolant.step(
@@ -607,7 +612,7 @@ class MultiTimeGraph3DInterpolantModel(pl.LightningModule):
                         x_hat=out[f"{key}_hat"],
                         x0=prior[key],
                         batch=batch_index,
-                        time=time,
+                        time=ttime,
                         dt=dt,
                     )
         samples = {key: data[f"{key}_t"] for key in self.interpolants.keys()}
