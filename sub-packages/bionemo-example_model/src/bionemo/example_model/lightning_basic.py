@@ -269,15 +269,17 @@ class ExampleFineTuneDropParentModel(ExampleModelTrunk):
 ExampleModelT = TypeVar("ExampleModelT", bound=ExampleModelTrunk)
 
 
+@dataclass
 class ExampleGenericConfig(Generic[ExampleModelT, Loss], MegatronBioNeMoTrainableModelConfig[ExampleModelT, Loss]):
     """ExampleConfig is a dataclass that is used to configure the model.
 
     Timers from ModelParallelConfig are required for megatron forward compatibility.
     """
 
-    loss_cls: Type[
-        Loss
-    ]  # since we do not need to make this a function of the config settings, do one per config type.
+    loss_cls: Type[Loss] = MSELossReduction  # type: ignore  # this will get overriden by children
+    hidden_size: int = 64  # Needs to be set to avoid zero division error in megatron :(
+    num_attention_heads: int = 1  # Needs to be set to avoid zero division error in megatron :(
+    num_layers: int = 1  # Needs to be set to avoid zero division error in megatron :(
 
     def configure_model(self) -> ExampleModelT:
         """Uses model_cls and loss_cls to configure the model.
@@ -305,7 +307,7 @@ class ExampleGenericConfig(Generic[ExampleModelT, Loss], MegatronBioNeMoTrainabl
 # The configs below simply define which model class to pair with which loss, since the abstractions around getting the
 #  model and loss are handled in the ExampleGenericConfig class.
 @dataclass
-class ExampleConfig(ExampleGenericConfig["ExampleModel", "MSELossReduction"]):
+class ExampleConfig(ExampleGenericConfig["ExampleModel", "MSELossReduction"], io.IOMixin):
     """ExampleConfig is a dataclass that is used to configure the model.
 
     Timers from ModelParallelConfig are required for megatron forward compatibility.
@@ -316,7 +318,9 @@ class ExampleConfig(ExampleGenericConfig["ExampleModel", "MSELossReduction"]):
 
 
 @dataclass
-class ExampleFineTuneBothConfig(ExampleGenericConfig["ExampleFineTuneBothModel", "MSEPlusClassifierLossReduction"]):
+class ExampleFineTuneBothConfig(
+    ExampleGenericConfig["ExampleFineTuneBothModel", "MSEPlusClassifierLossReduction"], io.IOMixin
+):
     """ExampleConfig is a dataclass that is used to configure the model.
 
     Timers from ModelParallelConfig are required for megatron forward compatibility.
@@ -328,7 +332,7 @@ class ExampleFineTuneBothConfig(ExampleGenericConfig["ExampleFineTuneBothModel",
 
 @dataclass
 class ExampleFineTuneDropParentConfig(
-    ExampleGenericConfig["ExampleFineTuneDropParentModel", "ClassifierLossReduction"]
+    ExampleGenericConfig["ExampleFineTuneDropParentModel", "ClassifierLossReduction"], io.IOMixin
 ):
     """ExampleConfig is a dataclass that is used to configure the model.
 

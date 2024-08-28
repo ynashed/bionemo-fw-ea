@@ -73,8 +73,8 @@ def _train_model_get_ckpt(
     # ckpt_path needs to be a string for SerDe
     ckpt_path_optstr: str | None = str(ckpt_path) if ckpt_path is not None else None
     config = model_cfg_cls(
-        initial_weights=ckpt_path_optstr,
-        skip_weight_prefixes=skip_weight_prefixes,
+        initial_ckpt_path=ckpt_path_optstr,
+        initial_ckpt_skip_keys_with_these_prefixes=sorted(skip_weight_prefixes),
         # NOTE: the optimizer needs fp16 and bf16 bools set to match the model. For now get them from the config and
         #  set them here.
         fp16=get_autocast_dtype(precision) == torch.float16,
