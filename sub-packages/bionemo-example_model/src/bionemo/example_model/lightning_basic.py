@@ -15,9 +15,8 @@
 
 """This is intended to be a minimal self-container NeMo2 example."""
 
-from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any, Dict, Optional, Sequence, Set, Tuple, Type, TypedDict
+from dataclasses import dataclass
+from typing import Any, Dict, Generic, Optional, Sequence, Tuple, Type, TypedDict, TypeVar
 
 import pytorch_lightning as pl
 import torch
@@ -35,9 +34,9 @@ from torchvision import transforms
 from torchvision.datasets import MNIST
 
 from bionemo.core.data.resamplers import PRNGDatasetShuffler
+from bionemo.core.model.config import Loss
 from bionemo.llm.lightning import LightningPassthroughPredictionMixin
 from bionemo.llm.model.config import MegatronBioNeMoTrainableModelConfig
-from bionemo.llm.utils.weight_utils import load_weights_sharded_inplace_nemo2_to_mcore
 
 
 __all__: Sequence[str] = (
@@ -266,108 +265,78 @@ class ExampleFineTuneDropParentModel(ExampleModelTrunk):
 #  model.
 
 
-@dataclass
-class ExampleConfig(MegatronBioNeMoTrainableModelConfig["ExampleModel", "MSELossReduction"]):
+# typevar for capturing subclasses of ExampleModelTrunk. Useful for Generic type hints as below.
+ExampleModelT = TypeVar("ExampleModelT", bound=ExampleModelTrunk)
+
+
+class ExampleGenericConfig(Generic[ExampleModelT, Loss], MegatronBioNeMoTrainableModelConfig[ExampleModelT, Loss]):
     """ExampleConfig is a dataclass that is used to configure the model.
 
     Timers from ModelParallelConfig are required for megatron forward compatibility.
     """
 
-    initial_weights: str | None = None
-    calculate_per_token_loss: bool = False
-    skip_weight_prefixes: Set[str] = field(default_factory=set)
+    loss_cls: Type[
+        Loss
+    ]  # since we do not need to make this a function of the config settings, do one per config type.
 
-    def configure_model(self) -> "ExampleModel":
-        """This function is called by the strategy to construct the model.
+    def configure_model(self) -> ExampleModelT:
+        """Uses model_cls and loss_cls to configure the model.
 
         Note: Must pass self into Model since model requires having a config object.
 
         Returns:
             The model object.
         """
-        # TODO: if checkpoint is provided, load config settings from checkpoint before we intialize the model.
-        # cckpt_settings = ...
-        # self.n_layers = cckpt_settings.n_layers # something like that
-        model = ExampleModel(self)
-        if self.initial_weights:
-            load_weights_sharded_inplace_nemo2_to_mcore(
-                model=model,
-                distributed_checkpoint_dir=self.initial_weights,
-                skip_keys_with_these_prefixes=self.skip_weight_prefixes,
-            )
+        # 1. first load any settings that may exist in the checkpoint related to the model.
+        if self.initial_ckpt_path:
+            self.load_settings_from_checkpoint(self.initial_ckpt_path)
+        # 2. then initialize the model
+        model = self.model_cls(self)
+        # 3. Load weights from the checkpoint into the model
+        if self.initial_ckpt_path:
+            self.update_model_from_checkpoint(model, self.initial_ckpt_path)
         return model
 
-    def get_loss_reduction_class(self) -> Type[MSELossReduction]:
-        """Return the expected loss reduction class."""
-        return MSELossReduction
+    def get_loss_reduction_class(self) -> Type[Loss]:
+        """Use loss_cls to configure the loss, since we do not change the settings of the loss based on the config."""
+        return self.loss_cls
 
 
+# The configs below simply define which model class to pair with which loss, since the abstractions around getting the
+#  model and loss are handled in the ExampleGenericConfig class.
 @dataclass
-class ExampleFineTuneBothConfig(
-    MegatronBioNeMoTrainableModelConfig["ExampleFineTuneBothModel", "MSEPlusClassifierLossReduction"]
-):
+class ExampleConfig(ExampleGenericConfig["ExampleModel", "MSELossReduction"]):
     """ExampleConfig is a dataclass that is used to configure the model.
 
     Timers from ModelParallelConfig are required for megatron forward compatibility.
     """
 
-    initial_weights: Path | None = None
-    calculate_per_token_loss: bool = False
-    skip_weight_prefixes: Set[str] = field(default_factory=set)
+    model_cls: Type[ExampleModel] = ExampleModel
+    loss_cls: Type[MSELossReduction] = MSELossReduction
 
-    def configure_model(self) -> "ExampleFineTuneBothModel":
-        """This function is called by the strategy to construct the model.
 
-        Note: Must pass self into Model since model requires having a config object.
+@dataclass
+class ExampleFineTuneBothConfig(ExampleGenericConfig["ExampleFineTuneBothModel", "MSEPlusClassifierLossReduction"]):
+    """ExampleConfig is a dataclass that is used to configure the model.
 
-        Returns:
-            The model object.
-        """
-        model = ExampleFineTuneBothModel(self)
-        if self.initial_weights:
-            load_weights_sharded_inplace_nemo2_to_mcore(
-                model=model,
-                distributed_checkpoint_dir=self.initial_weights,
-                skip_keys_with_these_prefixes=self.skip_weight_prefixes,
-            )
-        return model
+    Timers from ModelParallelConfig are required for megatron forward compatibility.
+    """
 
-    def get_loss_reduction_class(self) -> Type["MSEPlusClassifierLossReduction"]:
-        return MSEPlusClassifierLossReduction
+    model_cls: Type[ExampleFineTuneBothModel] = ExampleFineTuneBothModel
+    loss_cls: Type[MSEPlusClassifierLossReduction] = MSEPlusClassifierLossReduction
 
 
 @dataclass
 class ExampleFineTuneDropParentConfig(
-    MegatronBioNeMoTrainableModelConfig["ExampleFineTuneDropParentModel", "ClassifierLossReduction"]
+    ExampleGenericConfig["ExampleFineTuneDropParentModel", "ClassifierLossReduction"]
 ):
     """ExampleConfig is a dataclass that is used to configure the model.
 
     Timers from ModelParallelConfig are required for megatron forward compatibility.
     """
 
-    initial_weights: Path | None = None
-    calculate_per_token_loss: bool = False
-    skip_weight_prefixes: Set[str] = field(default_factory=set)
-
-    def configure_model(self) -> "ExampleFineTuneDropParentModel":
-        """This function is called by the strategy to construct the model.
-
-        Note: Must pass self into Model since model requires having a config object.
-
-        Returns:
-            The model object.
-        """
-        model = ExampleFineTuneDropParentModel(self)
-        if self.initial_weights:
-            load_weights_sharded_inplace_nemo2_to_mcore(
-                model=model,
-                distributed_checkpoint_dir=self.initial_weights,
-                skip_keys_with_these_prefixes=self.skip_weight_prefixes,
-            )
-        return model
-
-    def get_loss_reduction_class(self) -> Type["ClassifierLossReduction"]:
-        return ClassifierLossReduction
+    model_cls: Type[ExampleFineTuneDropParentModel] = ExampleFineTuneDropParentModel
+    loss_cls: Type[ClassifierLossReduction] = ClassifierLossReduction
 
 
 ################################################################################

@@ -18,8 +18,7 @@ import logging
 import os
 import tarfile
 from copy import deepcopy
-from dataclasses import dataclass, field, fields
-from pathlib import Path
+from dataclasses import dataclass, field
 from typing import (
     Callable,
     List,
@@ -45,19 +44,18 @@ from megatron.core.transformer.transformer_block import TransformerBlock
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.transformer.utils import get_linear_layer
 from nemo.collections.common.tokenizers.huggingface.auto_tokenizer import AutoTokenizer
-from nemo.lightning import get_vocab_size, io
-from nemo.lightning.io.pl import TrainerContext
+from nemo.lightning import get_vocab_size
 from nemo.lightning.megatron_parallel import MegatronLossReduction
 from torch import Tensor
 from torch.optim import Optimizer
 
 from bionemo.llm.model.biobert.transformer_specs import BiobertSpecOption, get_biobert_spec
-from bionemo.llm.model.config import MegatronBioNeMoTrainableModelConfig, override_mutate_possibly_extra_mutated_fiddle
-from bionemo.llm.model.loss import BERTMLMLossWithReduction
-from bionemo.llm.utils.weight_utils import (
-    load_weights_sharded_inplace_nemo2_to_mcore,
-    nemo1_to_nemo2_biobert_key_mapping,
+from bionemo.llm.model.config import (
+    OVERRIDE_BIONEMO_CONFIG_DEFAULTS,
+    MegatronBioNeMoTrainableModelConfig,
 )
+from bionemo.llm.model.loss import BERTMLMLossWithReduction
+from bionemo.llm.utils.weight_utils import nemo1_to_nemo2_biobert_key_mapping
 
 
 # Configure the logger
@@ -73,22 +71,19 @@ __all__: Sequence[str] = (
     "BioBertGenericConfig",
     "MegatronBioBertModel",
     "BioBertOutput",
-    "OVERRIDE_BIONEMO_CONFIG_DEFAULTS",
+    "OVERRIDE_BIOBERT_CONFIG_DEFAULTS",
 )
 
-_OVERRIDE_BIONEMO_CONFIG_DEFAULTS: List[str] = [
-    "initial_ckpt_skip_keys_with_these_prefixes",
-    "override_parent_fields",
-    "initial_ckpt_path_ignore_weights",
-    "initial_ckpt_path",
+
+# Add some fields specific to the BIOBERT config that we want to override by default
+_OVERRIDE_BIOBERT_CONFIG_DEFAULTS: List[str] = OVERRIDE_BIONEMO_CONFIG_DEFAULTS + [
     "return_only_hidden_states",
     "include_hiddens",
-    "model_cls",
 ]
 
 # A copy that we do not use internally. Useful for external users who want to
 #  start with these defaults and add some new keys that they want to not override.
-OVERRIDE_BIONEMO_CONFIG_DEFAULTS = deepcopy(_OVERRIDE_BIONEMO_CONFIG_DEFAULTS)
+OVERRIDE_BIOBERT_CONFIG_DEFAULTS = deepcopy(_OVERRIDE_BIOBERT_CONFIG_DEFAULTS)
 
 
 class BioBertOutput(TypedDict):  # noqa: D101
@@ -429,7 +424,7 @@ class BioBertGenericConfig(
     initial_ckpt_skip_keys_with_these_prefixes: List[str] = field(default_factory=list)
     # Used if initializing from a checkpoint, set this to any fields you want to override rather than re-set.
     #  by default all fields will be overridden.
-    override_parent_fields: List[str] = field(default_factory=lambda: _OVERRIDE_BIONEMO_CONFIG_DEFAULTS)
+    override_parent_fields: List[str] = field(default_factory=lambda: _OVERRIDE_BIOBERT_CONFIG_DEFAULTS)
     return_only_hidden_states: bool = False
     include_hiddens: bool = False  # Include hidden layers in the output of the model
     core_attention_override: Type[torch.nn.Module] | None = None
@@ -456,18 +451,8 @@ class BioBertGenericConfig(
                 f"You must supply `model_cls` to the {type(self)} for module to initialization in `configure_model`."
             )
 
-        # TODO refactor this next block out into a reusable config function.
         if self.initial_ckpt_path:
-            logger.warn(f"Loading {self.initial_ckpt_path}")
-            # 1. get the config
-            # TODO type(self) is probably not correct, maybe make the class name of the config to load an argument?
-            cfg_trainer_ctx: TrainerContext = io.load(Path(self.initial_ckpt_path), TrainerContext)
-            initial_config: MegatronBioNeMoTrainableModelConfig = cfg_trainer_ctx.model.config
-            initial_fields = {f.name for f in fields(initial_config)}
-            my_fields = [f.name for f in fields(self)]
-            skip_fields = set(self.override_parent_fields)
-            override_fields = [f for f in my_fields if f in initial_fields and f not in skip_fields]
-            override_mutate_possibly_extra_mutated_fiddle(self, initial_config, override_fields)
+            self.load_settings_from_checkpoint(self.initial_ckpt_path)
 
         model = self.model_cls(
             self,
@@ -518,11 +503,7 @@ class BioBertGenericConfig(
                 model.load_state_dict(new_state_dict_from_old, strict=not te_mapping)
         if self.initial_ckpt_path is not None:
             assert self.nemo1_ckpt_path is None, "Mutually exclusive checkpoint path used twice"
-            load_weights_sharded_inplace_nemo2_to_mcore(
-                model=model,
-                distributed_checkpoint_dir=self.initial_ckpt_path,
-                skip_keys_with_these_prefixes=set(self.initial_ckpt_skip_keys_with_these_prefixes),
-            )
+            self.update_model_from_checkpoint(model, self.initial_ckpt_path)
 
         # TODO (@jstjohn) come up with a cleaner way in the biobert module to return hidden states.
         #  maybe a suite of options like hugging face has so a user can ask for several or only one thing.
