@@ -127,12 +127,10 @@ class ESMDataModule(pl.LightningDataModule):
         if max_train_steps <= 0:
             raise RuntimeError("Please specify trainer.max_steps")
 
-        # Training data requires upsampling (multiply by max_train_steps)
-        num_train_samples = int(max_train_steps * self.data_sampler.global_batch_size)
+        # Create training dataset
         _train_ds = dataset.create_train_dataset(
             cluster_file=self._train_cluster_path,
             db_path=self._train_database_path,
-            total_samples=num_train_samples,
             seed=random_utils.get_seed_from_rng(rng),
             max_seq_length=self._max_seq_length,
             mask_prob=self._mask_prob,
@@ -140,10 +138,12 @@ class ESMDataModule(pl.LightningDataModule):
             mask_random_prob=self._mask_random_prob,
             tokenizer=self._tokenizer,
         )
+        num_train_samples = int(max_train_steps * self.data_sampler.global_batch_size)  # training data requires upsampling (multiply by max_train_steps) on single MegatronPretrainingRandomSampler
         self._train_ds = self._sample_and_shuffle_dataset(
             _train_ds, num_train_samples, "train"
-        )  # shuffle manually without MegatronPretrainingRandomSampler
+        )  # shuffle manually without cyclic MegatronPretrainingRandomSampler
 
+        # Create validation dataset
         _valid_ds = dataset.create_valid_dataset(
             clusters=self._valid_cluster_path,
             db_path=self._valid_database_path,
@@ -155,7 +155,7 @@ class ESMDataModule(pl.LightningDataModule):
             tokenizer=self._tokenizer,
         )
 
-        limit_val_batches = 1.0 if self.trainer.limit_val_batches is None else self.trainer.limit_val_batches
+        limit_val_batches = 1.0 if self.trainer.limit_val_batches is None else self.trainer.limit_val_batches  # validation data does not require upsampling
         if 0 < limit_val_batches <= 1.0 and isinstance(limit_val_batches, float):
             num_val_samples = int(len(_valid_ds) * limit_val_batches)
             if num_val_samples < self.data_sampler.global_batch_size:
@@ -170,7 +170,7 @@ class ESMDataModule(pl.LightningDataModule):
 
         self._valid_ds = self._sample_and_shuffle_dataset(
             _valid_ds, num_val_samples, "val"
-        )  # shuffle manually without MegatronPretrainingRandomSampler
+        )  # shuffle manually without cyclic MegatronPretrainingRandomSampler
 
         assert (
             hasattr(self, "trainer") and self.trainer is not None

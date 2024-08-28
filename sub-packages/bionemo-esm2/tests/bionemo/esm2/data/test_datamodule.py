@@ -18,6 +18,7 @@ from unittest import mock
 import pytest
 import torch.utils.data
 
+from bionemo.core.data.resamplers import PRNGResampleDataset
 from bionemo.esm2.data.datamodule import ESMDataModule
 from bionemo.llm.utils.datamodule_utils import tensor_dict_hash
 
@@ -367,7 +368,7 @@ def test_create_esm_datamodule_valid_dataloaders_has_consistent_samples_per_epoc
     # hash values from batches of the first epoch
     batch_hashes1 = [tensor_dict_hash(batch) for batch in data_module.val_dataloader()]
 
-    if is_ordered:  # second epoch should have exactly the same output includeing order
+    if is_ordered:  # second epoch should have exactly the same output including order
         for batch in data_module.val_dataloader():
             batch_hash = tensor_dict_hash(batch)
             assert batch_hash == batch_hashes1.pop()

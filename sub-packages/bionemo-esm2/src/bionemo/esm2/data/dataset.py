@@ -84,7 +84,6 @@ class ESMMaskedResidueDataset(Dataset):
         self,
         protein_dataset: ProteinSQLiteDataset,
         clusters: Sequence[Sequence[str]],
-        total_samples: Optional[int] = None,
         seed: int = np.random.SeedSequence().entropy,  # type: ignore
         max_seq_length: int = 1024,
         mask_prob: float = 0.15,
@@ -99,7 +98,6 @@ class ESMMaskedResidueDataset(Dataset):
             clusters: UniRef90 ids for all training sequences, bucketed by UniRef50 cluster. Alternatively for
                 validation, this can also just a list of UniRef50 ids, with each entry being a length-1 list with a
                 single UniRef50 id.
-            total_samples: Total number of samples to draw from the dataset. Default to the number of clusters.
             seed: Random seed for reproducibility. This seed is mixed with the index of the sample to retrieve to ensure
                 that __getitem__ is deterministic, but can be random across different runs. If None, a random seed is
                 generated.
@@ -111,7 +109,6 @@ class ESMMaskedResidueDataset(Dataset):
         """
         self.protein_dataset = protein_dataset
         self.clusters = clusters
-        self.total_samples = total_samples if total_samples is not None else len(clusters)
         self.seed = seed
         self.max_seq_length = max_seq_length
 
@@ -137,7 +134,7 @@ class ESMMaskedResidueDataset(Dataset):
             dataset[i] draws from the i % (num_clusters) cluster.
 
         """
-        return self.total_samples
+        return len(self.clusters)
 
     def __getitem__(self, idx: int) -> BertSample:
         """Deterministically masks and returns a protein sequence from the dataset.
@@ -199,7 +196,6 @@ class ESMMaskedResidueDataset(Dataset):
 def create_train_dataset(
     cluster_file: str | os.PathLike,
     db_path: str | os.PathLike,
-    total_samples: int,
     seed: int,
     max_seq_length: int = 1024,
     mask_prob: float = 0.15,
@@ -213,7 +209,6 @@ def create_train_dataset(
         cluster_file: Path to the cluster file. The file should contain a "ur90_id" column, where each row contains a
             list of UniRef90 ids for a single UniRef50 cluster.
         db_path: Path to the SQLite database.
-        total_samples: Total number of samples to draw from the dataset.
         seed: Random seed for reproducibility.
         max_seq_length: Crop long sequences to a maximum of this length, including BOS and EOS tokens.
         mask_prob: The overall probability a token is included in the loss function. Defaults to 0.15.
@@ -242,7 +237,6 @@ def create_train_dataset(
     return ESMMaskedResidueDataset(
         protein_dataset=protein_dataset,
         clusters=cluster_df["ur90_id"],
-        total_samples=total_samples,
         seed=seed,
         max_seq_length=max_seq_length,
         mask_prob=mask_prob,
