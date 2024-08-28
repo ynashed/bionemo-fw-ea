@@ -135,8 +135,8 @@ class ESMDataModule(pl.LightningDataModule):
         _train_ds = dataset.create_train_dataset(
             cluster_file=self._train_cluster_path,
             db_path=self._train_database_path,
-            seed=random_utils.get_seed_from_rng(rng),
             total_samples=num_train_samples,
+            seed=random_utils.get_seed_from_rng(rng),
             max_seq_length=self._max_seq_length,
             mask_prob=self._mask_prob,
             mask_token_prob=self._mask_token_prob,
@@ -158,8 +158,8 @@ class ESMDataModule(pl.LightningDataModule):
         _valid_ds = dataset.create_valid_dataset(
             clusters=self._valid_cluster_path,
             db_path=self._valid_database_path,
-            seed=random_utils.get_seed_from_rng(rng),
             total_samples=num_val_samples,
+            seed=random_utils.get_seed_from_rng(rng),
             max_seq_length=self._max_seq_length,
             mask_prob=self._mask_prob,
             mask_token_prob=self._mask_token_prob,

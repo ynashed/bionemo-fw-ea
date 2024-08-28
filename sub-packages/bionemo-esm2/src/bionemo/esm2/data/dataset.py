@@ -74,7 +74,7 @@ class ESMMaskedResidueDataset(Dataset):
 
     Megatron-LM expects the input datasets to be indexable, and for the output of the dataset for a given index to be
     deterministic. In cluster sampling, this can be tricky, since we need to perform weighted sampling over UniRef50
-    clusters. TODO(@jstjohn) Fix cyclic MegatornDataSampler
+    clusters.
 
     Here, the getitem(i) returns a randomly sampled UniRef90 sequence from the i % len(dataset) UniRef50 cluster, with i
     controlling the random seed used for selecting the UniRef90 sequence and performing the masking.
@@ -99,6 +99,7 @@ class ESMMaskedResidueDataset(Dataset):
             clusters: UniRef90 ids for all training sequences, bucketed by UniRef50 cluster. Alternatively for
                 validation, this can also just a list of UniRef50 ids, with each entry being a length-1 list with a
                 single UniRef50 id.
+            total_samples: Total number of samples to draw from the dataset.
             seed: Random seed for reproducibility. This seed is mixed with the index of the sample to retrieve to ensure
                 that __getitem__ is deterministic, but can be random across different runs. If None, a random seed is
                 generated.
@@ -110,8 +111,8 @@ class ESMMaskedResidueDataset(Dataset):
         """
         self.protein_dataset = protein_dataset
         self.clusters = clusters
-        self.seed = seed
         self.total_samples = total_samples
+        self.seed = seed
         self.max_seq_length = max_seq_length
 
         if tokenizer.mask_token_id is None:
@@ -132,7 +133,7 @@ class ESMMaskedResidueDataset(Dataset):
 
         !!! note
 
-            This is neither the actual number of clusters in the dataset nor the number of total sequences in __init__ kwargs.
+            This is neither the actual number of clusters in the dataset nor the number of total sequences; since
             dataset[i] draws from the i % (num_clusters) cluster.
 
         """
@@ -198,8 +199,8 @@ class ESMMaskedResidueDataset(Dataset):
 def create_train_dataset(
     cluster_file: str | os.PathLike,
     db_path: str | os.PathLike,
-    seed: int,
     total_samples: int,
+    seed: int,
     max_seq_length: int = 1024,
     mask_prob: float = 0.15,
     mask_token_prob: float = 0.8,
@@ -212,8 +213,8 @@ def create_train_dataset(
         cluster_file: Path to the cluster file. The file should contain a "ur90_id" column, where each row contains a
             list of UniRef90 ids for a single UniRef50 cluster.
         db_path: Path to the SQLite database.
+        total_samples: Total number of samples to draw from the dataset.
         seed: Random seed for reproducibility.
-        total_samples: Length of the dataset.
         max_seq_length: Crop long sequences to a maximum of this length, including BOS and EOS tokens.
         mask_prob: The overall probability a token is included in the loss function. Defaults to 0.15.
         mask_token_prob: Proportion of masked tokens that get assigned the <MASK> id. Defaults to 0.8.
@@ -241,8 +242,8 @@ def create_train_dataset(
     return ESMMaskedResidueDataset(
         protein_dataset=protein_dataset,
         clusters=cluster_df["ur90_id"],
-        seed=seed,
         total_samples=total_samples,
+        seed=seed,
         max_seq_length=max_seq_length,
         mask_prob=mask_prob,
         mask_token_prob=mask_token_prob,
@@ -276,8 +277,8 @@ def create_valid_clusters(cluster_file: str | os.PathLike) -> pd.Series:
 def create_valid_dataset(  # noqa: D417
     clusters: pd.Series | str | os.PathLike,
     db_path: str | os.PathLike,
-    seed: int,
     total_samples: int,
+    seed: int,
     max_seq_length: int = 1024,
     mask_prob: float = 0.15,
     mask_token_prob: float = 0.8,
@@ -290,9 +291,8 @@ def create_valid_dataset(  # noqa: D417
         cluster_file: Clusters as pd.Series, or path to the cluster file. The file should contain a single column named "ur50_id" with UniRef50
             IDs, with one UniRef50 ID per row.
         db_path: Path to the SQLite database.
+        total_samples: Total number of samples to draw from the dataset.
         seed: Random seed for reproducibility.
-        total_samples: Length of the dataset.
-
         max_seq_length: Crop long sequences to a maximum of this length, including BOS and EOS tokens.
         mask_prob: The overall probability a token is included in the loss function. Defaults to 0.15.
         mask_token_prob: Proportion of masked tokens that get assigned the <MASK> id. Defaults to 0.8.
@@ -320,8 +320,8 @@ def create_valid_dataset(  # noqa: D417
     return ESMMaskedResidueDataset(
         protein_dataset=protein_dataset,
         clusters=clusters,
-        seed=seed,
         total_samples=total_samples,
+        seed=seed,
         max_seq_length=max_seq_length,
         mask_prob=mask_prob,
         mask_token_prob=mask_token_prob,
