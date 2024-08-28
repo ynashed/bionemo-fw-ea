@@ -15,8 +15,8 @@
 
 """This is intended to be a minimal self-container NeMo2 example."""
 
-from dataclasses import dataclass
-from typing import Any, Dict, Generic, Optional, Sequence, Tuple, Type, TypedDict, TypeVar
+from dataclasses import dataclass, field
+from typing import Any, Dict, Generic, List, Optional, Sequence, Tuple, Type, TypedDict, TypeVar
 
 import pytorch_lightning as pl
 import torch
@@ -36,7 +36,7 @@ from torchvision.datasets import MNIST
 from bionemo.core.data.resamplers import PRNGDatasetShuffler
 from bionemo.core.model.config import Loss
 from bionemo.llm.lightning import LightningPassthroughPredictionMixin
-from bionemo.llm.model.config import MegatronBioNeMoTrainableModelConfig
+from bionemo.llm.model.config import OVERRIDE_BIONEMO_CONFIG_DEFAULTS, MegatronBioNeMoTrainableModelConfig
 
 
 __all__: Sequence[str] = (
@@ -280,6 +280,9 @@ class ExampleGenericConfig(Generic[ExampleModelT, Loss], MegatronBioNeMoTrainabl
     hidden_size: int = 64  # Needs to be set to avoid zero division error in megatron :(
     num_attention_heads: int = 1  # Needs to be set to avoid zero division error in megatron :(
     num_layers: int = 1  # Needs to be set to avoid zero division error in megatron :(
+    # IMPORTANT: Since we're adding/overriding the loss_cls, and that's not how we generally track this, we need to
+    #   add this into the list of config settings that we do not draw from the loaded checkpoint when restoring.
+    override_parent_fields: List[str] = field(default_factory=lambda: OVERRIDE_BIONEMO_CONFIG_DEFAULTS + ["loss_cls"])
 
     def configure_model(self) -> ExampleModelT:
         """Uses model_cls and loss_cls to configure the model.
