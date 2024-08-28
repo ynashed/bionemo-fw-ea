@@ -84,6 +84,7 @@ class ESMMaskedResidueDataset(Dataset):
         self,
         protein_dataset: ProteinSQLiteDataset,
         clusters: Sequence[Sequence[str]],
+        total_samples: int,
         seed: int = np.random.SeedSequence().entropy,  # type: ignore
         max_seq_length: int = 1024,
         mask_prob: float = 0.15,
@@ -110,6 +111,7 @@ class ESMMaskedResidueDataset(Dataset):
         self.protein_dataset = protein_dataset
         self.clusters = clusters
         self.seed = seed
+        self.total_samples = total_samples
         self.max_seq_length = max_seq_length
 
         if tokenizer.mask_token_id is None:
@@ -125,16 +127,16 @@ class ESMMaskedResidueDataset(Dataset):
 
         self.tokenizer = tokenizer
 
-    def __len__(self) -> int:  # TODO(@jstjohn) Fix cyclic MegatornDataSampler
+    def __len__(self) -> int:
         """Returns the total number of samples to be drawn.
 
         !!! note
 
-            This is either the actual number of clusters in the dataset or the number of total sequences in __init__ kwargs.
+            This is neither the actual number of clusters in the dataset nor the number of total sequences in __init__ kwargs.
             dataset[i] draws from the i % (num_clusters) cluster.
 
         """
-        return len(self.clusters)
+        return self.total_samples
 
     def __getitem__(self, idx: int) -> BertSample:
         """Deterministically masks and returns a protein sequence from the dataset.
@@ -197,6 +199,7 @@ def create_train_dataset(
     cluster_file: str | os.PathLike,
     db_path: str | os.PathLike,
     seed: int,
+    total_samples: int,
     max_seq_length: int = 1024,
     mask_prob: float = 0.15,
     mask_token_prob: float = 0.8,
@@ -210,6 +213,7 @@ def create_train_dataset(
             list of UniRef90 ids for a single UniRef50 cluster.
         db_path: Path to the SQLite database.
         seed: Random seed for reproducibility.
+        total_samples: Length of the dataset.
         max_seq_length: Crop long sequences to a maximum of this length, including BOS and EOS tokens.
         mask_prob: The overall probability a token is included in the loss function. Defaults to 0.15.
         mask_token_prob: Proportion of masked tokens that get assigned the <MASK> id. Defaults to 0.8.
@@ -238,6 +242,7 @@ def create_train_dataset(
         protein_dataset=protein_dataset,
         clusters=cluster_df["ur90_id"],
         seed=seed,
+        total_samples=total_samples,
         max_seq_length=max_seq_length,
         mask_prob=mask_prob,
         mask_token_prob=mask_token_prob,
@@ -272,6 +277,7 @@ def create_valid_dataset(  # noqa: D417
     clusters: pd.Series | str | os.PathLike,
     db_path: str | os.PathLike,
     seed: int,
+    total_samples: int,
     max_seq_length: int = 1024,
     mask_prob: float = 0.15,
     mask_token_prob: float = 0.8,
@@ -285,6 +291,7 @@ def create_valid_dataset(  # noqa: D417
             IDs, with one UniRef50 ID per row.
         db_path: Path to the SQLite database.
         seed: Random seed for reproducibility.
+        total_samples: Length of the dataset.
 
         max_seq_length: Crop long sequences to a maximum of this length, including BOS and EOS tokens.
         mask_prob: The overall probability a token is included in the loss function. Defaults to 0.15.
@@ -314,6 +321,7 @@ def create_valid_dataset(  # noqa: D417
         protein_dataset=protein_dataset,
         clusters=clusters,
         seed=seed,
+        total_samples=total_samples,
         max_seq_length=max_seq_length,
         mask_prob=mask_prob,
         mask_token_prob=mask_token_prob,

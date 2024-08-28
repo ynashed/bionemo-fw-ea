@@ -129,40 +129,42 @@ class ESMDataModule(pl.LightningDataModule):
             raise RuntimeError("Please specify trainer.max_steps")
 
         # Create training dataset
+        num_train_samples = int(
+            max_train_steps * self.data_sampler.global_batch_size
+        )  # training data requires upsampling (multiply by max_train_steps) on single MegatronPretrainingRandomSampler
         _train_ds = dataset.create_train_dataset(
             cluster_file=self._train_cluster_path,
             db_path=self._train_database_path,
             seed=random_utils.get_seed_from_rng(rng),
+            total_samples=num_train_samples,
             max_seq_length=self._max_seq_length,
             mask_prob=self._mask_prob,
             mask_token_prob=self._mask_token_prob,
             mask_random_prob=self._mask_random_prob,
             tokenizer=self._tokenizer,
         )
-        num_train_samples = int(
-            max_train_steps * self.data_sampler.global_batch_size
-        )  # training data requires upsampling (multiply by max_train_steps) on single MegatronPretrainingRandomSampler
         self._train_ds = self._sample_and_shuffle_dataset(
             _train_ds, num_train_samples, "train"
         )  # shuffle manually without cyclic MegatronPretrainingRandomSampler
 
         # Create validation dataset
+        val_clusters = dataset.create_valid_clusters(self._valid_cluster_path)
+        num_val_samples = infer_num_samples(
+            limit_batches=self.trainer.limit_val_batches,
+            num_samples_in_dataset=len(val_clusters),
+            global_batch_size=self.data_sampler.global_batch_size,
+            stage="val",
+        )
         _valid_ds = dataset.create_valid_dataset(
             clusters=self._valid_cluster_path,
             db_path=self._valid_database_path,
             seed=random_utils.get_seed_from_rng(rng),
+            total_samples=num_val_samples,
             max_seq_length=self._max_seq_length,
             mask_prob=self._mask_prob,
             mask_token_prob=self._mask_token_prob,
             mask_random_prob=self._mask_random_prob,
             tokenizer=self._tokenizer,
-        )
-
-        num_val_samples = infer_num_samples(
-            limit_batches=self.trainer.limit_val_batches,
-            num_samples_in_dataset=len(_valid_ds),
-            global_batch_size=self.data_sampler.global_batch_size,
-            stage="val",
         )
         self._valid_ds = self._sample_and_shuffle_dataset(
             _valid_ds, num_val_samples, "val"
