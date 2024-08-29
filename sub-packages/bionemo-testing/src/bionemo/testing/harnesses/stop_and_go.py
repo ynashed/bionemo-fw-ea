@@ -172,11 +172,7 @@ class StopAndGoHarness(ABC):
         Returns:
             dict: A dictionary of default metrics that can be used in the StopAndGoHarness.
         """
-        return {
-            "global_step": get_global_step,
-            # TODO  (Update when we are ToT.)
-            # "learning_rate": get_learning_rate
-        }
+        return {"global_step": get_global_step, "learning_rate": get_learning_rate}
 
     def get_callbacks(self, mode: Literal["stop", "go"]) -> list[pl.Callback]:
         """Returns a list of callbacks based on the specified mode. Base implemention provides reasonable defaults.
