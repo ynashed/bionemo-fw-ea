@@ -348,7 +348,7 @@ class MultiTimeGraph3DInterpolantModel(pl.LightningModule):
         time = self.sample_time(batch)
         out, batch, time = self(batch, time)
         loss, predictions = self.calculate_loss(batch, out, time, "val")
-        self.sample(100)
+        # self.sample(100)
         return loss
 
     def training_step(self, batch, batch_idx):
