@@ -30,6 +30,7 @@ API_REFERENCE_DIR = DOCS_DIR / "API_reference"
 EXAMPLES_DIR = DOCS_DIR / "examples"
 DEVELOPER_GUIDE_DIR = DOCS_DIR / "developer-guide"
 
+# Set up logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
