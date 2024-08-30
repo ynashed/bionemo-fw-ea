@@ -33,8 +33,8 @@ DEVELOPER_GUIDE_DIR = DOCS_DIR / "developer-guide"
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
-def generate_api_reference() -> None:
-    """Generate API reference documentation for all sub-packages.
+def generate_api_reference(src: Path) -> None:
+    """Generate API reference documentation for a given source directory.
 
     This function iterates through all 'src' directories in the sub-packages,
     generating API reference documentation for Python files and copying Markdown files.
