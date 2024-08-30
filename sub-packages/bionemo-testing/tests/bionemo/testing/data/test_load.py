@@ -26,82 +26,124 @@ from bionemo.testing.data.load import default_ngc_client, default_pbss_client, l
 from bionemo.testing.data.resource import get_all_resources
 
 
-@pytest.fixture()
-def resources(tmp_path):
+def test_load_raises_error_on_invalid_tag(tmp_path):
     (tmp_path / "foo.yaml").write_text(
         """
         - tag: "bar"
           pbss: "s3://test/bar"
           owner: Peter St John <pstjohn@nvidia.com>
           sha256: null
-        - tag: "baz"
-          pbss: "s3://test/baz.gz"
-          owner: Peter St John <pstjohn@nvidia.com>
-          sha256: null
-        - tag: "dir"
-          pbss: "s3://test/dir.tar"
-          owner: Peter St John <pstjohn@nvidia.com>
-          sha256: null
-        - tag: "dir.gz"
-          pbss: "s3://test/dir.tar.gz"
-          owner: Peter St John <pstjohn@nvidia.com>
-          sha256: null
-        - tag: "ngc_model"
+        """
+    )
+
+    with pytest.raises(ValueError, match="Resource 'invalid/tag' not found."):
+        load("invalid/tag", resources=get_all_resources(tmp_path), cache_dir=tmp_path)
+
+
+def test_load_raises_with_invalid_source(tmp_path):
+    (tmp_path / "foo.yaml").write_text(
+        """
+        - tag: "bar"
           pbss: "s3://test/bar"
-          ngc: model/foo/bar:1.0
-          ngc_registry: model
-          owner: Peter St John <pstjohn@nvidia.com>
-          sha256: null
-        - tag: "ngc_resource"
-          pbss: "s3://test/bar"
-          ngc: model/foo/bar:1.0
-          ngc_registry: resource
           owner: Peter St John <pstjohn@nvidia.com>
           sha256: null
         """
     )
 
-    return get_all_resources(tmp_path)
-
-
-def test_load_raises_error_on_invalid_tag(resources, tmp_path):
-    with pytest.raises(ValueError, match="Resource 'invalid/tag' not found."):
-        load("invalid/tag", resources=resources, cache_dir=tmp_path)
-
-
-def test_load_raises_with_invalid_source(resources, tmp_path):
     with pytest.raises(ValueError, match="Source 'invalid' not supported."):
-        load("foo/bar", source="invalid", resources=resources, cache_dir=tmp_path)  # type: ignore
+        load("foo/bar", source="invalid", resources=get_all_resources(tmp_path), cache_dir=tmp_path)  # type: ignore
 
 
-def test_load_raises_with_no_ngc_url(resources, tmp_path):
+def test_load_raises_with_no_ngc_url(tmp_path):
+    (tmp_path / "foo.yaml").write_text(
+        """
+        - tag: "bar"
+          pbss: "s3://test/bar"
+          owner: Peter St John <pstjohn@nvidia.com>
+          sha256: null
+        """
+    )
+
     with pytest.raises(ValueError, match="Resource 'foo/bar' does not have an NGC URL."):
-        load("foo/bar", source="ngc", resources=resources, cache_dir=tmp_path)  # type: ignore
+        load("foo/bar", source="ngc", resources=get_all_resources(tmp_path), cache_dir=tmp_path)  # type: ignore
 
 
 @patch("bionemo.testing.data.load._s3_download")
-def test_load_with_file(mocked_s3_download, resources, tmp_path):
+def test_load_with_file(mocked_s3_download, tmp_path):
+    (tmp_path / "foo.yaml").write_text(
+        """
+        - tag: "bar"
+          pbss: "s3://test/bar"
+          owner: Peter St John <pstjohn@nvidia.com>
+          sha256: null
+        """
+    )
+
     mocked_s3_download.side_effect = lambda _1, output_file, _2: Path(output_file).write_text("test")
-    file_path = load("foo/bar", resources=resources, cache_dir=tmp_path)
+    file_path = load("foo/bar", resources=get_all_resources(tmp_path), cache_dir=tmp_path)
     assert file_path.is_file()
     assert file_path.read_text() == "test"
 
 
 @patch("bionemo.testing.data.load._s3_download")
-def test_load_with_gzipped_file(mocked_s3_download, resources, tmp_path):
+def test_load_with_gzipped_file(mocked_s3_download, tmp_path):
+    (tmp_path / "foo.yaml").write_text(
+        """
+        - tag: "baz"
+          pbss: "s3://test/baz.gz"
+          owner: Peter St John <pstjohn@nvidia.com>
+          sha256: null
+        """
+    )
+
     def write_compressed_text(_1, output_file: str, _2):
         with gzip.open(output_file, "wt") as f:
             f.write("test")
 
     mocked_s3_download.side_effect = write_compressed_text
 
-    file_path = load("foo/baz", resources=resources, cache_dir=tmp_path)
+    file_path = load("foo/baz", resources=get_all_resources(tmp_path), cache_dir=tmp_path)
     assert file_path.is_file()
     assert file_path.read_text() == "test"
 
 
 @patch("bionemo.testing.data.load._s3_download")
-def test_load_with_tar_directory(mocked_s3_download, resources, tmp_path):
+def test_load_with_gzipped_file_no_decomp(mocked_s3_download, tmp_path):
+    (tmp_path / "foo.yaml").write_text(
+        """
+        - tag: "baz"
+          pbss: "s3://test/baz.gz"
+          owner: Peter St John <pstjohn@nvidia.com>
+          sha256: null
+          decompress: false
+        """
+    )
+
+    def write_compressed_text(_1, output_file: str, _2):
+        with gzip.open(output_file, "wt") as f:
+            f.write("test")
+
+    mocked_s3_download.side_effect = write_compressed_text
+
+    file_path = load("foo/baz", resources=get_all_resources(tmp_path), cache_dir=tmp_path)
+
+    # Assert the file remained compressed.
+    assert file_path.is_file()
+    with gzip.open(file_path, "rt") as f:
+        assert f.read() == "test"
+
+
+@patch("bionemo.testing.data.load._s3_download")
+def test_load_with_tar_directory(mocked_s3_download, tmp_path):
+    (tmp_path / "foo.yaml").write_text(
+        """
+        - tag: "dir"
+          pbss: "s3://test/dir.tar"
+          owner: Peter St John <pstjohn@nvidia.com>
+          sha256: null
+        """
+    )
+
     def write_compressed_dir(_1, output_file: str, _2):
         # Create a text file in memory
         text_content = "test"
@@ -118,13 +160,59 @@ def test_load_with_tar_directory(mocked_s3_download, resources, tmp_path):
 
     mocked_s3_download.side_effect = write_compressed_dir
 
-    file_path = load("foo/dir", resources=resources, cache_dir=tmp_path)
+    file_path = load("foo/dir", resources=get_all_resources(tmp_path), cache_dir=tmp_path)
     assert file_path.is_dir()
     assert (file_path / "test_file").read_text() == "test"
 
 
 @patch("bionemo.testing.data.load._s3_download")
-def test_load_with_targz_directory(mocked_s3_download, resources, tmp_path):
+def test_load_with_tar_directory_no_unpack(mocked_s3_download, tmp_path):
+    (tmp_path / "foo.yaml").write_text(
+        """
+        - tag: "dir"
+          pbss: "s3://test/dir.tar"
+          owner: Peter St John <pstjohn@nvidia.com>
+          sha256: null
+          unpack: false
+        """
+    )
+
+    def write_tarfile_dir(_1, output_file: str, _2):
+        # Create a text file in memory
+        text_content = "test"
+        text_file = io.BytesIO(text_content.encode("utf-8"))
+
+        # Create a tarfile
+        with tarfile.open(output_file, "w") as tar:
+            # Create a TarInfo object for the file
+            info = tarfile.TarInfo(name="test_file")
+            info.size = len(text_content)
+
+            # Add the file to the tarfile
+            tar.addfile(info, text_file)
+
+    mocked_s3_download.side_effect = write_tarfile_dir
+
+    file_path = load("foo/dir", resources=get_all_resources(tmp_path), cache_dir=tmp_path)
+
+    # Assert the file stays as a tarfile.
+    assert file_path.is_file()
+    with tarfile.open(file_path, "r") as tar:
+        tar.extractall(tmp_path / "extracted")
+        assert (tmp_path / "extracted/test_file").read_text() == "test"
+
+
+@patch("bionemo.testing.data.load._s3_download")
+def test_load_with_targz_directory(mocked_s3_download, tmp_path):
+    (tmp_path / "foo.yaml").write_text(
+        """
+        - tag: "dir.gz"
+          pbss: "s3://test/dir.tar.gz"
+          owner: Peter St John <pstjohn@nvidia.com>
+          sha256: null
+        """
+    )
+
     def write_compressed_dir(_1, output_file: str, _2):
         # Create a text file in memory
         text_content = "test"
@@ -141,7 +229,7 @@ def test_load_with_targz_directory(mocked_s3_download, resources, tmp_path):
 
     mocked_s3_download.side_effect = write_compressed_dir
 
-    file_path = load("foo/dir.gz", resources=resources, cache_dir=tmp_path)
+    file_path = load("foo/dir.gz", resources=get_all_resources(tmp_path), cache_dir=tmp_path)
     assert file_path.is_dir()
     assert (file_path / "test_file").read_text() == "test"
 
@@ -157,7 +245,18 @@ def test_default_ngc_client():
 
 
 @patch("bionemo.testing.data.load.default_ngc_client")
-def test_load_with_file_from_ngc_model(mocked_get_ngc_client, resources, tmp_path):
+def test_load_with_file_from_ngc_model(mocked_get_ngc_client, tmp_path):
+    (tmp_path / "foo.yaml").write_text(
+        """
+        - tag: "ngc_model"
+          pbss: "s3://test/bar"
+          ngc: model/foo/bar:1.0
+          ngc_registry: model
+          owner: Peter St John <pstjohn@nvidia.com>
+          sha256: null
+        """
+    )
+
     def mocked_ngc_download(url, destination, file_patterns):
         ngc_dirname = Path(url).name.replace(":", "_v")
         file_name = file_patterns[0]
@@ -169,7 +268,7 @@ def test_load_with_file_from_ngc_model(mocked_get_ngc_client, resources, tmp_pat
     mocked_ngc_client.registry.model.download_version.side_effect = mocked_ngc_download
     mocked_get_ngc_client.return_value = mocked_ngc_client
 
-    file_path = load("foo/ngc_model", resources=resources, source="ngc", cache_dir=tmp_path)
+    file_path = load("foo/ngc_model", resources=get_all_resources(tmp_path), source="ngc", cache_dir=tmp_path)
     assert file_path.is_file()
     assert file_path.read_text() == "test"
 
@@ -177,7 +276,18 @@ def test_load_with_file_from_ngc_model(mocked_get_ngc_client, resources, tmp_pat
 
 
 @patch("bionemo.testing.data.load.default_ngc_client")
-def test_load_with_file_from_ngc_resource(mocked_get_ngc_client, resources, tmp_path):
+def test_load_with_file_from_ngc_resource(mocked_get_ngc_client, tmp_path):
+    (tmp_path / "foo.yaml").write_text(
+        """
+        - tag: "ngc_resource"
+          pbss: "s3://test/bar"
+          ngc: model/foo/bar:1.0
+          ngc_registry: resource
+          owner: Peter St John <pstjohn@nvidia.com>
+          sha256: null
+          """
+    )
+
     def mocked_ngc_download(url, destination, file_patterns):
         ngc_dirname = Path(url).name.replace(":", "_v")
         file_name = file_patterns[0]
@@ -189,7 +299,7 @@ def test_load_with_file_from_ngc_resource(mocked_get_ngc_client, resources, tmp_
     mocked_ngc_client.registry.resource.download_version.side_effect = mocked_ngc_download
     mocked_get_ngc_client.return_value = mocked_ngc_client
 
-    file_path = load("foo/ngc_resource", resources=resources, source="ngc", cache_dir=tmp_path)
+    file_path = load("foo/ngc_resource", resources=get_all_resources(tmp_path), source="ngc", cache_dir=tmp_path)
     assert file_path.is_file()
     assert file_path.read_text() == "test"
 

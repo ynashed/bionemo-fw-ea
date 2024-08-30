@@ -58,6 +58,12 @@ class Resource(pydantic.BaseModel):
     description: str | None = None
     """A description of the file(s)."""
 
+    unpack: Literal[False, None] = None
+    """Whether the resource should be unpacked after download. If None, will defer to the file extension."""
+
+    decompress: Literal[False, None] = None
+    """Whether the resource should be decompressed after download. If None, will defer to the file extension."""
+
     @pydantic.model_validator(mode="after")
     def _validate_ngc_registry(self):
         if self.ngc and not self.ngc_registry:

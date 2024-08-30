@@ -150,17 +150,7 @@ def load(
     filename = str(resource.pbss).split("/")[-1]
 
     extension = "".join(Path(filename).suffixes)
-    if extension in {".gz", ".bz2", ".xz"}:
-        processor = pooch.Decompress()
-
-    elif extension in {".tar", ".tar.gz"}:
-        processor = pooch.Untar()
-
-    elif extension == ".zip":
-        processor = pooch.Unzip()
-
-    else:
-        processor = None
+    processor = _get_processor(extension, resource.unpack, resource.decompress)
 
     if source == "pbss":
         download_fn = _s3_download
@@ -189,3 +179,29 @@ def load(
 
     else:
         return Path(download)
+
+
+def _get_processor(extension: str, unpack: bool | None, decompress: bool | None):
+    """Get the processor for a given file extension.
+
+    If unpack and decompress are both None, the processor will be inferred from the file extension.
+
+    Args:
+        extension: The file extension.
+        unpack: Whether to unpack the file.
+        decompress: Whether to decompress the file.
+
+    Returns:
+        A Pooch processor object.
+    """
+    if extension in {".gz", ".bz2", ".xz"} and decompress is None:
+        return pooch.Decompress()
+
+    elif extension in {".tar", ".tar.gz"} and unpack is None:
+        return pooch.Untar()
+
+    elif extension == ".zip" and unpack is None:
+        return pooch.Unzip()
+
+    else:
+        return None
