@@ -24,6 +24,7 @@ from nemo.lightning import io
 from nemo.lightning.io.pl import TrainerContext
 
 from bionemo.core.model.config import BionemoModelConfig, BionemoTrainableModelConfig, Loss, Model
+from bionemo.llm.utils import iomixin_utils as iom
 from bionemo.llm.utils.weight_utils import load_weights_sharded_inplace_nemo2_to_mcore
 
 
@@ -47,7 +48,7 @@ _OVERRIDE_BIONEMO_CONFIG_DEFAULTS: List[str] = [
 OVERRIDE_BIONEMO_CONFIG_DEFAULTS = deepcopy(_OVERRIDE_BIONEMO_CONFIG_DEFAULTS)  # copy for export
 
 
-class MegatronBioNeMoModelConfig(BionemoModelConfig[Model], TransformerConfig, io.NeedsIOMixin):
+class MegatronBioNeMoModelConfig(BionemoModelConfig[Model], TransformerConfig, iom.WillHaveGetSetHparam):
     """A ModelConfig class for bionemo that supports usage with Megatron models, for example as NeMo2 requires."""
 
     model_cls: Type[Model]

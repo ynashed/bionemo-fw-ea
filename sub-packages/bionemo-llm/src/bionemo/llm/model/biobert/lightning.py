@@ -29,6 +29,7 @@ from nemo.lightning.pytorch.optim import MegatronOptimizerModule
 
 from bionemo.llm.lightning import LightningPassthroughPredictionMixin
 from bionemo.llm.model.config import MegatronBioNeMoTrainableModelConfig
+from bionemo.llm.utils import iomixin_utils as iom
 
 
 __all__: Sequence[str] = (
@@ -177,7 +178,7 @@ def get_packed_seq_params(batch: Dict[str, torch.Tensor]) -> PackedSeqParams:
 
 
 class BioBertLightningModule(  # noqa: D101
-    pl.LightningModule, nlio.IOMixin, nlio.ConnectorMixin, LightningPassthroughPredictionMixin
+    pl.LightningModule, iom.IOMixinWithGettersSetters, nlio.ConnectorMixin, LightningPassthroughPredictionMixin
 ):
     def __init__(
         self,

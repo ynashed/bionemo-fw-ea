@@ -37,6 +37,7 @@ from bionemo.core.data.resamplers import PRNGDatasetShuffler
 from bionemo.core.model.config import Loss
 from bionemo.llm.lightning import LightningPassthroughPredictionMixin
 from bionemo.llm.model.config import OVERRIDE_BIONEMO_CONFIG_DEFAULTS, MegatronBioNeMoTrainableModelConfig
+from bionemo.llm.utils import iomixin_utils as iom
 
 
 __all__: Sequence[str] = (
@@ -310,7 +311,7 @@ class ExampleGenericConfig(Generic[ExampleModelT, Loss], MegatronBioNeMoTrainabl
 # The configs below simply define which model class to pair with which loss, since the abstractions around getting the
 #  model and loss are handled in the ExampleGenericConfig class.
 @dataclass
-class ExampleConfig(ExampleGenericConfig["ExampleModel", "MSELossReduction"], io.IOMixin):
+class ExampleConfig(ExampleGenericConfig["ExampleModel", "MSELossReduction"], iom.IOMixinWithGettersSetters):
     """ExampleConfig is a dataclass that is used to configure the model.
 
     Timers from ModelParallelConfig are required for megatron forward compatibility.
@@ -322,7 +323,7 @@ class ExampleConfig(ExampleGenericConfig["ExampleModel", "MSELossReduction"], io
 
 @dataclass
 class ExampleFineTuneBothConfig(
-    ExampleGenericConfig["ExampleFineTuneBothModel", "MSEPlusClassifierLossReduction"], io.IOMixin
+    ExampleGenericConfig["ExampleFineTuneBothModel", "MSEPlusClassifierLossReduction"], iom.IOMixinWithGettersSetters
 ):
     """ExampleConfig is a dataclass that is used to configure the model.
 
@@ -335,7 +336,7 @@ class ExampleFineTuneBothConfig(
 
 @dataclass
 class ExampleFineTuneDropParentConfig(
-    ExampleGenericConfig["ExampleFineTuneDropParentModel", "ClassifierLossReduction"], io.IOMixin
+    ExampleGenericConfig["ExampleFineTuneDropParentModel", "ClassifierLossReduction"], iom.IOMixinWithGettersSetters
 ):
     """ExampleConfig is a dataclass that is used to configure the model.
 
