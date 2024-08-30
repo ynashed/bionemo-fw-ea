@@ -149,29 +149,30 @@ def load(
     resource = resources[model_or_data_tag]
     filename = str(resource.pbss).split("/")[-1]
 
-    match "".join(Path(filename).suffixes):
-        case ".gz" | ".bz2" | ".xz":
-            processor = pooch.Decompress()
+    extension = "".join(Path(filename).suffixes)
+    if extension in {".gz", ".bz2", ".xz"}:
+        processor = pooch.Decompress()
 
-        case ".tar" | ".tar.gz":
-            processor = pooch.Untar()
+    elif extension in {".tar", ".tar.gz"}:
+        processor = pooch.Untar()
 
-        case ".zip":
-            processor = pooch.Unzip()
+    elif extension == ".zip":
+        processor = pooch.Unzip()
 
-        case _:
-            processor = None
+    else:
+        processor = None
 
-    match source:
-        case "pbss":
-            download_fn = _s3_download
-            url = resource.pbss
-        case "ngc":
-            assert resource.ngc_registry is not None
-            download_fn = NGCDownloader(filename=filename, ngc_registry=resource.ngc_registry)
-            url = resource.ngc
-        case _:
-            raise ValueError(f"Source '{source}' not supported.")
+    if source == "pbss":
+        download_fn = _s3_download
+        url = resource.pbss
+
+    elif source == "ngc":
+        assert resource.ngc_registry is not None
+        download_fn = NGCDownloader(filename=filename, ngc_registry=resource.ngc_registry)
+        url = resource.ngc
+
+    else:
+        raise ValueError(f"Source '{source}' not supported.")
 
     download = pooch.retrieve(
         url=str(url),
