@@ -26,7 +26,7 @@ from nemo.lightning.megatron_parallel import DataT, MegatronLossReduction
 from nemo.lightning.pytorch.optim import MegatronOptimizerModule
 from torch import Tensor
 
-from bionemo.llm.lightning import BionemoLightningModule, default_megatron_optimizer
+from bionemo.llm.lightning import BionemoLightningModule, DataStep, ForwardStep, default_megatron_optimizer
 from bionemo.llm.model.biobert.model import BioBertConfig, MegatronBioBertModel
 
 
@@ -63,31 +63,6 @@ class SequenceBatchCore(TypedDict):
 class SequenceBatch(SequenceBatchCore, total=False):
     cu_seqlens_argmin: Tensor
     max_seqlen: Tensor
-
-
-def biobert_lightning_module(
-    config: BioBertConfig,
-    optimizer: Optional[MegatronOptimizerModule] = None,
-    tokenizer: Optional[TokenizerSpec] = None,
-) -> BionemoLightningModule[MegatronBioBertModel, MegatronLossReduction]:
-    """A pytorch lightning module for BioBert-derived models. This module is designed to be used with the Megatron-LM strategy and nemo 2.0 conventions.
-    To change the your loss, pass in a different config object that returns a different loss reduction class. To change your model and what it outputs,
-    pass in a different config object that returns a different model. Do not modify this function unless you need to change higher level logic. You may
-    need to modify the various step and forward functions towards the bottom of this file to handle new/different keys in the batch. In the future some of
-    those functions may need to be refactored out into the config object or a different place so that they live closer to the model definition.
-    """
-
-    return BionemoLightningModule(
-        config=config,
-        optimizer=optimizer if optimizer is not None else default_megatron_optimizer(),
-        data_step=biobert_data_step,
-        forward_step=bert_forward_step,
-        tokenizer=tokenizer,
-    )
-
-
-############################################################################################################
-# Below are static helper functions for handling various steps in the above class.
 
 
 def biobert_data_step(dataloader_iter) -> Dict[str, Tensor]:
@@ -147,6 +122,28 @@ def bert_forward_step(model: BertModel[DataT], batch: BertBatch) -> DataT:
     # TODO support losses that also include the binary head, this means doing something more fancy than the one
     #      default GPT reduction function above MaskedTokenLossReduction()
     return forward_results
+
+
+def biobert_lightning_module(
+    config: BioBertConfig,
+    optimizer: Optional[MegatronOptimizerModule] = None,
+    tokenizer: Optional[TokenizerSpec] = None,
+    data_step: DataStep = biobert_data_step,
+    forward_step: ForwardStep = bert_forward_step,
+) -> BionemoLightningModule[MegatronBioBertModel, MegatronLossReduction]:
+    """A pytorch lightning module for BioBert-derived models. This module is designed to be used with the Megatron-LM strategy and nemo 2.0 conventions.
+    To change the your loss, pass in a different config object that returns a different loss reduction class. To change your model and what it outputs,
+    pass in a different config object that returns a different model. Do not modify this function unless you need to change higher level logic. You may
+    need to modify the various step and forward functions towards the bottom of this file to handle new/different keys in the batch. In the future some of
+    those functions may need to be refactored out into the config object or a different place so that they live closer to the model definition.
+    """
+    return BionemoLightningModule(
+        config=config,
+        optimizer=optimizer if optimizer is not None else default_megatron_optimizer(),
+        data_step=data_step,
+        forward_step=forward_step,
+        tokenizer=tokenizer,
+    )
 
 
 def bert_default_optimizer(model: torch.nn.Module) -> FusedAdam:
