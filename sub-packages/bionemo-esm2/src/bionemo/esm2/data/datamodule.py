@@ -25,9 +25,11 @@ from nemo.lightning.pytorch.plugins import MegatronDataSampler
 from nemo.utils import logging
 from pytorch_lightning.utilities.types import EVAL_DATALOADERS, TRAIN_DATALOADERS
 
+from bionemo.core.data.resamplers import PRNGResampleDataset
 from bionemo.core.utils import random_utils
 from bionemo.esm2.data import dataset, tokenizer
 from bionemo.llm.data import collate
+from bionemo.llm.utils.datamodule_utils import infer_num_samples
 
 
 class ESMDataModule(pl.LightningDataModule):
@@ -51,7 +53,7 @@ class ESMDataModule(pl.LightningDataModule):
         mask_prob: float = 0.15,
         mask_token_prob: float = 0.8,
         mask_random_prob: float = 0.1,
-        tokenizer: tokenizer.HFTokenizer = tokenizer.get_tokenizer(),
+        tokenizer: tokenizer.BioNeMoAutoTokenizer = tokenizer.get_tokenizer(),
     ) -> None:
         """Initialize the ESMDataModule.
 
@@ -97,7 +99,7 @@ class ESMDataModule(pl.LightningDataModule):
             seq_len=max_seq_length,
             micro_batch_size=micro_batch_size,
             global_batch_size=global_batch_size,
-            dataloader_type="cyclic",  # This should attach a `MegatronPretrainingRandomSampler`.
+            dataloader_type="single",  # `MegatronPretrainingRandomSampler` from "cyclic" is failing.
             rampup_batch_size=rampup_batch_size,
         )
 
@@ -126,15 +128,11 @@ class ESMDataModule(pl.LightningDataModule):
         if max_train_steps <= 0:
             raise RuntimeError("Please specify trainer.max_steps")
 
-        eval_iters = int((max_train_steps // self.trainer.val_check_interval + 1) * self.trainer.limit_val_batches)
-        num_train_samples = int(max_train_steps * self.data_sampler.global_batch_size)
-        num_val_samples = int(eval_iters * self.data_sampler.global_batch_size)
-
-        if self.trainer.limit_val_batches <= 1.0 and isinstance(self.trainer.limit_val_batches, float):
-            # This is to make sure we only have one epoch on every validation iteration
-            num_val_samples = 1
-
-        self._train_ds = dataset.create_train_dataset(
+        # Create training dataset
+        num_train_samples = int(
+            max_train_steps * self.data_sampler.global_batch_size
+        )  # training data requires upsampling (multiply by max_train_steps) on single MegatronPretrainingRandomSampler
+        _train_ds = dataset.create_train_dataset(
             cluster_file=self._train_cluster_path,
             db_path=self._train_database_path,
             total_samples=num_train_samples,
@@ -145,9 +143,20 @@ class ESMDataModule(pl.LightningDataModule):
             mask_random_prob=self._mask_random_prob,
             tokenizer=self._tokenizer,
         )
+        self._train_ds = self._sample_and_shuffle_dataset(
+            _train_ds, None, "train"
+        )  # shuffle manually without cyclic MegatronPretrainingRandomSampler
 
-        self._valid_ds = dataset.create_valid_dataset(
-            cluster_file=self._valid_cluster_path,
+        # Create validation dataset
+        val_clusters = dataset.create_valid_clusters(self._valid_cluster_path)
+        num_val_samples = infer_num_samples(
+            limit_batches=self.trainer.limit_val_batches,
+            num_samples_in_dataset=len(val_clusters),
+            global_batch_size=self.data_sampler.global_batch_size,
+            stage="val",
+        )
+        _valid_ds = dataset.create_valid_dataset(
+            clusters=self._valid_cluster_path,
             db_path=self._valid_database_path,
             total_samples=num_val_samples,
             seed=random_utils.get_seed_from_rng(rng),
@@ -157,6 +166,9 @@ class ESMDataModule(pl.LightningDataModule):
             mask_random_prob=self._mask_random_prob,
             tokenizer=self._tokenizer,
         )
+        self._valid_ds = self._sample_and_shuffle_dataset(
+            _valid_ds, None, "val"
+        )  # shuffle manually without cyclic MegatronPretrainingRandomSampler
 
         assert (
             hasattr(self, "trainer") and self.trainer is not None
@@ -190,3 +202,20 @@ class ESMDataModule(pl.LightningDataModule):
     def test_dataloader(self) -> EVAL_DATALOADERS:
         """Raises a not implemented error."""
         raise NotImplementedError("No test dataset provided for ESM2")
+
+    def _sample_and_shuffle_dataset(self, dataset: dataset.ESMMaskedResidueDataset, num_samples: int, stage: str):  # noqa: D417
+        """Sample the training dataset.
+
+        Args:
+            dataset (torch.utils.data.Dataset): The dataset to sample from
+
+        Returns:
+            ResamplingMappedDataset: Resampled dataset
+
+        """
+        # This is where re-sampling occurs.
+        return PRNGResampleDataset(
+            dataset,
+            num_samples=num_samples,
+            seed=self._seed + len(stage),
+        )

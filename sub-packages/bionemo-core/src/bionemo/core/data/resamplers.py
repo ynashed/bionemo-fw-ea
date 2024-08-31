@@ -21,10 +21,10 @@ from typing import Optional, Union
 from torch.utils.data import Dataset
 
 
-class PRNGDatasetShuffler(Dataset):
+class PRNGResampleDataset(Dataset):
     """A thread-safe dataset shuffler that uses a pseudo-random number generator (PRNG) to shuffle the dataset.
 
-    PRNGDatasetShuffler shuffles a given dataset using a pseudo-random number generator (PRNG). This allows for
+    PRNGResampleDataset shuffles a given dataset using a pseudo-random number generator (PRNG). This allows for
     reproducible shuffling by controlling the random seed, while not ever storing the list of indices in memory. It
     works by generating random indices assuming that the requesting function asks for them sequentially. Although random
     lookups are supported, random lookups will involve recomputing state which is slow, and involves linearly advancing
@@ -34,7 +34,7 @@ class PRNGDatasetShuffler(Dataset):
     """
 
     def __init__(self, dataset: Dataset, seed: int = 42, num_samples: Optional[int] = None):
-        """Initializes the PRNGDatasetShuffler.
+        """Initializes the PRNGResampleDataset.
 
         Args:
             dataset (Dataset): The dataset to be shuffled.
@@ -105,4 +105,4 @@ class PRNGDatasetShuffler(Dataset):
         return self.num_samples
 
 
-__all__ = ["PRNGDatasetShuffler"]
+__all__ = ["PRNGResampleDataset"]

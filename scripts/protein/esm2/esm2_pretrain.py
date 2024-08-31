@@ -14,32 +14,23 @@
 # limitations under the License.
 
 
-# TODO(@mgreaves, @jstjohn, @jomitchell) Consider different abstractions for pretraining, inference, and fine-tuning and see
-#  how they would address code duplication in the case of ESM2+Geneformer as well as a third hypothetical model that does
-#  not share the same types/loaders, such as OpenFold. The design should be flexible enough to allow for those differeht
-#  use cases and not hide too much complexity that a user would want to customize, while reducing code duplication
-#  between scripts.
-
 import argparse
-import math
 from pathlib import Path
 from typing import Optional, Sequence, get_args
 
 from megatron.core.optimizer import OptimizerConfig
 from nemo import lightning as nl
 from nemo.collections import llm
-from nemo.lightning import io, resume
+from nemo.lightning import resume
 from nemo.lightning.pytorch import callbacks as nl_callbacks
 from nemo.lightning.pytorch.optim import MegatronOptimizerModule
-from nemo.lightning.pytorch.optim.lr_scheduler import CosineAnnealingScheduler
-from nemo.utils import logging
 from pytorch_lightning.callbacks import LearningRateMonitor, RichModelSummary
-from torch.nn import functional as F
 
 from bionemo.core.utils.dtypes import PrecisionTypes, get_autocast_dtype
-from bionemo.geneformer.api import GeneformerConfig
-from bionemo.geneformer.data.singlecell.datamodule import SingleCellDataModule
-from bionemo.geneformer.data.singlecell.preprocess import GeneformerPreprocess
+from bionemo.esm2.api import ESM2Config
+from bionemo.esm2.data.datamodule import ESMDataModule
+from bionemo.esm2.data.tokenizer import get_tokenizer
+from bionemo.esm2.model.lr_scheduler import WarmupAnnealDecayHoldScheduler
 from bionemo.llm.lightning import LossLoggingCallback
 from bionemo.llm.model.biobert.lightning import BioBertLightningModule
 from bionemo.llm.model.biobert.model import BiobertSpecOption
@@ -51,7 +42,10 @@ __all__: Sequence[str] = ("main", "parser")
 
 
 def main(
-    data_dir: Path,
+    train_cluster_path: Path,
+    train_database_path: Path,
+    valid_cluster_path: Path,
+    valid_database_path: Path,
     num_nodes: int,
     devices: int,
     seq_length: int,
@@ -59,15 +53,14 @@ def main(
     wandb_project: Optional[str],
     wandb_offline: bool,
     num_steps: int,
+    warmup_steps: int,
     limit_val_batches: int,
     val_check_interval: int,
     num_dataset_workers: int,
-    biobert_spec_option: BiobertSpecOption,
+    biobert_spec_option: BiobertSpecOption,  # TODO(@farhadrgh) clarify how to parse this.
     lr: float,
     micro_batch_size: int,
     accumulate_grad_batches: int,
-    cosine_rampup_frac: float,
-    cosine_hold_frac: float,
     experiment_name: str,
     resume_if_exists: bool,
     precision: PrecisionTypes,
@@ -80,11 +73,18 @@ def main(
     metric_to_monitor_for_checkpoints: str = "val_loss",
     save_top_k: int = 2,
     save_every_n_steps: int = 100,
+    num_layers: int = 33,
+    hidden_size: int = 1280,
+    num_attention_heads: int = 20,
+    ffn_hidden_size: int = 1280 * 4,
 ) -> None:
-    """Train a Geneformer model on single cell data.
+    """Train an ESM2 model on UR data.
 
     Args:
-        data_dir (Path): Base directory for the data.
+        train_cluster_path (Path): path to train cluster partquet
+        train_database_path (Path): path to train database
+        valid_cluster_path (Path): path to validation cluster parquet
+        valid_database_path (Path): path to validation database
         num_nodes (int): Number of nodes to run on
         devices (int): number of devices
         seq_length (int): sequence length
@@ -98,8 +98,6 @@ def main(
         biobert_spec_option (BiobertSpecOption): the biobert spec option (architecture) to use for this run
         lr (float): learning rate
         micro_batch_size (int): micro batch size, from this and parallelism settings we infer the global batch size
-        cosine_rampup_frac (float): fraction of steps at the beginning of the run to ramp up the learning rate
-        cosine_hold_frac (float): fraction of steps to hold the minimum learning rate at the end of the run
         experiment_name (str): experiment name, this is the name used for the wandb run, and the sub-directory of the
             result_dir that stores the logs and checkpoints.
         resume_if_exists (bool): attempt to resume if the checkpoint exists [FIXME @skothenhill this doesn't work yet]
@@ -110,11 +108,6 @@ def main(
     """
     # Create the result directory if it does not exist.
     result_dir.mkdir(parents=True, exist_ok=True)
-
-    # Setup train/test/val data paths
-    train_data_path = data_dir / "train"
-    val_data_path = data_dir / "val"
-    test_data_path = data_dir / "test"
 
     # Setup the strategy and trainer
     pipeline_model_parallel_size = 1
@@ -152,103 +145,63 @@ def main(
         accelerator="gpu",
         strategy=strategy,
         limit_val_batches=limit_val_batches,  # This controls upsampling and downsampling
-        val_check_interval=val_check_interval,  # TODO(@jstjohn) Checkpoint saving is currently broken, fix and change this.
+        val_check_interval=val_check_interval,
         num_nodes=num_nodes,
         callbacks=[
-            # TODO(@skothenhill-nv) these need to be cleaned up when we have the automatic addition of track_io
-            io.track_io(LossLoggingCallback)(),
-            io.track_io(RichModelSummary)(max_depth=4),
-            io.track_io(LearningRateMonitor)(),
+            LossLoggingCallback(),
+            RichModelSummary(max_depth=4),
+            LearningRateMonitor(),
         ],
         plugins=nl.MegatronMixedPrecision(precision=precision),
     )
 
-    preprocessor = GeneformerPreprocess(
-        download_directory=train_data_path,
-        medians_file_path=train_data_path / "medians.json",
-        tokenizer_vocab_path=train_data_path / "geneformer.vocab",
-    )
-    match preprocessor.preprocess():
-        case {"tokenizer": tokenizer, "median_dict": median_dict}:
-            logging.info("*************** Preprocessing Finished ************")
-        case _:
-            logging.error("Preprocessing failed.")
+    tokenizer = get_tokenizer()
 
-    # Configure the data module and model
-    data = SingleCellDataModule(
-        seq_length=seq_length,
-        tokenizer=tokenizer,
-        train_dataset_path=train_data_path,
-        val_dataset_path=val_data_path,
-        test_dataset_path=test_data_path,
-        random_token_prob=0.02,  # changed to represent the incorrect setting we originally used.
-        median_dict=median_dict,
-        micro_batch_size=micro_batch_size,
+    # Initialize the data module.
+    data = ESMDataModule(
+        train_cluster_path=train_cluster_path,
+        train_database_path=train_database_path,
+        valid_cluster_path=valid_cluster_path,
+        valid_database_path=valid_database_path,
         global_batch_size=global_batch_size,
-        # persistent workers is supported when num_dataset_workers > 0
-        persistent_workers=num_dataset_workers > 0,
-        pin_memory=False,
+        micro_batch_size=micro_batch_size,
+        min_seq_length=None,
+        max_seq_length=seq_length,
         num_workers=num_dataset_workers,
     )
-    geneformer_config = GeneformerConfig(
-        num_layers=6,
-        hidden_size=256,
-        ffn_hidden_size=512,
-        num_attention_heads=4,
+
+    # Configure the model
+    esm2_config = ESM2Config(
         seq_length=seq_length,
-        fp32_residual_connection=False,  # TODO(@jstjohn) check this
-        hidden_dropout=0.02,
-        init_method_std=0.02,
-        kv_channels=None,
-        apply_query_key_layer_scaling=False,
-        make_vocab_size_divisible_by=128,
-        masked_softmax_fusion=True,  # TODO(@jstjohn) check this
-        fp16_lm_cross_entropy=False,
+        num_layers=num_layers,
+        hidden_size=hidden_size,
+        num_attention_heads=num_attention_heads,
+        ffn_hidden_size=ffn_hidden_size,
         params_dtype=get_autocast_dtype(precision),
         pipeline_dtype=get_autocast_dtype(precision),
         autocast_dtype=get_autocast_dtype(precision),  # setting this speeds things up a lot
-        gradient_accumulation_fusion=False,  # THIS BREAKS STUFF, leave False
-        layernorm_zero_centered_gamma=False,  # TODO(@jstjohn) check this
-        layernorm_epsilon=1.0e-12,
-        activation_func=F.gelu,  # TODO(@jstjohn) check this
-        qk_layernorm=False,  # TODO(@jstjohn) check this
-        apply_residual_connection_post_layernorm=False,  # False is new default, True was BERT pub.
-        bias_activation_fusion=True,  # TODO(@jstjohn) check this
-        bias_dropout_fusion=True,  # TODO(@jstjohn) check this
-        get_attention_mask_from_fusion=False,
-        attention_dropout=0.1,
-        share_embeddings_and_output_weights=True,
-        enable_autocast=False,  # This has to be set to True if we use the mixed precision plugin
         biobert_spec_option=biobert_spec_option,
         nemo1_ckpt_path=nemo1_init_path,
     )
 
-    # The lightning class owns a copy of the actual model, and a loss function, both of which are configured
-    #  and lazily returned by the `geneformer_config` object defined above.
     model = BioBertLightningModule(
-        geneformer_config,
+        esm2_config,
         tokenizer=tokenizer,
         optimizer=MegatronOptimizerModule(
             config=OptimizerConfig(
                 lr=lr,
-                # TODO(@jstjohn) try decoupled_lr
-                optimizer="adam",
+                optimizer="adam",  # fused_adam not supported
                 use_distributed_optimizer=True,
-                # Pass through fp16/bf16 settings to avoid errors around model having bf16 enabled but optimizer not.
-                fp16=geneformer_config.fp16,
-                bf16=geneformer_config.bf16,
+                weight_decay=0.01,
+                adam_beta1=0.9,
+                adam_beta2=0.98,
             ),
-            lr_scheduler=CosineAnnealingScheduler(
-                max_steps=num_steps,
-                # minimum learning rate is 1/100th of the initial learning rate, so eg lr=1e-3 -> min_lr=1e-5
-                min_lr=lr / 100,
-                warmup_steps=int(math.ceil(num_steps * cosine_rampup_frac)),
-                interval="step",
-                monitor="val_loss",
-                constant_steps=int(math.ceil(num_steps * cosine_hold_frac)),
+            lr_scheduler=WarmupAnnealDecayHoldScheduler(
+                warmup_steps=warmup_steps, max_steps=num_steps, max_lr=lr, min_lr=lr / 10.0, anneal_percentage=0.10
             ),
         ),
     )
+
     # Configure our custom Checkpointer
     checkpoint_callback = nl_callbacks.ModelCheckpoint(
         save_best_model=save_best_checkpoint,
@@ -267,6 +220,7 @@ def main(
         wandb_kwargs=wandb_options,
         ckpt_callback=checkpoint_callback,
     )
+
     llm.train(
         model=model,
         data=data,
@@ -280,13 +234,33 @@ def main(
     )
 
 
-parser = argparse.ArgumentParser(description="Pretrain Geneformer with single cell data.")
+# TODO migrate to hydra config
+# Parse the arguments and pull them out into local variables for ease of future refactor to a
+#   config management system.
+parser = argparse.ArgumentParser(description="Pretrain ESM2 with UR data.")
 parser.add_argument(
-    "--data-dir",
+    "--train-cluster-path",
     type=Path,
     required=True,
-    help="Path to the data base directory, for example this might be "
-    "/workspace/bionemo2/data/cellxgene_2023-12-15_small",
+    help="Path to the train cluster data parquet file",
+)
+parser.add_argument(
+    "--train-database-path",
+    type=Path,
+    required=True,
+    help="Path to the train sequence database file",
+)
+parser.add_argument(
+    "--valid-cluster-path",
+    type=Path,
+    required=True,
+    help="Path to the valid cluster data parquet file",
+)
+parser.add_argument(
+    "--valid-database-path",
+    type=Path,
+    required=True,
+    help="Path to the vali sequence database file",
 )
 parser.add_argument(
     "--precision",
@@ -300,8 +274,8 @@ parser.add_argument(
     "--lr",
     type=float,
     required=False,
-    default=1e-4,
-    help="Learning rate for training. Default is 1e-4. With bigger global batches try 1e-3",
+    default=4e-4,
+    help="Learning rate for training. Default is 4e-4",
 )
 parser.add_argument(
     "--create-tensorboard-logger", action="store_true", default=False, help="Create a tensorboard logger."
@@ -313,32 +287,15 @@ parser.add_argument(
 parser.add_argument(
     "--result-dir", type=Path, required=False, default=Path("./results"), help="Path to the result directory."
 )
-parser.add_argument(
-    "--experiment-name", type=str, required=False, default="geneformer", help="Name of the experiment."
-)
+parser.add_argument("--experiment-name", type=str, required=False, default="esm2", help="Name of the experiment.")
 parser.add_argument("--wandb-offline", action="store_true", default=False, help="Use wandb in offline mode.")
 parser.add_argument(
     "--wandb-project",
     type=str,
     required=False,
     default=None,
-    help="Wandb project name. Wandb will only happen if this is set..",
+    help="Wandb project name. Wandb will only happen if this is set.",
 )
-parser.add_argument(
-    "--cosine-rampup-frac",
-    type=float,
-    required=False,
-    default=0.01,
-    help="Fraction of steps in which to ramp up the learning rate. Default is 0.01.",
-)
-parser.add_argument(
-    "--cosine-hold-frac",
-    type=float,
-    required=False,
-    default=0.05,
-    help="Fraction of final steps in which to hold the minimum LR. Default is 0.05.",
-)
-
 parser.add_argument(
     "--num-gpus",
     type=int,
@@ -357,29 +314,36 @@ parser.add_argument(
     "--num-steps",
     type=int,
     required=False,
-    default=10000,
-    help="Number of steps to use for training. Default is 10000.",
+    default=500000,
+    help="Number of steps to use for training. Default is 500000.",
+)
+parser.add_argument(
+    "--warmup-steps",
+    type=int,
+    required=False,
+    default=2000,
+    help="Number of warmup steps for WarmupAnnealDecayHold Scheduler. Default is 2000.",
 )
 parser.add_argument(
     "--num-dataset-workers",
     type=int,
     required=False,
-    default=0,
-    help="Number of steps to use for training. Default is 0.",
+    default=1,
+    help="Number of workers to use for training. Default is 1.",
 )
 parser.add_argument(
     "--val-check-interval",
     type=int,
     required=False,
     default=10000,
-    help="Number of steps to use for training. Default is 10000.",
+    help="Number of steps between validation. Default is 10000.",
 )
 parser.add_argument(
     "--seq-length",
     type=int,
     required=False,
-    default=2048,
-    help="Sequence length of cell. Default is 2048.",
+    default=1024,
+    help="Sequence length of cell. Default is 1024.",
 )
 parser.add_argument(
     "--limit-val-batches",
@@ -407,8 +371,8 @@ parser.add_argument(
     type=BiobertSpecOption,
     choices=[e.value for e in BiobertSpecOption],
     required=False,
-    default=BiobertSpecOption.bert_layer_local_spec.value,
-    help="Biobert spec option to use for the model. Default is 'bert_layer_local_spec'.",
+    default=BiobertSpecOption.esm2_bert_layer_local_spec.value,
+    help="Biobert spec option to use for the model. Default is 'esm2_bert_layer_local_spec'.",
 )
 parser.add_argument(
     "--nemo1-init-path",
@@ -450,12 +414,43 @@ parser.add_argument(
     help="Path to the checkpoint directory to restore from. Will override `--resume-if-exists` when set.",
 )
 
+# ESM2 specific configuration (default: 650M)
+parser.add_argument(
+    "--num-layers",
+    type=int,
+    required=False,
+    default=33,
+    help="Number of layers in the model. Default is 33.",
+)
+parser.add_argument(
+    "--hidden-size",
+    type=int,
+    required=False,
+    default=1280,
+    help="Hidden size of the model. Default is 1280.",
+)
+parser.add_argument(
+    "--num-attention-heads",
+    type=int,
+    required=False,
+    default=20,
+    help="Number of attention heads in the model. Default is 20.",
+)
+parser.add_argument(
+    "--ffn-hidden-size",
+    type=int,
+    required=False,
+    default=4 * 1280,
+    help="FFN hidden size of the model. Default is 4 * 1280.",
+)
+
 if __name__ == "__main__":
-    # Parse the arguments and pull them out into local variables for ease of future refactor to a
-    #   config management system.
     args = parser.parse_args()
     main(
-        data_dir=args.data_dir,
+        train_cluster_path=args.train_cluster_path,
+        train_database_path=args.train_database_path,
+        valid_cluster_path=args.valid_cluster_path,
+        valid_database_path=args.valid_database_path,
         num_nodes=args.num_nodes,
         devices=args.num_gpus,
         seq_length=args.seq_length,
@@ -463,6 +458,7 @@ if __name__ == "__main__":
         wandb_project=args.wandb_project,
         wandb_offline=args.wandb_offline,
         num_steps=args.num_steps,
+        warmup_steps=args.warmup_steps,
         limit_val_batches=args.limit_val_batches,
         val_check_interval=args.val_check_interval,
         num_dataset_workers=args.num_dataset_workers,
@@ -470,8 +466,6 @@ if __name__ == "__main__":
         lr=args.lr,
         micro_batch_size=args.micro_batch_size,
         accumulate_grad_batches=args.accumulate_grad_batches,
-        cosine_rampup_frac=args.cosine_rampup_frac,
-        cosine_hold_frac=args.cosine_hold_frac,
         precision=args.precision,
         experiment_name=args.experiment_name,
         resume_if_exists=args.resume_if_exists,
@@ -482,4 +476,8 @@ if __name__ == "__main__":
         metric_to_monitor_for_checkpoints=args.metric_to_monitor_for_checkpoints,
         save_top_k=args.save_top_k,
         save_every_n_steps=args.val_check_interval,
+        num_layers=args.num_layers,
+        hidden_size=args.hidden_size,
+        num_attention_heads=args.num_attention_heads,
+        ffn_hidden_size=args.ffn_hidden_size,
     )

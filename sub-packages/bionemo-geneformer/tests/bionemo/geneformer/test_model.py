@@ -35,7 +35,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from bionemo import geneformer
-from bionemo.core.data.resamplers import PRNGDatasetShuffler
+from bionemo.core.data.resamplers import PRNGResampleDataset
 from bionemo.core.utils.batching_utils import pad_token_ids
 from bionemo.core.utils.dtypes import get_autocast_dtype
 from bionemo.core.utils.random_utils import random_numpy_context
@@ -61,7 +61,7 @@ from bionemo.testing.utils import assert_matrix_correlation_above_value, assert_
 bionemo2_root: Path = (
     # geneformer module's path is the most dependable --> don't expect this to change!
     Path(geneformer.__file__)
-    # This gets us from 'sub-packages/bionemo-geneformer/src/bionemo/esm2/__init__.py' to 'sub-packages/bionemo-geneformer'
+    # This gets us from 'sub-packages/bionemo-geneformer/src/bionemo/geneformer/__init__.py' to 'sub-packages/bionemo-geneformer'
     .parent.parent.parent.parent
     # From here, we want to get to the root of the repository: _before_ sub-packages/
     .parent.parent
@@ -405,7 +405,6 @@ def test_geneformer_nemo1_v_nemo2_inference_golden_values(
         pipeline_model_parallel_size=1,
         ddp="megatron",
         find_unused_parameters=True,
-        enable_nemo_ckpt_io=False,
         data_sampler=nl.MegatronDataSampler(
             micro_batch_size=3,
             global_batch_size=3,
@@ -694,7 +693,7 @@ def _get_loss_from_model(model_config: GeneformerConfig, seed: int) -> float:
             prepend_cls_token=True,
             seed=42,
         )
-        dss = PRNGDatasetShuffler(
+        dss = PRNGResampleDataset(
             ds,
             seed=seed,
         )

@@ -192,8 +192,6 @@ class LossLoggingCallback(pl.Callback):  # noqa: D101
                 outputs = outputs["loss"]
             # TODO verify that losses are already reduced across ranks
             # torch.distributed.all_reduce(outputs, op=torch.distributed.ReduceOp.AVG)
-            # TODO verify that losses are already reduced across ranks
-            # torch.distributed.all_reduce(outputs, op=torch.distributed.ReduceOp.AVG)
             loss = outputs
             self.val_losses.append(loss)
 

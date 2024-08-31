@@ -27,6 +27,7 @@ class WillHaveGetSetHparam(ABC):
     Raises:
         NotImplementedError: You must implement set_hparam, get_hparam, and get_hparams
     """
+
     @abstractmethod
     def set_hparam(self, attribute: str, value: Any, also_change_value: bool = True) -> None:
         """Mutates the saved hyper-parameter for the io mixed class.
@@ -76,6 +77,7 @@ class IOMixinWithGettersSetters(WillHaveGetSetHparam, io.IOMixin):
 
     This enables you to mutate the hyper-parameters of your classes which will later be saved in configs.
     """
+
     def set_hparam(self, attribute: str, value: Any, also_change_value: bool = True) -> None:
         """Mutates the saved hyper-parameter for the io mixed class.
 

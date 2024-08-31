@@ -29,15 +29,15 @@ from megatron.core.transformer.enums import ModelType
 from megatron.core.transformer.transformer_block import TransformerBlock
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.transformer.utils import get_linear_layer
-from nemo.collections.common.tokenizers.huggingface.auto_tokenizer import AutoTokenizer
-from nemo.lightning import io
 from torch import Tensor
 from torch.optim import Optimizer
 
+from bionemo.esm2.data.tokenizer import BioNeMoAutoTokenizer
 from bionemo.esm2.model.attention import ESM2DotProductAttention
 from bionemo.esm2.model.embedding import ESM2Embedding
 from bionemo.llm.model.biobert.model import BioBertGenericConfig, MegatronBioBertModel
 from bionemo.llm.model.biobert.transformer_specs import BiobertSpecOption
+from bionemo.llm.utils import iomixin_utils as iom
 
 
 __all__: Sequence[str] = (
@@ -56,7 +56,7 @@ class ESM2Model(MegatronBioBertModel):
         transformer_layer_spec: spec_utils.ModuleSpec,
         vocab_size: int,
         max_sequence_length: int,
-        tokenizer: AutoTokenizer = None,
+        tokenizer: Optional[BioNeMoAutoTokenizer] = None,
         pre_process: bool = True,
         post_process: bool = True,
         fp16_lm_cross_entropy: bool = False,
@@ -132,7 +132,7 @@ class ESM2Model(MegatronBioBertModel):
                 # ESM2 NEW ARGS
                 token_dropout=self.config.token_dropout,
                 use_attention_mask=self.config.use_attention_mask,
-                mask_token_id=tokenizer.mask_id,
+                mask_token_id=tokenizer.mask_token_id,
             )
 
         if self.position_embedding_type == "rope":
@@ -216,7 +216,7 @@ def esm_gelu_func(x: Tensor) -> Tensor:
 
 
 @dataclass
-class ESM2Config(BioBertGenericConfig[ESM2Model], io.IOMixin):
+class ESM2Config(BioBertGenericConfig[ESM2Model], iom.IOMixinWithGettersSetters):
     """Configuration class for ESM2 model.
 
     Attributes:

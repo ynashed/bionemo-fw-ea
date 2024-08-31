@@ -26,11 +26,12 @@ from pytorch_lightning.utilities.types import EVAL_DATALOADERS, TRAIN_DATALOADER
 from tokenizers import Tokenizer
 from torch.utils.data import DataLoader
 
-from bionemo.core.data.resamplers import PRNGDatasetShuffler
+from bionemo.core.data.resamplers import PRNGResampleDataset
 from bionemo.core.utils import random_utils
 from bionemo.geneformer.data.singlecell.dataset import SingleCellDataset
 from bionemo.geneformer.tokenizer.gene_tokenizer import GeneTokenizer
 from bionemo.llm.data import collate
+from bionemo.llm.utils.datamodule_utils import infer_num_samples
 
 
 __all__: Sequence[str] = ("SingleCellDataModule",)
@@ -149,15 +150,20 @@ class SingleCellDataModule(pl.LightningDataModule):
                 "Trainer is set to run for multiple epochs. This is not recommended due to the same shuffle being used in each. Instead set max_epochs to 1 and increase the number of max_steps."
             )
         assert max_train_steps > 0, "Please specify trainer.max_steps"
-        eval_iters = int((max_train_steps // self.trainer.val_check_interval + 1) * self.trainer.limit_val_batches)
-        test_iters = self.trainer.limit_test_batches
-        num_train_samples = int(max_train_steps * self.data_sampler.global_batch_size)
-        num_val_samples = int(eval_iters * self.data_sampler.global_batch_size)
-        num_test_samples = int(test_iters * self.data_sampler.global_batch_size)
 
-        if self.trainer.limit_val_batches <= 1.0 and isinstance(self.trainer.limit_val_batches, float):
-            # This is to make sure we only have one epoch on every validation iteration
-            num_val_samples = 1
+        num_train_samples = int(max_train_steps * self.data_sampler.global_batch_size)
+        num_val_samples = infer_num_samples(
+            limit_batches=self.trainer.limit_val_batches,
+            num_samples_in_dataset=len(self._val_dataset_ori),
+            global_batch_size=self.data_sampler.global_batch_size,
+            stage="val",
+        )
+        num_test_samples = infer_num_samples(
+            limit_batches=self.trainer.limit_test_batches,
+            num_samples_in_dataset=len(self._test_dataset_ori),
+            global_batch_size=self.data_sampler.global_batch_size,
+            stage="test",
+        )
 
         # This happens exactly once during setup.
         self._train_ds = self._sample_and_shuffle_dataset(self._train_dataset_ori, num_train_samples, "train")
@@ -199,7 +205,7 @@ class SingleCellDataModule(pl.LightningDataModule):
 
         """
         # This is where re-sampling occurs.
-        return PRNGDatasetShuffler(
+        return PRNGResampleDataset(
             dataset,
             num_samples=num_samples,
             seed=self.seed + len(stage),
