@@ -33,7 +33,7 @@ DEVELOPER_GUIDE_DIR = DOCS_DIR / "developer-guide"
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
-def generate_api_reference(src: Path) -> None:
+def generate_api_reference() -> None:
     """Generate API reference documentation for a given source directory.
 
     This function iterates through all 'src' directories in the sub-packages,
@@ -135,9 +135,10 @@ def main() -> None:
     """
     DOCS_DIR.mkdir(exist_ok=True)
 
+    # generate api docs
     generate_api_reference()
 
-    for sub_package in SUB_PACKAGES_DIR.iterdir():
+    for sub_package in SUB_PACKAGES_DIR.glob('bionemo-*'):
         if sub_package.is_dir():
             logging.info(f"Processing sub-package: {sub_package}")
             get_subpackage_notebooks(sub_package)
