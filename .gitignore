@@ -66,6 +66,7 @@ MNISTCustom/
 
 # Python debugging
 .pdbhistory
+.python_history
 
 # Translations
 *.mo
