@@ -780,7 +780,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
             out = self.dynamics(data, time, timesteps=timesteps)
             out, data = self.separate_discrete_variables(out, data)
             for key, interpolant in self.interpolants.items():
-                if t / timesteps > 0.5 and key in conditional_variables:
+                if key in conditional_variables:  # t / timesteps > 0.5 and
                     data[f"{key}_t"] = prior[key]
                     continue
                 if interpolant is None:

@@ -80,7 +80,7 @@ class MoleculeEvaluationCallback(pl.Callback):
             defaults.update(MoleculeTrainDataMetrics.default_values())
         return defaults
 
-    def evaluate_molecules(self, pl_module, trainer=None):
+    def evaluate_molecules(self, pl_module, trainer=None, return_molecules=False):
         """
         Evaluate generated molecules on specified metrics.
 
@@ -132,6 +132,8 @@ class MoleculeEvaluationCallback(pl.Callback):
             for key, value in results.items():
                 if "store" not in key:
                     print(key, value)
+        if return_molecules:
+            results["molecules"] = mols
         return results
 
     def on_validation_epoch_end(self, trainer, pl_module):

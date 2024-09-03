@@ -16,7 +16,6 @@ from multiprocessing import Pool
 
 import numpy as np
 import pandas as pd
-import torch
 from rdkit import Chem
 from rdkit.Chem import AllChem
 from torch_geometric.data import DataLoader
@@ -26,7 +25,9 @@ from bionemo.model.molecule.moco.data.data_utils import full_atom_encoder, mol_t
 from bionemo.model.molecule.moco.data.molecule_dataset import full_atom_decoder
 from bionemo.model.molecule.moco.metrics.molecule import get_molecules
 from bionemo.model.molecule.moco.metrics.molecule_stability_2d import Molecule2DStability
-from bionemo.model.molecule.moco.models.module import Graph3DInterpolantModel
+from bionemo.model.molecule.moco.models.multitime_module import (
+    MultiTimeGraph3DInterpolantModel as Graph3DInterpolantModel,
+)
 
 
 def calc_performance_stats(rmsd_array, threshold):
@@ -162,32 +163,6 @@ if __name__ == "__main__":
     test_data = pd.read_csv(test_csv)  # this should include the corrected smiles
     with open(true_mols, 'rb') as f:
         true_mols = pickle.load(f)
-
-    # test_data =  enumerate(test_data) #tqdm(enumerate(test_data), total=len(test_data))
-    test_mols = []  # [(Chem.MolFromSmiles(smi), count) for (raw, count, smi) in test_data.iloc[1:].iterrows()]
-    for index, row in test_data.iterrows():
-        smiles = row['smiles']
-        n_conformers = row['n_conformers']
-        corrected_smiles = row['corrected_smiles']
-        if dataset == 'XL':
-            smiles = corrected_smiles
-        # print(f"Index: {index}, SMILES: {smiles}, n_conformers: {n_conformers}, Corrected SMILES: {corrected_smiles}")
-        test_mols.append((smiles, n_conformers, Chem.MolFromSmiles(corrected_smiles)))
-
-    input_data = {
-        smiles: mol_to_torch_geometric(mol[0], full_atom_encoder, smiles) for (smiles, mol) in true_mols.items()
-    }
-
-    threshold = threshold_ranges = np.arange(0, 2.5, 0.125)
-
-    best_ckpt_path = "/workspace/bionemo/bionemo/model/molecule/moco/ckpt/julian_best_mol_stab.ckpt"
-    ckpt_path = "/workspace/bionemo/bionemo/model/molecule/moco/models/results/eqgatdiff/EQGAT_FW_TEST_6_28_charges_live_interpolant/checkpoints/last.ckpt"
-    save_path = '/workspace/bionemo/bionemo/model/molecule/moco/models/results/eqgatdiff/julian/'  #! set up saving for infernece and forward
-
-    state_dict = torch.load(best_ckpt_path)["state_dict"]
-    state_dict = {k[6:]: v for k, v in state_dict.items() if k.startswith("model.")}
-    model = Graph3DInterpolantModel.load_from_checkpoint(ckpt_path)
-    model.dynamics.load_state_dict(state_dict)
     clean = [
         'C=CCC(CC=C)(NC(=O)c1cccc(C)c1)c1ccccc1',
         'C=CCN(c1ccccc1C(=O)O)S(=O)(=O)/C=C/c1ccccc1',
@@ -387,14 +362,40 @@ if __name__ == "__main__":
         'S=c1[nH]nc(COc2ccccc2)n1/N=C/C=C/c1ccco1',
         'c1cc2c3c(cccc3c1)C(N1CCOCC1)=N2',
     ]
+    # test_data =  enumerate(test_data) #tqdm(enumerate(test_data), total=len(test_data))
+    test_mols = []  # [(Chem.MolFromSmiles(smi), count) for (raw, count, smi) in test_data.iloc[1:].iterrows()]
+    for index, row in test_data.iterrows():
+        smiles = row['smiles']
+        n_conformers = row['n_conformers']
+        corrected_smiles = row['corrected_smiles']
+        if dataset == 'XL':
+            smiles = corrected_smiles
+        # print(f"Index: {index}, SMILES: {smiles}, n_conformers: {n_conformers}, Corrected SMILES: {corrected_smiles}")
+        test_mols.append((smiles, n_conformers, Chem.MolFromSmiles(corrected_smiles)))
 
+    input_data = {
+        smiles: mol_to_torch_geometric(mol[0], full_atom_encoder, smiles) for (smiles, mol) in true_mols.items()
+    }
+
+    threshold = threshold_ranges = np.arange(0, 2.5, 0.125)
+
+    # best_ckpt_path = "/workspace/bionemo/bionemo/model/molecule/moco/ckpt/julian_best_mol_stab.ckpt"
+    # ckpt_path = "/workspace/bionemo/bionemo/model/molecule/moco/models/results/eqgatdiff/EQGAT_FW_TEST_6_28_charges_live_interpolant/checkpoints/last.ckpt"
+    ckpt_path = "/workspace/bionemo/examples/molecule/moco/checkpoints/best-epoch=89-step=88025--mol_stable=0.954.ckpt"
+    save_path = '/workspace/bionemo/bionemo/model/molecule/moco/models/results/multitime/'  #! set up saving for infernece and forward
+    # bionemo/examples/molecule/moco/checkpoints/best-epoch=89-step=88025--mol_stable=0.954.ckpt
+    # state_dict = torch.load(best_ckpt_path)["state_dict"]
+    # state_dict = {k[6:]: v for k, v in state_dict.items() if k.startswith("model.")}
+    model = Graph3DInterpolantModel.load_from_checkpoint(ckpt_path)
+    # model.dynamics.load_state_dict(state_dict)
+    # mol_metrics = BasicMolecularMetrics({"atom_decoder": full_atom_decoder}, device=model.device)
     model.cuda()
     model.eval()
     count = 0
-    if not os.path.exists(save_path + f"eq_{dataset}_confs_clean.pkl"):
+    if not os.path.exists(save_path + f"mt_{dataset}_confs_clean.pkl"):
         OUTPUT = defaultdict(list)
     else:
-        with open(save_path + f"eq_{dataset}_confs_clean.pkl", 'rb') as f:
+        with open(save_path + f"mt_{dataset}_confs_clean.pkl", 'rb') as f:
             OUTPUT = pickle.load(f)
         print(OUTPUT.keys())
     batch_size = 100  # drugs 50 is like 50% gpu #XL 25 # XL 50 too big 10 is 25%
@@ -414,7 +415,7 @@ if __name__ == "__main__":
             count -= 1
             continue
         else:
-            batch_size = 50
+            batch_size = 150
         total = 2 * n_conf
         data = input_data[smi]
         loader = DataLoader([data] * total, batch_size=batch_size, shuffle=False)
@@ -429,11 +430,11 @@ if __name__ == "__main__":
             stability_res, valid_smiles, valid_molecules, stable_molecules, info_2d = mol_2d_stability(mols)
             print(smi, stability_res)
             OUTPUT[smi].extend([x.rdkit_mol for x in mols])
-            with open(save_path + f"eq_{dataset}_confs_clean.pkl", 'wb') as f:
+            with open(save_path + f"mt_{dataset}_confs_clean.pkl", 'wb') as f:
                 pickle.dump(OUTPUT, f)
-    # os.remove(save_path + f"eq_{dataset}_confs.pkl")
-    with open(save_path + f"eq_{dataset}_confs_final.pkl_clean", 'wb') as f:
+    # os.remove(save_path + f"mt_{dataset}_confs.pkl")
+    with open(save_path + f"mt_{dataset}_confs_final.pkl_clean", 'wb') as f:
         pickle.dump(OUTPUT, f)
 
-    result = run_benchmark(OUTPUT, test_data, true_mols, "eq_results_clean.pkl")
+    result = run_benchmark(OUTPUT, test_data, true_mols, "mt_results_clean.pkl")
 #! TODO need to filter out non clean molecules from failters ie pass in a filtermol for coverage to be accurate

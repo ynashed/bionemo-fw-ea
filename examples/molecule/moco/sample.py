@@ -8,6 +8,8 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
+import pickle
+
 import torch
 
 from bionemo.model.molecule.moco.data.molecule_datamodule import MoleculeDataModule
@@ -23,9 +25,9 @@ if __name__ == "__main__":
     # ckpt_path = f"{res_dir}/epoch=214-step=315199.ckpt"
     # ema_weights = f"{res_dir}/ema_parameters_epoch_214.pt"
     ema_weights = None
-    ckpt_path = '/workspace/bionemo/examples/molecule/moco/checkpoints/best-epoch=169-step=166269--mol_stable=0.984.ckpt'  # best-epoch=149-step=146708--mol_stable=0.978.ckpt"
+    ckpt_path = '/workspace/bionemo/examples/molecule/moco/checkpoints/best-epoch=549-step=403162--mol_stable=0.979.ckpt'  # best-epoch=169-step=166269--mol_stable=0.984.ckpt'  # best-epoch=149-step=146708--mol_stable=0.978.ckpt"
 
-    n_graphs = 1000
+    n_graphs = 5000
     batch_size = 200
     # to load previous weights
     # from omegaconf import OmegaConf
@@ -44,8 +46,8 @@ if __name__ == "__main__":
     datamodule = MoleculeDataModule(
         dataset_root="/workspace/bionemo/data/pyg_geom_drug",
         processed_folder="processed",
-        batch_size=150,
-        inference_batch_size=150,
+        batch_size=batch_size,
+        inference_batch_size=batch_size,
         removed_h=False,
         data_loader_type="midi",
     )
@@ -68,10 +70,12 @@ if __name__ == "__main__":
 
     model.cuda()
     model.eval()
-    import ipdb
 
-    ipdb.set_trace()
-    result = eval_callback.evaluate_molecules(model)
+    result = eval_callback.evaluate_molecules(model, return_molecules=True)
+    result['ckpt'] = ckpt_path
+    save_path = '/workspace/bionemo/bionemo/model/molecule/moco/models/results/megalodon/'
+    with open(save_path + "5k_mols_fn_v4_clamp.pkl", 'wb') as f:
+        pickle.dump(result, f)
     import ipdb
 
     ipdb.set_trace()
