@@ -9,6 +9,7 @@ theme:
     - content.code.annotate
     - navigation.tabs
     - navigation.sections
+    - navigation.indexes
     - navigation.instant
     - navigation.instant.prefetch
     - search.suggest
@@ -54,10 +55,14 @@ plugins:
   - mkdocs-jupyter
 
 markdown_extensions:
+  - pymdownx.details
+  - pymdownx.superfences
   - pymdownx.snippets:
       check_paths: true
       restrict_base_path: False
       base_path: "."
+  - def_list
+  - admonition
 
 copyright: |
   &copy; Copyright 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.

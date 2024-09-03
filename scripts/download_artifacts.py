@@ -378,4 +378,5 @@ if __name__ == "__main__":
     if not (args.models or args.data):
         logging.warning("No models or data were selected to download.")
     else:
+        logging.warning("This script is deprecated, use `bionemo.testing.data.load` instead.")
         main(models=args.models, data=args.data)
