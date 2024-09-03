@@ -790,6 +790,8 @@ def _train_model_get_ckpt(
     name: str,
     root_dir: Path,
     config: GeneformerConfig,
+    n_steps_train: int,
+    batch_size: int,
 ) -> Tuple[Path, MetricTracker, nl.Trainer]:
     data_error_str = "Please download test data with:\n`python scripts/download_artifacts.py --models all --model_dir ./models --data all --data_dir ./ --verbose --source pbss`"
     data_dir = Path(data_path)
@@ -819,8 +821,8 @@ def _train_model_get_ckpt(
         val_dataset_path=str(val_data_path),
         test_dataset_path=str(test_data_path),
         random_token_prob=0.1,
-        micro_batch_size=32,
-        global_batch_size=32,
+        micro_batch_size=batch_size,
+        global_batch_size=batch_size,
     )
 
     checkpoint_callback = nl_callbacks.ModelCheckpoint(
@@ -828,7 +830,7 @@ def _train_model_get_ckpt(
         save_last=True,
         save_on_train_epoch_end=True,
         monitor="reduced_train_loss",  # TODO find out how to get val_loss logged and use "val_loss",
-        every_n_train_steps=5,
+        every_n_train_steps=n_steps_train // 2,
         enable_nemo_ckpt_io=True,  # Enables the .nemo file-like checkpointing where all IOMixins are under SerDe
     )
     save_dir = root_dir / name
@@ -866,10 +868,10 @@ def _train_model_get_ckpt(
         devices=1,
         strategy=strategy,
         limit_val_batches=2,
-        val_check_interval=10,
-        max_steps=50,
+        val_check_interval=n_steps_train // 2,
+        max_steps=n_steps_train,
         num_nodes=1,
-        log_every_n_steps=10,
+        log_every_n_steps=n_steps_train // 2,
         callbacks=[LossLoggingCallback(), metric_tracker],
         plugins=nl.MegatronMixedPrecision(precision=MODEL_PRECISION),
     )
@@ -889,14 +891,21 @@ def _train_model_get_ckpt(
 
 
 @pytest.mark.needs_gpu
-def test_continue_from_checkpoint_geneformer(tmpdir, geneformer_config: GeneformerConfig):
+def test_continue_from_checkpoint_geneformer(
+    tmpdir, geneformer_config: GeneformerConfig, n_layers_test: int = 3, n_steps_train: int = 50, batch_size: int = 16
+):
     base_geneformer_config = io.reinit(geneformer_config)  # generate a new copy by calling the cached init.
 
     # Modify both the variable and associated saved init hyper-param by calling config.mutate(...)
     base_geneformer_config.set_hparam("return_only_hidden_states", False)
     base_geneformer_config.set_hparam("nemo1_ckpt_path", None)
-    base_geneformer_config.set_hparam("num_layers", 3)  # set to 3 layers
-    assert base_geneformer_config.num_layers == 3
+    base_geneformer_config.set_hparam("num_layers", n_layers_test)  # set to 3 layers
+    base_geneformer_config.set_hparam("hidden_size", 128)
+    base_geneformer_config.set_hparam("ffn_hidden_size", 256)
+    # Re-initialize after manually updating hidden_size/ffn_hidden_size since so many other parameters
+    #  are based off of these parameters and modified in post_init of the transformer config.
+    base_geneformer_config = io.reinit(base_geneformer_config)
+    assert base_geneformer_config.num_layers == n_layers_test
     assert base_geneformer_config.nemo1_ckpt_path is None
     assert not base_geneformer_config.return_only_hidden_states
     with megatron_parallel_state_utils.distributed_model_parallel_state(32):
@@ -904,39 +913,50 @@ def test_continue_from_checkpoint_geneformer(tmpdir, geneformer_config: Geneform
             name="test_experiment",
             root_dir=tmpdir / "pretrain",
             config=base_geneformer_config,
+            n_steps_train=n_steps_train,
+            batch_size=batch_size,
         )
         assert ckpt_path.exists()
         assert ckpt_path.is_dir()
         assert io.is_distributed_ckpt(ckpt_path)
-        assert initial_trainer.model.config.num_layers == 3
+        assert initial_trainer.model.config.num_layers == n_layers_test
         assert initial_metrics.collection_train["loss"][0] > initial_metrics.collection_train["loss"][-1]
     with megatron_parallel_state_utils.distributed_model_parallel_state(43):
         # NOTE all other hparams will be pulled from this checkpoint.
-        base_geneformer_config = GeneformerConfig(
+        update_base_geneformer_config = GeneformerConfig(
             initial_ckpt_path=str(ckpt_path),
         )
         continue_checkpoint, continue_metrics, continue_trainer = _train_model_get_ckpt(
             name="test_experiment_continue",
             root_dir=tmpdir / "continue_training",  # new checkpoint will land in a subdir of this
-            config=base_geneformer_config,  # same config as before since we are just continuing training
+            config=update_base_geneformer_config,  # same config as before since we are just continuing training
+            n_steps_train=n_steps_train,
+            batch_size=batch_size,
         )
         assert continue_checkpoint.exists()
         assert continue_checkpoint.is_dir()
         assert io.is_distributed_ckpt(continue_checkpoint)
-        assert continue_trainer.model.config.num_layers == 3
+        assert continue_trainer.model.config.num_layers == n_layers_test
         assert continue_metrics.collection_train["loss"][0] > continue_metrics.collection_train["loss"][-1]
         assert sum(continue_metrics.collection_train["loss"][:5]) < sum(initial_metrics.collection_train["loss"][-5:])
 
 
 @pytest.mark.needs_gpu
-def test_finetune_geneformer(tmpdir, geneformer_config: GeneformerConfig):
+def test_finetune_geneformer(
+    tmpdir, geneformer_config: GeneformerConfig, n_layers_test: int = 3, n_steps_train: int = 50, batch_size: int = 16
+):
     base_geneformer_config = io.reinit(geneformer_config)  # generate a new copy by calling the cached init.
 
     # Modify both the variable and associated saved init hyper-param by calling config.mutate(...)
     base_geneformer_config.set_hparam("return_only_hidden_states", False)
     base_geneformer_config.set_hparam("nemo1_ckpt_path", None)
-    base_geneformer_config.set_hparam("num_layers", 3)  # set to 3 layers
-    assert base_geneformer_config.num_layers == 3
+    base_geneformer_config.set_hparam("num_layers", n_layers_test)  # set to 3 layers
+    base_geneformer_config.set_hparam("hidden_size", 128)
+    base_geneformer_config.set_hparam("ffn_hidden_size", 256)
+    # Re-initialize after manually updating hidden_size/ffn_hidden_size since so many other parameters
+    #  are based off of these parameters and modified in post_init of the transformer config.
+    base_geneformer_config = io.reinit(base_geneformer_config)
+    assert base_geneformer_config.num_layers == n_layers_test
     assert base_geneformer_config.nemo1_ckpt_path is None
     assert not base_geneformer_config.return_only_hidden_states
     with megatron_parallel_state_utils.distributed_model_parallel_state(32):
@@ -944,11 +964,13 @@ def test_finetune_geneformer(tmpdir, geneformer_config: GeneformerConfig):
             name="test_experiment",
             root_dir=tmpdir / "pretrain",
             config=base_geneformer_config,
+            n_steps_train=n_steps_train,
+            batch_size=batch_size,
         )
         assert ckpt_path.exists()
         assert ckpt_path.is_dir()
         assert io.is_distributed_ckpt(ckpt_path)
-        assert initial_trainer.model.config.num_layers == 3
+        assert initial_trainer.model.config.num_layers == n_layers_test
         assert initial_metrics.collection_train["loss"][0] > initial_metrics.collection_train["loss"][-1]
     with megatron_parallel_state_utils.distributed_model_parallel_state(43):
         ft_geneformer_config = FineTuneSeqLenBioBertConfig(
@@ -959,9 +981,11 @@ def test_finetune_geneformer(tmpdir, geneformer_config: GeneformerConfig):
             name="finetune_new_head",
             root_dir=tmpdir / "finetune_new_head",  # new checkpoint will land in a subdir of this
             config=ft_geneformer_config,  # same config as before since we are just continuing training
+            n_steps_train=n_steps_train,
+            batch_size=batch_size,
         )
         assert simple_ft_checkpoint.exists()
         assert simple_ft_checkpoint.is_dir()
         assert io.is_distributed_ckpt(simple_ft_checkpoint)
-        assert ft_trainer.model.config.num_layers == 3
+        assert ft_trainer.model.config.num_layers == n_layers_test
         assert simple_ft_metrics.collection_train["loss"][0] > simple_ft_metrics.collection_train["loss"][-1]
