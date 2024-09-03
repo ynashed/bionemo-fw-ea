@@ -32,12 +32,12 @@ from bionemo.llm.lightning import LossLoggingCallback
 from bionemo.llm.model.config import MegatronBioNeMoTrainableModelConfig
 from bionemo.testing import megatron_parallel_state_utils
 from bionemo.testing.callbacks import MetricTracker
+from bionemo.testing.data.load import BIONEMO_CACHE_DIR
 
 
 def _train_model_get_ckpt(
     name: str,
     root_dir: Path,
-    data_dir: Path,
     model_cfg_cls: Type[MegatronBioNeMoTrainableModelConfig],
     ckpt_path: Path | None,
     skip_weight_prefixes: Set[str],
@@ -108,7 +108,7 @@ def _train_model_get_ckpt(
         callbacks=[LossLoggingCallback(), metric_tracker],
         **extra_args,
     )
-    data_module = lb.MNISTDataModule(data_dir=str(data_dir), batch_size=64)  # Re-use the same data directory
+    data_module = lb.MNISTDataModule(data_dir=str(BIONEMO_CACHE_DIR), batch_size=64)  # Re-use the same data directory
     llm.train(
         model=lightning_module,
         data=data_module,
@@ -127,13 +127,10 @@ def _train_model_get_ckpt(
 @pytest.mark.needs_gpu
 @pytest.mark.parametrize("precision", [32, "bf16-mixed"])
 def test_train_mnist_litautoencoder_with_megatron_strategy_single_gpu(tmpdir: LEGACY_PATH, precision: PrecisionTypes):
-    data_dir: Path = tmpdir / "data"
-    data_dir.mkdir()
     with megatron_parallel_state_utils.distributed_model_parallel_state():
         ckpt_path, initial_metrics = _train_model_get_ckpt(
             name="test_experiment",
             root_dir=tmpdir / "pretrain",
-            data_dir=data_dir,
             model_cfg_cls=lb.ExampleConfig,
             ckpt_path=None,
             skip_weight_prefixes=set(),
@@ -147,7 +144,6 @@ def test_train_mnist_litautoencoder_with_megatron_strategy_single_gpu(tmpdir: LE
         simple_ft_checkpoint, simple_ft_metrics = _train_model_get_ckpt(
             name="simple_finetune_experiment",
             root_dir=tmpdir / "simple_finetune",  # new checkpoint will land in a subdir of this
-            data_dir=data_dir,  # same data dir for all steps to skip re-download
             model_cfg_cls=lb.ExampleConfig,  # same config as before since we are just continuing training
             ckpt_path=ckpt_path,  # specify the initial checkpoint path now
             skip_weight_prefixes=set(),  # no new weights in this model need skipping
@@ -161,7 +157,6 @@ def test_train_mnist_litautoencoder_with_megatron_strategy_single_gpu(tmpdir: LE
         add_head_checkpoint, add_head_ft_metrics = _train_model_get_ckpt(
             name="add_head_finetune_experiment",
             root_dir=tmpdir / "add_head_finetune",
-            data_dir=data_dir,
             model_cfg_cls=lb.ExampleFineTuneBothConfig,  # config that returns a model/loss with a new task head
             ckpt_path=simple_ft_checkpoint,  # cumulatively modify a checkpoint with subsequent experiments, (optional)
             skip_weight_prefixes={"digit_classifier"},  # The new head weights are not in the ckpt so need skipping.
@@ -178,7 +173,6 @@ def test_train_mnist_litautoencoder_with_megatron_strategy_single_gpu(tmpdir: LE
         drop_head_checkpoint, drop_head_ft_metrics = _train_model_get_ckpt(
             name="drop_head_finetune_experiment",
             root_dir=tmpdir / "drop_head_finetune",
-            data_dir=data_dir,
             model_cfg_cls=lb.ExampleFineTuneDropParentConfig,  # config that drops the decoder and head -> only cls now
             ckpt_path=add_head_checkpoint,  # cumulatively build on the config that had this cls head (optional)
             skip_weight_prefixes=set(),  # no new parameters vs prior cfg, will continue training cls head by itself
