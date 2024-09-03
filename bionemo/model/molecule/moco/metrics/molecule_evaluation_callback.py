@@ -80,7 +80,7 @@ class MoleculeEvaluationCallback(pl.Callback):
             defaults.update(MoleculeTrainDataMetrics.default_values())
         return defaults
 
-    def evaluate_molecules(self, pl_module, trainer=None):
+    def evaluate_molecules(self, pl_module, trainer=None, return_molecules=False):
         """
         Evaluate generated molecules on specified metrics.
 
@@ -102,7 +102,7 @@ class MoleculeEvaluationCallback(pl.Callback):
 
         # Evaluate 2D stability
         mol_2d_stability = Molecule2DStability(self.dataset_info, device=pl_module.device)
-        stability_res, valid_smiles, _, _ = mol_2d_stability(mols)
+        stability_res, valid_smiles, valid_molecules, stable_molecules, info_2d = mol_2d_stability(mols)
         results.update(stability_res)
 
         if self.compute_2D_metrics:
@@ -125,8 +125,15 @@ class MoleculeEvaluationCallback(pl.Callback):
             train_data_res = train_data_metrics(valid_smiles)
             results.update(train_data_res)
 
+        # results['store_valid_molecules'] = valid_molecules
+        # results['store_stable_molecules'] = stable_molecules
+        # results['store_info_2d'] = info_2d
         if trainer is None or trainer.global_rank == 0:
-            print(results)
+            for key, value in results.items():
+                if "store" not in key:
+                    print(key, value)
+        if return_molecules:
+            results["molecules"] = mols
         return results
 
     def on_validation_epoch_end(self, trainer, pl_module):

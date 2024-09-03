@@ -13,7 +13,7 @@ import torch.nn.functional as F
 from torch import nn
 from torch_scatter import scatter_mean
 
-from bionemo.model.molecule.moco.models.mpnn import MLP
+from bionemo.model.molecule.moco.arch.scratch.mpnn import MLP
 
 
 class PredictionHead(nn.Module):
@@ -83,11 +83,11 @@ class InterpolantLossFunction(nn.Module):
         self.use_distance = use_distance
         self.distance_scale = distance_scale
 
-    def forward(self, batch, logits, data, batch_weight=None, element_weight=None):
+    def forward(self, batch, logits, data, batch_weight=None, element_weight=None, level=10000):
         # d (λx, λh, λe) = (3, 0.4, 2)
         batch_size = len(batch.unique())
         if self.continuous:
-            loss = self.f_continuous(logits, data).mean(-1)  # [N]
+            loss = self.f_continuous(logits, data).mean(-1)  # [N] #! this hsould prbably be sum
             output = logits
         else:
             loss = self.f_discrete(logits, data)
@@ -97,13 +97,36 @@ class InterpolantLossFunction(nn.Module):
         loss = scatter_mean(loss, index=batch, dim=0, dim_size=batch_size)
         if batch_weight is not None:
             loss = loss * batch_weight  # .unsqueeze(1)
+        if level is not None:
+            loss = loss.clamp(0, level)
+        # print(level)
         if self.aggregation == "mean":
             loss = self.scale * loss.mean()
         elif self.aggregation == "sum":
             loss = self.scale * loss.sum()
+
         return loss, output
 
-    def edge_loss(self, batch, logits, data, index, num_atoms, batch_weight=None, element_weight=None):
+    def backbone_loss(self, batch, logits, data, batch_weight, cutoff=2.5):
+        # import ipdb; ipdb.set_trace()
+        # a, b = self.forward(batch, logits, data)
+        batch_size = len(batch.unique())
+        grel = logits.unsqueeze(1) - logits.unsqueeze(0)
+        trel = data.unsqueeze(1) - data.unsqueeze(0)
+        gnorm = torch.linalg.norm(grel, dim=-1)
+        tnorm = torch.linalg.norm(trel, dim=-1)
+        mask = tnorm < cutoff
+        mask.fill_diagonal_(False)
+        gbackbone = gnorm * mask.int()
+        tbackbone = tnorm * mask.int()
+        loss = self.f_continuous(gbackbone, tbackbone)
+        loss_mask = (batch.unsqueeze(0) == batch.unsqueeze(1)).int()
+        loss = loss * loss_mask
+        loss = loss.sum(-1)
+        loss = scatter_mean(loss, index=batch, dim=0, dim_size=batch_size) * batch_weight
+        return loss.sum() / batch_weight.sum()
+
+    def edge_loss(self, batch, logits, data, index, num_atoms, batch_weight=None, element_weight=None, level=10000):
         batch_size = len(batch.unique())
         loss = self.f_discrete(logits, data)
         loss = 0.5 * scatter_mean(loss, index=index, dim=0, dim_size=num_atoms)  # Aggregate on the bonds first
@@ -113,6 +136,9 @@ class InterpolantLossFunction(nn.Module):
         loss = scatter_mean(loss, index=batch, dim=0, dim_size=batch_size)
         if batch_weight is not None:
             loss = loss * batch_weight  # .unsqueeze(1)
+        # loss = loss.clamp(0, level)
+        if level is not None:
+            loss = loss.clamp(0, level)
         if self.aggregation == "mean":
             loss = self.scale * loss.mean()
         elif self.aggregation == "sum":

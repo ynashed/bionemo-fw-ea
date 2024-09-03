@@ -146,10 +146,13 @@ class TimestepEmbedder(nn.Module):
             embedding = torch.cat([embedding, torch.zeros_like(embedding[:, :1])], dim=-1)
         return embedding
 
-    def forward(self, t, batch):
+    def forward(self, t, batch=None):
         t_freq = self.timestep_embedding(t, self.frequency_embedding_size)
         t_emb = self.mlp(t_freq)
-        return t_emb
+        if batch is not None:
+            return t_emb[batch]
+        else:
+            return t_emb
 
 
 class AdaLN(nn.Module):
@@ -670,6 +673,8 @@ if __name__ == "__main__":
     Z = atom_embedder(F.one_hot(ligand_feats, num_classes).float()).unsqueeze(1) * atom_embedder(
         F.one_hot(ligand_feats, num_classes).float()
     ).unsqueeze(0)
+    source, target = E_idx
+    E = A[source, target]
 
     source, target = E_idx
     r = X[target] - X[source]  # E x 3

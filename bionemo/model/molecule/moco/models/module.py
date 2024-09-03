@@ -31,6 +31,111 @@ from bionemo.model.molecule.moco.models.self_conditioning import SelfConditionin
 from bionemo.model.molecule.moco.models.utils import InterpolantLossFunction
 
 
+def compute_angles(pos, bond_matrix, edge_index):
+    """
+    Compute the angles between connected nodes in a graph based on their positions and the bond matrix.
+
+    Args:
+        positions (Tensor): Node positions [N, 3].
+        bond_matrix (Tensor): Adjacency matrix [N, N].
+        edge_index (Tensor): Edge index [2, E].
+
+    Returns:
+        Tensor: Vector of angles for existing bonds [E].
+    """
+    num_edges = edge_index.size(1)
+    angle_list = []
+
+    for edge_idx in range(num_edges):
+        src, dst = edge_index[:, edge_idx]
+        if bond_matrix[src, dst] > 0:
+            # Find all other neighbors to compute the angle
+            # src_neighbors = torch.nonzero(bond_matrix[src]).squeeze(1)
+            dst_neighbors = torch.nonzero(bond_matrix[dst]).squeeze(1)
+
+            # Remove self from neighbors
+            # src_neighbors = src_neighbors[src_neighbors != dst]
+            dst_neighbors = dst_neighbors[dst_neighbors != src]
+
+            for k in dst_neighbors:
+                if k != src:  # Avoid self-loop
+                    # Compute the angle (i, j, k)
+                    p_a = pos[src]
+                    p_b = pos[dst]
+                    p_c = pos[k]
+
+                    v1 = p_b - p_a
+                    v2 = p_c - p_a
+
+                    # Normalize the vectors
+                    v1_norm = v1 / (torch.norm(v1) + 1e-6)
+                    v2_norm = v2 / (torch.norm(v2) + 1e-6)
+
+                    # Compute cosine similarity
+                    cosine_similarity = torch.dot(v1_norm, v2_norm)
+
+                    # Clamp to avoid numerical errors
+                    cosine_similarity = cosine_similarity.clamp(-1, 1)
+
+                    # Compute angle
+                    angle = torch.acos(cosine_similarity)
+                    angle_list.append(angle)
+
+    return torch.stack(angle_list).to(pos.device)  # Convert list to tensor and move to device
+
+
+def cosine_distance_loss(true_angles, pred_angles):
+    """
+    Compute the cosine distance loss between true and predicted angles.
+
+    Args:
+        true_angles (Tensor): True angles [E].
+        pred_angles (Tensor): Predicted angles [E].
+
+    Returns:
+        Tensor: Loss value.
+    """
+    true_cos = torch.cos(true_angles)
+    pred_cos = torch.cos(pred_angles)
+    loss = 1 - torch.mean(true_cos * pred_cos)
+    return loss
+
+
+def angle_cosine_loss(X, X_true, edge_index, edge_attr, batch):
+    total_loss = 0.0
+
+    for graph_idx in torch.unique(batch):
+        # Mask to select the current graph
+        mask = batch == graph_idx
+        pos_pred = X[mask]  # Predicted positions for the current graph
+        pos_true = X_true[mask]  # True positions for the current graph
+
+        # Create bond matrix
+        edge_mask = (edge_index[0] >= mask.nonzero(as_tuple=True)[0].min()) & (
+            edge_index[0] <= mask.nonzero(as_tuple=True)[0].max()
+        )
+        bonds = edge_attr[edge_mask]
+        bond_indices = edge_index[:, edge_mask]
+
+        # Adjust bond indices to local molecule
+        local_bond_indices = bond_indices - bond_indices[0].min()
+        bond_matrix = torch.zeros((mask.sum().item(), mask.sum().item()), dtype=torch.long, device=X.device)
+        for src, dst, bond in zip(local_bond_indices[0], local_bond_indices[1], bonds):
+            bond_matrix[src, dst] = bond
+            bond_matrix[dst, src] = bond
+
+        # Compute angles
+        # import ipdb; ipdb.set_trace()
+        true_angles = compute_angles(pos_true, bond_matrix, local_bond_indices)
+        pred_angles = compute_angles(pos_pred, bond_matrix, local_bond_indices)
+
+        # Calculate loss
+        loss = cosine_distance_loss(true_angles, pred_angles)
+        total_loss += loss
+
+    return total_loss / len(torch.unique(batch))
+
+
 class Graph3DInterpolantModel(pl.LightningModule):
     def __init__(
         self,
@@ -67,8 +172,12 @@ class Graph3DInterpolantModel(pl.LightningModule):
             var["inp_dim"] = self.interpolants[var["variable_name"]].num_classes
         return SelfConditioningBuilder().create_self_cond(self_cond_params)
 
+    # def setup(self, stage = None):
+    #     self.loss_functions = self.initialize_loss_functions()
+
     def initialize_loss_functions(self):
         loss_functions = {}
+        self.loss_clamps = {'x': 1.0, 'edge_attr': 0.1, 'h': 1, 'charges': 0.1}
         for loss_params in self.loss_params.variables:
             index = loss_params.variable_name
             if "use_distance" in loss_params:
@@ -80,6 +189,11 @@ class Graph3DInterpolantModel(pl.LightningModule):
                     distance_scale=loss_params.distance_scale,  # TODO make these optional
                 )
             else:
+                # if "edge" in index:
+                #     import ipdb; ipdb.set_trace()
+                #     weight = torch.tensor([1.0000e+00, 3.1123e+01, 4.7676e+02, 2.1425e+04, 7.9271e+01]).to(self.device)
+                # else:
+                #     weight = None
                 loss_functions[index] = InterpolantLossFunction(
                     loss_scale=loss_params.loss_scale,
                     aggregation=loss_params.aggregate,
@@ -133,6 +247,37 @@ class Graph3DInterpolantModel(pl.LightningModule):
                     min_lr=self.lr_scheduler_params.min_lr,
                     cooldown=self.lr_scheduler_params.cooldown,
                 )
+            elif self.lr_scheduler_params.type == "linear_warmup":
+                scheduler = torch.optim.lr_scheduler.LinearLR(
+                    optimizer,
+                    start_factor=self.lr_scheduler_params.initial_lr
+                    / self.lr_scheduler_params.final_lr,  # Start factor (initial learning rate / final learning rate)
+                    end_factor=1.0,  # End factor (final learning rate / final learning rate)
+                    total_iters=self.lr_scheduler_params.num_warmup_steps,  # Number of iterations to go from start_factor to end_factor
+                )
+            elif self.lr_scheduler_params.type == "linear_warmup_decay":
+                # Warm-up phase using LinearLR
+                warmup_scheduler = torch.optim.lr_scheduler.LinearLR(
+                    optimizer,
+                    start_factor=self.lr_scheduler_params.initial_lr / self.lr_scheduler_params.final_lr,
+                    end_factor=1.0,
+                    total_iters=self.lr_scheduler_params.num_warmup_steps,  # Steps
+                )
+
+                # Decay phase using LinearLR (kicks in after milestone)
+                decay_scheduler = torch.optim.lr_scheduler.LinearLR(
+                    optimizer,
+                    start_factor=1.0,
+                    end_factor=self.lr_scheduler_params.min_lr_decay / self.lr_scheduler_params.final_lr,
+                    total_iters=self.lr_scheduler_params.num_decay_steps,  # Steps
+                )
+
+                # SequentialLR to combine both schedulers
+                scheduler = torch.optim.lr_scheduler.SequentialLR(
+                    optimizer,
+                    schedulers=[warmup_scheduler, decay_scheduler],
+                    milestones=[self.lr_scheduler_params.milestone_steps],  # Milestone in steps
+                )
             else:
                 raise NotImplementedError('LR Scheduler not supported: %s' % self.lr_scheduler_params.type)
             return {
@@ -140,7 +285,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
                 "lr_scheduler": {
                     "scheduler": scheduler,
                     "interval": self.lr_scheduler_params.interval,
-                    "monitor": self.lr_scheduler_params.monitor,
+                    # "monitor": self.lr_scheduler_params.monitor,
                     "frequency": self.lr_scheduler_params.frequency,
                     "strict": False,
                 },
@@ -297,7 +442,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
         time = self.sample_time(batch)
         out, batch, time = self(batch, time)
         loss, predictions = self.calculate_loss(batch, out, time, "val")
-        # result = self.sample(100)
+        # self.sample(100)
         return loss
 
     def training_step(self, batch, batch_idx):
@@ -317,6 +462,10 @@ class Graph3DInterpolantModel(pl.LightningModule):
         loss = 0
         predictions = {}
         for key, loss_fn in self.loss_functions.items():
+            if self.current_epoch < 10:
+                level = None
+            else:
+                level = self.loss_clamps[key]
             if "edge" in key:
                 sub_loss, sub_pred = loss_fn.edge_loss(
                     batch_geo,
@@ -325,10 +474,14 @@ class Graph3DInterpolantModel(pl.LightningModule):
                     index=batch['edge_index'][1],
                     num_atoms=batch_geo.size(0),
                     batch_weight=ws_t,
+                    level=level,
                 )
             else:
                 if loss_fn.continuous:
-                    sub_loss, sub_pred = loss_fn(batch_geo, out[f'{key}_hat'], batch[f'{key}'], batch_weight=ws_t)
+                    # import ipdb; ipdb.set_trace()
+                    sub_loss, sub_pred = loss_fn(
+                        batch_geo, out[f'{key}_hat'], batch[f'{key}'], batch_weight=ws_t, level=level
+                    )
                 else:
                     true_data = batch[f'{key}']
                     if len(true_data.shape) > 1:
@@ -336,10 +489,21 @@ class Graph3DInterpolantModel(pl.LightningModule):
                             true_data = true_data.unsqueeze(1)
                         else:
                             true_data = true_data.argmax(dim=-1)
-                    sub_loss, sub_pred = loss_fn(batch_geo, out[f'{key}_logits'], true_data, batch_weight=ws_t)
+                    sub_loss, sub_pred = loss_fn(
+                        batch_geo, out[f'{key}_logits'], true_data, batch_weight=ws_t, level=level
+                    )
+
+            # self.loss_clamps[key] = min(self.loss_clamps[key], sub_loss.item() / loss_fn.scale * 5)
+            # print(key, sub_loss)
+            # import ipdb; ipdb.set_trace() #! TODO see if we can hard code clamps based on epoch or train step self.current_epoch
             self.log(f"{stage}/{key}_loss", sub_loss, batch_size=batch_size, prog_bar=True)
             loss = loss + sub_loss
-            predictions[f'{key}'] = sub_pred
+            # predictions[f'{key}'] = sub_pred
+            # bbloss = self.loss_functions['x'].backbone_loss(
+            #     batch_geo, out['x_hat'], batch['x'], batch_weight=(time > 250).int()
+            # )
+            # self.log(f"{stage}/backbone_loss", bbloss, batch_size=batch_size, prog_bar=True)
+            # loss = loss + bbloss
 
             if loss_fn.use_distance in ["single", "triple"]:
                 if "Z_hat" in out.keys() and loss_fn.use_distance == "triple":
@@ -355,8 +519,13 @@ class Graph3DInterpolantModel(pl.LightningModule):
                 self.log(f"{stage}/distance_loss_tz", distance_loss_tz, batch_size=batch_size)
                 self.log(f"{stage}/distance_loss_pz", distance_loss_pz, batch_size=batch_size)
                 loss = loss + loss_fn.distance_scale * distance_loss
-
+            # if loss_fn.use_distance in ["angle"]:
+            #     # import ipdb; ipdb.set_trace()
+            #     angle_loss = angle_cosine_loss(X= out[f'x_hat'], X_true = batch[f'x'], edge_index = batch[f'edge_index'], edge_attr = batch[f'edge_attr'], batch=batch["batch"])
+            #     self.log(f"{stage}/bond_angle_loss", angle_loss, batch_size=batch_size, prog_bar=True)
+            #     loss = loss + angle_loss
         self.log(f"{stage}/loss", loss, batch_size=batch_size)
+        # print(self.loss_clamps)
         return loss, predictions
 
     def forward(self, batch, time):
@@ -404,8 +573,22 @@ class Graph3DInterpolantModel(pl.LightningModule):
             n_nodes = None
         return n_nodes
 
+    # def on_after_backward(self):
+    #     # Compute and log the maximum gradient norm before clipping
+    #     max_grad_norm = 0
+    #     for p in self.dynamics.parameters():
+    #         if p.grad is not None:
+    #             param_norm = p.grad.data.norm(2)
+    #             if param_norm > max_grad_norm:
+    #                 max_grad_norm = param_norm
+
+    #     # Log the maximum gradient norm before clipping
+    #     print("TEST", max_grad_norm)
+    #     results = {'train/max_grad_norm_before_clipping': max_grad_norm}
+    #     self.log_dict(results, sync_dist=True)
+
     @torch.no_grad()
-    def sample(self, num_samples, timesteps=500, time_discretization="linear", batch=None):
+    def sample(self, num_samples, timesteps=500, time_discretization="linear", batch=None, num_atoms=None):
         """
         Generates num_samples. Can supply a batch for inital starting points for conditional sampling for any interpolants set to None.
         """
@@ -427,14 +610,15 @@ class Graph3DInterpolantModel(pl.LightningModule):
             timeline = torch.arange(timesteps + 1)
             DT = [1 / timesteps] * timesteps
 
-        if self.node_distribution is not None:
-            num_atoms = torch.multinomial(
-                input=self.node_distribution,
-                num_samples=num_samples,
-                replacement=True,
-            )
-        else:
-            num_atoms = torch.randint(20, 55, (num_samples,)).to(torch.int64)
+        if num_atoms is None:
+            if self.node_distribution is not None:
+                num_atoms = torch.multinomial(
+                    input=self.node_distribution,
+                    num_samples=num_samples,
+                    replacement=True,
+                )
+            else:
+                num_atoms = torch.randint(20, 55, (num_samples,)).to(torch.int64)
         batch_index = torch.repeat_interleave(torch.arange(num_samples), num_atoms).to(self.device)
         edge_index = (
             torch.eq(batch_index.unsqueeze(0), batch_index.unsqueeze(-1)).int().fill_diagonal_(0).to(self.device)
@@ -468,6 +652,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
                 data[f"{key}_t"] = prior[key] = interpolant.prior(batch_index, shape, self.device)
         # Iterate through time, query the dynamics, apply interpolant step update
         out = {}
+        # print("DT", len(DT))
         for idx in tqdm(list(range(len(DT))), total=len(DT)):
             t = timeline[idx]
             dt = DT[idx]
@@ -605,7 +790,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
             out = self.dynamics(data, time, timesteps=timesteps)
             out, data = self.separate_discrete_variables(out, data)
             for key, interpolant in self.interpolants.items():
-                if t / timesteps > 0.5 and key in conditional_variables:
+                if key in conditional_variables:  # t / timesteps > 0.5 and
                     data[f"{key}_t"] = prior[key]
                     continue
                 if interpolant is None:

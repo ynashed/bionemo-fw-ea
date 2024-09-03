@@ -520,6 +520,7 @@ setup() {
     echo "Mounting ${LOCAL_REPO_PATH} at ${DOCKER_REPO_PATH} for development"
     DOCKER_CMD="${DOCKER_CMD} -v ${LOCAL_REPO_PATH}:${DOCKER_REPO_PATH} -e HOME=${DOCKER_REPO_PATH} -w ${DOCKER_REPO_PATH} "
     DOCKER_CMD="${DOCKER_CMD} -v ${LOCAL_RESULTS_PATH}:${DOCKER_RESULTS_PATH}"
+    DOCKER_CMD="${DOCKER_CMD} -v /data:/data" #! added for MoCo benchmarking
     DOCKER_CMD="${DOCKER_CMD} -v ${LOCAL_DATA_PATH}:${DOCKER_DATA_PATH}"
     DOCKER_CMD="${DOCKER_CMD} -v ${LOCAL_MODELS_PATH}:${DOCKER_MODELS_PATH}"
     DOCKER_CMD="${DOCKER_CMD} -v /etc/passwd:/etc/passwd:ro "

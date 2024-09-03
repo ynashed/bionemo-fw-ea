@@ -11,8 +11,8 @@
 from torch import nn
 from torch_scatter import scatter_mean
 
-from bionemo.model.molecule.moco.models.attention import AttentionLayer
-from bionemo.model.molecule.moco.models.mpnn import AdaLN, EquivariantMessagePassingLayer, TimestepEmbedder
+from bionemo.model.molecule.moco.arch.scratch.attention import AttentionLayer
+from bionemo.model.molecule.moco.arch.scratch.mpnn import AdaLN, EquivariantMessagePassingLayer, TimestepEmbedder
 from bionemo.model.molecule.moco.models.utils import PredictionHead
 
 

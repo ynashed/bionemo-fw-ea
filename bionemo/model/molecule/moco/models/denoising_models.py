@@ -14,11 +14,33 @@ import torch.nn.functional as F
 from torch_geometric.utils import to_dense_adj
 from torch_scatter import scatter_add
 
-from bionemo.model.molecule.moco.models.moco import MoCo
+from bionemo.model.molecule.moco.arch.equiformer_model import MoleculeDiTEquiformer
+from bionemo.model.molecule.moco.arch.final_model import MoleculeDiffusion, MoleculeDiffusionAli
+from bionemo.model.molecule.moco.arch.fn_model import MegaFNV3
+from bionemo.model.molecule.moco.arch.new_model import MegalodonV2
+from bionemo.model.molecule.moco.arch.old_model import MoleculeDiTe as MoleculeDiT
+from bionemo.model.molecule.moco.arch.old_model import (
+    MoleculeDiTe2,
+    MoleculeDiTe3,
+    MoleculeDiTeMPNN,
+    MoleculeDiTeResidual,
+)
+
+# from bionemo.model.molecule.moco.arch.model import MoleculeDiT
+from bionemo.model.molecule.moco.arch.scratch.moco import MoCo
+from bionemo.model.molecule.moco.arch.working_model import (
+    Megalodon,
+    MegalodonDot,
+    MegalodonDotFN,
+    MegalodonDotFNNoRes,
+    MegalodonDotFNNoResSkinny,
+    MegalodonNoGeom,
+    MegalodonNoRes,
+)
 from bionemo.model.molecule.moco.models.model_zoo.eqgat.eqgat_denoising_model import DenoisingEdgeNetwork
 
 # from bionemo.model.molecule.moco.models.model_zoo.eqgat.eqgat_denoising_model_distance import DenoisingEdgeNetwork
-from bionemo.model.molecule.moco.models.model_zoo.jodo import DGT_concat
+from bionemo.model.molecule.moco.models.model_zoo.jodo.jodo import DGT_concat
 
 
 class ModelBuilder:
@@ -26,7 +48,28 @@ class ModelBuilder:
 
     def __init__(self):
         """Initializes the ModelBuilder with a dictionary of available model classes."""
-        self.model_classes = {"moco": MOCOWrapper, "eqgat": EQGATWrapper, "jodo": JODOWrapper}
+        self.model_classes = {
+            "moco": MOCOWrapper,
+            "eqgat": EQGATWrapper,
+            "jodo": JODOWrapper,
+            "dit": DiTWrapper,
+            "dit2": DiT2Wrapper,
+            "dit3": DiT3Wrapper,
+            "ditmpnn": DiTMPNNWrapper,
+            "ditres": DiTResidualWrapper,
+            "mega": MegalodonWrapper,
+            "meganogeom": MegalodonNoGeomWrapper,
+            "meganores": MegalodonNoResWrapper,
+            "megadot": MegalodonDotWrapper,
+            "megadotfn": MegalodonDotFnWrapper,
+            "megadotfnnores": MegalodonDotFnNoResWrapper,
+            "equidit": EquiDitWrapper,
+            "skinny": MegalodonDotFNNoResSkinnyWrapper,
+            "md": MoleculeDiffusionWrapper,
+            "mdali": MoleculeDiffusionAliWrapper,
+            "megav2": MegalodonV2Wrapper,
+            "megav3": MegaFNV3Wrapper,
+        }
 
     def create_model(self, model_name: str, args_dict: dict, wrapper_args: dict):
         """
@@ -60,6 +103,86 @@ class ModelBuilder:
         self.model_classes[model_name.lower()] = model_class
 
 
+class MegaFNV3Wrapper(MegaFNV3):
+    """A wrapper class for the MoCo model."""
+
+    def __init__(self, args_dict, time_type="continuous", timesteps=None):
+        """
+        Initializes the DiTWrapper.
+
+        Args:
+            args_dict (dict): A dictionary of arguments for initializing the MoCo model.
+        """
+        self.args = args_dict
+        self.time_type = time_type
+        self.timesteps = timesteps
+        super().__init__(**args_dict)
+
+    def forward(self, batch, time, conditional_batch=None, timesteps=None):
+        """
+        Forward pass of the MoCo model.
+
+        Args:
+            batch (torch_geometric.data.Batch): The input batch.
+            time (Tensor): The time tensor.
+
+        Returns:
+            dict: The output of the MoCo model.
+        """
+        timesteps = timesteps if timesteps is not None else self.timesteps
+        if self.time_type == "discrete" and timesteps is not None:
+            time = (timesteps - time.float()) / timesteps
+        out = super().forward(
+            batch=batch["batch"],
+            X=batch["x_t"],
+            H=batch["h_t"],
+            E=batch["edge_attr_t"],
+            E_idx=batch["edge_index"],
+            t=time,
+        )
+        return out
+
+
+class MegalodonV2Wrapper(MegalodonV2):
+    """A wrapper class for the MoCo model."""
+
+    def __init__(self, args_dict, time_type="continuous", timesteps=None):
+        """
+        Initializes the DiTWrapper.
+
+        Args:
+            args_dict (dict): A dictionary of arguments for initializing the MoCo model.
+        """
+        self.args = args_dict
+        self.time_type = time_type
+        self.timesteps = timesteps
+        super().__init__(**args_dict)
+
+    def forward(self, batch, time, conditional_batch=None, timesteps=None):
+        """
+        Forward pass of the MoCo model.
+
+        Args:
+            batch (torch_geometric.data.Batch): The input batch.
+            time (Tensor): The time tensor.
+
+        Returns:
+            dict: The output of the MoCo model.
+        """
+        timesteps = timesteps if timesteps is not None else self.timesteps
+        if self.time_type == "discrete" and timesteps is not None:
+            time = (timesteps - time.float()) / timesteps
+        out = super().forward(
+            batch=batch["batch"],
+            X=batch["x_t"],
+            H=batch["h_t"],
+            E=batch["edge_attr_t"],
+            E_idx=batch["edge_index"],
+            t=time,
+        )
+        return out
+
+
 class MOCOWrapper(MoCo):
     """A wrapper class for the MoCo model."""
 
@@ -84,6 +207,606 @@ class MOCOWrapper(MoCo):
         Returns:
             dict: The output of the MoCo model.
         """
+        out = super().forward(
+            batch=batch["batch"],
+            X=batch["x_t"],
+            H=batch["h_t"],
+            E=batch["edge_attr_t"],
+            E_idx=batch["edge_index"],
+            t=time,
+        )
+        return out
+
+
+class MoleculeDiffusionAliWrapper(MoleculeDiffusionAli):
+    """A wrapper class for the MoCo model."""
+
+    def __init__(self, args_dict, time_type="continuous", timesteps=None):
+        """
+        Initializes the DiTWrapper.
+
+        Args:
+            args_dict (dict): A dictionary of arguments for initializing the MoCo model.
+        """
+        self.args = args_dict
+        self.time_type = time_type
+        self.timesteps = timesteps
+        super().__init__(**args_dict)
+
+    def forward(self, batch, time, conditional_batch=None, timesteps=None):
+        """
+        Forward pass of the MoCo model.
+
+        Args:
+            batch (torch_geometric.data.Batch): The input batch.
+            time (Tensor): The time tensor.
+
+        Returns:
+            dict: The output of the MoCo model.
+        """
+        timesteps = timesteps if timesteps is not None else self.timesteps
+        if self.time_type == "discrete" and timesteps is not None:
+            time = (timesteps - time.float()) / timesteps
+        out = super().forward(
+            batch=batch["batch"],
+            X=batch["x_t"],
+            H=batch["h_t"],
+            E=batch["edge_attr_t"],
+            E_idx=batch["edge_index"],
+            t_discrete=time,
+        )
+        return out
+
+
+class MoleculeDiffusionWrapper(MoleculeDiffusion):
+    """A wrapper class for the MoCo model."""
+
+    def __init__(self, args_dict, time_type="continuous", timesteps=None):
+        """
+        Initializes the DiTWrapper.
+
+        Args:
+            args_dict (dict): A dictionary of arguments for initializing the MoCo model.
+        """
+        self.args = args_dict
+        self.time_type = time_type
+        self.timesteps = timesteps
+        super().__init__(**args_dict)
+
+    def forward(self, batch, time, conditional_batch=None, timesteps=None):
+        """
+        Forward pass of the MoCo model.
+
+        Args:
+            batch (torch_geometric.data.Batch): The input batch.
+            time (Tensor): The time tensor.
+
+        Returns:
+            dict: The output of the MoCo model.
+        """
+        timesteps = timesteps if timesteps is not None else self.timesteps
+        if self.time_type == "discrete" and timesteps is not None:
+            time = (timesteps - time.float()) / timesteps
+        out = super().forward(
+            batch=batch["batch"],
+            X=batch["x_t"],
+            H=batch["h_t"],
+            E=batch["edge_attr_t"],
+            E_idx=batch["edge_index"],
+            t_discrete=time,
+        )
+        return out
+
+
+class EquiDitWrapper(MoleculeDiTEquiformer):
+    """A wrapper class for the MoCo model."""
+
+    def __init__(self, args_dict, time_type="continuous", timesteps=None):
+        """
+        Initializes the DiTWrapper.
+
+        Args:
+            args_dict (dict): A dictionary of arguments for initializing the MoCo model.
+        """
+        self.args = args_dict
+        self.time_type = time_type
+        self.timesteps = timesteps
+        super().__init__(**args_dict)
+
+    def forward(self, batch, time, conditional_batch=None, timesteps=None):
+        """
+        Forward pass of the MoCo model.
+
+        Args:
+            batch (torch_geometric.data.Batch): The input batch.
+            time (Tensor): The time tensor.
+
+        Returns:
+            dict: The output of the MoCo model.
+        """
+        timesteps = timesteps if timesteps is not None else self.timesteps
+        if self.time_type == "discrete" and timesteps is not None:
+            time = (timesteps - time.float()) / timesteps
+        out = super().forward(
+            batch=batch["batch"],
+            X=batch["x_t"],
+            H=batch["h_t"],
+            E=batch["edge_attr_t"],
+            E_idx=batch["edge_index"],
+            t=time,
+        )
+        return out
+
+
+class MegalodonDotFNNoResSkinnyWrapper(MegalodonDotFNNoResSkinny):
+    """A wrapper class for the MoCo model."""
+
+    def __init__(self, args_dict, time_type="continuous", timesteps=None):
+        """
+        Initializes the DiTWrapper.
+
+        Args:
+            args_dict (dict): A dictionary of arguments for initializing the MoCo model.
+        """
+        self.args = args_dict
+        self.time_type = time_type
+        self.timesteps = timesteps
+        super().__init__(**args_dict)
+
+    def forward(self, batch, time, conditional_batch=None, timesteps=None):
+        """
+        Forward pass of the MoCo model.
+
+        Args:
+            batch (torch_geometric.data.Batch): The input batch.
+            time (Tensor): The time tensor.
+
+        Returns:
+            dict: The output of the MoCo model.
+        """
+        timesteps = timesteps if timesteps is not None else self.timesteps
+        if self.time_type == "discrete" and timesteps is not None:
+            time = (timesteps - time.float()) / timesteps
+        out = super().forward(
+            batch=batch["batch"],
+            X=batch["x_t"],
+            H=batch["h_t"],
+            E=batch["edge_attr_t"],
+            E_idx=batch["edge_index"],
+            t=time,
+        )
+        return out
+
+
+class MegalodonDotFnNoResWrapper(MegalodonDotFNNoRes):
+    """A wrapper class for the MoCo model."""
+
+    def __init__(self, args_dict, time_type="continuous", timesteps=None):
+        """
+        Initializes the DiTWrapper.
+
+        Args:
+            args_dict (dict): A dictionary of arguments for initializing the MoCo model.
+        """
+        self.args = args_dict
+        self.time_type = time_type
+        self.timesteps = timesteps
+        super().__init__(**args_dict)
+
+    def forward(self, batch, time, conditional_batch=None, timesteps=None):
+        """
+        Forward pass of the MoCo model.
+
+        Args:
+            batch (torch_geometric.data.Batch): The input batch.
+            time (Tensor): The time tensor.
+
+        Returns:
+            dict: The output of the MoCo model.
+        """
+        timesteps = timesteps if timesteps is not None else self.timesteps
+        if self.time_type == "discrete" and timesteps is not None:
+            time = (timesteps - time.float()) / timesteps
+        out = super().forward(
+            batch=batch["batch"],
+            X=batch["x_t"],
+            H=batch["h_t"],
+            E=batch["edge_attr_t"],
+            E_idx=batch["edge_index"],
+            t=time,
+        )
+        return out
+
+
+class MegalodonDotFnWrapper(MegalodonDotFN):
+    """A wrapper class for the MoCo model."""
+
+    def __init__(self, args_dict, time_type="continuous", timesteps=None):
+        """
+        Initializes the DiTWrapper.
+
+        Args:
+            args_dict (dict): A dictionary of arguments for initializing the MoCo model.
+        """
+        self.args = args_dict
+        self.time_type = time_type
+        self.timesteps = timesteps
+        super().__init__(**args_dict)
+
+    def forward(self, batch, time, conditional_batch=None, timesteps=None):
+        """
+        Forward pass of the MoCo model.
+
+        Args:
+            batch (torch_geometric.data.Batch): The input batch.
+            time (Tensor): The time tensor.
+
+        Returns:
+            dict: The output of the MoCo model.
+        """
+        timesteps = timesteps if timesteps is not None else self.timesteps
+        if self.time_type == "discrete" and timesteps is not None:
+            time = (timesteps - time.float()) / timesteps
+        out = super().forward(
+            batch=batch["batch"],
+            X=batch["x_t"],
+            H=batch["h_t"],
+            E=batch["edge_attr_t"],
+            E_idx=batch["edge_index"],
+            t=time,
+        )
+        return out
+
+
+class MegalodonDotWrapper(MegalodonDot):
+    """A wrapper class for the MoCo model."""
+
+    def __init__(self, args_dict, time_type="continuous", timesteps=None):
+        """
+        Initializes the DiTWrapper.
+
+        Args:
+            args_dict (dict): A dictionary of arguments for initializing the MoCo model.
+        """
+        self.args = args_dict
+        self.time_type = time_type
+        self.timesteps = timesteps
+        super().__init__(**args_dict)
+
+    def forward(self, batch, time, conditional_batch=None, timesteps=None):
+        """
+        Forward pass of the MoCo model.
+
+        Args:
+            batch (torch_geometric.data.Batch): The input batch.
+            time (Tensor): The time tensor.
+
+        Returns:
+            dict: The output of the MoCo model.
+        """
+        timesteps = timesteps if timesteps is not None else self.timesteps
+        if self.time_type == "discrete" and timesteps is not None:
+            time = (timesteps - time.float()) / timesteps
+        out = super().forward(
+            batch=batch["batch"],
+            X=batch["x_t"],
+            H=batch["h_t"],
+            E=batch["edge_attr_t"],
+            E_idx=batch["edge_index"],
+            t=time,
+        )
+        return out
+
+
+class MegalodonNoResWrapper(MegalodonNoRes):
+    """A wrapper class for the MoCo model."""
+
+    def __init__(self, args_dict, time_type="continuous", timesteps=None):
+        """
+        Initializes the DiTWrapper.
+
+        Args:
+            args_dict (dict): A dictionary of arguments for initializing the MoCo model.
+        """
+        self.args = args_dict
+        self.time_type = time_type
+        self.timesteps = timesteps
+        super().__init__(**args_dict)
+
+    def forward(self, batch, time, conditional_batch=None, timesteps=None):
+        """
+        Forward pass of the MoCo model.
+
+        Args:
+            batch (torch_geometric.data.Batch): The input batch.
+            time (Tensor): The time tensor.
+
+        Returns:
+            dict: The output of the MoCo model.
+        """
+        timesteps = timesteps if timesteps is not None else self.timesteps
+        if self.time_type == "discrete" and timesteps is not None:
+            time = (timesteps - time.float()) / timesteps
+        out = super().forward(
+            batch=batch["batch"],
+            X=batch["x_t"],
+            H=batch["h_t"],
+            E=batch["edge_attr_t"],
+            E_idx=batch["edge_index"],
+            t=time,
+        )
+        return out
+
+
+class MegalodonNoGeomWrapper(MegalodonNoGeom):
+    """A wrapper class for the MoCo model."""
+
+    def __init__(self, args_dict, time_type="continuous", timesteps=None):
+        """
+        Initializes the DiTWrapper.
+
+        Args:
+            args_dict (dict): A dictionary of arguments for initializing the MoCo model.
+        """
+        self.args = args_dict
+        self.time_type = time_type
+        self.timesteps = timesteps
+        super().__init__(**args_dict)
+
+    def forward(self, batch, time, conditional_batch=None, timesteps=None):
+        """
+        Forward pass of the MoCo model.
+
+        Args:
+            batch (torch_geometric.data.Batch): The input batch.
+            time (Tensor): The time tensor.
+
+        Returns:
+            dict: The output of the MoCo model.
+        """
+        timesteps = timesteps if timesteps is not None else self.timesteps
+        if self.time_type == "discrete" and timesteps is not None:
+            time = (timesteps - time.float()) / timesteps
+        out = super().forward(
+            batch=batch["batch"],
+            X=batch["x_t"],
+            H=batch["h_t"],
+            E=batch["edge_attr_t"],
+            E_idx=batch["edge_index"],
+            t=time,
+        )
+        return out
+
+
+class MegalodonWrapper(Megalodon):
+    """A wrapper class for the MoCo model."""
+
+    def __init__(self, args_dict, time_type="continuous", timesteps=None):
+        """
+        Initializes the DiTWrapper.
+
+        Args:
+            args_dict (dict): A dictionary of arguments for initializing the MoCo model.
+        """
+        self.args = args_dict
+        self.time_type = time_type
+        self.timesteps = timesteps
+        super().__init__(**args_dict)
+
+    def forward(self, batch, time, conditional_batch=None, timesteps=None):
+        """
+        Forward pass of the MoCo model.
+
+        Args:
+            batch (torch_geometric.data.Batch): The input batch.
+            time (Tensor): The time tensor.
+
+        Returns:
+            dict: The output of the MoCo model.
+        """
+        timesteps = timesteps if timesteps is not None else self.timesteps
+        if self.time_type == "discrete" and timesteps is not None:
+            time = (timesteps - time.float()) / timesteps
+        out = super().forward(
+            batch=batch["batch"],
+            X=batch["x_t"],
+            H=batch["h_t"],
+            E=batch["edge_attr_t"],
+            E_idx=batch["edge_index"],
+            t=time,
+        )
+        return out
+
+
+class DiTResidualWrapper(MoleculeDiTeResidual):
+    """A wrapper class for the MoCo model."""
+
+    def __init__(self, args_dict, time_type="continuous", timesteps=None):
+        """
+        Initializes the DiTWrapper.
+
+        Args:
+            args_dict (dict): A dictionary of arguments for initializing the MoCo model.
+        """
+        self.args = args_dict
+        self.time_type = time_type
+        self.timesteps = timesteps
+        super().__init__(**args_dict)
+
+    def forward(self, batch, time, conditional_batch=None, timesteps=None):
+        """
+        Forward pass of the MoCo model.
+
+        Args:
+            batch (torch_geometric.data.Batch): The input batch.
+            time (Tensor): The time tensor.
+
+        Returns:
+            dict: The output of the MoCo model.
+        """
+        timesteps = timesteps if timesteps is not None else self.timesteps
+        if self.time_type == "discrete" and timesteps is not None:
+            time = (timesteps - time.float()) / timesteps
+        out = super().forward(
+            batch=batch["batch"],
+            X=batch["x_t"],
+            H=batch["h_t"],
+            E=batch["edge_attr_t"],
+            E_idx=batch["edge_index"],
+            t=time,
+        )
+        return out
+
+
+class DiTMPNNWrapper(MoleculeDiTeMPNN):
+    """A wrapper class for the MoCo model."""
+
+    def __init__(self, args_dict, time_type="continuous", timesteps=None):
+        """
+        Initializes the DiTWrapper.
+
+        Args:
+            args_dict (dict): A dictionary of arguments for initializing the MoCo model.
+        """
+        self.args = args_dict
+        self.time_type = time_type
+        self.timesteps = timesteps
+        super().__init__(**args_dict)
+
+    def forward(self, batch, time, conditional_batch=None, timesteps=None):
+        """
+        Forward pass of the MoCo model.
+
+        Args:
+            batch (torch_geometric.data.Batch): The input batch.
+            time (Tensor): The time tensor.
+
+        Returns:
+            dict: The output of the MoCo model.
+        """
+        timesteps = timesteps if timesteps is not None else self.timesteps
+        if self.time_type == "discrete" and timesteps is not None:
+            time = (timesteps - time.float()) / timesteps
+        out = super().forward(
+            batch=batch["batch"],
+            X=batch["x_t"],
+            H=batch["h_t"],
+            E=batch["edge_attr_t"],
+            E_idx=batch["edge_index"],
+            t=time,
+        )
+        return out
+
+
+class DiT3Wrapper(MoleculeDiTe3):
+    """A wrapper class for the MoCo model."""
+
+    def __init__(self, args_dict, time_type="continuous", timesteps=None):
+        """
+        Initializes the DiTWrapper.
+
+        Args:
+            args_dict (dict): A dictionary of arguments for initializing the MoCo model.
+        """
+        self.args = args_dict
+        self.time_type = time_type
+        self.timesteps = timesteps
+        super().__init__(**args_dict)
+
+    def forward(self, batch, time, conditional_batch=None, timesteps=None):
+        """
+        Forward pass of the MoCo model.
+
+        Args:
+            batch (torch_geometric.data.Batch): The input batch.
+            time (Tensor): The time tensor.
+
+        Returns:
+            dict: The output of the MoCo model.
+        """
+        timesteps = timesteps if timesteps is not None else self.timesteps
+        if self.time_type == "discrete" and timesteps is not None:
+            time = (timesteps - time.float()) / timesteps
+        out = super().forward(
+            batch=batch["batch"],
+            X=batch["x_t"],
+            H=batch["h_t"],
+            E=batch["edge_attr_t"],
+            E_idx=batch["edge_index"],
+            t=time,
+        )
+        return out
+
+
+class DiT2Wrapper(MoleculeDiTe2):
+    """A wrapper class for the MoCo model."""
+
+    def __init__(self, args_dict, time_type="continuous", timesteps=None):
+        """
+        Initializes the DiTWrapper.
+
+        Args:
+            args_dict (dict): A dictionary of arguments for initializing the MoCo model.
+        """
+        self.args = args_dict
+        self.time_type = time_type
+        self.timesteps = timesteps
+        super().__init__(**args_dict)
+
+    def forward(self, batch, time, conditional_batch=None, timesteps=None):
+        """
+        Forward pass of the MoCo model.
+
+        Args:
+            batch (torch_geometric.data.Batch): The input batch.
+            time (Tensor): The time tensor.
+
+        Returns:
+            dict: The output of the MoCo model.
+        """
+        timesteps = timesteps if timesteps is not None else self.timesteps
+        if self.time_type == "discrete" and timesteps is not None:
+            time = (timesteps - time.float()) / timesteps
+        out = super().forward(
+            batch=batch["batch"],
+            X=batch["x_t"],
+            H=batch["h_t"],
+            E=batch["edge_attr_t"],
+            E_idx=batch["edge_index"],
+            t=time,
+        )
+        return out
+
+
+class DiTWrapper(MoleculeDiT):
+    """A wrapper class for the MoCo model."""
+
+    def __init__(self, args_dict, time_type="continuous", timesteps=None):
+        """
+        Initializes the DiTWrapper.
+
+        Args:
+            args_dict (dict): A dictionary of arguments for initializing the MoCo model.
+        """
+        self.args = args_dict
+        self.time_type = time_type
+        self.timesteps = timesteps
+        super().__init__(**args_dict)
+
+    def forward(self, batch, time, conditional_batch=None, timesteps=None):
+        """
+        Forward pass of the MoCo model.
+
+        Args:
+            batch (torch_geometric.data.Batch): The input batch.
+            time (Tensor): The time tensor.
+
+        Returns:
+            dict: The output of the MoCo model.
+        """
+        timesteps = timesteps if timesteps is not None else self.timesteps
+        if self.time_type == "discrete" and timesteps is not None:
+            time = (timesteps - time.float()) / timesteps
         out = super().forward(
             batch=batch["batch"],
             X=batch["x_t"],

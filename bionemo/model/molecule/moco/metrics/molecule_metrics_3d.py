@@ -326,7 +326,9 @@ class Molecule3DMetrics:
             )
             self.dihedrals_w1(dihedrals_w1)
             metrics_3d["dihedrals"] = self.dihedrals_w1.compute().item()
-
+        # self.dihedrals_w1.reset()
+        # self.bond_lengths_w1.reset()
+        # self.angles_w1.reset()
         return metrics_3d
 
     @staticmethod

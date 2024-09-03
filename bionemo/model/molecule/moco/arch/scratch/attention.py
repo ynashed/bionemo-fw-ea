@@ -13,7 +13,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch_scatter import scatter, scatter_softmax
 
-from bionemo.model.molecule.moco.models.mpnn import MLP
+from bionemo.model.molecule.moco.arch.scratch.mpnn import MLP
 
 
 class AttentionLayer(nn.Module):
@@ -320,7 +320,7 @@ if __name__ == "__main__":
     #     H, X, Z, E = model(batch_ligand, X, H, E, E_idx, Z)
     #     print(X.sum().item(), H.sum().item(), E.sum().item(), Z.sum().item())
 
-    from bionemo.model.molecule.moco.models.mpnn import EquivariantMessagePassingLayer
+    from bionemo.model.molecule.moco.arch.scratch.mpnn import EquivariantMessagePassingLayer
 
     mpnn = EquivariantMessagePassingLayer()  #! Layer norm forces stable.
     model = AttentionLayer(num_heads=10)
