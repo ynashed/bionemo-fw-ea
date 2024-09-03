@@ -8,6 +8,9 @@ WORKDIR /build
 ARG MAX_JOBS=4
 ENV MAX_JOBS=${MAX_JOBS}
 
+# Upgrade setuptools and wheel
+RUN pip install --upgrade setuptools wheel
+
 # See NeMo readme for the latest tested versions of these libraries
 ARG APEX_COMMIT=810ffae374a2b9cb4b5c5e28eaeca7d7998fca0c
 RUN git clone https://github.com/NVIDIA/apex.git && \
@@ -45,7 +48,7 @@ RUN CAUSAL_CONV1D_FORCE_BUILD=TRUE pip --disable-pip-version-check --no-cache-di
 
 # Mamba dependancy installation
 RUN pip --disable-pip-version-check --no-cache-dir install \
-  git+https://github.com/state-spaces/mamba.git@v2.0.3
+  git+https://github.com/state-spaces/mamba.git@v2.2.2
 
 
 FROM bionemo2-base AS pip-requirements
