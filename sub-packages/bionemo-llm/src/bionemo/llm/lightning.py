@@ -18,10 +18,11 @@ from typing import Any, Callable, Generic, Iterable, Iterator, List, Optional, S
 import pytorch_lightning as pl
 import torch.distributed
 from megatron.core import parallel_state
+from megatron.core.optimizer.optimizer_config import OptimizerConfig
 from megatron.core.transformer.module import MegatronModule
 from nemo.lightning import io as nlio
 from nemo.lightning.megatron_parallel import DataT, MegatronLossReduction, ReductionT
-from nemo.lightning.pytorch.optim import MegatronOptimizerModule, OptimizerConfig
+from nemo.lightning.pytorch.optim import MegatronOptimizerModule
 from torch import Tensor
 
 from bionemo.core.model.config import BionemoTrainableModelConfig

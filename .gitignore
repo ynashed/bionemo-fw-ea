@@ -1,4 +1,8 @@
+# bionemo
 docs/site/
+*.nemo
+protein/
+singlecell/
 
 # Local configs
 .gitconfig
