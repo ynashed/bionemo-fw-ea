@@ -20,7 +20,6 @@ from megatron.core import parallel_state
 from megatron.core.transformer.module import MegatronModule
 from megatron.core.transformer.transformer_config import TransformerConfig
 from nemo.collections.nlp.modules.common.megatron.utils import average_losses_across_data_parallel_group
-from nemo.lightning import io
 from nemo.lightning.megatron_parallel import (
     MegatronLossReduction,
     masked_token_loss,
@@ -30,6 +29,7 @@ from torch import nn
 
 from bionemo.llm.model.biobert.model import BioBertGenericConfig, MegatronBioBertModel
 from bionemo.llm.model.loss import BERTMLMLossWithReduction, PerTokenLossDict, SameSizeLossDict
+from bionemo.llm.utils import iomixin_utils as iom
 
 
 """This package demonstrates how you can take a pretrained geneformer module and fine-tune the classifier
@@ -166,7 +166,9 @@ class MegatronBioBertFineTuneSeqLengthModel(MegatronBioBertModel):
 
 
 @dataclass
-class FineTuneSeqLenBioBertConfig(BioBertGenericConfig[MegatronBioBertFineTuneSeqLengthModel], io.IOMixin):
+class FineTuneSeqLenBioBertConfig(
+    BioBertGenericConfig[MegatronBioBertFineTuneSeqLengthModel], iom.IOMixinWithGettersSetters
+):
     # When overriding fields in a dataclass _always_ declare types: https://github.com/python/cpython/issues/123269
     model_cls: Type[MegatronBioBertFineTuneSeqLengthModel] = MegatronBioBertFineTuneSeqLengthModel
     # typical case is fine-tune the base biobert that doesn't have this head. If you are instead loading a checkpoint
