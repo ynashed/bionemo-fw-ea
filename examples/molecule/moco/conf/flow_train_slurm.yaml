@@ -64,7 +64,7 @@ interpolant:
     - variable_name: 'h'
       interpolant_type: 'discrete_flow_matching' #["discrete_diffusion", "discrete_flow_matching"]
       prior_type: 'uniform' #['uniform', 'mask', 'custom']
-      custom_prior: '/workspace/bionemo/data/pyg_geom_drug/processed/train_types_h.npy'
+      custom_prior: '/data/pyg_geom_drug/processed/train_types_h.npy'
       timesteps: *timesteps
       num_classes: &num_atoms 16
       scheduler_type: *scheduler_type
@@ -74,7 +74,7 @@ interpolant:
     - variable_name: 'edge_attr'
       interpolant_type: 'discrete_flow_matching' #["discrete_diffusion", "discrete_flow_matching"]
       prior_type: 'uniform'
-      custom_prior: '/workspace/bionemo/data/pyg_geom_drug/processed/train_bond_types_h.npy'
+      custom_prior: '/data/pyg_geom_drug/processed/train_bond_types_h.npy'
       timesteps: *timesteps
       num_classes: 5
       scheduler_type: *scheduler_type
@@ -84,7 +84,7 @@ interpolant:
     - variable_name: 'charges'
       interpolant_type: 'discrete_flow_matching' #["discrete_diffusion", "discrete_flow_matching"]
       prior_type: 'custom'
-      custom_prior: '/workspace/bionemo/data/pyg_geom_drug/processed/train_charges_prior.npy' #! had to manually create the marginal (h_prior*charge_h_prior[:, None]).sum(0)
+      custom_prior: '/data/pyg_geom_drug/processed/train_charges_prior.npy' #! had to manually create the marginal (h_prior*charge_h_prior[:, None]).sum(0)
       timesteps: *timesteps
       scheduler_type: *scheduler_type
       scheduler_cut: False
