@@ -33,7 +33,7 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 from torchvision.datasets import MNIST
 
-from bionemo.core.data.resamplers import PRNGDatasetShuffler
+from bionemo.core.data.resamplers import PRNGResampleDataset
 from bionemo.core.model.config import Loss
 from bionemo.llm.lightning import LightningPassthroughPredictionMixin
 from bionemo.llm.model.config import OVERRIDE_BIONEMO_CONFIG_DEFAULTS, MegatronBioNeMoTrainableModelConfig
@@ -494,15 +494,15 @@ class MNISTDataModule(pl.LightningDataModule):  # noqa: D101
         Args:
             stage: can be one of train / test / predict.
         """  # noqa: D415
-        self.mnist_test = PRNGDatasetShuffler(
+        self.mnist_test = PRNGResampleDataset(
             MNISTCustom(self.data_dir, download=True, transform=transforms.ToTensor(), train=False), seed=43
         )
         mnist_full = MNISTCustom(self.data_dir, download=True, transform=transforms.ToTensor(), train=True)
         mnist_train, mnist_val = torch.utils.data.random_split(
             mnist_full, [55000, 5000], generator=torch.Generator().manual_seed(42)
         )
-        self.mnist_train = PRNGDatasetShuffler(mnist_train, seed=44)
-        self.mnist_val = PRNGDatasetShuffler(mnist_val, seed=45)
+        self.mnist_train = PRNGResampleDataset(mnist_train, seed=44)
+        self.mnist_val = PRNGResampleDataset(mnist_val, seed=45)
 
     def train_dataloader(self) -> DataLoader:  # noqa: D102
         return DataLoader(self.mnist_train, batch_size=self.micro_batch_size, num_workers=0)
