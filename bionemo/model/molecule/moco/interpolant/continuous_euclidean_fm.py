@@ -175,6 +175,8 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
         optimal_noise = [mol_matrix[r][c] for r, c in zip(row_indices, col_indices)]
         return torch.cat(optimal_noise, dim=0)  #! returns N tot x 3 where this matches data_chunk
 
+    # ! This does not match Semla code they do the cost without the roation
+
     def interpolate(self, batch, x1, time):
         """
         Interpolate using continuous flow matching method.
@@ -194,7 +196,9 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
         """
         Return (x1 - xt) / (1 - t)
         """
-        return (x1 - xt) / (1.0 - torch.clamp(time[batch], self.min_t, self.max_t))
+        vf = (x1 - xt) / (1.0 - torch.clamp(time[batch], self.min_t, self.max_t)).unsqueeze(-1)
+        noise = torch.randn_like(x1) * self.noise_sigma
+        return vf + noise
 
     def prior_func(self, batch, shape, device, x1=None):
         if self.prior_type == "gaussian" or self.prior_type == "normal":
@@ -226,17 +230,19 @@ class ContinuousFlowMatchingInterpolant(Interpolant):
          B) Linear with dynamics as data prediction VF = x1 - x0 --> x_next = xt +  dt * (x_hat - x0) see Tong et al. https://arxiv.org/pdf/2302.00482 sec 3.2.2 basic I-CFM
         Both of which can add additional noise.
         """
+        # import ipdb; ipdb.set_trace()
         if self.vector_field_type == "standard":
-            data_scale, noise_scale = self.reverse_schedule(
-                batch, time, dt
-            )  #! this is same as xt + vf*df where vf = (xhat-xt)/(1-t) and can use the vector_field function
-            x_next = data_scale * x_hat + noise_scale * xt
+            # data_scale, noise_scale = self.reverse_schedule(
+            #     batch, time, dt
+            # )  #! this is same as xt + vf*df where vf = (xhat-xt)/(1-t) and can use the vector_field function
+            # x_next = data_scale * x_hat + noise_scale * xt
+            vf = self.vector_field(batch, x_hat, xt, time)
+            x_next = xt + dt * vf
         elif self.vector_field_type == "endpoint":
             data_scale, _ = self.reverse_schedule(batch, time, dt)
             x_next = xt + data_scale * (x_hat - x0)
         else:
             raise ValueError(f"f{self.vector_field_type} is not a recognized vector_field_type")
-
-        if self.noise_sigma > 0:
-            x_next += self.prior_func(batch, x_hat.shape, x_hat.device) * self.noise_sigma  # torch.randn_like(x_hat)
+        # if self.noise_sigma > 0:
+        #     x_next += self.prior_func(batch, x_hat.shape, x_hat.device) * self.noise_sigma  # torch.randn_like(x_hat)
         return x_next

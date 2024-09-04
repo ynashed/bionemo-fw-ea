@@ -211,7 +211,7 @@ class DiscreteFlowMatchingInterpolant(Interpolant):
         pt_x1_probs = F.softmax(logits_1 / self.temp, dim=-1)
         pt_x1_eq_xt_prob = torch.gather(pt_x1_probs, dim=-1, index=xt.long().unsqueeze(-1))
 
-        first = dt * pt_x1_probs * ((1 + N + N * (S - 1) * t) / (1 - t))
+        first = dt * pt_x1_probs * ((1 + 2 * N * (S - 1) * t) / (1 - t))
         second = dt * N * pt_x1_eq_xt_prob
         step_probs = (first + second).clamp(max=1.0)
 

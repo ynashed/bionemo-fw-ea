@@ -653,6 +653,7 @@ class Graph3DInterpolantModel(pl.LightningModule):
         # Iterate through time, query the dynamics, apply interpolant step update
         out = {}
         # print("DT", len(DT))
+        # import ipdb; ipdb.set_trace()
         for idx in tqdm(list(range(len(DT))), total=len(DT)):
             t = timeline[idx]
             dt = DT[idx]

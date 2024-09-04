@@ -24,8 +24,8 @@ if __name__ == "__main__":
     # res_dir = "/workspace/bionemo/results/eqgatdiff/eqgat_big_self_cond/checkpoints"
     # ckpt_path = f"{res_dir}/epoch=214-step=315199.ckpt"
     # ema_weights = f"{res_dir}/ema_parameters_epoch_214.pt"
-    ema_weights = None
-    ckpt_path = '/workspace/bionemo/examples/molecule/moco/checkpoints/best-epoch=549-step=403162--mol_stable=0.979.ckpt'  # best-epoch=169-step=166269--mol_stable=0.984.ckpt'  # best-epoch=149-step=146708--mol_stable=0.978.ckpt"
+    ema_weights = '/workspace/bionemo/examples/molecule/moco/checkpoints/SLOW_BEST_ema_parameters_epoch_239.pt'
+    ckpt_path = '/workspace/bionemo/examples/molecule/moco/checkpoints/SLOW_BEST_best-epoch=219-step=215172--mol_stable=0.975.ckpt'  # best-epoch=549-step=403162--mol_stable=0.979.ckpt'  # best-epoch=169-step=166269--mol_stable=0.984.ckpt'  # best-epoch=149-step=146708--mol_stable=0.978.ckpt"
 
     n_graphs = 5000
     batch_size = 200
@@ -52,16 +52,16 @@ if __name__ == "__main__":
         data_loader_type="midi",
     )
 
-    eval_callback = MoleculeEvaluationCallback(
-        n_graphs=n_graphs,
-        batch_size=batch_size,
-        timesteps=500,
-        compute_train_data_metrics=False,
-        compute_dihedrals=True,
-        train_smiles=datamodule.train_dataset.smiles,
-        statistics=datamodule.statistics,
-    )
-
+    # eval_callback = MoleculeEvaluationCallback(
+    #     n_graphs=n_graphs,
+    #     batch_size=batch_size,
+    #     timesteps=500,
+    #     compute_train_data_metrics=False,
+    #     compute_dihedrals=True,
+    #     train_smiles=datamodule.train_dataset.smiles,
+    #     statistics=datamodule.statistics,
+    # )
+    ema_weight_path = ema_weights
     if ema_weights is not None:
         ema_weights = torch.load(ema_weights, map_location="cuda")
         ema = EMA(model.parameters(), decay=0.999)
@@ -70,15 +70,25 @@ if __name__ == "__main__":
 
     model.cuda()
     model.eval()
+    for i in range(2, 8):
+        eval_callback = MoleculeEvaluationCallback(
+            n_graphs=n_graphs,
+            batch_size=batch_size,
+            timesteps=500,
+            compute_train_data_metrics=False,
+            compute_dihedrals=True,
+            train_smiles=datamodule.train_dataset.smiles,
+            statistics=datamodule.statistics,
+        )
+        result = eval_callback.evaluate_molecules(model, return_molecules=True)
+        result['ckpt'] = ckpt_path
+        result['ema_path'] = ema_weight_path
+        save_path = '/workspace/bionemo/bionemo/model/molecule/moco/models/results/megalodon/'
+        with open(save_path + f"5k_mols_slow_mega{i}.pkl", 'wb') as f:
+            pickle.dump(result, f)
+    # import ipdb
 
-    result = eval_callback.evaluate_molecules(model, return_molecules=True)
-    result['ckpt'] = ckpt_path
-    save_path = '/workspace/bionemo/bionemo/model/molecule/moco/models/results/megalodon/'
-    with open(save_path + "5k_mols_fn_v4_clamp.pkl", 'wb') as f:
-        pickle.dump(result, f)
-    import ipdb
-
-    ipdb.set_trace()
+    # ipdb.set_trace()
 
 
 # TODO: Error needs fixing as model weights require same data path
@@ -103,3 +113,19 @@ if __name__ == "__main__":
 # FileNotFoundError: [Errno 2] No such file or directory: '/data/pyg_geom_drug/processed/train_types_h.npy'
 # when loading you can overwrite any hyperparameters (eg, interpollant_params).
 # pl_module = Graph3DInterpolantModel.load_from_checkpoint(cfg.resume, interpolant_params=cfg.interpolant)
+# mol_stable 0.9714000225067139
+# atm_stable 0.9992256164550781
+# validity 0.9544000029563904
+# stable_valid 0.949
+# not_stable_valid 0.0054
+# stable_not_valid 0.0224
+# not_stable_not_valid 0.0232
+# QED 0.6312966802754982
+# SA 0.6583109807208718
+# LogP 2.5941492120704117
+# Lipinski 4.902975691533948
+# Diversity 0.8856248777579252
+# Unique 1.0
+# bond_lengths 0.08495713770389557
+# bond_angles 0.506560742855072
+# dihedrals 1.2173022031784058
