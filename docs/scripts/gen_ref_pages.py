@@ -138,7 +138,7 @@ def main() -> None:
     # generate api docs
     generate_api_reference()
 
-    for sub_package in SUB_PACKAGES_DIR.glob('bionemo-*'):
+    for sub_package in SUB_PACKAGES_DIR.glob("bionemo-*"):
         if sub_package.is_dir():
             logging.info(f"Processing sub-package: {sub_package}")
             get_subpackage_notebooks(sub_package)
