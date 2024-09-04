@@ -40,6 +40,7 @@ class ProteinSQLiteDataset(Dataset):
         """
         self.conn = sqlite3.connect(str(db_path))
         self.cursor = self.conn.cursor()
+        self._len = None
 
     def __len__(self) -> int:
         """Returns the number of proteins in the dataset.
@@ -47,8 +48,10 @@ class ProteinSQLiteDataset(Dataset):
         Returns:
             Number of proteins in the dataset.
         """
-        self.cursor.execute("SELECT COUNT(*) FROM protein")
-        return int(self.cursor.fetchone()[0])
+        if self._len is None:
+            self.cursor.execute("SELECT COUNT(*) FROM protein")
+            self._len = int(self.cursor.fetchone()[0])
+        return self._len
 
     def __getitem__(self, idx: str) -> str:
         """Returns the sequence of a protein at a given index.
@@ -87,7 +90,7 @@ class ESMMaskedResidueDataset(Dataset):
         mask_prob: float = 0.15,
         mask_token_prob: float = 0.8,
         mask_random_prob: float = 0.1,
-        tokenizer: tokenizer.HFTokenizer = tokenizer.get_tokenizer(),
+        tokenizer: tokenizer.BioNeMoAutoTokenizer = tokenizer.get_tokenizer(),
     ) -> None:
         """Initializes the dataset.
 
@@ -202,7 +205,7 @@ def create_train_dataset(
     mask_prob: float = 0.15,
     mask_token_prob: float = 0.8,
     mask_random_prob: float = 0.1,
-    tokenizer: tokenizer.HFTokenizer = tokenizer.get_tokenizer(),
+    tokenizer: tokenizer.BioNeMoAutoTokenizer = tokenizer.get_tokenizer(),
 ):
     """Creates a training dataset for ESM pretraining.
 
@@ -249,8 +252,30 @@ def create_train_dataset(
     )
 
 
-def create_valid_dataset(
-    cluster_file: str | os.PathLike,
+def create_valid_clusters(cluster_file: str | os.PathLike) -> pd.Series:
+    """Create a pandas series of UniRef50 cluster IDs from a cluster parquet file.
+
+    Args:
+        cluster_file: Path to the cluster file. The file should contain a single column named "ur50_id" with UniRef50
+        IDs, with one UniRef50 ID per row.
+
+    Returns:
+        A pandas series of UniRef50 cluster IDs.
+    """
+    if not Path(cluster_file).exists():
+        raise ValueError(f"Cluster file {cluster_file} not found.")
+
+    cluster_df = pd.read_parquet(cluster_file)
+    if "ur50_id" not in cluster_df.columns:
+        raise ValueError(
+            f"Validation cluster file must contain a 'ur50_id' column. Found columns {cluster_df.columns}."
+        )
+    clusters = cluster_df["ur50_id"].apply(lambda x: [x])
+    return clusters
+
+
+def create_valid_dataset(  # noqa: D417
+    clusters: pd.Series | str | os.PathLike,
     db_path: str | os.PathLike,
     total_samples: int,
     seed: int,
@@ -258,12 +283,12 @@ def create_valid_dataset(
     mask_prob: float = 0.15,
     mask_token_prob: float = 0.8,
     mask_random_prob: float = 0.1,
-    tokenizer: tokenizer.HFTokenizer = tokenizer.get_tokenizer(),
+    tokenizer: tokenizer.BioNeMoAutoTokenizer = tokenizer.get_tokenizer(),
 ):
     """Creates a validation dataset for ESM pretraining.
 
     Args:
-        cluster_file: Path to the cluster file. The file should contain a single column named "ur50_id" with UniRef50
+        cluster_file: Clusters as pd.Series, or path to the cluster file. The file should contain a single column named "ur50_id" with UniRef50
             IDs, with one UniRef50 ID per row.
         db_path: Path to the SQLite database.
         total_samples: Total number of samples to draw from the dataset.
@@ -281,22 +306,17 @@ def create_valid_dataset(
         ValueError: If the cluster file does not exist, the database file does not exist, or the cluster file does not
             contain a "ur50_id" column.
     """
-    if not Path(cluster_file).exists():
-        raise ValueError(f"Cluster file {cluster_file} not found.")
+    if isinstance(clusters, (str, os.PathLike)):
+        clusters = create_valid_clusters(clusters)
+    elif not isinstance(clusters, pd.Series):
+        raise ValueError(f"Clusters must be a pandas Series. Got {type(clusters)}.")
 
     if not Path(db_path).exists():
         raise ValueError(f"Database file {db_path} not found.")
 
     protein_dataset = ProteinSQLiteDataset(db_path)
 
-    cluster_df = pd.read_parquet(cluster_file)
-    if "ur50_id" not in cluster_df.columns:
-        raise ValueError(
-            f"Validation cluster file must contain a 'ur50_id' column. Found columns {cluster_df.columns}."
-        )
-
     # Create a single bucket for each UniRef50 cluster.
-    clusters = cluster_df["ur50_id"].apply(lambda x: [x])
     return ESMMaskedResidueDataset(
         protein_dataset=protein_dataset,
         clusters=clusters,
@@ -315,7 +335,7 @@ _T = TypeVar("_T", str, torch.Tensor)
 
 def _random_crop(s: _T, crop_length: int, rng: np.random.Generator) -> _T:
     """Randomly crops a input to a maximum length."""
-    if crop_length > len(s):
+    if crop_length >= len(s):
         return s
 
     start_index = rng.integers(0, len(s) - crop_length)

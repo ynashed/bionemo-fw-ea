@@ -18,14 +18,14 @@ import random
 
 import pytest
 
-from bionemo.core.data.resamplers import PRNGDatasetShuffler
+from bionemo.core.data.resamplers import PRNGResampleDataset
 
 
 def test_prng_dataset_sequential_shuffler_full():
-    """Test that the PRNGDatasetShuffler returns the same results as a random number generator when accessed sequentially."""
+    """Test that the PRNGResampleDataset returns the same results as a random number generator when accessed sequentially."""
     dataset = list(range(10))
     seed = 42
-    shuffled_dataset = PRNGDatasetShuffler(dataset, seed=seed, num_samples=100)
+    shuffled_dataset = PRNGResampleDataset(dataset, seed=seed, num_samples=100)
     rng = random.Random(seed)
     expected_output_full = [rng.randint(0, 9) for _ in range(100)]
     full_output = [shuffled_dataset[i] for i in range(100)]
@@ -34,12 +34,12 @@ def test_prng_dataset_sequential_shuffler_full():
 
 @pytest.mark.parametrize("modulo_remainder", [0, 1, 4, 9])
 def test_prng_dataset_sequential_shuffler_skips(modulo_remainder: int):
-    """Test that the PRNGDatasetShuffler returns the same results as a random number generator when accessed sequentially but with
+    """Test that the PRNGResampleDataset returns the same results as a random number generator when accessed sequentially but with
     some indices skipped, as would happen in a parallel dataloader context.
     """
     dataset = list(range(100))
     seed = 42
-    shuffled_dataset = PRNGDatasetShuffler(dataset, seed=seed, num_samples=1000)
+    shuffled_dataset = PRNGResampleDataset(dataset, seed=seed, num_samples=1000)
     rng = random.Random(seed)
     expected_output_full = [rng.randint(0, 99) for _ in range(1000)]
     every_10th_output = [shuffled_dataset[i] for i in range(1000) if i % 10 == modulo_remainder]
@@ -48,13 +48,13 @@ def test_prng_dataset_sequential_shuffler_skips(modulo_remainder: int):
 
 @pytest.mark.parametrize("modulo_remainder", [0, 1])
 def test_prng_dataset_random_shuffler_skips(modulo_remainder: int):
-    """Test that the PRNGDatasetShuffler returns the same results as a random number generator when accessed in a random order
+    """Test that the PRNGResampleDataset returns the same results as a random number generator when accessed in a random order
     and with some indices skipped as well. This is what would happen if a user did an unexpected thing and called this
     on a dataset in a random order. This is expected to be slower but we still want it to work.
     """
     dataset = list(range(100))
     seed = 42
-    shuffled_dataset = PRNGDatasetShuffler(dataset, seed=seed, num_samples=1000)
+    shuffled_dataset = PRNGResampleDataset(dataset, seed=seed, num_samples=1000)
     rng = random.Random(seed)
     expected_output_full = [rng.randint(0, 99) for _ in range(1000)]
     indices_to_check = [i for i in range(1000) if i % 10 == modulo_remainder]
@@ -69,7 +69,7 @@ def test_repeated_lookups():
     """Test that repeated lookups of the same index return the same value."""
     dataset = list(range(100))
     seed = 42
-    shuffled_dataset = PRNGDatasetShuffler(dataset, seed=seed, num_samples=1000)
+    shuffled_dataset = PRNGResampleDataset(dataset, seed=seed, num_samples=1000)
     rng = random.Random(seed)
     expected_output_full = [rng.randint(0, 99) for _ in range(1000)]
     indices_to_check = [i for i in range(1000) if i % 10 == 3]

@@ -18,6 +18,8 @@ from pathlib import Path
 
 import pytest
 
+from bionemo.testing.data.load import load
+
 
 @pytest.fixture
 def test_directory() -> Path:
@@ -26,6 +28,4 @@ def test_directory() -> Path:
     Returns:
         A Path object that is the directory with test data.
     """
-    current_file = Path(__file__).resolve()
-    target_path = current_file.parents[5].absolute() / "test_data/scdl_data"
-    return target_path
+    return load("scdl/sample") / "scdl_data"

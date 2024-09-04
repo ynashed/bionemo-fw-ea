@@ -73,12 +73,12 @@ def test_ESMPreTrainingDataset_getitem_match_for_identical_seeds(dummy_protein_d
     dataset2 = ESMMaskedResidueDataset(protein_dataset=dataset, clusters=clusters, total_samples=10, seed=123)
 
     # Check that the datasets are equal.
-    for i in range(len(dataset)):
+    for i in range(len(dataset1)):
         sample1 = dataset1[i]
         sample2 = dataset2[i]
 
         for key in sample1:
-            assert torch.allclose(sample1[key], sample2[key])
+            torch.testing.assert_close(sample1[key], sample2[key])
 
 
 def test_ESMPreTrainingDataset_getitem_is_deterministic(dummy_protein_dataset):
@@ -94,7 +94,7 @@ def test_ESMPreTrainingDataset_getitem_is_deterministic(dummy_protein_dataset):
     for _ in range(10):
         sample2 = dataset[8]
         for key in sample1:
-            assert torch.allclose(sample1[key], sample2[key])
+            torch.testing.assert_close(sample1[key], sample2[key])
 
 
 def test_ESMPreTrainingDataset_getitem_differs_with_different_seeds(dummy_protein_dataset):
@@ -148,7 +148,7 @@ def test_ESMPreTrainingDataset_crops_out_start_and_end(dummy_protein_dataset, to
     clusters = [["UniRef90_A"]]
 
     dataset = ESMMaskedResidueDataset(
-        protein_dataset=prot_dataset, clusters=clusters, total_samples=10, seed=123, max_seq_length=1024
+        protein_dataset=prot_dataset, clusters=clusters, seed=123, total_samples=10, max_seq_length=1024
     )
 
     assert len(dataset[0]["text"]) == len(prot_dataset["UniRef90_A"]) + 2
@@ -156,7 +156,7 @@ def test_ESMPreTrainingDataset_crops_out_start_and_end(dummy_protein_dataset, to
     assert dataset[0]["text"][-1] == tokenizer.eos_token_id
 
     dataset = ESMMaskedResidueDataset(
-        protein_dataset=prot_dataset, clusters=clusters, total_samples=10, seed=123, max_seq_length=3
+        protein_dataset=prot_dataset, clusters=clusters, seed=123, total_samples=10, max_seq_length=3
     )
 
     assert len(dataset[0]["text"]) == 3
@@ -189,7 +189,9 @@ def test_create_train_dataset(dummy_protein_dataset, tmp_path):
 
     cluster_file.to_parquet(tmp_path / "train_clusters.parquet")
 
-    dataset = create_train_dataset(tmp_path / "train_clusters.parquet", dummy_protein_dataset, 10, 123)
+    dataset = create_train_dataset(
+        cluster_file=tmp_path / "train_clusters.parquet", db_path=dummy_protein_dataset, total_samples=10, seed=123
+    )
     assert len(dataset) == 10
     dataset[6]  # Make sure it doesn't crash.
 
@@ -203,6 +205,8 @@ def test_create_valid_dataset(dummy_protein_dataset, tmp_path):
 
     cluster_file.to_parquet(tmp_path / "valid_clusters.parquet")
 
-    dataset = create_valid_dataset(tmp_path / "valid_clusters.parquet", dummy_protein_dataset, 10, 123)
+    dataset = create_valid_dataset(
+        clusters=tmp_path / "valid_clusters.parquet", db_path=dummy_protein_dataset, total_samples=10, seed=123
+    )
     assert len(dataset) == 10
     dataset[6]  # Make sure it doesn't crash.

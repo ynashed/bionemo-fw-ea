@@ -43,10 +43,11 @@ from bionemo.geneformer.data.singlecell.preprocess import GeneformerPreprocess
 from bionemo.llm.lightning import LossLoggingCallback
 from bionemo.llm.model.biobert.lightning import BioBertLightningModule
 from bionemo.llm.model.biobert.model import BiobertSpecOption
+from bionemo.llm.utils.datamodule_utils import float_or_int_or_none, infer_global_batch_size
 from bionemo.llm.utils.logger_utils import WandbLoggerOptions, setup_nemo_lightning_logger
 
 
-__all__: Sequence[str] = ("main",)
+__all__: Sequence[str] = ("main", "parser")
 
 
 def main(
@@ -64,6 +65,7 @@ def main(
     biobert_spec_option: BiobertSpecOption,
     lr: float,
     micro_batch_size: int,
+    accumulate_grad_batches: int,
     cosine_rampup_frac: float,
     cosine_hold_frac: float,
     experiment_name: str,
@@ -116,8 +118,18 @@ def main(
 
     # Setup the strategy and trainer
     pipeline_model_parallel_size = 1
+    tensor_model_parallel_size = 1
+    global_batch_size = infer_global_batch_size(
+        micro_batch_size=micro_batch_size,
+        num_nodes=num_nodes,
+        devices=devices,
+        accumulate_grad_batches=accumulate_grad_batches,
+        tensor_model_parallel_size=tensor_model_parallel_size,
+        pipeline_model_parallel_size=pipeline_model_parallel_size,
+    )
+
     strategy = nl.MegatronStrategy(
-        tensor_model_parallel_size=1,
+        tensor_model_parallel_size=tensor_model_parallel_size,
         pipeline_model_parallel_size=pipeline_model_parallel_size,
         ddp="megatron",
         find_unused_parameters=True,
@@ -172,7 +184,7 @@ def main(
         random_token_prob=0.02,  # changed to represent the incorrect setting we originally used.
         median_dict=median_dict,
         micro_batch_size=micro_batch_size,
-        global_batch_size=micro_batch_size * int(num_nodes * devices / pipeline_model_parallel_size),
+        global_batch_size=global_batch_size,
         # persistent workers is supported when num_dataset_workers > 0
         persistent_workers=num_dataset_workers > 0,
         pin_memory=False,
@@ -222,6 +234,9 @@ def main(
                 # TODO(@jstjohn) try decoupled_lr
                 optimizer="adam",
                 use_distributed_optimizer=True,
+                # Pass through fp16/bf16 settings to avoid errors around model having bf16 enabled but optimizer not.
+                fp16=geneformer_config.fp16,
+                bf16=geneformer_config.bf16,
             ),
             lr_scheduler=CosineAnnealingScheduler(
                 max_steps=num_steps,
@@ -265,170 +280,177 @@ def main(
     )
 
 
+parser = argparse.ArgumentParser(description="Pretrain Geneformer with single cell data.")
+parser.add_argument(
+    "--data-dir",
+    type=Path,
+    required=True,
+    help="Path to the data base directory, for example this might be "
+    "/workspace/bionemo2/data/cellxgene_2023-12-15_small",
+)
+parser.add_argument(
+    "--precision",
+    type=str,
+    choices=get_args(PrecisionTypes),
+    required=False,
+    default="bf16-mixed",
+    help="Precision type to use for training.",
+)
+parser.add_argument(
+    "--lr",
+    type=float,
+    required=False,
+    default=1e-4,
+    help="Learning rate for training. Default is 1e-4. With bigger global batches try 1e-3",
+)
+parser.add_argument(
+    "--create-tensorboard-logger", action="store_true", default=False, help="Create a tensorboard logger."
+)
+# FIXME (@skothenhill) figure out how checkpointing and resumption should work with the new nemo trainer
+parser.add_argument(
+    "--resume-if-exists", action="store_true", default=False, help="Resume training if a checkpoint exists."
+)
+parser.add_argument(
+    "--result-dir", type=Path, required=False, default=Path("./results"), help="Path to the result directory."
+)
+parser.add_argument(
+    "--experiment-name", type=str, required=False, default="geneformer", help="Name of the experiment."
+)
+parser.add_argument("--wandb-offline", action="store_true", default=False, help="Use wandb in offline mode.")
+parser.add_argument(
+    "--wandb-project",
+    type=str,
+    required=False,
+    default=None,
+    help="Wandb project name. Wandb will only happen if this is set..",
+)
+parser.add_argument(
+    "--cosine-rampup-frac",
+    type=float,
+    required=False,
+    default=0.01,
+    help="Fraction of steps in which to ramp up the learning rate. Default is 0.01.",
+)
+parser.add_argument(
+    "--cosine-hold-frac",
+    type=float,
+    required=False,
+    default=0.05,
+    help="Fraction of final steps in which to hold the minimum LR. Default is 0.05.",
+)
+
+parser.add_argument(
+    "--num-gpus",
+    type=int,
+    required=False,
+    default=1,
+    help="Number of GPUs to use for training. Default is 1.",
+)
+parser.add_argument(
+    "--num-nodes",
+    type=int,
+    required=False,
+    default=1,
+    help="Number of nodes to use for training. Default is 1.",
+)
+parser.add_argument(
+    "--num-steps",
+    type=int,
+    required=False,
+    default=10000,
+    help="Number of steps to use for training. Default is 10000.",
+)
+parser.add_argument(
+    "--num-dataset-workers",
+    type=int,
+    required=False,
+    default=0,
+    help="Number of steps to use for training. Default is 0.",
+)
+parser.add_argument(
+    "--val-check-interval",
+    type=int,
+    required=False,
+    default=10000,
+    help="Number of steps to use for training. Default is 10000.",
+)
+parser.add_argument(
+    "--seq-length",
+    type=int,
+    required=False,
+    default=2048,
+    help="Sequence length of cell. Default is 2048.",
+)
+parser.add_argument(
+    "--limit-val-batches",
+    type=float_or_int_or_none,
+    required=False,
+    default=2,
+    help="Number of global batches used for validation if int. Fraction of validation dataset if float. Default is 2.",
+)
+parser.add_argument(
+    "--micro-batch-size",
+    type=int,
+    required=False,
+    default=64,
+    help="Micro-batch size. Global batch size is inferred from this.",
+)
+parser.add_argument(
+    "--accumulate-grad-batches",
+    type=int,
+    required=False,
+    default=1,
+    help="Gradient accumulation steps. Global batch size is inferred from this.",
+)
+parser.add_argument(
+    "--biobert-spec-option",
+    type=BiobertSpecOption,
+    choices=[e.value for e in BiobertSpecOption],
+    required=False,
+    default=BiobertSpecOption.bert_layer_local_spec.value,
+    help="Biobert spec option to use for the model. Default is 'bert_layer_local_spec'.",
+)
+parser.add_argument(
+    "--nemo1-init-path",
+    type=Path,
+    required=False,
+    help="Path to nemo1 file, if desired to load at init time.",
+)
+parser.add_argument(
+    "--save-best-checkpoint",
+    action="store_true",
+    default=True,
+    help="Save the best checkpoint based on the metric to monitor.",
+)
+parser.add_argument(
+    "--save-last-checkpoint",
+    action="store_true",
+    default=True,
+    help="Save the last checkpoint.",
+)
+parser.add_argument(
+    "--metric-to-monitor-for-checkpoints",
+    type=str,
+    required=False,
+    default="val_loss",
+    help="The metric to monitor for checkpointing.",
+)
+parser.add_argument(
+    "--save-top-k",
+    type=int,
+    required=False,
+    default=2,
+    help="Save the top k checkpoints.",
+)
+parser.add_argument(
+    "--restore-from-checkpoint-path",
+    type=Path,
+    required=False,
+    default=None,
+    help="Path to the checkpoint directory to restore from. Will override `--resume-if-exists` when set.",
+)
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Pretrain Geneformer with single cell data.")
-    parser.add_argument(
-        "--data-dir",
-        type=Path,
-        required=True,
-        help="Path to the data base directory, for example this might be "
-        "/workspace/bionemo2/data/cellxgene_2023-12-15_small",
-    )
-    parser.add_argument(
-        "--precision",
-        type=str,
-        choices=get_args(PrecisionTypes),
-        required=False,
-        default="bf16-mixed",
-        help="Precision type to use for training.",
-    )
-    parser.add_argument(
-        "--lr",
-        type=float,
-        required=False,
-        default=1e-4,
-        help="Learning rate for training. Default is 1e-4. With bigger global batches try 1e-3",
-    )
-    parser.add_argument(
-        "--create-tensorboard-logger", action="store_true", default=False, help="Create a tensorboard logger."
-    )
-    # FIXME (@skothenhill) figure out how checkpointing and resumption should work with the new nemo trainer
-    parser.add_argument(
-        "--resume-if-exists", action="store_true", default=False, help="Resume training if a checkpoint exists."
-    )
-    parser.add_argument(
-        "--result-dir", type=Path, required=False, default=Path("./results"), help="Path to the result directory."
-    )
-    parser.add_argument(
-        "--experiment-name", type=str, required=False, default="geneformer", help="Name of the experiment."
-    )
-    parser.add_argument("--wandb-offline", action="store_true", default=False, help="Use wandb in offline mode.")
-    parser.add_argument(
-        "--wandb-project",
-        type=str,
-        required=False,
-        default=None,
-        help="Wandb project name. Wandb will only happen if this is set..",
-    )
-    parser.add_argument(
-        "--cosine-rampup-frac",
-        type=float,
-        required=False,
-        default=0.01,
-        help="Fraction of steps in which to ramp up the learning rate. Default is 0.01.",
-    )
-    parser.add_argument(
-        "--cosine-hold-frac",
-        type=float,
-        required=False,
-        default=0.05,
-        help="Fraction of final steps in which to hold the minimum LR. Default is 0.05.",
-    )
-
-    parser.add_argument(
-        "--num-gpus",
-        type=int,
-        required=False,
-        default=1,
-        help="Number of GPUs to use for training. Default is 1.",
-    )
-    parser.add_argument(
-        "--num-nodes",
-        type=int,
-        required=False,
-        default=1,
-        help="Number of nodes to use for training. Default is 1.",
-    )
-    parser.add_argument(
-        "--num-steps",
-        type=int,
-        required=False,
-        default=10000,
-        help="Number of steps to use for training. Default is 10000.",
-    )
-    parser.add_argument(
-        "--num-dataset-workers",
-        type=int,
-        required=False,
-        default=0,
-        help="Number of steps to use for training. Default is 0.",
-    )
-    parser.add_argument(
-        "--val-check-interval",
-        type=int,
-        required=False,
-        default=10000,
-        help="Number of steps to use for training. Default is 10000.",
-    )
-    parser.add_argument(
-        "--seq-length",
-        type=int,
-        required=False,
-        default=2048,
-        help="Sequence length of cell. Default is 2048.",
-    )
-    parser.add_argument(
-        "--limit-val-batches",
-        type=int,
-        required=False,
-        default=2,
-        help="Number of steps to use for training. Default is 2.",
-    )
-    parser.add_argument(
-        "--micro-batch-size",
-        type=int,
-        required=False,
-        default=64,
-        help="Micro-batch size. Global batch size is inferred from this.",
-    )
-    parser.add_argument(
-        "--biobert-spec-option",
-        type=BiobertSpecOption,
-        choices=[e.value for e in BiobertSpecOption],
-        required=False,
-        default=BiobertSpecOption.bert_layer_local_spec.value,
-        help="Biobert spec option to use for the model. Default is 'bert_layer_local_spec'.",
-    )
-    parser.add_argument(
-        "--nemo1-init-path",
-        type=Path,
-        required=False,
-        help="Path to nemo1 file, if desired to load at init time.",
-    )
-    parser.add_argument(
-        "--save-best-checkpoint",
-        action="store_true",
-        default=True,
-        help="Save the best checkpoint based on the metric to monitor.",
-    )
-    parser.add_argument(
-        "--save-last-checkpoint",
-        action="store_true",
-        default=True,
-        help="Save the last checkpoint.",
-    )
-    parser.add_argument(
-        "--metric-to-monitor-for-checkpoints",
-        type=str,
-        required=False,
-        default="val_loss",
-        help="The metric to monitor for checkpointing.",
-    )
-    parser.add_argument(
-        "--save-top-k",
-        type=int,
-        required=False,
-        default=2,
-        help="Save the top k checkpoints.",
-    )
-    parser.add_argument(
-        "--restore-from-checkpoint-path",
-        type=Path,
-        required=False,
-        default=None,
-        help="Path to the checkpoint directory to restore from. Will override `--resume-if-exists` when set.",
-    )
-
     # Parse the arguments and pull them out into local variables for ease of future refactor to a
     #   config management system.
     args = parser.parse_args()
@@ -447,6 +469,7 @@ if __name__ == "__main__":
         biobert_spec_option=args.biobert_spec_option,
         lr=args.lr,
         micro_batch_size=args.micro_batch_size,
+        accumulate_grad_batches=args.accumulate_grad_batches,
         cosine_rampup_frac=args.cosine_rampup_frac,
         cosine_hold_frac=args.cosine_hold_frac,
         precision=args.precision,

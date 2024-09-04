@@ -1,0 +1,64 @@
+exclude = [
+    ".*__pycache__",
+    ".*egg-info",
+    "docs",
+    "tests",
+    "venv",
+]
+source_roots = [
+    "sub-packages/bionemo-core/src",
+    "sub-packages/bionemo-esm2/src",
+    "sub-packages/bionemo-example_model/src",
+    "sub-packages/bionemo-fw/src",
+    "sub-packages/bionemo-geneformer/src",
+    "sub-packages/bionemo-llm/src",
+    "sub-packages/bionemo-testing/src",
+]
+
+[[modules]]
+path = "bionemo.core"
+depends_on = []
+
+[[modules]]
+path = "bionemo.esm2"
+depends_on = [
+    { path = "bionemo.core" },
+    { path = "bionemo.llm" },
+]
+
+[[modules]]
+path = "bionemo.example_model"
+depends_on = [
+    { path = "bionemo.core" },
+    { path = "bionemo.llm" },
+]
+
+[[modules]]
+path = "bionemo.fw"
+depends_on = [
+    { path = "bionemo.core" },
+    { path = "bionemo.esm2" },
+    { path = "bionemo.geneformer" },
+    { path = "bionemo.llm" },
+]
+
+[[modules]]
+path = "bionemo.geneformer"
+depends_on = [
+    { path = "bionemo.core" },
+    { path = "bionemo.llm" },
+]
+
+[[modules]]
+path = "bionemo.llm"
+depends_on = [
+    { path = "bionemo.core" },
+]
+
+[[modules]]
+path = "bionemo.testing"
+depends_on = []
+
+[[modules]]
+path = "<root>"
+depends_on = []
