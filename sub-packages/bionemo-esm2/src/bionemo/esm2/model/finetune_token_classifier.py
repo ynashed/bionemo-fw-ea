@@ -14,15 +14,25 @@
 # limitations under the License.
 
 
+import functools
 from dataclasses import dataclass, field
-from typing import Dict, List, Sequence, Tuple, Type
+from typing import Dict, Iterable, List, Sequence, Tuple, Type, Union
 
+import pytorch_lightning as pl
 import torch
 from megatron.core.transformer.module import MegatronModule
 from megatron.core.transformer.transformer_config import TransformerConfig
+from nemo.collections.common.tokenizers import TokenizerSpec
 from nemo.lightning.megatron_parallel import MegatronLossReduction, ReductionT
+from nemo.lightning.pytorch.plugins import MegatronDataSampler
+from nemo.utils import logging
+from pytorch_lightning.utilities.types import EVAL_DATALOADERS, TRAIN_DATALOADERS
+from torch.utils.data import Dataset
 
+from bionemo.core.data.resamplers import PRNGResampleDataset
 from bionemo.esm2.api import ESM2Config, ESM2Model
+from bionemo.esm2.data import dataset, tokenizer
+from bionemo.llm.data import collate
 from bionemo.llm.utils import iomixin_utils as iom
 
 
@@ -153,3 +163,302 @@ class FineTuneSeqLenBioBertConfig(ESM2Config, iom.IOMixinWithGettersSetters):
 
     def get_loss_reduction_class(self) -> Type[ClassifierLossReduction]:
         return ClassifierLossReduction
+
+
+class Label2IDTokenizer(TokenizerSpec):
+    """Initializes simple Char Tokenizer.
+    Intended to be used for extracting class labels
+    for classification models such as secondary
+    structure prediction model, where each class is
+    encoded with a character (ex. "C", "H", "E")
+
+        Examples:
+            >>> tokenizer = Label2IDTokenizer()
+            >>> seqs = ['CHE', 'CCC', 'EHH']
+            >>> tokenizer = tokenizer.build_vocab(s)
+    """
+
+    def __init__(self):
+        self.vocab = {}
+        self._update_index()
+
+    def _update_index(self):
+        """
+        Updates the id_to_vocab index based on the current vocab
+        """
+        self.decode_vocab = {id_: token for token, id_ in self.vocab.items()}
+
+    @property
+    def vocab_size(self) -> int:
+        """Return the size of the vocab being used."""
+        return len(self.vocab)
+
+    def text_to_tokens(self, text: str) -> List[str]:
+        return list(text)
+
+    def tokens_to_text(self, tokens):
+        return "".join(tokens)
+
+    def tokens_to_ids(self, tokens: List[str]) -> List[int]:
+        """Convert tokens to indexes/ids
+        Args:
+            tokens (List[str]):  Containing tokens
+        Returns:
+            (List[int]): Containing ID's for each token
+        """
+        ids = []
+        for token in tokens:
+            id_ = self.vocab.get(token)
+            if id_ is None:
+                raise ValueError(f"Do not recognize token: {token}")
+            else:
+                ids.append(id_)
+        return ids
+
+    def ids_to_tokens(self, ids: List[int]) -> List[str]:
+        """Convert Ids to tokens
+        Args:
+            ids (List[int]): Containg ids for each token
+        Returns:
+            (List[str]): Containing tokens
+        """
+        tokens = []
+        for id_ in ids:
+            token = self.decode_vocab.get(id_)
+            if token is None:
+                raise ValueError(f"Do not recognize ID: {id_}")
+            tokens.append(token)
+        return tokens
+
+    def text_to_ids(self, text: str) -> List[int]:
+        """Converts text to ids
+        Args:
+            text (str): String containing text to convert
+        Returns:
+            (List[int]): Id's corresponding to the tokenization
+            of the text
+        """
+        tokens = self.text_to_tokens(text)
+        return self.tokens_to_ids(tokens)
+
+    def ids_to_text(self, ids):
+        tokens = self.ids_to_tokens(ids)
+        return self.tokens_to_text(tokens)
+
+    def build_vocab(self, strings: Union[str, Iterable[str]]):
+        """Builds the vocabulary of the tokenizer from strings
+        Args:
+            strings: (Union[str, Iterable[str]]): Strings to
+                build the vocabulary with. If a string is supplied,
+                then the vocabulary is built from the single string.
+                Otherwise, the vocabulary is progressively built
+                from all of the strings in `strings`.
+        """
+
+        if isinstance(strings, str):
+            strings = [strings]
+
+        for string in strings:
+            for token in string:
+                if token not in self.vocab:
+                    self.vocab[token] = len(self.vocab)
+                    self.decode_vocab[self.vocab[token]] = token
+
+        return self
+
+
+class PerTokenValueDataset(Dataset):
+    def __init__(self, tokenizer):
+        self.data = [
+            (
+                "6o41-O",
+                "MTPAVTTYKLVINGKTLKGETTTKAVDAETAEKAFKQYANDNGVDGVWTYDDATKTFTVTEHHHHH",
+                "CCCCCEEEEEEEECCCEEEEEEEEECCHHHHHHHHHHHHHHCCCCCEEEEECCCCEEEEECCCCCC",
+            ),
+            (
+                "6o43-A",
+                "MNDQEKIDKFTHSYINDDFGLTIDQLVPKVKGYGRFNVWLGGNESKIRQVLKAVKEIGVSPTLFAVYEKNEGFSSGLGWLNHTSARGDYLTDAKFIARKLVSQSKQAGQPSWYDAGNIVHFVPQDVQRKGNADFAKNMKAGTIGRAYIPLTAAATWAAYYPLGLKASYNKVQNYGNPFLDGANTILAWGGKLDGKGGSPS",
+                "CCHHHHHHHHHCCECCCCCCCCHHHHHHHHCCCHHHHHCCCCCHHHHHHHHHHHHHHCCCHHHHHHHHHHHCCCCCECHHHCCECCCCHHHHHHHHHHHHHHHHCCCCCCCCCCCCCCCCCCCHHHHHHHHHHHHHCCCCCEHHHHHHHHCHHHHHHHHCHHHHCHHHHCCCCCCCHHHHHHHHHHHCCCCCCCCCCCCC",
+            ),
+            (
+                "6o5k-B",
+                "GPGFMRDSGSKASSDSQDANQCCTSCEDNAPATSYCVECSEPLCETCVEAHQRVKYTKDHTVRSTGPAKTRD",
+                "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCEEECCCCEEECHHHHHHHHHCCCCCCCCEEECCCCCCCC",
+            ),
+            (
+                "6o6d-A",
+                "SNALSRNEVLLNGDINFKEVRCVGDNGEVYGIISSKEALKIAQNLGLDLVLISASAKPPVCKVMDYNKFRYQNEKKIKEA",
+                "CCCCCCCCCCEHHHCCCCCEEEEECCCCEEEEECHHHHHHHHHHHCCEEEEEECCCCCCEEEEECHHHHHHHCCCCCCCC",
+            ),
+            (
+                "6o6j-A",
+                "MAKGKSEVVEQNHTLILGWSDKLGSLLNQLAIANESLGGGTIAVMAERDKEDMELDIGKMEFDFKGTSVICRSGSPLILADLKKVSVSKARTIIVLAEDGNADQSDARALRTVLSLTGVKEGLRGHIVVEMSDLDNEVLVKLVGGDLVETVVAHDVIGRLMIQCARQPGLAQIWEDILGFENCEFYIKRWPQLDGMLFEDVLISFPAAIPCGIKVASYGGKIILNPDDSYVLQEGDEVLVIAEDDDTYAPAPLPMVRRGSLPKDFVYPKSPERILFCGWRRDMEDMITVLDASLAPDSELWMFNDVPEKEREKKLIDGGLDISRLENISLVNREGNAVIRRHLESLPLESFDSILILADESVEDSAIQADSRSLATLLLIRDIQARRLPYVAMASQTQGGNFSKGSWIGEMKQASDKTVIISEILDPRTKNLLSMSKISDYVLSNELVSMALAMVAEDRQINDVLEELFAEEGNEMHIRQADIYLREGEEMSFYEIMLRARQRREILIGYRLANAERAVINPPAKTGRRKWSLKDVFVVITEKEGSRSHHHHHH",
+                "CCCCCCCCCCCCCEEEECCCCCHHHHHHHHHHHHHHHCCCEEEEEECCCHHHHHHHHHCCCCCCCCCEEEEEECCCCCHHHHHHCCHHHCCEEEECCCCCCHHHHHHHHHHHHHHHHCCCCCCCCEEEEEECCHHHHHHHHHHHHHHEEEEEHHHHHHHHHHHHHHCCCHHHHHHHHHCCCCCEEEEECCHHHCCCEHHHHCCCCCCEEEEEEEEHHHCCEEEECCCCCCECCCCCEEEEEECCCCCCCCCCCCCCCCCCCCCCCCCCCCCCEEEEECCCCCHHHHHHHHHHHCCCCEEEEEEECCCHHHHHHHHHHCCCCHHHCCCEEEEEEECCCCCHHHHHCCCHHHCCEEEECCCCCCCCCHHHHHHHHHHHHHHHHHHHHHCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCEEEEEECCHHHHHHCCCCHHHHHEEECHHHHHHHHHHHHCCCHHHHHHHHHCCCCEEEEEEEHHHCCCCCCEEEHHHHHHHHHCCCEEEEEEECCCCCCCEECCCCCCCEEECCCCCEEEEEEECCCCCCCCCCCC",
+            ),
+            (
+                "6o7b-A",
+                "MGSSHHHHHHSQDPMEIDELTALGGLLHDIGKPVQRAGLYSGDHSTQGARFLRDLAENTGRAEYELLSLFSEFHHKGHMKNDELMIRRIKELSPERFGLTMEDVLNALWIVYEADNLASGEREEGQPQASRPLYSVFNPGKAYPWAELDFEKELPVPGDVFSIRSQDYRELVKRLWEELSKAKLRSDRLLPVLEKYLTFVSSVTSEGNIISLYDHMRMTSAIALAMLRAGCTAEDVRSGRCRKEKRFLLIEGDFSGIQDFIYRVSGKGTLKYLRARSAYLELIGWDVVLEILSRLGLTRANVVFNAGGHFMIIAQNTPDAVKELEEIRAKAVEWLYREFESDLYLAIEWEPVSGREFGREGGKNLFAEARKRLKHKLTVRKLKRFGEIKGLFEHGHTERLAECPVCGRELPEGKLEPSASDPETKVCPTCNRLVSLGGNLPKLLGFGRTAKNDAGVLVEGPFSGFVPYLQGGRPVGEQILVKNTLNPGEIPESAQFVPYFVADYFKKDPKGGVATFEELSMASTGTRRLGVMKGDVDRLGEFFSSMDSPSKLATASRFMDYFFKGYIGAIIEGKFGYIIGDVPSLRDWPEEPDIVVVYAGGDAFFIVGAWDQIFELAFRVRRAFNAYTGGKLTLSVGLGYFDERTPIYRMADVVSERLDTAKDEGRNRVFVVGRSRPLDGKHKLSYEWNHYEELWRTYAPRIYAGNGRLKGKLESKKGLLWKLLEIRELYVRDPNDVRWAYLTAYLLGRHGLSDLFPELVGIDTKAVERKEPQPVYWVDGVLKIVLMAVRR",
+                "CCCCCCCCCCCCCCCCHHHHHHHHHHHCCCHHHHHCCCCCCCCHHHHHHHHHHHHHHCCCCCHHHHHHCCCCCCCCCCCCCCHHHHHHHHHCCHHHHCCCHHHHHHHHHHHHHHHHHHCCCCCCCCCCCCCCCECCCCCCCECCCCCCCCCCCCCCCECCCCCCCCHHHHHHHHHHHHHCCCCCCHHHHHHHHHHHHCCCECCCCCCCCCEHHHHHHHHHHHHHHHHHCCCCCCCCCCCHHHHCCCEEEEEEEEECHHHHHHCCCCCCCHHHHHHHHHHHHHHHHHHHHHHHHHHCCCHHHEEEEECCEEEEEEECCHHHHHHHHHHHHHHHHHHHHHHCCCCEEEEEEEEECHHHHCCCCCCCHHHHHHHHHHHHHHHHHCCCCCCCHHHHCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCEEEEECCCCCCCCEECCCCEEEEECCCCCCCCCEEEEECCCCCCCCCCCCEEEEECCCCCCCECCCCCECCHHHHHHCCCCCCCEEEEEEEECCHHHHHHCCCCHHHHHHHHHHHHHHHHHHHHHHHHCCCHHHHCCCCCCCCCCCCCCEEEEEEECCEEEEEEEHHHHHHHHHHHHHHHHHHCCCCCCEEEEEEEECCCCCHHHHHHHHHHHHHHHHHCCCCEEECCCCCCCCCCCCCCCEEHHHHHHHHHHHHHHHEEECCEECHHHCCCCHHHHHHHHHHHHHHHCCCCCHHHHHHHHCCCCCCCCCCCHHHCCCCHHHHHCCCCCHHHCCHHHHHHHHHHHCC",
+            ),
+            (
+                "6o7b-B",
+                "MPKFIAVKLIPKGPFRDIPRADTLFGAIGNAISAIHGQSAVEELVDAFVGGARISSAFPYSGDTYYLPKPLSVEPALEGILTGLDEEERYTTAKRLRKAKYLDLKNFELALRLRPFTIPEEIPYARVDVPRVVLDRVTQDSSIYFWEEIRFREKSGVYFLYSGPREVFDGYIAPAMRFLGDTGIGGKSTWGAGLFEVEFHEMKIDAPGSEYSVTLSNALPTKTPVLWRLLRKGGWSFGRRKPRMTFIAEGSIVKNDPGGMERLELGLSHEVYVYGLTFPLGVELPEGLE",
+                "CCEEEEEEEEECCCECCCCCHHHHHHHHHHHHHHHHCHHHHHHHHHHHHCCCEECCCEEEECCEEEEECCHHHCCCCCCCCCCCCCCCHHHHHHHHCCCCEEEHHHHHHHHCCCCCCCCCCCCEEEEEEEEEECCCCCCCCEEEEEEEEEECCCEEEEEEEECCHHHHHHCHHHHHHHHHCCCCCCCCCCCCCCEEEEEEEEECCCCCCCCEEECCCECCCCCCCECCEEECCCCCCCCCCCCCEEECCCCEECCCCECCEEECCCCCCCEEECCECCEEECCCCCCCC",
+            ),
+        ]
+        self._len = len(self.data)
+        self.tokenizer = tokenizer
+        label_tokenizer = Label2IDTokenizer()
+        self.label_tokenizer = label_tokenizer.build_vocab("CHE")
+
+    def __len__(self):
+        return self._len
+
+    def __getitem__(self, idx):
+        sequence = self.data[idx][1]
+        tokenized_sequence = self._tokenize(sequence)
+        label_ids = torch.tensor(self.label_tokenizer.text_to_ids(self.data[idx][1]))
+        labels = torch.nn.functional.one_hot(label_ids, num_classes=3)
+
+        return {
+            "text": tokenized_sequence,
+            "types": torch.zeros_like(tokenized_sequence, dtype=torch.int64),
+            "attention_mask": torch.ones_like(tokenized_sequence, dtype=torch.int64),
+            "labels": labels,
+            "loss_mask": torch.ones_like(tokenized_sequence, dtype=torch.bool),
+            "is_random": torch.zeros_like(tokenized_sequence, dtype=torch.int64),
+        }
+
+    def _tokenize(self, sequence: str) -> torch.Tensor:
+        """Tokenize a protein sequence.
+
+        Args:
+            sequence: The protein sequence.
+
+        Returns:
+            The tokenized sequence.
+        """
+        tensor = self.tokenizer.encode(sequence, add_special_tokens=True, return_tensors="pt")
+        return tensor.flatten()  # type: ignore
+
+
+class PerTokenValueDataModule(pl.LightningDataModule):  # noqa: D101
+    def __init__(
+        self,
+        seed: int | None = 42,
+        min_seq_length: int | None = None,
+        max_seq_length: int = 1024,
+        micro_batch_size: int = 4,
+        global_batch_size: int = 8,
+        num_workers: int = 10,
+        persistent_workers: bool = True,
+        pin_memory: bool = True,
+        rampup_batch_size: list[int] | None = None,
+        mask_prob: float = 0.15,
+        mask_token_prob: float = 0.8,
+        mask_random_prob: float = 0.1,
+        tokenizer: tokenizer.BioNeMoAutoTokenizer = tokenizer.get_tokenizer(),
+    ) -> None:
+        super().__init__()
+        self._seed = seed
+        self._min_seq_length = min_seq_length
+        self._max_seq_length = max_seq_length
+        self._mask_prob = mask_prob
+        self._mask_token_prob = mask_token_prob
+        self._mask_random_prob = mask_random_prob
+        self._tokenizer = tokenizer
+
+        self._micro_batch_size = micro_batch_size
+        self._num_workers = num_workers
+        self._persistent_workers = persistent_workers
+        self._pin_memory = pin_memory
+
+        self.data_sampler = MegatronDataSampler(
+            seq_len=max_seq_length,
+            micro_batch_size=micro_batch_size,
+            global_batch_size=global_batch_size,
+            dataloader_type="single",  # `MegatronPretrainingRandomSampler` from "cyclic" is failing.
+            rampup_batch_size=rampup_batch_size,
+        )
+
+    def setup(self, stage: str) -> None:
+        """Setup the ESMDataModule.
+
+        Args:
+            stage: Unused.
+
+        Raises:
+            RuntimeError: If the trainer is not attached, or if the trainer's max_steps is not set.
+        """
+        del stage  # Unused.
+
+        if not hasattr(self, "trainer") or self.trainer is None:
+            raise RuntimeError("Setup should be completed when trainer and config are attached.")
+
+        if self.trainer.max_epochs is not None and self.trainer.max_epochs > 1:
+            logging.warning(
+                "Trainer is set to run for multiple epochs. This is not recommended due to the same shuffle being used "
+                "in each. Instead set max_epochs to 1 and increase the number of max_steps."
+            )
+
+        max_train_steps = self.trainer.max_steps
+        if max_train_steps <= 0:
+            raise RuntimeError("Please specify trainer.max_steps")
+
+        # Create training dataset
+        _train_ds = PerTokenValueDataset(tokenizer=self._tokenizer)
+        self._train_ds = self._sample_and_shuffle_dataset(
+            _train_ds, None, "train"
+        )  # shuffle manually without cyclic MegatronPretrainingRandomSampler
+
+        # Create validation dataset
+        _valid_ds = PerTokenValueDataset(tokenizer=self._tokenizer)
+        self._valid_ds = self._sample_and_shuffle_dataset(
+            _valid_ds, None, "val"
+        )  # shuffle manually without cyclic MegatronPretrainingRandomSampler
+
+        assert (
+            hasattr(self, "trainer") and self.trainer is not None
+        ), "Setup should be completed when trainer and config are attached."
+
+    def _create_dataloader(self, dataset, **kwargs) -> torch.utils.data.DataLoader:
+        assert self._tokenizer.pad_token_id is not None, "Tokenizer must have a pad token id."
+
+        return torch.utils.data.DataLoader(
+            dataset,
+            num_workers=self._num_workers,
+            pin_memory=self._pin_memory,
+            persistent_workers=self._persistent_workers,
+            collate_fn=functools.partial(
+                collate.bert_padding_collate_fn,
+                padding_value=self._tokenizer.pad_token_id,
+                min_length=self._min_seq_length,
+                max_length=self._max_seq_length,
+            ),
+            **kwargs,
+        )
+
+    def train_dataloader(self) -> TRAIN_DATALOADERS:
+        """Returns the dataloader for training data."""
+        return self._create_dataloader(self._train_ds)
+
+    def val_dataloader(self) -> EVAL_DATALOADERS:
+        """Returns the dataloader for validation data."""
+        return self._create_dataloader(self._valid_ds)
+
+    def _sample_and_shuffle_dataset(self, dataset: dataset.ESMMaskedResidueDataset, num_samples: int, stage: str):  # noqa: D417
+        """Sample the training dataset.
+
+        Args:
+            dataset (torch.utils.data.Dataset): The dataset to sample from
+
+        Returns:
+            ResamplingMappedDataset: Resampled dataset
+
+        """
+        # This is where re-sampling occurs.
+        return PRNGResampleDataset(
+            dataset,
+            num_samples=num_samples,
+            seed=self._seed + len(stage),
+        )
