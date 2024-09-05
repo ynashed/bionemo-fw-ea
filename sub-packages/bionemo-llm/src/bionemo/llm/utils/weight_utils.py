@@ -13,10 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Sequence
+from pathlib import Path
+from typing import Sequence, Set
+
+from megatron.core import dist_checkpointing
+from megatron.core.dist_checkpointing.mapping import ShardedTensor
+from megatron.core.transformer.module import MegatronModule
 
 
-__all__: Sequence[str] = ("nemo1_to_nemo2_biobert_key_mapping",)
+__all__: Sequence[str] = (
+    "nemo1_to_nemo2_biobert_key_mapping",
+    "load_weights_sharded_inplace_nemo2_to_mcore",
+)
 
 
 def nemo1_to_nemo2_biobert_key_mapping(  # noqa: D417
@@ -87,3 +95,59 @@ def nemo1_to_nemo2_biobert_key_mapping(  # noqa: D417
         if ".pre_mlp_layernorm.weight" in base_rename:
             return base_rename.replace(".pre_mlp_layernorm.weight", ".mlp.linear_fc1.layer_norm_weight")
     return base_rename
+
+
+#############################################################################################
+# Core utility functions: Below are some utility functions that allow for loading a nemo2
+#  trained model back into a newly initialized megatron core model. The key insight is that
+#  the nemo2 lightning module owns a single `self.module = config.configure_model(...)`
+#  object. This `config.configure_module(...)` object is the megatron model that we want
+#  to load weights into. So we need to adjust the checkpoint keys since they will all
+#  have the extra `module.` prefix on them, while the megatron model we just initialized
+#  will not. These functions should make a wide variety of fine-tuning strategies doable.
+
+
+def _munge_key_megatron_to_nemo2(k: str) -> str:
+    return f"module.{k}"
+
+
+def _munge_sharded_tensor_key_megatron_to_nemo2(v: ShardedTensor) -> ShardedTensor:
+    # This works with PP=1, how do we handle PP>1?
+    key = v.key
+    v.key = _munge_key_megatron_to_nemo2(key)
+    return v
+
+
+def _key_in_filter(k: str, filter: Set[str]) -> bool:
+    for prefix in filter:
+        if k.startswith(prefix):
+            return True
+    return False
+
+
+def load_weights_sharded_inplace_nemo2_to_mcore(
+    model: MegatronModule, distributed_checkpoint_dir: str | Path, skip_keys_with_these_prefixes: Set[str]
+):
+    """Given a megatron module, this function will determine which keys/subsets of weights to load given the
+        parallel/distributed state. This operates assuming a checkpoint was saved by a nemo2 trainer which places
+        the `module.` prefix on all key names, but we are then going to load directly in to the megatron module
+        without the `module.` prefix. Note that if there are any _extra_ keys that you do not want to search the
+        checkpoint for, for example if you add new layers/heads onto your module, you need to supply the prefix
+        path to those keys in your model and they will be ignored. This latter feature is key for flexible fine-tuning
+        strategies where you load weights partially from other models with partially overlapping structures.
+
+    Args:
+        model: Megatron model that you want to load weights into.
+        distributed_checkpoint_dir: _description_
+        skip_keys_with_these_prefixes: _description_
+    """  # noqa: D205
+    sharded_state_dict = {
+        _munge_key_megatron_to_nemo2(k): _munge_sharded_tensor_key_megatron_to_nemo2(v)
+        for k, v in model.sharded_state_dict().items()
+        if not _key_in_filter(k, skip_keys_with_these_prefixes)
+    }
+    dist_checkpointing.load(
+        sharded_state_dict=sharded_state_dict,
+        checkpoint_dir=str(distributed_checkpoint_dir),
+        strict=dist_checkpointing.serialization.StrictHandling.ASSUME_OK_UNEXPECTED,
+    )

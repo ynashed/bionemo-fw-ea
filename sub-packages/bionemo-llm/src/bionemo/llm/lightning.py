@@ -33,6 +33,7 @@ __all__: Sequence[str] = (
 
 
 T = TypeVar("T")
+BatchT = TypeVar("BatchT")
 
 
 def some_first(seq: Iterable[Optional[T]]) -> T:

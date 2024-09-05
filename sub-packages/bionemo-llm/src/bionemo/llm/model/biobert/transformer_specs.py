@@ -15,7 +15,7 @@
 
 
 from enum import Enum
-from typing import Optional, Sequence
+from typing import Optional, Sequence, Type
 
 from megatron.core.fusions.fused_bias_dropout import get_bias_dropout_add
 from megatron.core.fusions.fused_layer_norm import FusedLayerNorm
@@ -60,7 +60,7 @@ class BiobertSpecOption(str, Enum):
 def get_biobert_spec(  # noqa: D417
     biobert_spec_option: BiobertSpecOption,
     qk_layernorm: bool = False,
-    core_attention: Optional[Module] = None,
+    core_attention: Optional[Type[Module]] = None,
 ) -> spec_utils.ModuleSpec:
     """Get the spec for the Biobert model.
 

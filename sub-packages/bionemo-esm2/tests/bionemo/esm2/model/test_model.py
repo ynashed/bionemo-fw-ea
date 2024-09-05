@@ -36,6 +36,7 @@ from bionemo.esm2.model.embedding import ESM2Embedding
 from bionemo.llm.model.biobert.model import MegatronBioBertModel
 from bionemo.llm.utils.weight_utils import nemo1_to_nemo2_biobert_key_mapping
 from bionemo.testing import megatron_parallel_state_utils
+from bionemo.testing.data.load import load
 
 
 bionemo2_root: Path = (
@@ -47,7 +48,7 @@ bionemo2_root: Path = (
     .parent.parent
 ).absolute()
 assert bionemo2_root != Path("/")
-nemo1_checkpoint_path: Path = bionemo2_root / "models/protein/esm2nv/esm2nv_650M_converted.nemo"
+nemo1_checkpoint_path: Path = load("esm2/nv_650m:1.0")
 
 
 def reduce_hiddens(hiddens: Tensor, attention_mask: Tensor) -> Tensor:
@@ -177,6 +178,7 @@ def test_esm2_650m_checkpoint(esm2_model):
 
 
 def test_esm2_golden_values(esm2_650M_config_w_ckpt, sample_data):
+    assert esm2_650M_config_w_ckpt.core_attention_override is not None
     tokenizer = AutoTokenizer(pretrained_model_name="facebook/esm2_t33_650M_UR50D")
     tokens = tokenizer.tokenizer([row[1] for row in sample_data], return_tensors="pt", padding=True).to("cuda")
     input_ids = tokens["input_ids"]
@@ -211,7 +213,7 @@ def test_esm2_golden_values(esm2_650M_config_w_ckpt, sample_data):
 
         # configure the model to return hiddens
         esm2_650M_config_hiddens = deepcopy(esm2_650M_config_w_ckpt)
-        esm2_650M_config_hiddens.return_only_hidden_states = True
+        esm2_650M_config_hiddens.set_hparam("return_only_hidden_states", True)
         model = esm2_650M_config_hiddens.configure_model(get_tokenizer()).cuda()
         model.eval()
         hiddens = model(input_ids, attention_mask)

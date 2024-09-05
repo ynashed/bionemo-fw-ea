@@ -14,7 +14,7 @@
 # limitations under the License.
 
 
-from typing import Dict, Optional, Sequence
+from typing import Callable, Dict, Iterable, Optional, Sequence
 
 import pytorch_lightning as pl
 import torch
@@ -26,100 +26,25 @@ from nemo.collections.common.tokenizers.tokenizer_spec import TokenizerSpec
 from nemo.lightning import io as nlio
 from nemo.lightning.megatron_parallel import DataT, MegatronLossReduction
 from nemo.lightning.pytorch.optim import MegatronOptimizerModule
-from torch.optim import Optimizer
 
 from bionemo.llm.lightning import LightningPassthroughPredictionMixin
-from bionemo.llm.model.biobert.model import BioBertConfig
+from bionemo.llm.model.config import MegatronBioNeMoTrainableModelConfig
+from bionemo.llm.utils import iomixin_utils as iom
 
 
 __all__: Sequence[str] = (
     "BioBertLightningModule",
     "biobert_data_step",
     "bert_forward_step",
-    "bert_default_optimizer",
+    "get_packed_seq_params",
+    "get_batch_on_this_context_parallel_rank",
 )
 
-
-class BioBertLightningModule(  # noqa: D101
-    pl.LightningModule, nlio.IOMixin, nlio.ConnectorMixin, LightningPassthroughPredictionMixin
-):
-    def __init__(
-        self,
-        config: BioBertConfig,
-        # TODO: Add transformer_layer_spec when we update mcore
-        tokenizer: Optional[TokenizerSpec] = None,
-        optimizer: MegatronOptimizerModule = MegatronOptimizerModule(
-            config=OptimizerConfig(lr=1e-4, optimizer="adam", use_distributed_optimizer=True),
-        ),
-    ):
-        """A pytorch lightning module for BioBert-derived models. This module is designed to be used with the Megatron-LM strategy and nemo 2.0 conventions.
-        To change the your loss, pass in a different config object that returns a different loss reduction class. To change your model and what it outputs,
-        pass in a different config object that returns a different model. Do not modify this function unless you need to change higher level logic. You may
-        need to modify the various step and forward functions towards the bottom of this file to handle new/different keys in the batch. In the future some of
-        those functions may need to be refactored out into the config object or a different place so that they live closer to the model definition.
-        """  # noqa: D205
-        super().__init__()
-        self.config = config
-        self.tokenizer = tokenizer
-        self.loss_reduction_class = config.get_loss_reduction_class()
-        # TODO replace the self.configure_optimizer call with the optimizer below
-        #  once it all works. This is the future direction for how things are going.
-
-        self.optim = optimizer
-        self.optim.connect(self)  # This will bind the `configure_optimizers` method
-
-    def configure_model(self) -> None:  # noqa: D102
-        self.module = self.config.configure_model(self.tokenizer)
-
-    # This is now replaced by the init hook on self.optimizer
-    # def configure_optimizers(self) -> Optimizer:
-    #     return bert_default_optimizer(self)
-
-    def forward(
-        self,
-        *args,
-        **kwargs,
-    ) -> torch.Tensor:
-        """Call the forward method of the underlying model, and return whatever it outputs."""
-        output_tensor = self.module(*args, **kwargs)  # for now just pass through to the underlying model
-        return output_tensor
-
-    def data_step(self, dataloader_iter) -> Dict[str, torch.Tensor]:  # noqa: D102
-        return biobert_data_step(dataloader_iter)
-
-    def forward_step(self, batch) -> torch.Tensor:  # noqa: D102
-        return bert_forward_step(self, batch)  # NOTE(@sichu) reduced to loss
-
-    def training_step(self, batch, batch_idx=None) -> torch.Tensor:  # noqa: D102
-        # In mcore the loss-function is part of the forward-pass (when labels are provided)
-        return self.forward_step(batch)
-
-    def validation_step(self, batch, batch_idx=None) -> torch.Tensor:  # noqa: D102
-        # In mcore the loss-function is part of the forward-pass (when labels are provided)
-        return self.forward_step(batch)
-
-    def predict_step(self, batch, batch_idx=None) -> torch.Tensor:  # noqa: D102
-        return self.forward_step(batch)
-
-    def training_loss_reduction(self) -> MegatronLossReduction:  # noqa: D102
-        # This is the function that takes batch['loss_mask'] and the logits output by the model and reduces the loss
-        #  This function will
-        return self.loss_reduction_class()
-
-    # The predict step comes from the LightningPassthroughPredictionMixin
-
-    def validation_loss_reduction(self) -> MegatronLossReduction:  # noqa: D102
-        return self.loss_reduction_class(validation_step=True)
-
-    def test_loss_reduction(self) -> MegatronLossReduction:  # noqa: D102
-        return self.loss_reduction_class(validation_step=True)
-
-    def copy(self) -> "BioBertLightningModule":  # noqa: D102
-        return self.__class__(self.config, self.tokenizer)
-
-
+DataStepOutput = Dict[str, torch.Tensor | PackedSeqParams]
+DataStepFunction = Callable[[Iterable], DataStepOutput]
+ForwardStepFunction = Callable[[pl.LightningModule, DataStepOutput], DataT]
 ############################################################################################################
-# Below are static helper functions for handling various steps in the above class.
+# Below are static helper functions for handling various steps in the actual class at the bottom of the file.
 
 
 def biobert_data_step(dataloader_iter) -> Dict[str, torch.Tensor]:
@@ -161,7 +86,7 @@ def biobert_data_step(dataloader_iter) -> Dict[str, torch.Tensor]:
     return output
 
 
-def bert_forward_step(model: pl.LightningModule, batch: Dict[str, torch.Tensor]) -> DataT:
+def bert_forward_step(model: pl.LightningModule, batch: DataStepOutput) -> DataT:
     """This subsets the batch keys to the ones actually used by forward pass of the model, and then calls the model's forward pass.
     if "cu_seqsens" are defined in the batch, then the packed sequence parameters are also passed to the model for forward pass efficiency.
     """  # noqa: D205
@@ -177,20 +102,6 @@ def bert_forward_step(model: pl.LightningModule, batch: Dict[str, torch.Tensor])
 
     forward_results = model(**forward_args)
     return forward_results  # TODO support losses that also include the binary head, this means doing something more fancy than the one default GPT reduction function above MaskedTokenLossReduction()
-
-
-def bert_default_optimizer(module) -> Optimizer:
-    """Returns the default optimizer for the BERT module.
-
-    Args:
-        module: The BERT module.
-
-    Returns:
-        The default optimizer initialized for this BERT module's parameters
-    """
-    from apex.optimizers import FusedAdam
-
-    return FusedAdam(module.parameters(), lr=1e-4, weight_decay=0.01)
 
 
 def get_batch_on_this_context_parallel_rank(batch: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
@@ -264,3 +175,87 @@ def get_packed_seq_params(batch: Dict[str, torch.Tensor]) -> PackedSeqParams:
         max_seqlen_kv=max_seqlen,
         qkv_format="thd",
     )
+
+
+class BioBertLightningModule(  # noqa: D101
+    pl.LightningModule, iom.IOMixinWithGettersSetters, nlio.ConnectorMixin, LightningPassthroughPredictionMixin
+):
+    def __init__(
+        self,
+        config: MegatronBioNeMoTrainableModelConfig,
+        # TODO: Add transformer_layer_spec when we update mcore
+        tokenizer: Optional[TokenizerSpec] = None,
+        optimizer: MegatronOptimizerModule = MegatronOptimizerModule(
+            config=OptimizerConfig(lr=1e-4, optimizer="adam", use_distributed_optimizer=True),
+        ),
+        data_step_function: DataStepFunction = biobert_data_step,
+        forward_step_function: ForwardStepFunction = bert_forward_step,
+    ):
+        """A pytorch lightning module for BioBert-derived models. This module is designed to be used with the Megatron-LM strategy and nemo 2.0 conventions.
+        To change the your loss, pass in a different config object that returns a different loss reduction class. To change your model and what it outputs,
+        pass in a different config object that returns a different model. Do not modify this function unless you need to change higher level logic. You may
+        need to modify the various step and forward functions towards the bottom of this file to handle new/different keys in the batch. In the future some of
+        those functions may need to be refactored out into the config object or a different place so that they live closer to the model definition.
+        """  # noqa: D205
+        super().__init__()
+        self.config = config
+        self.tokenizer = tokenizer
+        self.loss_reduction_class = config.get_loss_reduction_class()
+        # TODO replace the self.configure_optimizer call with the optimizer below
+        #  once it all works. This is the future direction for how things are going.
+
+        self.optim = optimizer
+        self.optim.connect(self)  # This will bind the `configure_optimizers` method
+        self.data_step_function: DataStepFunction = data_step_function
+        self.forward_step_function: ForwardStepFunction = forward_step_function
+
+    def configure_model(self) -> None:  # noqa: D102
+        self.module = self.config.configure_model(self.tokenizer)
+
+    # This is now replaced by the init hook on self.optimizer
+    # def configure_optimizers(self) -> Optimizer:
+    #     return bert_default_optimizer(self)
+
+    def forward(
+        self,
+        *args,
+        **kwargs,
+    ) -> torch.Tensor:
+        """Call the forward method of the underlying model, and return whatever it outputs."""
+        output_tensor = self.module(*args, **kwargs)  # for now just pass through to the underlying model
+        return output_tensor
+
+    def data_step(self, dataloader_iter) -> DataStepOutput:  # noqa: D102
+        return self.data_step_function(dataloader_iter)
+
+    def forward_step(self, batch) -> DataT:  # noqa: D102
+        return self.forward_step_function(self, batch)
+
+    def training_step(self, batch, batch_idx=None) -> DataT:  # noqa: D102
+        # In mcore the loss-function is part of the forward-pass (when labels are provided)
+        return self.forward_step(batch)
+
+    def validation_step(self, batch, batch_idx=None) -> DataT:  # noqa: D102
+        # In mcore the loss-function is part of the forward-pass (when labels are provided)
+        return self.forward_step(batch)
+
+    def predict_step(self, batch, batch_idx=None) -> DataT:  # noqa: D102
+        return self.forward_step(batch)
+
+    def training_loss_reduction(self) -> MegatronLossReduction:  # noqa: D102
+        # This is the function that takes batch['loss_mask'] and the logits output by the model and reduces the loss
+        #  This function will
+        return self.loss_reduction_class()
+
+    # The predict step comes from the LightningPassthroughPredictionMixin
+
+    def validation_loss_reduction(self) -> MegatronLossReduction:  # noqa: D102
+        return self.loss_reduction_class(validation_step=True)
+
+    def test_loss_reduction(self) -> MegatronLossReduction:  # noqa: D102
+        return self.loss_reduction_class(validation_step=True)
+
+    def copy(self) -> "BioBertLightningModule":  # noqa: D102
+        return self.__class__(
+            self.config, self.tokenizer, self.optim, self.data_step_function, self.forward_step_function
+        )

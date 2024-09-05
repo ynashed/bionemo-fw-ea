@@ -69,8 +69,8 @@ class SingleCellDataModule(pl.LightningDataModule):
         test_dataset_path: str,
         median_dict: dict[str, float],
         mask_prob: float = 0.15,
-        mask_token_prob: float = 0.8,
-        random_token_prob: float = 0.5,  # 50/50 split between mask and random token
+        mask_token_prob: float = 0.8,  # 80% mask token
+        random_token_prob: float = 0.1,  # 10% random token, remaining 1-(mask+random) will be identity.
         seq_length: int = 2048,
         micro_batch_size: int = 4,
         global_batch_size: int = 8,

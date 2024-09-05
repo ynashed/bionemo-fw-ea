@@ -1,0 +1,8 @@
+- tag: nv_650m:1.0
+  ngc: "nvidia/clara/esm2nv650m:1.0"
+  ngc_registry: model
+  pbss: "s3://bionemo-ci/models/esm2nv_650M_converted.nemo"
+  sha256: 1e38063cafa808306329428dd17ea6df78c9e5d6b3d2caf04237c555a1f131b7 # pragma: allowlist secret
+  owner: Farhad Ramezanghorbani <farhadr@nvidia.com>
+  description: >
+    A pretrained 650M parameter ESM2 model. See https://ngc.nvidia.com/catalog/models/nvidia:clara:esm2nv650m.

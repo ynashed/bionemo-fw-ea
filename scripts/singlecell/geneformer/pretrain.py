@@ -234,6 +234,9 @@ def main(
                 # TODO(@jstjohn) try decoupled_lr
                 optimizer="adam",
                 use_distributed_optimizer=True,
+                # Pass through fp16/bf16 settings to avoid errors around model having bf16 enabled but optimizer not.
+                fp16=geneformer_config.fp16,
+                bf16=geneformer_config.bf16,
             ),
             lr_scheduler=CosineAnnealingScheduler(
                 max_steps=num_steps,

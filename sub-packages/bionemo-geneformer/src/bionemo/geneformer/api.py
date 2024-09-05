@@ -13,9 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Sequence
+from dataclasses import dataclass
+from typing import Sequence, Type
 
-from bionemo.llm.model.biobert.model import BioBertConfig, MegatronBioBertModel
+from bionemo.llm.model.biobert.model import BioBertGenericConfig, MegatronBioBertModel
+from bionemo.llm.utils import iomixin_utils as iom
 
 
 __all__: Sequence[str] = (
@@ -25,4 +27,13 @@ __all__: Sequence[str] = (
 
 GeneformerModel = MegatronBioBertModel
 
-GeneformerConfig = BioBertConfig
+
+@dataclass
+class GeneformerConfig(BioBertGenericConfig[GeneformerModel], iom.IOMixinWithGettersSetters):
+    """A geneformer config.
+
+    The geneformer config overrides the parent config, and adds a leaf-level iomixin, please do not inherit from this
+    directly, as your parameters will likely be reset to this method's parameters silently.
+    """
+
+    model_cls: Type[GeneformerModel] = GeneformerModel
