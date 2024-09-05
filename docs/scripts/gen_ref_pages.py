@@ -14,9 +14,15 @@
 # limitations under the License.
 """Generate the code reference pages and copy Jupyter notebooks and README files."""
 
+import logging
 from pathlib import Path
 
 import mkdocs_gen_files
+
+
+# log stuff
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
 
 
 def generate_api_reference() -> None:
@@ -56,7 +62,7 @@ def generate_api_reference() -> None:
             full_doc_path = Path("API_reference") / doc_path
             with mkdocs_gen_files.open(full_doc_path, "w") as fd:
                 fd.write(path.read_text())
-            print(full_doc_path)
+            logger.info(f"Added Markdown file: {full_doc_path}")
             mkdocs_gen_files.set_edit_path(full_doc_path, path.relative_to(root))
 
 
@@ -80,7 +86,7 @@ def get_subpackage_notebooks(sub_package: Path, root: Path) -> None:
 
             with mkdocs_gen_files.open(dest_file, "wb") as fd:
                 fd.write(notebook.read_bytes())
-            print(f"Adding notebook: {dest_file}")
+            logger.info(f"Added notebook: {dest_file}")
             mkdocs_gen_files.set_edit_path(dest_file, notebook.relative_to(root))
 
 
@@ -103,7 +109,7 @@ def get_subpackage_readmes(sub_package: Path, root: Path) -> None:
 
         with mkdocs_gen_files.open(dest_file, "w") as fd:
             fd.write(readme_file.read_text())
-        print(f"Adding README: {dest_file}")
+        logger.info(f"Added README: {dest_file}")
         mkdocs_gen_files.set_edit_path(dest_file, readme_file.relative_to(root))
 
 
