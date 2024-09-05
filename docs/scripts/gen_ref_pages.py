@@ -114,7 +114,9 @@ def get_subpackage_readmes(sub_package: Path, root: Path) -> None:
 
 
 def generate_pages() -> None:
-    """This function orchestrates the entire process of generating API references,
+    """Generate pages for documentation.
+
+    This function orchestrates the entire process of generating API references,
     copying notebooks, and copying README files for all sub-packages.
 
     Returns:
