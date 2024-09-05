@@ -80,6 +80,7 @@ def get_subpackage_notebooks(sub_package: Path, root: Path) -> None:
 
             with mkdocs_gen_files.open(dest_file, "wb") as fd:
                 fd.write(notebook.read_bytes())
+            print(f"Adding notebook: {dest_file}")
             mkdocs_gen_files.set_edit_path(dest_file, notebook.relative_to(root))
 
 
@@ -102,6 +103,7 @@ def get_subpackage_readmes(sub_package: Path, root: Path) -> None:
 
         with mkdocs_gen_files.open(dest_file, "w") as fd:
             fd.write(readme_file.read_text())
+        print(f"Adding README: {dest_file}")
         mkdocs_gen_files.set_edit_path(dest_file, readme_file.relative_to(root))
 
 
