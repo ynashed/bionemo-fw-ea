@@ -15,6 +15,7 @@
 
 import functools
 from pathlib import Path
+from typing import Tuple
 
 import pytest
 import pytorch_lightning as pl
@@ -34,9 +35,9 @@ from torch.utils.data import Dataset
 
 from bionemo import esm2
 from bionemo.core.data.resamplers import PRNGResampleDataset
-from bionemo.core.utils.random_utils import random_numpy_context
 from bionemo.esm2.api import ESM2Config
 from bionemo.esm2.data import dataset, tokenizer
+from bionemo.esm2.data.datamodule import ESMDataModule
 from bionemo.esm2.model.finetune_token_classifier import ESM2FineTuneSeqLenBioBertConfig, Label2IDTokenizer
 from bionemo.llm.data import collate
 from bionemo.llm.lightning import LossLoggingCallback
@@ -65,9 +66,19 @@ def esm2_config() -> ESM2Config:
 
 
 @pytest.fixture(scope="module")
-def esm2_finetune_config() -> ESM2Config:
-    with megatron_parallel_state_utils.distributed_model_parallel_state():
-        yield ESM2FineTuneSeqLenBioBertConfig(nemo1_ckpt_path=nemo1_checkpoint_path.as_posix())
+def pretrain_data_module(dummy_protein_dataset, dummy_parquet_train_val_inputs):
+    train_cluster_path, valid_cluster_path = dummy_parquet_train_val_inputs
+    data_module = ESMDataModule(
+        train_cluster_path=train_cluster_path,
+        train_database_path=dummy_protein_dataset,
+        valid_cluster_path=valid_cluster_path,
+        valid_database_path=dummy_protein_dataset,
+        global_batch_size=8,
+        micro_batch_size=4,
+        min_seq_length=None,
+        max_seq_length=1024,
+    )
+    yield data_module
 
 
 class PerTokenValueDataset(Dataset):
@@ -267,78 +278,108 @@ class PerTokenValueDataModule(pl.LightningDataModule):  # noqa: D101
         )
 
 
+def _train_model(
+    name: str,
+    root_dir: Path,
+    config: ESM2Config,
+    data_module: pl.LightningDataModule,
+    n_steps_train: int,
+    tokenizer: tokenizer.BioNeMoAutoTokenizer,
+) -> Tuple[Path, MetricTracker, nl.Trainer]:
+    checkpoint_callback = nl_callbacks.ModelCheckpoint(
+        save_best_model=False,
+        save_last=True,
+        save_on_train_epoch_end=True,
+        monitor="reduced_train_loss",  # TODO find out how to get val_loss logged and use "val_loss",
+        every_n_train_steps=n_steps_train // 2,
+        enable_nemo_ckpt_io=True,  # Enables the .nemo file-like checkpointing where all IOMixins are under SerDe
+    )
+
+    # Setup the logger and train the model
+    nemo_logger = NeMoLogger(
+        dir=str(root_dir),
+        name=name,
+        tensorboard=TensorBoardLogger(save_dir=root_dir, name=name),
+        ckpt=checkpoint_callback,
+    )
+    # Needed so that the trainer can find an output directory for the profiler
+    # ckpt_path needs to be a string for SerDe
+    optimizer = MegatronOptimizerModule(
+        config=OptimizerConfig(
+            lr=5e-4,
+            optimizer="adam",
+            use_distributed_optimizer=True,
+            fp16=config.fp16,
+            bf16=config.bf16,
+        )
+    )
+    module = BioBertLightningModule(config=config, tokenizer=tokenizer, optimizer=optimizer)
+
+    strategy = nl.MegatronStrategy(
+        tensor_model_parallel_size=1,
+        pipeline_model_parallel_size=1,
+        ddp="megatron",
+        find_unused_parameters=True,
+        enable_nemo_ckpt_io=True,
+    )
+    metric_tracker = MetricTracker(metrics_to_track_val=["loss"], metrics_to_track_train=["loss"])
+    trainer = nl.Trainer(
+        accelerator="gpu",
+        devices=1,
+        strategy=strategy,
+        limit_val_batches=2,
+        val_check_interval=n_steps_train // 2,
+        max_steps=n_steps_train,
+        num_nodes=1,
+        log_every_n_steps=n_steps_train // 2,
+        callbacks=[LossLoggingCallback(), metric_tracker],
+        plugins=nl.MegatronMixedPrecision(precision="bf16-mixed"),
+    )
+    nllm.train(
+        model=module,
+        data=data_module,
+        trainer=trainer,
+        log=nemo_logger,
+        resume=resume.AutoResume(
+            path=None,  # Overrides the path found by resume_if_exists when set.
+            resume_if_exists=True,  # Looks for the -last checkpoint to continue training.
+            resume_ignore_no_checkpoint=True,  # When false this will throw an error with no existing checkpoint.
+        ),
+    )
+    ckpt_path = Path(checkpoint_callback.last_model_path.replace(".ckpt", ""))
+    return ckpt_path, metric_tracker, trainer
+
+
 @pytest.mark.needs_gpu
 def test_esm2_finetune_token_classifier(
-    tmpdir, esm2_finetune_config, tokenizer, n_steps_train: int = 50, seed: int = 42
+    tmpdir, esm2_config, tokenizer, pretrain_data_module, n_steps_train: int = 50, seed: int = 42
 ):
-    with (
-        megatron_parallel_state_utils.distributed_model_parallel_state(seed),
-        random_numpy_context(seed),
-    ):
-        # Initialize the data module.
-        data_module = PerTokenValueDataModule()
-
-        checkpoint_callback = nl_callbacks.ModelCheckpoint(
-            save_best_model=False,
-            save_last=True,
-            save_on_train_epoch_end=True,
-            monitor="reduced_train_loss",  # TODO find out how to get val_loss logged and use "val_loss",
-            every_n_train_steps=n_steps_train // 2,
-            enable_nemo_ckpt_io=True,  # Enables the .nemo file-like checkpointing where all IOMixins are under SerDe
+    with megatron_parallel_state_utils.distributed_model_parallel_state(seed):
+        ckpt_path, initial_metrics, _ = _train_model(
+            name="test_experiment",
+            root_dir=tmpdir / "pretrain",
+            config=esm2_config,
+            data_module=pretrain_data_module,
+            n_steps_train=n_steps_train,
+            tokenizer=tokenizer,
         )
-
-        # Setup the logger and train the model
-        nemo_logger = NeMoLogger(
-            dir=tmpdir,
-            name="esm2_finetune",
-            tensorboard=TensorBoardLogger(save_dir=tmpdir, name="esm2_finetune"),
-            ckpt=checkpoint_callback,
-        )
-        # Needed so that the trainer can find an output directory for the profiler
-        # ckpt_path needs to be a string for SerDe
-        optimizer = MegatronOptimizerModule(
-            config=OptimizerConfig(
-                lr=5e-4,
-                optimizer="adam",
-                use_distributed_optimizer=True,
-                fp16=esm2_finetune_config.fp16,
-                bf16=esm2_finetune_config.bf16,
-            )
-        )
-        module = BioBertLightningModule(config=esm2_finetune_config, tokenizer=tokenizer, optimizer=optimizer)
-
-        strategy = nl.MegatronStrategy(
-            tensor_model_parallel_size=1,
-            pipeline_model_parallel_size=1,
-            ddp="megatron",
-            find_unused_parameters=True,
-            enable_nemo_ckpt_io=True,
-        )
-        metric_tracker = MetricTracker(metrics_to_track_val=["loss"], metrics_to_track_train=["loss"])
-        trainer = nl.Trainer(
-            accelerator="gpu",
-            devices=1,
-            strategy=strategy,
-            limit_val_batches=2,
-            val_check_interval=n_steps_train // 2,
-            max_steps=n_steps_train,
-            num_nodes=1,
-            log_every_n_steps=n_steps_train // 2,
-            callbacks=[LossLoggingCallback(), metric_tracker],
-            plugins=nl.MegatronMixedPrecision(precision="bf16-mixed"),
-        )
-        nllm.train(
-            model=module,
-            data=data_module,
-            trainer=trainer,
-            log=nemo_logger,
-            resume=resume.AutoResume(
-                path=None,  # Overrides the path found by resume_if_exists when set.
-                resume_if_exists=True,  # Looks for the -last checkpoint to continue training.
-                resume_ignore_no_checkpoint=True,  # When false this will throw an error with no existing checkpoint.
-            ),
-        )
-        ckpt_path = Path(checkpoint_callback.last_model_path.replace(".ckpt", ""))
         assert ckpt_path.exists()
         assert ckpt_path.is_dir()
         assert io.is_distributed_ckpt(ckpt_path)
+        assert initial_metrics.collection_train["loss"][0] > initial_metrics.collection_train["loss"][-1]
+
+    with megatron_parallel_state_utils.distributed_model_parallel_state(seed):
+        esm2_finetune_config = ESM2FineTuneSeqLenBioBertConfig(initial_ckpt_path=str(ckpt_path))
+        finetune_data_module = PerTokenValueDataModule()
+        simple_ft_checkpoint, simple_ft_metrics, _ = _train_model(
+            name="finetune_new_head",
+            root_dir=tmpdir / "finetune_new_head",  # new checkpoint will land in a subdir of this
+            config=esm2_finetune_config,  # same config as before since we are just continuing training
+            data_module=finetune_data_module,
+            n_steps_train=n_steps_train,
+            tokenizer=tokenizer,
+        )
+        assert simple_ft_checkpoint.exists()
+        assert simple_ft_checkpoint.is_dir()
+        assert io.is_distributed_ckpt(simple_ft_checkpoint)
+        assert simple_ft_metrics.collection_train["loss"][0] > simple_ft_metrics.collection_train["loss"][-1]
