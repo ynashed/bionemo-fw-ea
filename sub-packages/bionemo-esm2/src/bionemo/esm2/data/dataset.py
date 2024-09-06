@@ -91,6 +91,8 @@ class ESMMaskedResidueDataset(Dataset):
         mask_token_prob: float = 0.8,
         mask_random_prob: float = 0.1,
         tokenizer: tokenizer.BioNeMoAutoTokenizer = tokenizer.get_tokenizer(),
+        stage: str = "train",
+        dump_location: str | Path | None = None,
     ) -> None:
         """Initializes the dataset.
 
@@ -114,6 +116,8 @@ class ESMMaskedResidueDataset(Dataset):
         self.total_samples = total_samples
         self.seed = seed
         self.max_seq_length = max_seq_length
+        self.stage = stage
+        self.dump_location = dump_location
 
         if tokenizer.mask_token_id is None:
             raise ValueError("Tokenizer does not have a mask token.")
@@ -174,7 +178,7 @@ class ESMMaskedResidueDataset(Dataset):
             mask_config=self.mask_config,
         )
 
-        return {
+        output = {
             "text": masked_sequence,
             "types": torch.zeros_like(masked_sequence, dtype=torch.int64),
             "attention_mask": torch.ones_like(masked_sequence, dtype=torch.int64),
@@ -182,6 +186,14 @@ class ESMMaskedResidueDataset(Dataset):
             "loss_mask": loss_mask,
             "is_random": torch.zeros_like(masked_sequence, dtype=torch.int64),
         }
+
+        if self.dump_location:
+            filename = os.path.join(self.dump_location, f"{self.stage}_{idx}.pt")
+            output_dump = {k: v.cpu() for k, v in output.items()}
+            output_dump = {'sequence': sequence, 'seed': self.seed, **output_dump}
+            torch.save(output_dump, filename)
+
+        return output
 
     def _tokenize(self, sequence: str) -> torch.Tensor:
         """Tokenize a protein sequence.
@@ -206,6 +218,7 @@ def create_train_dataset(
     mask_token_prob: float = 0.8,
     mask_random_prob: float = 0.1,
     tokenizer: tokenizer.BioNeMoAutoTokenizer = tokenizer.get_tokenizer(),
+    dump_location: str | os.PathLike | None = None,
 ):
     """Creates a training dataset for ESM pretraining.
 
@@ -220,6 +233,7 @@ def create_train_dataset(
         mask_token_prob: Proportion of masked tokens that get assigned the <MASK> id. Defaults to 0.8.
         mask_random_prob: Proportion of tokens that get assigned a random natural amino acid. Defaults to 0.1.
         tokenizer: The input ESM tokenizer. Defaults to the standard ESM tokenizer.
+        dump_location: If provided, the location to dump the output from dataset to.
 
     Returns:
         A dataset for ESM pretraining.
@@ -249,6 +263,8 @@ def create_train_dataset(
         mask_token_prob=mask_token_prob,
         mask_random_prob=mask_random_prob,
         tokenizer=tokenizer,
+        stage="train",
+        dump_location=dump_location,
     )
 
 
@@ -284,6 +300,7 @@ def create_valid_dataset(  # noqa: D417
     mask_token_prob: float = 0.8,
     mask_random_prob: float = 0.1,
     tokenizer: tokenizer.BioNeMoAutoTokenizer = tokenizer.get_tokenizer(),
+    dump_location: str | os.PathLike | None = None,
 ):
     """Creates a validation dataset for ESM pretraining.
 
@@ -298,6 +315,7 @@ def create_valid_dataset(  # noqa: D417
         mask_token_prob: Proportion of masked tokens that get assigned the <MASK> id. Defaults to 0.8.
         mask_random_prob: Proportion of tokens that get assigned a random natural amino acid. Defaults to 0.1.
         tokenizer: The input ESM tokenizer. Defaults to the standard ESM tokenizer.
+        dump_location: If provided, the location to dump the output from dataset to.
 
     Returns:
         A dataset for ESM pretraining.
@@ -327,6 +345,8 @@ def create_valid_dataset(  # noqa: D417
         mask_token_prob=mask_token_prob,
         mask_random_prob=mask_random_prob,
         tokenizer=tokenizer,
+        stage="val",
+        dump_location=dump_location,
     )
 
 

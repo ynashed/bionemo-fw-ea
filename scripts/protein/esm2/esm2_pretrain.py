@@ -77,6 +77,7 @@ def main(
     hidden_size: int = 1280,
     num_attention_heads: int = 20,
     ffn_hidden_size: int = 1280 * 4,
+    dump_location: Optional[Path] = None,
 ) -> None:
     """Train an ESM2 model on UR data.
 
@@ -158,6 +159,9 @@ def main(
     tokenizer = get_tokenizer()
 
     # Initialize the data module.
+    if dump_location is not None:
+        dump_location.mkdir(parents=True, exist_ok=True)
+
     data = ESMDataModule(
         train_cluster_path=train_cluster_path,
         train_database_path=train_database_path,
@@ -168,6 +172,7 @@ def main(
         min_seq_length=None,
         max_seq_length=seq_length,
         num_workers=num_dataset_workers,
+        dump_location=dump_location,
     )
 
     # Configure the model
@@ -443,6 +448,14 @@ parser.add_argument(
     default=4 * 1280,
     help="FFN hidden size of the model. Default is 4 * 1280.",
 )
+# debugging: check dataset behavior
+parser.add_argument(
+    "--dump-location",
+    type=Path,
+    required=False,
+    default=None,
+    help="Path to dump dataset output to. If set, will dump the dataset to this location and exit.",
+)
 
 if __name__ == "__main__":
     args = parser.parse_args()
@@ -480,4 +493,5 @@ if __name__ == "__main__":
         hidden_size=args.hidden_size,
         num_attention_heads=args.num_attention_heads,
         ffn_hidden_size=args.ffn_hidden_size,
+        dump_location=args.dump_location,
     )

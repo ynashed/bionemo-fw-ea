@@ -55,6 +55,7 @@ class ESMDataModule(pl.LightningDataModule):
         mask_random_prob: float = 0.1,
         tokenizer: tokenizer.BioNeMoAutoTokenizer = tokenizer.get_tokenizer(),
         use_sample_and_shuffle_dataset: bool = False,
+        dump_location: str | os.PathLike | None = None,
     ) -> None:
         """Initialize the ESMDataModule.
 
@@ -91,6 +92,7 @@ class ESMDataModule(pl.LightningDataModule):
         self._mask_random_prob = mask_random_prob
         self._tokenizer = tokenizer
         self._use_sample_and_shuffle_dataset = use_sample_and_shuffle_dataset
+        self._dump_location = dump_location
 
         self._micro_batch_size = micro_batch_size
         self._num_workers = num_workers
@@ -144,6 +146,7 @@ class ESMDataModule(pl.LightningDataModule):
             mask_token_prob=self._mask_token_prob,
             mask_random_prob=self._mask_random_prob,
             tokenizer=self._tokenizer,
+            dump_location=self._dump_location,
         )
         if self._use_sample_and_shuffle_dataset:
             self._train_ds = self._sample_and_shuffle_dataset(
@@ -170,6 +173,7 @@ class ESMDataModule(pl.LightningDataModule):
             mask_token_prob=self._mask_token_prob,
             mask_random_prob=self._mask_random_prob,
             tokenizer=self._tokenizer,
+            dump_location=self._dump_location,
         )
         if self._use_sample_and_shuffle_dataset:
             self._valid_ds = self._sample_and_shuffle_dataset(
