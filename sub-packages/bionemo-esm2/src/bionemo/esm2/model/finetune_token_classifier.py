@@ -139,7 +139,7 @@ class ESM2FineTuneSeqLengthModel(ESM2Model):
 
 
 @dataclass
-class FineTuneSeqLenBioBertConfig(ESM2Config, iom.IOMixinWithGettersSetters):
+class ESM2FineTuneSeqLenBioBertConfig(ESM2Config, iom.IOMixinWithGettersSetters):
     """ExampleConfig is a dataclass that is used to configure the model.
 
     Timers from ModelParallelConfig are required for megatron forward compatibility.
