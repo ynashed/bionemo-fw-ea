@@ -65,7 +65,7 @@ def esm2_config() -> ESM2Config:
         yield ESM2Config()
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def pretrain_data_module(dummy_protein_dataset, dummy_parquet_train_val_inputs):
     train_cluster_path, valid_cluster_path = dummy_parquet_train_val_inputs
     data_module = ESMDataModule(
