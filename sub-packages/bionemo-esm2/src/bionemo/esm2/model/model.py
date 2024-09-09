@@ -311,6 +311,7 @@ class ESM2GenericConfig(BioBertGenericConfig[ESM2ModelT]):
     core_attention_override: Type[torch.nn.Module] | None = ESM2DotProductAttention
 
 
+@dataclass
 class ESM2Config(ESM2GenericConfig[ESM2Model], iom.IOMixinWithGettersSetters):
     model_cls: Type[ESM2Model] = ESM2Model
     num_layers: int = 33  # 650M

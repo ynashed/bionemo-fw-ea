@@ -35,7 +35,7 @@ from torch.utils.data import Dataset
 
 from bionemo import esm2
 from bionemo.core.data.resamplers import PRNGResampleDataset
-from bionemo.esm2.api import ESM2Config
+from bionemo.esm2.api import ESM2Config, ESM2GenericConfig
 from bionemo.esm2.data import dataset, tokenizer
 from bionemo.esm2.data.datamodule import ESMDataModule
 from bionemo.esm2.model.finetune_token_classifier import ESM2FineTuneSeqLenBioBertConfig, Label2IDTokenizer
@@ -281,7 +281,7 @@ class PerTokenValueDataModule(pl.LightningDataModule):  # noqa: D101
 def _train_model(
     name: str,
     root_dir: Path,
-    config: ESM2Config,
+    config: ESM2GenericConfig,
     data_module: pl.LightningDataModule,
     n_steps_train: int,
     tokenizer: tokenizer.BioNeMoAutoTokenizer,
