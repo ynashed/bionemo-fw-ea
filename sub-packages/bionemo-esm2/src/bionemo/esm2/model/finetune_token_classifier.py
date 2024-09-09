@@ -14,7 +14,7 @@
 # limitations under the License.
 
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, Iterable, List, Sequence, Tuple, Type, Union
 
 import torch
@@ -141,6 +141,9 @@ class ESM2FineTuneSeqLenBioBertConfig(ESM2GenericConfig[ESM2FineTuneSeqLengthMod
     """
 
     model_cls: Type[ESM2FineTuneSeqLengthModel] = ESM2FineTuneSeqLengthModel
+    # typical case is fine-tune the base biobert that doesn't have this head. If you are instead loading a checkpoint
+    # that has this new head and want to keep using these weights, please drop this next line or set to []
+    initial_ckpt_skip_keys_with_these_prefixes: List[str] = field(default_factory=lambda: ["classification_head"])
 
     # A list of integers where each integer represents the output size for each class head.
     cnn_num_classes: int = 3  # number of classes in each label
