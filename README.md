@@ -4,10 +4,13 @@ To get started, please build the docker container using
 ./launch.sh build
 ```
 
+Launch a container from the build image by executing
+```bash
+./launch.sh dev
+```
+
 All `bionemo2` code is partitioned into independently installable namespace packages. These live under the `sub-packages/` directory.
 
-
-# TODO: Finish this.
 
 ## Downloading artifacts
 Set the AWS access info in your `.env` in the host container prior to running docker:
@@ -53,15 +56,64 @@ git add '3rdparty/NeMo/'
 git commit -m "updating NeMo commit"
 ```
 
+
 ## Testing Locally
 Inside the development container, run `./ci/scripts/static_checks.sh` to validate that code changes will pass the code
 formatting and license checks run during CI. In addition, run the longer `./ci/scripts/pr_test.sh` script to run unit
 tests for all sub-packages.
 
-## Running
-The following command runs a very small example of geneformer pretraining, as well as using our test data loading
-mechanism to grab the example data files and return the local path.
 
+## Publishing Packages
+
+### Set `BIONEMO_PUBLISH_MODE=1` and `REPO_ROOT`
+To publish a bionemo namespace package, you must set the `BIONEMO_PUBLISH_MODE` environment variable to a true value:
+one of `"true"`, `"y"`, `"yes"`, or `1` suffices. This will enable the build step to list any dependent bionemo
+subpackages by their PyPI-compatible package name. Otherwise, the default is to use local _path_ based dependencies
+to reference other bionemo `sub-packages/`.
+
+Additionally, when building, you must manually set the `REPO_ROOT` environment variable to point to the repository's
+root on your filesystem. This must be an absolute path. Or, it may be a relative path that starts from the user's home
+directory (i.e. `~/` is acceptable).
+
+### Increment `VERSION` File
+Make sure that the [`VERSION`](./VERSION) file is incremented appropriately. Bionemo packages follow
+[semantic versioning 2.0](https://semver.org/) rules: API-breaking changes are `MAJOR`, new features
+are `MINOR`, and bug-fixes and refactors are `PATCH` in `MAJOR.MINOR.PATCH` version string format.
+
+### `python -m build`
+Build the bionemo sub-package project by executing the following at the sub-package's root level:
+```shell
+BIONEMO_PUBLISH_MODE=1 python -m build
+```
+This will produce a wheel file for the sub-package's code and its dependencies.
+
+### `python -m twine upload`
+After building, the wheel file can be uploaded to PyPI (or a compatible package registry) by executing
+`python -m twine upload dist/*`.
+
+### All steps together
+```bash
+echo "Updated version: $(cat VERSION)"
+pushd sub-package/bionemo-<project name>
+REPO_ROOT="<path to bionemo-fw-ea>" BIONEMO_PUBLISH_MODE=1 python -m build
+TWINE_PASSWORD="<pypi pass>" TWINE_USERNAME="<pypi user>" python -m twine upload dist/*
+```
+
+
+## Models
+### Geneformer
+#### Get test data for geneformer
+```bash
+mkdir -p /workspace/bionemo2/data
+aws s3 cp \
+  s3://general-purpose/cellxgene_2023-12-15_small \
+  /workspace/bionemo2/data/cellxgene_2023-12-15_small \
+  --recursive \
+  --endpoint-url https://pbss.s8k.io
+```
+#### Running
+
+The following command runs a very small example of geneformer:
 ```bash
 TEST_DATA_DIR=$(bionemo_test_data_path single_cell/testdata-20240506 --source pbss); \
 python  \
@@ -107,6 +159,7 @@ python  \
     --training-model-config-class FineTuneSeqLenBioBertConfig \
     --restore-from-checkpoint-path results/test_experiment/dev/checkpoints/test_experiment--val_loss=10.2042-epoch=0
 ```
+
 
 ## Updating License Header on Python Files
 Make sure you have installed [`license-check`](https://gitlab-master.nvidia.com/clara-discovery/infra-bionemo),
