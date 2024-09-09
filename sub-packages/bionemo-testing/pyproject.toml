@@ -2,6 +2,10 @@
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
+[options]
+zip_safe = true
+include_package_data = true
+
 [project]
 name = "bionemo-testing"
 version = "2.0.0"
@@ -13,6 +17,9 @@ authors = [
     { name = "Malcolm Greaves", email = "mgreaves@nvidia.com" },
 ]
 dynamic = ["dependencies"]
+
+[project.scripts]
+bionemo_test_data_path = "bionemo.testing.data.load:main_cli"
 
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]}
