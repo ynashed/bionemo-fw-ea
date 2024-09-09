@@ -16,7 +16,7 @@
 
 import math
 from dataclasses import dataclass
-from typing import Callable, Literal, Optional, Sequence, Type
+from typing import Callable, Literal, Optional, Sequence, Type, TypeVar
 
 import torch
 import torch.distributed
@@ -42,6 +42,7 @@ from bionemo.llm.utils import iomixin_utils as iom
 
 __all__: Sequence[str] = (
     "ESM2Config",
+    "ESM2GenericConfig",
     "ESM2Model",
 )
 
@@ -215,8 +216,11 @@ def esm_gelu_func(x: Tensor) -> Tensor:
     return x * 0.5 * (1.0 + torch.erf(x / math.sqrt(2.0)))
 
 
+ESM2ModelT = TypeVar("ESM2ModelT", bound=ESM2Model)
+
+
 @dataclass
-class ESM2Config(BioBertGenericConfig[ESM2Model], iom.IOMixinWithGettersSetters):
+class ESM2GenericConfig(BioBertGenericConfig[ESM2ModelT]):
     """Configuration class for ESM2 model.
 
     Attributes:
@@ -305,3 +309,9 @@ class ESM2Config(BioBertGenericConfig[ESM2Model], iom.IOMixinWithGettersSetters)
     #  things as part of the workflow for inference and fine-tuning.
     return_only_hidden_states: bool = False  # return logits
     core_attention_override: Type[torch.nn.Module] | None = ESM2DotProductAttention
+
+
+class ESM2Config(ESM2GenericConfig[ESM2Model], iom.IOMixinWithGettersSetters):
+    model_cls: Type[ESM2Model] = ESM2Model
+    num_layers: int = 33  # 650M
+    hidden_size: int = 1280  # 650M

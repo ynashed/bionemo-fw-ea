@@ -14,7 +14,7 @@
 # limitations under the License.
 
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Dict, Iterable, List, Sequence, Tuple, Type, Union
 
 import torch
@@ -23,7 +23,7 @@ from megatron.core.transformer.transformer_config import TransformerConfig
 from nemo.collections.common.tokenizers import TokenizerSpec
 from nemo.lightning.megatron_parallel import MegatronLossReduction, ReductionT
 
-from bionemo.esm2.api import ESM2Config, ESM2Model
+from bionemo.esm2.api import ESM2GenericConfig, ESM2Model
 from bionemo.llm.utils import iomixin_utils as iom
 
 
@@ -84,19 +84,14 @@ class MegatronConvNetHead(MegatronModule):
         )
         # class_heads (torch.nn.ModuleList): A list of convolutional layers, each corresponding to a different class head.
         # These are used for producing logits scores of varying sizes as specified in `output_sizes`.
-        self.class_heads = torch.nn.ModuleList([])
-        for head_size in config.cnn_output_sizes:
-            self.class_heads.append(torch.nn.Conv2d(32, head_size, kernel_size=(7, 1), padding=(3, 0)))
+        self.class_heads = torch.nn.Conv2d(32, config.cnn_num_classes, kernel_size=(7, 1), padding=(3, 0))
 
     def forward(self, hidden_states: torch.Tensor) -> List[torch.Tensor]:
         # [b, s, h] -> [b, h, s, 1]
         hidden_states = hidden_states.permute(0, 2, 1).unsqueeze(dim=-1)
         hidden_states = self.finetune_model(hidden_states)  # [b, 32, s, 1]
-        outputs = []
-        for head in self.class_heads:
-            output = head(hidden_states)
-            outputs.append(output.squeeze(dim=-1).permute(0, 2, 1))  # [b, s, output_size]
-        return outputs
+        output = self.class_heads(hidden_states).squeeze(dim=-1).permute(0, 2, 1)  # [b, s, output_size]
+        return output
 
 
 class ESM2FineTuneSeqLengthModel(ESM2Model):
@@ -139,7 +134,7 @@ class ESM2FineTuneSeqLengthModel(ESM2Model):
 
 
 @dataclass
-class ESM2FineTuneSeqLenBioBertConfig(ESM2Config, iom.IOMixinWithGettersSetters):
+class ESM2FineTuneSeqLenBioBertConfig(ESM2GenericConfig, iom.IOMixinWithGettersSetters):
     """ExampleConfig is a dataclass that is used to configure the model.
 
     Timers from ModelParallelConfig are required for megatron forward compatibility.
@@ -148,7 +143,7 @@ class ESM2FineTuneSeqLenBioBertConfig(ESM2Config, iom.IOMixinWithGettersSetters)
     model_cls: Type[ESM2FineTuneSeqLengthModel] = ESM2FineTuneSeqLengthModel
 
     # A list of integers where each integer represents the output size for each class head.
-    cnn_output_sizes: List[int] = field(default_factory=lambda: [3])  # number of classes in each label
+    cnn_num_classes: int = 3  # number of classes in each label
     cnn_dropout: float = 0.25
     cnn_hidden_dim: int = 32  # The number of output channels in the bottleneck layer of the convolution.
 
