@@ -3,6 +3,53 @@ site_url: https://docs.nvidia.com/bionemo-framework/
 repo_url: https://github.com/NVIDIA/bionemo-fw-ea
 repo_name: NVIDIA/bionemo-fw-ea
 
+nav:
+  - Home: getting-started/index.md
+  - Getting Started:
+      - Prerequisites: getting-started/pre-reqs.md
+      - Access and Startup: getting-started/access-startup.md
+      - Next Steps: getting-started/next-steps.md
+  - User Guide: user-guide/index.md
+  - Models:
+      - Model Benchmarks: models/model-benchmarks.md
+      - DiffDock: models/diffdock.md
+      - DNABERT: models/dnabert.md
+      - DSMBind: models/dsmbind.md
+      - EquiDock: models/equidock.md
+      - ESM1-NV: models/esm1-nv.md
+      - ESM2-NV: models/esm2-nv.md
+      - Geneformer: models/geneformer.md
+      - MegaMolBART: models/megamolbart.md
+      - MolMIM: models/molmim.md
+      - OpenFold: models/openfold.md
+      - ProtT5-NV: models/prott5nv.md
+  - BioNeMo Core:
+      - BioNeMo for Model Training: bionemo-core/bionemo-fw-for-model-training-fw.md
+      - Data Module: bionemo-core/data-module-fw.md
+      - Deep Dive ESM1 PyTriton Inference: bionemo-core/deep-dive-esm1-pytriton-inference.md
+      - Downstream Task Validation: bionemo-core/dwnstr-task-validation.md
+      - Inference Triton: bionemo-core/inference-triton-fw.md
+  - Best Practices:
+      - Hyperparameters: best-practices/hyperparameters-fw.md
+      - Parallelism: best-practices/parallelism-fw.md
+  - Datasets:
+      - CELLxGENE: datasets/CELLxGENE.md
+      - GRCh38.p13: datasets/GRCh38.p13.md
+      - PertNet-2022: datasets/PertNet-2022.md
+      - MoleculeNet PhysChem: datasets/moleculenet-physchem.md
+      - OpenProteinSet: datasets/openproteinset.md
+      - PDB: datasets/pdb.md
+      - UniProt: datasets/uniprot.md
+      - ZINC15: datasets/zinc15.md
+  - Developer Guide:
+      - Code Review: developer-guide/CODE-REVIEW.md
+      - Contributing: developer-guide/CONTRIBUTING.md
+      - Jupyter Notebooks: developer-guide/jupyter-notebooks.ipynb
+  - Appendix:
+      - FAQ: appendix/faq-fw.md
+      - Release Notes: appendix/releasenotes-fw.md
+      - Bibliography: appendix/bibliography-fw.md
+
 theme:
   name: "material"
   features:

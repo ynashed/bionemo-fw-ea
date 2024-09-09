@@ -6,10 +6,7 @@ In the sections below, key components of the BioNeMo framework and their use wil
 
 The NVIDIA BioNeMo framework exists for training and deploying large biomolecular language models at supercomputing scale for the discovery and development of therapeutics. The large language model (LLM) framework currently has models for small molecules (SMILES) and protein sequences. Its modular design and high-level APIs make it easy to create, train, and deploy complex models for a variety of downstream tasks. The extensive collection of pre-trained models and scripts further facilitates rapid prototyping and development, and developers can customize the repository according to their needs.
 
-:::{note}
 For detailed information on model pre-training or fine-tuning, users should consult the Tutorials section. This BioNeMo Core section is intended for advanced use cases.
-:::
-
 
 ## Creating New Models
 
@@ -44,7 +41,7 @@ Re-using code and architectures is the easiest way to modify existing BioNeMo pi
         )
 ```
 
-The same customization principles apply to all the other models available in BioNeMo framework, but certain nuances apply to each one of them according to their `super` class.  MegaMolBART, for example, does not have the same `@property` decorated functions dealing with input and output names or input types as ESM1-nv:
+The same customization principles apply to all the other models available in BioNeMo framework, but certain nuances apply to each one of them according to their `super` class. MegaMolBART, for example, does not have the same `@property` decorated functions dealing with input and output names or input types as ESM1-nv:
 
 ```python
 # ESM1-nv
@@ -105,18 +102,18 @@ def sample_molecules(self, tokens_enc, enc_mask, hidden_states=None):
 
 Here's a summary of each model's superclass:
 
-| **Model**             | **Superclass**                   |
-|-----------------------|----------------------------------|
-| ESM-1nv               | MegatronBertModel                |
-| ProtT5nv              | MegatronT5Model                  |
-| MegaMolBART           | MegatronLMEncoderDecoderModel    |
-| MolMIM                | MegatronLMEncoderDecoderModel    |
+| **Model**   | **Superclass**                |
+| ----------- | ----------------------------- |
+| ESM-1nv     | MegatronBertModel             |
+| ProtT5nv    | MegatronT5Model               |
+| MegaMolBART | MegatronLMEncoderDecoderModel |
+| MolMIM      | MegatronLMEncoderDecoderModel |
 
 Customizations can also vary from simple changes in the tokenizer methods to more involved changes in the model architecture, including alterations in how the forward step is computed, callbacks or data augmentation functions.
 
 ## Config Files
 
-BioNeMo framework offers the option to easily set up and change model configurations for pre-training or fine-tuning workflows. Such configuration modifications can range from simple hyperparameters, such as number of hidden states to more advanced oodifications for data handling or connections to [Weights & Biases Dashboards](#weights-and-biases-charts) for experiment tracking; for example, refer to  `bionemo/examples/protein/esm1nv/conf/base_config.yaml`. You can reference environment variables inside the configuration files using [OmegaConf resolvers](https://omegaconf.readthedocs.io/en/latest/custom_resolvers.html); for example the variable `$BIONEMO_HOME` maybe referenced via `${oc.env:BIONEMO_HOME}`.
+BioNeMo framework offers the option to easily set up and change model configurations for pre-training or fine-tuning workflows. Such configuration modifications can range from simple hyperparameters, such as number of hidden states to more advanced oodifications for data handling or connections to [Weights & Biases Dashboards](#weights-and-biases-charts) for experiment tracking; for example, refer to `bionemo/examples/protein/esm1nv/conf/base_config.yaml`. You can reference environment variables inside the configuration files using [OmegaConf resolvers](https://omegaconf.readthedocs.io/en/latest/custom_resolvers.html); for example the variable `$BIONEMO_HOME` maybe referenced via `${oc.env:BIONEMO_HOME}`.
 
 Examples of typical configuration modifications for training can be fouind in the _.yaml_ files within the framework
 
@@ -162,7 +159,7 @@ It is also straightforward to change the configuration file to download and proc
     dataloader_type: single
 ```
 
-Some configuration parameters are inter-dependent. For example, `global_batch_size`, if provided, must be computed by a formula `micro_batch_size` * `devices` * `accumulate_grad_batches` / (`tensor_model_parallel_size` * `pipeline_model_parallel_size`). For simplicity, `global_batch_size` can be left to `null`, and the appropriate value will be inferred automatically.
+Some configuration parameters are inter-dependent. For example, `global_batch_size`, if provided, must be computed by a formula `micro_batch_size` _ `devices` _ `accumulate_grad_batches` / (`tensor_model_parallel_size` \* `pipeline_model_parallel_size`). For simplicity, `global_batch_size` can be left to `null`, and the appropriate value will be inferred automatically.
 
 There are also configuration parameters that are relevant to the model's tasks and multiple config files can be set. For example, under `examples/molecule/megamolbart/` there are several config files, each of which establishing a specific behavior for pre-training tasks.
 
@@ -208,12 +205,11 @@ Typically, the config files can be found under the `conf` directory in the same 
 
 Pre-trained checkpoints are also provided based on the models described in the [Introduction](./index.md). These checkpoints will have token-size limitations.
 
-| **Model**             | **Checkpoint's Max. Length**     | **Common Tasks**                                                                                                                                                    |
-|-----------------------|----------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| ESM-1nv & ProtT5nv    | 512 Tokens (Amino Acids)         | Thermostability, Secondary Structure Prediction, Subcellular Localization (check [FLIP Benchmark](./models/model-benchmarks.md))                                    |
-| MegaMolBART           | 512 Tokens (SMILES)              | Representation Learning, Structure Prediction, Molecule Generation                                                                                                  |
-| MolMIM                | 128 Tokens (SMILES)              | Representation Learning, Structure Prediction, Molecule Generation, Guided molecular generation (see ./notebooks/cma_es_guided_molecular_optimization_molmim.ipynb) |
-
+| **Model**          | **Checkpoint's Max. Length** | **Common Tasks**                                                                                                                                                    |
+| ------------------ | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ESM-1nv & ProtT5nv | 512 Tokens (Amino Acids)     | Thermostability, Secondary Structure Prediction, Subcellular Localization (check [FLIP Benchmark](./models/model-benchmarks.md))                                    |
+| MegaMolBART        | 512 Tokens (SMILES)          | Representation Learning, Structure Prediction, Molecule Generation                                                                                                  |
+| MolMIM             | 128 Tokens (SMILES)          | Representation Learning, Structure Prediction, Molecule Generation, Guided molecular generation (see ./notebooks/cma_es_guided_molecular_optimization_molmim.ipynb) |
 
 To enable support for longer sequences, customize configuration parameters to allow sequence lengths, assuming the user has the computational resources to support expansion. Taking ProtT5nv as example, several different configuration options are available in the _.yaml_ file. Under `examples/protein/prott5nv/conf/` the `base_config.yaml` file is the basis for production-level work. More information about how to use checkpoints can be found in the [Save-Restore Connectors](#save-restore-connectors) section below.
 
@@ -255,17 +251,16 @@ Given the ease to operate with [Data Module](./data-module-fw.md) and [Save-Rest
 
 BioNeMo framework pipelines are configured for specific dataset formats.
 
-| **Model**             | **Data Type**                    | **Common Public Datasets**   |
-|-----------------------|----------------------------------|------------------------------|
-| ESM-1nv & ProtT5nv    | Proteins  (FASTA, FASTQ, PDB)    | UniProt, GenBank, SRA, PDB,  |
-| MegaMolBART           | Molecules (CSV or SMI)           | PubChem, ZINC, ChEMBL, DUD-E |
+| **Model**          | **Data Type**                | **Common Public Datasets**   |
+| ------------------ | ---------------------------- | ---------------------------- |
+| ESM-1nv & ProtT5nv | Proteins (FASTA, FASTQ, PDB) | UniProt, GenBank, SRA, PDB,  |
+| MegaMolBART        | Molecules (CSV or SMI)       | PubChem, ZINC, ChEMBL, DUD-E |
 
 However, the pipelines can be modified for different datasets. The following three tutorials describe how to modify the ESM-1nv pipeline for compatibility with the [Observed Antibody Space (OAS) database](https://opig.stats.ox.ac.uk/webapps/oas/):
 
 1. [Adding the OAS Dataset: Downloading and Preprocessing](./notebooks/custom-dataset-preprocessing-fw.ipynb)
 2. [Adding the OAS Dataset: Modifying the Dataset Class](./notebooks/custom-dataset-class-fw.ipynb)
 3. [Creating a Custom Dataloader](TUTORIAL LINK)
-
 
 ## Weights & Biases Integration
 
@@ -277,7 +272,7 @@ Enabling integration with Weights & Biases is highly recommended. To leverage th
 
 In the image below are examples of metrics and dashboards used to monitor model training progress.
 
-![WANDB](./images/wandb-dashboard.png)
+![WANDB](../assets/old_images/wandb-dashboard.png)
 
 These training and system related metrics are automatically logged in the online dashboard when an API key is provided and upload to Weights and Biases is enabled.
 
@@ -300,6 +295,5 @@ Training related metrics include:
 - **Train Backward Timing**: a measure of the time required for the backpropagation step. Measuring the time this takes can help identify bottlenecks in the training process and assist in performance optimization.
 
 - **Validation Loss**: the loss function computed on the validation set. Validation loss is used during model training to avoid over-fitting (when a model learns the training data too well and performs poorly on unseen data). If validation loss starts to increase while training loss decreases, this is usually a sign of over-fitting.
-
 
 Refer to also optional metrics for [Validation With a Downstream Task](dwnstr-task-validation.md)

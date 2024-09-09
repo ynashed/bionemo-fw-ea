@@ -24,15 +24,16 @@ sequences: np.ndarray = encode_str_batch(seqs)
 
 On the server side, an inference callable that performs the following must be implemented:
 
-* accepted input in a supported format (numpy bytes array)
-* decodes it to a list of strings
-* runs inference with the pre-trained BioNeMo model (for example, ESM1)
-* converts output to a supported format
-* and sends it back to the client
+- accepted input in a supported format (numpy bytes array)
+- decodes it to a list of strings
+- runs inference with the pre-trained BioNeMo model (for example, ESM1)
+- converts output to a supported format
+- and sends it back to the client
 
 Mark this callable with the `@batch` decorator from PyTriton. This decorator converts the input request into a more suitable format that can be directly passed to the model (refer to more details on batch decorator in the [PyTrtion documentation](https://github.com/triton-inference-server/pytriton/blob/main/docs/decorators.md#batch)).
 
 An example inference callable is provided below:
+
 ```python
 from typing import Dict
 
@@ -55,9 +56,11 @@ def infer_fn(sequences: np.ndarray) -> Dict[str, np.ndarray]:
     response = {"embeddings": embedding.detach().cpu().numpy()}
     return response
 ```
+
 NOTE: This function is alreadty defined as `triton_embedding_infer_fn` in the `bionemo.triton.embeddings` module.
 
 Now, define and start the server:
+
 ```python
 from pytriton.model_config import Tensor
 from pytriton.triton import Triton
@@ -76,21 +79,19 @@ with Triton() as triton:
     )
     triton.serve()
 ```
+
 NOTE: See the `bionemo.triton.serve_bionemo_model` script for more serious use. This `bind` and `serve` action is perfomed in the `main` function.
 
-:::{note}
 The expected shapes for the inputs and outputs are defined in `infer_fn` (without the batch dimension), where -1 denotes a dynamic size.
 
 If your shapes are incorrect, then Triton will fail to perform inference!
-:::
 
-:::{warning}
 When using the `@batch` decorator, it is **vital** that the `infer_fn` parmaeter names align exactly with what is
 deinfed for `inputs` to the `.bind()` call. These names are how PyTriton ensures that the right tensors are passed
 along. Similiarly, the keys in the returned dictionary must align 1:1 with the names defined in the output tensors.
-:::
 
 When the server is running, use the client to perform a query:
+
 ```python
 from pytriton.client import ModelClient
 
@@ -104,7 +105,6 @@ embeddings = result_dict["embeddings"]
 print(f"{embeddings.shape=}\n{embeddings}")"
 ```
 
-
 ## Extending These Examples
 
 1. Inference callable can contain any Python code. Extend the existing example with a custom post-processing or implement a more complex, multi-step inference pipeline.
@@ -112,7 +112,8 @@ print(f"{embeddings.shape=}\n{embeddings}")"
 2. For more control over inference parameters (for example, sampling strategy for MegaMolBART), they can be exposed to the user. Remember to represent all inputs and outputs to the inference callable as numpy arrays.
 
 3. Use one of the provided components (server or client) alone - they are fully compatible with native solutions for Triton Inference Server.
-* Query the server with a different tool, like you would do with any other Triton instance
-* Use the client to interact with any Triton server, not necessarily set up with PyTriton
+
+- Query the server with a different tool, like you would do with any other Triton instance
+- Use the client to interact with any Triton server, not necessarily set up with PyTriton
 
 4. Finally, PyTriton provides variety of options to customize the server. Refer to the [PyTriton documentation](https://triton-inference-server.github.io/pytriton/latest).

@@ -6,14 +6,12 @@ This section describes the various parallelism options available in BioNeMo mode
 
 The following parallelism options are supported by the current BioNeMo models:
 
-* Data Parallelism - dividing the global batch between multiple GPUs and multiple nodes.
-* Model Parallelism
-    * Tensor Model Parallelism - dividing the model weights matrices between multiple GPUs and multiple nodes.
-    * Pipeline Model Parallelism - dividing the model layers between multiple GPUs and multiple nodes.
+- Data Parallelism - dividing the global batch between multiple GPUs and multiple nodes.
+- Model Parallelism
+  - Tensor Model Parallelism - dividing the model weights matrices between multiple GPUs and multiple nodes.
+  - Pipeline Model Parallelism - dividing the model layers between multiple GPUs and multiple nodes.
 
-:::{note}
 Pipeline model parallelism is available but not currently supported for BioNeMo models, thus `pipeline_model_parallel_size` should be set at 1.
-:::
 
 The global batch size is computed as follows:
 

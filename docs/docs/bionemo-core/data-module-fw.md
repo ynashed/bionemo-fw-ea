@@ -7,25 +7,29 @@ This section provides an overview BioNeMo DataModule and how to use and connect 
 The BioNeMo data module (`bionemo/core.py:BioNeMoDataModule`) serves to centralize several of BioNeMo’s core operations, thus simplifying workflows for future model extensions. This is an interface that encapsulates steps for data processing of BioNeMo Models, allowing higher adaptability of models to several use cases.
 
 Applications of the data module:
-* Fine tuning datasets as used by the finetuning ABC in `bionemo/model/core/encoder_finetuning.py`
-* BioNeMoDataModule implemention for per-token downstream task `bionemo/data/datasets/per_token_value_dataset.py`
-* BioNeMoDataModule implemention for single value downstream tasks `bionemo/data/datasets/single_value_dataset.py`
-* Transforms (for example, Tokenization) as in `bionemo/model/protein/downstream/protein_model_finetuning.py`
+
+- Fine tuning datasets as used by the finetuning ABC in `bionemo/model/core/encoder_finetuning.py`
+- BioNeMoDataModule implemention for per-token downstream task `bionemo/data/datasets/per_token_value_dataset.py`
+- BioNeMoDataModule implemention for single value downstream tasks `bionemo/data/datasets/single_value_dataset.py`
+- Transforms (for example, Tokenization) as in `bionemo/model/protein/downstream/protein_model_finetuning.py`
 
 The data modules coordinate functions related to data processing in BioNeMo, including the instantiation of train, validation and test datasets as well as tokenizers, addition of collate functions, and inferring the number of global samples (up and downsampling included).
 
 Since data modules are abstractors, these duties will depend on child classes being implemented:
-* `train_dataset`
-* `val_dataset`
-* `test_dataset`
-* Variations for additional level of control such as `sample_train_dataset` and `adjust_train_dataloader`. View the full class for additional convenience methods.
+
+- `train_dataset`
+- `val_dataset`
+- `test_dataset`
+- Variations for additional level of control such as `sample_train_dataset` and `adjust_train_dataloader`. View the full class for additional convenience methods.
 
 ## Reasons for using BioNeMo’s Data Module
+
 The Data Module gives developers 4 core benefits:
-* **Encapsulation**: centralizes all data processing steps in one place​​.
-* **Shareability and Reusability**: sharing and reusing data processing steps across projects
-* **Data Management**: Organizes data cleaning and preparation processes for clarity​.
-* **Flexibility**: dataset-agnostic model development and allows for easy swapping of datasets​​.
+
+- **Encapsulation**: centralizes all data processing steps in one place​​.
+- **Shareability and Reusability**: sharing and reusing data processing steps across projects
+- **Data Management**: Organizes data cleaning and preparation processes for clarity​.
+- **Flexibility**: dataset-agnostic model development and allows for easy swapping of datasets​​.
 
 Example:
 extracted from `bionemo/model/protein/downstream/protein_model_finetuning.py`
@@ -39,11 +43,13 @@ class PerTokenValueDataModule(BioNeMoDataModule):
 ```
 
 The code snippet above defines the tokenization process. It takes as arguments:
-* A configuration object of the model as in `examples/protein/esm1nv/conf/downstream_flip_sec_str.yaml`
-* A trainer object containing functions that define callbacks, checkpoints as in `bionemo/model/utils.py: setup_trainer(cfg)`
-* A model object like _ESM1nvModel_ as in `examples/protein/esm1nv/pretrain.py`
+
+- A configuration object of the model as in `examples/protein/esm1nv/conf/downstream_flip_sec_str.yaml`
+- A trainer object containing functions that define callbacks, checkpoints as in `bionemo/model/utils.py: setup_trainer(cfg)`
+- A model object like _ESM1nvModel_ as in `examples/protein/esm1nv/pretrain.py`
 
 ## How to use BioNeMo DataModule
+
 You may be familiar with Data Modules from other frameworks such as PyTorch Lightning. The principles are the same.
 
 To begin, have a look into the `bionemo/core.py` classes and functions, particularly the `BioNeMoDataModule` class and its functions. You will notice that many methods within the `BioNeMoDataModule` class are abstract methods and, therefore, they must be implemented and overridden by a subclass. One such example is:
@@ -86,9 +92,7 @@ class FineTune(BioNeMoDataModule):
         # ...
 ```
 
-:::{note}
 Method names must match the method names in the abstract class.
-:::
 
 We now have the basic building blocks of the DataModule and this will allow you to define core operations in the dataset. One can leverage the combination of other components from other libraries such as the `torch`, for example
 
@@ -138,4 +142,4 @@ class FineTune(BioNeMoDataModule):
 
 The same principle applies to the other functions. One can make customizations, add rules, exceptions and treatments to each one of them.
 
-For a full example, refer to the  [Generating embeddings for Protein Clustering](./notebooks/protein-esm1nv-clustering.ipynb) example notebook.
+For a full example, refer to the [Generating embeddings for Protein Clustering](./notebooks/protein-esm1nv-clustering.ipynb) example notebook.
