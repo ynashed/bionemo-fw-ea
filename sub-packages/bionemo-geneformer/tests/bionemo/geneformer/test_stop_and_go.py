@@ -40,6 +40,7 @@ from bionemo import geneformer
 from bionemo.core.utils.dtypes import get_autocast_dtype
 from bionemo.geneformer.api import GeneformerConfig
 from bionemo.geneformer.data.singlecell.preprocess import GeneformerPreprocess
+from bionemo.llm.lightning import MegatronStrategy
 from bionemo.llm.model.biobert.lightning import BioBertLightningModule
 from bionemo.llm.model.biobert.testing_utils import compute_biobert_loss_singlegpu
 from bionemo.llm.model.biobert.transformer_specs import BiobertSpecOption
@@ -185,7 +186,7 @@ class GeneformerStopAndGoTest(stop_and_go.StopAndGoHarness):
 
     def setup_trainer_and_strategy(self, mode: Literal["stop", "go"], metrics):
         devices, tp_size, pp_size = 1, 1, 1
-        strategy = nl.MegatronStrategy(
+        strategy = MegatronStrategy(
             tensor_model_parallel_size=tp_size,
             pipeline_model_parallel_size=pp_size,
             ddp="megatron",
