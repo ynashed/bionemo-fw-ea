@@ -41,6 +41,7 @@ __all__: Sequence[str] = (
 
 
 T = TypeVar("T")
+BatchT = TypeVar("BatchT")
 
 Model = TypeVar("Model", bound=MegatronModule)
 Loss = TypeVar("Loss", bound=MegatronLossReduction)

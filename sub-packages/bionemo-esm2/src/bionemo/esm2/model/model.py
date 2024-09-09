@@ -15,15 +15,12 @@
 
 
 import math
-import os
-import tarfile
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Callable, Literal, Optional, Sequence, Type
 
 import torch
 import torch.distributed
-from megatron.core import parallel_state, tensor_parallel
+from megatron.core import tensor_parallel
 from megatron.core.models.bert.bert_lm_head import BertLMHead
 from megatron.core.models.bert.pooler import Pooler
 from megatron.core.models.common.embeddings.rotary_pos_embedding import RotaryEmbedding
@@ -32,20 +29,15 @@ from megatron.core.transformer.enums import ModelType
 from megatron.core.transformer.transformer_block import TransformerBlock
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.transformer.utils import get_linear_layer
-from nemo.lightning import get_vocab_size
-from nemo.lightning.io import IOMixin
-from nemo.lightning.megatron_parallel import MegatronLossReduction
 from torch import Tensor
 from torch.optim import Optimizer
 
-from bionemo.core.model.config import BionemoModelConfig
 from bionemo.esm2.data.tokenizer import BioNeMoAutoTokenizer
 from bionemo.esm2.model.attention import ESM2DotProductAttention
 from bionemo.esm2.model.embedding import ESM2Embedding
-from bionemo.llm.model.biobert.model import MegatronBioBertModel
-from bionemo.llm.model.biobert.transformer_specs import BiobertSpecOption, get_biobert_spec
-from bionemo.llm.model.loss import BERTMLMLossWithReduction
-from bionemo.llm.utils.weight_utils import nemo1_to_nemo2_biobert_key_mapping
+from bionemo.llm.model.biobert.model import BioBertGenericConfig, MegatronBioBertModel
+from bionemo.llm.model.biobert.transformer_specs import BiobertSpecOption
+from bionemo.llm.utils import iomixin_utils as iom
 
 
 __all__: Sequence[str] = (
@@ -76,6 +68,7 @@ class ESM2Model(MegatronBioBertModel):
         add_binary_head=True,
         return_embeddings=False,
         use_full_attention_mask=False,
+        include_hiddens: bool = False,
     ) -> None:
         """Initialize the ESM2 model.
 
@@ -99,6 +92,7 @@ class ESM2Model(MegatronBioBertModel):
             add_binary_head (bool): Whether to add a binary head. Defaults to True.
             return_embeddings (bool): Whether to return embeddings. Defaults to False.
             use_full_attention_mask (bool): Whether to use full attention mask. Defaults to False.
+            include_hiddens: Whether to include hidden states in the output dictionary. Defaults to False.
         """
         super(MegatronBioBertModel, self).__init__(config=config)
         self.post_process = post_process
@@ -121,6 +115,7 @@ class ESM2Model(MegatronBioBertModel):
         self.position_embedding_type = position_embedding_type
         self.add_binary_head = add_binary_head
         self.return_embeddings = return_embeddings
+        self.include_hiddens = include_hiddens
 
         # megatron core pipelining currently depends on model type
         self.model_type = ModelType.encoder_or_decoder
@@ -221,7 +216,7 @@ def esm_gelu_func(x: Tensor) -> Tensor:
 
 
 @dataclass
-class ESM2Config(BionemoModelConfig[ESM2Model], TransformerConfig, IOMixin):
+class ESM2Config(BioBertGenericConfig[ESM2Model], iom.IOMixinWithGettersSetters):
     """Configuration class for ESM2 model.
 
     Attributes:
@@ -259,11 +254,13 @@ class ESM2Config(BionemoModelConfig[ESM2Model], TransformerConfig, IOMixin):
         return_only_hidden_states: Whether to return only hidden states.
     """
 
+    # When overriding fields in a dataclass _always_ declare types: https://github.com/python/cpython/issues/123269
+    model_cls: Type[ESM2Model] = ESM2Model
     num_layers: int = 33  # 650M
     hidden_size: int = 1280  # 650M
     num_attention_heads: int = 20
     ffn_hidden_size: int = 4 * 1280  # Transformer FFN hidden size. Usually 4 * hidden_size.
-    hidden_dropout: int = 0  # ESM2 removes dropout from hidden layers and attention
+    hidden_dropout: float = 0  # ESM2 removes dropout from hidden layers and attention
     attention_dropout: float = 0.0  # ESM2 does not use attention dropout
     apply_residual_connection_post_layernorm: bool = False  # TODO: farhadr False is new default, True was BERT pub.
     layernorm_epsilon: float = 1.0e-5
@@ -292,7 +289,7 @@ class ESM2Config(BionemoModelConfig[ESM2Model], TransformerConfig, IOMixin):
     rotary_percent: float = 1.0
     seq_len_interpolation_factor: Optional[float] = None
     seq_length: int = 1024
-    biobert_spec_option: BiobertSpecOption = BiobertSpecOption.esm2_bert_layer_local_spec.value
+    biobert_spec_option: BiobertSpecOption = BiobertSpecOption.esm2_bert_layer_local_spec
 
     # TODO: Move this to better places?
     get_attention_mask_from_fusion: bool = False
@@ -300,98 +297,11 @@ class ESM2Config(BionemoModelConfig[ESM2Model], TransformerConfig, IOMixin):
     optimizer_fn: Optional[Callable[[MegatronBioBertModel], Optimizer]] = None
     # TODO (@skothenhill,@georgea) update to use the nemo2 checkpoint mixins
     #  support HF (requires weight interleaving on qkv layer) and nemo1 checkpoints ideally.
-    # TODO (@skothenhill,@jstjohn) come up with a nice way of doing fine-tuning checkpoint loading,
-    #  where some acceptible layers (eg lm_head) may or may not be absent from the model, and others
-    #  (like a new head) may be new and missing from the initial checkpoint.
-    nemo1_ckpt_path: Optional[Path] = None
+    nemo1_ckpt_path: str | None = None
+    # The following checkpoint path is for nemo2 checkpoints. Config parameters not present in
+    #  self.override_parent_fields will be loaded from the checkpoint and override those values here.
+    initial_ckpt_path: str | None = None
     # TODO (@jstjohn) come up with a cleaner way in the biobert module to return user requested
     #  things as part of the workflow for inference and fine-tuning.
     return_only_hidden_states: bool = False  # return logits
-
-    def configure_model(self, tokenizer) -> ESM2Model:
-        """Configures the ESM2Model with the given tokenizer.
-
-        Args:
-            tokenizer: The tokenizer to be used.
-
-        Returns:
-            An instance of ESM2Model configured with the specified parameters.
-        """
-        vp_size = self.virtual_pipeline_model_parallel_size
-        if vp_size:
-            p_size = self.pipeline_model_parallel_size
-            assert (
-                self.num_layers // p_size
-            ) % vp_size == 0, "Make sure the number of model chunks is the same across all pipeline stages."
-
-        # The local specs all require the standard full attention mask. For transformer engine only the NVTE_FLASH_ATTN=0
-        #  option requires this full attention mask.
-        use_full_attention_mask: bool = os.getenv("NVTE_FLASH_ATTN") == "0" or self.biobert_spec_option in {
-            BiobertSpecOption.bert_layer_local_spec,
-            BiobertSpecOption.bert_layer_local_spec_with_qk_ln,
-            BiobertSpecOption.esm2_bert_layer_local_spec,
-        }
-
-        do_next_sentence = False
-
-        model = ESM2Model(
-            self,
-            transformer_layer_spec=get_biobert_spec(
-                self.biobert_spec_option,
-                qk_layernorm=self.qk_layernorm,
-                core_attention=ESM2DotProductAttention,
-            ),
-            num_tokentypes=2 if do_next_sentence else 0,
-            vocab_size=get_vocab_size(self, tokenizer.vocab_size, self.make_vocab_size_divisible_by),
-            max_sequence_length=self.seq_length,
-            tokenizer=tokenizer,
-            fp16_lm_cross_entropy=self.fp16_lm_cross_entropy,
-            parallel_output=self.parallel_output,
-            share_embeddings_and_output_weights=self.share_embeddings_and_output_weights,
-            position_embedding_type=self.position_embedding_type,
-            rotary_percent=self.rotary_percent,
-            seq_len_interpolation_factor=self.seq_len_interpolation_factor,
-            return_embeddings=False,
-            pre_process=parallel_state.is_pipeline_first_stage(),
-            post_process=parallel_state.is_pipeline_last_stage(),  # set to False for inference
-            add_binary_head=do_next_sentence,
-            use_full_attention_mask=use_full_attention_mask,
-        )
-        # TODO (@skothenhill) this is a hack to load the old checkpoint.
-        # This should be removed once we have a proper checkpoint conversion
-        # see NeMo/nemo/collections/llm/gpt/model/mixtral.py for how we should do it.
-        # We should eventually have an adapter for nemo1 checkpoints, HF checkpoints (at least for ESM2 @georgea)
-        # and an adapter may also be the right way to handle expected missing/extra keys when importing
-        # a checkpoint for fine-tuning (eg ignore misisng lm_head, if not there in model, etc).
-        if self.nemo1_ckpt_path is not None:
-            te_mapping = self.biobert_spec_option in {
-                BiobertSpecOption.bert_layer_with_transformer_engine_spec,
-                BiobertSpecOption.bert_layer_with_transformer_engine_and_qk_ln_spec,
-            }
-            with tarfile.open(self.nemo1_ckpt_path, "r") as old_ckpt:
-                ckpt_file = old_ckpt.extractfile("./model_weights.ckpt")
-                old_weights = torch.load(ckpt_file)
-                new_state_dict_from_old = {}
-                for k, v in old_weights.items():
-                    if "word_embeddings" in k:
-                        print(k)
-                    new_key = nemo1_to_nemo2_biobert_key_mapping(k, new_model_prefix="", te_mapping=te_mapping)
-                    new_state_dict_from_old[new_key] = v
-                # TE adds non-null ._extra_state objects to layers, which store some kind of buffer bits
-                #  so we need to allow those to pass through if we're loading from bionemo1 which did not
-                #  use TE.
-                model.load_state_dict(new_state_dict_from_old, strict=not te_mapping)
-
-        # TODO (@jstjohn) come up with a cleaner way in the biobert module to return hidden states.
-        #  maybe a suite of options like hugging face has so a user can ask for several or only one thing.
-        if self.return_only_hidden_states:
-            # this applies the final layernorm in the encoder to the hidden states which was
-            #  the default in nemo1.
-            model.post_process = False
-            model.encoder.post_process = True
-            model.encoder.post_layer_norm = True
-        return model
-
-    def get_loss_reduction_class(self) -> Type[MegatronLossReduction]:  # noqa: D102
-        # You could optionally return a different loss reduction class here based on the config settings.
-        return BERTMLMLossWithReduction
+    core_attention_override: Type[torch.nn.Module] | None = ESM2DotProductAttention

@@ -14,9 +14,9 @@
 # limitations under the License.
 
 
-from typing import Dict, Optional, Protocol, Sequence, TypedDict, cast
+from typing import Callable, Dict, Iterable, Optional, Protocol, Sequence, TypedDict, cast
 
-import torch
+import pytorch_lightning as pl
 import torch.distributed
 from apex.optimizers import FusedAdam
 from megatron.core import parallel_state
@@ -38,6 +38,9 @@ __all__: Sequence[str] = (
     "BertModel",
     "BertBatch",
     "SequenceBatch",
+    # ???
+    "get_packed_seq_params",
+    "get_batch_on_this_context_parallel_rank",
 )
 
 
@@ -50,6 +53,12 @@ class BertModel(Protocol[DataT]):
 class BertBatchCore(TypedDict):
     text: Tensor
     attention_mask: Tensor
+
+
+# ???
+DataStepOutput = Dict[str, torch.Tensor | PackedSeqParams]
+DataStepFunction = Callable[[Iterable], DataStepOutput]
+ForwardStepFunction = Callable[[pl.LightningModule, DataStepOutput], DataT]
 
 
 class BertBatch(BertBatchCore, total=False):
@@ -104,10 +113,14 @@ def biobert_data_step(dataloader_iter) -> Dict[str, Tensor]:
     return output
 
 
+# ???
+# def bert_forward_step(model: pl.LightningModule, batch: DataStepOutput) -> DataT:
 def bert_forward_step(model: BertModel[DataT], batch: BertBatch) -> DataT:
-    """This subsets the batch keys to the ones actually used by forward pass of the model, and then calls the model's forward pass.
+    """Performs the model's orward pass using the batch, for Megatron compatability.
+
+    This subsets the batch keys to the ones actually used by forward pass of the model, and then calls the model's forward pass.
     if "cu_seqsens" are defined in the batch, then the packed sequence parameters are also passed to the model for forward pass efficiency.
-    """  # noqa: D205
+    """
     forward_args = {
         "input_ids": batch["text"],
         "attention_mask": batch["attention_mask"],
@@ -131,11 +144,15 @@ def biobert_lightning_module(
     data_step: DataStep = biobert_data_step,
     forward_step: ForwardStep = bert_forward_step,
 ) -> BionemoLightningModule[MegatronBioBertModel, MegatronLossReduction]:
-    """A pytorch lightning module for BioBert-derived models. This module is designed to be used with the Megatron-LM strategy and nemo 2.0 conventions.
-    To change the your loss, pass in a different config object that returns a different loss reduction class. To change your model and what it outputs,
-    pass in a different config object that returns a different model. Do not modify this function unless you need to change higher level logic. You may
-    need to modify the various step and forward functions towards the bottom of this file to handle new/different keys in the batch. In the future some of
-    those functions may need to be refactored out into the config object or a different place so that they live closer to the model definition.
+    """A pytorch lightning module for BioBert-derived models.
+
+    This module is designed to be used with the Megatron-LM strategy and nemo 2.0 conventions.
+    To change your loss, pass in a different config object that returns a different loss reduction class.
+    To change your model and what it outputs, pass in a different config object that returns a different model.
+    Do not modify this function unless you need to change higher level logic. You may need to modify the various step
+    and forward functions towards the bottom of this file to handle new/different keys in the batch. In the future some
+    of those functions may need to be refactored out into the config object or a different place so that they live
+    closer to the model definition.
     """
     return BionemoLightningModule(
         config=config,
@@ -164,6 +181,7 @@ def get_batch_on_this_context_parallel_rank(batch: Dict[str, Tensor], in_place: 
 
     Modifies the batch data based on the context parallel rank, if the context parallel world size is greater than 1.
     Otherwise, the batch is returned as-is.
+
 
     Args:
         batch: The input batch data.

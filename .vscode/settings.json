@@ -1,14 +1,23 @@
 {
     "cSpell.words": [
+        "adata",
         "allclose",
         "bionemo",
+        "boto",
+        "botocore",
+        "docstrings",
         "dtype",
         "NBVAL",
         "nemo",
+        "ngcsdk",
+        "pbss",
+        "platformdirs",
         "pretraining",
+        "pydantic",
         "rampup",
         "resamplers",
         "singlecell",
+        "tqdm",
         "uniref"
     ],
     "editor.rulers": [
