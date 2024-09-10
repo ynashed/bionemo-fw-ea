@@ -36,12 +36,13 @@ from torch.utils.data import Dataset
 from bionemo import esm2
 from bionemo.core.data.resamplers import PRNGResampleDataset
 from bionemo.esm2.api import ESM2Config, ESM2GenericConfig
-from bionemo.esm2.data import dataset, tokenizer
+from bionemo.esm2.data import tokenizer
 from bionemo.esm2.data.datamodule import ESMDataModule
 from bionemo.esm2.model.finetune_token_classifier import ESM2FineTuneSeqLenBioBertConfig, Label2IDTokenizer
 from bionemo.llm.data import collate
 from bionemo.llm.lightning import LossLoggingCallback
 from bionemo.llm.model.biobert.lightning import BioBertLightningModule
+from bionemo.llm.utils.datamodule_utils import infer_num_samples
 from bionemo.testing import megatron_parallel_state_utils
 from bionemo.testing.callbacks import MetricTracker
 from bionemo.testing.data.load import load
@@ -131,7 +132,7 @@ class PerTokenValueDataset(Dataset):
     def __getitem__(self, idx):
         sequence = self.data[idx][1]
         tokenized_sequence = self._tokenize(sequence)
-        label_ids = torch.tensor(self.label_tokenizer.text_to_ids(self.data[idx][1]))
+        label_ids = torch.tensor(self.label_tokenizer.text_to_ids(self.data[idx][2]))
         labels = torch.nn.functional.one_hot(label_ids, num_classes=3)
 
         return {
@@ -221,14 +222,22 @@ class PerTokenValueDataModule(pl.LightningDataModule):  # noqa: D101
 
         # Create training dataset
         _train_ds = PerTokenValueDataset(tokenizer=self._tokenizer)
+        num_train_samples = int(max_train_steps * self.data_sampler.global_batch_size)
+
         self._train_ds = self._sample_and_shuffle_dataset(
-            _train_ds, None, "train"
+            _train_ds, num_train_samples, "train"
         )  # shuffle manually without cyclic MegatronPretrainingRandomSampler
 
         # Create validation dataset
         _valid_ds = PerTokenValueDataset(tokenizer=self._tokenizer)
+        num_val_samples = infer_num_samples(
+            limit_batches=self.trainer.limit_val_batches,
+            num_samples_in_dataset=len(_valid_ds),
+            global_batch_size=self.data_sampler.global_batch_size,
+            stage="val",
+        )
         self._valid_ds = self._sample_and_shuffle_dataset(
-            _valid_ds, None, "val"
+            _valid_ds, num_val_samples, "val"
         )  # shuffle manually without cyclic MegatronPretrainingRandomSampler
 
         assert (
@@ -260,7 +269,7 @@ class PerTokenValueDataModule(pl.LightningDataModule):  # noqa: D101
         """Returns the dataloader for validation data."""
         return self._create_dataloader(self._valid_ds)
 
-    def _sample_and_shuffle_dataset(self, dataset: dataset.ESMMaskedResidueDataset, num_samples: int, stage: str):  # noqa: D417
+    def _sample_and_shuffle_dataset(self, dataset: Dataset, num_samples: int, stage: str):  # noqa: D417
         """Sample the training dataset.
 
         Args:
