@@ -7,11 +7,13 @@ theme:
   name: "material"
   features:
     - content.code.annotate
-    - navigation.tabs
+    # - navigation.tabs
     - navigation.sections
     - navigation.indexes
     - navigation.instant
+    - navigation.path
     - navigation.instant.prefetch
+    - navigation.top
     - search.suggest
     - search.highlight
     - content.code.copy
@@ -25,7 +27,7 @@ theme:
     - media: "(prefers-color-scheme: light)"
       scheme: nvidia-light
       primary: custom
-      accent: indigo
+      accent: red
       toggle:
         icon: material/toggle-switch
         name: Switch to dark mode
@@ -53,16 +55,29 @@ plugins:
           paths:
             - ../sub-packages/*/src
   - mkdocs-jupyter
+  - include_dir_to_nav:
+      file_pattern: '.*\.(md|ipynb)$'
 
 markdown_extensions:
+  - attr_list
+  - md_in_html
   - pymdownx.details
   - pymdownx.superfences
   - pymdownx.snippets:
       check_paths: true
       restrict_base_path: False
       base_path: "."
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - def_list
   - admonition
+
+nav:
+  # - index.md
+  # - Getting Started: getting-started
+  # - User Guide: user-guide
+  # - Contributing: contributing
 
 copyright: |
   &copy; Copyright 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.

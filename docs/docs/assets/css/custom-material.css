@@ -1,6 +1,4 @@
-/* Customizations to support logo and other color changes */
-
-img[alt="logo"] {
+Customizations to support logo and other color changes img[alt="logo"] {
   content: var(--md-logo-url);
 }
 

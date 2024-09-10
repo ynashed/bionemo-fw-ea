@@ -29,7 +29,7 @@
   --md-accent-fg-color--transparent: hsla(var(--md-hue), 85%, 95%, 0.12);
   --md-accent-fg-color: hsla(201.7, 100%, 45%, 1);
   --md-default-fg-color: hsla(var(--md-hue), 15%, 11%, 1);
-  --md-default-fg-color--light: hsla(var(--md-hue), 15%, 14%, 0.62);
+  --md-default-fg-color--light: 77, 77, 77;
   --md-default-fg-color--lighter: hsla(var(--md-hue), 15%, 14%, 0.32);
   --md-default-fg-color--lightest: hsla(var(--md-hue), 15%, 14%, 0.12);
   --md-default-bg-color: hsla(var(--md-hue), 0%, 98%, 1);
@@ -63,12 +63,6 @@
   --md-admonition-bg-color: var(--md-default-bg-color);
   --md-footer-bg-color: hsla(var(--md-hue), 15%, 12%, 0.87);
   --md-footer-bg-color--dark: hsla(var(--md-hue), 15%, 10%, 1);
-  --md-shadow-z1: 0 #{px2rem(4px)} #{px2rem(10px)} hsla(0, 0%, 100%, 0.2),
-    0 0 #{px2rem(1px)} hsla(0, 0%, 1000%, 0.1);
-  --md-shadow-z2: 0 #{px2rem(4px)} #{px2rem(10px)} hsla(0, 0%, 100%, 0.3),
-    0 0 #{px2rem(1px)} hsla(0, 0%, 100%, 0.25);
-  --md-shadow-z3: 0 #{px2rem(4px)} #{px2rem(10px)} hsla(0, 0%, 100%, 0.4),
-    0 0 #{px2rem(1px)} hsla(0, 0%, 100%, 0.35);
 }
 
 [data-md-color-scheme="nvidia-dark"] {
@@ -135,10 +129,4 @@
   --md-admonition-bg-color: var(--md-default-bg-color);
   --md-footer-bg-color: hsla(var(--md-hue), 15%, 12%, 0.87);
   --md-footer-bg-color--dark: hsla(var(--md-hue), 15%, 20%, 1);
-  --md-shadow-z1: 0 #{px2rem(4px)} #{px2rem(10px)} hsla(0, 0%, 0%, 0.2),
-    0 0 #{px2rem(1px)} hsla(0, 0%, 0%, 0.1);
-  --md-shadow-z2: 0 #{px2rem(4px)} #{px2rem(10px)} hsla(0, 0%, 0%, 0.3),
-    0 0 #{px2rem(1px)} hsla(0, 0%, 0%, 0.25);
-  --md-shadow-z3: 0 #{px2rem(4px)} #{px2rem(10px)} hsla(0, 0%, 0%, 0.4),
-    0 0 #{px2rem(1px)} hsla(0, 0%, 0%, 0.35);
 }
