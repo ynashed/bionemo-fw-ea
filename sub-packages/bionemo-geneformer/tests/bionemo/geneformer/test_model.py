@@ -822,12 +822,11 @@ def _train_model_get_ckpt(
     )
 
     checkpoint_callback = nl_callbacks.ModelCheckpoint(
-        save_best_model=False,
         save_last=True,
         save_on_train_epoch_end=True,
         monitor="reduced_train_loss",  # TODO find out how to get val_loss logged and use "val_loss",
         every_n_train_steps=n_steps_train // 2,
-        enable_nemo_ckpt_io=True,  # Enables the .nemo file-like checkpointing where all IOMixins are under SerDe
+        always_save_context=True,  # Enables the .nemo file-like checkpointing where all IOMixins are under SerDe
     )
     save_dir = root_dir / name
     tb_logger = TensorBoardLogger(save_dir=save_dir, name=name)
@@ -856,7 +855,7 @@ def _train_model_get_ckpt(
         pipeline_model_parallel_size=1,
         ddp="megatron",
         find_unused_parameters=True,
-        enable_nemo_ckpt_io=True,
+        always_save_context=True,
     )
     metric_tracker = MetricTracker(metrics_to_track_val=["loss"], metrics_to_track_train=["loss"])
     trainer = nl.Trainer(
@@ -877,7 +876,6 @@ def _train_model_get_ckpt(
         trainer=trainer,
         log=nemo_logger,
         resume=resume.AutoResume(
-            path=None,  # Overrides the path found by resume_if_exists when set.
             resume_if_exists=True,  # Looks for the -last checkpoint to continue training.
             resume_ignore_no_checkpoint=True,  # When false this will throw an error with no existing checkpoint.
         ),

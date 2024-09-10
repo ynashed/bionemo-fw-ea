@@ -108,7 +108,7 @@ def main(
         wandb_entity (str): the group to use for the wandb run, sometimes called a team, could also be your username
         create_tensorboard_logger (bool): create the tensorboard logger
         restore_from_checkpoint_path (path): If set, restores the model from the directory passed in. Expects the
-            checkpoint to be created by using the ModelCheckpoint class and enable_nemo_ckpt_io=True.
+            checkpoint to be created by using the ModelCheckpoint class and always_save_context=True.
     """
     # Create the result directory if it does not exist.
     result_dir.mkdir(parents=True, exist_ok=True)
@@ -259,7 +259,7 @@ def main(
         monitor=metric_to_monitor_for_checkpoints,  # "val_loss",
         save_top_k=save_top_k,
         every_n_train_steps=save_every_n_steps,
-        enable_nemo_ckpt_io=True,  # Enables the .nemo file-like checkpointing where all IOMixins are under SerDe
+        always_save_context=True,  # Enables the .nemo file-like checkpointing where all IOMixins are under SerDe
     )
 
     # Setup the logger and train the model
