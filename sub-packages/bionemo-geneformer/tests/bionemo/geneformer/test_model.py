@@ -14,13 +14,16 @@
 # limitations under the License.
 
 import functools
+import os
 import tarfile
 from copy import deepcopy
 from pathlib import Path
-from typing import List, Tuple
+from typing import Any, List, Sequence, Tuple
 
 import pytest
+import pytorch_lightning as pl
 import torch
+from lightning.pytorch.callbacks import BasePredictionWriter
 from megatron.core.optimizer.optimizer_config import OptimizerConfig
 from megatron.core.transformer.module import Float16Module
 from nemo import lightning as nl
@@ -170,6 +173,36 @@ def geneformer_config():
         nemo1_ckpt_path=str(nemo1_checkpoint_path),
         return_only_hidden_states=True,  # This is what we did in nemo1 for inference
     )
+
+
+class BatchPredictionWriter(BasePredictionWriter, pl.Callback):
+    def __init__(self, output_dir, write_interval):
+        super().__init__(write_interval)
+        self.output_dir = str(output_dir)
+        os.makedirs(self.output_dir, exist_ok=True)
+
+    def write_on_batch_end(
+        self,
+        trainer: "pl.Trainer",
+        pl_module: "pl.LightningModule",
+        prediction: Any,
+        batch_indices: Sequence[int] | None,
+        batch: Any,
+        batch_idx: int,
+        dataloader_idx: int,
+    ):
+        # this will create N (num processes) files in `output_dir` each containing
+        # the predictions of it's respective rank
+        torch.save(
+            prediction, os.path.join(self.output_dir, f"predictions__rank_{trainer.global_rank}__batch_{batch_idx}.pt")
+        )
+
+        # optionally, you can also save `batch_indices` to get the information about the data index
+        # from your prediction data
+        torch.save(
+            batch_indices,
+            os.path.join(self.output_dir, f"batch_indices__rank_{trainer.global_rank}__batch_{batch_idx}.pt"),
+        )
 
 
 def test_bionemo2_rootdir():
@@ -445,6 +478,86 @@ def test_geneformer_nemo1_v_nemo2_inference_golden_values(
         mask=expected_vals["expected_pad_masks"],
         min_correlation=0.9999,
     )
+
+
+def test_distributed_inference_workflow(tmpdir, geneformer_config, cells: List[List[str]], seed: int = 42):
+    """Distributed inference test
+
+    Pytorch-lightning suggests you do distributed inference by the following. Use a callback that
+    can write predictions without returning them back to the main node. See:
+    https://lightning.ai/docs/pytorch/stable/deploy/production_basic.html#enable-distributed-inference
+    """
+    out_dir = tmpdir / "distributed_predictions"
+    pred_writer = BatchPredictionWriter(out_dir, write_interval="batch")
+    assert nemo_1_expected_values_path.exists(), f"Could not find expected values at {nemo_1_expected_values_path}."
+
+    data_dir = Path(data_path)
+    train_data_path = data_dir / "train"
+    if not nemo1_checkpoint_path.exists():
+        raise FileNotFoundError(f"Could not find checkpoint at {nemo1_checkpoint_path}. {data_dir}")
+    if not train_data_path.exists():
+        raise FileNotFoundError(f"Could not find train data at {train_data_path}. {data_dir}")
+
+    preprocessor = GeneformerPreprocess(
+        download_directory=train_data_path,
+        medians_file_path=train_data_path / "medians.json",
+        tokenizer_vocab_path=train_data_path / "geneformer.vocab",
+    )
+    match preprocessor.preprocess():
+        case {"tokenizer": tokenizer, "median_dict": _}:
+            pass
+        case _:
+            assert False
+
+    strategy = nl.MegatronStrategy(
+        tensor_model_parallel_size=1,
+        pipeline_model_parallel_size=1,
+        ddp="megatron",
+        find_unused_parameters=True,
+        data_sampler=nl.MegatronDataSampler(
+            micro_batch_size=1,
+            global_batch_size=1,
+            seq_len=16,
+            output_log=False,
+        ),
+    )
+    trainer = nl.Trainer(
+        devices=1,
+        accelerator="gpu",
+        strategy=strategy,
+        num_nodes=1,
+        plugins=nl.MegatronMixedPrecision(precision=MODEL_PRECISION),
+        callbacks=[pred_writer],
+    )
+    optimizer = MegatronOptimizerModule(
+        config=OptimizerConfig(
+            lr=1e-4,
+            optimizer="adam",
+            use_distributed_optimizer=True,
+            fp16=geneformer_config.fp16,
+            bf16=geneformer_config.bf16,
+        )
+    )
+    module = BioBertLightningModule(config=geneformer_config, tokenizer=tokenizer, optimizer=optimizer)
+
+    dataloader = torch.utils.data.DataLoader(_DummyDataSet(cells, tokenizer), batch_size=1, num_workers=0)
+    with megatron_parallel_state_utils.distributed_model_parallel_state(seed):
+        expected = torch.cat(trainer.predict(module, dataloaders=dataloader), dim=1)  # in memory
+        # FIXME bug where return_predictions=False calls an uninitialized variable in the case of a dataloader_iter
+        #   fix this in pytorch lightning.
+        trainer.predict(module, dataloaders=dataloader, return_predictions=True)  # distributed
+    result_files = out_dir.listdir()
+    assert len(result_files) == 3 * 2  # 2 files each of 3 batches
+    batch_1_f = out_dir / "predictions__rank_0__batch_0.pt"
+    batch_2_f = out_dir / "predictions__rank_0__batch_1.pt"
+    batch_3_f = out_dir / "predictions__rank_0__batch_2.pt"
+    assert batch_1_f.exists() and batch_2_f.exists() and batch_3_f.exists()
+    batch_1_t = torch.load(batch_1_f)
+    batch_2_t = torch.load(batch_2_f)
+    batch_3_t = torch.load(batch_3_f)
+    result = torch.cat([batch_1_t, batch_2_t, batch_3_t], dim=1).cpu()
+    torch.testing.assert_close(expected, result)
+    assert False, "Remove me once you set `return_predictions=False` and it works."
 
 
 @pytest.mark.skipif(USE_TE, reason="This per-layer test does not yet support TE mapping.")
