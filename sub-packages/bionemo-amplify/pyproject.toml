@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bionemo-amplify"
+license.file = "LICENSE"
+readme = "README.md"
+description = "BioNeMo Amplify"
+authors = [
+    { name = "Youssef Nashed", email = "ynashed@nvidia.com" },
+]
+dynamic = ["dependencies", "version"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include=["bionemo.*"]
+namespaces = true
+exclude = ["test*."]
