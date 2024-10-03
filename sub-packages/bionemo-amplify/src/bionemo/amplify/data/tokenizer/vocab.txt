@@ -1,7 +1,9 @@
-<cls>
 <pad>
-<eos>
 <unk>
+<mask>
+<bos>
+<eos>
+|
 L
 A
 G
@@ -22,12 +24,4 @@ M
 H
 W
 C
-X
 B
-U
-Z
-O
-.
--
-<null_1>
-<mask>
