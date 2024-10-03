@@ -37,5 +37,5 @@ class BioNeMoAutoTokenizer(transformers.AutoTokenizer, IOMixin):  # noqa D101
 
 @functools.cache
 def get_tokenizer() -> BioNeMoAutoTokenizer:
-    """Get the tokenizer for the ESM2 model."""
+    """Get the tokenizer for the AMPLIFY model."""
     return BioNeMoAutoTokenizer(Path(__file__).parent.resolve().as_posix(), use_fast=True)

@@ -1,14 +1,6 @@
 {
   "added_tokens_decoder": {
     "0": {
-      "content": "<cls>",
-      "lstrip": false,
-      "normalized": false,
-      "rstrip": false,
-      "single_word": false,
-      "special": true
-    },
-    "1": {
       "content": "<pad>",
       "lstrip": false,
       "normalized": false,
@@ -16,15 +8,7 @@
       "single_word": false,
       "special": true
     },
-    "2": {
-      "content": "<eos>",
-      "lstrip": false,
-      "normalized": false,
-      "rstrip": false,
-      "single_word": false,
-      "special": true
-    },
-    "3": {
+    "1": {
       "content": "<unk>",
       "lstrip": false,
       "normalized": false,
@@ -32,8 +16,24 @@
       "single_word": false,
       "special": true
     },
-    "32": {
+    "2": {
       "content": "<mask>",
+      "lstrip": false,
+      "normalized": false,
+      "rstrip": false,
+      "single_word": false,
+      "special": true
+    },
+    "3": {
+      "content": "<bos>",
+      "lstrip": false,
+      "normalized": false,
+      "rstrip": false,
+      "single_word": false,
+      "special": true
+    },
+    "4": {
+      "content": "<eos>",
       "lstrip": false,
       "normalized": false,
       "rstrip": false,
@@ -41,12 +41,18 @@
       "special": true
     }
   },
+  "bos_token": "<bos>",
   "clean_up_tokenization_spaces": true,
-  "cls_token": "<cls>",
   "eos_token": "<eos>",
   "mask_token": "<mask>",
-  "model_max_length": 1000000000000000019884624838656,
+  "model_input_names": [
+    "input_ids",
+    "attention_mask"
+  ],
+  "model_max_length": 2048,
   "pad_token": "<pad>",
-  "tokenizer_class": "EsmTokenizer",
+  "padding_side": "right",
+  "tokenizer_class": "PreTrainedTokenizerFast",
+  "truncation_side": "right",
   "unk_token": "<unk>"
 }
