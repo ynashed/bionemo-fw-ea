@@ -420,10 +420,7 @@ parser.add_argument(
 if __name__ == "__main__":
     args = parser.parse_args()
     main(
-        train_cluster_path=args.train_cluster_path,
-        train_database_path=args.train_database_path,
-        valid_cluster_path=args.valid_cluster_path,
-        valid_database_path=args.valid_database_path,
+        hf_dataset_name=args.hf_dataset_name,
         num_nodes=args.num_nodes,
         devices=args.num_gpus,
         seq_length=args.seq_length,
