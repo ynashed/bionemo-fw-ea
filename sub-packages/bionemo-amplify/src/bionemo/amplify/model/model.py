@@ -126,7 +126,7 @@ class AMPLIFYConfig(BioBertGenericConfig[AMPLIFYModel], iom.IOMixinWithGettersSe
     rotary_percent: float = 1.0
     seq_len_interpolation_factor: Optional[float] = None
     seq_length: int = 1024
-    biobert_spec_option: BiobertSpecOption = BiobertSpecOption.amplify_bert_layer_local_spec
+    biobert_spec_option: BiobertSpecOption = BiobertSpecOption.esm2_bert_layer_local_spec
 
     # TODO: Move this to better places?
     get_attention_mask_from_fusion: bool = False
