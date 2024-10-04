@@ -16,7 +16,7 @@
 
 import os
 from pathlib import Path
-from typing import Sequence, TypeVar
+from typing import Sequence, TypeVar, Literal
 
 import numpy as np
 import pandas as pd
@@ -37,7 +37,7 @@ class AMPLIFYMaskedResidueDataset(Dataset):
     def __init__(
         self,
         hf_dataset_name: str | os.PathLike,
-        split: str = "train",
+        split: Literal["train", "test"] = "train",
         seed: int = np.random.SeedSequence().entropy,  # type: ignore
         max_seq_length: int = 512,
         mask_prob: float = 0.15,
