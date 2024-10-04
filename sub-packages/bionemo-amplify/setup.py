@@ -22,6 +22,7 @@ from setuptools import setup
 LOCAL_REQS: list[str] = [
     "bionemo-core",
     "bionemo-llm",
+    "bionemo-esm2",
 ]
 
 
