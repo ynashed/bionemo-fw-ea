@@ -36,7 +36,7 @@ class AMPLIFYDataModule(pl.LightningDataModule):
     """LightningDataModule wrapper of `AMPLIFYDataset`."""
     def __init__(
         self,
-        hf_dataset_name: str = "chandar-lab/UR100P" | os.PathLike,
+        hf_dataset_name: str | os.PathLike = "chandar-lab/UR100P",
         seed: int | None = 42,
         min_seq_length: int | None = None,
         max_seq_length: int = 512,
