@@ -30,7 +30,7 @@ from bionemo.core.utils.dtypes import PrecisionTypes, get_autocast_dtype
 from bionemo.amplify.api import AMPLIFYConfig
 from bionemo.amplify.data.datamodule import AMPLIFYDataModule
 from bionemo.amplify.data.tokenizer import get_tokenizer
-from bionemo.amplify.model.lr_scheduler import WarmupAnnealDecayHoldScheduler
+from bionemo.esm2.model.lr_scheduler import WarmupAnnealDecayHoldScheduler
 from bionemo.llm.lightning import LossLoggingCallback
 from bionemo.llm.model.biobert.lightning import BioBertLightningModule
 from bionemo.llm.model.biobert.model import BiobertSpecOption
