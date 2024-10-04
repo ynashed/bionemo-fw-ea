@@ -34,18 +34,14 @@ from bionemo.llm.utils.datamodule_utils import infer_num_samples
 
 class AMPLIFYDataModule(pl.LightningDataModule):
     """LightningDataModule wrapper of `AMPLIFYDataset`."""
-
     def __init__(
         self,
-        train_cluster_path: str | os.PathLike,
-        train_database_path: str | os.PathLike,
-        valid_cluster_path: str | os.PathLike,
-        valid_database_path: str | os.PathLike,
+        hf_dataset_name: str = "chandar-lab/UR100P" | os.PathLike,
         seed: int | None = 42,
         min_seq_length: int | None = None,
-        max_seq_length: int = 1024,
-        micro_batch_size: int = 4,
-        global_batch_size: int = 8,
+        max_seq_length: int = 512,
+        micro_batch_size: int = 512,
+        global_batch_size: int = 4096,
         num_workers: int = 10,  # TODO(@jomitchell) can this be automatically set?
         persistent_workers: bool = True,
         pin_memory: bool = True,
@@ -58,16 +54,13 @@ class AMPLIFYDataModule(pl.LightningDataModule):
         """Initialize the AMPLIFYDataModule.
 
         Args:
-            train_cluster_path: A path to the parquet files containing UniRef90 training clusters.
-            train_database_path: A path to the sqlite file mapping UniRef90 cluster IDs to sequences.
-            valid_cluster_path: A path to the parquet files containing UniRef50 validation clusters.
-            valid_database_path: A path to the sqlite file mapping UniRef50 cluster IDs to sequences.
+            hf_dataset_name: The name of the HuggingFace dataset. Defaults to "chandar-lab/UR100P".
             seed: Input random seed. If None, initializes randomly. Defaults to 42.
             min_seq_length: Whether to pad sequences to a minimum length. If None, no extra padding is added. Defaults
                 to None.
-            max_seq_length: The maximum context length for the AMPLIFY transformer. Defaults to 1024.
-            micro_batch_size: Passed to MegatronDataSampler. Defaults to 4.
-            global_batch_size: Passed to MegatronDataSampler.. Defaults to 8.
+            max_seq_length: The maximum context length for the AMPLIFY transformer. Defaults to 512.
+            micro_batch_size: Passed to MegatronDataSampler. Defaults to 512.
+            global_batch_size: Passed to MegatronDataSampler.. Defaults to 4096.
             num_workers: The number of workers for the pytorch Dataloaders. Defaults to 10.
             persistent_workers: Whether to keep the workers alive between epochs. Defaults to True.
             pin_memory: Whether to pin GPU memory in the pytorch Dataloaders. Defaults to True.
@@ -78,10 +71,7 @@ class AMPLIFYDataModule(pl.LightningDataModule):
             tokenizer: The AMPLIFY tokenizer. Defaults to the one returned by `tokenizer.get_tokenizer()`.
         """
         super().__init__()
-        self._train_cluster_path = train_cluster_path
-        self._train_database_path = train_database_path
-        self._valid_cluster_path = valid_cluster_path
-        self._valid_database_path = valid_database_path
+        self._hf_dataset_name = hf_dataset_name
         self._seed = seed
         self._min_seq_length = min_seq_length
         self._max_seq_length = max_seq_length
@@ -132,43 +122,30 @@ class AMPLIFYDataModule(pl.LightningDataModule):
         num_train_samples = int(
             max_train_steps * self.data_sampler.global_batch_size
         )  # training data requires upsampling (multiply by max_train_steps) on single MegatronPretrainingRandomSampler
-        _train_ds = dataset.create_train_dataset(
-            cluster_file=self._train_cluster_path,
-            db_path=self._train_database_path,
-            total_samples=num_train_samples,
-            seed=random_utils.get_seed_from_rng(rng),
-            max_seq_length=self._max_seq_length,
-            mask_prob=self._mask_prob,
-            mask_token_prob=self._mask_token_prob,
-            mask_random_prob=self._mask_random_prob,
-            tokenizer=self._tokenizer,
-        )
-        self._train_ds = self._sample_and_shuffle_dataset(
-            _train_ds, None, "train"
-        )  # shuffle manually without cyclic MegatronPretrainingRandomSampler
+        _train_ds = dataset.AMPLIFYMaskedResidueDataset(hf_dataset_name=self.self._hf_dataset_name,
+                                                        split="train",
+                                                        seed=random_utils.get_seed_from_rng(rng),
+                                                        max_seq_length=self._max_seq_length,
+                                                        mask_prob=self._mask_prob,
+                                                        mask_token_prob=self._mask_token_prob,
+                                                        mask_random_prob=self._mask_random_prob,
+                                                        tokenizer=self._tokenizer)
+        self._train_ds = self._sample_and_shuffle_dataset(_train_ds, num_train_samples, "train")  # shuffle manually without cyclic MegatronPretrainingRandomSampler
 
         # Create validation dataset
-        val_clusters = dataset.create_valid_clusters(self._valid_cluster_path)
-        num_val_samples = infer_num_samples(
-            limit_batches=self.trainer.limit_val_batches,
-            num_samples_in_dataset=len(val_clusters),
-            global_batch_size=self.data_sampler.global_batch_size,
-            stage="val",
-        )
-        _valid_ds = dataset.create_valid_dataset(
-            clusters=self._valid_cluster_path,
-            db_path=self._valid_database_path,
-            total_samples=num_val_samples,
-            seed=random_utils.get_seed_from_rng(rng),
-            max_seq_length=self._max_seq_length,
-            mask_prob=self._mask_prob,
-            mask_token_prob=self._mask_token_prob,
-            mask_random_prob=self._mask_random_prob,
-            tokenizer=self._tokenizer,
-        )
-        self._valid_ds = self._sample_and_shuffle_dataset(
-            _valid_ds, None, "val"
-        )  # shuffle manually without cyclic MegatronPretrainingRandomSampler
+        _valid_ds = dataset.AMPLIFYMaskedResidueDataset(hf_dataset_name=self.self._hf_dataset_name,
+                                                        split="test",
+                                                        seed=random_utils.get_seed_from_rng(rng),
+                                                        max_seq_length=self._max_seq_length,
+                                                        mask_prob=self._mask_prob,
+                                                        mask_token_prob=self._mask_token_prob,
+                                                        mask_random_prob=self._mask_random_prob,
+                                                        tokenizer=self._tokenizer)
+        num_val_samples = infer_num_samples(limit_batches=self.trainer.limit_val_batches,
+                                            num_samples_in_dataset=len(_valid_ds),
+                                            global_batch_size=self.data_sampler.global_batch_size,
+                                            stage="val")
+        self._valid_ds = self._sample_and_shuffle_dataset(_valid_ds, num_val_samples, "val")  # shuffle manually without cyclic MegatronPretrainingRandomSampler
 
         assert (
             hasattr(self, "trainer") and self.trainer is not None
