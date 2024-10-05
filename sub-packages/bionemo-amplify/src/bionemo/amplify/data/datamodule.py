@@ -36,7 +36,7 @@ class AMPLIFYDataModule(pl.LightningDataModule):
     """LightningDataModule wrapper of `AMPLIFYDataset`."""
     def __init__(
         self,
-        hf_dataset_name: str | os.PathLike = "chandar-lab/UR100P",
+        hf_dataset_name: str = "chandar-lab/UR100P",
         seed: int | None = 42,
         min_seq_length: int | None = None,
         max_seq_length: int = 512,
@@ -122,7 +122,7 @@ class AMPLIFYDataModule(pl.LightningDataModule):
         num_train_samples = int(
             max_train_steps * self.data_sampler.global_batch_size
         )  # training data requires upsampling (multiply by max_train_steps) on single MegatronPretrainingRandomSampler
-        _train_ds = dataset.AMPLIFYMaskedResidueDataset(hf_dataset_name=self.self._hf_dataset_name,
+        _train_ds = dataset.AMPLIFYMaskedResidueDataset(hf_dataset_name=self._hf_dataset_name,
                                                         split="train",
                                                         seed=random_utils.get_seed_from_rng(rng),
                                                         max_seq_length=self._max_seq_length,
@@ -133,7 +133,7 @@ class AMPLIFYDataModule(pl.LightningDataModule):
         self._train_ds = self._sample_and_shuffle_dataset(_train_ds, num_train_samples, "train")  # shuffle manually without cyclic MegatronPretrainingRandomSampler
 
         # Create validation dataset
-        _valid_ds = dataset.AMPLIFYMaskedResidueDataset(hf_dataset_name=self.self._hf_dataset_name,
+        _valid_ds = dataset.AMPLIFYMaskedResidueDataset(hf_dataset_name=self._hf_dataset_name,
                                                         split="test",
                                                         seed=random_utils.get_seed_from_rng(rng),
                                                         max_seq_length=self._max_seq_length,
