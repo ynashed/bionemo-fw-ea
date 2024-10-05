@@ -79,7 +79,7 @@ class AMPLIFYConfig(BioBertGenericConfig[AMPLIFYModel], iom.IOMixinWithGettersSe
         make_vocab_size_divisible_by: Make the vocabulary size divisible by this value.
         token_dropout: Whether to apply token dropout.
         use_attention_mask: Whether to use attention mask.
-        use_amplify_attention: Whether to use AMPLIFY attention.
+        use_esm_attention: Whether to use ESM2 attention.
         attention_softmax_in_fp32: Whether to use fp32 for attention softmax.
         optimizer_fn: Optional optimizer function for the model.
         parallel_output: Whether to use parallel output.
@@ -109,7 +109,7 @@ class AMPLIFYConfig(BioBertGenericConfig[AMPLIFYModel], iom.IOMixinWithGettersSe
     use_attention_mask: bool = True
 
     # core attention
-    use_amplify_attention: bool = True
+    use_esm_attention: bool = True
     attention_softmax_in_fp32: bool = True
     normalize_attention_scores: bool = False
     apply_query_key_layer_scaling: bool = True

@@ -228,7 +228,7 @@ def main(
 #   config management system.
 parser = argparse.ArgumentParser(description="Pretrain AMPLIFY with UR100P data.")
 parser.add_argument(
-    "--hf_dataset_name",
+    "--hf-dataset-name",
     type=str,
     required=True,
     help="Name of the HuggingFace dataset containing UR100P protein sequences",
