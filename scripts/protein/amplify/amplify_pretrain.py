@@ -181,15 +181,13 @@ def main(
         optimizer=MegatronOptimizerModule(
             config=OptimizerConfig(
                 lr=lr,
-                optimizer="AdamW",  # fused_adam not supported
+                optimizer="adam",  # fused_adam not supported
                 use_distributed_optimizer=True,
                 weight_decay=0.01,
                 adam_beta1=0.9,
                 adam_beta2=0.98,
             ),
-            lr_scheduler=WarmupAnnealDecayHoldScheduler(
-                warmup_steps=warmup_steps, max_steps=num_steps, max_lr=lr, min_lr=lr / 10.0, anneal_percentage=0.10
-            ),
+            lr_scheduler=nl.lr_scheduler.CosineAnnealingScheduler(),
         ),
     )
 
