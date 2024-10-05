@@ -78,7 +78,7 @@ def main(
     """Train an AMPLIFY model on UR100P data.
 
     Args:
-        hf_dataset_name: Name of the Hugging Face dataset containing UR100P protein sequences.
+        hf_dataset_name: Name of the HuggingFace dataset containing UR100P protein sequences.
         num_nodes (int): Number of nodes to run on
         devices (int): number of devices
         seq_length (int): sequence length
@@ -231,9 +231,9 @@ def main(
 parser = argparse.ArgumentParser(description="Pretrain AMPLIFY with UR100P data.")
 parser.add_argument(
     "--hf_dataset_name",
-    type=Path,
+    type=str,
     required=True,
-    help="Name of the Hugging Face dataset containing UR100P protein sequences",
+    help="Name of the HuggingFace dataset containing UR100P protein sequences",
 )
 parser.add_argument(
     "--precision",

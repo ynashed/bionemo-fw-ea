@@ -36,7 +36,7 @@ class AMPLIFYMaskedResidueDataset(Dataset):
 
     def __init__(
         self,
-        hf_dataset_name: str | os.PathLike,
+        hf_dataset_name: str,
         split: Literal["train", "test"] = "train",
         seed: int = np.random.SeedSequence().entropy,  # type: ignore
         max_seq_length: int = 512,
