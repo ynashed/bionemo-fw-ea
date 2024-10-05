@@ -96,7 +96,7 @@ class AMPLIFYMaskedResidueDataset(Dataset):
 
         # Initialize a random number generator with a seed that is a combination of the dataset seed and the index.
         rng = np.random.default_rng([self.seed, idx])
-        sequence = self.protein_dataset[idx]
+        sequence = self.protein_dataset[idx]["sequence"]
 
         # We don't want special tokens before we pass the input to the masking function; we add these in the collate_fn.
         tokenized_sequence = self._tokenize(sequence)
