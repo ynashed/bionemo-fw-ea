@@ -1,30 +1,7 @@
 # BioNeMo2 Repo
-To get started, please build the docker container using
-```bash
-./launch.sh build
-```
 
-Launch a container from the build image by executing
-```bash
-./launch.sh dev
-```
-
-All `bionemo2` code is partitioned into independently installable namespace packages. These live under the `sub-packages/` directory.
-
-
-## Downloading artifacts
-Set the AWS access info in your `.env` in the host container prior to running docker:
-
-```bash
-AWS_ACCESS_KEY_ID="team-bionemo"
-AWS_SECRET_ACCESS_KEY=$(grep aws_secret_access_key ~/.aws/config | cut -d' ' -f 3)
-AWS_REGION="us-east-1"
-AWS_ENDPOINT_URL="https://pbss.s8k.io"
-```
-then, running tests should download the test data to a cache location when first invoked.
-
-For more information on adding new test artifacts, see the documentation in [bionemo.testing.data.load](sub-packages/bionemo-testing/src/bionemo/testing/data/README.md)
-
+All `bionemo2` code is partitioned into independently installable namespace packages.
+These live under the `sub-packages/` directory.
 
 ## Initializing 3rd-party dependencies as git submodules
 
@@ -44,18 +21,56 @@ To download the pinned versions of these submodules within an existing git repos
 git submodule update --init --recursive
 ```
 
-Different branches of the repo can have different pinned versions of these third-party submodules. To update submodules
-after switching branches (or pulling recent changes), run
-
-```bash
-git submodule update
-```
+Different branches of the repo can have different pinned versions of these third-party submodules. Make sure you
+update submodules after switching branches or pulling recent changes!
 
 To configure git to automatically update submodules when switching branches, run
-
 ```bash
 git config submodule.recurse true
 ```
+**NOTE**: this setting will not download **new** or remove **old** submodules with the branch's changes.
+You will have to run the full `git submodule update --init --recursive` command in these situations.
+
+## First Time Setup
+After cloning the repository, you need to run the setup script **first**:
+```bash
+./internal/scripts/setup_env_file.sh
+```
+This will return an exit code of 1 on a first time run.
+
+## Release Image Building
+To build the release image, run the following script:
+```bash
+DOCKER_BUILDKIT=1 ./ci/scripts/build_docker_image.sh \
+  -regular-docker-builder \
+  -image-name "nvcr.io/nvidian/cvai_bnmo_trng/bionemo:bionemo2-$(git rev-parse HEAD)"
+```
+
+## Development Image Building
+To build the development image, run the following script:
+```bash
+./internal/scripts/build_dev_image.sh
+```
+
+## Interactive Shell in Development Image
+After building the development image, you can start a container from it and open a bash shell in it by executing:
+```bash
+./internal/scripts/run_dev.sh
+```
+
+## Downloading artifacts
+Set the AWS access info in environment prior to running the dev-container launch script:
+```bash
+AWS_ACCESS_KEY_ID="team-bionemo"
+AWS_SECRET_ACCESS_KEY=$(grep aws_secret_access_key ~/.aws/config | cut -d' ' -f 3)
+AWS_REGION="us-east-1"
+AWS_ENDPOINT_URL="https://pbss.s8k.io"
+```
+then, running tests should download the test data to a cache location when first invoked.
+
+For more information on adding new test artifacts, see the documentation in
+[`bionemo.testing.data.load`](sub-packages/bionemo-testing/src/bionemo/testing/data/README.md).
+
 
 ### Updating pinned versions of NeMo / Megatron-LM
 
@@ -133,25 +148,55 @@ TWINE_PASSWORD="<pypi pass>" TWINE_USERNAME="<pypi user>" uvx twine upload /sub-
 
 
 ## Models
-### Geneformer
-#### Get test data for geneformer
+### ESM-2
+#### Running
+First off, we have a utility function for downloading full/test data and model checkpoints called `download_bionemo_data` that our following examples currently use. This will download the object if it is not already on your local system,  and then return the path either way. For example if you run this twice in a row, you should expect the second time you run it to return the path almost instantly.
+
+Note NVIDIA employees should use `pbss` rather than `ngc` for the data source.
+
 ```bash
-mkdir -p /workspace/bionemo2/data
-aws s3 cp \
-  s3://general-purpose/cellxgene_2023-12-15_small \
-  /workspace/bionemo2/data/cellxgene_2023-12-15_small \
-  --recursive \
-  --endpoint-url https://pbss.s8k.io
+export MY_DATA_SOURCE="ngc"
 ```
+or for NVIDIA internal employees with new data etc:
+```bash
+export MY_DATA_SOURCE="pbss"
+```
+
+```bash
+TEST_DATA_DIR=$(download_bionemo_data esm2/testdata_esm2_pretrain:2.0 --source $MY_DATA_SOURCE); \
+ESM2_650M_CKPT=$(download_bionemo_data esm2/650m:2.0 --source $MY_DATA_SOURCE); \
+python  \
+    scripts/protein/esm2/esm2_pretrain.py     \
+    --train-cluster-path ${TEST_DATA_DIR}/2024_03_sanity/train_clusters_sanity.parquet     \
+    --train-database-path ${TEST_DATA_DIR}/2024_03_sanity/train_sanity.db     \
+    --valid-cluster-path ${TEST_DATA_DIR}/2024_03_sanity/valid_clusters.parquet     \
+    --valid-database-path ${TEST_DATA_DIR}/2024_03_sanity/validation.db     \
+    --result-dir ./results     \
+    --experiment-name test_experiment     \
+    --num-gpus 1  \
+    --num-nodes 1 \
+    --val-check-interval 10 \
+    --num-dataset-workers 1 \
+    --num-steps 10 \
+    --max-seq-length 128 \
+    --limit-val-batches 2 \
+    --micro-batch-size 2 \
+    --restore-from-checkpoint-path ${ESM2_650M_CKPT}
+```
+
+### Geneformer
 #### Running
 
-The following command runs a very small example of geneformer:
+Similar to ESM-2, you can download the dataset and checkpoint through our utility function.
+
 ```bash
-TEST_DATA_DIR=$(bionemo_test_data_path single_cell/testdata-20240506 --source pbss); \
+TEST_DATA_DIR=$(download_bionemo_data single_cell/testdata-20240506 --source $MY_DATA_SOURCE); \
+GENEFORMER_10M_CKPT=$(download_bionemo_data geneformer/10M_240530:2.0 --source $MY_DATA_SOURCE); \
 python  \
     scripts/singlecell/geneformer/train.py     \
     --data-dir ${TEST_DATA_DIR}/cellxgene_2023-12-15_small/processed_data    \
     --result-dir ./results     \
+    --restore-from-checkpoint-path ${GENEFORMER_10M_CKPT} \
     --experiment-name test_experiment     \
     --num-gpus 1  \
     --num-nodes 1 \
@@ -174,7 +219,7 @@ copy the `scripts/singlecell/geneformer/train.py` and modify the DataModule clas
 Simple fine-tuning example (NOTE: please change `--restore-from-checkpoint-path` to be the one that was output last
 by the previous train run)
 ```bash
-TEST_DATA_DIR=$(bionemo_test_data_path single_cell/testdata-20240506 --source pbss); \
+TEST_DATA_DIR=$(download_bionemo_data single_cell/testdata-20240506 --source $MY_DATA_SOURCE); \
 python  \
     scripts/singlecell/geneformer/train.py     \
     --data-dir ${TEST_DATA_DIR}/cellxgene_2023-12-15_small/processed_data    \
@@ -189,7 +234,7 @@ python  \
     --limit-val-batches 2 \
     --micro-batch-size 2 \
     --training-model-config-class FineTuneSeqLenBioBertConfig \
-    --restore-from-checkpoint-path results/test_experiment/dev/checkpoints/test_experiment--val_loss=10.2042-epoch=0
+    --restore-from-checkpoint-path results/test_experiment/dev/checkpoints/test_experiment--val_loss=4.3506-epoch=1-last
 ```
 
 

@@ -32,7 +32,7 @@ from bionemo.esm2.data.dataset import RandomMaskStrategy
 from bionemo.esm2.data.tokenizer import get_tokenizer
 from bionemo.esm2.model.lr_scheduler import WarmupAnnealDecayHoldScheduler
 from bionemo.llm.lightning import PerplexityLoggingCallback
-from bionemo.llm.model.biobert.lightning import BioBertLightningModule
+from bionemo.llm.model.biobert.lightning import biobert_lightning_module
 from bionemo.llm.model.biobert.model import BiobertSpecOption
 from bionemo.llm.utils.datamodule_utils import float_or_int_or_none, infer_global_batch_size
 from bionemo.llm.utils.logger_utils import WandbLoggerOptions, setup_nemo_lightning_logger
@@ -191,8 +191,8 @@ def main(
     )
 
     # Configure the model
-    need_megatron_variable_seq_lengths_reductions = (
-        pipeline_model_parallel_size * tensor_model_parallel_size > 1 and min_seq_length != max_seq_length,
+    need_megatron_variable_seq_lengths_reductions: bool = (
+        pipeline_model_parallel_size * tensor_model_parallel_size > 1 and min_seq_length != max_seq_length
     )  # essential for pipeline/tensor parallel
     esm2_config = ESM2Config(
         seq_length=max_seq_length,
@@ -204,11 +204,13 @@ def main(
         pipeline_dtype=get_autocast_dtype(precision),
         autocast_dtype=get_autocast_dtype(precision),  # setting this speeds things up a lot
         biobert_spec_option=biobert_spec_option,
-        nemo1_ckpt_path=nemo1_init_path,
+        nemo1_ckpt_path=str(nemo1_init_path) if nemo1_init_path is not None else None,
+        # handle checkpoint resumption here rather than auto-resume so this supports fine-tuning capabilities
+        initial_ckpt_path=str(restore_from_checkpoint_path) if restore_from_checkpoint_path is not None else None,
         variable_seq_lengths=need_megatron_variable_seq_lengths_reductions,
     )
 
-    model = BioBertLightningModule(
+    model = biobert_lightning_module(
         esm2_config,
         tokenizer=tokenizer,
         optimizer=MegatronOptimizerModule(
@@ -250,7 +252,6 @@ def main(
         trainer=trainer,
         log=nemo_logger,
         resume=resume.AutoResume(
-            resume_from_path=restore_from_checkpoint_path,  # Overrides the path found by resume_if_exists when set.
             resume_if_exists=resume_if_exists,  # Looks for the -last checkpoint to continue training.
             resume_ignore_no_checkpoint=True,  # When false this will throw an error with no existing checkpoint.
         ),
