@@ -1,4 +1,4 @@
-# Vendored tokenizer config for facebook/esm2_t33_650M_UR50D
+# Vendored tokenizer config for chandar-lab/AMPLIFY_350M
 
 This directory contains the output of
 

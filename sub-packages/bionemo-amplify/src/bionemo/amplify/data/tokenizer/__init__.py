@@ -16,15 +16,15 @@
 import functools
 from importlib.resources import files
 
-import transformers
+from transformers import AutoTokenizer
 from nemo.lightning.io import IOMixin
 
 
-class BioNeMoAMPLIFYTokenizer(transformers.EsmTokenizer, IOMixin):  # noqa D101
+class BioNeMoAMPLIFYTokenizer(AutoTokenizer, IOMixin):  # noqa D101
     def __init__(self):
         """A wrapper to make AutoTokenizer serializable.
         """
-        other = transformers.AutoTokenizer.from_pretrained(str(files("bionemo.amplify.data.tokenizer")), use_fast=True)
+        other = AutoTokenizer.from_pretrained(str(files("bionemo.amplify.data.tokenizer")), use_fast=True)
         self.__dict__.update(dict(other.__dict__))
 
 
