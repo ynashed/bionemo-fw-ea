@@ -25,7 +25,9 @@ class BioNeMoAMPLIFYTokenizer(AutoTokenizer, IOMixin):  # noqa D101
         """A wrapper to make AutoTokenizer serializable.
         """
         other = AutoTokenizer.from_pretrained(str(files("bionemo.amplify.data.tokenizer")), use_fast=True)
-        self.__dict__.update(dict(other.__dict__))
+        for attr in dir(other):
+            if not attr.startswith("_"):
+                setattr(self, attr, getattr(other, attr))
 
 
 @functools.cache
