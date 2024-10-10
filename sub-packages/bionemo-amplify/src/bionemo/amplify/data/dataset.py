@@ -72,9 +72,9 @@ class AMPLIFYMaskedResidueDataset(Dataset):
 
         self.mask_config = masking.BertMaskConfig(
             tokenizer=tokenizer,
-            random_tokens=range(len(tokenizer.all_tokens))
+            random_tokens=range(tokenizer.vocab_size)
             if self.random_mask_strategy == RandomMaskStrategy.ALL_TOKENS
-            else range(6, len(tokenizer.all_tokens)),
+            else range(6, tokenizer.vocab_size),
             mask_prob=mask_prob,
             mask_token_prob=mask_token_prob,
             random_token_prob=mask_random_prob,
