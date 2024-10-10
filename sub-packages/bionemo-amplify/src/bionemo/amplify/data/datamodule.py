@@ -15,9 +15,8 @@
 
 
 import functools
-import os
+from typing import Literal
 
-import numpy as np
 import pytorch_lightning as pl
 import torch
 import torch.utils.data
@@ -26,7 +25,6 @@ from nemo.utils import logging
 from pytorch_lightning.utilities.types import EVAL_DATALOADERS, TRAIN_DATALOADERS
 
 from bionemo.core.data.resamplers import PRNGResampleDataset
-from bionemo.core.utils import random_utils
 from bionemo.amplify.data import dataset, tokenizer
 from bionemo.llm.data import collate
 from bionemo.llm.utils.datamodule_utils import infer_num_samples
@@ -49,7 +47,9 @@ class AMPLIFYDataModule(pl.LightningDataModule):
         mask_prob: float = 0.15,
         mask_token_prob: float = 0.8,
         mask_random_prob: float = 0.1,
-        tokenizer: tokenizer.BioNeMoAutoTokenizer = tokenizer.get_tokenizer(),
+        random_mask_strategy: dataset.RandomMaskStrategy = dataset.RandomMaskStrategy.ALL_TOKENS,
+        tokenizer: tokenizer.BioNeMoAMPLIFYTokenizer = tokenizer.get_tokenizer(),
+        dataloader_type: Literal["single", "cyclic"] = "single",
     ) -> None:
         """Initialize the AMPLIFYDataModule.
 
@@ -68,7 +68,9 @@ class AMPLIFYDataModule(pl.LightningDataModule):
             mask_prob: The overall chance of masking a token and having it appear in the loss fn. Defaults to 0.15.
             mask_token_prob: Percentage of masked tokens that get assigned the <MASK> id. Defaults to 0.8.
             mask_random_prob: Percentage of masked tokens assigned to a random amino acid. Defaults to 0.1.
+            random_mask_strategy: Whether to replace random masked tokens with all tokens or amino acids only. Defaults to RandomMaskStrategy.ALL_TOKENS.
             tokenizer: The AMPLIFY tokenizer. Defaults to the one returned by `tokenizer.get_tokenizer()`.
+            dataloader_type: The type of dataloader to use. Defaults to "single".
         """
         super().__init__()
         self._hf_dataset_name = hf_dataset_name
@@ -78,6 +80,7 @@ class AMPLIFYDataModule(pl.LightningDataModule):
         self._mask_prob = mask_prob
         self._mask_token_prob = mask_token_prob
         self._mask_random_prob = mask_random_prob
+        self._random_mask_strategy = random_mask_strategy
         self._tokenizer = tokenizer
 
         self._micro_batch_size = micro_batch_size
@@ -89,7 +92,7 @@ class AMPLIFYDataModule(pl.LightningDataModule):
             seq_len=max_seq_length,
             micro_batch_size=micro_batch_size,
             global_batch_size=global_batch_size,
-            dataloader_type="single",  # `MegatronPretrainingRandomSampler` from "cyclic" is failing.
+            dataloader_type=dataloader_type,  # `MegatronPretrainingRandomSampler` from "cyclic" is failing.
             rampup_batch_size=rampup_batch_size,
         )
 
@@ -103,7 +106,6 @@ class AMPLIFYDataModule(pl.LightningDataModule):
             RuntimeError: If the trainer is not attached, or if the trainer's max_steps is not set.
         """
         del stage  # Unused.
-        rng = np.random.default_rng(self._seed)
 
         if not hasattr(self, "trainer") or self.trainer is None:
             raise RuntimeError("Setup should be completed when trainer and config are attached.")
@@ -124,22 +126,24 @@ class AMPLIFYDataModule(pl.LightningDataModule):
         )  # training data requires upsampling (multiply by max_train_steps) on single MegatronPretrainingRandomSampler
         _train_ds = dataset.AMPLIFYMaskedResidueDataset(hf_dataset_name=self._hf_dataset_name,
                                                         split="train",
-                                                        seed=random_utils.get_seed_from_rng(rng),
+                                                        seed=self._seed,
                                                         max_seq_length=self._max_seq_length,
                                                         mask_prob=self._mask_prob,
                                                         mask_token_prob=self._mask_token_prob,
                                                         mask_random_prob=self._mask_random_prob,
+                                                        random_mask_strategy=self._random_mask_strategy,
                                                         tokenizer=self._tokenizer)
         self._train_ds = self._sample_and_shuffle_dataset(_train_ds, num_train_samples, "train")  # shuffle manually without cyclic MegatronPretrainingRandomSampler
 
         # Create validation dataset
         _valid_ds = dataset.AMPLIFYMaskedResidueDataset(hf_dataset_name=self._hf_dataset_name,
                                                         split="test",
-                                                        seed=random_utils.get_seed_from_rng(rng),
+                                                        seed=self._seed,
                                                         max_seq_length=self._max_seq_length,
                                                         mask_prob=self._mask_prob,
                                                         mask_token_prob=self._mask_token_prob,
                                                         mask_random_prob=self._mask_random_prob,
+                                                        random_mask_strategy=self._random_mask_strategy,
                                                         tokenizer=self._tokenizer)
         num_val_samples = infer_num_samples(limit_batches=self.trainer.limit_val_batches,
                                             num_samples_in_dataset=len(_valid_ds),

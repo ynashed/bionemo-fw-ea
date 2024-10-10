@@ -14,9 +14,7 @@
 # limitations under the License.
 
 
-import os
-from pathlib import Path
-from typing import Sequence, TypeVar, Literal
+from typing import TypeVar, Literal
 
 import numpy as np
 import pandas as pd
@@ -25,10 +23,11 @@ from torch.utils.data import Dataset
 
 from datasets import load_dataset as hf_load_dataset
 
+from bionemo.core.data.multi_epoch_dataset import EpochIndex, MultiEpochDatasetResampler
 from bionemo.amplify.data import tokenizer
 from bionemo.llm.data import masking
 from bionemo.llm.data.types import BertSample
-
+from bionemo.esm2.data.dataset import RandomMaskStrategy, _random_crop
 
 class AMPLIFYMaskedResidueDataset(Dataset):
     """Dataset class for AMPLIFY pretraining that implements sampling of UR100P sequences.
@@ -43,7 +42,8 @@ class AMPLIFYMaskedResidueDataset(Dataset):
         mask_prob: float = 0.15,
         mask_token_prob: float = 0.8,
         mask_random_prob: float = 0.1,
-        tokenizer: tokenizer.BioNeMoAutoTokenizer = tokenizer.get_tokenizer(),
+        random_mask_strategy: RandomMaskStrategy = RandomMaskStrategy.ALL_TOKENS,
+        tokenizer: tokenizer.BioNeMoAMPLIFYTokenizer = tokenizer.get_tokenizer(),
     ) -> None:
         """Initializes the dataset.
 
@@ -58,19 +58,23 @@ class AMPLIFYMaskedResidueDataset(Dataset):
             mask_prob: The overall probability a token is included in the loss function. Defaults to 0.15.
             mask_token_prob: Proportion of masked tokens that get assigned the <MASK> id. Defaults to 0.8.
             mask_random_prob: Proportion of tokens that get assigned a random natural amino acid. Defaults to 0.1.
+            random_mask_strategy: Whether to replace random masked tokens with all tokens or amino acids only. Defaults to RandomMaskStrategy.ALL_TOKENS.
             tokenizer: The input AMPLIFY tokenizer. Defaults to the standard AMPLIFY tokenizer.
         """
         self.protein_dataset = hf_load_dataset(hf_dataset_name, data_dir="UniProt", split=split)
         self.total_samples = len(self.protein_dataset)
         self.seed = seed
         self.max_seq_length = max_seq_length
-
+        self.random_mask_strategy = random_mask_strategy
+        
         if tokenizer.mask_token_id is None:
             raise ValueError("Tokenizer does not have a mask token.")
 
         self.mask_config = masking.BertMaskConfig(
             tokenizer=tokenizer,
-            random_tokens=range(4, 24),
+            random_tokens=range(len(tokenizer.all_tokens))
+            if self.random_mask_strategy == RandomMaskStrategy.ALL_TOKENS
+            else range(6, len(tokenizer.all_tokens)),
             mask_prob=mask_prob,
             mask_token_prob=mask_token_prob,
             random_token_prob=mask_random_prob,
@@ -83,26 +87,26 @@ class AMPLIFYMaskedResidueDataset(Dataset):
         """
         return self.total_samples
 
-    def __getitem__(self, idx: int) -> BertSample:
+    def __getitem__(self, index: EpochIndex) -> BertSample:
         """Deterministically masks and returns a protein sequence from the dataset.
         Args:
-            idx: Index of the sample to retrieve.
+            index: The current epoch and the index of the sample to retrieve.
 
         Returns:
             A (possibly-truncated), masked protein sequence with CLS and EOS tokens and associated mask fields.
         """
-        if idx not in range(len(self)):
-            raise IndexError(f"Index {idx} out of range [0, {len(self)}).")
+        if index.idx not in range(len(self)):
+            raise IndexError(f"Index {index.idx} out of range [0, {len(self)}).")
 
         # Initialize a random number generator with a seed that is a combination of the dataset seed and the index.
-        rng = np.random.default_rng([self.seed, idx])
-        sequence = self.protein_dataset[idx]["sequence"]
+        rng = np.random.default_rng([self.seed, index.epoch, index.idx])
+        sequence = self.protein_dataset[index.idx]["sequence"]
 
         # We don't want special tokens before we pass the input to the masking function; we add these in the collate_fn.
         tokenized_sequence = self._tokenize(sequence)
         cropped_sequence = _random_crop(tokenized_sequence, self.max_seq_length, rng)
 
-        torch_seed = rng.integers(low=np.iinfo(np.int64).min, high=np.iinfo(np.int64).max)
+        torch_seed = int(rng.integers(low=np.iinfo(np.int64).min, high=np.iinfo(np.int64).max))
         masked_sequence, labels, loss_mask = masking.apply_bert_pretraining_mask(
             tokenized_sequence=cropped_sequence,  # type: ignore
             random_seed=torch_seed,
@@ -129,15 +133,3 @@ class AMPLIFYMaskedResidueDataset(Dataset):
         """
         tensor = self.tokenizer.encode(sequence, add_special_tokens=True, return_tensors="pt")
         return tensor.flatten()  # type: ignore
-
-
-_T = TypeVar("_T", str, torch.Tensor)
-
-
-def _random_crop(s: _T, crop_length: int, rng: np.random.Generator) -> _T:
-    """Randomly crops a input to a maximum length."""
-    if crop_length >= len(s):
-        return s
-
-    start_index = rng.integers(0, len(s) - crop_length)
-    return s[start_index : start_index + crop_length]
