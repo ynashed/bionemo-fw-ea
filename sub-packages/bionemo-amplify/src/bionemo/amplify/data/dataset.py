@@ -87,20 +87,20 @@ class AMPLIFYMaskedResidueDataset(Dataset):
         """
         return self.total_samples
 
-    def __getitem__(self, index: EpochIndex) -> BertSample:
+    def __getitem__(self, idx: int) -> BertSample:
         """Deterministically masks and returns a protein sequence from the dataset.
         Args:
-            index: The current epoch and the index of the sample to retrieve.
+            idx: The current index of the sample to retrieve.
 
         Returns:
             A (possibly-truncated), masked protein sequence with CLS and EOS tokens and associated mask fields.
         """
-        if index.idx not in range(len(self)):
-            raise IndexError(f"Index {index.idx} out of range [0, {len(self)}).")
+        if idx not in range(len(self)):
+            raise IndexError(f"Index {idx} out of range [0, {len(self)}).")
 
         # Initialize a random number generator with a seed that is a combination of the dataset seed and the index.
-        rng = np.random.default_rng([self.seed, index.epoch, index.idx])
-        sequence = self.protein_dataset[index.idx]["sequence"]
+        rng = np.random.default_rng([self.seed, idx])
+        sequence = self.protein_dataset[idx]["sequence"]
 
         # We don't want special tokens before we pass the input to the masking function; we add these in the collate_fn.
         tokenized_sequence = self._tokenize(sequence)
