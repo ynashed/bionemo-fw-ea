@@ -20,7 +20,7 @@ import transformers
 from nemo.lightning.io import IOMixin
 
 
-class BioNeMoAMPLIFYTokenizer(transformers.AutoTokenizer, IOMixin):  # noqa D101
+class BioNeMoAMPLIFYTokenizer(transformers.EsmTokenizer, IOMixin):  # noqa D101
     def __init__(self):
         """A wrapper to make AutoTokenizer serializable.
         """
