@@ -53,9 +53,12 @@ class AMPLIFYConfig(ESM2GenericConfig, iom.IOMixinWithGettersSetters):
     activation_func: str = F.silu  # AMPLIFY MLP
     # TODO: Add support for RMSNorm
     init_method_std: float = 0.02
-
+    add_bias_linear: bool = False # AMPLIFY does not use bias in linear layers
+    normalization: "RMSNorm"    # AMPLIFY uses RMSNorm instead of LayerNorm
     position_embedding_type: Literal["learned_absolute", "rope"] = (
         "rope"  # AMPLIFY uses relative positional encoding 'ROPE' to extrapolate to longer sequences unseen during training
     )
     rotary_base: int = 10000
     rotary_percent: float = 1.0
+
+    make_vocab_size_divisible_by: int = 1
