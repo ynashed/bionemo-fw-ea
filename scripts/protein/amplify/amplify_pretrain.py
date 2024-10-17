@@ -280,7 +280,7 @@ parser.add_argument(
 parser.add_argument(
     "--result-dir", type=Path, required=False, default=Path("./results"), help="Path to the result directory."
 )
-parser.add_argument("--experiment-name", type=str, required=False, default="esm2", help="Name of the experiment.")
+parser.add_argument("--experiment-name", type=str, required=False, default="amplify", help="Name of the experiment.")
 
 parser.add_argument("--wandb-entity", type=str, default=None, help="The team posting this run")
 parser.add_argument("--wandb-project", type=str, default=None, help="Wandb project name ")
@@ -391,8 +391,8 @@ parser.add_argument(
     type=BiobertSpecOption,
     choices=[e.value for e in BiobertSpecOption],
     required=False,
-    default=BiobertSpecOption.esm2_bert_layer_with_transformer_engine_spec.value,
-    help="Biobert spec option to use for the model. Default is 'esm2_bert_layer_with_transformer_engine_spec'.",
+    default=BiobertSpecOption.amplify_bert_layer_with_transformer_engine_spec.value,
+    help="Biobert spec option to use for the model. Default is 'amplify_bert_layer_with_transformer_engine_spec'.",
 )
 parser.add_argument(
     "--nemo1-init-path",
@@ -440,7 +440,7 @@ parser.add_argument(
     type=RandomMaskStrategy,
     choices=[e.value for e in RandomMaskStrategy],
     default=RandomMaskStrategy.ALL_TOKENS.value,
-    help=f"""In ESM2 pretraining, 15%% of all tokens are masked and among which 10%% are replaced with a random token. This class controls the set of random tokens to choose from. Options are: '{"', '".join([e.value for e in RandomMaskStrategy])}'. Note that 'all_token' will introduce non-canonical amino acid tokens as effective mask tokens, and the resultant loss will appear lower than that from 'amino_acids_only'. Note that 'all_token' is the method used in hugging face as well as portions of fairseq.""",
+    help=f"""In pretraining, 15%% of all tokens are masked and among which 10%% are replaced with a random token. This class controls the set of random tokens to choose from. Options are: '{"', '".join([e.value for e in RandomMaskStrategy])}'. Note that 'all_token' will introduce non-canonical amino acid tokens as effective mask tokens, and the resultant loss will appear lower than that from 'amino_acids_only'. Note that 'all_token' is the method used in hugging face as well as portions of fairseq.""",
 )
 parser.add_argument(
     "--num-layers",
