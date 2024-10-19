@@ -209,9 +209,13 @@ def main(
                 use_distributed_optimizer=True,
                 weight_decay=0.01,
                 adam_beta1=0.9,
-                adam_beta2=0.98,
+                adam_beta2=0.95,
+                clip_grad=1.0,
             ),
-            lr_scheduler=nl.lr_scheduler.CosineAnnealingScheduler(),
+            lr_scheduler=nl.lr_scheduler.CosineAnnealingScheduler(
+                max_steps=num_steps,
+                warmup_steps=warmup_steps,
+            ),
         ),
     )
 

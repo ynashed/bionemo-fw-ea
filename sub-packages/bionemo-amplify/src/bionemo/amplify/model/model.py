@@ -26,7 +26,6 @@ from bionemo.esm2.model.attention import ESM2TEDotProductAttention
 from bionemo.esm2.model.embedding import ESM2Embedding
 
 from bionemo.llm.model.biobert.model import BioBertConfig, MegatronBioBertModel
-from bionemo.llm.model.layers import TELayerNorm
 from bionemo.llm.api import MegatronLossType
 from bionemo.llm.utils import iomixin_utils as iom
 from bionemo.llm.model.biobert.transformer_specs import BiobertSpecOption
@@ -36,6 +35,7 @@ from megatron.core.models.bert.pooler import Pooler
 from megatron.core.models.common.embeddings.rotary_pos_embedding import RotaryEmbedding
 from megatron.core.transformer import spec_utils
 from megatron.core.transformer.enums import ModelType
+from megatron.core.transformer.identity_op import IdentityOp
 from megatron.core.transformer.transformer_block import TransformerBlock
 from megatron.core.transformer.transformer_config import TransformerConfig
 from megatron.core.transformer.module import MegatronModule
@@ -56,12 +56,12 @@ class AMPLIFYLMHead(MegatronModule):
         config (TransformerConfig): TransformerConfig object
     """
 
-    def __init__(self, hidden_size: int, config: TransformerConfig):
+    def __init__(self, config: TransformerConfig):
         super().__init__(config=config)
-        self.layer_norm = TELayerNorm(config=config, hidden_size=hidden_size)
+        self.head = IdentityOp()
 
     def forward(self, hidden_states: Tensor) -> Tensor:
-        return self.layer_norm(hidden_states)
+        return self.head(hidden_states)
 
 class AMPLIFYModel(MegatronBioBertModel):
     """AMPLIFY protein language model."""
@@ -172,10 +172,7 @@ class AMPLIFYModel(MegatronBioBertModel):
         # Output
         if post_process:
             # TODO: Make sure you are passing in the mpu_vocab_size properly
-            self.lm_head = AMPLIFYLMHead(
-                config.hidden_size,
-                config,
-            )
+            self.lm_head = AMPLIFYLMHead(config)
 
             self.output_layer = tensor_parallel.ColumnParallelLinear(
                 config.hidden_size,

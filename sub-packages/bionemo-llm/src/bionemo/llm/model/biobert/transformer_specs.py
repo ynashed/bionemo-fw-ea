@@ -231,7 +231,6 @@ def get_biobert_spec(  # noqa: D417
             amplify_bert_layer_local_spec = spec_utils.ModuleSpec(
                 module=TransformerLayer,
                 submodules=TransformerLayerSubmodules(
-                    input_layernorm=TELayerNorm,
                     self_attention=spec_utils.ModuleSpec(
                         module=SelfAttention,
                         params={"attn_mask_type": AttnMaskType.padding},
