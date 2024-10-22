@@ -24,7 +24,7 @@ from nemo.lightning.pytorch.plugins import MegatronDataSampler
 from nemo.utils import logging
 from pytorch_lightning.utilities.types import EVAL_DATALOADERS, TRAIN_DATALOADERS
 
-from bionemo.core.data.multi_epoch_dataset import MultiEpochDatasetResampler
+from bionemo.core.data.resamplers import PRNGResampleDataset
 from bionemo.amplify.data import dataset, tokenizer
 from bionemo.llm.data import collate
 from bionemo.llm.utils.datamodule_utils import infer_num_samples
@@ -133,7 +133,7 @@ class AMPLIFYDataModule(pl.LightningDataModule):
                                                         mask_random_prob=self._mask_random_prob,
                                                         random_mask_strategy=self._random_mask_strategy,
                                                         tokenizer=self._tokenizer)
-        self._train_ds = MultiEpochDatasetResampler(_train_ds, num_samples=num_train_samples, shuffle=True, seed=self._seed)
+        self._train_ds = self._sample_and_shuffle_dataset(_train_ds, num_train_samples, "train")  # shuffle manually without cyclic MegatronPretrainingRandomSampler
 
         # Create validation dataset
         _valid_ds = dataset.AMPLIFYMaskedResidueDataset(hf_dataset_name=self._hf_dataset_name,
@@ -149,7 +149,7 @@ class AMPLIFYDataModule(pl.LightningDataModule):
                                             num_samples_in_dataset=len(_valid_ds),
                                             global_batch_size=self.data_sampler.global_batch_size,
                                             stage="val")
-        self._valid_ds = MultiEpochDatasetResampler(_valid_ds, num_samples=num_val_samples, shuffle=True, seed=self._seed)
+        self._valid_ds = self._sample_and_shuffle_dataset(_valid_ds, num_val_samples, "val")  # shuffle manually without cyclic MegatronPretrainingRandomSampler
 
         assert (
             hasattr(self, "trainer") and self.trainer is not None
@@ -183,3 +183,20 @@ class AMPLIFYDataModule(pl.LightningDataModule):
     def test_dataloader(self) -> EVAL_DATALOADERS:
         """Raises a not implemented error."""
         raise NotImplementedError("No test dataset provided for AMPLIFY")
+
+    def _sample_and_shuffle_dataset(self, dataset: dataset.AMPLIFYMaskedResidueDataset, num_samples: int, stage: str):  # noqa: D417
+        """Sample the training dataset.
+
+        Args:
+            dataset (torch.utils.data.Dataset): The dataset to sample from
+
+        Returns:
+            ResamplingMappedDataset: Resampled dataset
+
+        """
+        # This is where re-sampling occurs.
+        return PRNGResampleDataset(
+            dataset,
+            num_samples=num_samples,
+            seed=self._seed + len(stage),
+        )
