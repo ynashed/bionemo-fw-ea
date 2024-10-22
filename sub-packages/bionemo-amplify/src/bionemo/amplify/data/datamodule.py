@@ -149,7 +149,7 @@ class AMPLIFYDataModule(pl.LightningDataModule):
                                             num_samples_in_dataset=len(_valid_ds),
                                             global_batch_size=self.data_sampler.global_batch_size,
                                             stage="val")
-        self._valid_ds = MultiEpochDatasetResampler(_valid_ds, num_samples=num_val_samples, shuffle=False, seed=self._seed)
+        self._valid_ds = MultiEpochDatasetResampler(_valid_ds, num_samples=num_val_samples, shuffle=True, seed=self._seed)
 
         assert (
             hasattr(self, "trainer") and self.trainer is not None

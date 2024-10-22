@@ -24,6 +24,7 @@ from torch.utils.data import Dataset
 from datasets import load_dataset as hf_load_dataset
 
 from bionemo.core.data.multi_epoch_dataset import EpochIndex
+from bionemo.core.utils import random_utils
 from bionemo.amplify.data import tokenizer
 from bionemo.llm.data import masking
 from bionemo.llm.data.types import BertSample
@@ -95,18 +96,19 @@ class AMPLIFYMaskedResidueDataset(Dataset):
         Returns:
             A (possibly-truncated), masked protein sequence with CLS and EOS tokens and associated mask fields.
         """
+        # Initialize a random number generator with a seed that is a combination of the dataset seed, epoch, and index.
+        rng = np.random.default_rng([self.seed, index.epoch, index.idx])
         if index.idx not in range(len(self)):
             raise IndexError(f"Index {index.idx} out of range [0, {len(self)}).")
         
-        # Initialize a random number generator with a seed that is a combination of the dataset seed, epoch, and index.
-        rng = np.random.default_rng([self.seed, index.epoch, index.idx])
         sequence = self.protein_dataset[int(index.idx)]["sequence"]
 
         # We don't want special tokens before we pass the input to the masking function; we add these in the collate_fn.
         tokenized_sequence = self._tokenize(sequence)
         cropped_sequence = _random_crop(tokenized_sequence, self.max_seq_length, rng)
 
-        torch_seed = int(rng.integers(low=np.iinfo(np.int64).min, high=np.iinfo(np.int64).max))
+        # Get a single integer seed for torch from our rng, since the index tuple is hard to pass directly to torch.
+        torch_seed = random_utils.get_seed_from_rng(rng)
         masked_sequence, labels, loss_mask = masking.apply_bert_pretraining_mask(
             tokenized_sequence=cropped_sequence,  # type: ignore
             random_seed=torch_seed,
