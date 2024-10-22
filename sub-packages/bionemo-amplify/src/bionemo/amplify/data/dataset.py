@@ -97,9 +97,10 @@ class AMPLIFYMaskedResidueDataset(Dataset):
         """
         if index.idx not in range(len(self)):
             raise IndexError(f"Index {index.idx} out of range [0, {len(self)}).")
-
+        
+        # Initialize a random number generator with a seed that is a combination of the dataset seed, epoch, and index.
         rng = np.random.default_rng([self.seed, index.epoch, index.idx])
-        sequence = self.protein_dataset[index.idx]["sequence"]
+        sequence = self.protein_dataset[int(index.idx)]["sequence"]
 
         # We don't want special tokens before we pass the input to the masking function; we add these in the collate_fn.
         tokenized_sequence = self._tokenize(sequence)
