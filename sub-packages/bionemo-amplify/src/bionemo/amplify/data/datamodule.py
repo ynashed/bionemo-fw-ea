@@ -125,6 +125,7 @@ class AMPLIFYDataModule(pl.LightningDataModule):
             max_train_steps * self.data_sampler.global_batch_size
         )  # training data requires upsampling (multiply by max_train_steps) on single MegatronPretrainingRandomSampler
         _train_ds = dataset.AMPLIFYMaskedResidueDataset(hf_dataset_name=self._hf_dataset_name,
+                                                        dataset_subset=None,
                                                         split="train",
                                                         seed=self._seed,
                                                         max_seq_length=self._max_seq_length,
@@ -137,6 +138,7 @@ class AMPLIFYDataModule(pl.LightningDataModule):
 
         # Create validation dataset
         _valid_ds = dataset.AMPLIFYMaskedResidueDataset(hf_dataset_name=self._hf_dataset_name,
+                                                        dataset_subset="UniProt",
                                                         split="test",
                                                         seed=self._seed,
                                                         max_seq_length=self._max_seq_length,

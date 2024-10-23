@@ -37,6 +37,7 @@ class AMPLIFYMaskedResidueDataset(Dataset):
     def __init__(
         self,
         hf_dataset_name: str,
+        dataset_subset: str = None,
         split: Literal["train", "test"] = "train",
         seed: int = np.random.SeedSequence().entropy,  # type: ignore
         max_seq_length: int = 512,
@@ -49,7 +50,8 @@ class AMPLIFYMaskedResidueDataset(Dataset):
         """Initializes the dataset.
 
         Args:
-            hf_dataset_name: Name of the Hugging Face dataset containing UR100P protein sequences.
+            hf_dataset_name: Name of the HuggingFace dataset containing UR100P protein sequences.
+            dataset_subset: Name of the UR100P HuggingFace dataset subset (or relative data_dir).
             split: The split of the dataset to use ["train", "test"]. Defaults to "train".
             total_samples: Total number of samples to draw from the dataset.
             seed: Random seed for reproducibility. This seed is mixed with the index of the sample to retrieve to ensure
@@ -62,7 +64,7 @@ class AMPLIFYMaskedResidueDataset(Dataset):
             random_mask_strategy: Whether to replace random masked tokens with all tokens or amino acids only. Defaults to RandomMaskStrategy.ALL_TOKENS.
             tokenizer: The input AMPLIFY tokenizer. Defaults to the standard AMPLIFY tokenizer.
         """
-        self.protein_dataset = hf_load_dataset(hf_dataset_name, data_dir="UniProt", split=split)
+        self.protein_dataset = hf_load_dataset(hf_dataset_name, data_dir=dataset_subset, split=split)
         self.total_samples = len(self.protein_dataset)
         self.seed = seed
         self.max_seq_length = max_seq_length
