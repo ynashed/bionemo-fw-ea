@@ -49,6 +49,7 @@ def main(
     result_dir: Path,
     num_steps: int,
     warmup_steps: int,
+    final_step: int,
     limit_val_batches: int,
     val_check_interval: int,
     num_dataset_workers: int,
@@ -215,6 +216,7 @@ def main(
             lr_scheduler=nl.lr_scheduler.CosineAnnealingScheduler(
                 max_steps=num_steps,
                 warmup_steps=warmup_steps,
+                constant_steps=num_steps-final_step,
             ),
         ),
     )
@@ -271,8 +273,8 @@ parser.add_argument(
     "--lr",
     type=float,
     required=False,
-    default=4e-4,
-    help="Learning rate for training. Default is 4e-4",
+    default=1e-3,
+    help="Learning rate for training. Default is 1e-3",
 )
 parser.add_argument(
     "--create-tensorboard-logger", action="store_true", default=False, help="Create a tensorboard logger."
@@ -318,15 +320,22 @@ parser.add_argument(
     "--num-steps",
     type=int,
     required=False,
-    default=1000000,
-    help="Number of steps to use for training. Default is 1000000.",
+    default=1_000_000,
+    help="Number of steps to use for training. Default is 1,000,000.",
 )
 parser.add_argument(
     "--warmup-steps",
     type=int,
     required=False,
-    default=2000,
-    help="Number of warmup steps for WarmupAnnealDecayHold Scheduler. Default is 2000.",
+    default=1000,
+    help="Number of warmup steps for WarmupAnnealDecayHold Scheduler. Default is 1000.",
+)
+parser.add_argument(
+    "--final-step",
+    type=int,
+    required=False,
+    default=900_000,
+    help="Number of decay steps for WarmupAnnealDecayHold Scheduler. Default is 900,000.",
 )
 parser.add_argument(
     "--num-dataset-workers",
@@ -352,7 +361,7 @@ parser.add_argument(
     "--max-seq-length",
     type=int,
     required=False,
-    default=1024,
+    default=512,
     help="Maximum sequence length. Samples will be truncated if exceeds this value.",
 )
 parser.add_argument(
@@ -450,29 +459,29 @@ parser.add_argument(
     "--num-layers",
     type=int,
     required=False,
-    default=32,
-    help="Number of layers in the model. Default is 32.",
+    default=24,
+    help="Number of layers in the model. Default is 24.",
 )
 parser.add_argument(
     "--hidden-size",
     type=int,
     required=False,
-    default=960,
-    help="Hidden size of the model. Default is 960.",
+    default=640,
+    help="Hidden size of the model. Default is 640.",
 )
 parser.add_argument(
     "--num-attention-heads",
     type=int,
     required=False,
-    default=15,
-    help="Number of attention heads in the model. Default is 15.",
+    default=10,
+    help="Number of attention heads in the model. Default is 10.",
 )
 parser.add_argument(
     "--ffn-hidden-size",
     type=int,
     required=False,
-    default=4 * 960,
-    help="FFN hidden size of the model. Default is 4 * 960.",
+    default=4 * 640,
+    help="FFN hidden size of the model. Default is 4 * 640.",
 )
 
 if __name__ == "__main__":
@@ -494,6 +503,7 @@ if __name__ == "__main__":
         wandb_offline=args.wandb_offline,
         num_steps=args.num_steps,
         warmup_steps=args.warmup_steps,
+        final_step=args.final_step,
         limit_val_batches=args.limit_val_batches,
         val_check_interval=args.val_check_interval,
         num_dataset_workers=args.num_dataset_workers,

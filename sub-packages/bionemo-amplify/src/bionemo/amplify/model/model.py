@@ -225,11 +225,11 @@ class AMPLIFYConfig(BioBertConfig[AMPLIFYModelT, MegatronLossType], iom.IOMixinW
 
     # When overriding fields in a dataclass _always_ declare types: https://github.com/python/cpython/issues/123269
     model_cls: Type[AMPLIFYModelT] = AMPLIFYModel
-    seq_length: int = 1024
-    num_layers: int = 32  # 350M, 24 for 120M
-    hidden_size: int = 960  # 350M, 640 for 120M
-    num_attention_heads: int = 15 # 350M, 10 for 120M
-    ffn_hidden_size: int = 3840  # Transformer FFN hidden size. Usually 4 * hidden_size.
+    seq_length: int = 512
+    num_layers: int = 24  # 32 for 350M, 24 for 120M
+    hidden_size: int = 640  # 960 for 350M, 640 for 120M
+    num_attention_heads: int = 10 # 15 for 350M, 10 for 120M
+    ffn_hidden_size: int = 2560  # Transformer FFN hidden size. Usually 4 * hidden_size.
     hidden_dropout: float = 0  # AMPLIFY removes dropout from hidden layers and attention
     attention_dropout: float = 0.0  # AMPLIFY does not use attention dropout
     layernorm_epsilon: float = 1.0e-5
