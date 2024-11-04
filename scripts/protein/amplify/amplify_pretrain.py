@@ -215,6 +215,7 @@ def main(
                 clip_grad=1.0,
             ),
             lr_scheduler=nl.lr_scheduler.CosineAnnealingScheduler(
+                min_lr=0,
                 max_steps=num_steps,
                 warmup_steps=warmup_steps,
                 constant_steps=num_steps-final_step,
