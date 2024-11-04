@@ -206,6 +206,7 @@ def main(
         optimizer=MegatronOptimizerModule(
             config=OptimizerConfig(
                 lr=lr,
+                bf16=True,
                 optimizer="adam",  # fused_adam not supported
                 use_distributed_optimizer=True,
                 weight_decay=0.01,
