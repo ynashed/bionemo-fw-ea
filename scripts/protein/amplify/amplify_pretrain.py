@@ -49,7 +49,7 @@ def main(
     result_dir: Path,
     num_steps: int,
     warmup_steps: int,
-    final_step: int,
+    decay_steps: int,
     limit_val_batches: int,
     val_check_interval: int,
     num_dataset_workers: int,
@@ -215,10 +215,9 @@ def main(
                 clip_grad=1.0,
             ),
             lr_scheduler=nl.lr_scheduler.CosineAnnealingScheduler(
-                min_lr=0,
-                max_steps=num_steps,
+                min_lr=0.1*lr,
+                max_steps=decay_steps,
                 warmup_steps=warmup_steps,
-                constant_steps=num_steps-final_step,
             ),
         ),
     )
@@ -333,7 +332,7 @@ parser.add_argument(
     help="Number of warmup steps for WarmupAnnealDecayHold Scheduler. Default is 1000.",
 )
 parser.add_argument(
-    "--final-step",
+    "--decay-steps",
     type=int,
     required=False,
     default=900_000,
@@ -505,7 +504,7 @@ if __name__ == "__main__":
         wandb_offline=args.wandb_offline,
         num_steps=args.num_steps,
         warmup_steps=args.warmup_steps,
-        final_step=args.final_step,
+        decay_steps=args.decay_steps,
         limit_val_batches=args.limit_val_batches,
         val_check_interval=args.val_check_interval,
         num_dataset_workers=args.num_dataset_workers,
