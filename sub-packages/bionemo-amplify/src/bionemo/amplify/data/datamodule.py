@@ -47,7 +47,7 @@ class AMPLIFYDataModule(pl.LightningDataModule):
         mask_prob: float = 0.15,
         mask_token_prob: float = 0.8,
         mask_random_prob: float = 0.1,
-        random_mask_strategy: dataset.RandomMaskStrategy = dataset.RandomMaskStrategy.ALL_TOKENS,
+        random_mask_strategy: dataset.RandomMaskStrategy = dataset.RandomMaskStrategy.AMINO_ACIDS_ONLY,
         tokenizer: tokenizer.BioNeMoAMPLIFYTokenizer = tokenizer.get_tokenizer(),
         dataloader_type: Literal["single", "cyclic"] = "single",
     ) -> None:
@@ -60,7 +60,7 @@ class AMPLIFYDataModule(pl.LightningDataModule):
                 to None.
             max_seq_length: The maximum context length for the AMPLIFY transformer. Defaults to 512.
             micro_batch_size: Passed to MegatronDataSampler. Defaults to 512.
-            global_batch_size: Passed to MegatronDataSampler.. Defaults to 4096.
+            global_batch_size: Passed to MegatronDataSampler. Defaults to 4096.
             num_workers: The number of workers for the pytorch Dataloaders. Defaults to 10.
             persistent_workers: Whether to keep the workers alive between epochs. Defaults to True.
             pin_memory: Whether to pin GPU memory in the pytorch Dataloaders. Defaults to True.
@@ -68,7 +68,7 @@ class AMPLIFYDataModule(pl.LightningDataModule):
             mask_prob: The overall chance of masking a token and having it appear in the loss fn. Defaults to 0.15.
             mask_token_prob: Percentage of masked tokens that get assigned the <MASK> id. Defaults to 0.8.
             mask_random_prob: Percentage of masked tokens assigned to a random amino acid. Defaults to 0.1.
-            random_mask_strategy: Whether to replace random masked tokens with all tokens or amino acids only. Defaults to RandomMaskStrategy.ALL_TOKENS.
+            random_mask_strategy: Whether to replace random masked tokens with all tokens or amino acids only. Defaults to RandomMaskStrategy.AMINO_ACIDS_ONLY.
             tokenizer: The AMPLIFY tokenizer. Defaults to the one returned by `tokenizer.get_tokenizer()`.
             dataloader_type: The type of dataloader to use. Defaults to "single".
         """

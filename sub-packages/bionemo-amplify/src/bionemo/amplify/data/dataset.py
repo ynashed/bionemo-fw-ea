@@ -44,7 +44,7 @@ class AMPLIFYMaskedResidueDataset(Dataset):
         mask_prob: float = 0.15,
         mask_token_prob: float = 0.8,
         mask_random_prob: float = 0.1,
-        random_mask_strategy: RandomMaskStrategy = RandomMaskStrategy.ALL_TOKENS,
+        random_mask_strategy: RandomMaskStrategy = RandomMaskStrategy.AMINO_ACIDS_ONLY,
         tokenizer: tokenizer.BioNeMoAMPLIFYTokenizer = tokenizer.get_tokenizer(),
     ) -> None:
         """Initializes the dataset.
@@ -61,7 +61,7 @@ class AMPLIFYMaskedResidueDataset(Dataset):
             mask_prob: The overall probability a token is included in the loss function. Defaults to 0.15.
             mask_token_prob: Proportion of masked tokens that get assigned the <MASK> id. Defaults to 0.8.
             mask_random_prob: Proportion of tokens that get assigned a random natural amino acid. Defaults to 0.1.
-            random_mask_strategy: Whether to replace random masked tokens with all tokens or amino acids only. Defaults to RandomMaskStrategy.ALL_TOKENS.
+            random_mask_strategy: Whether to replace random masked tokens with all tokens or amino acids only. Defaults to RandomMaskStrategy.AMINO_ACIDS_ONLY.
             tokenizer: The input AMPLIFY tokenizer. Defaults to the standard AMPLIFY tokenizer.
         """
         self.protein_dataset = hf_load_dataset(hf_dataset_name, data_dir=dataset_subset, split=split)

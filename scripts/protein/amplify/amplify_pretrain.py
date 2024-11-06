@@ -67,7 +67,7 @@ def main(
     wandb_group: Optional[str] = None,
     wandb_id: Optional[str] = None,
     wandb_anonymous: Optional[bool] = False,
-    wandb_log_model: bool = False,
+    wandb_log_model: bool = True,
     pipeline_model_parallel_size: int = 1,
     tensor_model_parallel_size: int = 1,
     create_tensorboard_logger: bool = False,
@@ -78,7 +78,7 @@ def main(
     metric_to_monitor_for_checkpoints: str = "val_loss",
     save_top_k: int = 2,
     save_every_n_steps: int = 100,
-    random_mask_strategy: RandomMaskStrategy = RandomMaskStrategy.ALL_TOKENS,
+    random_mask_strategy: RandomMaskStrategy = RandomMaskStrategy.AMINO_ACIDS_ONLY,
     num_layers: int = 32,
     hidden_size: int = 960,
     num_attention_heads: int = 15,
@@ -208,7 +208,7 @@ def main(
                 lr=lr,
                 optimizer="adam",  # fused_adam not supported
                 use_distributed_optimizer=True,
-                weight_decay=0.01,
+                weight_decay=0.001,
                 adam_beta1=0.9,
                 adam_beta2=0.95,
                 clip_grad=1.0,
@@ -448,12 +448,12 @@ parser.add_argument(
     help="Path to the checkpoint directory to restore from. Will override `--resume-if-exists` when set.",
 )
 
-# AMPLIFY specific configuration (default: 350M)
+# AMPLIFY specific configuration (default: 120M)
 parser.add_argument(
     "--random-mask-strategy",
     type=RandomMaskStrategy,
     choices=[e.value for e in RandomMaskStrategy],
-    default=RandomMaskStrategy.ALL_TOKENS.value,
+    default=RandomMaskStrategy.AMINO_ACIDS_ONLY.value,
     help=f"""In pretraining, 15%% of all tokens are masked and among which 10%% are replaced with a random token. This class controls the set of random tokens to choose from. Options are: '{"', '".join([e.value for e in RandomMaskStrategy])}'. Note that 'all_token' will introduce non-canonical amino acid tokens as effective mask tokens, and the resultant loss will appear lower than that from 'amino_acids_only'. Note that 'all_token' is the method used in hugging face as well as portions of fairseq.""",
 )
 parser.add_argument(
