@@ -117,7 +117,7 @@ class AMPLIFYMaskedResidueDataset(Dataset):
                 random_seed=torch_seed,
                 mask_config=self.mask_config,
             )
-            if tokenizer.mask_token_id in masked_sequence:
+            if self.tokenizer.mask_token_id in masked_sequence:
                 break
 
         return {
