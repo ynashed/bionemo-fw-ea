@@ -208,7 +208,7 @@ def main(
                 lr=lr,
                 optimizer="adam",  # fused_adam not supported
                 use_distributed_optimizer=True,
-                weight_decay=0.001,
+                weight_decay=0.0,
                 adam_beta1=0.9,
                 adam_beta2=0.95,
                 clip_grad=1.0,
