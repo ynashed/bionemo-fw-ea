@@ -52,6 +52,7 @@ def main(
     decay_steps: int,
     limit_val_batches: int,
     val_check_interval: int,
+    log_every_n_steps: Optional[int],
     num_dataset_workers: int,
     biobert_spec_option: BiobertSpecOption,  # TODO(@farhadrgh) clarify how to parse this.
     lr: float,
@@ -77,7 +78,6 @@ def main(
     save_last_checkpoint: bool = True,
     metric_to_monitor_for_checkpoints: str = "val_loss",
     save_top_k: int = 2,
-    save_every_n_steps: int = 100,
     random_mask_strategy: RandomMaskStrategy = RandomMaskStrategy.AMINO_ACIDS_ONLY,
     num_layers: int = 32,
     hidden_size: int = 960,
@@ -159,6 +159,7 @@ def main(
         strategy=strategy,
         limit_val_batches=limit_val_batches,  # This controls upsampling and downsampling
         val_check_interval=val_check_interval,
+        log_every_n_steps=log_every_n_steps,
         num_nodes=num_nodes,
         callbacks=[
             PerplexityLoggingCallback(log_train=False, log_val=True),
@@ -227,7 +228,7 @@ def main(
         save_last=save_last_checkpoint,
         monitor=metric_to_monitor_for_checkpoints,  # "val_loss",
         save_top_k=save_top_k,
-        every_n_train_steps=save_every_n_steps,
+        every_n_train_steps=val_check_interval,
         always_save_context=True,  # Enables the .nemo file-like checkpointing where all IOMixins are under SerDe
     )
 
@@ -353,9 +354,17 @@ parser.add_argument(
     help="Number of steps between validation. Default is 10000.",
 )
 parser.add_argument(
+    "--log-every-n-steps",
+    type=int,
+    required=False,
+    default=100,
+    help="Number of steps between logging. Default is 100.",
+)
+parser.add_argument(
     "--min-seq-length",
     type=int,
     required=False,
+    default=512,
     help="Minimum sequence length. Sampled will be padded if less than this value.",
 )
 parser.add_argument(
@@ -507,6 +516,7 @@ if __name__ == "__main__":
         decay_steps=args.decay_steps,
         limit_val_batches=args.limit_val_batches,
         val_check_interval=args.val_check_interval,
+        log_every_n_steps=args.log_every_n_steps,
         num_dataset_workers=args.num_dataset_workers,
         biobert_spec_option=args.biobert_spec_option,
         lr=args.lr,
@@ -523,7 +533,6 @@ if __name__ == "__main__":
         save_last_checkpoint=args.save_last_checkpoint,
         metric_to_monitor_for_checkpoints=args.metric_to_monitor_for_checkpoints,
         save_top_k=args.save_top_k,
-        save_every_n_steps=args.val_check_interval,
         random_mask_strategy=args.random_mask_strategy,
         num_layers=args.num_layers,
         hidden_size=args.hidden_size,
