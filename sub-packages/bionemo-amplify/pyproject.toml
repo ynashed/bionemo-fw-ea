@@ -1,6 +1,6 @@
 [build-system]
 requires = ["setuptools>=64", "wheel"]
-build-backend = "setuptools.build_meta
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "bionemo-amplify"
@@ -13,7 +13,7 @@ dynamic = ["version"]
 dependencies = [
     # bionemo sub-packages
     'bionemo-core',
-    'bionemo-esm2'
+    'bionemo-esm2',
     'bionemo-llm',
     # external
 ]

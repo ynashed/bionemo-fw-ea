@@ -98,7 +98,7 @@ class AMPLIFYDataModule(MegatronDataModule):
         )
 
     @property
-    def tokenizer(self) -> tokenizer.BioNeMoESMTokenizer:
+    def tokenizer(self) -> tokenizer.BioNeMoAMPLIFYTokenizer:
         """Returns the tokenizer."""
         return self._tokenizer
     
