@@ -73,7 +73,7 @@ RUN source /usr/local/nvm/nvm.sh && \
 
 # Use UV to install python packages from the workspace. This just installs packages into the system's python
 # environment, and does not use the current uv.lock file.
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.4.25 /uv /usr/local/bin/uv
 ENV UV_LINK_MODE=copy \
   UV_COMPILE_BYTECODE=1 \
   UV_PYTHON_DOWNLOADS=never \
@@ -146,7 +146,7 @@ USER $USERNAME
 COPY --from=bionemo2-base --chown=$USERNAME:$USERNAME --chmod=777 \
   /usr/local/lib/python3.10/dist-packages /usr/local/lib/python3.10/dist-packages
 
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.4.25 /uv /usr/local/bin/uv
 ENV UV_LINK_MODE=copy \
   UV_COMPILE_BYTECODE=0 \
   UV_PYTHON_DOWNLOADS=never \
@@ -172,12 +172,14 @@ FROM dev AS development
 
 WORKDIR /workspace/bionemo2
 COPY --from=bionemo2-base /workspace/bionemo2/ .
+COPY ./internal ./internal
 # because of the `rm -rf ./3rdparty` in bionemo2-base
 COPY ./3rdparty ./3rdparty
 USER root
 RUN <<EOF
 set -eo pipefail
 find . -name __pycache__ -type d -print | xargs rm -rf
+uv pip install --no-build-isolation --editable ./internal/infra-bionemo
 for sub in ./3rdparty/* ./sub-packages/bionemo-*; do
     uv pip install --no-deps --no-build-isolation --editable $sub
 done
@@ -202,3 +204,7 @@ COPY ./ci/scripts ./ci/scripts
 COPY ./docs ./docs
 
 RUN chmod 777 -R /workspace/bionemo2/
+
+# Transformer engine attention defaults
+# We have to declare this again because the devcontainer splits from the release image's base.
+ENV NVTE_FUSED_ATTN=1 NVTE_FLASH_ATTN=0

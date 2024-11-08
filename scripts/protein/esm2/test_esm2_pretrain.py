@@ -108,6 +108,7 @@ def test_main_runs(monkeypatch, tmpdir, dummy_protein_dataset, dummy_parquet_tra
             warmup_steps=5,
             limit_val_batches=1,
             val_check_interval=1,
+            log_every_n_steps=None,
             num_dataset_workers=1,
             biobert_spec_option=BiobertSpecOption.esm2_bert_layer_with_transformer_engine_spec,
             lr=1e-4,
@@ -143,6 +144,7 @@ def test_main_runs(monkeypatch, tmpdir, dummy_protein_dataset, dummy_parquet_tra
 def test_val_dataloader_in_main_runs_with_limit_val_batches(
     monkeypatch, tmpdir, dummy_protein_dataset, dummy_parquet_train_val_inputs, limit_val_batches
 ):
+    # TODO: pydantic.
     """Ensures doesn't run out of validation samples whenever updating limit_val_batches logic.
 
     Args:
@@ -175,6 +177,7 @@ def test_val_dataloader_in_main_runs_with_limit_val_batches(
             warmup_steps=2,
             limit_val_batches=limit_val_batches,
             val_check_interval=1,
+            log_every_n_steps=None,
             num_dataset_workers=1,
             biobert_spec_option=BiobertSpecOption.esm2_bert_layer_with_transformer_engine_spec,
             lr=1e-4,
