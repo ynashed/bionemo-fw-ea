@@ -19,7 +19,7 @@ from bionemo.core.data.permute import permute
 
 
 def test_permute_with_invalid_range():
-    with pytest.raises(ValueError, match="The range of the permuted index must be greater than 0."):
+    with pytest.raises(ValueError, match="The length of the permuted range must be greater than 1."):
         permute(0, 0, 0)
 
 

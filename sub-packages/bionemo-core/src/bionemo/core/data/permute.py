@@ -13,12 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import warnings
 
-import numba
 
-
-@numba.njit(fastmath=True)
-def permute(i: int, l: int, p: int) -> int:
+def permute(index: int, length: int, seed: int) -> int:
     """Index into a permuted array with constant space and time complexity.
 
     This function permutes an index `i` into a range `[0, l)` using a hash function. See
@@ -26,48 +24,51 @@ def permute(i: int, l: int, p: int) -> int:
     "Correlated Multi-Jittered Sampling" by Andrew Kensler for the original algorithm.
 
     Args:
-        i: The index to permute.
-        l: The range of the permuted index.
-        p: The permutation seed.
+        index: The index to permute.
+        length: The range of the permuted index.
+        seed: The permutation seed.
 
     Returns:
-        The permuted index.
+        The permuted index in range(0, length).
     """
-    if l <= 0:
-        raise ValueError("The range of the permuted index must be greater than 0.")
+    if length <= 1:
+        raise ValueError("The length of the permuted range must be greater than 1.")
 
-    if i not in range(l):
+    if index not in range(length):
         raise ValueError("The index to permute must be in the range [0, l).")
 
-    if p < 0:
+    if seed < 0:
         raise ValueError("The permutation seed must be greater than or equal to 0.")
 
-    w = l - 1
-    w |= w >> 1
-    w |= w >> 2
-    w |= w >> 4
-    w |= w >> 8
-    w |= w >> 16
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
 
-    while True:
-        i ^= p
-        i *= 0xE170893D
-        i ^= p >> 16
-        i ^= (i & w) >> 4
-        i ^= p >> 8
-        i *= 0x0929EB3F
-        i ^= p >> 23
-        i ^= (i & w) >> 1
-        i *= 1 | p >> 27
-        i *= 0x6935FA69
-        i ^= (i & w) >> 11
-        i *= 0x74DCB303
-        i ^= (i & w) >> 2
-        i *= 0x9E501CC3
-        i ^= (i & w) >> 2
-        i *= 0xC860A3DF
-        i &= w
-        if i < l:
-            break
+        w = length - 1
+        w |= w >> 1
+        w |= w >> 2
+        w |= w >> 4
+        w |= w >> 8
+        w |= w >> 16
 
-    return (i + p) % l
+        while True:
+            index ^= seed
+            index *= 0xE170893D
+            index ^= seed >> 16
+            index ^= (index & w) >> 4
+            index ^= seed >> 8
+            index *= 0x0929EB3F
+            index ^= seed >> 23
+            index ^= (index & w) >> 1
+            index *= 1 | seed >> 27
+            index *= 0x6935FA69
+            index ^= (index & w) >> 11
+            index *= 0x74DCB303
+            index ^= (index & w) >> 2
+            index *= 0x9E501CC3
+            index ^= (index & w) >> 2
+            index *= 0xC860A3DF
+            index &= w
+            if index < length:
+                break
+
+    return (index + seed) % length
