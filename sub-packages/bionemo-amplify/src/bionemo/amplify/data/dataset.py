@@ -14,10 +14,9 @@
 # limitations under the License.
 
 
-from typing import TypeVar, Literal
+from typing import Literal
 
 import numpy as np
-import pandas as pd
 import torch
 from torch.utils.data import Dataset
 

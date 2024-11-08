@@ -25,7 +25,7 @@ from bionemo.amplify.data.tokenizer import BioNeMoAMPLIFYTokenizer
 from bionemo.esm2.model.attention import ESM2TEDotProductAttention
 from bionemo.esm2.model.embedding import ESM2Embedding
 
-from bionemo.llm.model.biobert.model import BioBertConfig, MegatronBioBertModel
+from bionemo.llm.model.biobert.model import BioBertConfig, MegatronBioBertModel, PositionEmbeddingKinds
 from bionemo.llm.api import MegatronLossType
 from bionemo.llm.utils import iomixin_utils as iom
 from bionemo.llm.model.biobert.transformer_specs import BiobertSpecOption
@@ -83,8 +83,10 @@ class AMPLIFYModel(MegatronBioBertModel):
         seq_len_interpolation_factor: Optional[float] = None,
         add_binary_head: bool = True,
         return_embeddings: bool = False,
+        include_embeddings: bool = False,
         use_full_attention_mask: bool = False,
         include_hiddens: bool = False,
+        skip_logits: bool = False,
     ) -> None:
         """Initialize the AMPLIFY model.
 
@@ -107,8 +109,10 @@ class AMPLIFYModel(MegatronBioBertModel):
             seq_len_interpolation_factor (Optional[float]): Interpolation factor for sequence length. Defaults to None.
             add_binary_head (bool): Whether to add a binary head. Defaults to True.
             return_embeddings (bool): Whether to return embeddings. Defaults to False.
+            include_embeddings (bool): Whether to include embeddings in the output dictionary. Defaults to False.
             use_full_attention_mask (bool): Whether to use full attention mask. Defaults to False.
-            include_hiddens: Whether to include hidden states in the output dictionary. Defaults to False.
+            include_hiddens (bool): Whether to include hidden states in the output dictionary. Defaults to False.
+            skip_logits (bool): Skip writing the token logits in output dict
         """
         super(MegatronBioBertModel, self).__init__(config=config)
         self.post_process = post_process
@@ -131,7 +135,9 @@ class AMPLIFYModel(MegatronBioBertModel):
         self.position_embedding_type = position_embedding_type
         self.add_binary_head = add_binary_head
         self.return_embeddings = return_embeddings
+        self.include_embeddings = include_embeddings
         self.include_hiddens = include_hiddens
+        self.skip_logits = skip_logits
 
         # megatron core pipelining currently depends on model type
         self.model_type = ModelType.encoder_or_decoder
@@ -221,7 +227,43 @@ AMPLIFYModelT = TypeVar("AMPLIFYModelT", bound=AMPLIFYModel)
 
 @dataclass
 class AMPLIFYConfig(BioBertConfig[AMPLIFYModelT, MegatronLossType], iom.IOMixinWithGettersSetters):
-    """Configuration class for AMPLIFY model. """
+    """Configuration class for AMPLIFY model.
+
+    Attributes:
+        num_layers: Number of layers in the model.
+        hidden_size: Hidden size of the model.
+        num_attention_heads: Number of attention heads in the model.
+        ffn_hidden_size: Hidden size of the feed-forward network.
+        hidden_dropout: Dropout rate for hidden layers.
+        attention_dropout: Dropout rate for attention layers.
+        apply_residual_connection_post_layernorm: Whether to apply residual connection after layer normalization.
+        layernorm_epsilon: Epsilon value for layer normalization.
+        layernorm_zero_centered_gamma: Whether to zero-center the gamma parameter in layer normalization.
+        activation_func: Activation function used in the model.
+        init_method_std: Standard deviation for weight initialization.
+        apply_query_key_layer_scaling: Whether to apply scaling to query and key layers.
+        masked_softmax_fusion: Whether to use a kernel that fuses attention softmax with its mask.
+        fp16_lm_cross_entropy: Whether to move the cross entropy unreduced loss calculation for lm head to fp16.
+        share_embeddings_and_output_weights: Whether to share embeddings and output weights.
+        enable_autocast: Whether to enable autocast for mixed precision.
+        biobert_spec_option: BiobertSpecOption for the model.
+        position_embedding_type: Type of position embedding used in the model.
+        seq_length: Length of the input sequence.
+        make_vocab_size_divisible_by: Make the vocabulary size divisible by this value.
+        token_dropout: Whether to apply token dropout.
+        use_attention_mask: Whether to use attention mask.
+        use_esm_attention: Whether to use ESM attention.
+        attention_softmax_in_fp32: Whether to use fp32 for attention softmax.
+        optimizer_fn: Optional optimizer function for the model.
+        parallel_output: Whether to use parallel output.
+        rotary_base: Base value for rotary positional encoding.
+        rotary_percent: Percentage of rotary positional encoding.
+        seq_len_interpolation_factor: Interpolation factor for sequence length.
+        get_attention_mask_from_fusion: Whether to get attention mask from fusion.
+        nemo1_ckpt_path: Path to NEMO1 checkpoint.
+        return_only_hidden_states: Whether to return only hidden states.
+        loss_reduction_class: Loss reduction class for the model. Default to BERTMLMLossWithReduction.
+    """
 
     # When overriding fields in a dataclass _always_ declare types: https://github.com/python/cpython/issues/123269
     model_cls: Type[AMPLIFYModelT] = AMPLIFYModel
@@ -232,10 +274,29 @@ class AMPLIFYConfig(BioBertConfig[AMPLIFYModelT, MegatronLossType], iom.IOMixinW
     ffn_hidden_size: int = 2560  # Transformer FFN hidden size. Usually 4 * hidden_size.
     hidden_dropout: float = 0  # AMPLIFY removes dropout from hidden layers and attention
     attention_dropout: float = 0.0  # AMPLIFY does not use attention dropout
+    apply_residual_connection_post_layernorm: bool = False  # TODO: farhadr False is new default, True was BERT pub.
     layernorm_epsilon: float = 1.0e-5
     init_method_std: float = 0.02
 
-    share_embeddings_and_output_weights: bool = False
+    # embedding
+    token_dropout: bool = True
+    use_attention_mask: bool = True
+
+    # core attention
+    use_esm_attention: bool = False  # Skip ESM2 custom attention for TE acceleration. Still passes golden value test.
+    attention_softmax_in_fp32: bool = False
+    normalize_attention_scores: bool = False
+
+    # From megatron.core.models.gpt.bert_model.GPTModel
+    fp16_lm_cross_entropy: bool = False  # Move the cross entropy unreduced loss calculation for lm head to fp16
+    parallel_output: bool = True
+    share_embeddings_and_output_weights: bool = True
+    make_vocab_size_divisible_by: int = 1
+    position_embedding_type: PositionEmbeddingKinds = "rope"
+    rotary_base: int = 10000
+    rotary_percent: float = 1.
+    
+    #AMPLIFY specific configuration
     add_bias_linear: bool = False # AMPLIFY does not use bias in linear layers
     bias_swiglu_fusion: bool = True
     bias_activation_fusion: bool = False
@@ -245,26 +306,6 @@ class AMPLIFYConfig(BioBertConfig[AMPLIFYModelT, MegatronLossType], iom.IOMixinW
     activation_func: str = silu 
     normalization: str = "RMSNorm"    # AMPLIFY uses RMSNorm instead of LayerNorm
     layernorm_zero_centered_gamma: bool = False # Zero centered gamma not supported for RMSNorm
-    position_embedding_type: Literal["learned_absolute", "rope"] = (
-        "rope"  # AMPLIFY uses relative positional encoding 'ROPE' to extrapolate to longer sequences unseen during training
-    )
-    rotary_base: int = 10000
-    rotary_percent: float = 1.0
-
-    make_vocab_size_divisible_by: int = 1
-
-    # embedding
-    token_dropout: bool = True
-    use_attention_mask: bool = True
-
-    # core attention
-    use_esm_attention: bool = False  # Skip ESM2 custom attention for TE acceleration. Still passes golden value test.
-    attention_softmax_in_fp32: bool = True
-    normalize_attention_scores: bool = False
-
-    # From megatron.core.models.gpt.bert_model.GPTModel
-    fp16_lm_cross_entropy: bool = False  # Move the cross entropy unreduced loss calculation for lm head to fp16
-    parallel_output: bool = True
     biobert_spec_option: BiobertSpecOption = BiobertSpecOption.amplify_bert_layer_with_transformer_engine_spec
 
     # TODO: Move this to better places?
@@ -280,6 +321,8 @@ class AMPLIFYConfig(BioBertConfig[AMPLIFYModelT, MegatronLossType], iom.IOMixinW
     # TODO (@jstjohn) come up with a cleaner way in the biobert module to return user requested
     #  things as part of the workflow for inference and fine-tuning.
     return_embeddings: bool = False
+    include_embeddings: bool = False
+    skip_logits: bool = False
     return_only_hidden_states: bool = False  # return logits
 
     def __post_init__(self):
