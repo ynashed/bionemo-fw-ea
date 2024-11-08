@@ -20,7 +20,6 @@ import torch
 
 from bionemo.amplify.data.dataset import (
     AMPLIFYMaskedResidueDataset,
-    ProteinSQLiteDataset,
     create_train_dataset,
     create_valid_dataset,
 )

@@ -17,7 +17,7 @@
 import pytest
 import torch
 
-from bionemo.amplify2.data.tokenizer import get_tokenizer
+from bionemo.amplify.data.tokenizer import get_tokenizer
 
 
 @pytest.fixture
@@ -32,10 +32,10 @@ def test_tokenize_protein1(tokenizer):
 
     # fmt: off
     amplify_tokens = torch.tensor(
-        [20, 15, 11,  7, 10, 16,  9, 10,  4, 15,  8, 12,  7, 10, 12,  4,  9,
-         10,  8, 15,  9, 14,  7,  8,  6,  5, 16,  4,  5,  9,  9,  4,  8,  7,
-          8, 10, 16,  7, 12,  7, 16, 13, 12,  5, 19,  4, 10,  8,  4,  6, 19,
-         17, 12,  7,  5, 11, 14, 10,  6, 19,  7,  4,  5,  6,  6])
+        [22, 17, 13, 9, 12, 18, 11, 12, 6, 17, 10, 14, 9, 12, 14, 6, 11, 12,
+        10, 17, 11, 16, 9, 10, 8, 7, 18, 6, 7, 11, 11, 6, 10, 9, 10, 12, 18,
+        9, 14, 9, 18, 15, 14, 7, 21, 6, 12, 10, 6, 8, 21, 19, 14, 9, 7, 13, 
+        16, 12, 8, 21, 9, 6, 7, 8, 8])
     # fmt: on
 
     torch.testing.assert_close(torch.tensor(our_tokens), amplify_tokens)
@@ -48,11 +48,10 @@ def test_tokenize_protein2(tokenizer):
 
     # fmt: off
     amplify_tokens = torch.tensor(
-        [15,  5,  4, 11,  5, 10, 16, 16,  9,  7, 18, 13,  4, 12, 10, 13, 21,
-         12,  8, 16, 11,  6, 20, 14, 14, 11, 10,  5,  9, 12,  5, 16, 10,  4,
-          6, 18, 10,  8, 14, 17,  5,  5,  9,  9, 21,  4, 15,  5,  4,  5, 10,
-         15,  6,  7, 12,  9, 12,  7,  8,  6,  5,  8, 10,  6, 12, 10,  4,  4,
-         16,  9,  9])
+        [17, 7, 6, 13, 7, 12, 18, 18, 11, 9, 20, 15, 6, 14, 12, 15, 23, 14, 10, 
+         18, 13, 8, 22, 16, 16, 13, 12, 7, 11, 14, 7, 18, 12, 6, 8, 20, 12, 10, 
+         16, 19, 7, 7, 11, 11, 23, 6, 17, 7, 6, 7, 12, 17, 8, 9, 14, 11, 14, 9, 
+         10, 8, 7, 10, 12, 8, 14, 12, 6, 6, 18, 11, 11])
     # fmt: on
 
     torch.testing.assert_close(torch.tensor(our_tokens), amplify_tokens)
@@ -65,31 +64,30 @@ def test_tokenize_protein2_with_mask(tokenizer):
 
     # fmt: off
     amplify_tokens = torch.tensor(
-        [15,  5,  4, 11,  5, 10, 16, 16,  9,  7, 18, 13,  4, 12, 10, 13, 32,
-         12,  8, 16, 11,  6, 20, 14, 14, 11, 10,  5,  9, 12,  5, 16, 10,  4,
-          6, 18, 10,  8, 14, 17,  5,  5,  9,  9, 21,  4, 15,  5,  4,  5, 10,
-         15,  6,  7, 12,  9, 12,  7,  8,  6,  5,  8, 10,  6, 12, 10,  4,  4,
-         16,  9,  9])
+        [17, 7, 6, 13, 7, 12, 18, 18, 11, 9, 20, 15, 6, 14, 12, 15, 2, 14, 10, 18, 
+         13, 8, 22, 16, 16, 13, 12, 7, 11, 14, 7, 18, 12, 6, 8, 20, 12, 10, 16, 19, 
+         7, 7, 11, 11, 23, 6, 17, 7, 6, 7, 12, 17, 8, 9, 14, 11, 14, 9, 10, 8, 7, 
+         10, 12, 8, 14, 12, 6, 6, 18, 11, 11])
     # fmt: on
 
     torch.testing.assert_close(torch.tensor(our_tokens), amplify_tokens)
 
 
 def test_tokenize_protein3(tokenizer):
-    our_tokens = tokenizer.encode("K A <mask> I S Q", add_special_tokens=False)
-    amplify_tokens = torch.tensor([15, 5, 32, 12, 8, 16])
+    our_tokens = tokenizer.encode("KA<mask>I SQ", add_special_tokens=False)
+    amplify_tokens = torch.tensor([17, 7, 2, 14, 1, 10, 18])
     torch.testing.assert_close(torch.tensor(our_tokens), amplify_tokens)
 
 
 def test_tokenize_non_standard_tokens(tokenizer):
-    our_tokens = tokenizer.encode(" ".join(["<cls>", "<pad>", "<eos>", "<unk>", "<mask>"]), add_special_tokens=False)
-    amplify_tokens = torch.tensor([0, 1, 2, 3, 32])
+    our_tokens = tokenizer.encode("".join(["<pad>", "<eos>", "<unk>", "<mask>"]), add_special_tokens=False)
+    amplify_tokens = torch.tensor([0, 4, 1, 2])
     torch.testing.assert_close(torch.tensor(our_tokens), amplify_tokens)
 
 
 def test_tokenize_with_invalid_token(tokenizer):
-    assert tokenizer.encode("<invalid>", add_special_tokens=False) == [3]
+    assert tokenizer.encode("<x>", add_special_tokens=False) == [1, 1, 1]
 
 
 def test_tokenize_with_empty_string(tokenizer):
-    assert tokenizer.encode("", add_special_tokens=True) == [0, 2]
+    assert tokenizer.encode("", add_special_tokens=True) == [3, 4]
