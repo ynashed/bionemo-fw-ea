@@ -99,7 +99,7 @@ class AMPLIFYMaskedResidueDataset(Dataset):
         """
         # Initialize a random number generator with a seed that is a combination of the dataset seed, epoch, and index.
         rng = np.random.default_rng([self.seed, index.epoch, index.idx])
-        if index.idx not in range(len(self)):
+        if index.idx >= len(self):
             raise IndexError(f"Index {index.idx} out of range [0, {len(self)}).")
         
         sequence = self.protein_dataset[int(index.idx)]["sequence"]
