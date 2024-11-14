@@ -290,7 +290,7 @@ class AMPLIFYConfig(BioBertConfig[AMPLIFYModelT, MegatronLossType], iom.IOMixinW
 
     # core attention
     use_esm_attention: bool = False  # Skip ESM2 custom attention for TE acceleration. Still passes golden value test.
-    attention_softmax_in_fp32: bool = False
+    attention_softmax_in_fp32: bool = True
     normalize_attention_scores: bool = False
 
     # From megatron.core.models.gpt.bert_model.GPTModel
@@ -304,7 +304,7 @@ class AMPLIFYConfig(BioBertConfig[AMPLIFYModelT, MegatronLossType], iom.IOMixinW
     
     #AMPLIFY specific configuration
     add_bias_linear: bool = False # AMPLIFY does not use bias in linear layers
-    bias_swiglu_fusion: bool = True
+    bias_swiglu_fusion: bool = False
     bias_activation_fusion: bool = False
     bias_dropout_fusion: bool = False
     apply_rope_fusion: bool = True
