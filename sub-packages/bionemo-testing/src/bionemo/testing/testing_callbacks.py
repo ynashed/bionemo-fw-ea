@@ -14,6 +14,8 @@
 # limitations under the License.
 
 
+import os
+import signal
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional, Union
 
@@ -29,8 +31,8 @@ from bionemo.testing.harnesses.mode import Mode
 from bionemo.testing.torch import recursive_detach
 
 
-class StopAfterValidEpochEndCallback(Callback):
-    """A callback that raises a StopAndGoException after the validation epoch.
+class StopAfterValidEpochEndCallback(Callback, CallbackMethods):
+    """A callback that stops training after the validation epoch.
 
     Use this callback for pytest based Stop and go tests.
     """
@@ -39,6 +41,24 @@ class StopAfterValidEpochEndCallback(Callback):
         if trainer.sanity_checking:
             return
         trainer.should_stop = True
+
+
+class SignalAfterGivenStepCallback(Callback, CallbackMethods):
+    """A callback that emits a given signal to the current process at the defined step.
+
+    Use this callback for pytest based Stop and go tests.
+    """
+
+    def __init__(self, stop_step: int, signal_: signal.Signals = signal.SIGUSR2):
+        """Initializes the callback with the given stop_step."""
+        self.stop_step = stop_step
+        self.signal = signal_
+
+    def on_megatron_step_start(self, step: MegatronStep) -> MegatronStep:
+        """Stop training if the global step is greater than or equal to the stop_step."""
+        if step.trainer.global_step >= self.stop_step:
+            os.kill(os.getpid(), self.signal)
+        return step
 
 
 class BaseInterruptedVsContinuousCallback(Callback, CallbackMethods, io.IOMixin):

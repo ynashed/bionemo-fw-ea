@@ -29,7 +29,8 @@ python -m coverage erase
 
 for dir in docs/ ./sub-packages/bionemo-*/; do
     echo "Running pytest in $dir"
-    python -m coverage run --parallel-mode --source bionemo -m pytest -v --nbval-lax $dir
+    python -m coverage run --parallel-mode --source bionemo \
+        -m pytest -v --nbval-lax --durations=0 --durations-min=60.0 $dir
 done
 
 python -m coverage combine

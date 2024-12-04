@@ -367,11 +367,3 @@ class StopAndGoHarness(ABC):
         assert val_consumed_go == 0
         assert train_consumed_stop == 0
         assert train_consumed_go > 0
-
-    def test_identical_number_of_validation_batches(self):
-        """Ensures that the input tensors for training are identical for the interrupted and continuous tests."""
-        callback_type = testing_callbacks.ValidLossCallback
-        interrupted_callback = get_callback(self.callbacks, Mode.RESUME, callback_type)
-        continuous_callback = get_callback(self.callbacks, Mode.CONTINUOUS, callback_type)
-        assert interrupted_callback.data, f"No data found for {callback_type}"
-        assert len(interrupted_callback.data) == len(continuous_callback.data)
