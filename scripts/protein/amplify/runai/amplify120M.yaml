@@ -1,0 +1,70 @@
+apiVersion: kubeflow.org/v1
+kind: PyTorchJob
+metadata:
+  #generateName: training-
+  namespace: runai-amplify
+  name: amplify-120M
+spec:
+  elasticPolicy:
+    maxReplicas: 4
+    maxRestarts: 10
+    minReplicas: 1
+    nProcPerNode: 8
+    rdzvBackend: c10d
+  pytorchReplicaSpecs:
+    Worker:
+      replicas: 4
+      restartPolicy: OnFailure
+      template:
+        metadata:
+          annotations:
+            k8s.v1.cni.cncf.io/networks: ''
+            sidecar.istio.io/inject: 'false'
+        spec:
+          containers:
+          - command:
+            - bash
+            - -euxc
+            - "torchrun scripts/protein/amplify/amplify_pretrain.py  \
+              --hf-dataset-name chandar-lab/UR100P   \
+              --result-dir /results     \
+              --experiment-name 32GPU_pretrain   \
+              --wandb-project amplify_pretrain \
+              --num-gpus 8  \
+              --num-nodes 4 \
+              --micro-batch-size 128 \
+              --lr 1.0e-3 \
+              --max-seq-length 512 \
+              --warmup-steps 10000 \
+              --num-steps 1000000"
+            env:
+            - name: TRANSFORMERS_OFFLINE
+              value: '0'
+            - name: TORCH_NCCL_AVOID_RECORD_STREAMS
+              value: '1'
+            - name: NCCL_NVLS_ENABLE
+              value: '0'
+            - name: NVTE_DP_AMAX_REDUCE_INTERVAL
+              value: '0'
+            - name: NVTE_ASYNC_AMAX_REDUCTION
+              value: '1'
+            - name: NVTE_FUSED_ATTN
+              value: '0'
+            - name: HF_HOME
+              value: '/home/local/.cache'
+            image: nvcr.io/nvidia/clara/bionemo-framework:2.0
+            name: pytorch
+            resources:
+              limits:
+                nvidia.com/gpu: '8'
+            volumeMounts:
+            - mountPath: /checkpoints
+              name: workspace
+              readOnly: false
+          volumes:
+          - name: workspace
+            persistentVolumeClaim:
+              claimName: zoey-test-default-wojqr
+          schedulerName: runai-scheduler
+  runPolicy:
+    backoffLimit: 10
