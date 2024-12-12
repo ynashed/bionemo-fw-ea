@@ -64,6 +64,11 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.labels['training.kubeflow.org/replica-index']
+            - name: WANDB_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: accesskey-wandb-key
+                  key: SecretKey
             - name: TRANSFORMERS_OFFLINE
               value: '0'
             - name: TORCH_NCCL_AVOID_RECORD_STREAMS
