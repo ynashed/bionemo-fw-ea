@@ -23,7 +23,7 @@ from nemo.collections import llm
 from nemo.lightning import resume
 from nemo.lightning.pytorch import callbacks as nl_callbacks
 from nemo.lightning.pytorch.optim import MegatronOptimizerModule
-from pytorch_lightning.callbacks import LearningRateMonitor, RichModelSummary
+from lightning.pytorch.callbacks import LearningRateMonitor, RichModelSummary
 
 from bionemo.core.utils.dtypes import PrecisionTypes, get_autocast_dtype
 from bionemo.amplify.api import AMPLIFYConfig

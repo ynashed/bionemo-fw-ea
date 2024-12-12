@@ -3,7 +3,7 @@ kind: PyTorchJob
 metadata:
   #generateName: training-
   namespace: runai-amplify
-  name: amplify-120M
+  name: pretrain-amplify-120m
 spec:
   elasticPolicy:
     maxReplicas: 4
@@ -22,22 +22,48 @@ spec:
             sidecar.istio.io/inject: 'false'
         spec:
           containers:
-          - command:
-            - bash
-            - -euxc
-            - "torchrun scripts/protein/amplify/amplify_pretrain.py  \
-              --hf-dataset-name chandar-lab/UR100P   \
-              --result-dir /results     \
-              --experiment-name 32GPU_pretrain   \
-              --wandb-project amplify_pretrain \
-              --num-gpus 8  \
-              --num-nodes 4 \
-              --micro-batch-size 128 \
-              --lr 1.0e-3 \
-              --max-seq-length 512 \
-              --warmup-steps 10000 \
-              --num-steps 1000000"
+          - command: ["bash", "-euxc"]
+            args:
+              - |
+                export CURRENT_TIMESTAMP=$(date +%s) && \
+                export REPLICA_LOG_DIR=/home/local/.cache/logs/replica-${REPLICA_INDEX} && \
+                export LOG_FILE=${REPLICA_LOG_DIR}/${CURRENT_TIMESTAMP}out.log && \
+                mkdir -p -m 777 ${REPLICA_LOG_DIR} && \
+                mkdir -p /home/workspace &&\
+                cd /home/workspace &&\
+                git clone https://github.com/ynashed/bionemo-framework &&\
+                cd bionemo-framework &&\
+                git checkout ynashed/amplify/runai &&\
+                cd 3rdparty/Megatron-LM/ &&\
+                git apply ../megatron_optimizer_pytorch.patch &&\
+                cd ../../sub-packages/bionemo-amplify/ &&\
+                pip install -e . &&\
+                cd ../.. &&\
+                cd sub-packages/bionemo-llm/  &&\
+                pip install -e .  &&\
+                cd ../.. &&\
+                cd sub-packages/bionemo-core/ &&\
+                pip install -e . &&\
+                cd ../.. &&\
+                ( \
+                  torchrun scripts/protein/amplify/amplify_pretrain.py  \
+                  --hf-dataset-name chandar-lab/UR100P   \
+                  --result-dir /results     \
+                  --experiment-name 32GPU_pretrain   \
+                  --wandb-project amplify_pretrain \
+                  --num-gpus 8  \
+                  --num-nodes 4 \
+                  --micro-batch-size 128 \
+                  --lr 1.0e-3 \
+                  --max-seq-length 512 \
+                  --warmup-steps 1000 \
+                  --num-steps 1000000 \
+                ) 2>&1 | sed "s/\r/\n/g" | tee ${LOG_FILE}
             env:
+            - name: REPLICA_INDEX
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['training.kubeflow.org/replica-index']
             - name: TRANSFORMERS_OFFLINE
               value: '0'
             - name: TORCH_NCCL_AVOID_RECORD_STREAMS
@@ -52,19 +78,19 @@ spec:
               value: '0'
             - name: HF_HOME
               value: '/home/local/.cache'
-            image: nvcr.io/nvidia/clara/bionemo-framework:2.0
+            image: nvcr.io/nvidia/clara/bionemo-framework:nightly
             name: pytorch
             resources:
               limits:
                 nvidia.com/gpu: '8'
             volumeMounts:
-            - mountPath: /checkpoints
-              name: workspace
+            - mountPath: /home/local/.cache
+              name: ur100p
               readOnly: false
           volumes:
-          - name: workspace
+          - name: ur100p
             persistentVolumeClaim:
-              claimName: zoey-test-default-wojqr
+              claimName: ur100p-project-kht81
           schedulerName: runai-scheduler
   runPolicy:
     backoffLimit: 10
