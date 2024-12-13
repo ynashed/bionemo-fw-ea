@@ -36,6 +36,7 @@ spec:
                 git submodule update --init --recursive && git checkout ynashed/amplify/runai &&\
                 cd 3rdparty/Megatron-LM/ &&\
                 git apply ../megatron_optimizer_pytorch.patch &&\
+                pip install -e . &&\
                 cd ../../sub-packages/bionemo-amplify/ &&\
                 pip install -e . &&\
                 cd ../../sub-packages/bionemo-llm/ &&\
