@@ -280,7 +280,7 @@ parser.add_argument(
     type=str,
     choices=get_args(PrecisionTypes),
     required=False,
-    default="fp32",
+    default="fp32-mixed",
     help="Precision type to use for training.",
 )
 parser.add_argument(
