@@ -336,7 +336,7 @@ class AMPLIFYConfig(BioBertConfig[AMPLIFYModelT, MegatronLossType], iom.IOMixinW
         super().__post_init__()
         if self.biobert_spec_option == BiobertSpecOption.amplify_bert_layer_with_transformer_engine_spec:
             self.apply_query_key_layer_scaling = False
-            self.core_attention_override = ESM2TEDotProductAttention #TODO: ynashed: verify if this is needed
+            # self.core_attention_override = ESM2TEDotProductAttention #TODO: ynashed: verify if this is needed
             if self.gated_linear_unit:
                 # To keep the number of parameters and the amount of computation constant, we reduce the number of
                 # hidden units by a factor of 2/3 (https://arxiv.org/pdf/2002.05202.pdf) and make it a multiple of 8 to

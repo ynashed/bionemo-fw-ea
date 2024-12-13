@@ -55,7 +55,7 @@ spec:
                   --micro-batch-size 128 \
                   --lr 1.0e-3 \
                   --max-seq-length 512 \
-                  --warmup-steps 20000 \
+                  --warmup-steps 1000 \
                   --num-steps 1000000 \
                 ) 2>&1 | sed "s/\r/\n/g" | tee ${LOG_FILE}
             env:
