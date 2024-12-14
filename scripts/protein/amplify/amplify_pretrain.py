@@ -224,6 +224,7 @@ def main(
                 weight_decay=0.01,
                 adam_beta1=0.9,
                 adam_beta2=0.95,
+                adam_eps=1e-5,
                 clip_grad=1.0,
             ),
             lr_scheduler=nl.lr_scheduler.CosineAnnealingScheduler(
