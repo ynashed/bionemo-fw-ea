@@ -225,7 +225,7 @@ def main(
                 adam_beta1=0.9,
                 adam_beta2=0.95,
                 clip_grad=1.0,
-                initial_loss_scale=2**16,
+                loss_scale=2**16,
             ),
             lr_scheduler=nl.lr_scheduler.CosineAnnealingScheduler(
                 min_lr=0.1*lr,
@@ -281,7 +281,7 @@ parser.add_argument(
     type=str,
     choices=get_args(PrecisionTypes),
     required=False,
-    default="bf16-mixed",
+    default="fp16-mixed",
     help="Precision type to use for training.",
 )
 parser.add_argument(
