@@ -181,7 +181,7 @@ def main(
         num_nodes=num_nodes,
         callbacks=callbacks,
         plugins=nl.MegatronMixedPrecision(precision=precision, 
-                                          loss_scale=2**32),
+                                          fp16_loss_scale=2**32),
     )
 
     tokenizer = get_tokenizer()
