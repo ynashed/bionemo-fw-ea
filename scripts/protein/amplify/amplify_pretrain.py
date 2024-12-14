@@ -180,8 +180,7 @@ def main(
         log_every_n_steps=log_every_n_steps,
         num_nodes=num_nodes,
         callbacks=callbacks,
-        plugins=nl.MegatronMixedPrecision(precision=precision, 
-                                          fp16_loss_scale=2**32),
+        plugins=nl.MegatronMixedPrecision(precision=precision),
     )
 
     tokenizer = get_tokenizer()
@@ -281,7 +280,7 @@ parser.add_argument(
     type=str,
     choices=get_args(PrecisionTypes),
     required=False,
-    default="fp16-mixed",
+    default="bf16-mixed",
     help="Precision type to use for training.",
 )
 parser.add_argument(
