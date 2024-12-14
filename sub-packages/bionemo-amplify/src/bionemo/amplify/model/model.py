@@ -290,13 +290,13 @@ class AMPLIFYConfig(BioBertConfig[AMPLIFYModelT, MegatronLossType], iom.IOMixinW
 
     # core attention
     use_esm_attention: bool = False  # Skip ESM2 custom attention for TE acceleration. Still passes golden value test.
-    attention_softmax_in_fp32: bool = False
+    attention_softmax_in_fp32: bool = True
     normalize_attention_scores: bool = False
 
     # From megatron.core.models.gpt.bert_model.GPTModel
     fp16_lm_cross_entropy: bool = False  # Move the cross entropy unreduced loss calculation for lm head to fp16
     parallel_output: bool = True
-    share_embeddings_and_output_weights: bool = True
+    share_embeddings_and_output_weights: bool = False
     make_vocab_size_divisible_by: int = 1
     position_embedding_type: PositionEmbeddingKinds = "rope"
     rotary_base: int = 10000
@@ -304,10 +304,10 @@ class AMPLIFYConfig(BioBertConfig[AMPLIFYModelT, MegatronLossType], iom.IOMixinW
     
     #AMPLIFY specific configuration
     add_bias_linear: bool = False # AMPLIFY does not use bias in linear layers
-    bias_swiglu_fusion: bool = True
+    bias_swiglu_fusion: bool = False
     bias_activation_fusion: bool = False
     bias_dropout_fusion: bool = False
-    apply_rope_fusion: bool = True
+    apply_rope_fusion: bool = False
     gated_linear_unit: bool = True
     activation_func: str = silu 
     normalization: str = "RMSNorm"    # AMPLIFY uses RMSNorm instead of LayerNorm
