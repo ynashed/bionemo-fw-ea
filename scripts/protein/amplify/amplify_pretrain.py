@@ -180,7 +180,8 @@ def main(
         log_every_n_steps=log_every_n_steps,
         num_nodes=num_nodes,
         callbacks=callbacks,
-        plugins=nl.MegatronMixedPrecision(precision=precision),
+        plugins=nl.MegatronMixedPrecision(precision=precision, 
+                                          loss_scale=2**32),
     )
 
     tokenizer = get_tokenizer()
@@ -225,7 +226,6 @@ def main(
                 adam_beta1=0.9,
                 adam_beta2=0.95,
                 clip_grad=1.0,
-                loss_scale=2**16,
             ),
             lr_scheduler=nl.lr_scheduler.CosineAnnealingScheduler(
                 min_lr=0.1*lr,
