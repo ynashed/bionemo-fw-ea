@@ -8,7 +8,7 @@ spec:
   elasticPolicy:
     maxReplicas: 4
     maxRestarts: 10
-    minReplicas: 1
+    minReplicas: 4
     nProcPerNode: 8
     rdzvBackend: c10d
   pytorchReplicaSpecs:
@@ -31,11 +31,10 @@ spec:
                 mkdir -p -m 777 ${REPLICA_LOG_DIR} && \
                 mkdir -p /home/workspace &&\
                 cd /home/workspace &&\
-                git clone --recursive https://github.com/ynashed/bionemo-framework &&\
+                git clone https://github.com/ynashed/bionemo-framework &&\
                 cd bionemo-framework &&\
-                git submodule update --init --recursive && git checkout ynashed/amplify/runai &&\
-                cd 3rdparty/Megatron-LM/ &&\
-                git apply ../megatron_optimizer_pytorch.patch &&\
+                git checkout ynashed/amplify/runai &&\
+                cd sub-packages/bionemo-esm2/ &&\
                 pip install -e . &&\
                 cd ../../sub-packages/bionemo-amplify/ &&\
                 pip install -e . &&\

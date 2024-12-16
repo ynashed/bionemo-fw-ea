@@ -25,7 +25,6 @@ from torch.optim import Optimizer
 from bionemo.amplify.data.tokenizer import BioNeMoAMPLIFYTokenizer
 from bionemo.esm2.model.attention import ESM2TEDotProductAttention
 from bionemo.esm2.model.embedding import ESM2Embedding
-from bionemo.esm2.model.model import ESM2Model
 
 from bionemo.llm.model.biobert.model import BioBertConfig, MegatronBioBertModel, PositionEmbeddingKinds
 from bionemo.llm.api import MegatronLossType
@@ -49,9 +48,186 @@ __all__: Sequence[str] = (
     "AMPLIFYModel",
 )
 
-class AMPLIFYModel(ESM2Model):
+
+class AMPLIFYLMHead(MegatronModule):
+    """LM head for AMPLIFY
+
+    Args:
+        hidden_size: hidden size
+        config (TransformerConfig): TransformerConfig object
+    """
+
+    def __init__(self, config: TransformerConfig):
+        super().__init__(config=config)
+        self.head = IdentityOp()
+
+    def forward(self, hidden_states: Tensor) -> Tensor:
+        return self.head(hidden_states)
+
+class AMPLIFYModel(MegatronBioBertModel):
     """AMPLIFY protein language model."""
-    pass
+    def __init__(
+        self,
+        config: TransformerConfig,
+        num_tokentypes: int,
+        transformer_layer_spec: spec_utils.ModuleSpec,
+        vocab_size: int,
+        max_sequence_length: int,
+        tokenizer: Optional[BioNeMoAMPLIFYTokenizer] = None,
+        pre_process: bool = True,
+        post_process: bool = True,
+        fp16_lm_cross_entropy: bool = False,
+        parallel_output: bool = True,
+        share_embeddings_and_output_weights: bool = False,
+        position_embedding_type: Literal["learned_absolute", "rope"] = "learned_absolute",
+        rotary_percent: float = 1.0,
+        seq_len_interpolation_factor: Optional[float] = None,
+        add_binary_head: bool = True,
+        return_embeddings: bool = False,
+        include_embeddings: bool = False,
+        use_full_attention_mask: bool = False,
+        include_hiddens: bool = False,
+        skip_logits: bool = False,
+    ) -> None:
+        """Initialize the AMPLIFY model.
+
+        Args:
+            config (TransformerConfig): transformer config
+            num_tokentypes (int): Set to 2 when args.bert_binary_head is True, and 0 otherwise. Defaults to 0.
+            transformer_layer_spec (ModuleSpec): Specifies module to use for transformer layers
+            vocab_size (int): vocabulary size
+            max_sequence_length (int): maximum size of sequence. This is used for positional embedding
+            tokenizer (AutoTokenizer): optional tokenizer object (currently only used in the constructor of ESM2Model)
+            pre_process (bool): Include embedding layer (used with pipeline parallelism)
+            post_process (bool): Include an output layer (used with pipeline parallelism)
+            fp16_lm_cross_entropy: Whether to move the cross entropy unreduced loss calculation for lm head to fp16.
+            parallel_output (bool): Do not gather the outputs, keep them split across tensor parallel ranks
+            share_embeddings_and_output_weights (bool): When True, input embeddings and output logit weights are shared. Defaults to False.
+            position_embedding_type (string): Position embedding type. Options ['learned_absolute', 'rope'].
+                Defaults is 'learned_absolute'.
+            rotary_percent (float): Percent of rotary dimension to use for rotary position embeddings.
+                Defaults to 1.0 (100%). Ignored unless position_embedding_type is 'rope'.
+            seq_len_interpolation_factor (Optional[float]): Interpolation factor for sequence length. Defaults to None.
+            add_binary_head (bool): Whether to add a binary head. Defaults to True.
+            return_embeddings (bool): Whether to return embeddings. Defaults to False.
+            include_embeddings (bool): Whether to include embeddings in the output dictionary. Defaults to False.
+            use_full_attention_mask (bool): Whether to use full attention mask. Defaults to False.
+            include_hiddens (bool): Whether to include hidden states in the output dictionary. Defaults to False.
+            skip_logits (bool): Skip writing the token logits in output dict
+        """
+        super(MegatronBioBertModel, self).__init__(config=config)
+        self.post_process = post_process
+        self.add_binary_head = add_binary_head
+        if return_embeddings:
+            assert self.post_process, "only return embeddings on the last pipeline stage"
+        # `b` = batch, `s` = sequence.
+        # The old flash attention mechanism apparently wants you to use a b x 1 x s x s attention mask while
+        #  the new one wants a b x 1 x 1 x s attention mask. This is a hack to allow us to switch between the two.
+        self.use_full_attention_mask = use_full_attention_mask
+        self.config: TransformerConfig = config
+        self.transformer_layer_spec: spec_utils.ModuleSpec = transformer_layer_spec
+        self.vocab_size = vocab_size
+        self.max_sequence_length = max_sequence_length
+        self.pre_process = pre_process
+        self.post_process = post_process
+        self.fp16_lm_cross_entropy = fp16_lm_cross_entropy
+        self.parallel_output = parallel_output
+        self.share_embeddings_and_output_weights = share_embeddings_and_output_weights
+        self.position_embedding_type = position_embedding_type
+        self.add_binary_head = add_binary_head
+        self.return_embeddings = return_embeddings
+        self.include_embeddings = include_embeddings
+        self.include_hiddens = include_hiddens
+        self.skip_logits = skip_logits
+
+        # megatron core pipelining currently depends on model type
+        self.model_type = ModelType.encoder_or_decoder
+
+        # Embeddings.
+        if self.pre_process:
+            self.register_buffer(
+                "bert_position_id_tensor",
+                torch.arange(max_sequence_length, dtype=torch.long, requires_grad=False).unsqueeze(0),
+                persistent=False,
+            )
+            # ESM2 Customization: ESM2Embedding instead of LanguageModelEmbedding
+            # TODO: call super, overwrite the self.embedding, and setup_embeddings_and_output_layer in constructor.
+            # Note: need to avoid calling setup twice: skip with super (super(skip_setup=True))
+            self.embedding = ESM2Embedding(
+                config=self.config,
+                vocab_size=self.vocab_size,
+                max_sequence_length=self.max_sequence_length,
+                position_embedding_type=position_embedding_type,
+                num_tokentypes=num_tokentypes,
+                # ESM2 NEW ARGS
+                token_dropout=self.config.token_dropout,
+                use_attention_mask=self.config.use_attention_mask,
+                mask_token_id=tokenizer.mask_token_id,
+            )
+
+        if self.position_embedding_type == "rope":
+            self.rotary_pos_emb = RotaryEmbedding(
+                kv_channels=self.config.kv_channels,
+                rotary_percent=rotary_percent,
+                rotary_interleaved=self.config.rotary_interleaved,
+                seq_len_interpolation_factor=seq_len_interpolation_factor,
+            )
+
+        # Transformer.
+        self.encoder = TransformerBlock(
+            config=self.config,
+            spec=self.transformer_layer_spec,
+            pre_process=self.pre_process,
+            post_process=self.post_process,
+        )
+
+        # Output
+        if post_process:
+            # TODO: Make sure you are passing in the mpu_vocab_size properly
+            self.lm_head = AMPLIFYLMHead(config)
+
+            self.output_layer = tensor_parallel.ColumnParallelLinear(
+                config.hidden_size,
+                self.vocab_size,
+                config=config,
+                init_method=config.init_method,
+                bias=True,
+                skip_bias_add=False,
+                gather_output=not self.parallel_output,
+                skip_weight_param_allocation=pre_process and share_embeddings_and_output_weights,
+            )
+
+            self.binary_head = None
+            if self.add_binary_head:
+                # TODO: Shoudl switch this to TE ?
+                self.binary_head = get_linear_layer(
+                    config.hidden_size, 2, config.init_method, config.perform_initialization
+                )
+
+                self.pooler = Pooler(config.hidden_size, config.init_method, config, config.sequence_parallel)
+        if self.pre_process or self.post_process:
+            self.setup_embeddings_and_output_layer()
+
+    def embedding_forward(
+        self, input_ids: Tensor, position_ids: Tensor, tokentype_ids: Tensor = None, attention_mask: Tensor = None
+    ):
+        """Forward pass of the embedding layer.
+
+        Args:
+            input_ids: The input tensor of shape (batch_size, sequence_length) containing the input IDs.
+            position_ids: The tensor of shape (batch_size, sequence_length) containing the position IDs.
+            tokentype_ids: The tensor of shape (batch_size, sequence_length) containing the token type IDs. Defaults to None.
+            attention_mask: The tensor of shape (batch_size, sequence_length) containing the attention mask. Defaults to None.
+
+        Returns:
+            Tensor: The output tensor of shape (batch_size, sequence_length, hidden_size) containing the embedded representations.
+        """
+        # ESM2 Customization: ESM2Embedding forward takes attention_mask
+        # in addition to the args required by LanguageModelEmbedding
+        return self.embedding(
+            input_ids=input_ids, position_ids=position_ids, tokentype_ids=tokentype_ids, attention_mask=attention_mask
+        )
+        
 
 AMPLIFYModelT = TypeVar("AMPLIFYModelT", bound=AMPLIFYModel)
 
@@ -134,9 +310,9 @@ class AMPLIFYConfig(BioBertConfig[AMPLIFYModelT, MegatronLossType], iom.IOMixinW
     apply_rope_fusion: bool = True
     gated_linear_unit: bool = True
     activation_func: str = silu 
-    # normalization: str = "RMSNorm"    # AMPLIFY uses RMSNorm instead of LayerNorm
+    normalization: str = "RMSNorm"    # AMPLIFY uses RMSNorm instead of LayerNorm
     layernorm_zero_centered_gamma: bool = False # Zero centered gamma not supported for RMSNorm
-    biobert_spec_option: BiobertSpecOption = BiobertSpecOption.amplify_bert_layer_with_transformer_engine_spec
+    biobert_spec_option: BiobertSpecOption = BiobertSpecOption.esm2_bert_layer_with_transformer_engine_spec
 
     # TODO: Move this to better places?
     get_attention_mask_from_fusion: bool = False
@@ -158,8 +334,7 @@ class AMPLIFYConfig(BioBertConfig[AMPLIFYModelT, MegatronLossType], iom.IOMixinW
     def __post_init__(self):
         """Check compatibility between biobert_spec_option and apply_query_key_layer_scaling post initialization."""
         super().__post_init__()
-        if self.biobert_spec_option == BiobertSpecOption.amplify_bert_layer_with_transformer_engine_spec or\
-            self.biobert_spec_option == BiobertSpecOption.esm2_bert_layer_with_transformer_engine_spec:
+        if self.biobert_spec_option == BiobertSpecOption.esm2_bert_layer_with_transformer_engine_spec:
             self.apply_query_key_layer_scaling = False
             self.core_attention_override = ESM2TEDotProductAttention #TODO: ynashed: verify if this is needed
             if self.gated_linear_unit:
