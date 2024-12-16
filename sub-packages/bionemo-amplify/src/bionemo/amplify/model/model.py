@@ -158,7 +158,8 @@ class AMPLIFYConfig(BioBertConfig[AMPLIFYModelT, MegatronLossType], iom.IOMixinW
     def __post_init__(self):
         """Check compatibility between biobert_spec_option and apply_query_key_layer_scaling post initialization."""
         super().__post_init__()
-        if self.biobert_spec_option == BiobertSpecOption.amplify_bert_layer_with_transformer_engine_spec:
+        if self.biobert_spec_option == BiobertSpecOption.amplify_bert_layer_with_transformer_engine_spec or\
+            self.biobert_spec_option == BiobertSpecOption.esm2_bert_layer_with_transformer_engine_spec:
             self.apply_query_key_layer_scaling = False
             self.core_attention_override = ESM2TEDotProductAttention #TODO: ynashed: verify if this is needed
             if self.gated_linear_unit:
