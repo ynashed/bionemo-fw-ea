@@ -46,11 +46,12 @@ spec:
                 ( \
                   torchrun scripts/protein/amplify/amplify_pretrain.py  \
                   --hf-dataset-name chandar-lab/UR100P   \
-                  --result-dir /results     \
-                  --experiment-name 32GPU_pretrain   \
+                  --result-dir /home/local/.cache     \
+                  --experiment-name 32GPU_pretrain_mask_strategy_all_tokens   \
                   --wandb-project amplify_pretrain \
                   --num-gpus 8  \
                   --num-nodes 4 \
+                  --random-mask-strategy all_tokens\
                   --micro-batch-size 128 \
                   --lr 1.0e-3 \
                   --max-seq-length 512 \
