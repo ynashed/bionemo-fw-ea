@@ -15,7 +15,7 @@
 
 from typing import Any, Callable, Dict, Generic, Iterable, Iterator, List, Optional, Sequence, Tuple, TypeVar, Union
 
-import pytorch_lightning as pl
+import lightning.pytorch as pl
 import torch.distributed
 from megatron.core import parallel_state
 from megatron.core.optimizer.optimizer_config import OptimizerConfig
@@ -177,8 +177,7 @@ class PassthroughLossReduction(MegatronLossReduction, Generic[DataT]):
         Returns:
             A tuple containing the loss tensor (dummy in this case) and the forward output (unmodified).
         """
-        dtype, device = get_dtype_device(forward_out)
-        return torch.zeros(1, device=device, dtype=dtype), forward_out
+        return torch.zeros((1, 1)), forward_out
 
     def reduce(self, forward_out: List[DataT]) -> DataT:
         """Collates list of model's outputs into a single output."""
@@ -313,6 +312,8 @@ class BionemoLightningModule(
 
     def predict_step(self, batch, batch_idx: Optional[int] = None) -> Tensor:
         """Alias for forward_step."""
+        if len(batch) == 0:
+            return
         return self.forward_step(batch)
 
     def training_loss_reduction(self) -> MegatronLossType:

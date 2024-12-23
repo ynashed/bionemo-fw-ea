@@ -8,7 +8,11 @@ The ESM-2 model is a transformer-based protein language model that was pretraine
 
 In this tutorial, we will demonstrate how to create an ESM-2 pretraining data module, and create and train a ESM-2 model.
 
-All commands should be executed inside the BioNeMo docker container, which has all ESM-2 dependencies pre-installed. This tutorial assumes that a copy of the BioNeMo framework repo exists on workstation or server and has been mounted inside the container at `/workspace/bionemo2`.  For more information on how to build or pull the BioNeMo2 container, refer to the [Initialization Guide](../../getting-started/initialization-guide.md).
+All commands should be executed inside the BioNeMo docker container, which has all ESM-2 dependencies pre-installed. The BioNeMo Framework container can run in a brev.dev launchable: [![ Click here to deploy.](https://uohmivykqgnnbiouffke.supabase.co/storage/v1/object/public/landingpage/brevdeploynavy.svg)](https://console.brev.dev/launchable/deploy/now?launchableID=env-2pPDA4sJyTuFf3KsCv5KWRbuVlU). It takes about 10 minutes to deploy this notebook as a Launchable. As of this writing, we are working on a free tier so a credit card may be required. You can reach out to your NVIDIA rep for credit. After launching the instance, launch a Terminal session in the Jupyter Lab UI. (Note: This links to the nightly release and may be out of sync with these docs.)
+
+Alternatively,  more information on how to build or pull the BioNeMo2 container locally, refer to the [Initialization Guide](../../getting-started/initialization-guide.md).
+
+This tutorial assumes that a copy of the BioNeMo framework repo exists on workstation or server and has been mounted inside the container at `/workspace/bionemo2`.
 
 !!! note
 
@@ -57,7 +61,7 @@ strategy = nl.MegatronStrategy(
 BioNeMo2 trainer is very similar to PyTorch Lightning trainer. We can configure the training configurations and logging.
 
 ```python
-from pytorch_lightning.callbacks import LearningRateMonitor, RichModelSummary
+from lightning.pytorch.callbacks import LearningRateMonitor, RichModelSummary
 from bionemo.llm.lightning import PerplexityLoggingCallback
 
 num_steps = 20
@@ -253,7 +257,6 @@ checkpoint_callback = nl_callbacks.ModelCheckpoint(
     save_last=True,
     monitor="val_loss",
     save_top_k=1,
-    every_n_train_steps=100,
     always_save_context=True,
 )
 
@@ -277,12 +280,13 @@ llm.train(
 )
 ```
 
-Or simply call `esm2_pretrain.py` directly.
+Or simply use the ESM2 pretrain located in `$WORKDIR/sub-packages/bionemo-esm2/src/bionemo/esm2/scripts/train_esm2.py`. This script can be called either by directly using python or the installed executable `train_esm2`:
+
 ```bash
 # Enable fused attention in transformer engine for speed-up
 DATA_DIR=$(download_bionemo_data esm2/testdata_esm2_pretrain:2.0 --source ngc)
 
-python scripts/protein/esm2/esm2_pretrain.py \
+train_esm2 \
     --train-cluster-path ${DATA_DIR}/2024_03_sanity/train_clusters_sanity.parquet \
     --train-database-path ${DATA_DIR}/2024_03_sanity/train_sanity.db \
     --valid-cluster-path ${DATA_DIR}/2024_03_sanity/valid_clusters.parquet \
