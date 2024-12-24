@@ -223,7 +223,7 @@ def main(
                 use_distributed_optimizer=False,
                 weight_decay=0.01,
                 adam_beta1=0.9,
-                adam_beta2=0.98,
+                adam_beta2=0.95,
                 clip_grad=1.0,
             ),
             lr_scheduler=nl.lr_scheduler.CosineAnnealingScheduler(
@@ -426,8 +426,8 @@ parser.add_argument(
     type=BiobertSpecOption,
     choices=[e.value for e in BiobertSpecOption],
     required=False,
-    default=BiobertSpecOption.amplify_bert_layer_with_transformer_engine_spec.value,
-    help="Biobert spec option to use for the model. Default is 'amplify_bert_layer_with_transformer_engine_spec'.",
+    default=BiobertSpecOption.esm2_bert_layer_with_transformer_engine_spec.value,
+    help="Biobert spec option to use for the model. Default is 'esm2_bert_layer_with_transformer_engine_spec'.",
 )
 parser.add_argument(
     "--nemo1-init-path",
