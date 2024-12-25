@@ -17,13 +17,13 @@ import argparse
 from pathlib import Path
 from typing import List, Optional, Sequence, get_args
 
+from lightning.pytorch.callbacks import LearningRateMonitor, RichModelSummary
 from megatron.core.optimizer import OptimizerConfig
 from nemo import lightning as nl
 from nemo.collections import llm
 from nemo.lightning import resume
 from nemo.lightning.pytorch import callbacks as nl_callbacks
 from nemo.lightning.pytorch.optim import MegatronOptimizerModule
-from pytorch_lightning.callbacks import LearningRateMonitor, RichModelSummary
 
 from bionemo.core.utils.dtypes import PrecisionTypes, get_autocast_dtype
 from bionemo.amplify.api import AMPLIFYConfig
@@ -82,7 +82,7 @@ def main(
     nsys_start_step: int = 0,
     nsys_end_step: Optional[int] = None,
     nsys_ranks: List[int] = [0],
-    random_mask_strategy: RandomMaskStrategy = RandomMaskStrategy.AMINO_ACIDS_ONLY,
+    random_mask_strategy: RandomMaskStrategy = RandomMaskStrategy.ALL_TOKENS,
     num_layers: int = 32,
     hidden_size: int = 960,
     num_attention_heads: int = 15,
@@ -115,8 +115,21 @@ def main(
             result_dir that stores the logs and checkpoints.
         resume_if_exists (bool): attempt to resume if the checkpoint exists [FIXME @skothenhill this doesn't work yet]
         create_tensorboard_logger (bool): create the tensorboard logger
-        restore_from_checkpoint_path (path): If set, restores the model from the directory passed in. Expects the
+        restore_from_checkpoint_path (Optional[str]): If set, restores the model from the directory passed in. Expects the
             checkpoint to be created by using the ModelCheckpoint class and always_save_context=True.
+        save_best_checkpoint (bool): whether to save the best checkpoint
+        save_last_checkpoint (bool): whether to save the last checkpoint
+        metric_to_monitor_for_checkpoints (str): metric to monitor for checkpoints
+        save_top_k (int): number of top checkpoints to save
+        nsys_profiling (bool): whether to enable nsys profiling
+        nsys_start_step (int): start step for nsys profiling
+        nsys_end_step (Optional[int]): end step for nsys profiling
+        nsys_ranks (List[int]): ranks for nsys profiling
+        random_mask_strategy (RandomMaskStrategy): random mask strategy
+        num_layers (int): number of layers
+        hidden_size (int): hidden size
+        num_attention_heads (int): number of attention heads
+        ffn_hidden_size (int): feed forward hidden size
     """
     # Create the result directory if it does not exist.
     result_dir.mkdir(parents=True, exist_ok=True)
@@ -137,6 +150,9 @@ def main(
         ddp="megatron",
         find_unused_parameters=True,
         ckpt_include_optimizer=True,
+        # NOTE: there are issues related to async that may occur, most recently observed due to duplicate filenames.
+        ckpt_async_save=True,
+        ckpt_parallel_load=True,
     )
 
     # for wandb integration
@@ -160,6 +176,7 @@ def main(
         PerplexityLoggingCallback(log_train=False, log_val=True),
         RichModelSummary(max_depth=4),
         LearningRateMonitor(),
+        nl_callbacks.PreemptionCallback(),
     ]
     if nsys_profiling:
         if nsys_end_step is None:
@@ -196,7 +213,7 @@ def main(
         random_mask_strategy=random_mask_strategy,
         tokenizer=tokenizer,
     )
-
+    # Configure the model
     amplify_config = AMPLIFYConfig(
         seq_length=max_seq_length,
         num_layers=num_layers,
@@ -220,7 +237,7 @@ def main(
             config=OptimizerConfig(
                 lr=lr,
                 optimizer="adam",  # fused_adam not supported
-                use_distributed_optimizer=False,
+                use_distributed_optimizer=True,
                 weight_decay=0.01,
                 adam_beta1=0.9,
                 adam_beta2=0.95,
@@ -242,6 +259,7 @@ def main(
         save_top_k=save_top_k,
         every_n_train_steps=val_check_interval,
         always_save_context=True,  # Enables the .nemo file-like checkpointing where all IOMixins are under SerDe
+        filename="{epoch}-{val_loss:.2f}-{step}-{consumed_samples}",  # Including step and consumed_samples in the checkpoint filename prevents duplicate filenames and bugs related to this.
     )
 
     # Setup the logger and train the model
@@ -265,279 +283,12 @@ def main(
     )
 
 
-# TODO migrate to hydra config
-# Parse the arguments and pull them out into local variables for ease of future refactor to a
-#   config management system.
-parser = argparse.ArgumentParser(description="Pretrain AMPLIFY with UR100P data.")
-parser.add_argument(
-    "--hf-dataset-name",
-    type=str,
-    required=True,
-    help="Name of the HuggingFace dataset containing UR100P protein sequences",
-)
-parser.add_argument(
-    "--precision",
-    type=str,
-    choices=get_args(PrecisionTypes),
-    required=False,
-    default="bf16-mixed",
-    help="Precision type to use for training.",
-)
-parser.add_argument(
-    "--lr",
-    type=float,
-    required=False,
-    default=1e-3,
-    help="Learning rate for training. Default is 1e-3",
-)
-parser.add_argument(
-    "--create-tensorboard-logger", action="store_true", default=False, help="Create a tensorboard logger."
-)
-# FIXME (@skothenhill) figure out how checkpointing and resumption should work with the new nemo trainer
-parser.add_argument(
-    "--resume-if-exists", action="store_true", default=False, help="Resume training if a checkpoint exists."
-)
-parser.add_argument(
-    "--result-dir", type=Path, required=False, default=Path("./results"), help="Path to the result directory."
-)
-parser.add_argument("--experiment-name", type=str, required=False, default="amplify", help="Name of the experiment.")
-
-parser.add_argument("--wandb-entity", type=str, default=None, help="The team posting this run")
-parser.add_argument("--wandb-project", type=str, default=None, help="Wandb project name ")
-parser.add_argument("--wandb-tags", nargs="+", type=str, default=None, help="Tags associated with this run")
-parser.add_argument(
-    "--wandb-group", type=str, default=None, help="A unique string shared by all runs in a given group"
-)
-parser.add_argument(
-    "--wandb-id", type=str, default=None, help="Sets the version, mainly used to resume a previous run"
-)
-parser.add_argument("--wandb-anonymous", action="store_true", help="Enable or explicitly disable anonymous logging")
-parser.add_argument(
-    "--wandb-log-model", action="store_true", help="Save checkpoints in wandb dir to upload on W&B servers"
-)
-parser.add_argument("--wandb-offline", action="store_true", help="Use wandb in offline mode")
-parser.add_argument(
-    "--num-gpus",
-    type=int,
-    required=False,
-    default=1,
-    help="Number of GPUs to use for training. Default is 1.",
-)
-parser.add_argument(
-    "--num-nodes",
-    type=int,
-    required=False,
-    default=1,
-    help="Number of nodes to use for training. Default is 1.",
-)
-parser.add_argument(
-    "--num-steps",
-    type=int,
-    required=False,
-    default=1_000_000,
-    help="Number of steps to use for training. Default is 1,000,000.",
-)
-parser.add_argument(
-    "--warmup-steps",
-    type=int,
-    required=False,
-    default=1000,
-    help="Number of warmup steps for WarmupAnnealDecayHold Scheduler. Default is 1000.",
-)
-parser.add_argument(
-    "--decay-steps",
-    type=int,
-    required=False,
-    default=900_000,
-    help="Number of decay steps for WarmupAnnealDecayHold Scheduler. Default is 900,000.",
-)
-parser.add_argument(
-    "--num-dataset-workers",
-    type=int,
-    required=False,
-    default=1,
-    help="Number of workers to use for training. Default is 1.",
-)
-parser.add_argument(
-    "--val-check-interval",
-    type=int,
-    required=False,
-    default=10000,
-    help="Number of steps between validation. Default is 10000.",
-)
-parser.add_argument(
-    "--log-every-n-steps",
-    type=int,
-    required=False,
-    default=100,
-    help="Number of steps between logging. Default is 100.",
-)
-parser.add_argument(
-    "--min-seq-length",
-    type=int,
-    required=False,
-    default=512,
-    help="Minimum sequence length. Sampled will be padded if less than this value.",
-)
-parser.add_argument(
-    "--max-seq-length",
-    type=int,
-    required=False,
-    default=512,
-    help="Maximum sequence length. Samples will be truncated if exceeds this value.",
-)
-parser.add_argument(
-    "--limit-val-batches",
-    type=float_or_int_or_none,
-    required=False,
-    default=1.0,
-    help="Number of global batches used for validation if int. Fraction of validation dataset if float. Default is 1.0.",
-)
-parser.add_argument(
-    "--micro-batch-size",
-    type=int,
-    required=False,
-    default=64,
-    help="Micro-batch size. Global batch size is inferred from this.",
-)
-parser.add_argument(
-    "--pipeline-model-parallel-size",
-    type=int,
-    required=False,
-    default=1,
-    help="Pipeline model parallel size. Default is 1.",
-)
-parser.add_argument(
-    "--tensor-model-parallel-size",
-    type=int,
-    required=False,
-    default=1,
-    help="Tensor model parallel size. Default is 1.",
-)
-parser.add_argument(
-    "--accumulate-grad-batches",
-    type=int,
-    required=False,
-    default=1,
-    help="Gradient accumulation steps. Global batch size is inferred from this.",
-)
-parser.add_argument(
-    "--biobert-spec-option",
-    type=BiobertSpecOption,
-    choices=[e.value for e in BiobertSpecOption],
-    required=False,
-    default=BiobertSpecOption.esm2_bert_layer_with_transformer_engine_spec.value,
-    help="Biobert spec option to use for the model. Default is 'esm2_bert_layer_with_transformer_engine_spec'.",
-)
-parser.add_argument(
-    "--nemo1-init-path",
-    type=Path,
-    required=False,
-    help="Path to nemo1 file, if desired to load at init time.",
-)
-parser.add_argument(
-    "--save-best-checkpoint",
-    action="store_true",
-    default=True,
-    help="Save the best checkpoint based on the metric to monitor.",
-)
-parser.add_argument(
-    "--save-last-checkpoint",
-    action="store_true",
-    default=True,
-    help="Save the last checkpoint.",
-)
-parser.add_argument(
-    "--metric-to-monitor-for-checkpoints",
-    type=str,
-    required=False,
-    default="val_loss",
-    help="The metric to monitor for checkpointing.",
-)
-parser.add_argument(
-    "--save-top-k",
-    type=int,
-    required=False,
-    default=2,
-    help="Save the top k checkpoints.",
-)
-parser.add_argument(
-    "--restore-from-checkpoint-path",
-    type=Path,
-    required=False,
-    default=None,
-    help="Path to the checkpoint directory to restore from. Will override `--resume-if-exists` when set.",
-)
-parser.add_argument(
-    "--nsys-profiling",
-    action="store_true",
-    default=False,
-    help="Enable targeted `nsys` profiling on the training loop for a defined step range. To actually get profiling output you must run the whole program with `nsys`. For example: "
-    " `nsys profile -s none -o output_report_name -t cuda,nvtx --force-overwrite true --capture-range=cudaProfilerApi --capture-range-end=stop  [regular python command here]`",
-)
-# start, end, rank
-parser.add_argument(
-    "--nsys-start-step",
-    type=int,
-    required=False,
-    default=0,
-    help="Start nsys profiling after this step.",
-)
-parser.add_argument(
-    "--nsys-end-step",
-    type=int,
-    required=False,
-    help="End nsys profiling after this step.",
-)
-# rank as list of integers
-parser.add_argument(
-    "--nsys-ranks",
-    type=int,
-    nargs="+",
-    required=False,
-    default=[0],
-    help="Enable nsys profiling for these ranks.",
-)
-
-# AMPLIFY specific configuration (default: 120M)
-parser.add_argument(
-    "--random-mask-strategy",
-    type=RandomMaskStrategy,
-    choices=[e.value for e in RandomMaskStrategy],
-    default=RandomMaskStrategy.AMINO_ACIDS_ONLY.value,
-    help=f"""In pretraining, 15%% of all tokens are masked and among which 10%% are replaced with a random token. This class controls the set of random tokens to choose from. Options are: '{"', '".join([e.value for e in RandomMaskStrategy])}'. Note that 'all_token' will introduce non-canonical amino acid tokens as effective mask tokens, and the resultant loss will appear lower than that from 'amino_acids_only'. Note that 'all_token' is the method used in hugging face as well as portions of fairseq.""",
-)
-parser.add_argument(
-    "--num-layers",
-    type=int,
-    required=False,
-    default=24,
-    help="Number of layers in the model. Default is 24.",
-)
-parser.add_argument(
-    "--hidden-size",
-    type=int,
-    required=False,
-    default=640,
-    help="Hidden size of the model. Default is 640.",
-)
-parser.add_argument(
-    "--num-attention-heads",
-    type=int,
-    required=False,
-    default=10,
-    help="Number of attention heads in the model. Default is 10.",
-)
-parser.add_argument(
-    "--ffn-hidden-size",
-    type=int,
-    required=False,
-    default=4 * 640,
-    help="FFN hidden size of the model. Default is 4 * 640.",
-)
-
-if __name__ == "__main__":
+def train_amplify_entrypoint():
+    """Entrypoint for running pretraining for amplify."""
+    # 1. get arguments
+    parser = get_parser()
     args = parser.parse_args()
+    # 2. Call pretrain with args
     main(
         hf_dataset_name=args.hf_dataset_name,
         num_nodes=args.num_nodes,
@@ -585,3 +336,281 @@ if __name__ == "__main__":
         num_attention_heads=args.num_attention_heads,
         ffn_hidden_size=args.ffn_hidden_size,
     )
+
+def get_parser():
+    """Return the cli parser for this tool."""
+    # TODO migrate to hydra config
+    # Parse the arguments and pull them out into local variables for ease of future refactor to a
+    #   config management system.
+    parser = argparse.ArgumentParser(description="Pretrain AMPLIFY with UR100P data.")
+    parser.add_argument(
+        "--hf-dataset-name",
+        type=str,
+        required=True,
+        help="Name of the HuggingFace dataset containing UR100P protein sequences",
+    )
+    parser.add_argument(
+        "--precision",
+        type=str,
+        choices=get_args(PrecisionTypes),
+        required=False,
+        default="bf16-mixed",
+        help="Precision type to use for training.",
+    )
+    parser.add_argument(
+        "--lr",
+        type=float,
+        required=False,
+        default=1e-3,
+        help="Learning rate for training. Default is 1e-3",
+    )
+    parser.add_argument(
+        "--create-tensorboard-logger", action="store_true", default=False, help="Create a tensorboard logger."
+    )
+    # FIXME (@skothenhill) figure out how checkpointing and resumption should work with the new nemo trainer
+    parser.add_argument(
+        "--resume-if-exists", action="store_true", default=False, help="Resume training if a checkpoint exists."
+    )
+    parser.add_argument(
+        "--result-dir", type=Path, required=False, default=Path("./results"), help="Path to the result directory."
+    )
+    parser.add_argument("--experiment-name", type=str, required=False, default="amplify", help="Name of the experiment.")
+
+    parser.add_argument("--wandb-entity", type=str, default=None, help="The team posting this run")
+    parser.add_argument("--wandb-project", type=str, default=None, help="Wandb project name ")
+    parser.add_argument("--wandb-tags", nargs="+", type=str, default=None, help="Tags associated with this run")
+    parser.add_argument(
+        "--wandb-group", type=str, default=None, help="A unique string shared by all runs in a given group"
+    )
+    parser.add_argument(
+        "--wandb-id", type=str, default=None, help="Sets the version, mainly used to resume a previous run"
+    )
+    parser.add_argument("--wandb-anonymous", action="store_true", help="Enable or explicitly disable anonymous logging")
+    parser.add_argument(
+        "--wandb-log-model", action="store_true", help="Save checkpoints in wandb dir to upload on W&B servers"
+    )
+    parser.add_argument("--wandb-offline", action="store_true", help="Use wandb in offline mode")
+    parser.add_argument(
+        "--num-gpus",
+        type=int,
+        required=False,
+        default=1,
+        help="Number of GPUs to use for training. Default is 1.",
+    )
+    parser.add_argument(
+        "--num-nodes",
+        type=int,
+        required=False,
+        default=1,
+        help="Number of nodes to use for training. Default is 1.",
+    )
+    parser.add_argument(
+        "--num-steps",
+        type=int,
+        required=False,
+        default=1_000_000,
+        help="Number of steps to use for training. Default is 1,000,000.",
+    )
+    parser.add_argument(
+        "--warmup-steps",
+        type=int,
+        required=False,
+        default=1000,
+        help="Number of warmup steps for WarmupAnnealDecayHold Scheduler. Default is 1000.",
+    )
+    parser.add_argument(
+        "--decay-steps",
+        type=int,
+        required=False,
+        default=900_000,
+        help="Number of decay steps for WarmupAnnealDecayHold Scheduler. Default is 900,000.",
+    )
+    parser.add_argument(
+        "--num-dataset-workers",
+        type=int,
+        required=False,
+        default=1,
+        help="Number of workers to use for training. Default is 1.",
+    )
+    parser.add_argument(
+        "--val-check-interval",
+        type=int,
+        required=False,
+        default=10000,
+        help="Number of steps between validation. Default is 10000.",
+    )
+    parser.add_argument(
+        "--log-every-n-steps",
+        type=int,
+        required=False,
+        default=100,
+        help="Number of steps between logging. Default is 100.",
+    )
+    parser.add_argument(
+        "--min-seq-length",
+        type=int,
+        required=False,
+        default=512,
+        help="Minimum sequence length. Sampled will be padded if less than this value.",
+    )
+    parser.add_argument(
+        "--max-seq-length",
+        type=int,
+        required=False,
+        default=512,
+        help="Maximum sequence length. Samples will be truncated if exceeds this value.",
+    )
+    parser.add_argument(
+        "--limit-val-batches",
+        type=float_or_int_or_none,
+        required=False,
+        default=1.0,
+        help="Number of global batches used for validation if int. Fraction of validation dataset if float. Default is 1.0.",
+    )
+    parser.add_argument(
+        "--micro-batch-size",
+        type=int,
+        required=False,
+        default=64,
+        help="Micro-batch size. Global batch size is inferred from this.",
+    )
+    parser.add_argument(
+        "--pipeline-model-parallel-size",
+        type=int,
+        required=False,
+        default=1,
+        help="Pipeline model parallel size. Default is 1.",
+    )
+    parser.add_argument(
+        "--tensor-model-parallel-size",
+        type=int,
+        required=False,
+        default=1,
+        help="Tensor model parallel size. Default is 1.",
+    )
+    parser.add_argument(
+        "--accumulate-grad-batches",
+        type=int,
+        required=False,
+        default=1,
+        help="Gradient accumulation steps. Global batch size is inferred from this.",
+    )
+    parser.add_argument(
+        "--biobert-spec-option",
+        type=BiobertSpecOption,
+        choices=[e.value for e in BiobertSpecOption],
+        required=False,
+        default=BiobertSpecOption.esm2_bert_layer_with_transformer_engine_spec.value,
+        help="Biobert spec option to use for the model. Default is 'esm2_bert_layer_with_transformer_engine_spec'.",
+    )
+    parser.add_argument(
+        "--nemo1-init-path",
+        type=Path,
+        required=False,
+        help="Path to nemo1 file, if desired to load at init time.",
+    )
+    parser.add_argument(
+        "--save-best-checkpoint",
+        action="store_true",
+        default=True,
+        help="Save the best checkpoint based on the metric to monitor.",
+    )
+    parser.add_argument(
+        "--save-last-checkpoint",
+        action="store_true",
+        default=True,
+        help="Save the last checkpoint.",
+    )
+    parser.add_argument(
+        "--metric-to-monitor-for-checkpoints",
+        type=str,
+        required=False,
+        default="val_loss",
+        help="The metric to monitor for checkpointing.",
+    )
+    parser.add_argument(
+        "--save-top-k",
+        type=int,
+        required=False,
+        default=2,
+        help="Save the top k checkpoints.",
+    )
+    parser.add_argument(
+        "--restore-from-checkpoint-path",
+        type=Path,
+        required=False,
+        default=None,
+        help="Path to the checkpoint directory to restore from. Will override `--resume-if-exists` when set.",
+    )
+    parser.add_argument(
+        "--nsys-profiling",
+        action="store_true",
+        default=False,
+        help="Enable targeted `nsys` profiling on the training loop for a defined step range. To actually get profiling output you must run the whole program with `nsys`. For example: "
+        " `nsys profile -s none -o output_report_name -t cuda,nvtx --force-overwrite true --capture-range=cudaProfilerApi --capture-range-end=stop  [regular python command here]`",
+    )
+    # start, end, rank
+    parser.add_argument(
+        "--nsys-start-step",
+        type=int,
+        required=False,
+        default=0,
+        help="Start nsys profiling after this step.",
+    )
+    parser.add_argument(
+        "--nsys-end-step",
+        type=int,
+        required=False,
+        help="End nsys profiling after this step.",
+    )
+    # rank as list of integers
+    parser.add_argument(
+        "--nsys-ranks",
+        type=int,
+        nargs="+",
+        required=False,
+        default=[0],
+        help="Enable nsys profiling for these ranks.",
+    )
+
+    # AMPLIFY specific configuration (default: 120M)
+    parser.add_argument(
+        "--random-mask-strategy",
+        type=RandomMaskStrategy,
+        choices=[e.value for e in RandomMaskStrategy],
+        default=RandomMaskStrategy.AMINO_ACIDS_ONLY.value,
+        help=f"""In pretraining, 15%% of all tokens are masked and among which 10%% are replaced with a random token. This class controls the set of random tokens to choose from. Options are: '{"', '".join([e.value for e in RandomMaskStrategy])}'. Note that 'all_token' will introduce non-canonical amino acid tokens as effective mask tokens, and the resultant loss will appear lower than that from 'amino_acids_only'. Note that 'all_token' is the method used in hugging face as well as portions of fairseq.""",
+    )
+    parser.add_argument(
+        "--num-layers",
+        type=int,
+        required=False,
+        default=24,
+        help="Number of layers in the model. Default is 24.",
+    )
+    parser.add_argument(
+        "--hidden-size",
+        type=int,
+        required=False,
+        default=640,
+        help="Hidden size of the model. Default is 640.",
+    )
+    parser.add_argument(
+        "--num-attention-heads",
+        type=int,
+        required=False,
+        default=10,
+        help="Number of attention heads in the model. Default is 10.",
+    )
+    parser.add_argument(
+        "--ffn-hidden-size",
+        type=int,
+        required=False,
+        default=4 * 640,
+        help="FFN hidden size of the model. Default is 4 * 640.",
+    )
+    return parser
+
+
+if __name__ == "__main__":
+    train_amplify_entrypoint()

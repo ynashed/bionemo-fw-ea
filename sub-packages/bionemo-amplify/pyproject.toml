@@ -18,13 +18,13 @@ dependencies = [
     # external
 ]
 
-# Make sure that the tokenizer files are included along with the python files during installation.
-[tool.setuptools.package-data]
-"bionemo.amplify" = ["data/tokenizer/*.json", "data/tokenizer/*.txt"]
-
 [project.scripts]
 bionemo-amplify-train= "bionemo.amplify.run.main:main"
 bionemo-amplify-recipe= "bionemo.amplify.run.recipes:main"
+
+# Make sure that the tokenizer files are included along with the python files during installation.
+[tool.setuptools.package-data]
+"bionemo.amplify" = ["data/tokenizer/*.json", "data/tokenizer/*.txt"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
