@@ -4,8 +4,10 @@
 
 This is a minimalist package containing an example model that makes use of bionemo2 and nemo conventions. It contains the necessary models, dataloaders, datasets, and custom loss fucntions. The referenced classes and function are in `bionemo.example_model.lightning.lightning_basic`.
 
-This tutorial demonstrates the creation of a simple MNIST model. This should be run in a BioNeMo container. For this tutorial, we will reuse elements from the BioNeMo example_model package.
+This tutorial demonstrates the creation of a simple MNIST model. This should be run in a BioNeMo container. The BioNeMo Framework container can run in a brev.dev launchable: [![ Click here to deploy.](https://uohmivykqgnnbiouffke.supabase.co/storage/v1/object/public/landingpage/brevdeploynavy.svg)](https://console.brev.dev/launchable/deploy?launchableID=env-2pPDA4sJyTuFf3KsCv5KWRbuVlU). It takes about 10 minutes to deploy this notebook as a Launchable. As of this writing, we are working on a free tier so a credit card may be required. You can reach out to your NVIDIA rep for credit. Notebooks and a shell interface can be launced by clicking `Open Notebook`. (Note: This links to the nightly release and may be out of sync with these docs.)
 
+
+For this tutorial, we will reuse elements from the BioNeMo example_model package.
 
 `Megatron`/`NeMo` modules and datasets are special derivatives of PyTorch modules and datasets that extend and accelerate the distributed training and inference capabilities of PyTorch.
 
@@ -73,7 +75,7 @@ Similarly, `ExampleFineTuneConfig` extends `ExampleGenericConfig` for finetuning
 
 # Training Module
 
-It is helfpul to have a training module that inherits from `pytorch_lightning.LightningModule` which organizes the model architecture, training, validation, and testing logic while abstracting away boilerplate code, enabling easier and more scalable training. This wrapper can be used for all model and loss combinations specified in the config.
+It is helfpul to have a training module that inherits from `lightning.pytorch.LightningModule` which organizes the model architecture, training, validation, and testing logic while abstracting away boilerplate code, enabling easier and more scalable training. This wrapper can be used for all model and loss combinations specified in the config.
 In `bionemo.example_model.lightning.lightning_basic`, we define `BionemoLightningModule`.
 
 In this example, `training_step`, `validation_step`, and `predict_step` define the training, validation, and prediction loops are independent of the forward method. In nemo:
@@ -97,7 +99,7 @@ We specify a training strategy of type `nemo.lightning.MegatronStrategy`. This s
 
 We specify a trainer of type `nemo.lightning.Trainer`, which is an extension of the pytorch lightning trainer. This is where the devices, validation intervals, maximal steps, maximal number of epochs, and how frequently to log are specified.
 
-we specify a nemo-logger. We can set TensorBoard and WandB logging, along with extra loggers. Here, we specify a `CSVLogger` from pytorch_lightning.loggers.
+we specify a nemo-logger. We can set TensorBoard and WandB logging, along with extra loggers. Here, we specify a `CSVLogger` from lightning.pytorch.loggers.
 
 We can now proceed to training. The first pre-training scripts is `bionemo/example_model/training_scripts/pretrain_mnist.py`
 

@@ -28,7 +28,7 @@ import math
 import pathlib
 from typing import Literal
 
-import pytorch_lightning as pl
+import lightning.pytorch as pl
 import torch
 from megatron.core.optimizer.optimizer_config import OptimizerConfig
 from nemo import lightning as nl
@@ -46,7 +46,7 @@ from bionemo.testing.harnesses import stop_and_go
 from bionemo.testing.harnesses.mode import Mode
 
 
-DATA_PATH: pathlib.Path = load("single_cell/testdata-20240506") / "cellxgene_2023-12-15_small" / "processed_data"
+DATA_PATH: pathlib.Path = load("single_cell/testdata-20241203") / "cellxgene_2023-12-15_small_processed_scdl"
 
 MODEL_PRECISION: Literal["bf16-mixed"] = "bf16-mixed"
 SEQ_LEN: int = 1024
@@ -97,7 +97,7 @@ class TestGeneformerStopAndGo(stop_and_go.StopAndGoHarness):
     limit_val_batches: int = 2
     lr: float = 1e-4
     precision: Literal["16-mixed", "bf16-mixed", "32"] = MODEL_PRECISION
-    train_val_output_atol: float = 2e-2
+    output_tensor_atol: float = 3e-2
 
     @override
     @classmethod

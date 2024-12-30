@@ -20,11 +20,11 @@ from typing import Any, Dict, Set, Tuple, Type
 import pytest
 import torch
 from _pytest.compat import LEGACY_PATH
+from lightning.pytorch.loggers import TensorBoardLogger
 from nemo import lightning as nl
 from nemo.collections import llm
 from nemo.lightning import NeMoLogger, io, resume
 from nemo.lightning.pytorch import callbacks as nl_callbacks
-from pytorch_lightning.loggers import TensorBoardLogger
 
 from bionemo.core import BIONEMO_CACHE_DIR
 from bionemo.core.utils.dtypes import PrecisionTypes, get_autocast_dtype
@@ -52,10 +52,10 @@ def _train_model_get_ckpt(
     checkpoint_callback = nl_callbacks.ModelCheckpoint(
         save_last=True,
         save_on_train_epoch_end=True,
-        monitor="reduced_train_loss",  # TODO find out how to get val_loss logged and use "val_loss",
-        every_n_train_steps=5,
+        monitor="val_loss",
         always_save_context=True,  # Enables the .nemo file-like checkpointing where all IOMixins are under SerDe
         # async_save=False,  # Tries to save asynchronously, previously led to race conditions.
+        filename="{epoch}-{step}-{val_loss:.2f}",
     )
     save_dir = root_dir / name
     tb_logger = TensorBoardLogger(save_dir=save_dir, name=name)

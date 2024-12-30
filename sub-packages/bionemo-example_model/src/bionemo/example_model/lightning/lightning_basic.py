@@ -19,7 +19,6 @@ import os
 from dataclasses import dataclass, field
 from typing import Any, Dict, Generic, List, Optional, Sequence, Tuple, Type, TypedDict, TypeVar
 
-import pytorch_lightning as pl
 import torch
 from megatron.core import ModelParallelConfig
 from megatron.core.optimizer.optimizer_config import OptimizerConfig
@@ -35,6 +34,7 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 from torchvision.datasets import MNIST
 
+import lightning.pytorch as pl
 from bionemo.core import BIONEMO_CACHE_DIR
 from bionemo.core.data.multi_epoch_dataset import IdentityMultiEpochDatasetWrapper, MultiEpochDatasetResampler
 from bionemo.llm.api import MegatronLossType
@@ -649,8 +649,7 @@ class BionemoLightningModule(pl.LightningModule, io.IOMixin, LightningPassthroug
 checkpoint_callback = nl_callbacks.ModelCheckpoint(
     save_last=True,
     save_on_train_epoch_end=True,
-    monitor="reduced_train_loss",
-    every_n_train_steps=25,
+    monitor="val_loss",
     always_save_context=True,  # Enables the .nemo file-like checkpointing where all IOMixins are under SerDe
 )
 

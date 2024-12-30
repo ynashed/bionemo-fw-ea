@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Type, get_args
 
 import torch
+from lightning.pytorch.callbacks import LearningRateMonitor, RichModelSummary
 from megatron.core.distributed import DistributedDataParallelConfig
 from megatron.core.optimizer import OptimizerConfig
 from nemo import lightning as nl
@@ -36,7 +37,6 @@ from nemo.lightning.pytorch.optim import MegatronOptimizerModule
 from nemo.lightning.pytorch.optim.lr_scheduler import CosineAnnealingScheduler
 from nemo.utils import logging
 from nemo.utils.exp_manager import TimingCallback
-from pytorch_lightning.callbacks import LearningRateMonitor, RichModelSummary
 
 from bionemo.core.utils.dtypes import PrecisionTypes, get_autocast_dtype
 from bionemo.geneformer.api import FineTuneSeqLenBioBertConfig, GeneformerConfig
@@ -81,6 +81,10 @@ def main(
     create_tensorboard_logger: bool = False,
     nemo1_init_path: Path | None = None,
     restore_from_checkpoint_path: Path | None = None,
+    num_layers: int = 6,
+    hidden_size: int = 256,
+    ffn_hidden_size: int = 512,
+    num_attention_heads: int = 4,
     save_last_checkpoint: bool = True,
     metric_to_monitor_for_checkpoints: str = "val_loss",
     save_top_k: int = 2,
@@ -93,6 +97,7 @@ def main(
     gc_interval: int = 0,
     aligned_megatron_ddp: bool = False,
     recompilation_check: bool = False,
+    include_unrecognized_vocab_in_dataset: bool = False,
     # TODO add datamodule class, and ability to change data step to get full support for pretraining workflows
 ) -> None:
     """Train a Geneformer model on single cell data.
@@ -134,6 +139,10 @@ def main(
         create_tensorboard_logger (bool): create the tensorboard logger
         restore_from_checkpoint_path (path): If set, restores the model from the directory passed in. Expects the
             checkpoint to be created by using the ModelCheckpoint class and always_save_context=True.
+        num_layers (int): Number of layers in geneformer. Default to 6.
+        hidden_size (int): Hidden size in geneformer. Default to 256.
+        ffn_hidden_size (int): Feedforward hidden size in geneformer. Default to 512.
+        num_attention_heads (int): Number of attention heads in geneformer. Default to 4.
         log_every_n_steps (int): log at this interval.
         nsys_profiling (bool): Whether to enable the nsys profiling callback hooks. You still need to execute the
             function with nsys on the command line, but this enables more useful outputs in your nsys profiles, as
@@ -147,6 +156,7 @@ def main(
             good for clusters. This will likely slow down single node runs though.
         recompilation_check (bool): enable a recompilation check (only do on a small run) to verify that fused gpu
             kernels are not being regularly recompiled, which is very expensive, with a particular model/settings.
+        include_unrecognized_vocab_in_dataset (bool): If set to True, a hard-check is performed to verify all gene identifers are in the user supplied tokenizer vocab. Defaults to False which means any gene identifier not in the user supplied tokenizer vocab will be excluded..
     """
     # Create the result directory if it does not exist.
     if wandb_tags is None:
@@ -190,14 +200,12 @@ def main(
         find_unused_parameters=True,
         ckpt_include_optimizer=True,
         gradient_as_bucket_view=True,
-        # FIXME there are intermittent errors with async checkpoint saving.
-        #  see https://wandb.ai/clara-discovery/geneformer_bionemo2_goodslurm/runs/uAFi7DzI/logs
-        # ckpt_async_save=True,
-        # ckpt_parallel_load=True,
+        ckpt_async_save=True,
+        ckpt_parallel_load=True,
     )
 
     # for wandb integration
-    # Please refer to https://pytorch-lightning.readthedocs.io/en/0.7.6/api/pytorch_lightning.loggers.html"
+    # Please refer to https://pytorch-lightning.readthedocs.io/en/0.7.6/api/lightning.pytorch.loggers.html"
     wandb_options: Optional[WandbConfig] = (
         None
         if wandb_project is None
@@ -273,13 +281,13 @@ def main(
         persistent_workers=num_dataset_workers > 0,
         pin_memory=False,
         num_workers=num_dataset_workers,
+        include_unrecognized_vocab_in_dataset=include_unrecognized_vocab_in_dataset,
     )
     geneformer_config = config_class(
-        # TODO let users set different num layers/model shapes here to support bigger/smaller architectures
-        num_layers=6,
-        hidden_size=256,
-        ffn_hidden_size=512,
-        num_attention_heads=4,
+        num_layers=num_layers,
+        hidden_size=hidden_size,
+        ffn_hidden_size=ffn_hidden_size,
+        num_attention_heads=num_attention_heads,
         seq_length=seq_length,
         bias_dropout_fusion=True,  # TODO fix the recompilation issue, but for now it's faster even with recompilations
         bias_activation_fusion=True,  # TODO same note as above. Set these to False to see recompilation go away
@@ -322,10 +330,11 @@ def main(
     # Configure our custom Checkpointer
     checkpoint_callback = nl_callbacks.ModelCheckpoint(
         save_last=save_last_checkpoint,
-        monitor=metric_to_monitor_for_checkpoints,  # "val_loss",
+        monitor=metric_to_monitor_for_checkpoints,
         save_top_k=save_top_k,
         every_n_train_steps=val_check_interval,
         always_save_context=True,  # Enables the .nemo file-like checkpointing where all IOMixins are under SerDe
+        filename="{epoch}-{val_loss:.2f}-{step}-{consumed_samples}",  # Including step and consumed_samples in the checkpoint filename prevents duplicate filenames and bugs related to this.
     )
 
     # Setup the logger and train the model
@@ -416,6 +425,11 @@ def get_parser():
         required=False,
         default=0.01,
         help="Fraction of steps in which to ramp up the learning rate. Default is 0.01.",
+    )
+    parser.add_argument(
+        "--include-unrecognized-vocab-in-dataset",
+        action="store_true",
+        help="If set to true, a hard-check is performed to verify all gene identifers are in the user supplied tokenizer vocab. Defaults to False which means any gene identifier not in the user supplied tokenizer vocab will be excluded.",
     )
     parser.add_argument(
         "--cosine-hold-frac",
@@ -542,7 +556,14 @@ def get_parser():
         default=None,
         help="Path to the checkpoint directory to restore from. Will override `--resume-if-exists` when set.",
     )
-
+    parser.add_argument("--num-layers", type=int, default=6, help="Number of layers in geneformer. Default to 6.")
+    parser.add_argument("--hidden-size", type=int, default=256, help="Hidden size in geneformer. Default to 256.")
+    parser.add_argument(
+        "--ffn-hidden-size", type=int, default=512, help="Feedforward hidden size in geneformer. Default to 512."
+    )
+    parser.add_argument(
+        "--num-attention-heads", type=int, default=4, help="Number of attention heads in geneformer. Default to 4."
+    )
     # TODO consider whether nemo.run or some other method can simplify this config class lookup.
     config_class_options: Dict[str, Type[BioBertConfig]] = {
         "GeneformerConfig": GeneformerConfig,
@@ -672,6 +693,7 @@ def entrypoint():
         gc_interval=args.gc_interval,
         aligned_megatron_ddp=args.aligned_megatron_ddp,
         recompilation_check=args.recompilation_check,
+        include_unrecognized_vocab_in_dataset=args.include_unrecognized_vocab_in_dataset,
     )
 
 

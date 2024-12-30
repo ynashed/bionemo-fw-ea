@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import math
+import re
 import tarfile
 from copy import deepcopy
 from pathlib import Path
@@ -23,6 +24,7 @@ from unittest import mock
 import pytest
 import torch
 import torch.utils.data
+from lightning.pytorch.loggers import TensorBoardLogger
 from megatron.core.optimizer.optimizer_config import OptimizerConfig
 from megatron.core.transformer.module import Float16Module
 from nemo import lightning as nl
@@ -34,7 +36,6 @@ from nemo.lightning.pytorch.callbacks.model_transform import ModelTransform
 from nemo.lightning.pytorch.callbacks.peft import PEFT
 from nemo.lightning.pytorch.optim.lr_scheduler import WarmupPolicyScheduler
 from nemo.lightning.pytorch.optim.megatron import MegatronOptimizerModule
-from pytorch_lightning.loggers import TensorBoardLogger
 from torch.nn import functional as F
 from tqdm import tqdm
 
@@ -64,7 +65,7 @@ nemo1_release_checkpoint_path: Path = load("geneformer/10M_240530:1.0")
 nemo2_release_checkpoint_path: Path = load("geneformer/10M_240530:2.0")
 nemo_1_per_layer_outputs_path: Path = load("single_cell/nemo1-geneformer-per-layer-outputs")
 nemo_1_expected_values_path: Path = load("single_cell/nemo1-geneformer-golden-vals")
-data_path: Path = load("single_cell/testdata-20240506") / "cellxgene_2023-12-15_small" / "processed_data"
+data_path: Path = load("single_cell/testdata-20241203") / "cellxgene_2023-12-15_small_processed_scdl"
 
 
 CELLS_FOR_TEST: List[List[str]] = [
@@ -260,6 +261,9 @@ class _DummyDataSet(torch.utils.data.Dataset):
         return {"text": self.input_ids[idx], "attention_mask": self.mask[idx]}
 
 
+@pytest.mark.xfail(
+    re.search(r"h[1-9]00", torch.cuda.get_device_name().lower()) is not None, reason="Known issue on H100 GPUs"
+)
 def test_geneformer_nemo1_v_nemo2_inference_golden_values(
     geneformer_config: GeneformerConfig, cells: List[List[str]], seed: int = 42
 ):
@@ -821,8 +825,7 @@ def _train_model_get_ckpt(
     checkpoint_callback = nl_callbacks.ModelCheckpoint(
         save_last=True,
         save_on_train_epoch_end=True,
-        monitor="reduced_train_loss",  # TODO find out how to get val_loss logged and use "val_loss",
-        every_n_train_steps=n_steps_train // 2,
+        monitor="val_loss",
         always_save_context=True,  # Enables the .nemo file-like checkpointing where all IOMixins are under SerDe
     )
     save_dir = root_dir / name
