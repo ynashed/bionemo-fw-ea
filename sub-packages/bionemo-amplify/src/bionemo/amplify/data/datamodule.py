@@ -17,10 +17,10 @@
 import functools
 from typing import Literal
 
+from lightning.pytorch.utilities.types import EVAL_DATALOADERS, TRAIN_DATALOADERS
 from nemo.lightning.data import WrappedDataLoader
 from nemo.lightning.pytorch.plugins import MegatronDataSampler
 from nemo.utils import logging
-from pytorch_lightning.utilities.types import EVAL_DATALOADERS, TRAIN_DATALOADERS
 
 from bionemo.core.data.multi_epoch_dataset import MultiEpochDatasetResampler
 from bionemo.amplify.data import dataset, tokenizer
