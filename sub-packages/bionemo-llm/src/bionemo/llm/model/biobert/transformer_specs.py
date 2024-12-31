@@ -25,7 +25,6 @@ from megatron.core.transformer import spec_utils
 from megatron.core.transformer.attention import SelfAttention, SelfAttentionSubmodules
 from megatron.core.transformer.custom_layers.transformer_engine import (
     TEDotProductAttention,
-    TEColumnParallelLinear,
     TELayerNormColumnParallelLinear,
     TERowParallelLinear,
 )
