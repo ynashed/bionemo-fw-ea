@@ -19,8 +19,7 @@ dependencies = [
 ]
 
 [project.scripts]
-bionemo-amplify-train= "bionemo.amplify.run.main:main"
-bionemo-amplify-recipe= "bionemo.amplify.run.recipes:main"
+train_amplify = "bionemo.amplify.scripts.train_amplify:train_amplify_entrypoint"
 
 # Make sure that the tokenizer files are included along with the python files during installation.
 [tool.setuptools.package-data]
