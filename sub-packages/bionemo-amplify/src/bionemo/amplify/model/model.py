@@ -147,6 +147,15 @@ class AMPLIFYModel(MegatronBioBertModel):
         # megatron core pipelining currently depends on model type
         self.model_type = ModelType.encoder_or_decoder
 
+        if config.gated_linear_unit:
+            # To keep the number of parameters and the amount of computation constant, we reduce the number of
+            # hidden units by a factor of 2/3 (https://arxiv.org/pdf/2002.05202.pdf) and make it a multiple of 8 to
+            # avoid RuntimeError due to misaligned operand
+            multiple_of = 8
+            config.ffn_hidden_size = int(2 * config.ffn_hidden_size / 3)
+            config.ffn_hidden_size = multiple_of * ((config.ffn_hidden_size + multiple_of - 1) // multiple_of)
+            self.config.ffn_hidden_size = config.ffn_hidden_size
+
         # Embeddings.
         if self.pre_process:
             self.register_buffer(
@@ -351,10 +360,3 @@ class AMPLIFYConfig(BioBertConfig[AMPLIFYModelT, MegatronLossType], iom.IOMixinW
             raise ValueError(f"Unknown biobert_spec_option: {self.biobert_spec_option}")
         
         self.core_attention_override = ESM2TEDotProductAttention
-        if self.gated_linear_unit:
-            # To keep the number of parameters and the amount of computation constant, we reduce the number of
-            # hidden units by a factor of 2/3 (https://arxiv.org/pdf/2002.05202.pdf) and make it a multiple of 8 to
-            # avoid RuntimeError due to misaligned operand
-            multiple_of = 8
-            self.ffn_hidden_size = int(2 * self.ffn_hidden_size / 3)
-            self.ffn_hidden_size = multiple_of * ((self.ffn_hidden_size + multiple_of - 1) // multiple_of)
