@@ -163,7 +163,7 @@ def main(
             overlap_param_gather=overlap_param_gather,
             average_in_collective=average_in_collective,
             grad_reduce_in_fp32=grad_reduce_in_fp32,
-            use_distributed_optimizer=True,
+            use_distributed_optimizer=False,
         ),
         find_unused_parameters=True,
         gradient_as_bucket_view=True,
@@ -260,7 +260,7 @@ def main(
             config=OptimizerConfig(
                 lr=lr,
                 optimizer="adam",  # fused_adam not supported
-                use_distributed_optimizer=True,
+                use_distributed_optimizer=False,
                 weight_decay=0.01,
                 adam_beta1=0.9,
                 adam_beta2=0.95,
